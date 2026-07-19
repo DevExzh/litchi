@@ -1,6 +1,4 @@
-use litchi_rtf::{
-    FormField, FormFieldType, FormTextType, RtfDocument, RtfWriter,
-};
+use litchi_rtf::{FormField, FormFieldType, FormTextType, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
 
@@ -128,7 +126,10 @@ fn parses_bundled_libreoffice_form_field_fixtures() {
         "sw/qa/extras/rtfimport/data/tdf96326.rtf",
         "sw/qa/extras/odfexport/data/tdf165315.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)

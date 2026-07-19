@@ -80,7 +80,9 @@ fn preserves_duplicate_names_as_ordered_inert_entries() {
     let owned = document.document_variables()[0].clone().into_owned();
     assert_eq!(owned, document.document_variables()[0]);
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(&document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.document_variables(), document.document_variables());
 }

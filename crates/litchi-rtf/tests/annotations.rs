@@ -47,7 +47,9 @@ fn point_and_range_comments_round_trip_without_visible_text_duplication() {
     let document = RtfDocument::parse(source).unwrap();
     assert!(!document.annotations()[0].has_reference);
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(&document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
     let output = String::from_utf8(output).unwrap();
     let reparsed = RtfDocument::parse(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());

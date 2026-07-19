@@ -12,10 +12,8 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_unicode_generator_as_inert_provenance_and_round_trips() {
-    let document = RtfDocument::parse(
-        r#"{\rtf1\ansi{\*\generator Acme \u20320? 1.0;}Visible}"#,
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r#"{\rtf1\ansi{\*\generator Acme \u20320? 1.0;}Visible}"#).unwrap();
     assert_eq!(document.text(), "Visible");
     assert_eq!(document.generator().unwrap().value, "Acme 你 1.0");
 
@@ -81,7 +79,10 @@ fn parses_bundled_libreoffice_generator_fixtures() {
             "LibreOfficeDev/4.4.0.0.alpha0$Linux_X86_64",
         ),
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for (fixture, expected_prefix) in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)

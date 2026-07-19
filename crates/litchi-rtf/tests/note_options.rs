@@ -50,21 +50,45 @@ fn supports_all_42_note_numbering_control_spellings() {
         ("ftnnrlc", "aftnnrlc", NoteNumberingStyle::LowercaseRoman),
         ("ftnnruc", "aftnnruc", NoteNumberingStyle::UppercaseRoman),
         ("ftnnchi", "aftnnchi", NoteNumberingStyle::Chicago),
-        ("ftnnchosung", "aftnnchosung", NoteNumberingStyle::KoreanChosung),
+        (
+            "ftnnchosung",
+            "aftnnchosung",
+            NoteNumberingStyle::KoreanChosung,
+        ),
         ("ftnncnum", "aftnncnum", NoteNumberingStyle::Circle),
-        ("ftnndbnum", "aftnndbnum", NoteNumberingStyle::KanjiDigitless),
-        ("ftnndbnumd", "aftnndbnumd", NoteNumberingStyle::KanjiWithDigit),
+        (
+            "ftnndbnum",
+            "aftnndbnum",
+            NoteNumberingStyle::KanjiDigitless,
+        ),
+        (
+            "ftnndbnumd",
+            "aftnndbnumd",
+            NoteNumberingStyle::KanjiWithDigit,
+        ),
         ("ftnndbnumt", "aftnndbnumt", NoteNumberingStyle::KanjiThree),
         ("ftnndbnumk", "aftnndbnumk", NoteNumberingStyle::KanjiFour),
         ("ftnndbar", "aftnndbar", NoteNumberingStyle::DoubleByte),
-        ("ftnnganada", "aftnnganada", NoteNumberingStyle::KoreanGanada),
+        (
+            "ftnnganada",
+            "aftnnganada",
+            NoteNumberingStyle::KoreanGanada,
+        ),
         ("ftnngbnum", "aftnngbnum", NoteNumberingStyle::ChineseOne),
         ("ftnngbnumd", "aftnngbnumd", NoteNumberingStyle::ChineseTwo),
-        ("ftnngbnuml", "aftnngbnuml", NoteNumberingStyle::ChineseThree),
+        (
+            "ftnngbnuml",
+            "aftnngbnuml",
+            NoteNumberingStyle::ChineseThree,
+        ),
         ("ftnngbnumk", "aftnngbnumk", NoteNumberingStyle::ChineseFour),
         ("ftnnzodiac", "aftnnzodiac", NoteNumberingStyle::ZodiacOne),
         ("ftnnzodiacd", "aftnnzodiacd", NoteNumberingStyle::ZodiacTwo),
-        ("ftnnzodiacl", "aftnnzodiacl", NoteNumberingStyle::ZodiacThree),
+        (
+            "ftnnzodiacl",
+            "aftnnzodiacl",
+            NoteNumberingStyle::ZodiacThree,
+        ),
     ];
 
     for (footnote, endnote, style) in cases {
@@ -118,9 +142,11 @@ fn rejects_invalid_values_and_non_root_or_late_note_options() {
         footnote_start: Some(0),
         ..NoteOptions::default()
     };
-    assert!(RtfWriter::new(Vec::new())
-        .write_note_options(&invalid)
-        .is_err());
+    assert!(
+        RtfWriter::new(Vec::new())
+            .write_note_options(&invalid)
+            .is_err()
+    );
 }
 
 #[test]
@@ -158,10 +184,16 @@ fn parses_named_libreoffice_note_option_fixtures() {
         options.present_kinds,
         Some(PresentNoteKinds::FootnotesAndEndnotes)
     );
-    assert_eq!(options.footnote_placement, Some(NotePlacement::BottomOfPage));
+    assert_eq!(
+        options.footnote_placement,
+        Some(NotePlacement::BottomOfPage)
+    );
     assert_eq!(options.footnote_start, Some(1));
     assert_eq!(options.footnote_restart, Some(FootnoteRestart::EachSection));
-    assert_eq!(options.endnote_placement, Some(NotePlacement::EndOfDocument));
+    assert_eq!(
+        options.endnote_placement,
+        Some(NotePlacement::EndOfDocument)
+    );
     assert_eq!(options.endnote_start, Some(1));
 
     let arabic = include_bytes!(
@@ -173,7 +205,10 @@ fn parses_named_libreoffice_note_option_fixtures() {
         options.present_kinds,
         Some(PresentNoteKinds::FootnotesAndEndnotes)
     );
-    assert_eq!(options.footnote_placement, Some(NotePlacement::BottomOfPage));
+    assert_eq!(
+        options.footnote_placement,
+        Some(NotePlacement::BottomOfPage)
+    );
     assert_eq!(options.footnote_numbering, Some(NoteNumberingStyle::Arabic));
     assert_eq!(options.endnote_numbering, Some(NoteNumberingStyle::Arabic));
 }

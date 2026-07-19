@@ -21,8 +21,14 @@ fn parses_header_defaults_and_language_run_boundaries() {
     ))
     .unwrap();
     assert_eq!(document.language_defaults().primary, Some(language(1033)));
-    assert_eq!(document.language_defaults().east_asian, Some(language(2052)));
-    assert_eq!(document.language_defaults().complex_script, Some(language(1025)));
+    assert_eq!(
+        document.language_defaults().east_asian,
+        Some(language(2052))
+    );
+    assert_eq!(
+        document.language_defaults().complex_script,
+        Some(language(1025))
+    );
     let russian = document
         .blocks()
         .iter()
@@ -34,10 +40,12 @@ fn parses_header_defaults_and_language_run_boundaries() {
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.language_defaults(), document.language_defaults());
     assert_eq!(reparsed.text(), document.text());
-    assert!(reparsed
-        .blocks()
-        .iter()
-        .any(|block| block.formatting.language == Some(language(1049))));
+    assert!(
+        reparsed
+            .blocks()
+            .iter()
+            .any(|block| block.formatting.language == Some(language(1049)))
+    );
 }
 
 #[test]
@@ -91,7 +99,10 @@ fn mutation_writer_and_language_id_validation() {
     assert_eq!(reparsed.text(), "Body");
 
     document.clear_language_defaults();
-    assert_eq!(document.language_defaults(), &DocumentLanguageDefaults::default());
+    assert_eq!(
+        document.language_defaults(),
+        &DocumentLanguageDefaults::default()
+    );
     assert!(LanguageId::new(65_535).is_ok());
     assert!(LanguageId::new(65_536).is_err());
     assert!(RtfDocument::parse(r#"{\rtf1\lang-1 bad}"#).is_err());
@@ -105,7 +116,10 @@ fn parses_bundled_libreoffice_language_and_proofing_fixtures() {
         "sw/qa/extras/rtfexport/data/cjklist25.rtf",
         "sw/qa/extras/ooxmlexport/data/ooo39250-1-min.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)

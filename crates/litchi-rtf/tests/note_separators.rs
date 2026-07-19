@@ -1,6 +1,4 @@
-use litchi_rtf::{
-    NoteSeparatorElement, NoteSeparatorKind, RtfDocument, RtfWriter,
-};
+use litchi_rtf::{NoteSeparatorElement, NoteSeparatorKind, RtfDocument, RtfWriter};
 
 const SYNTHETIC: &str = r#"{\rtf1\ansi\ansicpg1250\uc1
 {\*\ftnsep \'8a\chftnsep\par}
@@ -17,19 +15,40 @@ fn parses_decodes_and_round_trips_note_separators() {
     let table = doc.note_separators();
     assert_eq!(table.entries().len(), 6);
     let first = table.get(NoteSeparatorKind::FootnoteSeparator).unwrap();
-    assert!(first.elements.iter().any(|element| matches!(element, NoteSeparatorElement::Text(text) if text == "Š")));
-    assert!(first.elements.contains(&NoteSeparatorElement::SeparatorMark));
-    assert!(first.elements.contains(&NoteSeparatorElement::ParagraphBreak));
-    let notice = table.get(NoteSeparatorKind::FootnoteContinuationNotice).unwrap();
-    assert!(notice.elements.iter().any(|element| matches!(element, NoteSeparatorElement::Text(text) if text.contains("Notice 你"))));
+    assert!(
+        first
+            .elements
+            .iter()
+            .any(|element| matches!(element, NoteSeparatorElement::Text(text) if text == "Š"))
+    );
+    assert!(
+        first
+            .elements
+            .contains(&NoteSeparatorElement::SeparatorMark)
+    );
+    assert!(
+        first
+            .elements
+            .contains(&NoteSeparatorElement::ParagraphBreak)
+    );
+    let notice = table
+        .get(NoteSeparatorKind::FootnoteContinuationNotice)
+        .unwrap();
+    assert!(notice.elements.iter().any(
+        |element| matches!(element, NoteSeparatorElement::Text(text) if text.contains("Notice 你"))
+    ));
     assert_eq!(doc.text().trim(), "Body");
 
     let mut first_bytes = Vec::new();
-    RtfWriter::new(&mut first_bytes).write_document(&doc).unwrap();
+    RtfWriter::new(&mut first_bytes)
+        .write_document(&doc)
+        .unwrap();
     let reparsed = RtfDocument::parse_bytes(&first_bytes).unwrap();
     assert_eq!(table, reparsed.note_separators());
     let mut second_bytes = Vec::new();
-    RtfWriter::new(&mut second_bytes).write_document(&reparsed).unwrap();
+    RtfWriter::new(&mut second_bytes)
+        .write_document(&reparsed)
+        .unwrap();
     assert_eq!(first_bytes, second_bytes);
 }
 
@@ -45,7 +64,10 @@ fn rejects_malformed_note_separators() {
         r#"{\rtf1{\*\ftnsep\bin2 AB}}"#,
     ];
     for source in malformed {
-        assert!(RtfDocument::parse(source).is_err(), "accepted malformed RTF: {source}");
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "accepted malformed RTF: {source}"
+        );
     }
 }
 
@@ -55,7 +77,10 @@ fn parses_real_libreoffice_note_separator_fixture() {
         "../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-3.rtf"
     );
     let marker = br"{\*\ftnsep";
-    let start = fixture.windows(marker.len()).position(|window| window == marker).unwrap();
+    let start = fixture
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .unwrap();
     let mut depth = 0usize;
     let mut end = None;
     for (offset, byte) in fixture[start..].iter().enumerate() {
@@ -79,6 +104,14 @@ fn parses_real_libreoffice_note_separator_fixture() {
         .note_separators()
         .get(NoteSeparatorKind::FootnoteSeparator)
         .unwrap();
-    assert!(separator.elements.contains(&NoteSeparatorElement::SeparatorMark));
-    assert!(separator.elements.contains(&NoteSeparatorElement::ParagraphBreak));
+    assert!(
+        separator
+            .elements
+            .contains(&NoteSeparatorElement::SeparatorMark)
+    );
+    assert!(
+        separator
+            .elements
+            .contains(&NoteSeparatorElement::ParagraphBreak)
+    );
 }

@@ -29,7 +29,9 @@ fn parses_decodes_and_round_trips_file_table() {
     assert_eq!(doc.text().trim(), "Body");
 
     let mut first_bytes = Vec::new();
-    RtfWriter::new(&mut first_bytes).write_document(&doc).unwrap();
+    RtfWriter::new(&mut first_bytes)
+        .write_document(&doc)
+        .unwrap();
     let reparsed = RtfDocument::parse_bytes(&first_bytes).unwrap();
     assert_eq!(table, reparsed.file_table().unwrap());
     let mut second_bytes = Vec::new();

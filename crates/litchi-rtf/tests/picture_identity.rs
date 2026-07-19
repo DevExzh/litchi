@@ -2,8 +2,7 @@ use litchi_rtf::{ImageType, Picture, PictureIdentity, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 
 const UID: &[u8] = &[
-    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
-    0xee, 0xff,
+    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
 ];
 
 #[test]
@@ -17,10 +16,7 @@ fn parses_and_canonically_round_trips_picture_identity() {
     let picture = &document.pictures()[0];
     assert_eq!(picture.image_type, ImageType::Png);
     assert_eq!(picture.identity.as_ref().unwrap().tag, Some(-7));
-    assert_eq!(
-        picture.identity.as_ref().unwrap().units_per_inch,
-        Some(96)
-    );
+    assert_eq!(picture.identity.as_ref().unwrap().units_per_inch, Some(96));
     assert_eq!(picture.identity.as_ref().unwrap().uid.as_deref(), Some(UID));
 
     let mut first = br"{\rtf1".to_vec();
@@ -42,15 +38,16 @@ fn parses_and_canonically_round_trips_picture_identity() {
         units_per_inch: None,
         uid: Some(Cow::Borrowed(UID)),
     });
-    assert!(matches!(borrowed.identity.unwrap().uid, Some(Cow::Borrowed(_))));
+    assert!(matches!(
+        borrowed.identity.unwrap().uid,
+        Some(Cow::Borrowed(_))
+    ));
 }
 
 #[test]
 fn accepts_real_empty_uid_but_rejects_malformed_identity_content() {
-    let empty = RtfDocument::parse(
-        r#"{\rtf1{\pict\pngblip{\*\blipuid } 89504e470d0a1a0a}}"#,
-    )
-    .unwrap();
+    let empty =
+        RtfDocument::parse(r#"{\rtf1{\pict\pngblip{\*\blipuid } 89504e470d0a1a0a}}"#).unwrap();
     assert_eq!(
         empty.pictures()[0]
             .identity
@@ -152,10 +149,12 @@ fn parses_multiple_bundled_libreoffice_identity_fixtures() {
             .unwrap()
             .uid
             .as_deref(),
-        Some(&[
-            0xc0, 0xd4, 0x86, 0xc2, 0x6e, 0xfd, 0x24, 0x45, 0x9c, 0x14, 0x59, 0x2d, 0x82,
-            0x49, 0xa3, 0x2b,
-        ][..])
+        Some(
+            &[
+                0xc0, 0xd4, 0x86, 0xc2, 0x6e, 0xfd, 0x24, 0x45, 0x9c, 0x14, 0x59, 0x2d, 0x82, 0x49,
+                0xa3, 0x2b,
+            ][..]
+        )
     );
 
     let with_upi = include_bytes!(
@@ -168,9 +167,11 @@ fn parses_multiple_bundled_libreoffice_identity_fixtures() {
     assert_eq!(identity.units_per_inch, Some(2));
     assert_eq!(
         identity.uid.as_deref(),
-        Some(&[
-            0x70, 0xb0, 0x23, 0x93, 0xad, 0x94, 0xa8, 0x7d, 0x9e, 0xc5, 0x96, 0xdf, 0xc3,
-            0xb1, 0x42, 0x83,
-        ][..])
+        Some(
+            &[
+                0x70, 0xb0, 0x23, 0x93, 0xad, 0x94, 0xa8, 0x7d, 0x9e, 0xc5, 0x96, 0xdf, 0xc3, 0xb1,
+                0x42, 0x83,
+            ][..]
+        )
     );
 }

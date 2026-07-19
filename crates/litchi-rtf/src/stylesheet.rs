@@ -202,11 +202,7 @@ impl<'a> StyleSheet<'a> {
     /// Return the based-on chain from the root ancestor to the selected style.
     ///
     /// Raw definitions remain unchanged so explicit resets survive writing.
-    pub fn inheritance_chain(
-        &self,
-        style_type: StyleType,
-        id: u16,
-    ) -> RtfResult<Vec<&Style<'a>>> {
+    pub fn inheritance_chain(&self, style_type: StyleType, id: u16) -> RtfResult<Vec<&Style<'a>>> {
         let mut chain = Vec::new();
         let mut seen = HashSet::new();
         let mut current = self.get_typed(style_type, id);
@@ -246,7 +242,10 @@ impl<'a> StyleSheet<'a> {
                     "RTF style name is empty, too long, or contains a semicolon".to_string(),
                 ));
             }
-            if style.priority.is_some_and(|value| !(0..=99).contains(&value)) {
+            if style
+                .priority
+                .is_some_and(|value| !(0..=99).contains(&value))
+            {
                 return Err(RtfError::MalformedDocument(
                     "RTF style priority must be in 0..=99".to_string(),
                 ));

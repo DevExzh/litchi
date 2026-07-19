@@ -129,7 +129,10 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
     assert_eq!(document.text(), "AB");
     let text_box = &document.legacy_text_boxes()[0];
     assert_eq!(text_box.text, "textbox without border\n");
-    assert_eq!(text_box.horizontal_anchor, Some(LegacyHorizontalAnchor::Page));
+    assert_eq!(
+        text_box.horizontal_anchor,
+        Some(LegacyHorizontalAnchor::Page)
+    );
     assert_eq!(
         text_box.vertical_anchor,
         Some(LegacyVerticalAnchor::Paragraph)
@@ -148,15 +151,11 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
     assert_eq!((text_box.x, text_box.y), (Some(941), Some(2114)));
     assert_eq!((text_box.width, text_box.height), (Some(1349), Some(221)));
 
-    let nested_geometry = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf"
-    );
+    let nested_geometry =
+        include_bytes!("../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf");
     let document = RtfDocument::parse_bytes(&isolated_drawing(nested_geometry)).unwrap();
     let text_box = &document.legacy_text_boxes()[0];
     assert!(text_box.text.contains("hello"));
     assert_eq!((text_box.x, text_box.y), (Some(227), Some(227)));
-    assert_eq!(
-        (text_box.width, text_box.height),
-        (Some(11911), Some(9709))
-    );
+    assert_eq!((text_box.width, text_box.height), (Some(11911), Some(9709)));
 }

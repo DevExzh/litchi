@@ -61,6 +61,14 @@ pub struct Annotation<'a> {
     pub date: Option<Cow<'a, str>>,
     /// Comment text
     pub text: Cow<'a, str>,
+    /// Positional root shapes owned by the comment story.
+    pub shapes: Vec<crate::Shape<'a>>,
+    /// Positional root shape groups owned by the comment story.
+    pub shape_groups: Vec<crate::ShapeGroup<'a>>,
+    /// Exact source order of drawings in the comment story.
+    pub drawing_order: Vec<crate::StoryDrawing>,
+    /// Exact source order of drawings, fields, and page breaks in the comment story.
+    pub story_events: Vec<crate::StoryEvent>,
     /// UTF-8 byte offset where the annotated range starts.
     pub position: usize,
     /// UTF-8 byte offset where the annotated range ends.
@@ -85,6 +93,10 @@ impl<'a> Annotation<'a> {
             initials: Cow::Borrowed(""),
             date: None,
             text,
+            shapes: Vec::new(),
+            shape_groups: Vec::new(),
+            drawing_order: Vec::new(),
+            story_events: Vec::new(),
             position: 0,
             range_end: 0,
             parent_id: None,
@@ -104,6 +116,10 @@ impl<'a> Annotation<'a> {
             initials: Cow::Borrowed(""),
             date: None,
             text: Cow::Borrowed(""),
+            shapes: Vec::new(),
+            shape_groups: Vec::new(),
+            drawing_order: Vec::new(),
+            story_events: Vec::new(),
             position: 0,
             range_end: 0,
             parent_id: None,
@@ -129,6 +145,14 @@ impl<'a> Annotation<'a> {
                 "RTF annotation body exceeds the safety limit".to_string(),
             ));
         }
+        crate::field::validate_story_events(
+            self.text.as_ref(),
+            &self.shapes,
+            &self.shape_groups,
+            &self.drawing_order,
+            &self.story_events,
+            "annotation",
+        )?;
         for (kind, value) in [
             ("author", Some(self.author.as_ref())),
             ("initials", Some(self.initials.as_ref())),
@@ -144,6 +168,79 @@ impl<'a> Annotation<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Append a validated positional root shape to the comment story.
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> RtfResult<()> {
+        let mut shapes = self.shapes.clone();
+        shapes.push(shape);
+        let mut order = self.drawing_order.clone();
+        order.push(crate::StoryDrawing::Shape(self.shapes.len()));
+        crate::shape::validate_story_drawings(
+            self.text.as_ref(),
+            &shapes,
+            &self.shape_groups,
+            &order,
+            "annotation",
+        )?;
+        self.shapes = shapes;
+        self.drawing_order = order;
+        self.story_events
+            .push(crate::StoryEvent::Drawing(crate::StoryDrawing::Shape(
+                self.shapes.len() - 1,
+            )));
+        Ok(())
+    }
+
+    /// Append a validated positional root shape group to the comment story.
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> RtfResult<()> {
+        let mut groups = self.shape_groups.clone();
+        groups.push(group);
+        let mut order = self.drawing_order.clone();
+        order.push(crate::StoryDrawing::ShapeGroup(self.shape_groups.len()));
+        crate::shape::validate_story_drawings(
+            self.text.as_ref(),
+            &self.shapes,
+            &groups,
+            &order,
+            "annotation",
+        )?;
+        self.shape_groups = groups;
+        self.drawing_order = order;
+        self.story_events.push(crate::StoryEvent::Drawing(
+            crate::StoryDrawing::ShapeGroup(self.shape_groups.len() - 1),
+        ));
+        Ok(())
+    }
+
+    /// Clear all drawings owned by the comment story.
+    pub fn clear_drawings(&mut self) {
+        self.shapes.clear();
+        self.shape_groups.clear();
+        self.drawing_order.clear();
+        self.story_events
+            .retain(|event| !matches!(event, crate::StoryEvent::Drawing(_)));
+    }
+
+    pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
+        self.story_events.iter().filter_map(|event| match event {
+            crate::StoryEvent::PageBreak(page_break) => Some(page_break),
+            _ => None,
+        })
+    }
+
+    pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
+        crate::field::push_story_page_break(
+            &mut self.story_events,
+            self.text.as_ref(),
+            position,
+            "annotation",
+        )
+    }
+
+    pub fn clear_page_breaks(&mut self) {
+        self.story_events
+            .retain(|event| !matches!(event, crate::StoryEvent::PageBreak(_)));
     }
 
     pub(crate) fn text_bytes(&self) -> Option<usize> {
@@ -166,6 +263,18 @@ impl<'a> Annotation<'a> {
             initials: Cow::Owned(self.initials.into_owned()),
             date: self.date.map(|value| Cow::Owned(value.into_owned())),
             text: Cow::Owned(self.text.into_owned()),
+            shapes: self
+                .shapes
+                .into_iter()
+                .map(crate::Shape::into_owned)
+                .collect(),
+            shape_groups: self
+                .shape_groups
+                .into_iter()
+                .map(crate::ShapeGroup::into_owned)
+                .collect(),
+            drawing_order: self.drawing_order,
+            story_events: self.story_events,
             position: self.position,
             range_end: self.range_end,
             parent_id: self.parent_id.map(|value| Cow::Owned(value.into_owned())),
@@ -260,8 +369,7 @@ impl<'a> Revision<'a> {
             },
             RevisionType::FormatChange | RevisionType::MovedFrom | RevisionType::MovedTo => {
                 return Err(RtfError::MalformedDocument(
-                    "this RTF revision kind has no lossless scoped-run representation"
-                        .to_string(),
+                    "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
             },
             _ => {},

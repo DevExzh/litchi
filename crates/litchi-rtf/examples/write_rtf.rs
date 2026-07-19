@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         code_page: 1252,
         indent: false,
         default_font: 0,
-        default_tab_width: 720,
+        default_tab_width: litchi_rtf::DefaultTabWidthPolicy::Override(720),
     };
     let mut writer = RtfWriter::with_options(&mut output, options);
 

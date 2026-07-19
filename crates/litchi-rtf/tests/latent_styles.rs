@@ -94,13 +94,13 @@ fn parses_bundled_libreoffice_latent_style_fixtures() {
             false,
         ),
         ("sw/qa/core/data/rtf/pass/tdf116851.rtf", true),
-        (
-            "sw/qa/extras/ooxmlexport/data/tdf154703_framePr2.rtf",
-            true,
-        ),
+        ("sw/qa/extras/ooxmlexport/data/tdf154703_framePr2.rtf", true),
         ("sw/qa/extras/rtfexport/data/fdo55504-1-min.rtf", false),
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for (fixture, has_exceptions) in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)

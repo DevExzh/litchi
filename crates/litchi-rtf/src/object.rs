@@ -2,7 +2,16 @@
 
 use std::borrow::Cow;
 
+use crate::{RtfError, RtfResult};
+
 const COMPOUND_FILE_SIGNATURE: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+
+/// Maximum number of inert object destinations retained from one document.
+pub const MAX_EMBEDDED_OBJECTS: usize = 65_536;
+/// Maximum aggregate text metadata accepted for one object.
+pub const MAX_OBJECT_METADATA_BYTES: usize = 1024 * 1024;
+/// Maximum decoded `objdata` payload accepted for one object.
+pub const MAX_OBJECT_DATA_BYTES: usize = 64 * 1024 * 1024;
 
 /// Storage/link mode declared by an RTF `object` destination.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -15,9 +24,32 @@ pub enum ObjectKind {
     AutoLink,
     /// An HTML object (`objhtml`)
     Html,
+    /// A Macintosh Edition Manager subscriber (`objsub`)
+    Subscriber,
+    /// A Macintosh Edition Manager publisher (`objpub`)
+    Publisher,
+    /// A Macintosh Installable Command embedder (`objicemb`)
+    InstallableCommand,
+    /// An OLE control (`objocx`)
+    OleControl,
     /// No recognized kind control was present
     #[default]
     Unknown,
+}
+
+/// Requested representation of an object's `result` destination.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObjectResultKind {
+    /// Standard RTF (`rsltrtf`)
+    Rtf,
+    /// Plain text (`rslttxt`)
+    Text,
+    /// Windows metafile or MacPict (`rsltpict`)
+    Picture,
+    /// Bitmap (`rsltbmp`)
+    Bitmap,
+    /// HTML (`rslthtml`)
+    Html,
 }
 
 /// Bounds-checked view of the OLE ObjectHeader stored in `objdata`.
@@ -48,22 +80,48 @@ impl OleObjectHeader<'_> {
 /// An RTF embedded or linked object.
 #[derive(Debug, Clone)]
 pub struct EmbeddedObject<'a> {
+    /// UTF-8 byte offset in the visible document body
+    pub position: usize,
     /// Storage/link mode
     pub kind: ObjectKind,
+    /// Whether the link targets another part of this document (`linkself`)
+    pub link_self: bool,
     /// Programmatic class name (`objclass`)
     pub class_name: Cow<'a, str>,
     /// User-visible object name (`objname`)
     pub name: Cow<'a, str>,
+    /// Optional original CLSID from the `oleclsid` destination
+    pub class_id: Cow<'a, str>,
     /// Object width in twips
     pub width: i32,
     /// Object height in twips
     pub height: i32,
+    /// Optional tab-stop alignment distance in twips (`objalign`)
+    pub alignment: Option<i32>,
+    /// Optional vertical baseline translation in twips (`objtransy`)
+    pub translation_y: Option<i32>,
+    /// Optional top crop in twips (`objcropt`)
+    pub crop_top: Option<i32>,
+    /// Optional bottom crop in twips (`objcropb`)
+    pub crop_bottom: Option<i32>,
+    /// Optional left crop in twips (`objcropl`)
+    pub crop_left: Option<i32>,
+    /// Optional right crop in twips (`objcropr`)
+    pub crop_right: Option<i32>,
+    /// Optional horizontal scale percentage (`objscalex`)
+    pub scale_x: Option<i32>,
+    /// Optional vertical scale percentage (`objscaley`)
+    pub scale_y: Option<i32>,
     /// Whether the object is locked
     pub locked: bool,
     /// Whether the producer requested an external-link update
     pub update_requested: bool,
     /// Whether the producer requested size synchronization
     pub set_size: bool,
+    /// Whether formatting from the current result should be retained (`rsltmerge`)
+    pub merge_result: bool,
+    /// Requested representation for the `result` destination
+    pub result_kind: Option<ObjectResultKind>,
     /// Plain-text rendered fallback from the `result` destination
     pub result_text: Cow<'a, str>,
     /// Indices into `RtfDocument::pictures()` for rendered fallback images
@@ -77,14 +135,27 @@ impl<'a> EmbeddedObject<'a> {
     #[inline]
     pub fn new() -> Self {
         Self {
+            position: 0,
             kind: ObjectKind::Unknown,
+            link_self: false,
             class_name: Cow::Borrowed(""),
             name: Cow::Borrowed(""),
+            class_id: Cow::Borrowed(""),
             width: 0,
             height: 0,
+            alignment: None,
+            translation_y: None,
+            crop_top: None,
+            crop_bottom: None,
+            crop_left: None,
+            crop_right: None,
+            scale_x: None,
+            scale_y: None,
             locked: false,
             update_requested: false,
             set_size: false,
+            merge_result: false,
+            result_kind: None,
             result_text: Cow::Borrowed(""),
             result_picture_indices: Vec::new(),
             data: Vec::new(),
@@ -110,6 +181,46 @@ impl<'a> EmbeddedObject<'a> {
             item_name,
             native_data,
         })
+    }
+
+    /// Validate positional metadata and references into the shared picture store.
+    pub fn validate(&self, body: &str, picture_count: usize) -> RtfResult<()> {
+        if body.get(..self.position).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF embedded object position is not a UTF-8 body boundary".to_string(),
+            ));
+        }
+        let metadata_bytes = self
+            .class_name
+            .len()
+            .checked_add(self.name.len())
+            .and_then(|size| size.checked_add(self.class_id.len()))
+            .and_then(|size| size.checked_add(self.result_text.len()))
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF embedded object metadata size overflow".to_string(),
+                )
+            })?;
+        if metadata_bytes > MAX_OBJECT_METADATA_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF embedded object metadata exceeds the safety limit".to_string(),
+            ));
+        }
+        if self.data.len() > MAX_OBJECT_DATA_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF embedded object data exceeds the safety limit".to_string(),
+            ));
+        }
+        if self
+            .result_picture_indices
+            .iter()
+            .any(|index| *index >= picture_count)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF embedded object references a missing result picture".to_string(),
+            ));
+        }
+        Ok(())
     }
 }
 

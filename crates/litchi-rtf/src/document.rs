@@ -7,7 +7,61 @@ use super::types::{ColorTable, FontTable, Paragraph as RtfParagraph, Run, StyleB
 use bumpalo::Bump;
 use std::borrow::Cow;
 
-fn owned_table(table:&super::table::Table<'_>)->super::table::Table<'static>{let mut output=super::table::Table::new();output.set_direction(table.direction());for row in table.rows(){let mut owned_row=super::table::Row::new();owned_row.set_direction(row.direction());owned_row.set_layout(*row.layout());owned_row.set_borders(row.borders().clone());owned_row.set_shading(row.shading());owned_row.set_geometry(row.geometry());owned_row.set_autoformat_flags(row.autoformat_flags());owned_row.set_banding(row.banding());for cell in row.cells(){let mut owned_cell=super::table::Cell::with_distances(Cow::Owned(cell.text().to_string()),cell.padding().clone(),cell.spacing().clone());owned_cell.set_layout(*cell.layout());owned_cell.set_merge(cell.merge());owned_cell.set_right_boundary(cell.right_boundary());owned_cell.set_preferred_width(cell.preferred_width());owned_cell.set_borders(cell.borders().clone());owned_cell.set_shading(cell.shading());for nested in cell.nested_tables(){owned_cell.add_nested_table(nested.text_offset,owned_table(&nested.table)).expect("validated nested-table offset");}owned_row.add_cell(owned_cell);}owned_row.set_padding(row.padding().clone());owned_row.set_spacing(row.spacing().clone());owned_row.set_positioning(row.positioning().clone());output.add_row(owned_row);}output}
+fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> {
+    let mut output = super::table::Table::new();
+    output.set_direction(table.direction());
+    for row in table.rows() {
+        let mut owned_row = super::table::Row::new();
+        owned_row.set_table_style(row.table_style());
+        owned_row.set_direction(row.direction());
+        owned_row.set_layout(*row.layout());
+        owned_row.set_borders(row.borders().clone());
+        owned_row.set_shading(row.shading());
+        owned_row.set_geometry(row.geometry());
+        owned_row.set_autoformat_flags(row.autoformat_flags());
+        owned_row.set_banding(row.banding());
+        for cell in row.cells() {
+            let mut owned_cell = super::table::Cell::with_distances(
+                Cow::Owned(cell.text().to_string()),
+                cell.padding().clone(),
+                cell.spacing().clone(),
+            );
+            owned_cell.set_layout(*cell.layout());
+            owned_cell.set_merge(cell.merge());
+            owned_cell.set_right_boundary(cell.right_boundary());
+            owned_cell.set_preferred_width(cell.preferred_width());
+            owned_cell.set_borders(cell.borders().clone());
+            owned_cell.set_shading(cell.shading());
+            for nested in cell.nested_tables() {
+                owned_cell
+                    .add_nested_table(nested.text_offset, owned_table(&nested.table))
+                    .expect("validated nested-table offset");
+            }
+            owned_cell
+                .set_story_content(
+                    cell.shapes()
+                        .iter()
+                        .cloned()
+                        .map(crate::Shape::into_owned)
+                        .collect(),
+                    cell.shape_groups()
+                        .iter()
+                        .cloned()
+                        .map(crate::ShapeGroup::into_owned)
+                        .collect(),
+                    cell.drawing_order().to_vec(),
+                    cell.story_events().to_vec(),
+                )
+                .expect("validated cell story order");
+            owned_row.add_cell(owned_cell);
+        }
+        owned_row.set_padding(row.padding().clone());
+        owned_row.set_spacing(row.spacing().clone());
+        owned_row.set_positioning(row.positioning().clone());
+        output.add_row(owned_row);
+    }
+    output
+}
 use std::path::Path;
 
 /// RTF Document.
@@ -27,6 +81,8 @@ pub struct RtfDocument<'a> {
     tables: Vec<super::table::Table<'a>>,
     /// Extracted pictures
     pictures: Vec<super::picture::Picture<'a>>,
+    /// Positional body picture wrappers referencing `pictures`.
+    picture_compatibility_records: Vec<crate::PictureCompatibilityRecord>,
     /// Extracted fields
     fields: Vec<super::field::Field<'a>>,
     /// Ordered positional legacy form fields.
@@ -37,16 +93,90 @@ pub struct RtfDocument<'a> {
     revision_save: Option<crate::RevisionSaveMetadata>,
     /// Ordered inert XML namespace table; `Some([])` preserves an empty table.
     xml_namespaces: Option<Vec<crate::XmlNamespace<'a>>>,
+    /// Ordered inert usernames used by range-level protection.
+    protection_user_table: Option<crate::ProtectionUserTable<'a>>,
+    /// Explicit passive document hyphenation properties.
+    hyphenation: crate::DocumentHyphenation,
+    /// Inert names from `nextfile` and `template` document destinations.
+    external_references: crate::DocumentExternalReferences<'a>,
+    /// Passive document view and zoom metadata.
+    document_view: crate::DocumentView,
+    /// Passive review-display suppression preferences.
+    review_display: crate::DocumentReviewDisplay,
+    /// Inert document-window caption text.
+    window_caption: Option<crate::DocumentWindowCaption<'a>>,
+    /// Inert custom XSL transform location metadata.
+    xsl_transform: Option<crate::DocumentXslTransform<'a>>,
+    /// Passive requested intent from the `usexform` flag.
+    xsl_transform_usage: crate::DocumentXslTransformUsage,
+    /// Passive suggested filters for a host application's style list.
+    style_list_filter: Option<crate::DocumentStyleListFilter>,
+    /// Passive suggested sorting for a host application's style list.
+    style_sort_method: Option<crate::DocumentStyleSortMethod>,
+    /// Passive read-only and thumbnail-generation save preferences.
+    save_preferences: crate::DocumentSavePreferences,
+    /// Opaque, inert write-reservation metadata.
+    write_reservations: crate::DocumentWriteReservations<'a>,
+    /// Passive source and AutoFormat classification metadata.
+    origin_metadata: crate::DocumentOriginMetadata,
+    /// Passive backup, storage-format, and template flags.
+    file_settings: crate::DocumentFileSettings,
+    /// Passive compatibility and output-request flags.
+    output_settings: crate::DocumentOutputSettings,
+    /// Passive document rendering flags.
+    rendering_settings: crate::DocumentRenderingSettings,
+    /// Passive printing, cleanup, and event-mask properties.
+    processing_settings: crate::DocumentProcessingSettings,
+    /// Passive document-level drawing-grid properties.
+    drawing_grid: crate::DocumentDrawingGrid,
+    /// Passive document print-layout settings.
+    print_layout_settings: crate::DocumentPrintLayoutSettings,
+    /// Passive theme font-resolution language identifiers.
+    theme_languages: crate::DocumentThemeLanguages,
+    /// Passive web-save and custom-XML policies.
+    xml_policies: crate::DocumentXmlPolicies,
+    /// Passive system-font and linguistic-data embedding policies.
+    embedding_policies: crate::DocumentEmbeddingPolicies,
+    /// Passive move and formatting revision policies.
+    revision_policies: crate::DocumentRevisionPolicies,
+    /// Passive theme and style-application policies.
+    style_policies: crate::DocumentStylePolicies,
+    /// Passive legacy style and formatting restriction declarations.
+    style_restrictions: crate::DocumentStyleRestrictions,
+    /// Passive booklet-printing requests.
+    booklet_printing: crate::DocumentBookletPrinting,
+    /// Passive privacy-removal requests.
+    privacy_policies: crate::DocumentPrivacyPolicies,
+    /// Passive legacy extra-line-spacing compatibility requests.
+    line_spacing_compatibility: crate::DocumentLineSpacingCompatibility,
+    /// Passive Word 6-era East Asian typography compatibility requests.
+    east_asian_compatibility: crate::DocumentEastAsianCompatibility,
+    /// Passive legacy table-layout compatibility requests.
+    table_layout_compatibility: crate::DocumentTableLayoutCompatibility,
+    /// Passive legacy automatic-layout compatibility requests.
+    legacy_layout_compatibility: crate::DocumentLegacyLayoutCompatibility,
+    /// Passive Asian character-grid and line-breaking compatibility requests.
+    asian_grid_compatibility: crate::DocumentAsianGridCompatibility,
+    /// Passive compatibility reset, UI-throttling, and upgrade requests.
+    compatibility_policy: crate::DocumentCompatibilityPolicy,
+    /// Passive Word 2003-era compatibility requests.
+    word_2003_compatibility: crate::DocumentWord2003Compatibility,
     /// Inert Office theme package and optional color-scheme mapping bytes.
     theme: Option<crate::DocumentTheme<'a>>,
     /// Inert latent-style defaults and ordered exceptions.
     latent_styles: Option<crate::LatentStyles<'a>>,
     /// Inert custom XML data-store bytes.
     data_store: Option<crate::DocumentDataStore<'a>>,
+    /// Inert mail-merge connection, query, and data-source metadata.
+    mail_merge: Option<crate::MailMerge<'a>>,
     /// Document-level defaults for mathematical layout.
     math_properties: Option<crate::DocumentMathProperties>,
     /// Default primary, East Asian, and complex-script languages.
     language_defaults: crate::DocumentLanguageDefaults,
+    /// Passive root default-font selectors and default property destinations.
+    default_formatting: crate::DocumentDefaultFormatting,
+    /// Explicit source `deftab` width; omission is preserved as `None`.
+    default_tab_width_twips: Option<u32>,
     /// Explicit default bidirectional precedence for document text.
     document_direction: Option<crate::TextDirection>,
     /// Whether the document gutter is positioned on the right.
@@ -67,6 +197,8 @@ pub struct RtfDocument<'a> {
     list_override_table: super::list::ListOverrideTable,
     /// Ordered inert legacy section-numbering defaults.
     legacy_section_numbering: crate::LegacySectionNumbering<'a>,
+    /// Ordered inert legacy paragraph-numbering records referenced by paragraphs.
+    legacy_paragraph_numbering: Vec<crate::LegacyParagraphNumbering<'a>>,
     /// Optional paragraph-group property table.
     paragraph_group_table: Option<crate::ParagraphGroupPropertyTable>,
     /// Sections
@@ -75,6 +207,11 @@ pub struct RtfDocument<'a> {
     bookmarks: super::bookmark::BookmarkTable<'a>,
     /// Shapes
     shapes: Vec<super::shape::Shape<'a>>,
+    /// Exact source order of non-background root drawings in the body story.
+    drawing_order: Vec<crate::StoryDrawing>,
+    body_story_events: Vec<crate::BodyStoryEvent>,
+    /// Index in `shapes` owned by the unique document-background destination.
+    background_shape_index: Option<usize>,
     /// Inert positional legacy drawing text boxes.
     legacy_text_boxes: Vec<crate::LegacyTextBox<'a>>,
     /// Inert positional legacy drawing primitives.
@@ -182,7 +319,7 @@ impl<'a> RtfDocument<'a> {
         let owned_tables: Vec<super::table::Table<'static>> = parsed
             .tables
             .into_iter()
-            .map(|table|owned_table(&table))
+            .map(|table| owned_table(&table))
             .collect();
 
         // Convert pictures to owned
@@ -200,6 +337,22 @@ impl<'a> RtfDocument<'a> {
                 field_type: field.field_type,
                 instruction: Cow::Owned(field.instruction.into_owned()),
                 result: Cow::Owned(field.result.into_owned()),
+                status: field.status,
+                shapes: field
+                    .shapes
+                    .into_iter()
+                    .map(crate::Shape::into_owned)
+                    .collect(),
+                shape_groups: field
+                    .shape_groups
+                    .into_iter()
+                    .map(crate::ShapeGroup::into_owned)
+                    .collect(),
+                drawing_order: field.drawing_order,
+                result_events: field.result_events,
+                owner: field.owner,
+                position: field.position,
+                range_end: field.range_end,
             })
             .collect();
 
@@ -207,14 +360,27 @@ impl<'a> RtfDocument<'a> {
             .objects
             .into_iter()
             .map(|object| super::object::EmbeddedObject {
+                position: object.position,
                 kind: object.kind,
+                link_self: object.link_self,
                 class_name: Cow::Owned(object.class_name.into_owned()),
                 name: Cow::Owned(object.name.into_owned()),
+                class_id: Cow::Owned(object.class_id.into_owned()),
                 width: object.width,
                 height: object.height,
+                alignment: object.alignment,
+                translation_y: object.translation_y,
+                crop_top: object.crop_top,
+                crop_bottom: object.crop_bottom,
+                crop_left: object.crop_left,
+                crop_right: object.crop_right,
+                scale_x: object.scale_x,
+                scale_y: object.scale_y,
                 locked: object.locked,
                 update_requested: object.update_requested,
                 set_size: object.set_size,
+                merge_result: object.merge_result,
+                result_kind: object.result_kind,
                 result_text: Cow::Owned(object.result_text.into_owned()),
                 result_picture_indices: object.result_picture_indices,
                 data: object.data,
@@ -229,15 +395,14 @@ impl<'a> RtfDocument<'a> {
             blocks: owned_blocks,
             tables: owned_tables,
             pictures: owned_pictures,
+            picture_compatibility_records: parsed.picture_compatibility_records,
             fields: owned_fields,
             form_fields: parsed
                 .form_fields
                 .into_iter()
                 .map(super::form_field::FormField::into_owned)
                 .collect(),
-            generator: parsed
-                .generator
-                .map(crate::DocumentGenerator::into_owned),
+            generator: parsed.generator.map(crate::DocumentGenerator::into_owned),
             revision_save: parsed.revision_save,
             xml_namespaces: parsed.saw_xml_namespace_table.then(|| {
                 parsed
@@ -246,11 +411,54 @@ impl<'a> RtfDocument<'a> {
                     .map(crate::XmlNamespace::into_owned)
                     .collect()
             }),
+            protection_user_table: parsed
+                .protection_user_table
+                .map(crate::ProtectionUserTable::into_owned),
+            hyphenation: parsed.hyphenation,
+            external_references: parsed.external_references.into_owned(),
+            document_view: parsed.document_view,
+            review_display: parsed.review_display,
+            window_caption: parsed
+                .window_caption
+                .map(crate::DocumentWindowCaption::into_owned),
+            xsl_transform: parsed
+                .xsl_transform
+                .map(crate::DocumentXslTransform::into_owned),
+            xsl_transform_usage: parsed.xsl_transform_usage,
+            style_list_filter: parsed.style_list_filter,
+            style_sort_method: parsed.style_sort_method,
+            save_preferences: parsed.save_preferences,
+            write_reservations: parsed.write_reservations.into_owned(),
+            origin_metadata: parsed.origin_metadata,
+            file_settings: parsed.file_settings,
+            output_settings: parsed.output_settings,
+            rendering_settings: parsed.rendering_settings,
+            processing_settings: parsed.processing_settings,
+            drawing_grid: parsed.drawing_grid,
+            print_layout_settings: parsed.print_layout_settings,
+            theme_languages: parsed.theme_languages,
+            xml_policies: parsed.xml_policies,
+            embedding_policies: parsed.embedding_policies,
+            revision_policies: parsed.revision_policies,
+            style_policies: parsed.style_policies,
+            style_restrictions: parsed.style_restrictions,
+            booklet_printing: parsed.booklet_printing,
+            privacy_policies: parsed.privacy_policies,
+            line_spacing_compatibility: parsed.line_spacing_compatibility,
+            east_asian_compatibility: parsed.east_asian_compatibility,
+            table_layout_compatibility: parsed.table_layout_compatibility,
+            legacy_layout_compatibility: parsed.legacy_layout_compatibility,
+            asian_grid_compatibility: parsed.asian_grid_compatibility,
+            compatibility_policy: parsed.compatibility_policy,
+            word_2003_compatibility: parsed.word_2003_compatibility,
             theme: parsed.theme.map(crate::DocumentTheme::into_owned),
             latent_styles: parsed.latent_styles.map(crate::LatentStyles::into_owned),
             data_store: parsed.data_store.map(crate::DocumentDataStore::into_owned),
+            mail_merge: parsed.mail_merge.map(crate::MailMerge::into_owned),
             math_properties: parsed.math_properties,
             language_defaults: parsed.language_defaults,
+            default_formatting: parsed.default_formatting,
+            default_tab_width_twips: parsed.default_tab_width_twips,
             document_direction: parsed.document_direction,
             gutter_on_right: parsed.gutter_on_right,
             objects: owned_objects,
@@ -277,12 +485,20 @@ impl<'a> RtfDocument<'a> {
             list_table: Self::convert_list_table_to_owned(parsed.list_table),
             list_override_table: parsed.list_override_table,
             legacy_section_numbering: parsed.legacy_section_numbering.into_owned(),
+            legacy_paragraph_numbering: parsed
+                .legacy_paragraph_numbering
+                .into_iter()
+                .map(crate::LegacyParagraphNumbering::into_owned)
+                .collect(),
             paragraph_group_table: parsed
                 .paragraph_group_table
                 .map(crate::ParagraphGroupPropertyTable::into_owned),
             sections: Self::convert_sections_to_owned(parsed.sections),
             bookmarks: Self::convert_bookmarks_to_owned(parsed.bookmarks),
             shapes: Self::convert_shapes_to_owned(parsed.shapes),
+            drawing_order: parsed.drawing_order,
+            body_story_events: parsed.body_story_events,
+            background_shape_index: parsed.background_shape_index,
             legacy_text_boxes: parsed
                 .legacy_text_boxes
                 .into_iter()
@@ -471,6 +687,39 @@ impl<'a> RtfDocument<'a> {
         &self.tables
     }
 
+    /// Mutably access document tables, including their nested cell stories.
+    pub fn tables_mut(&mut self) -> &mut [super::table::Table<'a>] {
+        &mut self.tables
+    }
+
+    fn table_cell_mut(
+        &mut self,
+        path: &crate::TableCellPath,
+    ) -> RtfResult<&mut crate::Cell<'a>> {
+        let root = path.root;
+        let mut cell = self
+            .tables
+            .get_mut(root.table_index)
+            .and_then(|table| table.rows_mut().get_mut(root.row_index))
+            .and_then(|row| row.cells_mut().get_mut(root.cell_index))
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("RTF table-cell path is outside the document".to_string())
+            })?;
+        for coordinate in &path.nested {
+            cell = cell
+                .nested_tables_mut()
+                .get_mut(coordinate.table_index)
+                .and_then(|nested| nested.table.rows_mut().get_mut(coordinate.row_index))
+                .and_then(|row| row.cells_mut().get_mut(coordinate.cell_index))
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF nested table-cell path is outside the document".to_string(),
+                    )
+                })?;
+        }
+        Ok(cell)
+    }
+
     /// Get all document elements (paragraphs and tables) in approximate document order.
     ///
     /// Note: Due to RTF's structure, tables are extracted separately from paragraph flow.
@@ -562,6 +811,73 @@ impl<'a> RtfDocument<'a> {
         &self.pictures
     }
 
+    /// Replace typed `picprop` metadata on one existing picture without cloning image bytes.
+    pub fn set_picture_shape_properties(
+        &mut self,
+        picture_index: usize,
+        properties: Option<crate::PictureShapeProperties<'a>>,
+    ) -> RtfResult<Option<crate::PictureShapeProperties<'a>>> {
+        if let Some(properties) = &properties {
+            properties.validate()?;
+        }
+        let picture = self.pictures.get_mut(picture_index).ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF picture shape-property mutation references a missing picture".to_string(),
+            )
+        })?;
+        Ok(std::mem::replace(&mut picture.shape_properties, properties))
+    }
+
+    /// Return positional body `shppict` and `nonshppict` wrapper records.
+    pub fn picture_compatibility_records(&self) -> &[crate::PictureCompatibilityRecord] {
+        &self.picture_compatibility_records
+    }
+
+    /// Resolve a wrapper record to its shared picture payload.
+    pub fn picture_for_compatibility_record(
+        &self,
+        record: &crate::PictureCompatibilityRecord,
+    ) -> Option<&super::picture::Picture<'_>> {
+        self.pictures.get(record.picture_index)
+    }
+
+    /// Append a validated positional wrapper without cloning picture bytes.
+    pub fn push_picture_compatibility_record(
+        &mut self,
+        record: crate::PictureCompatibilityRecord,
+    ) -> RtfResult<()> {
+        let body = self.text();
+        record.validate(&body, self.pictures.len())?;
+        if self.picture_compatibility_records.len() >= crate::MAX_PICTURE_COMPATIBILITY_RECORDS {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture-compatibility record count exceeds the safety limit".to_string(),
+            ));
+        }
+        if self
+            .picture_compatibility_records
+            .last()
+            .is_some_and(|previous| {
+                previous.position > record.position
+                    || (previous.position == record.position && previous.kind == record.kind)
+            })
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture-compatibility records are duplicated or out of body order".to_string(),
+            ));
+        }
+        let index = self.picture_compatibility_records.len();
+        self.picture_compatibility_records.push(record);
+        self.insert_body_story_event(crate::BodyStoryEvent::PictureCompatibility(index))?;
+        Ok(())
+    }
+
+    /// Clear wrapper provenance without deleting shared picture payloads.
+    pub fn clear_picture_compatibility_records(&mut self) {
+        self.picture_compatibility_records.clear();
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::PictureCompatibility(_)));
+    }
+
     /// Get all fields in the document.
     ///
     /// Returns all fields (hyperlinks, cross-references, etc.) from the RTF document.
@@ -583,6 +899,44 @@ impl<'a> RtfDocument<'a> {
     /// ```
     pub fn fields(&self) -> &[super::field::Field<'_>] {
         &self.fields
+    }
+
+    pub fn push_field(&mut self, field: super::field::Field<'a>) -> RtfResult<()> {
+        if !matches!(field.owner, crate::FieldOwner::Body) {
+            return Err(RtfError::MalformedDocument(
+                "document-level generic fields must be owned by the body story".to_string(),
+            ));
+        }
+        if self.fields.len() >= crate::field::MAX_GENERIC_FIELDS {
+            return Err(RtfError::MalformedDocument(
+                "RTF generic field count exceeds the safety limit".to_string(),
+            ));
+        }
+        field.validate()?;
+        let body = self.text();
+        if body.get(field.position..field.position).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF generic field position is not a UTF-8 body boundary".to_string(),
+            ));
+        }
+        if self
+            .last_body_story_position()
+            .is_some_and(|position| position > field.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF body story order moves backwards".to_string(),
+            ));
+        }
+        let index = self.fields.len();
+        self.fields.push(field);
+        self.insert_body_story_event(crate::BodyStoryEvent::Field(index))?;
+        Ok(())
+    }
+
+    pub fn clear_fields(&mut self) {
+        self.fields.clear();
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::Field(_)));
     }
 
     /// Return ordered positional legacy form fields.
@@ -662,6 +1016,583 @@ impl<'a> RtfDocument<'a> {
         self.xml_namespaces = None;
     }
 
+    /// Return inert range-protection usernames in their source order.
+    pub fn protection_user_table(&self) -> Option<&crate::ProtectionUserTable<'_>> {
+        self.protection_user_table.as_ref()
+    }
+
+    /// Replace the inert range-protection username table after full validation.
+    pub fn set_protection_user_table(
+        &mut self,
+        table: crate::ProtectionUserTable<'a>,
+    ) -> RtfResult<()> {
+        table.validate()?;
+        self.protection_user_table = Some(table);
+        Ok(())
+    }
+
+    /// Remove the range-protection username table entirely.
+    pub fn clear_protection_user_table(&mut self) {
+        self.protection_user_table = None;
+    }
+
+    /// Return explicit document-level hyphenation properties.
+    pub fn hyphenation(&self) -> &crate::DocumentHyphenation {
+        &self.hyphenation
+    }
+
+    /// Replace document-level hyphenation properties after bounds validation.
+    pub fn set_hyphenation(&mut self, hyphenation: crate::DocumentHyphenation) -> RtfResult<()> {
+        hyphenation.validate()?;
+        self.hyphenation = hyphenation;
+        Ok(())
+    }
+
+    /// Remove all explicit hyphenation controls and restore RTF defaults.
+    pub fn clear_hyphenation(&mut self) {
+        self.hyphenation = crate::DocumentHyphenation::default();
+    }
+
+    /// Return inert external document/template names without resolving them.
+    pub fn external_references(&self) -> &crate::DocumentExternalReferences<'_> {
+        &self.external_references
+    }
+
+    /// Replace inert external document/template names after full validation.
+    pub fn set_external_references(
+        &mut self,
+        references: crate::DocumentExternalReferences<'a>,
+    ) -> RtfResult<()> {
+        references.validate()?;
+        self.external_references = references;
+        Ok(())
+    }
+
+    /// Remove both external document-reference destinations.
+    pub fn clear_external_references(&mut self) {
+        self.external_references = crate::DocumentExternalReferences::default();
+    }
+
+    /// Return explicit passive document view and zoom settings.
+    pub fn document_view(&self) -> &crate::DocumentView {
+        &self.document_view
+    }
+
+    /// Replace passive document view and zoom settings after validation.
+    pub fn set_document_view(&mut self, view: crate::DocumentView) -> RtfResult<()> {
+        view.validate()?;
+        self.document_view = view;
+        Ok(())
+    }
+
+    /// Remove explicit document view controls.
+    pub fn clear_document_view(&mut self) {
+        self.document_view = crate::DocumentView::default();
+    }
+
+    /// Return passive review-display preferences.
+    pub fn review_display(&self) -> &crate::DocumentReviewDisplay {
+        &self.review_display
+    }
+
+    /// Replace passive review-display preferences.
+    pub fn set_review_display(&mut self, display: crate::DocumentReviewDisplay) {
+        self.review_display = display;
+    }
+
+    /// Remove all review-display suppression flags.
+    pub fn clear_review_display(&mut self) {
+        self.review_display = crate::DocumentReviewDisplay::default();
+    }
+
+    /// Return passive document-window caption metadata.
+    pub fn window_caption(&self) -> Option<&crate::DocumentWindowCaption<'a>> {
+        self.window_caption.as_ref()
+    }
+
+    /// Replace passive document-window caption metadata.
+    pub fn set_window_caption(
+        &mut self,
+        caption: crate::DocumentWindowCaption<'a>,
+    ) -> RtfResult<()> {
+        caption.validate()?;
+        self.window_caption = Some(caption);
+        Ok(())
+    }
+
+    /// Remove document-window caption metadata.
+    pub fn clear_window_caption(&mut self) {
+        self.window_caption = None;
+    }
+
+    /// Return the inert custom XSL transform location.
+    pub fn xsl_transform(&self) -> Option<&crate::DocumentXslTransform<'a>> {
+        self.xsl_transform.as_ref()
+    }
+
+    /// Replace the inert custom XSL transform location.
+    pub fn set_xsl_transform(
+        &mut self,
+        transform: crate::DocumentXslTransform<'a>,
+    ) -> RtfResult<()> {
+        transform.validate()?;
+        self.xsl_transform = Some(transform);
+        Ok(())
+    }
+
+    /// Remove custom XSL transform location metadata.
+    pub fn clear_xsl_transform(&mut self) {
+        self.xsl_transform = None;
+    }
+
+    /// Return the passive requested transform-usage intent.
+    pub fn xsl_transform_usage(&self) -> crate::DocumentXslTransformUsage {
+        self.xsl_transform_usage
+    }
+
+    /// Replace the passive requested transform-usage intent.
+    pub fn set_xsl_transform_usage(&mut self, usage: crate::DocumentXslTransformUsage) {
+        self.xsl_transform_usage = usage;
+    }
+
+    /// Clear requested transform usage without changing the stored location.
+    pub fn clear_xsl_transform_usage(&mut self) {
+        self.xsl_transform_usage = crate::DocumentXslTransformUsage::NotRequested;
+    }
+
+    /// Return passive style-list filter suggestions.
+    pub fn style_list_filter(&self) -> Option<crate::DocumentStyleListFilter> {
+        self.style_list_filter
+    }
+
+    /// Replace passive style-list filter suggestions.
+    pub fn set_style_list_filter(
+        &mut self,
+        filter: crate::DocumentStyleListFilter,
+    ) -> RtfResult<()> {
+        filter.validate()?;
+        self.style_list_filter = Some(filter);
+        Ok(())
+    }
+
+    /// Remove style-list filter suggestions.
+    pub fn clear_style_list_filter(&mut self) {
+        self.style_list_filter = None;
+    }
+
+    /// Return an explicitly stored style-list sorting suggestion.
+    pub fn style_sort_method(&self) -> Option<crate::DocumentStyleSortMethod> {
+        self.style_sort_method
+    }
+
+    /// Return the stored suggestion or the specification default when omitted.
+    pub fn effective_style_sort_method(&self) -> crate::DocumentStyleSortMethod {
+        self.style_sort_method.unwrap_or_default()
+    }
+
+    /// Replace the passive style-list sorting suggestion.
+    pub fn set_style_sort_method(&mut self, method: crate::DocumentStyleSortMethod) {
+        self.style_sort_method = Some(method);
+    }
+
+    /// Remove the explicit suggestion, restoring the effective host default.
+    pub fn clear_style_sort_method(&mut self) {
+        self.style_sort_method = None;
+    }
+
+    /// Return passive save-related document preferences.
+    pub fn save_preferences(&self) -> &crate::DocumentSavePreferences {
+        &self.save_preferences
+    }
+
+    /// Replace passive save-related document preferences.
+    pub fn set_save_preferences(&mut self, preferences: crate::DocumentSavePreferences) {
+        self.save_preferences = preferences;
+    }
+
+    /// Remove explicit save-related preferences.
+    pub fn clear_save_preferences(&mut self) {
+        self.save_preferences = crate::DocumentSavePreferences::default();
+    }
+
+    /// Return opaque write-reservation metadata without authenticating it.
+    pub fn write_reservations(&self) -> &crate::DocumentWriteReservations<'a> {
+        &self.write_reservations
+    }
+
+    /// Replace opaque write-reservation metadata without authenticating it.
+    pub fn set_write_reservations(
+        &mut self,
+        reservations: crate::DocumentWriteReservations<'a>,
+    ) -> RtfResult<()> {
+        reservations.validate()?;
+        self.write_reservations = reservations;
+        Ok(())
+    }
+
+    /// Remove all write-reservation metadata.
+    pub fn clear_write_reservations(&mut self) {
+        self.write_reservations = crate::DocumentWriteReservations::default();
+    }
+
+    pub fn origin_metadata(&self) -> &crate::DocumentOriginMetadata {
+        &self.origin_metadata
+    }
+
+    pub fn set_origin_metadata(&mut self, metadata: crate::DocumentOriginMetadata) {
+        self.origin_metadata = metadata;
+    }
+
+    pub fn clear_origin_metadata(&mut self) {
+        self.origin_metadata = crate::DocumentOriginMetadata::default();
+    }
+
+    /// Return passive file and template settings.
+    pub fn file_settings(&self) -> &crate::DocumentFileSettings {
+        &self.file_settings
+    }
+
+    /// Replace passive file and template settings.
+    pub fn set_file_settings(&mut self, settings: crate::DocumentFileSettings) {
+        self.file_settings = settings;
+    }
+
+    /// Remove explicit file and template settings.
+    pub fn clear_file_settings(&mut self) {
+        self.file_settings = crate::DocumentFileSettings::default();
+    }
+
+    /// Return passive compatibility and output-request flags.
+    pub fn output_settings(&self) -> &crate::DocumentOutputSettings {
+        &self.output_settings
+    }
+
+    /// Replace passive compatibility and output-request flags.
+    pub fn set_output_settings(&mut self, settings: crate::DocumentOutputSettings) {
+        self.output_settings = settings;
+    }
+
+    /// Remove explicit compatibility and output-request flags.
+    pub fn clear_output_settings(&mut self) {
+        self.output_settings = crate::DocumentOutputSettings::default();
+    }
+
+    /// Return passive document rendering flags.
+    pub fn rendering_settings(&self) -> &crate::DocumentRenderingSettings {
+        &self.rendering_settings
+    }
+
+    /// Replace passive document rendering flags.
+    pub fn set_rendering_settings(&mut self, settings: crate::DocumentRenderingSettings) {
+        self.rendering_settings = settings;
+    }
+
+    /// Remove explicit document rendering flags.
+    pub fn clear_rendering_settings(&mut self) {
+        self.rendering_settings = crate::DocumentRenderingSettings::default();
+    }
+
+    /// Return passive printing, cleanup, and event-mask properties.
+    pub fn processing_settings(&self) -> &crate::DocumentProcessingSettings {
+        &self.processing_settings
+    }
+
+    /// Replace passive printing, cleanup, and event-mask properties.
+    pub fn set_processing_settings(&mut self, settings: crate::DocumentProcessingSettings) {
+        self.processing_settings = settings;
+    }
+
+    /// Remove explicit printing, cleanup, and event-mask properties.
+    pub fn clear_processing_settings(&mut self) {
+        self.processing_settings = crate::DocumentProcessingSettings::default();
+    }
+
+    /// Return passive document-level drawing-grid properties.
+    pub fn drawing_grid(&self) -> &crate::DocumentDrawingGrid {
+        &self.drawing_grid
+    }
+
+    /// Replace passive document-level drawing-grid properties.
+    pub fn set_drawing_grid(&mut self, drawing_grid: crate::DocumentDrawingGrid) {
+        self.drawing_grid = drawing_grid;
+    }
+
+    /// Remove all explicit document-level drawing-grid properties.
+    pub fn clear_drawing_grid(&mut self) {
+        self.drawing_grid = crate::DocumentDrawingGrid::default();
+    }
+
+    /// Return passive print-layout settings.
+    pub fn print_layout_settings(&self) -> &crate::DocumentPrintLayoutSettings {
+        &self.print_layout_settings
+    }
+
+    /// Atomically replace passive print-layout settings.
+    pub fn set_print_layout_settings(
+        &mut self,
+        settings: crate::DocumentPrintLayoutSettings,
+    ) -> RtfResult<()> {
+        settings.validate()?;
+        self.print_layout_settings = settings;
+        Ok(())
+    }
+
+    /// Atomically replace the document-wide gutter width in twips.
+    pub fn set_document_gutter_twips(&mut self, value: Option<u32>) -> RtfResult<()> {
+        let mut candidate = self.print_layout_settings;
+        candidate.set_document_gutter_twips(value)?;
+        self.print_layout_settings = candidate;
+        Ok(())
+    }
+
+    /// Remove explicit print-layout settings.
+    pub fn clear_print_layout_settings(&mut self) {
+        self.print_layout_settings = crate::DocumentPrintLayoutSettings::default();
+    }
+
+    /// Return passive theme font-resolution language identifiers.
+    pub fn theme_languages(&self) -> &crate::DocumentThemeLanguages {
+        &self.theme_languages
+    }
+
+    /// Replace passive theme font-resolution language identifiers.
+    pub fn set_theme_languages(&mut self, languages: crate::DocumentThemeLanguages) {
+        self.theme_languages = languages;
+    }
+
+    /// Remove explicit theme font-resolution language identifiers.
+    pub fn clear_theme_languages(&mut self) {
+        self.theme_languages = crate::DocumentThemeLanguages::default();
+    }
+
+    /// Return passive web-save and custom-XML policies.
+    pub fn xml_policies(&self) -> &crate::DocumentXmlPolicies {
+        &self.xml_policies
+    }
+
+    /// Replace passive web-save and custom-XML policies.
+    pub fn set_xml_policies(&mut self, policies: crate::DocumentXmlPolicies) {
+        self.xml_policies = policies;
+    }
+
+    /// Remove all explicit web-save and custom-XML policies.
+    pub fn clear_xml_policies(&mut self) {
+        self.xml_policies = crate::DocumentXmlPolicies::default();
+    }
+
+    /// Return passive system-font and linguistic-data embedding policies.
+    pub fn embedding_policies(&self) -> &crate::DocumentEmbeddingPolicies {
+        &self.embedding_policies
+    }
+
+    /// Replace passive system-font and linguistic-data embedding policies.
+    pub fn set_embedding_policies(&mut self, policies: crate::DocumentEmbeddingPolicies) {
+        self.embedding_policies = policies;
+    }
+
+    /// Remove all explicit embedding policies.
+    pub fn clear_embedding_policies(&mut self) {
+        self.embedding_policies = crate::DocumentEmbeddingPolicies::default();
+    }
+
+    /// Return passive move and formatting revision policies.
+    pub fn revision_policies(&self) -> &crate::DocumentRevisionPolicies {
+        &self.revision_policies
+    }
+
+    /// Replace passive move and formatting revision policies.
+    pub fn set_revision_policies(&mut self, policies: crate::DocumentRevisionPolicies) {
+        self.revision_policies = policies;
+    }
+
+    /// Remove all explicit revision-policy controls.
+    pub fn clear_revision_policies(&mut self) {
+        self.revision_policies = crate::DocumentRevisionPolicies::default();
+    }
+
+    /// Return passive theme and style-application policies.
+    pub fn style_policies(&self) -> &crate::DocumentStylePolicies {
+        &self.style_policies
+    }
+
+    /// Replace passive theme and style-application policies.
+    pub fn set_style_policies(&mut self, policies: crate::DocumentStylePolicies) {
+        self.style_policies = policies;
+    }
+
+    /// Remove all explicit theme and style-application policies.
+    pub fn clear_style_policies(&mut self) {
+        self.style_policies = crate::DocumentStylePolicies::default();
+    }
+
+    /// Return passive legacy style and formatting restriction declarations.
+    pub fn style_restrictions(&self) -> &crate::DocumentStyleRestrictions {
+        &self.style_restrictions
+    }
+
+    /// Replace passive legacy style and formatting restriction declarations.
+    pub fn set_style_restrictions(&mut self, restrictions: crate::DocumentStyleRestrictions) {
+        self.style_restrictions = restrictions;
+    }
+
+    /// Remove all legacy style and formatting restriction declarations.
+    pub fn clear_style_restrictions(&mut self) {
+        self.style_restrictions = crate::DocumentStyleRestrictions::default();
+    }
+
+    /// Return passive booklet-printing metadata.
+    pub fn booklet_printing(&self) -> &crate::DocumentBookletPrinting {
+        &self.booklet_printing
+    }
+
+    /// Replace passive booklet-printing metadata.
+    pub fn set_booklet_printing(&mut self, printing: crate::DocumentBookletPrinting) {
+        self.booklet_printing = printing;
+    }
+
+    /// Remove all booklet-printing metadata.
+    pub fn clear_booklet_printing(&mut self) {
+        self.booklet_printing = crate::DocumentBookletPrinting::default();
+    }
+
+    /// Return passive privacy-removal requests.
+    pub fn privacy_policies(&self) -> &crate::DocumentPrivacyPolicies {
+        &self.privacy_policies
+    }
+
+    /// Replace passive privacy-removal requests.
+    pub fn set_privacy_policies(&mut self, policies: crate::DocumentPrivacyPolicies) {
+        self.privacy_policies = policies;
+    }
+
+    /// Remove all privacy-removal requests without changing document metadata.
+    pub fn clear_privacy_policies(&mut self) {
+        self.privacy_policies = crate::DocumentPrivacyPolicies::default();
+    }
+
+    /// Return passive legacy extra-line-spacing compatibility requests.
+    pub fn line_spacing_compatibility(&self) -> &crate::DocumentLineSpacingCompatibility {
+        &self.line_spacing_compatibility
+    }
+
+    /// Replace passive legacy extra-line-spacing compatibility requests.
+    pub fn set_line_spacing_compatibility(
+        &mut self,
+        compatibility: crate::DocumentLineSpacingCompatibility,
+    ) {
+        self.line_spacing_compatibility = compatibility;
+    }
+
+    /// Clear legacy extra-line-spacing requests without changing layout.
+    pub fn clear_line_spacing_compatibility(&mut self) {
+        self.line_spacing_compatibility = crate::DocumentLineSpacingCompatibility::default();
+    }
+
+    /// Return passive Word 6-era East Asian typography compatibility requests.
+    pub fn east_asian_compatibility(&self) -> &crate::DocumentEastAsianCompatibility {
+        &self.east_asian_compatibility
+    }
+
+    /// Replace passive East Asian compatibility requests without applying them.
+    pub fn set_east_asian_compatibility(
+        &mut self,
+        compatibility: crate::DocumentEastAsianCompatibility,
+    ) {
+        self.east_asian_compatibility = compatibility;
+    }
+
+    /// Clear East Asian compatibility requests without changing document content.
+    pub fn clear_east_asian_compatibility(&mut self) {
+        self.east_asian_compatibility = crate::DocumentEastAsianCompatibility::default();
+    }
+
+    /// Return passive legacy table-layout compatibility requests.
+    pub fn table_layout_compatibility(&self) -> &crate::DocumentTableLayoutCompatibility {
+        &self.table_layout_compatibility
+    }
+
+    /// Replace passive table-layout compatibility requests without applying them.
+    pub fn set_table_layout_compatibility(
+        &mut self,
+        compatibility: crate::DocumentTableLayoutCompatibility,
+    ) {
+        self.table_layout_compatibility = compatibility;
+    }
+
+    /// Clear table-layout compatibility requests without changing any table.
+    pub fn clear_table_layout_compatibility(&mut self) {
+        self.table_layout_compatibility = crate::DocumentTableLayoutCompatibility::default();
+    }
+
+    /// Return passive legacy automatic-layout compatibility requests.
+    pub fn legacy_layout_compatibility(&self) -> &crate::DocumentLegacyLayoutCompatibility {
+        &self.legacy_layout_compatibility
+    }
+
+    /// Replace passive legacy layout requests without applying them.
+    pub fn set_legacy_layout_compatibility(
+        &mut self,
+        compatibility: crate::DocumentLegacyLayoutCompatibility,
+    ) {
+        self.legacy_layout_compatibility = compatibility;
+    }
+
+    /// Clear legacy layout requests without changing document content or layout.
+    pub fn clear_legacy_layout_compatibility(&mut self) {
+        self.legacy_layout_compatibility = crate::DocumentLegacyLayoutCompatibility::default();
+    }
+
+    /// Return passive Asian character-grid and line-breaking requests.
+    pub fn asian_grid_compatibility(&self) -> &crate::DocumentAsianGridCompatibility {
+        &self.asian_grid_compatibility
+    }
+
+    /// Replace passive Asian grid requests without applying them.
+    pub fn set_asian_grid_compatibility(
+        &mut self,
+        compatibility: crate::DocumentAsianGridCompatibility,
+    ) {
+        self.asian_grid_compatibility = compatibility;
+    }
+
+    /// Clear Asian grid requests without changing text or layout.
+    pub fn clear_asian_grid_compatibility(&mut self) {
+        self.asian_grid_compatibility = crate::DocumentAsianGridCompatibility::default();
+    }
+
+    /// Return passive compatibility reset, UI-throttling, and upgrade requests.
+    pub fn compatibility_policy(&self) -> &crate::DocumentCompatibilityPolicy {
+        &self.compatibility_policy
+    }
+
+    /// Replace passive document compatibility policy declarations.
+    pub fn set_compatibility_policy(&mut self, policy: crate::DocumentCompatibilityPolicy) {
+        self.compatibility_policy = policy;
+    }
+
+    /// Clear compatibility policy declarations without changing document content.
+    pub fn clear_compatibility_policy(&mut self) {
+        self.compatibility_policy = crate::DocumentCompatibilityPolicy::default();
+    }
+
+    /// Return passive Word 2003-era compatibility requests.
+    pub fn word_2003_compatibility(&self) -> &crate::DocumentWord2003Compatibility {
+        &self.word_2003_compatibility
+    }
+
+    /// Replace passive Word 2003 compatibility requests without applying them.
+    pub fn set_word_2003_compatibility(
+        &mut self,
+        compatibility: crate::DocumentWord2003Compatibility,
+    ) {
+        self.word_2003_compatibility = compatibility;
+    }
+
+    /// Clear Word 2003 compatibility requests without changing document layout.
+    pub fn clear_word_2003_compatibility(&mut self) {
+        self.word_2003_compatibility = crate::DocumentWord2003Compatibility::default();
+    }
+
     /// Return inert Office theme bytes without interpreting their contents.
     pub fn theme(&self) -> Option<&crate::DocumentTheme<'_>> {
         self.theme.as_ref()
@@ -713,6 +1644,23 @@ impl<'a> RtfDocument<'a> {
         self.data_store = None;
     }
 
+    /// Return inert mail-merge metadata without opening sources or evaluating queries.
+    pub fn mail_merge(&self) -> Option<&crate::MailMerge<'_>> {
+        self.mail_merge.as_ref()
+    }
+
+    /// Replace inert mail-merge metadata after complete bounds validation.
+    pub fn set_mail_merge(&mut self, mail_merge: crate::MailMerge<'a>) -> RtfResult<()> {
+        mail_merge.validate()?;
+        self.mail_merge = Some(mail_merge);
+        Ok(())
+    }
+
+    /// Remove all mail-merge metadata.
+    pub fn clear_mail_merge(&mut self) {
+        self.mail_merge = None;
+    }
+
     /// Return document-level mathematical layout defaults.
     pub fn math_properties(&self) -> Option<&crate::DocumentMathProperties> {
         self.math_properties.as_ref()
@@ -738,6 +1686,21 @@ impl<'a> RtfDocument<'a> {
         &self.language_defaults
     }
 
+    pub fn default_formatting(&self) -> &crate::DocumentDefaultFormatting {
+        &self.default_formatting
+    }
+    pub fn set_default_formatting(
+        &mut self,
+        value: crate::DocumentDefaultFormatting,
+    ) -> RtfResult<()> {
+        value.validate()?;
+        self.default_formatting = value;
+        Ok(())
+    }
+    pub fn clear_default_formatting(&mut self) {
+        self.default_formatting = crate::DocumentDefaultFormatting::default();
+    }
+
     /// Replace document language defaults.
     pub fn set_language_defaults(
         &mut self,
@@ -751,6 +1714,36 @@ impl<'a> RtfDocument<'a> {
     /// Remove all document language defaults.
     pub fn clear_language_defaults(&mut self) {
         self.language_defaults = crate::DocumentLanguageDefaults::default();
+    }
+
+    /// Return the explicitly declared `deftab` width in twips.
+    ///
+    /// `None` means the source omitted `deftab`; it does not mean zero.
+    pub fn default_tab_width_twips(&self) -> Option<u32> {
+        self.default_tab_width_twips
+    }
+
+    /// Return the explicit width or the RTF 1.9.1 default of 720 twips.
+    pub fn effective_default_tab_width_twips(&self) -> u32 {
+        self.default_tab_width_twips
+            .unwrap_or(crate::DEFAULT_TAB_WIDTH_TWIPS)
+    }
+
+    /// Set an explicit default tab width without creating paragraph tab stops.
+    pub fn set_default_tab_width_twips(&mut self, width: u32) -> RtfResult<()> {
+        if width > crate::MAX_DEFAULT_TAB_WIDTH_TWIPS {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF deftab width {width} exceeds {}",
+                crate::MAX_DEFAULT_TAB_WIDTH_TWIPS
+            )));
+        }
+        self.default_tab_width_twips = Some(width);
+        Ok(())
+    }
+
+    /// Remove the explicit width so serialization preserves omission.
+    pub fn clear_default_tab_width(&mut self) {
+        self.default_tab_width_twips = None;
     }
 
     /// Return the explicit document-wide bidirectional precedence.
@@ -795,11 +1788,13 @@ impl<'a> RtfDocument<'a> {
                     "RTF XML namespace IDs must be unique".to_string(),
                 ));
             }
-            total = total.checked_add(namespace.namespace.len()).ok_or_else(|| {
-                RtfError::MalformedDocument(
-                    "RTF XML namespace aggregate size overflow".to_string(),
-                )
-            })?;
+            total = total
+                .checked_add(namespace.namespace.len())
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF XML namespace aggregate size overflow".to_string(),
+                    )
+                })?;
             if total > crate::xml_namespace::MAX_XML_NAMESPACE_TOTAL_BYTES {
                 return Err(RtfError::MalformedDocument(
                     "RTF XML namespace aggregate text exceeds the safety limit".to_string(),
@@ -810,10 +1805,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append inert form-field metadata at a valid visible body range.
-    pub fn push_form_field(
-        &mut self,
-        field: super::form_field::FormField<'a>,
-    ) -> RtfResult<()> {
+    pub fn push_form_field(&mut self, field: super::form_field::FormField<'a>) -> RtfResult<()> {
         field.validate()?;
         if self.form_fields.len() >= super::form_field::MAX_FORM_FIELDS {
             return Err(RtfError::MalformedDocument(
@@ -845,9 +1837,10 @@ impl<'a> RtfDocument<'a> {
         let total = self
             .form_fields
             .iter()
-            .try_fold(field.text_bytes().unwrap_or(usize::MAX), |total, existing| {
-                total.checked_add(existing.text_bytes()?)
-            })
+            .try_fold(
+                field.text_bytes().unwrap_or(usize::MAX),
+                |total, existing| total.checked_add(existing.text_bytes()?),
+            )
             .ok_or_else(|| {
                 RtfError::MalformedDocument("RTF form-field aggregate size overflow".to_string())
             })?;
@@ -856,18 +1849,70 @@ impl<'a> RtfDocument<'a> {
                 "RTF form-field aggregate text exceeds the safety limit".to_string(),
             ));
         }
+        let index = self.form_fields.len();
         self.form_fields.push(field);
+        self.insert_body_story_event(crate::BodyStoryEvent::FormFieldStart(index))?;
+        self.insert_body_story_event(crate::BodyStoryEvent::FormFieldEnd(index))?;
         Ok(())
     }
 
     /// Remove all legacy form-field metadata without changing visible body text.
     pub fn clear_form_fields(&mut self) {
         self.form_fields.clear();
+        self.body_story_events.retain(|event| {
+            !matches!(
+                event,
+                crate::BodyStoryEvent::FormFieldStart(_) | crate::BodyStoryEvent::FormFieldEnd(_)
+            )
+        });
     }
 
     /// Return embedded and linked object records without activating their content.
     pub fn objects(&self) -> &[super::object::EmbeddedObject<'_>] {
         &self.objects
+    }
+
+    /// Resolve one object result-picture reference without cloning picture bytes.
+    pub fn picture_for_object_result(
+        &self,
+        object: &super::object::EmbeddedObject<'_>,
+        result_index: usize,
+    ) -> Option<&super::picture::Picture<'_>> {
+        object
+            .result_picture_indices
+            .get(result_index)
+            .and_then(|index| self.pictures.get(*index))
+    }
+
+    /// Append a validated inert object destination at its body position.
+    pub fn push_object(&mut self, object: super::object::EmbeddedObject<'a>) -> RtfResult<()> {
+        if self.objects.len() >= super::object::MAX_EMBEDDED_OBJECTS {
+            return Err(RtfError::MalformedDocument(
+                "RTF embedded object count exceeds the safety limit".to_string(),
+            ));
+        }
+        let body = self.text();
+        object.validate(&body, self.pictures.len())?;
+        if self
+            .objects
+            .last()
+            .is_some_and(|previous| previous.position > object.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF embedded objects are not ordered by body position".to_string(),
+            ));
+        }
+        let index = self.objects.len();
+        self.objects.push(object);
+        self.insert_body_story_event(crate::BodyStoryEvent::Object(index))?;
+        Ok(())
+    }
+
+    /// Remove all inert object destinations without removing shared result pictures.
+    pub fn clear_objects(&mut self) {
+        self.objects.clear();
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::Object(_)));
     }
 
     /// Return ordered inert RTF document-variable name/value pairs.
@@ -881,9 +1926,7 @@ impl<'a> RtfDocument<'a> {
         variable: super::document_variable::DocumentVariable<'a>,
     ) -> RtfResult<()> {
         variable.validate()?;
-        if self.document_variables.len()
-            >= super::document_variable::MAX_DOCUMENT_VARIABLES
-        {
+        if self.document_variables.len() >= super::document_variable::MAX_DOCUMENT_VARIABLES {
             return Err(RtfError::MalformedDocument(
                 "RTF document-variable count limit exceeded".to_string(),
             ));
@@ -895,9 +1938,9 @@ impl<'a> RtfDocument<'a> {
                     .and_then(|size| size.checked_add(existing.value.len()))
             },
         );
-        if aggregate.is_none_or(|size| {
-            size > super::document_variable::MAX_DOCUMENT_VARIABLE_TEXT_BYTES
-        }) {
+        if aggregate
+            .is_none_or(|size| size > super::document_variable::MAX_DOCUMENT_VARIABLE_TEXT_BYTES)
+        {
             return Err(RtfError::MalformedDocument(
                 "RTF document-variable aggregate text limit exceeded".to_string(),
             ));
@@ -938,13 +1981,13 @@ impl<'a> RtfDocument<'a> {
             )));
         }
         let aggregate = property.text_bytes().and_then(|initial| {
-            self.user_properties.iter().try_fold(initial, |size, existing| {
-                size.checked_add(existing.text_bytes()?)
-            })
+            self.user_properties
+                .iter()
+                .try_fold(initial, |size, existing| {
+                    size.checked_add(existing.text_bytes()?)
+                })
         });
-        if aggregate.is_none_or(|size| {
-            size > super::user_property::MAX_USER_PROPERTY_TEXT_BYTES
-        }) {
+        if aggregate.is_none_or(|size| size > super::user_property::MAX_USER_PROPERTY_TEXT_BYTES) {
             return Err(RtfError::MalformedDocument(
                 "RTF user-property aggregate text limit exceeded".to_string(),
             ));
@@ -998,7 +2041,9 @@ impl<'a> RtfDocument<'a> {
         let total = self
             .generated_list_markers
             .iter()
-            .try_fold(marker.text.len(), |total, entry| total.checked_add(entry.text.len()))
+            .try_fold(marker.text.len(), |total, entry| {
+                total.checked_add(entry.text.len())
+            })
             .ok_or_else(|| {
                 RtfError::MalformedDocument(
                     "RTF generated list-marker text size overflow".to_string(),
@@ -1009,12 +2054,16 @@ impl<'a> RtfDocument<'a> {
                 "RTF generated list-marker text exceeds the aggregate safety limit".to_string(),
             ));
         }
+        let index = self.generated_list_markers.len();
         self.generated_list_markers.push(marker);
+        self.insert_body_story_event(crate::BodyStoryEvent::GeneratedListMarker(index))?;
         Ok(())
     }
 
     pub fn clear_generated_list_markers(&mut self) {
         self.generated_list_markers.clear();
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::GeneratedListMarker(_)));
     }
 
     /// Append an inert source mark at a valid UTF-8 body position.
@@ -1030,9 +2079,7 @@ impl<'a> RtfDocument<'a> {
                     .to_string(),
             ));
         }
-        if self.navigation_entries.len()
-            >= super::navigation_entry::MAX_NAVIGATION_ENTRIES
-        {
+        if self.navigation_entries.len() >= super::navigation_entry::MAX_NAVIGATION_ENTRIES {
             return Err(RtfError::MalformedDocument(
                 "RTF navigation-entry count limit exceeded".to_string(),
             ));
@@ -1051,13 +2098,71 @@ impl<'a> RtfDocument<'a> {
                 "RTF navigation-entry aggregate text limit exceeded".to_string(),
             ));
         }
+        let index = self.navigation_entries.len();
         self.navigation_entries.push(entry);
+        self.insert_body_story_event(crate::BodyStoryEvent::NavigationEntry(index))?;
         Ok(())
+    }
+
+    /// Append navigation metadata for ownership by a table-cell story.
+    pub fn push_cell_navigation_entry_metadata(
+        &mut self,
+        entry: super::navigation_entry::NavigationEntry<'a>,
+    ) -> RtfResult<usize> {
+        entry.validate()?;
+        if self.navigation_entries.len() >= super::navigation_entry::MAX_NAVIGATION_ENTRIES {
+            return Err(RtfError::MalformedDocument(
+                "RTF navigation-entry count limit exceeded".to_string(),
+            ));
+        }
+        let aggregate = entry.text_bytes().and_then(|initial| {
+            self.navigation_entries.iter().try_fold(initial, |size, existing| {
+                size.checked_add(existing.text_bytes()?)
+            })
+        });
+        if aggregate.is_none_or(|size| {
+            size > super::navigation_entry::MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES
+        }) {
+            return Err(RtfError::MalformedDocument(
+                "RTF navigation-entry aggregate text limit exceeded".to_string(),
+            ));
+        }
+        let index = self.navigation_entries.len();
+        self.navigation_entries.push(entry);
+        Ok(index)
+    }
+
+    /// Atomically append navigation metadata and attach it to one cell story.
+    pub fn push_navigation_entry_for_cell(
+        &mut self,
+        path: &crate::TableCellPath,
+        entry: super::navigation_entry::NavigationEntry<'a>,
+    ) -> RtfResult<usize> {
+        let position = entry.position();
+        if self.table_cell_mut(path)?.text().get(position..position).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF navigation-entry position is outside its table-cell story".to_string(),
+            ));
+        }
+        let index = self.push_cell_navigation_entry_metadata(entry)?;
+        if let Err(error) = self
+            .table_cell_mut(path)?
+            .push_navigation_entry_reference(index, position)
+        {
+            self.navigation_entries.pop();
+            return Err(error);
+        }
+        Ok(index)
     }
 
     /// Remove all index and table-of-contents source marks.
     pub fn clear_navigation_entries(&mut self) {
         self.navigation_entries.clear();
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::NavigationEntry(_)));
+        for table in &mut self.tables {
+            table.clear_navigation_entry_references();
+        }
     }
 
     /// Get the list table.
@@ -1065,6 +2170,53 @@ impl<'a> RtfDocument<'a> {
     /// Returns all list definitions (for bulleted and numbered lists) in the document.
     pub fn list_table(&self) -> &super::list::ListTable<'_> {
         &self.list_table
+    }
+
+    /// Resolve ordered list-picture records without cloning their image payloads.
+    pub fn list_picture_bullets(
+        &self,
+    ) -> impl ExactSizeIterator<Item = Option<&super::picture::Picture<'_>>> {
+        (0..self.list_table.picture_bullet_count as usize).map(|slot| {
+            self.list_table
+                .picture_bullet_picture_indices()
+                .get(slot)
+                .copied()
+                .flatten()
+                .and_then(|index| self.pictures.get(index))
+        })
+    }
+
+    /// Replace list-picture records with validated references into `pictures()`.
+    pub fn set_list_picture_bullet_indices(
+        &mut self,
+        indices: Vec<Option<usize>>,
+    ) -> RtfResult<()> {
+        if indices
+            .iter()
+            .flatten()
+            .any(|index| *index >= self.pictures.len())
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF list-picture index is outside the document picture store".to_string(),
+            ));
+        }
+        let old_count = self.list_table.picture_bullet_count;
+        let old_indices = self.list_table.picture_bullet_picture_indices().to_vec();
+        self.list_table
+            .set_picture_bullet_picture_indices(indices)?;
+        if let Err(error) = self.list_table.validate() {
+            self.list_table.picture_bullet_count = old_count;
+            self.list_table
+                .set_picture_bullet_picture_indices(old_indices)?;
+            self.list_table.picture_bullet_count = old_count;
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    /// Clear list-picture references without deleting shared picture payloads.
+    pub fn clear_list_picture_bullets(&mut self) -> RtfResult<()> {
+        self.set_list_picture_bullet_indices(Vec::new())
     }
 
     /// Get the list override table.
@@ -1077,6 +2229,20 @@ impl<'a> RtfDocument<'a> {
     /// Return ordered legacy `pnseclvl` section-numbering defaults.
     pub fn legacy_section_numbering(&self) -> &crate::LegacySectionNumbering<'_> {
         &self.legacy_section_numbering
+    }
+
+    /// Return legacy `pn` records in exact source order.
+    pub fn legacy_paragraph_numbering_records(&self) -> &[crate::LegacyParagraphNumbering<'_>] {
+        &self.legacy_paragraph_numbering
+    }
+
+    /// Resolve the inert `pn` record owned by a paragraph snapshot.
+    pub fn legacy_paragraph_numbering(
+        &self,
+        paragraph: &crate::Paragraph,
+    ) -> Option<&crate::LegacyParagraphNumbering<'_>> {
+        self.legacy_paragraph_numbering
+            .get(paragraph.legacy_numbering? as usize)
     }
 
     /// Return the inert paragraph-group property table.
@@ -1140,7 +2306,11 @@ impl<'a> RtfDocument<'a> {
             .iter()
             .find(|candidate| candidate.level == level_index)
             .and_then(|candidate| candidate.start_at)
-            .or_else(|| (level_index == 0).then_some(list_override.start_at_override).flatten());
+            .or_else(|| {
+                (level_index == 0)
+                    .then_some(list_override.start_at_override)
+                    .flatten()
+            });
         Some((list_override, level, start_at))
     }
 
@@ -1163,6 +2333,253 @@ impl<'a> RtfDocument<'a> {
     /// Returns drawing objects, text boxes, and other shapes.
     pub fn shapes(&self) -> &[super::shape::Shape<'_>] {
         &self.shapes
+    }
+
+    /// Recursively find a body, background, grouped, or text-story shape by name.
+    pub fn find_shape_by_name(&self, name: &str) -> Option<&super::shape::Shape<'_>> {
+        self.shapes.iter().find_map(|shape| shape.find_by_name(name))
+            .or_else(|| self.shape_groups.iter().find_map(|group| group.find_shape_by_name(name)))
+    }
+
+    /// Recursively find a body, background, grouped, or text-story shape by `shplid`.
+    pub fn find_shape_by_id(&self, id: i32) -> Option<&super::shape::Shape<'_>> {
+        self.shapes.iter().find_map(|shape| shape.find_by_id(id))
+            .or_else(|| self.shape_groups.iter().find_map(|group| group.find_shape_by_id(id)))
+    }
+
+    /// Exact source order of root shapes and shape groups in the body story.
+    pub fn drawing_order(&self) -> &[crate::StoryDrawing] {
+        &self.drawing_order
+    }
+
+    pub fn body_story_events(&self) -> &[crate::BodyStoryEvent] {
+        &self.body_story_events
+    }
+
+    pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
+        self.body_story_events.iter().filter_map(|event| match event {
+            crate::BodyStoryEvent::PageBreak(page_break) => Some(page_break),
+            _ => None,
+        })
+    }
+
+    pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
+        let body = self.text();
+        if body.get(position..position).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF page-break position is not a UTF-8 body boundary".to_string(),
+            ));
+        }
+        self.insert_body_story_event(crate::BodyStoryEvent::PageBreak(
+            crate::PageBreak::new(position),
+        ))
+    }
+
+    pub fn clear_page_breaks(&mut self) {
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::PageBreak(_)));
+    }
+
+    /// Append a validated standalone shape at its UTF-8 body position.
+    pub fn push_shape(&mut self, shape: super::shape::Shape<'a>) -> RtfResult<()> {
+        if shape.is_background {
+            return Err(RtfError::MalformedDocument(
+                "RTF background shapes must use set_background_shape".to_string(),
+            ));
+        }
+        if self.shapes.len() >= 65_536 {
+            return Err(RtfError::MalformedDocument(
+                "RTF shape count exceeds the safety limit".to_string(),
+            ));
+        }
+        shape.validate()?;
+        let body = self.text();
+        if body.get(shape.position..shape.position).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF shape position is not a UTF-8 body boundary".to_string(),
+            ));
+        }
+        if self
+            .shapes
+            .iter()
+            .rev()
+            .find(|shape| !shape.is_background)
+            .is_some_and(|previous| previous.position > shape.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF shapes are out of body order".to_string(),
+            ));
+        }
+        if self
+            .last_drawing_position()
+            .is_some_and(|position| position > shape.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF body drawing order moves backwards".to_string(),
+            ));
+        }
+        if self
+            .last_body_story_position()
+            .is_some_and(|position| position > shape.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF body story order moves backwards".to_string(),
+            ));
+        }
+        let drawing = crate::StoryDrawing::Shape(self.shapes.len());
+        self.drawing_order.push(drawing);
+        self.shapes.push(shape);
+        self.insert_body_story_event(crate::BodyStoryEvent::Drawing(drawing))?;
+        Ok(())
+    }
+
+    /// Ergonomic alias for appending a validated body shape.
+    pub fn add_shape(&mut self, shape: super::shape::Shape<'a>) -> RtfResult<usize> {
+        let index = self.shapes.len();
+        self.push_shape(shape)?;
+        Ok(index)
+    }
+
+    /// Atomically replace a non-background root shape without relocating its body anchor.
+    pub fn replace_shape(&mut self, index: usize, replacement: super::shape::Shape<'a>) -> RtfResult<super::shape::Shape<'a>> {
+        let current = self.shapes.get(index).ok_or_else(|| RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds")))?;
+        if self.background_shape_index == Some(index) || replacement.is_background {
+            return Err(RtfError::MalformedDocument("RTF background shape must use set_background_shape".to_string()));
+        }
+        if replacement.position != current.position {
+            return Err(RtfError::MalformedDocument("RTF shape replacement cannot relocate its body anchor".to_string()));
+        }
+        replacement.validate()?;
+        let old = std::mem::replace(&mut self.shapes[index], replacement);
+        Ok(old)
+    }
+
+    /// Atomically remove one non-background root shape and repair every stored index.
+    pub fn remove_shape(&mut self, index: usize) -> RtfResult<super::shape::Shape<'a>> {
+        if index >= self.shapes.len() { return Err(RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds"))); }
+        if self.background_shape_index == Some(index) { return Err(RtfError::MalformedDocument("RTF background shape must use clear_background_shape".to_string())); }
+        let mut shapes = self.shapes.clone();
+        let mut order = self.drawing_order.clone();
+        let mut events = self.body_story_events.clone();
+        let removed = shapes.remove(index);
+        order.retain(|drawing| !matches!(drawing, crate::StoryDrawing::Shape(value) if *value == index));
+        events.retain(|event| !matches!(event, crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(value)) if *value == index));
+        for drawing in &mut order { if let crate::StoryDrawing::Shape(value) = drawing && *value > index { *value -= 1; } }
+        for event in &mut events { if let crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(value)) = event && *value > index { *value -= 1; } }
+        self.shapes = shapes;
+        self.drawing_order = order;
+        self.body_story_events = events;
+        if let Some(background) = &mut self.background_shape_index && *background > index { *background -= 1; }
+        Ok(removed)
+    }
+
+    /// Remove all standalone shapes while preserving the document background.
+    pub fn clear_shapes(&mut self) {
+        self.drawing_order
+            .retain(|drawing| !matches!(drawing, crate::StoryDrawing::Shape(_)));
+        self.body_story_events.retain(|event| {
+            !matches!(
+                event,
+                crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(_))
+            )
+        });
+        if let Some(index) = self.background_shape_index {
+            let background = self.shapes.remove(index);
+            self.shapes.clear();
+            self.shapes.push(background);
+            self.background_shape_index = Some(0);
+        } else {
+            self.shapes.clear();
+        }
+    }
+
+    /// Return the typed shape in the document `background` destination.
+    #[must_use]
+    pub fn background_shape(&self) -> Option<&super::shape::Shape<'_>> {
+        self.background_shape_index
+            .and_then(|index| self.shapes.get(index))
+    }
+
+    /// Set the unique document-background destination shape.
+    pub fn set_background_shape(&mut self, mut shape: super::shape::Shape<'a>) -> RtfResult<()> {
+        Self::validate_background_shape(&shape)?;
+        shape.is_background = true;
+        if let Some(index) = self.background_shape_index {
+            self.shapes[index] = shape;
+        } else {
+            if self.shapes.len() >= 65_536 {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shape count exceeds the safety limit".to_string(),
+                ));
+            }
+            self.background_shape_index = Some(self.shapes.len());
+            self.shapes.push(shape);
+        }
+        Ok(())
+    }
+
+    /// Remove only the destination-owned background shape.
+    pub fn clear_background_shape(&mut self) -> Option<super::shape::Shape<'a>> {
+        let index = self.background_shape_index.take()?;
+        let removed = self.shapes.remove(index);
+        for drawing in &mut self.drawing_order {
+            if let crate::StoryDrawing::Shape(shape_index) = drawing
+                && *shape_index > index
+            {
+                *shape_index -= 1;
+            }
+        }
+        for event in &mut self.body_story_events {
+            if let crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(shape_index)) = event
+                && *shape_index > index
+            {
+                *shape_index -= 1;
+            }
+        }
+        Some(removed)
+    }
+
+    fn validate_background_shape(shape: &super::shape::Shape<'_>) -> RtfResult<()> {
+        if shape.properties.len() > 65_536 {
+            return Err(RtfError::MalformedDocument(
+                "RTF background shape property count exceeds the safety limit".to_string(),
+            ));
+        }
+        if shape.text.len() > 16 * 1_048_576 {
+            return Err(RtfError::MalformedDocument(
+                "RTF background shape text exceeds the safety limit".to_string(),
+            ));
+        }
+        for property in &shape.properties {
+            property.validate()?;
+            if property.name.len().saturating_add(property.value.len()) > 1_048_576 {
+                return Err(RtfError::MalformedDocument(
+                    "RTF background shape property exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        if let Some(result) = &shape.result {
+            result.validate()?;
+        }
+        shape
+            .geometry
+            .x
+            .checked_add(shape.geometry.width)
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF background shape horizontal geometry overflows".to_string(),
+                )
+            })?;
+        shape
+            .geometry
+            .y
+            .checked_add(shape.geometry.height)
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF background shape vertical geometry overflows".to_string(),
+                )
+            })?;
+        Ok(())
     }
 
     /// Return inert positional legacy drawing text boxes.
@@ -1195,7 +2612,9 @@ impl<'a> RtfDocument<'a> {
         let total = self
             .legacy_text_boxes
             .iter()
-            .try_fold(text_box.text.len(), |total, entry| total.checked_add(entry.text.len()))
+            .try_fold(text_box.text.len(), |total, entry| {
+                total.checked_add(entry.text.len())
+            })
             .ok_or_else(|| {
                 RtfError::MalformedDocument("RTF legacy text-box size overflow".to_string())
             })?;
@@ -1204,12 +2623,16 @@ impl<'a> RtfDocument<'a> {
                 "RTF legacy text-box text exceeds the aggregate safety limit".to_string(),
             ));
         }
+        let index = self.legacy_text_boxes.len();
         self.legacy_text_boxes.push(text_box);
+        self.insert_body_story_event(crate::BodyStoryEvent::LegacyTextBox(index))?;
         Ok(())
     }
 
     pub fn clear_legacy_text_boxes(&mut self) {
         self.legacy_text_boxes.clear();
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::LegacyTextBox(_)));
     }
 
     /// Return inert positional legacy drawing primitives other than top-level text boxes.
@@ -1230,17 +2653,25 @@ impl<'a> RtfDocument<'a> {
                 "RTF legacy drawing position is not a UTF-8 body boundary".to_string(),
             ));
         }
-        if self.legacy_drawings.last().is_some_and(|previous| previous.position > drawing.position) {
+        if self
+            .legacy_drawings
+            .last()
+            .is_some_and(|previous| previous.position > drawing.position)
+        {
             return Err(RtfError::MalformedDocument(
                 "RTF legacy drawings are out of body order".to_string(),
             ));
         }
+        let index = self.legacy_drawings.len();
         self.legacy_drawings.push(drawing);
+        self.insert_body_story_event(crate::BodyStoryEvent::LegacyDrawing(index))?;
         Ok(())
     }
 
     pub fn clear_legacy_drawings(&mut self) {
         self.legacy_drawings.clear();
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::LegacyDrawing(_)));
     }
 
     /// Get all shape groups in the document.
@@ -1248,6 +2679,206 @@ impl<'a> RtfDocument<'a> {
     /// Returns grouped shapes.
     pub fn shape_groups(&self) -> &[super::shape::ShapeGroup<'_>] {
         &self.shape_groups
+    }
+
+    /// Append a validated root shape group.
+    pub fn push_shape_group(&mut self, group: super::shape::ShapeGroup<'a>) -> RtfResult<()> {
+        if self.shape_groups.len() >= 16_384 {
+            return Err(RtfError::MalformedDocument(
+                "RTF shape group count exceeds the safety limit".to_string(),
+            ));
+        }
+        group.validate()?;
+        let body = self.text();
+        if body.get(group.position..group.position).is_none()
+            || self
+                .shape_groups
+                .last()
+                .is_some_and(|previous| previous.position > group.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF shape groups are outside or out of body order".to_string(),
+            ));
+        }
+        if self
+            .last_drawing_position()
+            .is_some_and(|position| position > group.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF body drawing order moves backwards".to_string(),
+            ));
+        }
+        if self
+            .last_body_story_position()
+            .is_some_and(|position| position > group.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF body story order moves backwards".to_string(),
+            ));
+        }
+        let drawing = crate::StoryDrawing::ShapeGroup(self.shape_groups.len());
+        self.drawing_order.push(drawing);
+        self.shape_groups.push(group);
+        self.insert_body_story_event(crate::BodyStoryEvent::Drawing(drawing))?;
+        Ok(())
+    }
+
+    /// Ergonomic alias for appending a validated root shape group.
+    pub fn add_shape_group(&mut self, group: super::shape::ShapeGroup<'a>) -> RtfResult<usize> {
+        let index = self.shape_groups.len();
+        self.push_shape_group(group)?;
+        Ok(index)
+    }
+
+    /// Atomically replace a root group without relocating its body anchor.
+    pub fn replace_shape_group(&mut self, index: usize, replacement: super::shape::ShapeGroup<'a>) -> RtfResult<super::shape::ShapeGroup<'a>> {
+        let current = self.shape_groups.get(index).ok_or_else(|| RtfError::MalformedDocument(format!("RTF shape-group index {index} is out of bounds")))?;
+        if replacement.position != current.position { return Err(RtfError::MalformedDocument("RTF shape-group replacement cannot relocate its body anchor".to_string())); }
+        replacement.validate()?;
+        Ok(std::mem::replace(&mut self.shape_groups[index], replacement))
+    }
+
+    /// Atomically remove one root group and repair every stored index.
+    pub fn remove_shape_group(&mut self, index: usize) -> RtfResult<super::shape::ShapeGroup<'a>> {
+        if index >= self.shape_groups.len() { return Err(RtfError::MalformedDocument(format!("RTF shape-group index {index} is out of bounds"))); }
+        let mut groups = self.shape_groups.clone();
+        let mut order = self.drawing_order.clone();
+        let mut events = self.body_story_events.clone();
+        let removed = groups.remove(index);
+        order.retain(|drawing| !matches!(drawing, crate::StoryDrawing::ShapeGroup(value) if *value == index));
+        events.retain(|event| !matches!(event, crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(value)) if *value == index));
+        for drawing in &mut order { if let crate::StoryDrawing::ShapeGroup(value) = drawing && *value > index { *value -= 1; } }
+        for event in &mut events { if let crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(value)) = event && *value > index { *value -= 1; } }
+        self.shape_groups = groups;
+        self.drawing_order = order;
+        self.body_story_events = events;
+        Ok(removed)
+    }
+
+    /// Reorder root drawings at the same body anchor without moving unrelated story content.
+    pub fn move_drawing(&mut self, from: usize, to: usize) -> RtfResult<()> {
+        if from >= self.drawing_order.len() || to >= self.drawing_order.len() {
+            return Err(RtfError::MalformedDocument("RTF drawing reorder index is out of bounds".to_string()));
+        }
+        if from == to { return Ok(()); }
+        let start = from.min(to);
+        let end = from.max(to);
+        let anchor = self.root_drawing_position(self.drawing_order[from]);
+        if self.drawing_order[start..=end].iter().any(|drawing| self.root_drawing_position(*drawing) != anchor) {
+            return Err(RtfError::MalformedDocument("RTF drawings at different body anchors cannot be reordered".to_string()));
+        }
+        let mut order = self.drawing_order.clone();
+        let drawing = order.remove(from);
+        order.insert(to, drawing);
+        let mut events = self.body_story_events.clone();
+        let mut next = order.iter().copied();
+        for event in &mut events {
+            if let crate::BodyStoryEvent::Drawing(drawing) = event { *drawing = next.next().expect("drawing event count matches order"); }
+        }
+        if next.next().is_some() { return Err(RtfError::MalformedDocument("RTF drawing event order is incomplete".to_string())); }
+        self.drawing_order = order;
+        self.body_story_events = events;
+        Ok(())
+    }
+
+    fn root_drawing_position(&self, drawing: crate::StoryDrawing) -> usize {
+        match drawing { crate::StoryDrawing::Shape(index) => self.shapes[index].position, crate::StoryDrawing::ShapeGroup(index) => self.shape_groups[index].position }
+    }
+
+    /// Remove all root shape groups.
+    pub fn clear_shape_groups(&mut self) {
+        self.shape_groups.clear();
+        self.drawing_order
+            .retain(|drawing| !matches!(drawing, crate::StoryDrawing::ShapeGroup(_)));
+        self.body_story_events.retain(|event| {
+            !matches!(
+                event,
+                crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(_))
+            )
+        });
+    }
+
+    fn last_drawing_position(&self) -> Option<usize> {
+        self.drawing_order.last().map(|drawing| match *drawing {
+            crate::StoryDrawing::Shape(index) => self.shapes[index].position,
+            crate::StoryDrawing::ShapeGroup(index) => self.shape_groups[index].position,
+        })
+    }
+
+    fn last_body_story_position(&self) -> Option<usize> {
+        self.body_story_events
+            .iter()
+            .rev()
+            .find_map(|event| match *event {
+                crate::BodyStoryEvent::Drawing(_)
+                | crate::BodyStoryEvent::Field(_)
+                | crate::BodyStoryEvent::PageBreak(_) => {
+                    self.body_story_event_position(*event)
+                },
+                _ => None,
+            })
+    }
+
+    fn body_story_event_position(&self, event: crate::BodyStoryEvent) -> Option<usize> {
+        Some(match event {
+            crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
+                self.shapes.get(index)?.position
+            },
+            crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(index)) => {
+                self.shape_groups.get(index)?.position
+            },
+            crate::BodyStoryEvent::Field(index) => self.fields.get(index)?.position,
+            crate::BodyStoryEvent::PageBreak(page_break) => page_break.position,
+            crate::BodyStoryEvent::BookmarkStart(index) => {
+                self.bookmarks.bookmarks().get(index)?.position
+            },
+            crate::BodyStoryEvent::BookmarkEnd(index) => {
+                let bookmark = self.bookmarks.bookmarks().get(index)?;
+                bookmark.position.checked_add(bookmark.content.len())?
+            },
+            crate::BodyStoryEvent::AnnotationStart(index) => self.annotations.get(index)?.position,
+            crate::BodyStoryEvent::AnnotationEnd(index) => self.annotations.get(index)?.range_end,
+            crate::BodyStoryEvent::Note(index) => self.notes.get(index)?.position,
+            crate::BodyStoryEvent::Object(index) => self.objects.get(index)?.position,
+            crate::BodyStoryEvent::PictureCompatibility(index) => {
+                self.picture_compatibility_records.get(index)?.position
+            },
+            crate::BodyStoryEvent::FormFieldStart(index) => self.form_fields.get(index)?.position,
+            crate::BodyStoryEvent::FormFieldEnd(index) => self.form_fields.get(index)?.range_end,
+            crate::BodyStoryEvent::RevisionStart(index) => self.revisions.get(index)?.position,
+            crate::BodyStoryEvent::RevisionEnd(index) => self.revisions.get(index)?.range_end,
+            crate::BodyStoryEvent::RevisionDeletion(index) => self.revisions.get(index)?.position,
+            crate::BodyStoryEvent::GeneratedListMarker(index) => {
+                self.generated_list_markers.get(index)?.position
+            },
+            crate::BodyStoryEvent::LegacyTextBox(index) => {
+                self.legacy_text_boxes.get(index)?.position
+            },
+            crate::BodyStoryEvent::LegacyDrawing(index) => {
+                self.legacy_drawings.get(index)?.position
+            },
+            crate::BodyStoryEvent::NavigationEntry(index) => {
+                self.navigation_entries.get(index)?.position()
+            },
+        })
+    }
+
+    fn insert_body_story_event(&mut self, event: crate::BodyStoryEvent) -> RtfResult<()> {
+        let position = self.body_story_event_position(event).ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF body story event references missing metadata".to_string(),
+            )
+        })?;
+        let at = self
+            .body_story_events
+            .iter()
+            .rposition(|existing| {
+                self.body_story_event_position(*existing)
+                    .is_some_and(|value| value <= position)
+            })
+            .map_or(0, |index| index + 1);
+        self.body_story_events.insert(at, event);
+        Ok(())
     }
 
     /// Get the stylesheet.
@@ -1295,7 +2926,10 @@ impl<'a> RtfDocument<'a> {
     ) -> RtfResult<()> {
         annotation.validate()?;
         let body = self.text();
-        if body.get(annotation.position..annotation.range_end).is_none() {
+        if body
+            .get(annotation.position..annotation.range_end)
+            .is_none()
+        {
             return Err(RtfError::MalformedDocument(
                 "RTF annotation range is outside body text or splits a character".to_string(),
             ));
@@ -1320,20 +2954,27 @@ impl<'a> RtfDocument<'a> {
                 size.checked_add(existing.text_bytes()?)
             })
         });
-        if aggregate.is_none_or(|size| {
-            size > super::annotation::MAX_ANNOTATION_TEXT_TOTAL_BYTES
-        }) {
+        if aggregate.is_none_or(|size| size > super::annotation::MAX_ANNOTATION_TEXT_TOTAL_BYTES) {
             return Err(RtfError::MalformedDocument(
                 "RTF annotation aggregate text limit exceeded".to_string(),
             ));
         }
+        let index = self.annotations.len();
         self.annotations.push(annotation);
+        self.insert_body_story_event(crate::BodyStoryEvent::AnnotationStart(index))?;
+        self.insert_body_story_event(crate::BodyStoryEvent::AnnotationEnd(index))?;
         Ok(())
     }
 
     /// Remove all comment annotations.
     pub fn clear_annotations(&mut self) {
         self.annotations.clear();
+        self.body_story_events.retain(|event| {
+            !matches!(
+                event,
+                crate::BodyStoryEvent::AnnotationStart(_) | crate::BodyStoryEvent::AnnotationEnd(_)
+            )
+        });
     }
 
     // Helper methods to convert borrowed data to owned
@@ -1381,6 +3022,10 @@ impl<'a> RtfDocument<'a> {
         }
         owned.picture_bullet_count = table.picture_bullet_count;
         owned
+            .set_picture_bullet_picture_indices(table.picture_bullet_picture_indices().to_vec())
+            .expect("parsed list-picture indices are bounded");
+        owned.picture_bullet_count = table.picture_bullet_count;
+        owned
     }
 
     /// Convert sections to owned
@@ -1405,6 +3050,12 @@ impl<'a> RtfDocument<'a> {
                                 paragraph: paragraph.paragraph,
                             })
                             .collect(),
+                        shapes: Self::convert_shapes_to_owned(header_footer.shapes),
+                        shape_groups: Self::convert_shape_groups_to_owned(
+                            header_footer.shape_groups,
+                        ),
+                        drawing_order: header_footer.drawing_order,
+                        story_events: header_footer.story_events,
                     })
                     .collect(),
             })
@@ -1453,6 +3104,7 @@ impl<'a> RtfDocument<'a> {
         group: super::shape::ShapeGroup<'_>,
     ) -> super::shape::ShapeGroup<'static> {
         super::shape::ShapeGroup {
+            position: group.position,
             name: Cow::Owned(group.name.into_owned()),
             shapes: group
                 .shapes
@@ -1464,24 +3116,34 @@ impl<'a> RtfDocument<'a> {
                 .into_iter()
                 .map(Self::convert_shape_group_to_owned)
                 .collect(),
+            child_order: group.child_order,
+            info: group.info,
             geometry: group.geometry,
             properties: group
                 .properties
                 .into_iter()
                 .map(Self::convert_shape_property_to_owned)
                 .collect(),
+            result: group.result.map(crate::ShapeResult::into_owned),
         }
     }
 
     fn convert_shape_to_owned(shape: super::shape::Shape<'_>) -> super::shape::Shape<'static> {
         super::shape::Shape {
+            position: shape.position,
+            instruction_present: shape.instruction_present,
             shape_type: shape.shape_type,
             geometry: shape.geometry,
             fill: shape.fill,
             border: shape.border,
             line: shape.line,
             text: Cow::Owned(shape.text.into_owned()),
+            text_destination_present: shape.text_destination_present,
             text_formatting: shape.text_formatting,
+            text_shapes: Self::convert_shapes_to_owned(shape.text_shapes),
+            text_shape_groups: Self::convert_shape_groups_to_owned(shape.text_shape_groups),
+            text_drawing_order: shape.text_drawing_order,
+            text_story_events: shape.text_story_events,
             wrap_mode: shape.wrap_mode,
             behind_doc: shape.behind_doc,
             is_background: shape.is_background,
@@ -1492,6 +3154,8 @@ impl<'a> RtfDocument<'a> {
                 .into_iter()
                 .map(Self::convert_shape_property_to_owned)
                 .collect(),
+            result: shape.result.map(super::shape::ShapeResult::into_owned),
+            info: shape.info,
         }
     }
 
@@ -1501,6 +3165,10 @@ impl<'a> RtfDocument<'a> {
         super::shape::ShapeProperty {
             name: Cow::Owned(property.name.into_owned()),
             value: Cow::Owned(property.value.into_owned()),
+            binary_value: property
+                .binary_value
+                .map(|value| Cow::Owned(value.into_owned())),
+            theme_value: property.theme_value,
         }
     }
 
@@ -1551,8 +3219,12 @@ impl<'a> RtfDocument<'a> {
             category: info.category.map(|value| Cow::Owned(value.into_owned())),
             keywords: info.keywords.map(|value| Cow::Owned(value.into_owned())),
             comment: info.comment.map(|value| Cow::Owned(value.into_owned())),
-            document_comment: info.document_comment.map(|value| Cow::Owned(value.into_owned())),
-            hyperlink_base: info.hyperlink_base.map(|value| Cow::Owned(value.into_owned())),
+            document_comment: info
+                .document_comment
+                .map(|value| Cow::Owned(value.into_owned())),
+            hyperlink_base: info
+                .hyperlink_base
+                .map(|value| Cow::Owned(value.into_owned())),
             version: info.version,
             revision: info.revision,
             creation_time: info
@@ -1591,6 +3263,10 @@ impl<'a> RtfDocument<'a> {
                 initials: Cow::Owned(annotation.initials.into_owned()),
                 date: annotation.date.map(|value| Cow::Owned(value.into_owned())),
                 text: Cow::Owned(annotation.text.into_owned()),
+                shapes: Self::convert_shapes_to_owned(annotation.shapes),
+                shape_groups: Self::convert_shape_groups_to_owned(annotation.shape_groups),
+                drawing_order: annotation.drawing_order,
+                story_events: annotation.story_events,
                 position: annotation.position,
                 range_end: annotation.range_end,
                 parent_id: annotation
@@ -1609,10 +3285,15 @@ impl<'a> RtfDocument<'a> {
         notes
             .into_iter()
             .map(|note| super::section::Note {
+                position: note.position,
                 is_footnote: note.is_footnote,
                 reference: Cow::Owned(note.reference.into_owned()),
                 content: Cow::Owned(note.content.into_owned()),
                 formatting: note.formatting,
+                shapes: Self::convert_shapes_to_owned(note.shapes),
+                shape_groups: Self::convert_shape_groups_to_owned(note.shape_groups),
+                drawing_order: note.drawing_order,
+                story_events: note.story_events,
             })
             .collect()
     }
@@ -1640,6 +3321,47 @@ impl<'a> RtfDocument<'a> {
         &self.notes
     }
 
+    /// Append a validated footnote or endnote at a UTF-8 main-story boundary.
+    pub fn push_note(&mut self, note: super::section::Note<'a>) -> RtfResult<()> {
+        note.validate()?;
+        if self.text().get(note.position..note.position).is_none()
+            || self
+                .notes
+                .last()
+                .is_some_and(|previous| previous.position > note.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF notes are outside or out of main-story order".to_string(),
+            ));
+        }
+        if self.notes.len() >= super::section::MAX_NOTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF note count exceeds the safety limit".to_string(),
+            ));
+        }
+        let aggregate = note.text_bytes().and_then(|initial| {
+            self.notes.iter().try_fold(initial, |size, existing| {
+                size.checked_add(existing.text_bytes()?)
+            })
+        });
+        if aggregate.is_none_or(|size| size > super::section::MAX_NOTE_TEXT_TOTAL_BYTES) {
+            return Err(RtfError::MalformedDocument(
+                "RTF note aggregate text exceeds the safety limit".to_string(),
+            ));
+        }
+        let index = self.notes.len();
+        self.notes.push(note);
+        self.insert_body_story_event(crate::BodyStoryEvent::Note(index))?;
+        Ok(())
+    }
+
+    /// Remove all footnotes and endnotes.
+    pub fn clear_notes(&mut self) {
+        self.notes.clear();
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::Note(_)));
+    }
+
     /// Return explicit document-level footnote and endnote configuration.
     pub fn note_options(&self) -> &crate::NoteOptions {
         &self.note_options
@@ -1658,7 +3380,10 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Replace note-separator destinations after validation.
-    pub fn set_note_separators(&mut self, separators: crate::NoteSeparatorTable<'a>) -> RtfResult<()> {
+    pub fn set_note_separators(
+        &mut self,
+        separators: crate::NoteSeparatorTable<'a>,
+    ) -> RtfResult<()> {
         separators.validate()?;
         self.note_separators = separators;
         Ok(())
@@ -1733,10 +3458,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append a validated tracked change.
-    pub fn push_revision(
-        &mut self,
-        revision: super::annotation::Revision<'a>,
-    ) -> RtfResult<()> {
+    pub fn push_revision(&mut self, revision: super::annotation::Revision<'a>) -> RtfResult<()> {
         revision.validate()?;
         if self.revisions.len() >= super::annotation::MAX_REVISIONS {
             return Err(RtfError::MalformedDocument(
@@ -1744,14 +3466,10 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         let author_index = usize::try_from(revision.id).map_err(|_| {
-            RtfError::MalformedDocument(
-                "RTF revision author index cannot be negative".to_string(),
-            )
+            RtfError::MalformedDocument("RTF revision author index cannot be negative".to_string())
         })?;
         let author = self.revision_authors.get(author_index).ok_or_else(|| {
-            RtfError::MalformedDocument(
-                "RTF revision author index is outside revtbl".to_string(),
-            )
+            RtfError::MalformedDocument("RTF revision author index is outside revtbl".to_string())
         })?;
         if author.name != revision.author {
             return Err(RtfError::MalformedDocument(
@@ -1795,8 +3513,7 @@ impl<'a> RtfDocument<'a> {
             },
             _ => {
                 return Err(RtfError::MalformedDocument(
-                    "this RTF revision kind has no lossless scoped-run representation"
-                        .to_string(),
+                    "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
             },
         }
@@ -1814,13 +3531,120 @@ impl<'a> RtfDocument<'a> {
                 "RTF aggregate revision text exceeds the safety limit".to_string(),
             ));
         }
+        let index = self.revisions.len();
+        let kind = revision.revision_type;
         self.revisions.push(revision);
+        match kind {
+            super::annotation::RevisionType::Insertion => {
+                self.insert_body_story_event(crate::BodyStoryEvent::RevisionStart(index))?;
+                self.insert_body_story_event(crate::BodyStoryEvent::RevisionEnd(index))?;
+            },
+            super::annotation::RevisionType::Deletion => {
+                self.insert_body_story_event(crate::BodyStoryEvent::RevisionDeletion(index))?;
+            },
+            _ => unreachable!("revision kind validated above"),
+        }
         Ok(())
+    }
+
+    /// Append tracked-change metadata for ownership by a table-cell story.
+    pub fn push_cell_revision_metadata(
+        &mut self,
+        revision: super::annotation::Revision<'a>,
+    ) -> RtfResult<usize> {
+        revision.validate()?;
+        if self.revisions.len() >= super::annotation::MAX_REVISIONS {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision count exceeds the safety limit".to_string(),
+            ));
+        }
+        let author_index = usize::try_from(revision.id).map_err(|_| {
+            RtfError::MalformedDocument("RTF revision author index cannot be negative".to_string())
+        })?;
+        if self
+            .revision_authors
+            .get(author_index)
+            .is_none_or(|author| author.name != revision.author)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision author is missing from or does not match revtbl".to_string(),
+            ));
+        }
+        let total = self.revisions.iter().try_fold(revision.content.len(), |total, existing| {
+            total.checked_add(existing.content.len())
+        });
+        if total.is_none_or(|total| total > super::annotation::MAX_REVISION_TEXT_TOTAL_BYTES) {
+            return Err(RtfError::MalformedDocument(
+                "RTF aggregate revision text exceeds the safety limit".to_string(),
+            ));
+        }
+        let index = self.revisions.len();
+        self.revisions.push(revision);
+        Ok(index)
+    }
+
+    /// Atomically append tracked-change metadata and attach its event(s) to one cell story.
+    pub fn push_revision_for_cell(
+        &mut self,
+        path: &crate::TableCellPath,
+        revision: super::annotation::Revision<'a>,
+    ) -> RtfResult<usize> {
+        let kind = revision.revision_type;
+        let position = revision.position;
+        let range_end = revision.range_end;
+        let cell = self.table_cell_mut(path)?;
+        match kind {
+            super::annotation::RevisionType::Insertion
+                if cell.text().get(position..range_end) == Some(revision.content.as_ref()) => {},
+            super::annotation::RevisionType::Deletion
+                if cell.text().get(position..position).is_some() => {},
+            super::annotation::RevisionType::Insertion => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF insertion revision does not match its table-cell range".to_string(),
+                ));
+            },
+            super::annotation::RevisionType::Deletion => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF deletion revision is outside its table-cell story".to_string(),
+                ));
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "this RTF revision kind has no lossless scoped-run representation".to_string(),
+                ));
+            },
+        }
+        let index = self.push_cell_revision_metadata(revision)?;
+        let result = match kind {
+            super::annotation::RevisionType::Insertion => self
+                .table_cell_mut(path)?
+                .push_insertion_revision_reference(index, position, range_end),
+            super::annotation::RevisionType::Deletion => self
+                .table_cell_mut(path)?
+                .push_deletion_revision_reference(index, position),
+            _ => unreachable!(),
+        };
+        if let Err(error) = result {
+            self.revisions.pop();
+            return Err(error);
+        }
+        Ok(index)
     }
 
     /// Remove all tracked changes while retaining the ordered author table.
     pub fn clear_revisions(&mut self) {
         self.revisions.clear();
+        self.body_story_events.retain(|event| {
+            !matches!(
+                event,
+                crate::BodyStoryEvent::RevisionStart(_)
+                    | crate::BodyStoryEvent::RevisionEnd(_)
+                    | crate::BodyStoryEvent::RevisionDeletion(_)
+            )
+        });
+        for table in &mut self.tables {
+            table.clear_revision_references();
+        }
     }
 }
 
@@ -1861,15 +3685,15 @@ mod tests {
                     {\sp{\sn fLine}{\sv 0}}
                     {\sp{\sn lineColor}{\sv 460809}}
                     {\sp{\sn lineWidth}{\sv 12700}}
-                    {\sp{\sn futureOfficeArtProperty}{\sv retained}}}
-                {\shptxt Hello \u20320?}}
-            {\shpgrp\shpleft1\shptop2\shpright801\shpbottom602
+                    {\sp{\sn futureOfficeArtProperty}{\sv retained}}
+                    {\shptxt Hello \u20320?}}}
+            {\shpgrp{\*\shpinst\shpleft1\shptop2\shpright801\shpbottom602
                 {\sp{\sn wzName}{\sv Owned Group}}
-                {\shp\shpinst1\shpleft5\shptop6\shpwidth70\shpheight80\shpfblwtxt1}
-                {\shp\shpinst3\shpleft15\shptop16\shpwidth90\shpheight100}
-                {\shpgrp\shpleft100\shptop110\shpright400\shpbottom510
+                {\shp{\*\shpinst\shpleft5\shptop6\shpwidth70\shpheight80\shpfblwtxt1{\sp{\sn shapeType}{\sv 1}}}}
+                {\shp{\*\shpinst\shpleft15\shptop16\shpwidth90\shpheight100{\sp{\sn shapeType}{\sv 3}}}}
+                {\shpgrp{\*\shpinst\shpleft100\shptop110\shpright400\shpbottom510
                     {\sp{\sn wzName}{\sv Owned Nested Group}}
-                    {\shp\shpinst20\shpleft1\shptop2\shpwidth3\shpheight4}}}
+                    {\shp{\*\shpinst\shpleft1\shptop2\shpwidth3\shpheight4{\sp{\sn shapeType}{\sv 20}}}}}}}}
         }"#;
         let doc = RtfDocument::parse(rtf).unwrap();
 
@@ -1939,10 +3763,10 @@ mod tests {
     fn rejects_excessively_nested_shape_groups() {
         let mut rtf = String::from("{\\rtf1");
         for _ in 0..=64 {
-            rtf.push_str("{\\shpgrp");
+            rtf.push_str("{\\shpgrp{\\*\\shpinst");
         }
         for _ in 0..=64 {
-            rtf.push('}');
+            rtf.push_str("}}");
         }
         rtf.push('}');
 
@@ -1980,8 +3804,15 @@ mod tests {
         let rtf = include_str!("../../../test-data/rtf/watermark.rtf");
         let doc = RtfDocument::parse(rtf).unwrap();
 
-        assert_eq!(doc.shapes().len(), 3);
-        let shape = &doc.shapes()[0];
+        assert!(doc.shapes().is_empty());
+        let header_shapes: Vec<_> = doc
+            .sections()
+            .iter()
+            .flat_map(|section| &section.headers_footers)
+            .flat_map(|header_footer| &header_footer.shapes)
+            .collect();
+        assert_eq!(header_shapes.len(), 3);
+        let shape = header_shapes[0];
         assert_eq!(shape.shape_type, crate::ShapeType::Custom(136));
         assert_eq!(shape.geometry.rotation, 315);
         assert_eq!(shape.fill.color.raw(), 6_108_695);
@@ -2076,13 +3907,15 @@ mod tests {
         for rtf in [
             r#"{\rtf1 body"#,
             r#"{\rtf1{\*\unknown destination"#,
-            r#"{\rtf1{\shp\shpleft1}"#,
-            r#"{\rtf1{\shp{\sp{\sn shapeType}{\sv 1}"#,
+            r#"{\rtf1{\shp{\*\shpinst\shpleft1}}"#,
+            r#"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}"#,
         ] {
-            assert!(matches!(
-                RtfDocument::parse(rtf),
-                Err(RtfError::UnexpectedEof)
-            ));
+            let result = RtfDocument::parse(rtf);
+            match result {
+                Err(RtfError::UnexpectedEof) => {},
+                Err(error) => panic!("unexpected error for {rtf:?}: {error}"),
+                Ok(_) => panic!("unexpected success for {rtf:?}"),
+            }
         }
     }
 

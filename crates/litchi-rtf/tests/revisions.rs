@@ -91,17 +91,19 @@ fn mutation_uses_utf8_boundaries_and_explicit_author_table() {
         })
         .unwrap();
 
-    assert!(document
-        .push_revision(Revision {
-            revision_type: RevisionType::Deletion,
-            author: Cow::Borrowed("Ada"),
-            date: Some(Cow::Borrowed("14")),
-            id: 0,
-            content: Cow::Borrowed("x"),
-            position: 2,
-            range_end: 2,
-        })
-        .is_err());
+    assert!(
+        document
+            .push_revision(Revision {
+                revision_type: RevisionType::Deletion,
+                author: Cow::Borrowed("Ada"),
+                date: Some(Cow::Borrowed("14")),
+                id: 0,
+                content: Cow::Borrowed("x"),
+                position: 2,
+                range_end: 2,
+            })
+            .is_err()
+    );
     assert!(document.clear_revision_authors().is_err());
 
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
@@ -137,7 +139,10 @@ fn parses_bundled_libreoffice_revision_fixtures() {
         "sw/qa/extras/rtfexport/data/FWDP90_min.rtf",
         "sw/qa/extras/rtfimport/data/tdf167710.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)

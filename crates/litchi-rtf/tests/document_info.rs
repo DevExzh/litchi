@@ -4,7 +4,9 @@ use std::fs;
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(document)
+        .unwrap();
     output
 }
 
@@ -17,11 +19,15 @@ fn parses_complete_typed_info_and_round_trips_without_body_leakage() {
         r#"{\creatim\yr2024\mo2\dy29\hr23\min59\sec58}{\revtim\yr2025\mo7}"#,
         r#"{\printim\yr2026\mo1\dy2}{\buptim\yr2023}"#,
         r#"\version4\vern9\edmins120\nofpages8\nofwords900\nofchars4200\nofcharsws5000\id77}Body}"#,
-    )).unwrap();
+    ))
+    .unwrap();
     let info = document.info();
     assert_eq!(info.comment.as_deref(), Some("Summary"));
     assert_eq!(info.document_comment.as_deref(), Some("Document note"));
-    assert_eq!(info.hyperlink_base.as_deref(), Some("https://example.test/base/"));
+    assert_eq!(
+        info.hyperlink_base.as_deref(),
+        Some("https://example.test/base/")
+    );
     assert_eq!(info.creation_timestamp.unwrap().day, Some(29));
     assert_eq!(info.revision_timestamp.unwrap().day, None);
     assert_eq!(info.backup_timestamp.unwrap().month, None);
@@ -40,8 +46,12 @@ fn writer_accepts_typed_and_legacy_timestamps_and_rejects_unsafe_values() {
     writer.write_document_header().unwrap();
     let mut info = DocumentInfo::new();
     info.creation_timestamp = Some(RtfTimestamp {
-        year: Some(2024), month: Some(2), day: Some(29),
-        hour: None, minute: None, second: None,
+        year: Some(2024),
+        month: Some(2),
+        day: Some(29),
+        hour: None,
+        minute: None,
+        second: None,
     });
     info.revision_time = Some(Cow::Borrowed("2025-07-16T12:34:56"));
     writer.write_document_info(&info).unwrap();
@@ -52,13 +62,25 @@ fn writer_accepts_typed_and_legacy_timestamps_and_rejects_unsafe_values() {
 
     let mut invalid = DocumentInfo::new();
     invalid.pages = Some(i32::MAX as u32 + 1);
-    assert!(RtfWriter::new(Vec::new()).write_document_info(&invalid).is_err());
+    assert!(
+        RtfWriter::new(Vec::new())
+            .write_document_info(&invalid)
+            .is_err()
+    );
     invalid.pages = None;
     invalid.creation_timestamp = Some(RtfTimestamp {
-        year: Some(2023), month: Some(2), day: Some(29),
-        hour: None, minute: None, second: None,
+        year: Some(2023),
+        month: Some(2),
+        day: Some(29),
+        hour: None,
+        minute: None,
+        second: None,
     });
-    assert!(RtfWriter::new(Vec::new()).write_document_info(&invalid).is_err());
+    assert!(
+        RtfWriter::new(Vec::new())
+            .write_document_info(&invalid)
+            .is_err()
+    );
 }
 
 #[test]
@@ -74,11 +96,22 @@ fn rejects_ambiguous_or_malformed_known_info_metadata() {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 
-    let invalid_calendar = RtfDocument::parse(
-        r#"{\rtf1{\info{\creatim\yr2023\mo2\dy29}{\revtim\hr24}}}"#,
-    ).unwrap();
-    assert!(!invalid_calendar.info().creation_timestamp.unwrap().is_valid());
-    assert!(!invalid_calendar.info().revision_timestamp.unwrap().is_valid());
+    let invalid_calendar =
+        RtfDocument::parse(r#"{\rtf1{\info{\creatim\yr2023\mo2\dy29}{\revtim\hr24}}}"#).unwrap();
+    assert!(
+        !invalid_calendar
+            .info()
+            .creation_timestamp
+            .unwrap()
+            .is_valid()
+    );
+    assert!(
+        !invalid_calendar
+            .info()
+            .revision_timestamp
+            .unwrap()
+            .is_valid()
+    );
 }
 
 #[test]
@@ -88,7 +121,10 @@ fn parses_real_libreoffice_info_fixtures() {
         "sw/qa/extras/ooxmlexport/data/ooo39250-1-min.rtf",
         "sw/qa/extras/ooxmlexport/data/tdf154703_framePr2.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for (index, fixture) in FIXTURES.iter().enumerate() {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)
@@ -112,8 +148,14 @@ fn preserves_libreoffice_zero_timestamp_sentinels() {
     let revision = document.info().revision_timestamp.unwrap();
     let printed = document.info().print_timestamp.unwrap();
 
-    assert_eq!((revision.year, revision.month, revision.day), (Some(0), Some(0), Some(0)));
-    assert_eq!((printed.year, printed.month, printed.day), (Some(0), Some(0), Some(0)));
+    assert_eq!(
+        (revision.year, revision.month, revision.day),
+        (Some(0), Some(0), Some(0))
+    );
+    assert_eq!(
+        (printed.year, printed.month, printed.day),
+        (Some(0), Some(0), Some(0))
+    );
     assert!(!revision.is_valid());
     assert!(!printed.is_valid());
 

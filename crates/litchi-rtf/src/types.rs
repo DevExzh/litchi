@@ -1,6 +1,6 @@
 //! RTF document type definitions.
 
-use super::border::{CharacterBorder, CharacterShading, Borders, Shading};
+use super::border::{Borders, CharacterBorder, CharacterShading, Shading};
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::num::NonZeroU16;
@@ -145,11 +145,23 @@ impl EmbeddedFont<'_> {
     pub const MAX_FILE_NAME_BYTES: usize = 4_096;
 
     pub fn validate(&self) -> RtfResult<()> {
-        if self.file_name.as_ref().is_some_and(|name| name.is_empty() || name.len() > Self::MAX_FILE_NAME_BYTES) {
-            return Err(RtfError::MalformedDocument("invalid or oversized RTF embedded font file name".to_string()));
+        if self
+            .file_name
+            .as_ref()
+            .is_some_and(|name| name.is_empty() || name.len() > Self::MAX_FILE_NAME_BYTES)
+        {
+            return Err(RtfError::MalformedDocument(
+                "invalid or oversized RTF embedded font file name".to_string(),
+            ));
         }
-        if self.data.as_ref().is_some_and(|data| data.is_empty() || data.len() > Self::MAX_DATA_BYTES) {
-            return Err(RtfError::MalformedDocument("invalid or oversized RTF embedded font data".to_string()));
+        if self
+            .data
+            .as_ref()
+            .is_some_and(|data| data.is_empty() || data.len() > Self::MAX_DATA_BYTES)
+        {
+            return Err(RtfError::MalformedDocument(
+                "invalid or oversized RTF embedded font data".to_string(),
+            ));
         }
         Ok(())
     }
@@ -208,10 +220,18 @@ impl<'a> Font<'a> {
         const MAX_FONT_NAME_BYTES: usize = 4_096;
         if self.name.is_empty()
             || self.name.len() > MAX_FONT_NAME_BYTES
-            || self.alternate_name.as_ref().is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
-            || self.non_tagged_name.as_ref().is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
+            || self
+                .alternate_name
+                .as_ref()
+                .is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
+            || self
+                .non_tagged_name
+                .as_ref()
+                .is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
         {
-            return Err(RtfError::MalformedDocument("invalid or oversized RTF font name".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "invalid or oversized RTF font name".to_string(),
+            ));
         }
         if let Some(embedded) = &self.embedded {
             embedded.validate()?;
@@ -224,8 +244,12 @@ impl<'a> Font<'a> {
             name: Cow::Owned(self.name.into_owned()),
             family: self.family,
             charset: self.charset,
-            alternate_name: self.alternate_name.map(|name| Cow::Owned(name.into_owned())),
-            non_tagged_name: self.non_tagged_name.map(|name| Cow::Owned(name.into_owned())),
+            alternate_name: self
+                .alternate_name
+                .map(|name| Cow::Owned(name.into_owned())),
+            non_tagged_name: self
+                .non_tagged_name
+                .map(|name| Cow::Owned(name.into_owned())),
             panose: self.panose,
             pitch: self.pitch,
             code_page: self.code_page,
@@ -245,7 +269,10 @@ impl<'a> FontTable<'a> {
     /// Create a new font table.
     #[inline]
     pub fn new() -> Self {
-        Self { fonts: Vec::new(), defined: Vec::new() }
+        Self {
+            fonts: Vec::new(),
+            defined: Vec::new(),
+        }
     }
 
     /// Add a font to the table at a specific index.
@@ -280,12 +307,17 @@ impl<'a> FontTable<'a> {
     }
 
     pub fn is_defined(&self, font_ref: FontRef) -> bool {
-        self.defined.get(font_ref as usize).copied().unwrap_or(false)
+        self.defined
+            .get(font_ref as usize)
+            .copied()
+            .unwrap_or(false)
     }
 
     pub fn validate(&self) -> RtfResult<()> {
         if self.fonts.len() > 65_536 || self.defined.len() != self.fonts.len() {
-            return Err(RtfError::MalformedDocument("invalid RTF font-table size".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF font-table size".to_string(),
+            ));
         }
         const MAX_AGGREGATE_EMBEDDED_BYTES: usize = 256 * 1_048_576;
         let mut aggregate = 0usize;
@@ -297,18 +329,32 @@ impl<'a> FontTable<'a> {
             font.validate()?;
             aggregate = aggregate
                 .checked_add(font.name.len())
-                .and_then(|total| total.checked_add(font.alternate_name.as_ref().map_or(0, |name| name.len())))
-                .and_then(|total| total.checked_add(font.non_tagged_name.as_ref().map_or(0, |name| name.len())))
-                .ok_or_else(|| RtfError::MalformedDocument("RTF font-table text size overflow".to_string()))?;
+                .and_then(|total| {
+                    total.checked_add(font.alternate_name.as_ref().map_or(0, |name| name.len()))
+                })
+                .and_then(|total| {
+                    total.checked_add(font.non_tagged_name.as_ref().map_or(0, |name| name.len()))
+                })
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument("RTF font-table text size overflow".to_string())
+                })?;
             embedded_aggregate = embedded_aggregate
-                .checked_add(font.embedded.as_ref().map_or(0, |embedded| embedded.data.as_ref().map_or(0, |data| data.len())))
-                .ok_or_else(|| RtfError::MalformedDocument("RTF font-table embedded size overflow".to_string()))?;
+                .checked_add(font.embedded.as_ref().map_or(0, |embedded| {
+                    embedded.data.as_ref().map_or(0, |data| data.len())
+                }))
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument("RTF font-table embedded size overflow".to_string())
+                })?;
         }
         if aggregate > 16 * 1_048_576 {
-            return Err(RtfError::MalformedDocument("RTF font-table text exceeds the safety limit".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF font-table text exceeds the safety limit".to_string(),
+            ));
         }
         if embedded_aggregate > MAX_AGGREGATE_EMBEDDED_BYTES {
-            return Err(RtfError::MalformedDocument("RTF font-table embedded fonts exceed the safety limit".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF font-table embedded fonts exceed the safety limit".to_string(),
+            ));
         }
         Ok(())
     }
@@ -394,7 +440,15 @@ pub struct Indentation {
     /// First line indent (in twips)
     pub first_line: i32,
 }
-#[derive(Debug,Clone,Copy,PartialEq,Eq,Default)]pub struct ParagraphLogicalIndentation{pub start:Option<i32>,pub end:Option<i32>,pub first_line_character_units:Option<i32>,pub left_character_units:Option<i32>,pub right_character_units:Option<i32>,pub mirrored:bool}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParagraphLogicalIndentation {
+    pub start: Option<i32>,
+    pub end: Option<i32>,
+    pub first_line_character_units: Option<i32>,
+    pub left_character_units: Option<i32>,
+    pub right_character_units: Option<i32>,
+    pub mirrored: bool,
+}
 
 /// Paragraph wrapping policy from `wrapdefault`, `nocwrap`, `nowwrap`, and `nooverflow`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -435,9 +489,78 @@ pub struct ParagraphLineBreaking {
     pub font_alignment: ParagraphFontAlignment,
 }
 
+/// Maximum supported number of lines occupied by a paragraph drop cap.
+pub const MAX_PARAGRAPH_DROP_CAP_LINES: u16 = 255;
+
+/// Placement selected by the RTF `\\dropcaptN` paragraph property.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParagraphDropCapKind {
+    /// Drop cap remains within the regular text margin (`\\dropcapt1`).
+    InText,
+    /// Drop cap is placed in the left margin (`\\dropcapt2`).
+    Margin,
+}
+
+impl ParagraphDropCapKind {
+    /// Return the canonical RTF numeric value.
+    pub const fn as_rtf_value(self) -> i32 {
+        match self {
+            Self::InText => 1,
+            Self::Margin => 2,
+        }
+    }
+}
+
+/// Complete, validated paragraph drop-cap settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphDropCap {
+    kind: ParagraphDropCapKind,
+    line_count: u8,
+}
+
+impl ParagraphDropCap {
+    /// Construct a complete drop cap.
+    pub fn new(kind: ParagraphDropCapKind, line_count: u16) -> crate::RtfResult<Self> {
+        if !(1..=MAX_PARAGRAPH_DROP_CAP_LINES).contains(&line_count) {
+            return Err(crate::RtfError::InvalidStructure(format!(
+                "RTF drop-cap line count must be in 1..={MAX_PARAGRAPH_DROP_CAP_LINES}"
+            )));
+        }
+        Ok(Self {
+            kind,
+            line_count: line_count as u8,
+        })
+    }
+
+    /// Drop-cap placement.
+    pub const fn kind(self) -> ParagraphDropCapKind {
+        self.kind
+    }
+
+    /// Number of text lines occupied by the drop cap.
+    pub const fn line_count(self) -> u8 {
+        self.line_count
+    }
+
+    /// Validate the model before serialization.
+    pub fn validate(self) -> crate::RtfResult<()> {
+        if self.line_count == 0 {
+            return Err(crate::RtfError::InvalidStructure(
+                "RTF drop-cap line count must be nonzero".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Paragraph properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Paragraph {
+    /// Applied paragraph-style handle from `\\sN`.
+    ///
+    /// The reference is retained as inert provenance; concrete paragraph and
+    /// character properties remain independently represented.
+    pub paragraph_style: Option<u16>,
     /// Explicit paragraph direction; `None` uses left-to-right precedence.
     pub direction: Option<TextDirection>,
     /// Text alignment
@@ -463,12 +586,37 @@ pub struct Paragraph {
     pub page_break_before: bool,
     /// Widow/orphan control
     pub widow_control: bool,
+    /// Complete drop-cap settings from `\\dropcapliN` and `\\dropcaptN`.
+    pub drop_cap: Option<ParagraphDropCap>,
     /// Line-breaking and automatic-spacing policy.
     pub line_breaking: ParagraphLineBreaking,
     /// List override index (`\lsN`) applied to this paragraph
     pub list_override: Option<i32>,
     /// Zero-based list level (`\ilvlN`) applied to this paragraph
     pub list_level: Option<u8>,
+    /// Index into the document's ordered inert legacy `pn` record table.
+    pub legacy_numbering: Option<u32>,
+}
+
+impl Paragraph {
+    /// Set or clear the applied paragraph-style handle.
+    #[inline]
+    pub fn set_paragraph_style(&mut self, value: Option<u16>) {
+        self.paragraph_style = value;
+    }
+
+    /// Replace the paragraph shading after validating its RTF domain.
+    pub fn set_shading(&mut self, shading: Shading) -> crate::RtfResult<()> {
+        shading.validate()?;
+        self.shading = shading;
+        Ok(())
+    }
+
+    /// Clear all explicit paragraph-shading controls.
+    #[inline]
+    pub fn clear_shading(&mut self) {
+        self.shading.clear();
+    }
 }
 
 /// Underline style
@@ -504,22 +652,152 @@ pub enum TextDirection {
     RightToLeft,
 }
 
+/// Character repertoire selected for a formatted run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CharacterType {
+    /// Low ANSI characters (`\\loch`, byte range 0x00 through 0x7f).
+    LowAnsi,
+    /// High ANSI characters (`\\hich`, byte range 0x80 through 0xff).
+    HighAnsi,
+    /// Double-byte characters (`\\dbch`).
+    DoubleByte,
+}
+
+/// Exact form of the East Asian character-grid control.
+///
+/// Parameterless `\\cgrid` is retained separately from a numeric value because
+/// both forms are emitted by common RTF producers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CharacterGrid {
+    /// A parameterless `\\cgrid` control.
+    Parameterless,
+    /// An explicit signed 16-bit `\\cgridN` value.
+    Value(i16),
+}
+
+/// Associated-font baseline selected by `\\aupN` or `\\adnN`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssociatedCharacterBaseline {
+    /// Raise the associated font by the given number of half-points.
+    RaisedHalfPoints(u16),
+    /// Lower the associated font by the given number of half-points.
+    LoweredHalfPoints(u16),
+}
+
+/// Underline styles defined for an associated font.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssociatedUnderlineStyle {
+    None,
+    Single,
+    Dotted,
+    Double,
+    Words,
+}
+
 /// Associated character properties used for complex-script text.
 ///
 /// Optional fields preserve the distinction between an omitted property and an
 /// explicit off value such as `\ab0` or `\ai0`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct AssociatedCharacterFormatting {
+    /// Associated bold override from `\\ab` or `\\ab0`.
+    pub bold: Option<bool>,
+    /// Associated all-capitals override from `\\acaps` or `\\acaps0`.
+    pub all_caps: Option<bool>,
+    /// Associated foreground color from `\\acfN`.
+    pub color_ref: Option<ColorRef>,
+    /// Associated baseline from `\\adnN` or `\\aupN`.
+    pub baseline: Option<AssociatedCharacterBaseline>,
+    /// Associated character expansion in quarter-points from `\\aexpndN`.
+    pub expansion_quarter_points: Option<i16>,
     /// Associated font reference from `\afN`.
     pub font_ref: Option<FontRef>,
     /// Associated font size in half-points from `\afsN`.
     pub font_size: Option<NonZeroU16>,
     /// Associated complex-script language from `\alangN`.
     pub language: Option<crate::LanguageId>,
-    /// Associated bold override from `\ab` or `\ab0`.
-    pub bold: Option<bool>,
     /// Associated italic override from `\ai` or `\ai0`.
     pub italic: Option<bool>,
+    /// Associated outline override from `\\aoutl` or `\\aoutl0`.
+    pub outline: Option<bool>,
+    /// Associated small-capitals override from `\\ascaps` or `\\ascaps0`.
+    pub small_caps: Option<bool>,
+    /// Associated shadow override from `\\ashad` or `\\ashad0`.
+    pub shadow: Option<bool>,
+    /// Associated strikethrough override from `\\astrike` or `\\astrike0`.
+    pub strike: Option<bool>,
+    /// Associated underline selector, including an explicit no-underline value.
+    pub underline: Option<AssociatedUnderlineStyle>,
+}
+
+impl AssociatedCharacterFormatting {
+    /// Replace this metadata with the omitted/default state.
+    #[inline]
+    pub fn clear(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Set or clear the associated baseline after validating the RTF domain.
+    pub fn set_baseline(
+        &mut self,
+        value: Option<AssociatedCharacterBaseline>,
+    ) -> crate::RtfResult<()> {
+        if matches!(
+            value,
+            Some(
+                AssociatedCharacterBaseline::RaisedHalfPoints(value)
+                    | AssociatedCharacterBaseline::LoweredHalfPoints(value)
+            ) if i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS
+        ) {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF associated character baseline is out of range".to_string(),
+            ));
+        }
+        self.baseline = value;
+        Ok(())
+    }
+
+    /// Set or clear associated quarter-point expansion.
+    pub fn set_expansion_quarter_points(&mut self, value: Option<i32>) -> crate::RtfResult<()> {
+        self.expansion_quarter_points = match value {
+            None => None,
+            Some(value)
+                if (-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION)
+                    .contains(&value) =>
+            {
+                Some(value as i16)
+            },
+            Some(_) => {
+                return Err(crate::RtfError::MalformedDocument(
+                    "RTF associated character expansion is out of range".to_string(),
+                ));
+            },
+        };
+        Ok(())
+    }
+
+    /// Validate metadata before canonical serialization.
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if let Some(baseline) = self.baseline {
+            let value = match baseline {
+                AssociatedCharacterBaseline::RaisedHalfPoints(value)
+                | AssociatedCharacterBaseline::LoweredHalfPoints(value) => value,
+            };
+            if i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS {
+                return Err(crate::RtfError::MalformedDocument(
+                    "RTF associated character baseline is out of range".to_string(),
+                ));
+            }
+        }
+        if self.expansion_quarter_points.is_some_and(|value| {
+            i32::from(value).unsigned_abs() > crate::MAX_CHARACTER_EXPANSION as u32
+        }) {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF associated character expansion is out of range".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Character formatting properties.
@@ -527,12 +805,20 @@ pub struct AssociatedCharacterFormatting {
 pub struct Formatting {
     /// Typed baseline, expansion, scaling, and kerning state.
     pub character_positioning: crate::CharacterPositioning,
+    /// Applied character-style handle from `\\csN`.
+    ///
+    /// RTF requires the concrete style properties to accompany the reference,
+    /// so this is retained as inert provenance rather than resolved into the
+    /// surrounding formatting.
+    pub character_style: Option<u16>,
     /// Font reference
     pub font_ref: FontRef,
     /// Font size in half-points
     pub font_size: NonZeroU16,
     /// Color reference
     pub color_ref: ColorRef,
+    /// Exact background color reference from `\cbN`; `None` preserves omission.
+    pub background_color: Option<ColorRef>,
     /// Background/highlight color reference
     pub highlight_color: Option<ColorRef>,
     /// Character border introduced by `chbrdr`.
@@ -585,6 +871,15 @@ pub struct Formatting {
     pub no_proof: bool,
     /// Explicit character-run direction; `None` uses left-to-right precedence.
     pub direction: Option<TextDirection>,
+    /// Character repertoire selected by `\\loch`, `\\hich`, or `\\dbch`.
+    pub character_type: Option<CharacterType>,
+    /// Complex-script selector from `\\fcs0` or `\\fcs1`.
+    ///
+    /// `None` means that no selector was present; `Some(false)` preserves an
+    /// explicit `\\fcs0`.
+    pub complex_script: Option<bool>,
+    /// East Asian character-grid metadata from `\\cgrid` or `\\cgridN`.
+    pub character_grid: Option<CharacterGrid>,
     /// Associated complex-script character properties.
     pub associated: AssociatedCharacterFormatting,
 }
@@ -593,10 +888,11 @@ impl Default for Formatting {
     fn default() -> Self {
         Self {
             character_positioning: crate::CharacterPositioning::default(),
+            character_style: None,
             font_ref: 0,
-            // SAFETY: 24 (12pt) is non-zero
-            font_size: unsafe { NonZeroU16::new_unchecked(24) },
+            font_size: NonZeroU16::new(24).expect("non-zero default font size"),
             color_ref: 0,
+            background_color: None,
             highlight_color: None,
             character_border: None,
             character_shading: None,
@@ -623,8 +919,49 @@ impl Default for Formatting {
             east_asian_language_no_proof: None,
             no_proof: false,
             direction: None,
+            character_type: None,
+            complex_script: None,
+            character_grid: None,
             associated: AssociatedCharacterFormatting::default(),
         }
+    }
+}
+
+impl Formatting {
+    /// Set or clear the applied character-style handle.
+    #[inline]
+    pub fn set_character_style(&mut self, value: Option<u16>) {
+        self.character_style = value;
+    }
+
+    /// Set or clear the exact `\cbN` character background color.
+    #[inline]
+    pub fn set_background_color(&mut self, value: Option<ColorRef>) {
+        self.background_color = value;
+    }
+
+    /// Clear the exact character background color without changing highlighting.
+    #[inline]
+    pub fn clear_background_color(&mut self) {
+        self.background_color = None;
+    }
+
+    /// Set or clear the character repertoire selector.
+    #[inline]
+    pub fn set_character_type(&mut self, value: Option<CharacterType>) {
+        self.character_type = value;
+    }
+
+    /// Set or clear the complex-script selector.
+    #[inline]
+    pub fn set_complex_script(&mut self, value: Option<bool>) {
+        self.complex_script = value;
+    }
+
+    /// Set or clear the East Asian character-grid metadata.
+    #[inline]
+    pub fn set_character_grid(&mut self, value: Option<CharacterGrid>) {
+        self.character_grid = value;
     }
 }
 

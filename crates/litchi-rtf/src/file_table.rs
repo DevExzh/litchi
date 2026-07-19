@@ -98,10 +98,18 @@ impl<'a> FileTable<'a> {
     pub fn add(&mut self, entry: FileTableEntry<'a>) -> RtfResult<()> {
         entry.validate()?;
         if self.entries.len() >= MAX_FILE_TABLE_ENTRIES {
-            return Err(RtfError::MalformedDocument("RTF file table exceeds the entry limit".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF file table exceeds the entry limit".to_string(),
+            ));
         }
-        if self.entries.last().is_some_and(|previous| previous.id >= entry.id) {
-            return Err(RtfError::MalformedDocument("RTF file-table IDs are duplicated or out of order".to_string()));
+        if self
+            .entries
+            .last()
+            .is_some_and(|previous| previous.id >= entry.id)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF file-table IDs are duplicated or out of order".to_string(),
+            ));
         }
         self.entries.push(entry);
         Ok(())
@@ -109,7 +117,9 @@ impl<'a> FileTable<'a> {
 
     pub fn validate(&self) -> RtfResult<()> {
         if self.entries.is_empty() || self.entries.len() > MAX_FILE_TABLE_ENTRIES {
-            return Err(RtfError::MalformedDocument("RTF file table has an invalid entry count".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF file table has an invalid entry count".to_string(),
+            ));
         }
         let mut ids = HashSet::with_capacity(self.entries.len());
         let mut previous = None;
@@ -117,7 +127,9 @@ impl<'a> FileTable<'a> {
         for entry in &self.entries {
             entry.validate()?;
             if !ids.insert(entry.id) || previous.is_some_and(|id| id >= entry.id) {
-                return Err(RtfError::MalformedDocument("RTF file-table IDs are duplicated or out of order".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "RTF file-table IDs are duplicated or out of order".to_string(),
+                ));
             }
             previous = Some(entry.id);
             text_bytes = text_bytes.checked_add(entry.name.len()).ok_or_else(|| {
@@ -125,12 +137,20 @@ impl<'a> FileTable<'a> {
             })?;
         }
         if text_bytes > MAX_FILE_TABLE_TEXT_BYTES {
-            return Err(RtfError::MalformedDocument("RTF file-table text exceeds the safety limit".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF file-table text exceeds the safety limit".to_string(),
+            ));
         }
         Ok(())
     }
 
     pub(crate) fn into_owned(self) -> FileTable<'static> {
-        FileTable { entries: self.entries.into_iter().map(FileTableEntry::into_owned).collect() }
+        FileTable {
+            entries: self
+                .entries
+                .into_iter()
+                .map(FileTableEntry::into_owned)
+                .collect(),
+        }
     }
 }

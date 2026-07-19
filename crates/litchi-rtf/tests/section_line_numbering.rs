@@ -1,11 +1,13 @@
 use litchi_rtf::{
-    RtfDocument, RtfWriter, Section, SectionLineNumberRestart, SectionLineNumbering,
-    MAX_SECTION_LINE_INCREMENT, MAX_SECTION_LINE_START,
+    MAX_SECTION_LINE_INCREMENT, MAX_SECTION_LINE_START, RtfDocument, RtfWriter, Section,
+    SectionLineNumberRestart, SectionLineNumbering,
 };
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(document)
+        .unwrap();
     output
 }
 
@@ -40,7 +42,9 @@ fn parses_bundled_libreoffice_line_numbering_fixtures() {
     assert!(continuous.sections().iter().any(|section| {
         section.properties.line_numbering
             == SectionLineNumbering {
-                increment: Some(5), distance: Some(283), start: None,
+                increment: Some(5),
+                distance: Some(283),
+                start: None,
                 restart: Some(SectionLineNumberRestart::Continuous),
             }
     }));
@@ -62,14 +66,24 @@ fn preserves_disabled_offset_defaults_restart_modes_and_sectd_reset() {
     let offset_only = RtfDocument::parse(r#"{\rtf1\linex0 Body}"#).unwrap();
     assert_eq!(
         offset_only.sections()[0].properties.line_numbering,
-        SectionLineNumbering { distance: Some(0), ..SectionLineNumbering::default() }
+        SectionLineNumbering {
+            distance: Some(0),
+            ..SectionLineNumbering::default()
+        }
     );
-    assert!(!offset_only.sections()[0].properties.line_numbering.is_enabled());
+    assert!(
+        !offset_only.sections()[0]
+            .properties
+            .line_numbering
+            .is_enabled()
+    );
 
-    let defaults = RtfDocument::parse(
-        r#"{\rtf1\linemod\linex\linestarts\linerestart X\sectd Y}"#,
-    ).unwrap();
-    assert_eq!(defaults.sections()[0].properties.line_numbering, SectionLineNumbering::default());
+    let defaults =
+        RtfDocument::parse(r#"{\rtf1\linemod\linex\linestarts\linerestart X\sectd Y}"#).unwrap();
+    assert_eq!(
+        defaults.sections()[0].properties.line_numbering,
+        SectionLineNumbering::default()
+    );
 
     for (control, expected) in [
         ("linerestart", SectionLineNumberRestart::Section),
@@ -78,7 +92,10 @@ fn preserves_disabled_offset_defaults_restart_modes_and_sectd_reset() {
     ] {
         let source = format!(r#"{{\rtf1\linemod1\{control} X}}"#);
         assert_eq!(
-            RtfDocument::parse(&source).unwrap().sections()[0].properties.line_numbering.restart,
+            RtfDocument::parse(&source).unwrap().sections()[0]
+                .properties
+                .line_numbering
+                .restart,
             Some(expected)
         );
     }
@@ -96,7 +113,10 @@ fn inert_destinations_do_not_change_section_line_numbering() {
     ] {
         let document = RtfDocument::parse(source).unwrap();
         assert!(
-            document.sections().iter().all(|section| section.properties.line_numbering.is_empty()),
+            document
+                .sections()
+                .iter()
+                .all(|section| section.properties.line_numbering.is_empty()),
             "destination leaked line numbering: {source}"
         );
     }
@@ -106,7 +126,10 @@ fn inert_destinations_do_not_change_section_line_numbering() {
 fn rejects_out_of_range_values_and_invalid_public_writer_state() {
     for source in [
         r#"{\rtf1\linemod-1 X}"#.to_string(),
-        format!(r#"{{\rtf1\linemod{} X}}"#, u32::from(MAX_SECTION_LINE_INCREMENT) + 1),
+        format!(
+            r#"{{\rtf1\linemod{} X}}"#,
+            u32::from(MAX_SECTION_LINE_INCREMENT) + 1
+        ),
         r#"{\rtf1\linex-1 X}"#.to_string(),
         r#"{\rtf1\linex31681 X}"#.to_string(),
         r#"{\rtf1\linestarts0 X}"#.to_string(),

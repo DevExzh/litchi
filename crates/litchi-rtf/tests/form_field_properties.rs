@@ -118,9 +118,7 @@ fn parses_bundled_libreoffice_extended_formfield() {
         cursor = end;
     };
     let group = std::str::from_utf8(&fixture[start..end]).unwrap();
-    let source = format!(
-        r#"{{\rtf1\ansi{{\field{{\*\fldinst FORMTEXT{group}}}{{\fldrslt x}}}}}}"#
-    );
+    let source = format!(r#"{{\rtf1\ansi{{\field{{\*\fldinst FORMTEXT{group}}}{{\fldrslt x}}}}}}"#);
     let document = RtfDocument::parse(&source).unwrap();
     let field = &document.form_fields()[0];
     assert_eq!(field.field_type, FormFieldType::Text);

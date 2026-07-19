@@ -44,10 +44,8 @@ fn parses_libreoffice_defaults_as_inert_metadata_and_round_trips() {
 
 #[test]
 fn accepts_unstarred_math_properties_destination() {
-    let document = RtfDocument::parse(
-        r#"{\rtf1{\mmathPr\mmathFont34\mdefJc1\mwrapIndent1440}Body}"#,
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r#"{\rtf1{\mmathPr\mmathFont34\mdefJc1\mwrapIndent1440}Body}"#).unwrap();
     let properties = document.math_properties().unwrap();
     assert_eq!(properties.math_font, Some(34));
     assert_eq!(
@@ -151,7 +149,10 @@ fn parses_bundled_libreoffice_math_property_fixtures() {
         "sw/qa/extras/rtfexport/data/tdf161878.rtf",
         "sw/qa/extras/odfexport/data/footnote_spacing_hanging_para.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)

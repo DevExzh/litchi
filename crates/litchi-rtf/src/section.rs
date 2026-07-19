@@ -314,6 +314,8 @@ impl SectionNoteOptions {
 /// Section properties
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionProperties {
+    /// Optional section-style handle referenced by this section.
+    pub section_style: Option<u16>,
     /// Explicit direction used to thread section columns.
     pub direction: Option<TextDirection>,
     /// Section break type
@@ -357,6 +359,7 @@ pub struct SectionProperties {
 impl Default for SectionProperties {
     fn default() -> Self {
         Self {
+            section_style: None,
             direction: None,
             break_type: SectionBreakType::default(),
             page_width: 12240,  // 8.5 inches at 1440 twips/inch
@@ -377,6 +380,14 @@ impl Default for SectionProperties {
             note_options: SectionNoteOptions::default(),
             page_borders: crate::PageBorders::default(),
         }
+    }
+}
+
+impl SectionProperties {
+    /// Set or clear the section-style handle referenced by this section.
+    #[inline]
+    pub fn set_section_style(&mut self, section_style: Option<u16>) {
+        self.section_style = section_style;
     }
 }
 
@@ -408,6 +419,14 @@ pub struct HeaderFooter<'a> {
     pub header_type: HeaderFooterType,
     /// Content paragraphs
     pub paragraphs: Vec<HeaderFooterParagraph<'a>>,
+    /// Positional root shapes owned by this header/footer story.
+    pub shapes: Vec<crate::Shape<'a>>,
+    /// Positional root shape groups owned by this header/footer story.
+    pub shape_groups: Vec<crate::ShapeGroup<'a>>,
+    /// Exact source order of drawings in this header/footer story.
+    pub drawing_order: Vec<crate::StoryDrawing>,
+    /// Exact source order of drawings and generic fields in this story.
+    pub story_events: Vec<crate::StoryEvent>,
 }
 
 impl<'a> HeaderFooter<'a> {
@@ -417,6 +436,10 @@ impl<'a> HeaderFooter<'a> {
         Self {
             header_type,
             paragraphs: Vec::new(),
+            shapes: Vec::new(),
+            shape_groups: Vec::new(),
+            drawing_order: Vec::new(),
+            story_events: Vec::new(),
         }
     }
 
@@ -433,6 +456,83 @@ impl<'a> HeaderFooter<'a> {
             .map(|p| p.text.as_ref())
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    /// Append a validated positional shape to this story.
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
+        let mut shapes = self.shapes.clone();
+        shapes.push(shape);
+        let mut order = self.drawing_order.clone();
+        order.push(crate::StoryDrawing::Shape(self.shapes.len()));
+        let text = self.text();
+        crate::shape::validate_story_drawings(
+            &text,
+            &shapes,
+            &self.shape_groups,
+            &order,
+            "header/footer",
+        )?;
+        self.shapes = shapes;
+        self.drawing_order = order;
+        self.story_events
+            .push(crate::StoryEvent::Drawing(crate::StoryDrawing::Shape(
+                self.shapes.len() - 1,
+            )));
+        Ok(())
+    }
+
+    /// Append a validated positional root shape group to this story.
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
+        let mut groups = self.shape_groups.clone();
+        groups.push(group);
+        let mut order = self.drawing_order.clone();
+        order.push(crate::StoryDrawing::ShapeGroup(self.shape_groups.len()));
+        let text = self.text();
+        crate::shape::validate_story_drawings(
+            &text,
+            &self.shapes,
+            &groups,
+            &order,
+            "header/footer",
+        )?;
+        self.shape_groups = groups;
+        self.drawing_order = order;
+        self.story_events
+            .push(crate::StoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(
+                self.shape_groups.len() - 1,
+            )));
+        Ok(())
+    }
+
+    /// Clear all drawings owned by this header/footer story.
+    pub fn clear_drawings(&mut self) {
+        self.shapes.clear();
+        self.shape_groups.clear();
+        self.drawing_order.clear();
+        self.story_events
+            .retain(|event| !matches!(event, crate::StoryEvent::Drawing(_)));
+    }
+
+    pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
+        self.story_events.iter().filter_map(|event| match event {
+            crate::StoryEvent::PageBreak(page_break) => Some(page_break),
+            _ => None,
+        })
+    }
+
+    pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
+        let text = self.text();
+        crate::field::push_story_page_break(
+            &mut self.story_events,
+            &text,
+            position,
+            "header/footer",
+        )
+    }
+
+    pub fn clear_page_breaks(&mut self) {
+        self.story_events
+            .retain(|event| !matches!(event, crate::StoryEvent::PageBreak(_)));
     }
 }
 
@@ -499,6 +599,8 @@ impl<'a> Default for Section<'a> {
 /// Footnote or endnote
 #[derive(Debug, Clone)]
 pub struct Note<'a> {
+    /// UTF-8 byte offset where the note destination occurs in the main story.
+    pub position: usize,
     /// Whether this is a footnote (true) or endnote (false)
     pub is_footnote: bool,
     /// Reference mark (number or symbol)
@@ -507,17 +609,34 @@ pub struct Note<'a> {
     pub content: Cow<'a, str>,
     /// Character formatting for the note
     pub formatting: Formatting,
+    /// Positional root shapes owned by the note story.
+    pub shapes: Vec<crate::Shape<'a>>,
+    /// Positional root shape groups owned by the note story.
+    pub shape_groups: Vec<crate::ShapeGroup<'a>>,
+    /// Exact source order of drawings in this note story.
+    pub drawing_order: Vec<crate::StoryDrawing>,
+    /// Exact source order of drawings and generic fields in this note story.
+    pub story_events: Vec<crate::StoryEvent>,
 }
+
+pub(crate) const MAX_NOTES: usize = 65_536;
+pub(crate) const MAX_NOTE_BODY_BYTES: usize = 4 * 1_048_576;
+pub(crate) const MAX_NOTE_TEXT_TOTAL_BYTES: usize = 16 * 1_048_576;
 
 impl<'a> Note<'a> {
     /// Create a new footnote
     #[inline]
     pub fn footnote(reference: Cow<'a, str>, content: Cow<'a, str>) -> Self {
         Self {
+            position: 0,
             is_footnote: true,
             reference,
             content,
             formatting: Formatting::default(),
+            shapes: Vec::new(),
+            shape_groups: Vec::new(),
+            drawing_order: Vec::new(),
+            story_events: Vec::new(),
         }
     }
 
@@ -525,10 +644,110 @@ impl<'a> Note<'a> {
     #[inline]
     pub fn endnote(reference: Cow<'a, str>, content: Cow<'a, str>) -> Self {
         Self {
+            position: 0,
             is_footnote: false,
             reference,
             content,
             formatting: Formatting::default(),
+            shapes: Vec::new(),
+            shape_groups: Vec::new(),
+            drawing_order: Vec::new(),
+            story_events: Vec::new(),
         }
+    }
+
+    /// Validate this note story independently of its main-story anchor.
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self.content.len() > MAX_NOTE_BODY_BYTES || self.reference.len() > 65_536 {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF note text exceeds the safety limit".to_string(),
+            ));
+        }
+        crate::field::validate_story_events(
+            self.content.as_ref(),
+            &self.shapes,
+            &self.shape_groups,
+            &self.drawing_order,
+            &self.story_events,
+            "note",
+        )
+    }
+
+    pub(crate) fn text_bytes(&self) -> Option<usize> {
+        self.content.len().checked_add(self.reference.len())
+    }
+
+    /// Append a validated positional root shape to this note story.
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
+        let mut shapes = self.shapes.clone();
+        shapes.push(shape);
+        let mut order = self.drawing_order.clone();
+        order.push(crate::StoryDrawing::Shape(self.shapes.len()));
+        crate::shape::validate_story_drawings(
+            self.content.as_ref(),
+            &shapes,
+            &self.shape_groups,
+            &order,
+            "note",
+        )?;
+        self.shapes = shapes;
+        self.drawing_order = order;
+        self.story_events
+            .push(crate::StoryEvent::Drawing(crate::StoryDrawing::Shape(
+                self.shapes.len() - 1,
+            )));
+        Ok(())
+    }
+
+    /// Append a validated positional root shape group to this note story.
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
+        let mut groups = self.shape_groups.clone();
+        groups.push(group);
+        let mut order = self.drawing_order.clone();
+        order.push(crate::StoryDrawing::ShapeGroup(self.shape_groups.len()));
+        crate::shape::validate_story_drawings(
+            self.content.as_ref(),
+            &self.shapes,
+            &groups,
+            &order,
+            "note",
+        )?;
+        self.shape_groups = groups;
+        self.drawing_order = order;
+        self.story_events
+            .push(crate::StoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(
+                self.shape_groups.len() - 1,
+            )));
+        Ok(())
+    }
+
+    /// Clear all drawings owned by this note story.
+    pub fn clear_drawings(&mut self) {
+        self.shapes.clear();
+        self.shape_groups.clear();
+        self.drawing_order.clear();
+        self.story_events
+            .retain(|event| !matches!(event, crate::StoryEvent::Drawing(_)));
+    }
+
+    pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
+        self.story_events.iter().filter_map(|event| match event {
+            crate::StoryEvent::PageBreak(page_break) => Some(page_break),
+            _ => None,
+        })
+    }
+
+    pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
+        crate::field::push_story_page_break(
+            &mut self.story_events,
+            self.content.as_ref(),
+            position,
+            "note",
+        )
+    }
+
+    pub fn clear_page_breaks(&mut self) {
+        self.story_events
+            .retain(|event| !matches!(event, crate::StoryEvent::PageBreak(_)));
     }
 }

@@ -87,7 +87,11 @@ impl UserPropertyDateTime {
                 parts.next().and_then(|part| part.parse().ok()),
                 parts.next().and_then(|part| part.parse().ok()),
             );
-            if parts.next().is_some() || values.0.is_none() || values.1.is_none() || values.2.is_none() {
+            if parts.next().is_some()
+                || values.0.is_none()
+                || values.1.is_none()
+                || values.2.is_none()
+            {
                 return Err(RtfError::MalformedDocument(
                     "RTF date user property has an invalid time".to_string(),
                 ));
@@ -97,15 +101,19 @@ impl UserPropertyDateTime {
             (None, None, None)
         };
         let parsed = Self {
-            year: year.ok_or_else(|| RtfError::MalformedDocument(
-                "RTF date user property has an invalid year".to_string(),
-            ))?,
-            month: month.ok_or_else(|| RtfError::MalformedDocument(
-                "RTF date user property has an invalid month".to_string(),
-            ))?,
-            day: day.ok_or_else(|| RtfError::MalformedDocument(
-                "RTF date user property has an invalid day".to_string(),
-            ))?,
+            year: year.ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF date user property has an invalid year".to_string(),
+                )
+            })?,
+            month: month.ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF date user property has an invalid month".to_string(),
+                )
+            })?,
+            day: day.ok_or_else(|| {
+                RtfError::MalformedDocument("RTF date user property has an invalid day".to_string())
+            })?,
             hour,
             minute,
             second,
@@ -149,20 +157,34 @@ impl UserPropertyDateTime {
 /// dereference them.
 #[derive(Clone, Debug, PartialEq)]
 pub enum UserPropertyValue<'a> {
-    Integer { value: i32, lexical: Cow<'a, str> },
-    Real { value: f64, lexical: Cow<'a, str> },
-    Boolean { value: bool, lexical: Cow<'a, str> },
-    Text { value: Cow<'a, str> },
-    Date { value: UserPropertyDateTime, lexical: Cow<'a, str> },
-    Unknown { type_code: i32, lexical: Cow<'a, str> },
+    Integer {
+        value: i32,
+        lexical: Cow<'a, str>,
+    },
+    Real {
+        value: f64,
+        lexical: Cow<'a, str>,
+    },
+    Boolean {
+        value: bool,
+        lexical: Cow<'a, str>,
+    },
+    Text {
+        value: Cow<'a, str>,
+    },
+    Date {
+        value: UserPropertyDateTime,
+        lexical: Cow<'a, str>,
+    },
+    Unknown {
+        type_code: i32,
+        lexical: Cow<'a, str>,
+    },
 }
 
 impl<'a> UserPropertyValue<'a> {
     /// Parse a value using the RTF 1.9.1 `\proptype` code.
-    pub fn from_lexical(
-        type_code: i32,
-        lexical: impl Into<Cow<'a, str>>,
-    ) -> RtfResult<Self> {
+    pub fn from_lexical(type_code: i32, lexical: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
         let lexical = lexical.into();
         let value = match type_code {
             3 => Self::Integer {

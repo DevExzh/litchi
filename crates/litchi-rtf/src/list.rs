@@ -234,13 +234,19 @@ pub struct ListTable<'a> {
     lists: Vec<List<'a>>,
     /// Number of inert picture-bullet records in `\listpicture`.
     pub picture_bullet_count: u32,
+    /// Optional indices into the document picture store, in `levelpicture` order.
+    picture_bullet_picture_indices: Vec<Option<usize>>,
 }
 
 impl<'a> ListTable<'a> {
     /// Create a new list table
     #[inline]
     pub fn new() -> Self {
-        Self { lists: Vec::new(), picture_bullet_count: 0 }
+        Self {
+            lists: Vec::new(),
+            picture_bullet_count: 0,
+            picture_bullet_picture_indices: Vec::new(),
+        }
     }
 
     /// Add a list to the table
@@ -261,32 +267,74 @@ impl<'a> ListTable<'a> {
         &self.lists
     }
 
+    /// Return retained picture-store indices for nonempty picture-bullet records.
+    pub fn picture_bullet_picture_indices(&self) -> &[Option<usize>] {
+        &self.picture_bullet_picture_indices
+    }
+
+    pub(crate) fn set_picture_bullet_picture_indices(
+        &mut self,
+        indices: Vec<Option<usize>>,
+    ) -> RtfResult<()> {
+        if indices.len() > 65_536 {
+            return Err(RtfError::MalformedDocument(
+                "RTF list-picture record count exceeds the safety limit".to_string(),
+            ));
+        }
+        self.picture_bullet_count = u32::try_from(indices.len()).map_err(|_| {
+            RtfError::MalformedDocument("RTF list-picture count overflow".to_string())
+        })?;
+        self.picture_bullet_picture_indices = indices;
+        Ok(())
+    }
+
     pub(crate) fn validate(&self) -> RtfResult<()> {
         if self.lists.len() > MAX_LISTS {
-            return Err(RtfError::MalformedDocument("RTF list count exceeds the safety limit".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF list count exceeds the safety limit".to_string(),
+            ));
+        }
+        if self.picture_bullet_count > 65_536
+            || self.picture_bullet_picture_indices.len() > self.picture_bullet_count as usize
+        {
+            return Err(RtfError::MalformedDocument(
+                "invalid or oversized RTF list-picture table".to_string(),
+            ));
         }
         let mut ids = HashSet::with_capacity(self.lists.len());
         for list in &self.lists {
             if !ids.insert(list.id) {
-                return Err(RtfError::MalformedDocument("duplicate RTF list ID".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF list ID".to_string(),
+                ));
             }
-            if list.levels.is_empty() || list.levels.len() > MAX_LIST_LEVELS
+            if list.levels.is_empty()
+                || list.levels.len() > MAX_LIST_LEVELS
                 || (list.simple && (list.hybrid || list.levels.len() > 1))
                 || list.name.len() > MAX_LIST_TEXT_BYTES
                 || list.style_name.len() > MAX_LIST_TEXT_BYTES
-                || list.style_priority.is_some_and(|value| !(0..=99).contains(&value))
+                || list
+                    .style_priority
+                    .is_some_and(|value| !(0..=99).contains(&value))
             {
-                return Err(RtfError::MalformedDocument("invalid or oversized RTF list definition".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "invalid or oversized RTF list definition".to_string(),
+                ));
             }
             let mut levels = HashSet::new();
             for level in &list.levels {
-                if level.level > 8 || !levels.insert(level.level)
+                if level.level > 8
+                    || !levels.insert(level.level)
                     || level.number_text.len() > MAX_LIST_TEXT_BYTES
                     || level.number_positions.len() > MAX_LIST_TEXT_BYTES
                     || level.tabs.len() > MAX_LIST_TABS
-                    || level.picture_index.is_some_and(|index| index >= self.picture_bullet_count)
+                    || level
+                        .picture_index
+                        .is_some_and(|index| index >= self.picture_bullet_count)
                 {
-                    return Err(RtfError::MalformedDocument("invalid or oversized RTF list level".to_string()));
+                    return Err(RtfError::MalformedDocument(
+                        "invalid or oversized RTF list level".to_string(),
+                    ));
                 }
             }
         }
@@ -339,7 +387,9 @@ impl ListOverrideTable {
 
     pub(crate) fn validate(&self, lists: &ListTable<'_>) -> RtfResult<()> {
         if self.overrides.len() > MAX_LISTS {
-            return Err(RtfError::MalformedDocument("RTF list override count exceeds the safety limit".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF list override count exceeds the safety limit".to_string(),
+            ));
         }
         // Partial documents can retain the complete override table while
         // retaining only a contiguous suffix of the corresponding definitions.
@@ -368,12 +418,23 @@ impl ListOverrideTable {
             if !indices.insert(entry.index)
                 || (lists.get(entry.list_id).is_none() && !partial_definition_suffix)
                 || entry.levels.len() > MAX_LIST_LEVELS
-                || entry.level_count_override.is_some_and(|count| usize::from(count) != entry.levels.len())
+                || entry
+                    .level_count_override
+                    .is_some_and(|count| usize::from(count) != entry.levels.len())
             {
-                return Err(RtfError::MalformedDocument("invalid RTF list override definition".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF list override definition".to_string(),
+                ));
             }
-            if entry.levels.iter().enumerate().any(|(index, level)| level.level as usize != index) {
-                return Err(RtfError::MalformedDocument("RTF list override levels are out of order".to_string()));
+            if entry
+                .levels
+                .iter()
+                .enumerate()
+                .any(|(index, level)| level.level as usize != index)
+            {
+                return Err(RtfError::MalformedDocument(
+                    "RTF list override levels are out of order".to_string(),
+                ));
             }
         }
         Ok(())

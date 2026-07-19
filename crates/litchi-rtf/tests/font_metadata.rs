@@ -26,7 +26,9 @@ fn parses_decodes_and_round_trips_extended_font_metadata() {
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
     assert_eq!(doc.font_table(), reparsed.font_table());
     let mut second = Vec::new();
-    RtfWriter::new(&mut second).write_document(&reparsed).unwrap();
+    RtfWriter::new(&mut second)
+        .write_document(&reparsed)
+        .unwrap();
     assert_eq!(first, second);
 }
 
@@ -46,7 +48,10 @@ fn rejects_malformed_extended_font_metadata() {
         r#"{\rtf1{\fonttbl{\f0\fnil\cpg70000 Arial;}}}"#,
     ];
     for source in malformed {
-        assert!(RtfDocument::parse(source).is_err(), "accepted malformed RTF: {source}");
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "accepted malformed RTF: {source}"
+        );
     }
 }
 
@@ -56,7 +61,10 @@ fn parses_real_libreoffice_font_metadata_fixture() {
         "../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf"
     );
     let marker = br"{\fonttbl";
-    let start = fixture.windows(marker.len()).position(|window| window == marker).unwrap();
+    let start = fixture
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .unwrap();
     let mut depth = 0usize;
     let mut end = None;
     for (offset, byte) in fixture[start..].iter().enumerate() {

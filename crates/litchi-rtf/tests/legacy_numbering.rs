@@ -1,6 +1,4 @@
-use litchi_rtf::{
-    LegacyNumberingAlignment, LegacyNumberingFormat, RtfDocument, RtfWriter,
-};
+use litchi_rtf::{LegacyNumberingAlignment, LegacyNumberingFormat, RtfDocument, RtfWriter};
 
 const SYNTHETIC: &str = r#"{\rtf1\ansi\ansicpg1250
 {\*\pnseclvl1\pnucrm\pnqc\pnstart3\pnindent720\pnsp144\pnhang\pnprev\pnf2
@@ -27,7 +25,9 @@ fn parses_decodes_and_round_trips_legacy_section_numbering() {
     assert_eq!(doc.text().trim(), "Body");
 
     let mut first_bytes = Vec::new();
-    RtfWriter::new(&mut first_bytes).write_document(&doc).unwrap();
+    RtfWriter::new(&mut first_bytes)
+        .write_document(&doc)
+        .unwrap();
     let reparsed = RtfDocument::parse_bytes(&first_bytes).unwrap();
     assert_eq!(numbering, reparsed.legacy_section_numbering());
     let mut second_bytes = Vec::new();
@@ -50,7 +50,10 @@ fn rejects_malformed_legacy_section_numbering() {
         r#"{\rtf1 Body{\*\pnseclvl1\pndec}}"#,
     ];
     for source in malformed {
-        assert!(RtfDocument::parse(source).is_err(), "accepted malformed RTF: {source}");
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "accepted malformed RTF: {source}"
+        );
     }
 }
 
@@ -62,8 +65,14 @@ fn parses_real_libreoffice_pnseclvl_fixture() {
     .unwrap();
     let numbering = doc.legacy_section_numbering();
     assert_eq!(numbering.levels().len(), 9);
-    assert_eq!(numbering.get(1).unwrap().format, LegacyNumberingFormat::UpperRoman);
-    assert_eq!(numbering.get(3).unwrap().format, LegacyNumberingFormat::Decimal);
+    assert_eq!(
+        numbering.get(1).unwrap().format,
+        LegacyNumberingFormat::UpperRoman
+    );
+    assert_eq!(
+        numbering.get(3).unwrap().format,
+        LegacyNumberingFormat::Decimal
+    );
     assert_eq!(numbering.get(5).unwrap().text_before, "(");
     assert_eq!(numbering.get(5).unwrap().text_after, ")");
 }

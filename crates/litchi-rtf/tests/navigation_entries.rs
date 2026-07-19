@@ -1,6 +1,4 @@
-use litchi_rtf::{
-    IndexPageReference, NavigationEntry, RtfDocument, RtfWriter,
-};
+use litchi_rtf::{IndexPageReference, NavigationEntry, RtfDocument, RtfWriter};
 
 #[test]
 fn parses_microsoft_grammar_index_controls_and_hidden_text() {
@@ -55,7 +53,9 @@ fn round_trips_unicode_safe_text_positions_and_coexisting_markup() {
     assert_eq!(document.navigation_entries()[0].position(), "你".len());
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(&document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
     let output = String::from_utf8(output).unwrap();
     assert!(output.contains("\\xe\\v"));
     assert!(output.contains("\\tc\\v"));

@@ -39,7 +39,11 @@ fn retains_and_resolves_extended_list_metadata() {
     assert_eq!(list_override.levels[1].start_at, None);
     assert!(list_override.levels[1].format_override);
 
-    let body = doc.blocks().iter().find(|block| block.text.contains("Body")).unwrap();
+    let body = doc
+        .blocks()
+        .iter()
+        .find(|block| block.text.contains("Body"))
+        .unwrap();
     let (resolved_override, resolved_level, start_at) =
         doc.resolve_paragraph_list(&body.paragraph).unwrap();
     assert_eq!(resolved_override.index, 4);
@@ -57,7 +61,9 @@ fn writer_round_trips_list_models_deterministically() {
     assert_eq!(doc.list_override_table(), reparsed.list_override_table());
 
     let mut second = Vec::new();
-    RtfWriter::new(&mut second).write_document(&reparsed).unwrap();
+    RtfWriter::new(&mut second)
+        .write_document(&reparsed)
+        .unwrap();
     assert_eq!(first, second);
 }
 
@@ -73,7 +79,10 @@ fn rejects_malformed_list_roots_ids_and_overrides() {
         r#"{\rtf1{\*\listtable{\list\listtemplateid1{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}}{\*\listoverridetable{\listoverride\listid1\listoverridecount1\ls1}}}"#,
     ];
     for source in malformed {
-        assert!(RtfDocument::parse(source).is_err(), "accepted malformed RTF: {source}");
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "accepted malformed RTF: {source}"
+        );
     }
 }
 
@@ -84,31 +93,32 @@ fn parses_rare_libreoffice_list_fixtures() {
     ))
     .unwrap();
     assert!(picture.list_table().picture_bullet_count > 0);
-    assert!(picture
-        .list_table()
-        .lists()
-        .iter()
-        .flat_map(|list| &list.levels)
-        .any(|level| level.picture_index.is_some()));
+    assert!(
+        picture
+            .list_table()
+            .lists()
+            .iter()
+            .flat_map(|list| &list.levels)
+            .any(|level| level.picture_index.is_some())
+    );
 
     let style = RtfDocument::parse_bytes(include_bytes!(
         "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf125719_case_2.rtf"
     ))
     .unwrap();
-    assert!(style
-        .list_table()
-        .lists()
-        .iter()
-        .any(|list| !list.style_name.is_empty()));
+    assert!(
+        style
+            .list_table()
+            .lists()
+            .iter()
+            .any(|list| !list.style_name.is_empty())
+    );
 
     let starts = RtfDocument::parse_bytes(include_bytes!(
         "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/num-override-start.rtf"
     ))
     .unwrap();
-    assert!(starts
-        .list_override_table()
-        .overrides()
-        .iter()
-        .any(|entry| entry.levels.len() >= 2
-            && entry.levels[0].start_at != entry.levels[1].start_at));
+    assert!(starts.list_override_table().overrides().iter().any(
+        |entry| entry.levels.len() >= 2 && entry.levels[0].start_at != entry.levels[1].start_at
+    ));
 }

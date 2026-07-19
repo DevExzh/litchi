@@ -1,10 +1,12 @@
 use litchi_rtf::{
-    RtfDocument, RtfWriter, Section, SectionColumn, SectionColumns, MAX_SECTION_COLUMNS,
+    MAX_SECTION_COLUMNS, RtfDocument, RtfWriter, Section, SectionColumn, SectionColumns,
 };
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(document)
+        .unwrap();
     output
 }
 
@@ -21,16 +23,23 @@ fn parses_variable_columns_with_group_inheritance_and_round_trips_canonically() 
     assert_eq!(
         columns.explicit,
         vec![
-            SectionColumn { width: 3000, space_after: Some(240) },
-            SectionColumn { width: 4000, space_after: None },
+            SectionColumn {
+                width: 3000,
+                space_after: Some(240)
+            },
+            SectionColumn {
+                width: 4000,
+                space_after: None
+            },
         ]
     );
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains(
-        r#"\cols2\linebetcol\colsx720\colno1\colw3000\colsr240\colno2\colw4000"#
-    ));
+    assert!(
+        serialized
+            .contains(r#"\cols2\linebetcol\colsx720\colno1\colw3000\colsr240\colno2\colw4000"#)
+    );
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.sections()[0].properties.columns, *columns);
 }
@@ -51,10 +60,11 @@ fn parses_bundled_libreoffice_equal_and_variable_column_fixtures() {
     ));
     let variable = RtfDocument::parse_bytes(variable).unwrap();
     assert!(variable.sections().iter().any(|section| {
-        section.properties.columns.explicit == [SectionColumn {
-            width: 9032,
-            space_after: None,
-        }]
+        section.properties.columns.explicit
+            == [SectionColumn {
+                width: 9032,
+                space_after: None,
+            }]
     }));
 }
 
@@ -88,7 +98,10 @@ fn public_builders_and_writer_enforce_column_bounds() {
 
     let mut section = Section::new();
     section.properties.columns.count = 2;
-    section.properties.columns.explicit = vec![SectionColumn { width: 1000, space_after: None }];
+    section.properties.columns.explicit = vec![SectionColumn {
+        width: 1000,
+        space_after: None,
+    }];
     let mut output = Vec::new();
     assert!(RtfWriter::new(&mut output).write_section(&section).is_err());
 }

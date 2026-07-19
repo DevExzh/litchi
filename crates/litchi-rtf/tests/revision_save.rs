@@ -49,7 +49,9 @@ fn mutation_validates_membership_uniqueness_and_preserves_body() {
     assert!(metadata.set_root(Some(44)).is_err());
 
     let mut document = RtfDocument::parse(r#"{\rtf1 Text}"#).unwrap();
-    document.set_revision_save_metadata(metadata.clone()).unwrap();
+    document
+        .set_revision_save_metadata(metadata.clone())
+        .unwrap();
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), "Text");
     assert_eq!(reparsed.revision_save_metadata(), Some(&metadata));
@@ -87,7 +89,10 @@ fn parses_bundled_libreoffice_revision_save_fixtures() {
         "sw/qa/extras/ooxmlexport/data/tdf141173_missingFrames.rtf",
         "sw/qa/writerfilter/filters-test/data/pass/TCI-TN65GP-DDRHDLL-partial.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)
@@ -96,6 +101,10 @@ fn parses_bundled_libreoffice_revision_save_fixtures() {
             .revision_save_metadata()
             .unwrap_or_else(|| panic!("fixture exposed no revision-save table: {fixture}"));
         assert!(!metadata.ids().is_empty());
-        assert!(metadata.root().is_some_and(|root| metadata.ids().contains(&root)));
+        assert!(
+            metadata
+                .root()
+                .is_some_and(|root| metadata.ids().contains(&root))
+        );
     }
 }

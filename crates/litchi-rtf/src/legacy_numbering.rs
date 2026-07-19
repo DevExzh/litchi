@@ -125,7 +125,11 @@ impl<'a> LegacySectionNumbering<'a> {
                 "RTF contains too many pnseclvl destinations".to_string(),
             ));
         }
-        if self.levels.last().is_some_and(|last| last.level >= level.level) {
+        if self
+            .levels
+            .last()
+            .is_some_and(|last| last.level >= level.level)
+        {
             return Err(RtfError::MalformedDocument(
                 "RTF pnseclvl destinations are duplicated or out of order".to_string(),
             ));

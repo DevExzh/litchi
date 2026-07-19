@@ -52,7 +52,10 @@ impl<'a> IndexEntry<'a> {
 
     pub(crate) fn validate(&self) -> RtfResult<()> {
         validate_text("index-entry", &self.text, false)?;
-        if self.index_id.is_some_and(|value| !value.is_ascii_uppercase()) {
+        if self
+            .index_id
+            .is_some_and(|value| !value.is_ascii_uppercase())
+        {
             return Err(RtfError::MalformedDocument(
                 "RTF index identifier must be ASCII A through Z".to_string(),
             ));
@@ -188,9 +191,7 @@ impl<'a> NavigationEntry<'a> {
     pub fn into_owned(self) -> NavigationEntry<'static> {
         match self {
             Self::Index(entry) => NavigationEntry::Index(entry.into_owned()),
-            Self::TableOfContents(entry) => {
-                NavigationEntry::TableOfContents(entry.into_owned())
-            },
+            Self::TableOfContents(entry) => NavigationEntry::TableOfContents(entry.into_owned()),
         }
     }
 }

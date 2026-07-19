@@ -187,16 +187,32 @@ pub enum BorderStyle {
 impl BorderStyle {
     pub(crate) const fn control_word(self) -> &'static str {
         match self {
-            Self::None => "brdrnone", Self::Single => "brdrs", Self::Thick => "brdrth",
-            Self::Dotted => "brdrdot", Self::Dashed => "brdrdash", Self::DashSmallGap => "brdrdashsm",
-            Self::DotDash => "brdrdashd", Self::DotDotDash => "brdrdashdd", Self::Double => "brdrdb",
-            Self::Triple => "brdrtriple", Self::ThickThinSmall => "brdrthtnsg", Self::ThinThickSmall => "brdrtnthsg",
-            Self::ThinThickThinSmall => "brdrtnthtnsg", Self::ThickThinMedium => "brdrthtnmg",
-            Self::ThinThickMedium => "brdrtnthmg", Self::ThinThickThinMedium => "brdrtnthtnmg",
-            Self::ThickThinLarge => "brdrthtnlg", Self::ThinThickLarge => "brdrtnthlg",
-            Self::ThinThickThinLarge => "brdrtnthtnlg", Self::Wavy => "brdrwavy",
-            Self::WavyDouble => "brdrwavydb", Self::Striped => "brdrdashdotstr", Self::Embossed => "brdremboss",
-            Self::Engraved => "brdrengrave", Self::Outset => "brdroutset", Self::Inset => "brdrinset",
+            Self::None => "brdrnone",
+            Self::Single => "brdrs",
+            Self::Thick => "brdrth",
+            Self::Dotted => "brdrdot",
+            Self::Dashed => "brdrdash",
+            Self::DashSmallGap => "brdrdashsm",
+            Self::DotDash => "brdrdashd",
+            Self::DotDotDash => "brdrdashdd",
+            Self::Double => "brdrdb",
+            Self::Triple => "brdrtriple",
+            Self::ThickThinSmall => "brdrthtnsg",
+            Self::ThinThickSmall => "brdrtnthsg",
+            Self::ThinThickThinSmall => "brdrtnthtnsg",
+            Self::ThickThinMedium => "brdrthtnmg",
+            Self::ThinThickMedium => "brdrtnthmg",
+            Self::ThinThickThinMedium => "brdrtnthtnmg",
+            Self::ThickThinLarge => "brdrthtnlg",
+            Self::ThinThickLarge => "brdrtnthlg",
+            Self::ThinThickThinLarge => "brdrtnthtnlg",
+            Self::Wavy => "brdrwavy",
+            Self::WavyDouble => "brdrwavydb",
+            Self::Striped => "brdrdashdotstr",
+            Self::Embossed => "brdremboss",
+            Self::Engraved => "brdrengrave",
+            Self::Outset => "brdroutset",
+            Self::Inset => "brdrinset",
         }
     }
 }
@@ -249,10 +265,14 @@ impl Border {
 
     pub fn validate_table(&self) -> crate::RtfResult<()> {
         if !(0..=75).contains(&self.width) {
-            return Err(crate::RtfError::MalformedDocument("RTF table-border width must be in 0..=75 twips".to_string()));
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF table-border width must be in 0..=75 twips".to_string(),
+            ));
         }
         if !(0..=crate::MAX_TABLE_DISTANCE_TWIPS).contains(&self.space) {
-            return Err(crate::RtfError::MalformedDocument("RTF table-border spacing is out of range".to_string()));
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF table-border spacing is out of range".to_string(),
+            ));
         }
         Ok(())
     }
@@ -380,12 +400,14 @@ pub enum ShadingPattern {
 /// Shading/background fill
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Shading {
-    /// Shading pattern
-    pub pattern: ShadingPattern,
-    /// Foreground color (pattern color)
-    pub foreground_color: ColorRef,
-    /// Background color (fill color)
-    pub background_color: ColorRef,
+    /// Exact `\shadingN` value in hundredths of a percent.
+    pub amount: Option<u16>,
+    /// Legacy typed pattern used by mutation APIs when no exact amount exists.
+    pub pattern: Option<ShadingPattern>,
+    /// Exact `\cfpatN` foreground color reference.
+    pub foreground_color: Option<ColorRef>,
+    /// Exact `\cbpatN` background color reference.
+    pub background_color: Option<ColorRef>,
 }
 
 impl Shading {
@@ -399,16 +421,69 @@ impl Shading {
     #[inline]
     pub fn solid(color: ColorRef) -> Self {
         Self {
-            pattern: ShadingPattern::Solid,
-            foreground_color: color,
-            background_color: color,
+            amount: Some(10_000),
+            pattern: Some(ShadingPattern::Solid),
+            foreground_color: Some(color),
+            background_color: Some(color),
         }
+    }
+
+    /// Whether any paragraph-shading control was explicitly retained.
+    #[inline]
+    pub fn is_present(&self) -> bool {
+        self.amount.is_some()
+            || self.pattern.is_some()
+            || self.foreground_color.is_some()
+            || self.background_color.is_some()
     }
 
     /// Check if shading is visible
     #[inline]
     pub fn is_visible(&self) -> bool {
-        self.pattern != ShadingPattern::Clear
+        self.amount.is_some_and(|amount| amount != 0)
+            || self
+                .pattern
+                .is_some_and(|pattern| pattern != ShadingPattern::Clear)
+            || self.foreground_color.is_some_and(|color| color != 0)
+            || self.background_color.is_some_and(|color| color != 0)
+    }
+
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self.amount.is_some_and(|amount| amount > 10_000) {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF paragraph shading must be in 0..=10000".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Set or clear the exact `\shadingN` amount.
+    pub fn set_amount(&mut self, amount: Option<u16>) -> crate::RtfResult<()> {
+        if amount.is_some_and(|amount| amount > 10_000) {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF paragraph shading must be in 0..=10000".to_string(),
+            ));
+        }
+        self.amount = amount;
+        Ok(())
+    }
+
+    /// Set or clear the paragraph shading foreground color.
+    #[inline]
+    pub fn set_foreground_color(&mut self, color: Option<ColorRef>) {
+        self.foreground_color = color;
+    }
+
+    /// Set or clear the paragraph shading background color.
+    #[inline]
+    pub fn set_background_color(&mut self, color: Option<ColorRef>) {
+        self.background_color = color;
+    }
+
+    /// Replace this metadata with the omitted/default state.
+    #[inline]
+    pub fn clear(&mut self) {
+        *self = Self::default();
     }
 }
 

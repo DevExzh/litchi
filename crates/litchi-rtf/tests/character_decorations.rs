@@ -2,12 +2,11 @@ use litchi_rtf::{CharacterBorderStyle, RtfDocument, RtfWriter};
 
 #[test]
 fn parses_libreoffice_character_border_and_shading_fixtures() {
-    let border_source = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+    let border_source =
+        std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
             "../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/hidden-para-separator.rtf",
-        ),
-    )
-    .unwrap();
+        ))
+        .unwrap();
     let border_document = RtfDocument::parse(&border_source).unwrap();
     assert!(border_document.runs().iter().any(|run| {
         run.text().contains('C')
@@ -17,9 +16,8 @@ fn parses_libreoffice_character_border_and_shading_fixtures() {
     }));
 
     let shading_source = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/165717.rtf",
-        ),
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/165717.rtf"),
     )
     .unwrap();
     let shading_document = RtfDocument::parse(&shading_source).unwrap();
@@ -42,20 +40,32 @@ fn inherits_resets_writes_and_keeps_ignored_destinations_inert() {
     );
     let document = RtfDocument::parse(source).unwrap();
     let blocks = document.blocks();
-    let outer = blocks.iter().find(|block| block.text.contains("Outer")).unwrap();
-    let inner = blocks.iter().find(|block| block.text.contains("Inner")).unwrap();
-    let tail = blocks.iter().find(|block| block.text.contains("Tail")).unwrap();
-    let plain = blocks.iter().find(|block| block.text.contains("Plain")).unwrap();
-    let visible = blocks.iter().find(|block| block.text.contains("Visible")).unwrap();
+    let outer = blocks
+        .iter()
+        .find(|block| block.text.contains("Outer"))
+        .unwrap();
+    let inner = blocks
+        .iter()
+        .find(|block| block.text.contains("Inner"))
+        .unwrap();
+    let tail = blocks
+        .iter()
+        .find(|block| block.text.contains("Tail"))
+        .unwrap();
+    let plain = blocks
+        .iter()
+        .find(|block| block.text.contains("Plain"))
+        .unwrap();
+    let visible = blocks
+        .iter()
+        .find(|block| block.text.contains("Visible"))
+        .unwrap();
 
     let outer_border = outer.formatting.character_border.unwrap();
     assert_eq!(outer_border.style, CharacterBorderStyle::Single);
     assert_eq!(outer_border.width, 10);
     assert!(outer_border.shadow && outer_border.frame);
-    assert_eq!(
-        outer.formatting.character_shading.unwrap().amount,
-        2500
-    );
+    assert_eq!(outer.formatting.character_shading.unwrap().amount, 2500);
     assert_eq!(
         inner.formatting.character_border.unwrap().style,
         CharacterBorderStyle::Double
@@ -67,7 +77,9 @@ fn inherits_resets_writes_and_keeps_ignored_destinations_inert() {
     assert_eq!(visible.formatting.character_border, Some(outer_border));
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(&document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
     let written = String::from_utf8(output).unwrap();
     assert!(written.contains(
         r#"\chbrdr\brdrs\brdrw10\brdrcf2\brsp3\brdrsh\brdrframe\chshdng2500\chcfpat3\chcbpat4"#
@@ -100,8 +112,7 @@ fn rejects_malformed_character_decorations() {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
 
-    assert!(RtfDocument::parse(
-        r#"{\rtf1{\*\unknown\chbrdr1\chshdng10001 ignored}Visible}"#
-    )
-    .is_ok());
+    assert!(
+        RtfDocument::parse(r#"{\rtf1{\*\unknown\chbrdr1\chshdng10001 ignored}Visible}"#).is_ok()
+    );
 }

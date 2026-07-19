@@ -23,12 +23,15 @@ pub enum NoteSeparatorElement<'a> {
     ContinuationSeparatorMark,
     ParagraphBreak,
     LineBreak,
+    Drawing(crate::StoryDrawing),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoteSeparator<'a> {
     pub kind: NoteSeparatorKind,
     pub elements: Vec<NoteSeparatorElement<'a>>,
+    pub shapes: Vec<crate::Shape<'a>>,
+    pub shape_groups: Vec<crate::ShapeGroup<'a>>,
 }
 
 impl<'a> NoteSeparator<'a> {
@@ -38,16 +41,84 @@ impl<'a> NoteSeparator<'a> {
                 "RTF note separator contains too many elements".to_string(),
             ));
         }
-        let text_bytes = self.elements.iter().try_fold(0usize, |total, element| {
-            total.checked_add(match element {
-                NoteSeparatorElement::Text(text) => text.len(),
-                _ => 0,
+        let text_bytes = self
+            .elements
+            .iter()
+            .try_fold(0usize, |total, element| {
+                total.checked_add(match element {
+                    NoteSeparatorElement::Text(text) => text.len(),
+                    _ => 0,
+                })
             })
-        }).ok_or_else(|| RtfError::MalformedDocument("RTF note-separator size overflow".to_string()))?;
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("RTF note-separator size overflow".to_string())
+            })?;
         if text_bytes > MAX_NOTE_SEPARATOR_TEXT_BYTES {
             return Err(RtfError::MalformedDocument(
                 "RTF note-separator text exceeds the safety limit".to_string(),
             ));
+        }
+        let story = self.text();
+        let order = self.drawing_order();
+        crate::shape::validate_story_drawings(
+            &story,
+            &self.shapes,
+            &self.shape_groups,
+            &order,
+            "note separator",
+        )?;
+        Ok(())
+    }
+
+    pub fn text(&self) -> String {
+        let mut text = String::new();
+        for element in &self.elements {
+            match element {
+                NoteSeparatorElement::Text(value) => text.push_str(value),
+                NoteSeparatorElement::ParagraphBreak | NoteSeparatorElement::LineBreak => {
+                    text.push('\n')
+                },
+                NoteSeparatorElement::SeparatorMark
+                | NoteSeparatorElement::ContinuationSeparatorMark
+                | NoteSeparatorElement::Drawing(_) => {},
+            }
+        }
+        text
+    }
+
+    pub fn drawing_order(&self) -> Vec<crate::StoryDrawing> {
+        self.elements
+            .iter()
+            .filter_map(|element| match element {
+                NoteSeparatorElement::Drawing(drawing) => Some(*drawing),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> RtfResult<()> {
+        self.elements
+            .push(NoteSeparatorElement::Drawing(crate::StoryDrawing::Shape(
+                self.shapes.len(),
+            )));
+        self.shapes.push(shape);
+        if let Err(error) = self.validate() {
+            self.shapes.pop();
+            self.elements.pop();
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> RtfResult<()> {
+        self.elements.push(NoteSeparatorElement::Drawing(
+            crate::StoryDrawing::ShapeGroup(self.shape_groups.len()),
+        ));
+        self.shape_groups.push(group);
+        if let Err(error) = self.validate() {
+            self.shape_groups.pop();
+            self.elements.pop();
+            return Err(error);
         }
         Ok(())
     }
@@ -55,13 +126,34 @@ impl<'a> NoteSeparator<'a> {
     pub(crate) fn into_owned(self) -> NoteSeparator<'static> {
         NoteSeparator {
             kind: self.kind,
-            elements: self.elements.into_iter().map(|element| match element {
-                NoteSeparatorElement::Text(text) => NoteSeparatorElement::Text(Cow::Owned(text.into_owned())),
-                NoteSeparatorElement::SeparatorMark => NoteSeparatorElement::SeparatorMark,
-                NoteSeparatorElement::ContinuationSeparatorMark => NoteSeparatorElement::ContinuationSeparatorMark,
-                NoteSeparatorElement::ParagraphBreak => NoteSeparatorElement::ParagraphBreak,
-                NoteSeparatorElement::LineBreak => NoteSeparatorElement::LineBreak,
-            }).collect(),
+            shapes: self
+                .shapes
+                .into_iter()
+                .map(crate::Shape::into_owned)
+                .collect(),
+            shape_groups: self
+                .shape_groups
+                .into_iter()
+                .map(crate::ShapeGroup::into_owned)
+                .collect(),
+            elements: self
+                .elements
+                .into_iter()
+                .map(|element| match element {
+                    NoteSeparatorElement::Text(text) => {
+                        NoteSeparatorElement::Text(Cow::Owned(text.into_owned()))
+                    },
+                    NoteSeparatorElement::SeparatorMark => NoteSeparatorElement::SeparatorMark,
+                    NoteSeparatorElement::ContinuationSeparatorMark => {
+                        NoteSeparatorElement::ContinuationSeparatorMark
+                    },
+                    NoteSeparatorElement::ParagraphBreak => NoteSeparatorElement::ParagraphBreak,
+                    NoteSeparatorElement::LineBreak => NoteSeparatorElement::LineBreak,
+                    NoteSeparatorElement::Drawing(drawing) => {
+                        NoteSeparatorElement::Drawing(drawing)
+                    },
+                })
+                .collect(),
         }
     }
 }
@@ -87,7 +179,10 @@ impl<'a> NoteSeparatorTable<'a> {
     pub fn add(&mut self, separator: NoteSeparator<'a>) -> RtfResult<()> {
         separator.validate()?;
         if self.entries.len() >= 6
-            || self.entries.last().is_some_and(|entry| entry.kind >= separator.kind)
+            || self
+                .entries
+                .last()
+                .is_some_and(|entry| entry.kind >= separator.kind)
         {
             return Err(RtfError::MalformedDocument(
                 "RTF note-separator destinations are duplicated or out of order".to_string(),
@@ -113,7 +208,11 @@ impl<'a> NoteSeparatorTable<'a> {
 
     pub(crate) fn into_owned(self) -> NoteSeparatorTable<'static> {
         NoteSeparatorTable {
-            entries: self.entries.into_iter().map(NoteSeparator::into_owned).collect(),
+            entries: self
+                .entries
+                .into_iter()
+                .map(NoteSeparator::into_owned)
+                .collect(),
         }
     }
 }

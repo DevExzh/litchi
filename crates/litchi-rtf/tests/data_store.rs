@@ -12,16 +12,11 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_inert_data_store_bytes_and_round_trips() {
-    let document = RtfDocument::parse(
-        r#"{\rtf1{\*\datastore 01050000 0200000018000000}Body}"#,
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r#"{\rtf1{\*\datastore 01050000 0200000018000000}Body}"#).unwrap();
     assert_eq!(document.text(), "Body");
     let store = document.data_store().unwrap();
-    assert_eq!(
-        store.data.as_ref(),
-        [1, 5, 0, 0, 2, 0, 0, 0, 24, 0, 0, 0]
-    );
+    assert_eq!(store.data.as_ref(), [1, 5, 0, 0, 2, 0, 0, 0, 24, 0, 0, 0]);
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
@@ -72,7 +67,10 @@ fn parses_bundled_libreoffice_data_store_fixtures() {
         "sw/qa/extras/odfexport/data/tdf165315.rtf",
         "sw/qa/extras/rtfexport/data/tdf158830.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)

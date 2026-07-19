@@ -129,11 +129,14 @@ impl ParagraphGroupPropertyTable {
                         "RTF paragraph-group parent references contain a cycle".to_string(),
                     ));
                 }
-                current = self.get(current).ok_or_else(|| {
-                    RtfError::MalformedDocument(
-                        "invalid RTF paragraph-group parent reference".to_string(),
-                    )
-                })?.parent_id;
+                current = self
+                    .get(current)
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "invalid RTF paragraph-group parent reference".to_string(),
+                        )
+                    })?
+                    .parent_id;
             }
         }
         Ok(())

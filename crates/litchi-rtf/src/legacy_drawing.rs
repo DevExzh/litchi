@@ -47,7 +47,9 @@ pub enum LegacyDrawingColor {
 impl LegacyDrawingColor {
     pub fn gray_half_percent(value: i32) -> RtfResult<Self> {
         let value = u8::try_from(value).map_err(|_| {
-            RtfError::MalformedDocument("RTF legacy drawing grayscale is outside 0..=200".to_string())
+            RtfError::MalformedDocument(
+                "RTF legacy drawing grayscale is outside 0..=200".to_string(),
+            )
         })?;
         if value > 200 {
             return Err(RtfError::MalformedDocument(
@@ -282,7 +284,12 @@ pub enum LegacyDrawingPrimitive<'a> {
 }
 
 impl LegacyDrawingPrimitive<'_> {
-    fn validate_at(&self, depth: usize, primitives: &mut usize, points: &mut usize) -> RtfResult<()> {
+    fn validate_at(
+        &self,
+        depth: usize,
+        primitives: &mut usize,
+        points: &mut usize,
+    ) -> RtfResult<()> {
         if depth > MAX_LEGACY_DRAWING_DEPTH {
             return Err(RtfError::MalformedDocument(
                 "RTF legacy drawing nesting exceeds the safety limit".to_string(),
@@ -297,7 +304,11 @@ impl LegacyDrawingPrimitive<'_> {
             ));
         }
         match self {
-            Self::Group { geometry, children, end_geometry } => {
+            Self::Group {
+                geometry,
+                children,
+                end_geometry,
+            } => {
                 geometry.validate()?;
                 end_geometry.validate()?;
                 if children.is_empty() {
@@ -318,20 +329,31 @@ impl LegacyDrawingPrimitive<'_> {
                         "RTF legacy callout requires a polyline followed by a text box".to_string(),
                     ));
                 }
-                if callout.angle.is_some_and(|angle| !matches!(angle, 0 | 30 | 45 | 60 | 90)) {
+                if callout
+                    .angle
+                    .is_some_and(|angle| !matches!(angle, 0 | 30 | 45 | 60 | 90))
+                {
                     return Err(RtfError::MalformedDocument(
                         "RTF legacy callout angle is invalid".to_string(),
                     ));
                 }
-                callout.polyline.validate_at(depth + 1, primitives, points)?;
-                callout.text_box.validate_at(depth + 1, primitives, points)?;
+                callout
+                    .polyline
+                    .validate_at(depth + 1, primitives, points)?;
+                callout
+                    .text_box
+                    .validate_at(depth + 1, primitives, points)?;
             },
             Self::Line { geometry, .. }
             | Self::Rectangle { geometry, .. }
             | Self::Ellipse { geometry, .. }
             | Self::Arc { geometry, .. } => geometry.validate()?,
             Self::TextBox { text_box, .. } => text_box.validate()?,
-            Self::Polyline { points: item_points, geometry, .. } => {
+            Self::Polyline {
+                points: item_points,
+                geometry,
+                ..
+            } => {
                 geometry.validate()?;
                 if item_points.is_empty() || item_points.len() > MAX_LEGACY_DRAWING_POINTS {
                     return Err(RtfError::MalformedDocument(
@@ -339,11 +361,14 @@ impl LegacyDrawingPrimitive<'_> {
                     ));
                 }
                 *points = points.checked_add(item_points.len()).ok_or_else(|| {
-                    RtfError::MalformedDocument("RTF legacy drawing point count overflow".to_string())
+                    RtfError::MalformedDocument(
+                        "RTF legacy drawing point count overflow".to_string(),
+                    )
                 })?;
                 if *points > MAX_LEGACY_DRAWING_TOTAL_POINTS {
                     return Err(RtfError::MalformedDocument(
-                        "RTF legacy drawing aggregate point count exceeds the safety limit".to_string(),
+                        "RTF legacy drawing aggregate point count exceeds the safety limit"
+                            .to_string(),
                     ));
                 }
             },
@@ -353,7 +378,11 @@ impl LegacyDrawingPrimitive<'_> {
 
     pub(crate) fn into_owned(self) -> LegacyDrawingPrimitive<'static> {
         match self {
-            Self::Group { geometry, children, end_geometry } => LegacyDrawingPrimitive::Group {
+            Self::Group {
+                geometry,
+                children,
+                end_geometry,
+            } => LegacyDrawingPrimitive::Group {
                 geometry,
                 children: children.into_iter().map(Self::into_owned).collect(),
                 end_geometry,
@@ -376,12 +405,62 @@ impl LegacyDrawingPrimitive<'_> {
                 geometry: callout.geometry,
                 properties: callout.properties,
             }),
-            Self::Line { start, end, geometry, properties } => LegacyDrawingPrimitive::Line { start, end, geometry, properties },
-            Self::Rectangle { rounded, geometry, properties } => LegacyDrawingPrimitive::Rectangle { rounded, geometry, properties },
-            Self::TextBox { text_box, properties } => LegacyDrawingPrimitive::TextBox { text_box: text_box.into_owned(), properties },
-            Self::Ellipse { geometry, properties } => LegacyDrawingPrimitive::Ellipse { geometry, properties },
-            Self::Polyline { closed, points, geometry, properties } => LegacyDrawingPrimitive::Polyline { closed, points, geometry, properties },
-            Self::Arc { flip_x, flip_y, geometry, properties } => LegacyDrawingPrimitive::Arc { flip_x, flip_y, geometry, properties },
+            Self::Line {
+                start,
+                end,
+                geometry,
+                properties,
+            } => LegacyDrawingPrimitive::Line {
+                start,
+                end,
+                geometry,
+                properties,
+            },
+            Self::Rectangle {
+                rounded,
+                geometry,
+                properties,
+            } => LegacyDrawingPrimitive::Rectangle {
+                rounded,
+                geometry,
+                properties,
+            },
+            Self::TextBox {
+                text_box,
+                properties,
+            } => LegacyDrawingPrimitive::TextBox {
+                text_box: text_box.into_owned(),
+                properties,
+            },
+            Self::Ellipse {
+                geometry,
+                properties,
+            } => LegacyDrawingPrimitive::Ellipse {
+                geometry,
+                properties,
+            },
+            Self::Polyline {
+                closed,
+                points,
+                geometry,
+                properties,
+            } => LegacyDrawingPrimitive::Polyline {
+                closed,
+                points,
+                geometry,
+                properties,
+            },
+            Self::Arc {
+                flip_x,
+                flip_y,
+                geometry,
+                properties,
+            } => LegacyDrawingPrimitive::Arc {
+                flip_x,
+                flip_y,
+                geometry,
+                properties,
+            },
         }
     }
 }

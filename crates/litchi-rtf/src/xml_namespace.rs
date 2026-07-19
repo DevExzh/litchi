@@ -38,8 +38,7 @@ impl<'a> XmlNamespace<'a> {
         }
         if self.namespace.contains(['\0', '\r', '\n']) {
             return Err(RtfError::MalformedDocument(
-                "RTF XML namespace identifier contains a forbidden control character"
-                    .to_string(),
+                "RTF XML namespace identifier contains a forbidden control character".to_string(),
             ));
         }
         Ok(())

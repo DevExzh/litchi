@@ -1,11 +1,14 @@
 use litchi_rtf::{
-    LegacyCalloutType, LegacyDrawingFillPattern, LegacyDrawingLineStyle,
-    LegacyDrawingPrimitive, RtfDocument, RtfWriter,
+    LegacyCalloutType, LegacyDrawingFillPattern, LegacyDrawingLineStyle, LegacyDrawingPrimitive,
+    RtfDocument, RtfWriter,
 };
 
 fn isolated_drawing(fixture: &[u8]) -> Vec<u8> {
     let marker = br"{\*\do";
-    let start = fixture.windows(marker.len()).position(|window| window == marker).unwrap();
+    let start = fixture
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .unwrap();
     let mut depth = 0usize;
     let mut end = None;
     for (offset, byte) in fixture[start..].iter().enumerate() {
@@ -13,7 +16,10 @@ fn isolated_drawing(fixture: &[u8]) -> Vec<u8> {
             b'{' => depth += 1,
             b'}' => {
                 depth -= 1;
-                if depth == 0 { end = Some(start + offset + 1); break; }
+                if depth == 0 {
+                    end = Some(start + offset + 1);
+                    break;
+                }
             },
             _ => {},
         }
@@ -38,24 +44,48 @@ fn parses_all_simple_primitives_and_round_trips_canonically() {
     let document = RtfDocument::parse(source).unwrap();
     assert_eq!(document.text(), "AB");
     assert_eq!(document.legacy_drawings().len(), 5);
-    let LegacyDrawingPrimitive::Line { properties, .. } = &document.legacy_drawings()[0].primitive else { panic!() };
-    assert_eq!(properties.line.unwrap().style, LegacyDrawingLineStyle::Dashed);
+    let LegacyDrawingPrimitive::Line { properties, .. } = &document.legacy_drawings()[0].primitive
+    else {
+        panic!()
+    };
+    assert_eq!(
+        properties.line.unwrap().style,
+        LegacyDrawingLineStyle::Dashed
+    );
     assert!(properties.start_arrow.is_some());
     assert!(properties.end_arrow.is_some());
     assert!(properties.shadow.is_some());
-    let LegacyDrawingPrimitive::Rectangle { rounded, properties, .. } = &document.legacy_drawings()[1].primitive else { panic!() };
+    let LegacyDrawingPrimitive::Rectangle {
+        rounded,
+        properties,
+        ..
+    } = &document.legacy_drawings()[1].primitive
+    else {
+        panic!()
+    };
     assert!(*rounded);
-    assert_eq!(properties.fill.unwrap().pattern, LegacyDrawingFillPattern::LightTrellis);
-    let LegacyDrawingPrimitive::Polyline { closed, points, .. } = &document.legacy_drawings()[4].primitive else { panic!() };
+    assert_eq!(
+        properties.fill.unwrap().pattern,
+        LegacyDrawingFillPattern::LightTrellis
+    );
+    let LegacyDrawingPrimitive::Polyline { closed, points, .. } =
+        &document.legacy_drawings()[4].primitive
+    else {
+        panic!()
+    };
     assert!(*closed);
     assert_eq!(points.len(), 3);
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first).write_document(&document).unwrap();
+    RtfWriter::new(&mut first)
+        .write_document(&document)
+        .unwrap();
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
     assert_eq!(reparsed.legacy_drawings(), document.legacy_drawings());
     let mut second = Vec::new();
-    RtfWriter::new(&mut second).write_document(&reparsed).unwrap();
+    RtfWriter::new(&mut second)
+        .write_document(&reparsed)
+        .unwrap();
     assert_eq!(first, second);
 }
 
@@ -74,33 +104,66 @@ fn parses_recursive_groups_and_callouts() {
     );
     let document = RtfDocument::parse(source).unwrap();
     assert_eq!(document.legacy_drawings().len(), 2);
-    let LegacyDrawingPrimitive::Group { children, .. } = &document.legacy_drawings()[0].primitive else { panic!() };
+    let LegacyDrawingPrimitive::Group { children, .. } = &document.legacy_drawings()[0].primitive
+    else {
+        panic!()
+    };
     assert_eq!(children.len(), 2);
     assert!(matches!(children[1], LegacyDrawingPrimitive::Group { .. }));
-    let LegacyDrawingPrimitive::Callout(callout) = &document.legacy_drawings()[1].primitive else { panic!() };
+    let LegacyDrawingPrimitive::Callout(callout) = &document.legacy_drawings()[1].primitive else {
+        panic!()
+    };
     assert_eq!(callout.callout_type, LegacyCalloutType::Single);
     assert_eq!(callout.angle, Some(45));
-    assert!(matches!(*callout.polyline, LegacyDrawingPrimitive::Polyline { .. }));
-    assert!(matches!(*callout.text_box, LegacyDrawingPrimitive::TextBox { .. }));
+    assert!(matches!(
+        *callout.polyline,
+        LegacyDrawingPrimitive::Polyline { .. }
+    ));
+    assert!(matches!(
+        *callout.text_box,
+        LegacyDrawingPrimitive::TextBox { .. }
+    ));
 }
 
 #[test]
 fn parses_named_libreoffice_primitive_fixtures() {
-    let polyline = include_bytes!("../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/dppolyline.rtf");
+    let polyline = include_bytes!(
+        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/dppolyline.rtf"
+    );
     let document = RtfDocument::parse_bytes(polyline).unwrap();
     assert_eq!(document.legacy_drawings().len(), 4);
     assert!(document.legacy_drawings().iter().all(|drawing| matches!(&drawing.primitive, LegacyDrawingPrimitive::Polyline { points, .. } if points.len() == 2)));
 
-    let rectangle = include_bytes!("../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/dprect-anchor.rtf");
+    let rectangle = include_bytes!(
+        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/dprect-anchor.rtf"
+    );
     let document = RtfDocument::parse_bytes(rectangle).unwrap();
-    let LegacyDrawingPrimitive::Rectangle { rounded, properties, .. } = &document.legacy_drawings()[0].primitive else { panic!() };
+    let LegacyDrawingPrimitive::Rectangle {
+        rounded,
+        properties,
+        ..
+    } = &document.legacy_drawings()[0].primitive
+    else {
+        panic!()
+    };
     assert!(*rounded);
-    assert_eq!(properties.line.unwrap().style, LegacyDrawingLineStyle::Hollow);
-    assert_eq!(properties.fill.unwrap().pattern, LegacyDrawingFillPattern::Solid);
+    assert_eq!(
+        properties.line.unwrap().style,
+        LegacyDrawingLineStyle::Hollow
+    );
+    assert_eq!(
+        properties.fill.unwrap().pattern,
+        LegacyDrawingFillPattern::Solid
+    );
 
-    let group = include_bytes!("../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf91684.rtf");
+    let group = include_bytes!(
+        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf91684.rtf"
+    );
     let document = RtfDocument::parse_bytes(&isolated_drawing(group)).unwrap();
-    let LegacyDrawingPrimitive::Group { children, .. } = &document.legacy_drawings()[0].primitive else { panic!() };
+    let LegacyDrawingPrimitive::Group { children, .. } = &document.legacy_drawings()[0].primitive
+    else {
+        panic!()
+    };
     assert_eq!(children.len(), 3);
 }
 
@@ -118,6 +181,9 @@ fn rejects_malformed_order_duplicates_cardinality_and_caps() {
         r#"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dppolyline\dppolycount65537}}"#,
     ];
     for source in malformed {
-        assert!(RtfDocument::parse(source).is_err(), "accepted malformed drawing: {source}");
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "accepted malformed drawing: {source}"
+        );
     }
 }

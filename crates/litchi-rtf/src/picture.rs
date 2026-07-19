@@ -13,6 +13,74 @@ use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_PICTURE_WRITE_BYTES: usize = 64 * 1_048_576;
+/// Maximum number of scalar OfficeArt properties on one inline picture.
+pub const MAX_PICTURE_SHAPE_PROPERTIES: usize = 4_096;
+/// Maximum aggregate name/value bytes on one inline picture.
+pub const MAX_PICTURE_SHAPE_PROPERTY_BYTES: usize = 1024 * 1024;
+
+/// Ordered OfficeArt properties from a picture's starred `picprop` destination.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PictureShapeProperties<'a> {
+    /// Optional producer shape identifier (`shplid`)
+    pub shape_id: Option<i32>,
+    /// Ordered scalar or binary `sp` records, including optional theme metadata
+    pub properties: Vec<crate::ShapeProperty<'a>>,
+}
+
+impl PictureShapeProperties<'_> {
+    /// Validate the normative nonempty property list and resource bounds.
+    pub fn validate(&self) -> RtfResult<()> {
+        if self.properties.is_empty() || self.properties.len() > MAX_PICTURE_SHAPE_PROPERTIES {
+            return Err(RtfError::MalformedDocument(
+                "RTF picprop must contain a bounded nonempty property list".to_string(),
+            ));
+        }
+        let mut bytes = 0usize;
+        for property in &self.properties {
+            property.validate()?;
+            bytes = bytes
+                .checked_add(property.name.len())
+                .and_then(|size| size.checked_add(property.value.len()))
+                .and_then(|size| {
+                    size.checked_add(
+                        property
+                            .binary_value
+                            .as_ref()
+                            .map_or(0, |value| value.len()),
+                    )
+                })
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF picture shape-property size overflow".to_string(),
+                    )
+                })?;
+            if bytes > MAX_PICTURE_SHAPE_PROPERTY_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF picture shape properties exceed the text safety limit".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn into_owned(self) -> PictureShapeProperties<'static> {
+        PictureShapeProperties {
+            shape_id: self.shape_id,
+            properties: self
+                .properties
+                .into_iter()
+                .map(|property| crate::ShapeProperty {
+                    name: Cow::Owned(property.name.into_owned()),
+                    value: Cow::Owned(property.value.into_owned()),
+                    binary_value: property
+                        .binary_value
+                        .map(|value| Cow::Owned(value.into_owned())),
+                    theme_value: property.theme_value,
+                })
+                .collect(),
+        }
+    }
+}
 
 /// Inert identity metadata attached to one RTF picture payload.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -75,6 +143,73 @@ pub enum ImageType {
     Unknown,
 }
 
+/// Passive crop distances in twips from the four source-picture edges.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PictureCrop {
+    pub left: Option<i32>,
+    pub right: Option<i32>,
+    pub top: Option<i32>,
+    pub bottom: Option<i32>,
+}
+
+/// Passive legacy bitmap header controls carried by a `pict` destination.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PictureBitmapMetadata {
+    /// Source selected `wbitmap` rather than `dibitmap`.
+    pub windows_bitmap: bool,
+    /// Source explicitly used the legacy `picbmp` flag.
+    pub bitmap_source: bool,
+    /// Source bits per pixel from `picbpp`.
+    pub bits_per_pixel: Option<u16>,
+    /// Windows bitmap bits per pixel from `wbmbitspixel`.
+    pub windows_bits_per_pixel: Option<u16>,
+    /// Windows bitmap plane count from `wbmplanes`.
+    pub planes: Option<u16>,
+    /// Bytes per source bitmap scan line from `wbmwidthbytes`.
+    pub width_bytes: Option<u32>,
+}
+
+impl PictureBitmapMetadata {
+    fn validate(&self, image_type: ImageType) -> RtfResult<()> {
+        let present = self.windows_bitmap
+            || self.bitmap_source
+            || self.bits_per_pixel.is_some()
+            || self.windows_bits_per_pixel.is_some()
+            || self.planes.is_some()
+            || self.width_bytes.is_some();
+        if present && image_type != ImageType::Dib {
+            return Err(RtfError::MalformedDocument(
+                "RTF bitmap header controls require a DIB or Windows bitmap picture".to_string(),
+            ));
+        }
+        for (name, value) in [
+            ("picbpp", self.bits_per_pixel),
+            ("wbmbitspixel", self.windows_bits_per_pixel),
+            ("wbmplanes", self.planes),
+        ] {
+            if value == Some(0) {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must be positive"
+                )));
+            }
+        }
+        if self.width_bytes == Some(0) {
+            return Err(RtfError::MalformedDocument(
+                "RTF wbmwidthbytes must be positive".to_string(),
+            ));
+        }
+        if self
+            .width_bytes
+            .is_some_and(|value| value > i32::MAX as u32)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF wbmwidthbytes exceeds the signed control-word range".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Extracted picture from RTF document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Picture<'a> {
@@ -84,6 +219,8 @@ pub struct Picture<'a> {
     pub data: Cow<'a, [u8]>,
     /// Optional cache/source identity metadata.
     pub identity: Option<PictureIdentity<'a>>,
+    /// Optional inline OfficeArt property destination (`picprop`)
+    pub shape_properties: Option<PictureShapeProperties<'a>>,
     /// Picture width (in twips, 1/1440 inch)
     pub width: Option<i32>,
     /// Picture height (in twips)
@@ -96,6 +233,12 @@ pub struct Picture<'a> {
     pub scale_x: Option<i32>,
     /// Vertical scaling percentage
     pub scale_y: Option<i32>,
+    /// Whether the source supplied the `picscaled` flag.
+    pub scaled: bool,
+    /// Passive source crop distances.
+    pub crop: PictureCrop,
+    /// Passive legacy bitmap header metadata.
+    pub bitmap: PictureBitmapMetadata,
 }
 
 impl<'a> Picture<'a> {
@@ -106,12 +249,16 @@ impl<'a> Picture<'a> {
             image_type,
             data,
             identity: None,
+            shape_properties: None,
             width: None,
             height: None,
             goal_width: None,
             goal_height: None,
             scale_x: None,
             scale_y: None,
+            scaled: false,
+            crop: PictureCrop::default(),
+            bitmap: PictureBitmapMetadata::default(),
         }
     }
 
@@ -130,6 +277,10 @@ impl<'a> Picture<'a> {
         if let Some(identity) = &self.identity {
             identity.validate()?;
         }
+        if let Some(properties) = &self.shape_properties {
+            properties.validate()?;
+        }
+        self.bitmap.validate(self.image_type)?;
         Ok(())
     }
 
@@ -138,12 +289,18 @@ impl<'a> Picture<'a> {
             image_type: self.image_type,
             data: Cow::Owned(self.data.into_owned()),
             identity: self.identity.map(PictureIdentity::into_owned),
+            shape_properties: self
+                .shape_properties
+                .map(PictureShapeProperties::into_owned),
             width: self.width,
             height: self.height,
             goal_width: self.goal_width,
             goal_height: self.goal_height,
             scale_x: self.scale_x,
             scale_y: self.scale_y,
+            scaled: self.scaled,
+            crop: self.crop,
+            bitmap: self.bitmap,
         }
     }
 
@@ -258,12 +415,16 @@ mod tests {
             image_type: ImageType::Png,
             data: Cow::Borrowed(&[]),
             identity: None,
+            shape_properties: None,
             width: Some(1440), // 1 inch
             height: Some(1440),
             goal_width: None,
             goal_height: None,
             scale_x: Some(200), // 200% scale
             scale_y: Some(200),
+            scaled: false,
+            crop: PictureCrop::default(),
+            bitmap: PictureBitmapMetadata::default(),
         };
 
         assert_eq!(pic.computed_width(), Some(2880)); // 2 inches

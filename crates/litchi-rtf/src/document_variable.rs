@@ -19,10 +19,7 @@ pub struct DocumentVariable<'a> {
 }
 
 impl<'a> DocumentVariable<'a> {
-    pub fn new(
-        name: impl Into<Cow<'a, str>>,
-        value: impl Into<Cow<'a, str>>,
-    ) -> RtfResult<Self> {
+    pub fn new(name: impl Into<Cow<'a, str>>, value: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
         let variable = Self {
             name: name.into(),
             value: value.into(),

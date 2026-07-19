@@ -193,12 +193,16 @@ impl FormField<'_> {
                 "RTF form-field list exceeds 25 entries".to_string(),
             ));
         }
-        if self.half_point_size.is_some_and(|value| !(1..=32767).contains(&value)) {
+        if self
+            .half_point_size
+            .is_some_and(|value| !(1..=32767).contains(&value))
+        {
             return Err(RtfError::MalformedDocument(
                 "RTF form-field half-point size is outside 1..=32767".to_string(),
             ));
         }
-        if self.own_help != self.help_text.is_some() || self.own_status != self.status_text.is_some()
+        if self.own_help != self.help_text.is_some()
+            || self.own_status != self.status_text.is_some()
         {
             return Err(RtfError::MalformedDocument(
                 "RTF form-field own-help/status flags conflict with their text destinations"
@@ -226,25 +230,30 @@ impl FormField<'_> {
                 }
             },
             FormFieldType::CheckBox => {
-                if self.text_type.is_some_and(|value| value != FormTextType::Regular)
+                if self
+                    .text_type
+                    .is_some_and(|value| value != FormTextType::Regular)
                     || self.max_length.is_some()
                     || self.format.is_some()
                     || self.default_text.is_some()
                     || !self.list_entries.is_empty()
                     || self.has_list_box
-                    || self.default_result.is_some_and(|value| !(0..=1).contains(&value))
+                    || self
+                        .default_result
+                        .is_some_and(|value| !(0..=1).contains(&value))
                     || self
                         .result
                         .is_some_and(|value| value != 25 && !(0..=1).contains(&value))
                 {
                     return Err(RtfError::MalformedDocument(
-                        "RTF checkbox form-field controls conflict or are out of range"
-                            .to_string(),
+                        "RTF checkbox form-field controls conflict or are out of range".to_string(),
                     ));
                 }
             },
             FormFieldType::DropDown => {
-                if self.text_type.is_some_and(|value| value != FormTextType::Regular)
+                if self
+                    .text_type
+                    .is_some_and(|value| value != FormTextType::Regular)
                     || self.max_length.is_some()
                     || self.format.is_some()
                     || self.default_text.is_some()

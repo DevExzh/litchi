@@ -20,7 +20,10 @@ fn parses_inert_theme_bytes_and_round_trips_without_interpretation() {
     assert_eq!(document.text(), "Body");
     let theme = document.theme().unwrap();
     assert_eq!(theme.data.as_ref(), [0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
-    assert_eq!(theme.color_scheme_mapping.as_deref(), Some(b"<?xml>".as_slice()));
+    assert_eq!(
+        theme.color_scheme_mapping.as_deref(),
+        Some(b"<?xml>".as_slice())
+    );
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
@@ -78,7 +81,10 @@ fn parses_bundled_libreoffice_theme_fixtures() {
         "sw/qa/extras/odfexport/data/tdf165315.rtf",
         "sw/qa/extras/rtfexport/data/tdf158830.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)

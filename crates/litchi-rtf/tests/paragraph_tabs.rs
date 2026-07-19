@@ -1,6 +1,4 @@
-use litchi_rtf::{
-    MAX_PARAGRAPH_TAB_STOPS, RtfDocument, RtfWriter, TabAlignment, TabLeader,
-};
+use litchi_rtf::{MAX_PARAGRAPH_TAB_STOPS, RtfDocument, RtfWriter, TabAlignment, TabLeader};
 
 fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a litchi_rtf::StyleBlock<'a> {
     document
@@ -12,12 +10,11 @@ fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a litchi_rtf::Sty
 
 #[test]
 fn parses_libreoffice_paragraph_and_style_tab_fixture() {
-    let source = std::fs::read(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+    let source =
+        std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
             "../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf96308-tabpos.rtf",
-        ),
-    )
-    .unwrap();
+        ))
+        .unwrap();
     let document = RtfDocument::parse_bytes(&source).unwrap();
 
     let style_tabs = document
@@ -38,11 +35,9 @@ fn parses_libreoffice_paragraph_and_style_tab_fixture() {
             .any(|cell| cell.text().contains("A1"))
     }));
 
-    let leader_source = std::fs::read(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tab-stop-fill-chars.rtf",
-        ),
-    )
+    let leader_source = std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tab-stop-fill-chars.rtf",
+    ))
     .unwrap();
     let leader_document = RtfDocument::parse_bytes(&leader_source).unwrap();
     assert!(leader_document.blocks().iter().any(|block| {
@@ -87,12 +82,20 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
     assert_eq!(tabs[6].alignment, TabAlignment::Left);
 
     assert_eq!(block(&document, "Inner").paragraph.tab_stops.len(), 8);
-    assert_eq!(block(&document, "Tail").paragraph.tab_stops, outer.paragraph.tab_stops);
+    assert_eq!(
+        block(&document, "Tail").paragraph.tab_stops,
+        outer.paragraph.tab_stops
+    );
     assert!(block(&document, "Reset").paragraph.tab_stops.is_empty());
-    assert_eq!(block(&document, "Visible").paragraph.tab_stops, outer.paragraph.tab_stops);
+    assert_eq!(
+        block(&document, "Visible").paragraph.tab_stops,
+        outer.paragraph.tab_stops
+    );
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(&document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
     let written = String::from_utf8(output).unwrap();
     assert!(written.contains(concat!(
         r#"\tqr\tldot\tx720\tqc\tlmdot\tx1440\tqdec\tlhyph\tx2160"#,
@@ -110,11 +113,16 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
 
 #[test]
 fn parses_and_writes_tabs_in_paragraph_styles() {
-    let document = RtfDocument::parse(
-        r#"{\rtf1{\stylesheet{\s30\tqr\tldot\tx2552 Body Text 3;}}Body}"#,
-    )
-    .unwrap();
-    let tabs = document.stylesheet().get(30).unwrap().paragraph.unwrap().tab_stops;
+    let document =
+        RtfDocument::parse(r#"{\rtf1{\stylesheet{\s30\tqr\tldot\tx2552 Body Text 3;}}Body}"#)
+            .unwrap();
+    let tabs = document
+        .stylesheet()
+        .get(30)
+        .unwrap()
+        .paragraph
+        .unwrap()
+        .tab_stops;
     assert_eq!(tabs.len(), 1);
     assert_eq!(tabs.as_slice()[0].alignment, TabAlignment::Right);
 
@@ -125,7 +133,13 @@ fn parses_and_writes_tabs_in_paragraph_styles() {
     writer.write_str("}").unwrap();
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(
-        reparsed.stylesheet().get(30).unwrap().paragraph.unwrap().tab_stops,
+        reparsed
+            .stylesheet()
+            .get(30)
+            .unwrap()
+            .paragraph
+            .unwrap()
+            .tab_stops,
         tabs
     );
 }
@@ -153,8 +167,5 @@ fn rejects_malformed_and_over_limit_tab_definitions() {
     over_limit.push_str(" X}");
     assert!(RtfDocument::parse(&over_limit).is_err());
 
-    assert!(RtfDocument::parse(
-        r#"{\rtf1{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}"#,
-    )
-    .is_ok());
+    assert!(RtfDocument::parse(r#"{\rtf1{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}"#,).is_ok());
 }

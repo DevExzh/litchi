@@ -19,10 +19,7 @@ enum RtfEncoding {
     Cp850,
 }
 
-fn strict_paragraph_toggle(
-    value: Option<i32>,
-    name: &str,
-) -> std::result::Result<bool, RtfError> {
+fn strict_paragraph_toggle(value: Option<i32>, name: &str) -> std::result::Result<bool, RtfError> {
     match value {
         None | Some(1) => Ok(true),
         Some(0) => Ok(false),
@@ -32,10 +29,7 @@ fn strict_paragraph_toggle(
     }
 }
 
-fn strict_paragraph_selector(
-    value: Option<i32>,
-    name: &str,
-) -> std::result::Result<(), RtfError> {
+fn strict_paragraph_selector(value: Option<i32>, name: &str) -> std::result::Result<(), RtfError> {
     if value.is_some() {
         return Err(RtfError::MalformedDocument(format!(
             "RTF {name} must not have a numeric parameter"
@@ -48,18 +42,35 @@ fn required_paragraph_bool(value: Option<i32>, name: &str) -> std::result::Resul
     match value {
         Some(0) => Ok(false),
         Some(1) => Ok(true),
-        None => Err(RtfError::MalformedDocument(format!("RTF {name} requires 0 or 1"))),
-        Some(_) => Err(RtfError::MalformedDocument(format!("RTF {name} accepts only 0 or 1"))),
+        None => Err(RtfError::MalformedDocument(format!(
+            "RTF {name} requires 0 or 1"
+        ))),
+        Some(_) => Err(RtfError::MalformedDocument(format!(
+            "RTF {name} accepts only 0 or 1"
+        ))),
     }
 }
 
 fn required_list_spacing(value: Option<i32>, name: &str) -> std::result::Result<u32, RtfError> {
-    let value = value.ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter")))?;
-    u32::try_from(value).ok().filter(|value| *value <= 1_000_000).ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} must be in 0..=1000000"))
-    })
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+    })?;
+    u32::try_from(value)
+        .ok()
+        .filter(|value| *value <= 1_000_000)
+        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} must be in 0..=1000000")))
 }
-fn required_paragraph_indent(value:Option<i32>,name:&str)->std::result::Result<i32,RtfError>{let value=value.ok_or_else(||RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter")))?;if value.unsigned_abs()>10_000_000{return Err(RtfError::MalformedDocument(format!("RTF {name} exceeds the supported range")))}Ok(value)}
+fn required_paragraph_indent(value: Option<i32>, name: &str) -> std::result::Result<i32, RtfError> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+    })?;
+    if value.unsigned_abs() > 10_000_000 {
+        return Err(RtfError::MalformedDocument(format!(
+            "RTF {name} exceeds the supported range"
+        )));
+    }
+    Ok(value)
+}
 
 impl RtfEncoding {
     fn decode(self, bytes: &[u8]) -> Cow<'_, str> {
@@ -145,6 +156,29 @@ fn control_symbol_text(control: &ControlWord<'_>) -> Option<&'static str> {
     }
 }
 
+fn duplicate_mail_merge(name: &str) -> RtfError {
+    RtfError::MalformedDocument(format!(
+        "RTF mail-merge destination contains duplicate {name} metadata"
+    ))
+}
+
+fn nonnegative_mail_merge(value: i32, name: &str) -> RtfResult<u32> {
+    u32::try_from(value).map_err(|_| {
+        RtfError::MalformedDocument(format!("RTF mail-merge {name} cannot be negative"))
+    })
+}
+
+fn set_mail_merge_text<'a>(
+    slot: &mut Option<Cow<'a, str>>,
+    value: Cow<'a, str>,
+    name: &str,
+) -> RtfResult<()> {
+    if slot.replace(value).is_some() {
+        return Err(duplicate_mail_merge(name));
+    }
+    Ok(())
+}
+
 /// RTF destination type - determines if we're in document body or header
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Destination {
@@ -212,8 +246,8 @@ const MAX_BOOKMARK_NAME_BYTES: usize = 65_536;
 const MAX_ANNOTATIONS: usize = super::annotation::MAX_ANNOTATIONS;
 const MAX_ANNOTATION_TEXT_BYTES: usize = 4 * 1_048_576;
 const MAX_SECTIONS: usize = 4_096;
-use super::stylesheet::{MAX_STYLES, MAX_STYLE_NAME_BYTES};
-use super::list::{MAX_LISTS, MAX_LIST_LEVELS, MAX_LIST_TEXT_BYTES, MAX_LIST_TABS};
+use super::list::{MAX_LIST_LEVELS, MAX_LIST_TABS, MAX_LIST_TEXT_BYTES, MAX_LISTS};
+use super::stylesheet::{MAX_STYLE_NAME_BYTES, MAX_STYLES};
 const MAX_REVISION_AUTHORS: usize = super::annotation::MAX_REVISION_AUTHORS;
 const MAX_REVISION_AUTHOR_BYTES: usize = 65_536;
 const MAX_REVISIONS: usize = super::annotation::MAX_REVISIONS;
@@ -222,6 +256,7 @@ const MAX_SHAPE_GROUPS: usize = 16_384;
 const MAX_SHAPES_PER_GROUP: usize = 65_536;
 const MAX_GROUPS_PER_GROUP: usize = 16_384;
 const MAX_SHAPE_GROUP_DEPTH: usize = 64;
+const MAX_STORY_GROUP_DEPTH: usize = 64;
 const MAX_SHAPE_PROPERTIES: usize = 65_536;
 const MAX_SHAPE_PROPERTY_BYTES: usize = 1_048_576;
 const MAX_SHAPE_TEXT_BYTES: usize = 16 * 1_048_576;
@@ -230,17 +265,17 @@ const MAX_OBJECT_TEXT_BYTES: usize = 1_048_576;
 const MAX_OBJECT_DATA_BYTES: usize = 256 * 1_048_576;
 const MAX_PICTURE_DATA_BYTES: usize = 256 * 1_048_576;
 use super::document_variable::{
-    DocumentVariable, MAX_DOCUMENT_VARIABLES, MAX_DOCUMENT_VARIABLE_NAME_BYTES,
-    MAX_DOCUMENT_VARIABLE_TEXT_BYTES, MAX_DOCUMENT_VARIABLE_VALUE_BYTES,
-};
-use super::user_property::{
-    MAX_USER_PROPERTIES, MAX_USER_PROPERTY_NAME_BYTES, MAX_USER_PROPERTY_TEXT_BYTES,
-    MAX_USER_PROPERTY_VALUE_BYTES, UserProperty, UserPropertyValue,
+    DocumentVariable, MAX_DOCUMENT_VARIABLE_NAME_BYTES, MAX_DOCUMENT_VARIABLE_TEXT_BYTES,
+    MAX_DOCUMENT_VARIABLE_VALUE_BYTES, MAX_DOCUMENT_VARIABLES,
 };
 use super::navigation_entry::{
     IndexEntry, IndexPageReference, MAX_NAVIGATION_ENTRIES, MAX_NAVIGATION_ENTRY_DEPTH,
     MAX_NAVIGATION_ENTRY_TEXT_BYTES, MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES, NavigationEntry,
     TableOfContentsEntry,
+};
+use super::user_property::{
+    MAX_USER_PROPERTIES, MAX_USER_PROPERTY_NAME_BYTES, MAX_USER_PROPERTY_TEXT_BYTES,
+    MAX_USER_PROPERTY_VALUE_BYTES, UserProperty, UserPropertyValue,
 };
 
 struct OpenBookmark {
@@ -257,6 +292,16 @@ struct BookmarkSpan {
     end: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum ParsedBodyStoryEvent {
+    Resolved(crate::BodyStoryEvent),
+    AnnotationStart(i32),
+    AnnotationEnd(i32),
+    RevisionStart(usize),
+    RevisionEnd(usize),
+    RevisionDeletion(usize),
+}
+
 /// Parser state for tracking formatting context.
 #[derive(Debug, Clone)]
 struct State {
@@ -268,6 +313,10 @@ struct State {
     character_border_seen: u8,
     /// Current paragraph properties
     paragraph: Paragraph,
+    /// Parsed `dropcapt` value retained independently until the pair is complete.
+    drop_cap_kind: Option<crate::ParagraphDropCapKind>,
+    /// Parsed `dropcapli` value retained independently until the pair is complete.
+    drop_cap_lines: Option<u8>,
     /// Optional alignment selector for the next `tx` tab terminator.
     pending_tab_alignment: Option<super::border::TabAlignment>,
     /// Optional leader selector for the next `tx` or `tb` tab terminator.
@@ -279,6 +328,7 @@ struct State {
     table_nesting_level: u8,
     /// Cell boundaries for current row (in twips)
     cell_boundaries: SmallVec<[i32; 8]>,
+    table_style: Option<u16>,
     table_row_padding: crate::TableEdgeDistances,
     table_row_spacing: crate::TableEdgeDistances,
     table_row_positioning: crate::FloatingTablePosition,
@@ -331,12 +381,16 @@ struct State {
     revision_author_id: Option<i32>,
     /// Packed RTF revision timestamp
     revision_date: Option<i32>,
+    revision_event_id: Option<usize>,
+    paragraph_content_started: bool,
+    paragraph_numbering_declared: bool,
 }
 
 fn is_section_control(control: &ControlWord<'_>) -> bool {
     matches!(
         control,
         ControlWord::SectionDefault
+            | ControlWord::SectionStyle(_)
             | ControlWord::SectionBreak
             | ControlWord::SectionContinuous
             | ControlWord::SectionColumn
@@ -395,38 +449,346 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
     )
 }
 
-fn apply_table_distance(state:&mut State,target:crate::TableDistanceTarget,parameter:Option<i32>,unit:bool)->RtfResult<()> {
-    let value=parameter.ok_or_else(||RtfError::MalformedDocument("RTF table distance control requires a parameter".to_string()))?;
-    let distances=match (target.scope,target.kind){(crate::TableDistanceScope::Row,crate::TableDistanceKind::Padding)=>&mut state.table_row_padding,(crate::TableDistanceScope::Row,crate::TableDistanceKind::Spacing)=>&mut state.table_row_spacing,(crate::TableDistanceScope::Cell,crate::TableDistanceKind::Padding)=>&mut state.pending_cell_padding,(crate::TableDistanceScope::Cell,crate::TableDistanceKind::Spacing)=>&mut state.pending_cell_spacing};
-    let side=distances.side_mut(target.edge);if unit{side.unit=Some(match value{0=>crate::TableDistanceUnit::Null,3=>crate::TableDistanceUnit::Twips,_=>return Err(RtfError::MalformedDocument("RTF table distance unit must be 0 or 3".to_string()))});}else{if !(0..=crate::MAX_TABLE_DISTANCE_TWIPS).contains(&value){return Err(RtfError::MalformedDocument("RTF table distance value is out of range".to_string()))}side.value=Some(value as u16);}Ok(())
+fn apply_table_distance(
+    state: &mut State,
+    target: crate::TableDistanceTarget,
+    parameter: Option<i32>,
+    unit: bool,
+) -> RtfResult<()> {
+    let value = parameter.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF table distance control requires a parameter".to_string())
+    })?;
+    let distances = match (target.scope, target.kind) {
+        (crate::TableDistanceScope::Row, crate::TableDistanceKind::Padding) => {
+            &mut state.table_row_padding
+        },
+        (crate::TableDistanceScope::Row, crate::TableDistanceKind::Spacing) => {
+            &mut state.table_row_spacing
+        },
+        (crate::TableDistanceScope::Cell, crate::TableDistanceKind::Padding) => {
+            &mut state.pending_cell_padding
+        },
+        (crate::TableDistanceScope::Cell, crate::TableDistanceKind::Spacing) => {
+            &mut state.pending_cell_spacing
+        },
+    };
+    let side = distances.side_mut(target.edge);
+    if unit {
+        side.unit = Some(match value {
+            0 => crate::TableDistanceUnit::Null,
+            3 => crate::TableDistanceUnit::Twips,
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF table distance unit must be 0 or 3".to_string(),
+                ));
+            },
+        });
+    } else {
+        if !(0..=crate::MAX_TABLE_DISTANCE_TWIPS).contains(&value) {
+            return Err(RtfError::MalformedDocument(
+                "RTF table distance value is out of range".to_string(),
+            ));
+        }
+        side.value = Some(value as u16);
+    }
+    Ok(())
 }
 
-fn table_width_unit(parameter:Option<i32>)->RtfResult<crate::TablePreferredWidthUnit>{match parameter{Some(0)=>Ok(crate::TablePreferredWidthUnit::Null),Some(1)=>Ok(crate::TablePreferredWidthUnit::Auto),Some(2)=>Ok(crate::TablePreferredWidthUnit::Percent),Some(3)=>Ok(crate::TablePreferredWidthUnit::Twips),None=>Err(RtfError::MalformedDocument("RTF preferred-width unit requires a parameter".to_string())),Some(_)=>Err(RtfError::MalformedDocument("RTF preferred-width unit must be in 0..=3".to_string()))}}
-fn table_indent_unit(parameter:Option<i32>)->RtfResult<crate::TableIndentUnit>{match parameter{Some(0)=>Ok(crate::TableIndentUnit::Auto),Some(1)=>Ok(crate::TableIndentUnit::Twips),Some(2)=>Ok(crate::TableIndentUnit::Nil),Some(3)=>Ok(crate::TableIndentUnit::Percent),None=>Err(RtfError::MalformedDocument("RTF tblindtype requires a parameter".to_string())),Some(_)=>Err(RtfError::MalformedDocument("RTF tblindtype must be in 0..=3".to_string()))}}
-fn resolve_preferred_width(unit:Option<crate::TablePreferredWidthUnit>,value:Option<i32>)->RtfResult<Option<crate::TablePreferredWidth>>{let Some(unit)=unit else{return if value.is_none(){Ok(None)}else{Err(RtfError::MalformedDocument("RTF preferred-width value lacks its unit control".to_string()))}};let value=match unit{crate::TablePreferredWidthUnit::Null|crate::TablePreferredWidthUnit::Auto=>{if value.is_some_and(|value|value!=0){return Err(RtfError::MalformedDocument("RTF null or auto preferred width must omit its value or use zero".to_string()))}None},crate::TablePreferredWidthUnit::Percent=>Some(required_table_value(value,"preferred width percentage",crate::MAX_TABLE_WIDTH_PERCENT as u16)?),crate::TablePreferredWidthUnit::Twips=>Some(required_table_value(value,"preferred width",crate::MAX_TABLE_GEOMETRY_TWIPS as u16)?)};Ok(Some(crate::TablePreferredWidth::new(unit,value)?))}
-fn resolve_invisible_width(unit:Option<crate::TablePreferredWidthUnit>,value:Option<i32>,side:&str)->RtfResult<Option<crate::TablePreferredWidth>>{let Some(unit)=unit else{return if value.is_none(){Ok(None)}else{Err(RtfError::MalformedDocument(format!("RTF {side} invisible-width value lacks its unit control")))}};let value=match unit{crate::TablePreferredWidthUnit::Null|crate::TablePreferredWidthUnit::Auto=>{if value.is_some_and(|value|value!=0){return Err(RtfError::MalformedDocument(format!("RTF null or auto {side} invisible width must omit its value or use zero")))}None},crate::TablePreferredWidthUnit::Percent=>Some(required_table_value(Some(value.unwrap_or(0)),&format!("{side} invisible width percentage"),crate::MAX_TABLE_WIDTH_PERCENT as u16)?),crate::TablePreferredWidthUnit::Twips=>Some(required_table_value(Some(value.unwrap_or(0)),&format!("{side} invisible width"),crate::MAX_TABLE_GEOMETRY_TWIPS as u16)?)};Ok(Some(crate::TablePreferredWidth::new(unit,value)?))}
-fn resolve_row_geometry(state:&State)->RtfResult<crate::TableRowGeometry>{let mut geometry=state.table_row_geometry;geometry.set_preferred_width(resolve_preferred_width(state.table_width_unit,state.table_width_value)?);geometry.set_leading_invisible_width(resolve_invisible_width(state.table_leading_width_unit,state.table_leading_width_value,"leading")?);geometry.set_trailing_invisible_width(resolve_invisible_width(state.table_trailing_width_unit,state.table_trailing_width_value,"trailing")?);if state.table_indent_value.is_some()||state.table_indent_unit.is_some(){let unit=state.table_indent_unit.unwrap_or(crate::TableIndentUnit::Twips);geometry.set_indent(Some(crate::TableIndent::new(unit,state.table_indent_value.unwrap_or(0))?));}geometry.validate()?;Ok(geometry)}
-fn table_geometry_twips(parameter:Option<i32>,name:&str,signed:bool)->RtfResult<i32>{let value=parameter.ok_or_else(||RtfError::MalformedDocument(format!("RTF {name} requires a parameter")))?;let valid=if signed{value.unsigned_abs()<=crate::MAX_TABLE_GEOMETRY_TWIPS as u32}else{(0..=crate::MAX_TABLE_GEOMETRY_TWIPS).contains(&value)};if valid{Ok(value)}else{Err(RtfError::MalformedDocument(format!("RTF {name} is out of range")))}}
-fn table_row_height(parameter:Option<i32>)->RtfResult<crate::TableRowHeight>{let value=parameter.ok_or_else(||RtfError::MalformedDocument("RTF trrh requires a parameter".to_string()))?;if value.unsigned_abs()>crate::MAX_TABLE_GEOMETRY_TWIPS as u32{return Err(RtfError::MalformedDocument("RTF trrh is out of range".to_string()))}Ok(if value==0{crate::TableRowHeight::Automatic}else if value>0{crate::TableRowHeight::Minimum(value as u16)}else{crate::TableRowHeight::Exact(value.unsigned_abs() as u16)})}
+fn table_width_unit(parameter: Option<i32>) -> RtfResult<crate::TablePreferredWidthUnit> {
+    match parameter {
+        Some(0) => Ok(crate::TablePreferredWidthUnit::Null),
+        Some(1) => Ok(crate::TablePreferredWidthUnit::Auto),
+        Some(2) => Ok(crate::TablePreferredWidthUnit::Percent),
+        Some(3) => Ok(crate::TablePreferredWidthUnit::Twips),
+        None => Err(RtfError::MalformedDocument(
+            "RTF preferred-width unit requires a parameter".to_string(),
+        )),
+        Some(_) => Err(RtfError::MalformedDocument(
+            "RTF preferred-width unit must be in 0..=3".to_string(),
+        )),
+    }
+}
+fn table_indent_unit(parameter: Option<i32>) -> RtfResult<crate::TableIndentUnit> {
+    match parameter {
+        Some(0) => Ok(crate::TableIndentUnit::Auto),
+        Some(1) => Ok(crate::TableIndentUnit::Twips),
+        Some(2) => Ok(crate::TableIndentUnit::Nil),
+        Some(3) => Ok(crate::TableIndentUnit::Percent),
+        None => Err(RtfError::MalformedDocument(
+            "RTF tblindtype requires a parameter".to_string(),
+        )),
+        Some(_) => Err(RtfError::MalformedDocument(
+            "RTF tblindtype must be in 0..=3".to_string(),
+        )),
+    }
+}
+fn resolve_preferred_width(
+    unit: Option<crate::TablePreferredWidthUnit>,
+    value: Option<i32>,
+) -> RtfResult<Option<crate::TablePreferredWidth>> {
+    let Some(unit) = unit else {
+        return if value.is_none() {
+            Ok(None)
+        } else {
+            Err(RtfError::MalformedDocument(
+                "RTF preferred-width value lacks its unit control".to_string(),
+            ))
+        };
+    };
+    let value = match unit {
+        crate::TablePreferredWidthUnit::Null | crate::TablePreferredWidthUnit::Auto => {
+            if value.is_some_and(|value| value != 0) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF null or auto preferred width must omit its value or use zero".to_string(),
+                ));
+            }
+            None
+        },
+        crate::TablePreferredWidthUnit::Percent => Some(required_table_value(
+            value,
+            "preferred width percentage",
+            crate::MAX_TABLE_WIDTH_PERCENT as u16,
+        )?),
+        crate::TablePreferredWidthUnit::Twips => Some(required_table_value(
+            value,
+            "preferred width",
+            crate::MAX_TABLE_GEOMETRY_TWIPS as u16,
+        )?),
+    };
+    Ok(Some(crate::TablePreferredWidth::new(unit, value)?))
+}
+fn resolve_invisible_width(
+    unit: Option<crate::TablePreferredWidthUnit>,
+    value: Option<i32>,
+    side: &str,
+) -> RtfResult<Option<crate::TablePreferredWidth>> {
+    let Some(unit) = unit else {
+        return if value.is_none() {
+            Ok(None)
+        } else {
+            Err(RtfError::MalformedDocument(format!(
+                "RTF {side} invisible-width value lacks its unit control"
+            )))
+        };
+    };
+    let value = match unit {
+        crate::TablePreferredWidthUnit::Null | crate::TablePreferredWidthUnit::Auto => {
+            if value.is_some_and(|value| value != 0) {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF null or auto {side} invisible width must omit its value or use zero"
+                )));
+            }
+            None
+        },
+        crate::TablePreferredWidthUnit::Percent => Some(required_table_value(
+            Some(value.unwrap_or(0)),
+            &format!("{side} invisible width percentage"),
+            crate::MAX_TABLE_WIDTH_PERCENT as u16,
+        )?),
+        crate::TablePreferredWidthUnit::Twips => Some(required_table_value(
+            Some(value.unwrap_or(0)),
+            &format!("{side} invisible width"),
+            crate::MAX_TABLE_GEOMETRY_TWIPS as u16,
+        )?),
+    };
+    Ok(Some(crate::TablePreferredWidth::new(unit, value)?))
+}
+fn resolve_row_geometry(state: &State) -> RtfResult<crate::TableRowGeometry> {
+    let mut geometry = state.table_row_geometry;
+    geometry.set_preferred_width(resolve_preferred_width(
+        state.table_width_unit,
+        state.table_width_value,
+    )?);
+    geometry.set_leading_invisible_width(resolve_invisible_width(
+        state.table_leading_width_unit,
+        state.table_leading_width_value,
+        "leading",
+    )?);
+    geometry.set_trailing_invisible_width(resolve_invisible_width(
+        state.table_trailing_width_unit,
+        state.table_trailing_width_value,
+        "trailing",
+    )?);
+    if state.table_indent_value.is_some() || state.table_indent_unit.is_some() {
+        let unit = state
+            .table_indent_unit
+            .unwrap_or(crate::TableIndentUnit::Twips);
+        geometry.set_indent(Some(crate::TableIndent::new(
+            unit,
+            state.table_indent_value.unwrap_or(0),
+        )?));
+    }
+    geometry.validate()?;
+    Ok(geometry)
+}
+fn table_geometry_twips(parameter: Option<i32>, name: &str, signed: bool) -> RtfResult<i32> {
+    let value = parameter
+        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} requires a parameter")))?;
+    let valid = if signed {
+        value.unsigned_abs() <= crate::MAX_TABLE_GEOMETRY_TWIPS as u32
+    } else {
+        (0..=crate::MAX_TABLE_GEOMETRY_TWIPS).contains(&value)
+    };
+    if valid {
+        Ok(value)
+    } else {
+        Err(RtfError::MalformedDocument(format!(
+            "RTF {name} is out of range"
+        )))
+    }
+}
+fn table_row_height(parameter: Option<i32>) -> RtfResult<crate::TableRowHeight> {
+    let value = parameter
+        .ok_or_else(|| RtfError::MalformedDocument("RTF trrh requires a parameter".to_string()))?;
+    if value.unsigned_abs() > crate::MAX_TABLE_GEOMETRY_TWIPS as u32 {
+        return Err(RtfError::MalformedDocument(
+            "RTF trrh is out of range".to_string(),
+        ));
+    }
+    Ok(if value == 0 {
+        crate::TableRowHeight::Automatic
+    } else if value > 0 {
+        crate::TableRowHeight::Minimum(value as u16)
+    } else {
+        crate::TableRowHeight::Exact(value.unsigned_abs() as u16)
+    })
+}
 
-fn require_parameterless(parameter:Option<i32>,name:&str)->RtfResult<()>{if parameter.is_some(){return Err(RtfError::MalformedDocument(format!("RTF {name} does not accept a parameter")))}Ok(())}
+fn require_parameterless(parameter: Option<i32>, name: &str) -> RtfResult<()> {
+    if parameter.is_some() {
+        return Err(RtfError::MalformedDocument(format!(
+            "RTF {name} does not accept a parameter"
+        )));
+    }
+    Ok(())
+}
 
-fn required_table_value(value:Option<i32>,name:&str,maximum:u16)->RtfResult<u16>{let value=value.ok_or_else(||RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter")))?;let value=u16::try_from(value).map_err(|_|RtfError::MalformedDocument(format!("RTF {name} value must be in 0..={maximum}")))?;if value>maximum{return Err(RtfError::MalformedDocument(format!("RTF {name} value must be in 0..={maximum}")))}Ok(value)}
-fn floating_table_offset(parameter:Option<i32>,negative:bool,axis:&str)->RtfResult<i32>{let value=parameter.ok_or_else(||RtfError::MalformedDocument(format!("RTF floating-table {axis} offset requires a parameter")))?;let valid=if negative{(-crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS..=-1).contains(&value)}else{(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value)};if !valid{return Err(RtfError::MalformedDocument(format!("RTF floating-table {axis} offset is out of range")))}Ok(value)}
-fn floating_table_wrap_distance(parameter:Option<i32>)->RtfResult<u16>{let value=parameter.ok_or_else(||RtfError::MalformedDocument("RTF floating-table wrap distance requires a parameter".to_string()))?;if !(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value){return Err(RtfError::MalformedDocument("RTF floating-table wrap distance is out of range".to_string()))}Ok(value as u16)}
-const MAX_LOGICAL_TABLES:usize=4096;
-const MAX_LOGICAL_TABLE_ROWS:usize=65_536;
+fn required_table_value(value: Option<i32>, name: &str, maximum: u16) -> RtfResult<u16> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+    })?;
+    let value = u16::try_from(value).map_err(|_| {
+        RtfError::MalformedDocument(format!("RTF {name} value must be in 0..={maximum}"))
+    })?;
+    if value > maximum {
+        return Err(RtfError::MalformedDocument(format!(
+            "RTF {name} value must be in 0..={maximum}"
+        )));
+    }
+    Ok(value)
+}
+fn floating_table_offset(parameter: Option<i32>, negative: bool, axis: &str) -> RtfResult<i32> {
+    let value = parameter.ok_or_else(|| {
+        RtfError::MalformedDocument(format!(
+            "RTF floating-table {axis} offset requires a parameter"
+        ))
+    })?;
+    let valid = if negative {
+        (-crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS..=-1).contains(&value)
+    } else {
+        (0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value)
+    };
+    if !valid {
+        return Err(RtfError::MalformedDocument(format!(
+            "RTF floating-table {axis} offset is out of range"
+        )));
+    }
+    Ok(value)
+}
+fn floating_table_wrap_distance(parameter: Option<i32>) -> RtfResult<u16> {
+    let value = parameter.ok_or_else(|| {
+        RtfError::MalformedDocument(
+            "RTF floating-table wrap distance requires a parameter".to_string(),
+        )
+    })?;
+    if !(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value) {
+        return Err(RtfError::MalformedDocument(
+            "RTF floating-table wrap distance is out of range".to_string(),
+        ));
+    }
+    Ok(value as u16)
+}
+const MAX_LOGICAL_TABLES: usize = 4096;
+const MAX_LOGICAL_TABLE_ROWS: usize = 65_536;
 
-struct NestedTableBuilder<'a>{level:u8,table:super::table::Table<'a>,row:super::table::Row<'a>,cell_text:SmallVec<[u8;128]>,cell_nested:Vec<crate::CellNestedTable<'a>>}
-impl<'a> NestedTableBuilder<'a>{fn new(level:u8)->Self{Self{level,table:super::table::Table::new(),row:super::table::Row::new(),cell_text:SmallVec::new(),cell_nested:Vec::new()}}}
+#[derive(Default)]
+struct DrawingStoryCapture<'a> {
+    shapes: Vec<crate::Shape<'a>>,
+    shape_groups: Vec<crate::ShapeGroup<'a>>,
+    drawing_order: Vec<crate::StoryDrawing>,
+    story_events: Vec<crate::StoryEvent>,
+    story_offset: usize,
+}
+
+struct NestedTableBuilder<'a> {
+    level: u8,
+    table: super::table::Table<'a>,
+    row: super::table::Row<'a>,
+    cell_text: SmallVec<[u8; 128]>,
+    cell_nested: Vec<crate::CellNestedTable<'a>>,
+    cell_drawings: DrawingStoryCapture<'a>,
+    cell_story_events: Vec<crate::CellStoryEvent>,
+}
+impl<'a> NestedTableBuilder<'a> {
+    fn new(level: u8) -> Self {
+        Self {
+            level,
+            table: super::table::Table::new(),
+            row: super::table::Row::new(),
+            cell_text: SmallVec::new(),
+            cell_nested: Vec::new(),
+            cell_drawings: DrawingStoryCapture::default(),
+            cell_story_events: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum RootDrawingOwner {
+    FieldResult,
+    NoteSeparator,
+    Note,
+    HeaderFooter,
+    Cell(u8),
+    Body,
+}
 
 fn associated_font_ref(value: Option<i32>) -> RtfResult<FontRef> {
     let value = value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF af control requires a numeric parameter".to_string())
     })?;
-    u16::try_from(value).map_err(|_| {
-        RtfError::MalformedDocument("RTF af value must be in 0..=65535".to_string())
-    })
+    u16::try_from(value)
+        .map_err(|_| RtfError::MalformedDocument("RTF af value must be in 0..=65535".to_string()))
+}
+
+fn character_type_selector(
+    parameter: Option<i32>,
+    name: &str,
+    value: crate::CharacterType,
+) -> RtfResult<crate::CharacterType> {
+    require_parameterless(parameter, name)?;
+    Ok(value)
+}
+
+fn complex_script_selector(value: Option<i32>) -> RtfResult<bool> {
+    match value {
+        Some(0) => Ok(false),
+        Some(1) => Ok(true),
+        _ => Err(RtfError::MalformedDocument(
+            "RTF fcs control requires a numeric parameter of 0 or 1".to_string(),
+        )),
+    }
+}
+
+fn character_grid(value: Option<i32>) -> RtfResult<crate::CharacterGrid> {
+    match value {
+        None => Ok(crate::CharacterGrid::Parameterless),
+        Some(value) => i16::try_from(value)
+            .map(crate::CharacterGrid::Value)
+            .map_err(|_| {
+                RtfError::MalformedDocument("RTF cgrid value must be in -32768..=32767".to_string())
+            }),
+    }
 }
 
 fn associated_font_size(value: Option<i32>) -> RtfResult<NonZeroU16> {
@@ -448,6 +810,161 @@ fn associated_language(value: Option<i32>) -> RtfResult<crate::LanguageId> {
     crate::LanguageId::from_rtf(value)
 }
 
+fn character_style_reference(value: Option<i32>) -> RtfResult<u16> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF cs control requires a numeric style handle".to_string())
+    })?;
+    u16::try_from(value).map_err(|_| {
+        RtfError::MalformedDocument("RTF cs style handle must be in 0..=65535".to_string())
+    })
+}
+
+fn paragraph_style_reference(value: Option<i32>) -> RtfResult<u16> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF s control requires a numeric style handle".to_string())
+    })?;
+    u16::try_from(value).map_err(|_| {
+        RtfError::MalformedDocument("RTF s style handle must be in 0..=65535".to_string())
+    })
+}
+
+fn section_style_reference(value: Option<i32>) -> RtfResult<u16> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF ds control requires a numeric style handle".to_string())
+    })?;
+    u16::try_from(value).map_err(|_| {
+        RtfError::MalformedDocument("RTF ds style handle must be in 0..=65535".to_string())
+    })
+}
+
+fn table_style_reference(value: Option<i32>) -> RtfResult<u16> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF ts control requires a numeric style handle".to_string())
+    })?;
+    u16::try_from(value).map_err(|_| {
+        RtfError::MalformedDocument("RTF ts style handle must be in 0..=65535".to_string())
+    })
+}
+
+fn associated_toggle(value: Option<i32>, name: &str) -> RtfResult<bool> {
+    match value {
+        None | Some(1) => Ok(true),
+        Some(0) => Ok(false),
+        Some(_) => Err(RtfError::MalformedDocument(format!(
+            "RTF {name} toggle parameter must be 0 or 1"
+        ))),
+    }
+}
+
+fn associated_required_u16(value: Option<i32>, name: &str, maximum: i32) -> RtfResult<u16> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
+    })?;
+    if !(0..=maximum).contains(&value) {
+        return Err(RtfError::MalformedDocument(format!(
+            "RTF {name} value must be in 0..={maximum}"
+        )));
+    }
+    Ok(value as u16)
+}
+
+fn apply_associated_character_control(
+    formatting: &mut crate::AssociatedCharacterFormatting,
+    control: &ControlWord<'_>,
+) -> RtfResult<bool> {
+    use crate::{AssociatedCharacterBaseline as Baseline, AssociatedUnderlineStyle as Underline};
+
+    match control {
+        ControlWord::AssociatedBold(value) => {
+            formatting.bold = Some(associated_toggle(*value, "ab")?);
+        },
+        ControlWord::AssociatedAllCaps(value) => {
+            formatting.all_caps = Some(associated_toggle(*value, "acaps")?);
+        },
+        ControlWord::AssociatedColor(value) => {
+            formatting.color_ref =
+                Some(associated_required_u16(*value, "acf", i32::from(u16::MAX))?);
+        },
+        ControlWord::AssociatedBaselineDown(value) => {
+            formatting.baseline = Some(Baseline::LoweredHalfPoints(associated_required_u16(
+                *value,
+                "adn",
+                crate::MAX_CHARACTER_BASELINE_HALF_POINTS,
+            )?));
+        },
+        ControlWord::AssociatedExpansion(value) => {
+            let value = value.ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF aexpnd control requires a numeric parameter".to_string(),
+                )
+            })?;
+            if !(-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION).contains(&value)
+            {
+                return Err(RtfError::MalformedDocument(
+                    "RTF aexpnd value must be in -31680..=31680".to_string(),
+                ));
+            }
+            formatting.expansion_quarter_points = Some(value as i16);
+        },
+        ControlWord::AssociatedFontNumber(value) => {
+            formatting.font_ref = Some(associated_font_ref(*value)?);
+        },
+        ControlWord::AssociatedFontSize(value) => {
+            formatting.font_size = Some(associated_font_size(*value)?);
+        },
+        ControlWord::AssociatedItalic(value) => {
+            formatting.italic = Some(associated_toggle(*value, "ai")?);
+        },
+        ControlWord::AssociatedLanguage(value) => {
+            formatting.language = Some(associated_language(*value)?);
+        },
+        ControlWord::AssociatedOutline(value) => {
+            formatting.outline = Some(associated_toggle(*value, "aoutl")?);
+        },
+        ControlWord::AssociatedSmallCaps(value) => {
+            formatting.small_caps = Some(associated_toggle(*value, "ascaps")?);
+        },
+        ControlWord::AssociatedShadow(value) => {
+            formatting.shadow = Some(associated_toggle(*value, "ashad")?);
+        },
+        ControlWord::AssociatedStrike(value) => {
+            formatting.strike = Some(associated_toggle(*value, "astrike")?);
+        },
+        ControlWord::AssociatedUnderline(value) => {
+            formatting.underline = Some(if associated_toggle(*value, "aul")? {
+                Underline::Single
+            } else {
+                Underline::None
+            });
+        },
+        ControlWord::AssociatedUnderlineDotted(value) => {
+            require_parameterless(*value, "auld")?;
+            formatting.underline = Some(Underline::Dotted);
+        },
+        ControlWord::AssociatedUnderlineDouble(value) => {
+            require_parameterless(*value, "auldb")?;
+            formatting.underline = Some(Underline::Double);
+        },
+        ControlWord::AssociatedUnderlineNone(value) => {
+            require_parameterless(*value, "aulnone")?;
+            formatting.underline = Some(Underline::None);
+        },
+        ControlWord::AssociatedUnderlineWords(value) => {
+            require_parameterless(*value, "aulw")?;
+            formatting.underline = Some(Underline::Words);
+        },
+        ControlWord::AssociatedBaselineUp(value) => {
+            formatting.baseline = Some(Baseline::RaisedHalfPoints(associated_required_u16(
+                *value,
+                "aup",
+                crate::MAX_CHARACTER_BASELINE_HALF_POINTS,
+            )?));
+        },
+        _ => return Ok(false),
+    }
+    Ok(true)
+}
+
 impl Default for State {
     fn default() -> Self {
         Self {
@@ -455,14 +972,53 @@ impl Default for State {
             character_border_active: false,
             character_border_seen: 0,
             paragraph: Paragraph::default(),
+            drop_cap_kind: None,
+            drop_cap_lines: None,
             pending_tab_alignment: None,
             pending_tab_leader: None,
             unicode_skip: 1,
             in_table: false,
             table_nesting_level: 0,
             cell_boundaries: SmallVec::new(),
-            table_row_padding: Default::default(), table_row_spacing: Default::default(), table_row_positioning: Default::default(), table_row_direction:None, table_row_layout:Default::default(), table_row_borders:Default::default(), table_row_shading:Default::default(), table_row_geometry:Default::default(), table_autoformat_flags:Default::default(), table_row_banding:Default::default(), table_row_index_seen:false, table_row_band_index_seen:false, table_last_row_seen:false, table_width_unit:None, table_width_value:None, table_leading_width_unit:None, table_leading_width_value:None, table_trailing_width_unit:None, table_trailing_width_value:None, table_indent_value:None, table_indent_unit:None,
-            pending_cell_padding: Default::default(), pending_cell_spacing: Default::default(), pending_cell_layout:Default::default(), pending_cell_merge:Default::default(), pending_cell_borders:Default::default(), pending_cell_shading:Default::default(), pending_cell_width_unit:None, pending_cell_width_value:None, table_row_shading_seen:0, pending_cell_shading_seen:0, active_table_border:None, active_table_border_seen:0, cell_distances: SmallVec::new(), cell_layouts:SmallVec::new(), cell_merges:SmallVec::new(), cell_decorations:SmallVec::new(), cell_widths:SmallVec::new(),
+            table_style: None,
+            table_row_padding: Default::default(),
+            table_row_spacing: Default::default(),
+            table_row_positioning: Default::default(),
+            table_row_direction: None,
+            table_row_layout: Default::default(),
+            table_row_borders: Default::default(),
+            table_row_shading: Default::default(),
+            table_row_geometry: Default::default(),
+            table_autoformat_flags: Default::default(),
+            table_row_banding: Default::default(),
+            table_row_index_seen: false,
+            table_row_band_index_seen: false,
+            table_last_row_seen: false,
+            table_width_unit: None,
+            table_width_value: None,
+            table_leading_width_unit: None,
+            table_leading_width_value: None,
+            table_trailing_width_unit: None,
+            table_trailing_width_value: None,
+            table_indent_value: None,
+            table_indent_unit: None,
+            pending_cell_padding: Default::default(),
+            pending_cell_spacing: Default::default(),
+            pending_cell_layout: Default::default(),
+            pending_cell_merge: Default::default(),
+            pending_cell_borders: Default::default(),
+            pending_cell_shading: Default::default(),
+            pending_cell_width_unit: None,
+            pending_cell_width_value: None,
+            table_row_shading_seen: 0,
+            pending_cell_shading_seen: 0,
+            active_table_border: None,
+            active_table_border_seen: 0,
+            cell_distances: SmallVec::new(),
+            cell_layouts: SmallVec::new(),
+            cell_merges: SmallVec::new(),
+            cell_decorations: SmallVec::new(),
+            cell_widths: SmallVec::new(),
             destination: Destination::DocumentBody,
             visible_section_format: false,
             section_column_number: None,
@@ -470,6 +1026,9 @@ impl Default for State {
             revision_type: None,
             revision_author_id: None,
             revision_date: None,
+            revision_event_id: None,
+            paragraph_content_started: false,
+            paragraph_numbering_declared: false,
         }
     }
 }
@@ -502,12 +1061,17 @@ pub struct Parser<'a> {
     /// Current cell text buffer
     current_cell_text: SmallVec<[u8; 128]>,
     current_cell_nested: Vec<crate::CellNestedTable<'a>>,
+    current_cell_drawings: DrawingStoryCapture<'a>,
+    current_cell_story_events: Vec<crate::CellStoryEvent>,
     nested_table_builders: Vec<NestedTableBuilder<'a>>,
     logical_table_count: usize,
     /// Extracted pictures
     pictures: Vec<super::picture::Picture<'a>>,
+    /// Positional body picture-wrapper records referencing `pictures`.
+    picture_compatibility_records: Vec<crate::PictureCompatibilityRecord>,
     /// Extracted fields
     fields: Vec<super::field::Field<'a>>,
+    field_drawing_captures: Vec<DrawingStoryCapture<'a>>,
     form_fields: Vec<super::form_field::FormField<'a>>,
     form_field_text_bytes: usize,
     generator: Option<crate::DocumentGenerator<'a>>,
@@ -518,6 +1082,70 @@ pub struct Parser<'a> {
     xml_namespaces: Vec<crate::XmlNamespace<'a>>,
     saw_xml_namespace_table: bool,
     xml_namespace_text_bytes: usize,
+    protection_users: Vec<crate::ProtectionUser<'a>>,
+    saw_protection_user_table: bool,
+    protection_user_text_bytes: usize,
+    hyphenation: crate::DocumentHyphenation,
+    hyphenation_seen: u8,
+    external_references: crate::DocumentExternalReferences<'a>,
+    document_view: crate::DocumentView,
+    document_view_seen: u8,
+    review_display: crate::DocumentReviewDisplay,
+    review_display_seen: u8,
+    window_caption: Option<crate::DocumentWindowCaption<'a>>,
+    xsl_transform: Option<crate::DocumentXslTransform<'a>>,
+    xsl_transform_usage: crate::DocumentXslTransformUsage,
+    use_xsl_transform_seen: bool,
+    style_list_filter: Option<crate::DocumentStyleListFilter>,
+    style_sort_method: Option<crate::DocumentStyleSortMethod>,
+    style_sort_method_seen: bool,
+    save_preferences: crate::DocumentSavePreferences,
+    save_preferences_seen: u8,
+    write_reservations: crate::DocumentWriteReservations<'a>,
+    origin_metadata: crate::DocumentOriginMetadata,
+    file_settings: crate::DocumentFileSettings,
+    file_settings_seen: u8,
+    output_settings: crate::DocumentOutputSettings,
+    output_settings_seen: u8,
+    rendering_settings: crate::DocumentRenderingSettings,
+    rendering_settings_seen: u8,
+    processing_settings: crate::DocumentProcessingSettings,
+    processing_settings_seen: u8,
+    drawing_grid: crate::DocumentDrawingGrid,
+    drawing_grid_seen: u8,
+    print_layout_settings: crate::DocumentPrintLayoutSettings,
+    print_layout_settings_seen: u8,
+    section_gutter_overrides: Vec<bool>,
+    theme_languages: crate::DocumentThemeLanguages,
+    theme_languages_seen: u8,
+    xml_policies: crate::DocumentXmlPolicies,
+    xml_policies_seen: u8,
+    embedding_policies: crate::DocumentEmbeddingPolicies,
+    embedding_policies_seen: u8,
+    revision_policies: crate::DocumentRevisionPolicies,
+    revision_policies_seen: u8,
+    style_policies: crate::DocumentStylePolicies,
+    style_policies_seen: u8,
+    style_restrictions: crate::DocumentStyleRestrictions,
+    style_restrictions_seen: u8,
+    booklet_printing: crate::DocumentBookletPrinting,
+    booklet_printing_seen: u8,
+    privacy_policies: crate::DocumentPrivacyPolicies,
+    privacy_policies_seen: u8,
+    line_spacing_compatibility: crate::DocumentLineSpacingCompatibility,
+    line_spacing_compatibility_seen: u8,
+    east_asian_compatibility: crate::DocumentEastAsianCompatibility,
+    east_asian_compatibility_seen: u8,
+    table_layout_compatibility: crate::DocumentTableLayoutCompatibility,
+    table_layout_compatibility_seen: u8,
+    legacy_layout_compatibility: crate::DocumentLegacyLayoutCompatibility,
+    legacy_layout_compatibility_seen: u8,
+    asian_grid_compatibility: crate::DocumentAsianGridCompatibility,
+    asian_grid_compatibility_seen: u8,
+    compatibility_policy: crate::DocumentCompatibilityPolicy,
+    compatibility_policy_seen: u8,
+    word_2003_compatibility: crate::DocumentWord2003Compatibility,
+    word_2003_compatibility_seen: u16,
     theme_data: Option<Vec<u8>>,
     saw_theme_data: bool,
     color_scheme_mapping: Option<Vec<u8>>,
@@ -525,8 +1153,12 @@ pub struct Parser<'a> {
     latent_styles: Option<crate::LatentStyles<'a>>,
     data_store: Option<Vec<u8>>,
     saw_data_store: bool,
+    mail_merge: Option<crate::MailMerge<'a>>,
     math_properties: Option<crate::DocumentMathProperties>,
+    default_tab_width_twips: Option<u32>,
     language_defaults: crate::DocumentLanguageDefaults,
+    default_formatting: crate::DocumentDefaultFormatting,
+    default_font_selectors_seen: u8,
     saw_info_group: bool,
     document_direction: Option<crate::TextDirection>,
     gutter_on_right: bool,
@@ -557,6 +1189,7 @@ pub struct Parser<'a> {
     list_override_table: super::list::ListOverrideTable,
     saw_list_override_table: bool,
     legacy_section_numbering: crate::LegacySectionNumbering<'a>,
+    legacy_paragraph_numbering: Vec<crate::LegacyParagraphNumbering<'a>>,
     paragraph_group_table: Option<crate::ParagraphGroupPropertyTable>,
     /// Sections
     sections: Vec<super::section::Section<'a>>,
@@ -578,6 +1211,12 @@ pub struct Parser<'a> {
     next_bookmark_order: usize,
     /// Shapes
     shapes: Vec<super::shape::Shape<'a>>,
+    /// Exact source order of non-background root drawings in the body story.
+    drawing_order: Vec<crate::StoryDrawing>,
+    body_story_events: Vec<ParsedBodyStoryEvent>,
+    revision_event_indices: Vec<Option<usize>>,
+    /// Index in `shapes` owned by the unique document-background destination.
+    background_shape_index: Option<usize>,
     /// Inert legacy drawing text boxes.
     legacy_text_boxes: Vec<crate::LegacyTextBox<'a>>,
     /// Inert legacy drawing primitives other than top-level compatibility text boxes.
@@ -609,6 +1248,9 @@ pub struct Parser<'a> {
     note_options: crate::NoteOptions,
     note_options_closed: bool,
     note_separators: crate::NoteSeparatorTable<'a>,
+    current_note_separator_active: bool,
+    current_note_separator_elements: Vec<crate::NoteSeparatorElement<'a>>,
+    current_note_separator_drawings: DrawingStoryCapture<'a>,
     /// Track changes/revisions
     revisions: Vec<super::annotation::Revision<'a>>,
     /// Authors referenced by tracked-change author indices
@@ -624,6 +1266,18 @@ pub struct Parser<'a> {
     current_header_footer: Option<super::section::HeaderFooter<'a>>,
     /// Current note being parsed (content buffer)
     current_note_buffer: SmallVec<[u8; 256]>,
+    /// Root shapes captured from the active footnote/endnote story.
+    current_note_shapes: Vec<super::shape::Shape<'a>>,
+    /// Root shape groups captured from the active footnote/endnote story.
+    current_note_shape_groups: Vec<super::shape::ShapeGroup<'a>>,
+    current_note_drawing_order: Vec<crate::StoryDrawing>,
+    current_note_story_events: Vec<crate::StoryEvent>,
+    /// Drawings captured from the active header/footer story.
+    current_hf_shapes: Vec<super::shape::Shape<'a>>,
+    current_hf_shape_groups: Vec<super::shape::ShapeGroup<'a>>,
+    current_hf_drawing_order: Vec<crate::StoryDrawing>,
+    current_hf_story_events: Vec<crate::StoryEvent>,
+    current_hf_story_offset: usize,
     /// Current header/footer type being parsed
     current_hf_type: Option<super::section::HeaderFooterType>,
 }
@@ -656,6 +1310,10 @@ struct FormFieldBuilder {
 struct LegacyTextBoxBuilder {
     saw_text_box: bool,
     text: Option<String>,
+    shapes: Vec<super::shape::Shape<'static>>,
+    shape_groups: Vec<super::shape::ShapeGroup<'static>>,
+    drawing_order: Vec<crate::StoryDrawing>,
+    story_events: Vec<crate::StoryEvent>,
     horizontal_anchor: Option<crate::LegacyHorizontalAnchor>,
     vertical_anchor: Option<crate::LegacyVerticalAnchor>,
     x: Option<i32>,
@@ -687,13 +1345,19 @@ struct LegacyColorBuilder {
 
 impl LegacyColorBuilder {
     fn is_empty(&self) -> bool {
-        self.gray.is_none() && self.red.is_none() && self.green.is_none() && self.blue.is_none() && !self.palette
+        self.gray.is_none()
+            && self.red.is_none()
+            && self.green.is_none()
+            && self.blue.is_none()
+            && !self.palette
     }
 
     fn finish(&self, name: &str) -> RtfResult<Option<crate::LegacyDrawingColor>> {
         if let Some(gray) = self.gray {
             if self.red.is_some() || self.green.is_some() || self.blue.is_some() || self.palette {
-                return Err(Parser::legacy_error(&format!("{name} mixes grayscale and RGB")));
+                return Err(Parser::legacy_error(&format!(
+                    "{name} mixes grayscale and RGB"
+                )));
             }
             return Ok(Some(crate::LegacyDrawingColor::gray_half_percent(gray)?));
         }
@@ -701,8 +1365,11 @@ impl LegacyColorBuilder {
             return Ok(None);
         }
         let component = |value: Option<i32>| -> RtfResult<u8> {
-            u8::try_from(value.ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} RGB color")))?)
-                .map_err(|_| Parser::legacy_error(&format!("{name} RGB component is outside 0..=255")))
+            u8::try_from(
+                value
+                    .ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} RGB color")))?,
+            )
+            .map_err(|_| Parser::legacy_error(&format!("{name} RGB component is outside 0..=255")))
         };
         Ok(Some(crate::LegacyDrawingColor::Rgb {
             red: component(self.red)?,
@@ -726,9 +1393,17 @@ impl LegacyArrowBuilder {
             return Ok(None);
         }
         Ok(Some(crate::LegacyDrawingArrow {
-            fill: self.fill.ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} arrow")))?,
-            length: crate::LegacyDrawingArrowSize::try_from(self.length.ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} arrow")))?)?,
-            width: crate::LegacyDrawingArrowSize::try_from(self.width.ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} arrow")))?)?,
+            fill: self
+                .fill
+                .ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} arrow")))?,
+            length: crate::LegacyDrawingArrowSize::try_from(
+                self.length
+                    .ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} arrow")))?,
+            )?,
+            width: crate::LegacyDrawingArrowSize::try_from(
+                self.width
+                    .ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} arrow")))?,
+            )?,
         }))
     }
 }
@@ -754,40 +1429,98 @@ impl LegacyPropertiesBuilder {
     }
 
     fn flag(slot: &mut bool, name: &str) -> RtfResult<()> {
-        if *slot { return Err(Parser::legacy_error(&format!("duplicate {name}"))); }
+        if *slot {
+            return Err(Parser::legacy_error(&format!("duplicate {name}")));
+        }
         *slot = true;
         Ok(())
     }
 
     fn apply(&mut self, control: &ControlWord<'_>) -> RtfResult<bool> {
         match control {
-            ControlWord::LegacyDrawingLineStyle(value) => Self::set(&mut self.line_style, *value, "line style")?,
-            ControlWord::LegacyDrawingLineGray(value) => Self::set(&mut self.line_color.gray, *value, "line grayscale")?,
-            ControlWord::LegacyDrawingLineRed(value) => Self::set(&mut self.line_color.red, *value, "line red")?,
-            ControlWord::LegacyDrawingLineGreen(value) => Self::set(&mut self.line_color.green, *value, "line green")?,
-            ControlWord::LegacyDrawingLineBlue(value) => Self::set(&mut self.line_color.blue, *value, "line blue")?,
-            ControlWord::LegacyDrawingLinePalette => Self::flag(&mut self.line_color.palette, "line palette")?,
-            ControlWord::LegacyDrawingLineWidth(value) => Self::set(&mut self.line_width, *value, "line width")?,
-            ControlWord::LegacyDrawingFillForegroundGray(value) => Self::set(&mut self.fill_foreground.gray, *value, "foreground grayscale")?,
-            ControlWord::LegacyDrawingFillForegroundRed(value) => Self::set(&mut self.fill_foreground.red, *value, "foreground red")?,
-            ControlWord::LegacyDrawingFillForegroundGreen(value) => Self::set(&mut self.fill_foreground.green, *value, "foreground green")?,
-            ControlWord::LegacyDrawingFillForegroundBlue(value) => Self::set(&mut self.fill_foreground.blue, *value, "foreground blue")?,
-            ControlWord::LegacyDrawingFillForegroundPalette => Self::flag(&mut self.fill_foreground.palette, "foreground palette")?,
-            ControlWord::LegacyDrawingFillBackgroundGray(value) => Self::set(&mut self.fill_background.gray, *value, "background grayscale")?,
-            ControlWord::LegacyDrawingFillBackgroundRed(value) => Self::set(&mut self.fill_background.red, *value, "background red")?,
-            ControlWord::LegacyDrawingFillBackgroundGreen(value) => Self::set(&mut self.fill_background.green, *value, "background green")?,
-            ControlWord::LegacyDrawingFillBackgroundBlue(value) => Self::set(&mut self.fill_background.blue, *value, "background blue")?,
-            ControlWord::LegacyDrawingFillBackgroundPalette => Self::flag(&mut self.fill_background.palette, "background palette")?,
-            ControlWord::LegacyDrawingFillPattern(value) => Self::set(&mut self.fill_pattern, *value, "fill pattern")?,
-            ControlWord::LegacyDrawingStartArrowFill(value) => Self::set(&mut self.start_arrow.fill, *value, "start arrow fill")?,
-            ControlWord::LegacyDrawingStartArrowLength(value) => Self::set(&mut self.start_arrow.length, *value, "start arrow length")?,
-            ControlWord::LegacyDrawingStartArrowWidth(value) => Self::set(&mut self.start_arrow.width, *value, "start arrow width")?,
-            ControlWord::LegacyDrawingEndArrowFill(value) => Self::set(&mut self.end_arrow.fill, *value, "end arrow fill")?,
-            ControlWord::LegacyDrawingEndArrowLength(value) => Self::set(&mut self.end_arrow.length, *value, "end arrow length")?,
-            ControlWord::LegacyDrawingEndArrowWidth(value) => Self::set(&mut self.end_arrow.width, *value, "end arrow width")?,
+            ControlWord::LegacyDrawingLineStyle(value) => {
+                Self::set(&mut self.line_style, *value, "line style")?
+            },
+            ControlWord::LegacyDrawingLineGray(value) => {
+                Self::set(&mut self.line_color.gray, *value, "line grayscale")?
+            },
+            ControlWord::LegacyDrawingLineRed(value) => {
+                Self::set(&mut self.line_color.red, *value, "line red")?
+            },
+            ControlWord::LegacyDrawingLineGreen(value) => {
+                Self::set(&mut self.line_color.green, *value, "line green")?
+            },
+            ControlWord::LegacyDrawingLineBlue(value) => {
+                Self::set(&mut self.line_color.blue, *value, "line blue")?
+            },
+            ControlWord::LegacyDrawingLinePalette => {
+                Self::flag(&mut self.line_color.palette, "line palette")?
+            },
+            ControlWord::LegacyDrawingLineWidth(value) => {
+                Self::set(&mut self.line_width, *value, "line width")?
+            },
+            ControlWord::LegacyDrawingFillForegroundGray(value) => Self::set(
+                &mut self.fill_foreground.gray,
+                *value,
+                "foreground grayscale",
+            )?,
+            ControlWord::LegacyDrawingFillForegroundRed(value) => {
+                Self::set(&mut self.fill_foreground.red, *value, "foreground red")?
+            },
+            ControlWord::LegacyDrawingFillForegroundGreen(value) => {
+                Self::set(&mut self.fill_foreground.green, *value, "foreground green")?
+            },
+            ControlWord::LegacyDrawingFillForegroundBlue(value) => {
+                Self::set(&mut self.fill_foreground.blue, *value, "foreground blue")?
+            },
+            ControlWord::LegacyDrawingFillForegroundPalette => {
+                Self::flag(&mut self.fill_foreground.palette, "foreground palette")?
+            },
+            ControlWord::LegacyDrawingFillBackgroundGray(value) => Self::set(
+                &mut self.fill_background.gray,
+                *value,
+                "background grayscale",
+            )?,
+            ControlWord::LegacyDrawingFillBackgroundRed(value) => {
+                Self::set(&mut self.fill_background.red, *value, "background red")?
+            },
+            ControlWord::LegacyDrawingFillBackgroundGreen(value) => {
+                Self::set(&mut self.fill_background.green, *value, "background green")?
+            },
+            ControlWord::LegacyDrawingFillBackgroundBlue(value) => {
+                Self::set(&mut self.fill_background.blue, *value, "background blue")?
+            },
+            ControlWord::LegacyDrawingFillBackgroundPalette => {
+                Self::flag(&mut self.fill_background.palette, "background palette")?
+            },
+            ControlWord::LegacyDrawingFillPattern(value) => {
+                Self::set(&mut self.fill_pattern, *value, "fill pattern")?
+            },
+            ControlWord::LegacyDrawingStartArrowFill(value) => {
+                Self::set(&mut self.start_arrow.fill, *value, "start arrow fill")?
+            },
+            ControlWord::LegacyDrawingStartArrowLength(value) => {
+                Self::set(&mut self.start_arrow.length, *value, "start arrow length")?
+            },
+            ControlWord::LegacyDrawingStartArrowWidth(value) => {
+                Self::set(&mut self.start_arrow.width, *value, "start arrow width")?
+            },
+            ControlWord::LegacyDrawingEndArrowFill(value) => {
+                Self::set(&mut self.end_arrow.fill, *value, "end arrow fill")?
+            },
+            ControlWord::LegacyDrawingEndArrowLength(value) => {
+                Self::set(&mut self.end_arrow.length, *value, "end arrow length")?
+            },
+            ControlWord::LegacyDrawingEndArrowWidth(value) => {
+                Self::set(&mut self.end_arrow.width, *value, "end arrow width")?
+            },
             ControlWord::LegacyDrawingShadow => Self::flag(&mut self.shadow, "shadow")?,
-            ControlWord::LegacyDrawingShadowX(value) => Self::set(&mut self.shadow_x, *value, "shadow x")?,
-            ControlWord::LegacyDrawingShadowY(value) => Self::set(&mut self.shadow_y, *value, "shadow y")?,
+            ControlWord::LegacyDrawingShadowX(value) => {
+                Self::set(&mut self.shadow_x, *value, "shadow x")?
+            },
+            ControlWord::LegacyDrawingShadowY(value) => {
+                Self::set(&mut self.shadow_y, *value, "shadow y")?
+            },
             _ => return Ok(false),
         }
         Ok(true)
@@ -795,30 +1528,63 @@ impl LegacyPropertiesBuilder {
 
     fn finish(self) -> RtfResult<crate::LegacyDrawingProperties> {
         let line_color = self.line_color.finish("line")?;
-        let line = if self.line_style.is_some() || line_color.is_some() || self.line_width.is_some() {
-            let style = self.line_style.unwrap_or(crate::LegacyDrawingLineStyle::Solid);
+        let line = if self.line_style.is_some() || line_color.is_some() || self.line_width.is_some()
+        {
+            let style = self
+                .line_style
+                .unwrap_or(crate::LegacyDrawingLineStyle::Solid);
             Some(crate::LegacyDrawingLine {
                 style,
-                color: line_color.unwrap_or(crate::LegacyDrawingColor::Rgb { red: 0, green: 0, blue: 0, palette: false }),
+                color: line_color.unwrap_or(crate::LegacyDrawingColor::Rgb {
+                    red: 0,
+                    green: 0,
+                    blue: 0,
+                    palette: false,
+                }),
                 width: self.line_width.unwrap_or(0),
             })
-        } else { None };
+        } else {
+            None
+        };
         let foreground = self.fill_foreground.finish("foreground fill")?;
         let background = self.fill_background.finish("background fill")?;
         let fill = if foreground.is_some() || background.is_some() || self.fill_pattern.is_some() {
             Some(crate::LegacyDrawingFill {
-                foreground: foreground.unwrap_or(crate::LegacyDrawingColor::Rgb { red: 255, green: 255, blue: 255, palette: false }),
-                background: background.unwrap_or(crate::LegacyDrawingColor::Rgb { red: 0, green: 0, blue: 0, palette: false }),
-                pattern: crate::LegacyDrawingFillPattern::try_from(self.fill_pattern.ok_or_else(|| Parser::legacy_error("fill colors lack dpfillpat"))?)?,
+                foreground: foreground.unwrap_or(crate::LegacyDrawingColor::Rgb {
+                    red: 255,
+                    green: 255,
+                    blue: 255,
+                    palette: false,
+                }),
+                background: background.unwrap_or(crate::LegacyDrawingColor::Rgb {
+                    red: 0,
+                    green: 0,
+                    blue: 0,
+                    palette: false,
+                }),
+                pattern: crate::LegacyDrawingFillPattern::try_from(
+                    self.fill_pattern
+                        .ok_or_else(|| Parser::legacy_error("fill colors lack dpfillpat"))?,
+                )?,
             })
-        } else { None };
+        } else {
+            None
+        };
         let shadow = if self.shadow || self.shadow_x.is_some() || self.shadow_y.is_some() {
-            if !self.shadow { return Err(Parser::legacy_error("shadow offsets lack dpshadow")); }
+            if !self.shadow {
+                return Err(Parser::legacy_error("shadow offsets lack dpshadow"));
+            }
             Some(crate::LegacyDrawingShadow {
-                x_offset: self.shadow_x.ok_or_else(|| Parser::legacy_error("dpshadow lacks dpshadx"))?,
-                y_offset: self.shadow_y.ok_or_else(|| Parser::legacy_error("dpshadow lacks dpshady"))?,
+                x_offset: self
+                    .shadow_x
+                    .ok_or_else(|| Parser::legacy_error("dpshadow lacks dpshadx"))?,
+                y_offset: self
+                    .shadow_y
+                    .ok_or_else(|| Parser::legacy_error("dpshadow lacks dpshady"))?,
             })
-        } else { None };
+        } else {
+            None
+        };
         Ok(crate::LegacyDrawingProperties {
             line,
             fill,
@@ -857,10 +1623,14 @@ impl<'a> Parser<'a> {
             current_row: None,
             current_cell_text: SmallVec::new(),
             current_cell_nested: Vec::new(),
+            current_cell_drawings: DrawingStoryCapture::default(),
+            current_cell_story_events: Vec::new(),
             nested_table_builders: Vec::new(),
             logical_table_count: 0,
             pictures: Vec::new(),
+            picture_compatibility_records: Vec::new(),
             fields: Vec::new(),
+            field_drawing_captures: Vec::new(),
             form_fields: Vec::new(),
             form_field_text_bytes: 0,
             generator: None,
@@ -871,6 +1641,70 @@ impl<'a> Parser<'a> {
             xml_namespaces: Vec::new(),
             saw_xml_namespace_table: false,
             xml_namespace_text_bytes: 0,
+            protection_users: Vec::new(),
+            saw_protection_user_table: false,
+            protection_user_text_bytes: 0,
+            hyphenation: crate::DocumentHyphenation::default(),
+            hyphenation_seen: 0,
+            external_references: crate::DocumentExternalReferences::default(),
+            document_view: crate::DocumentView::default(),
+            document_view_seen: 0,
+            review_display: crate::DocumentReviewDisplay::default(),
+            review_display_seen: 0,
+            window_caption: None,
+            xsl_transform: None,
+            xsl_transform_usage: crate::DocumentXslTransformUsage::default(),
+            use_xsl_transform_seen: false,
+            style_list_filter: None,
+            style_sort_method: None,
+            style_sort_method_seen: false,
+            save_preferences: crate::DocumentSavePreferences::default(),
+            save_preferences_seen: 0,
+            write_reservations: crate::DocumentWriteReservations::default(),
+            origin_metadata: crate::DocumentOriginMetadata::default(),
+            file_settings: crate::DocumentFileSettings::default(),
+            file_settings_seen: 0,
+            output_settings: crate::DocumentOutputSettings::default(),
+            output_settings_seen: 0,
+            rendering_settings: crate::DocumentRenderingSettings::default(),
+            rendering_settings_seen: 0,
+            processing_settings: crate::DocumentProcessingSettings::default(),
+            processing_settings_seen: 0,
+            drawing_grid: crate::DocumentDrawingGrid::default(),
+            drawing_grid_seen: 0,
+            print_layout_settings: crate::DocumentPrintLayoutSettings::default(),
+            print_layout_settings_seen: 0,
+            section_gutter_overrides: Vec::new(),
+            theme_languages: crate::DocumentThemeLanguages::default(),
+            theme_languages_seen: 0,
+            xml_policies: crate::DocumentXmlPolicies::default(),
+            xml_policies_seen: 0,
+            embedding_policies: crate::DocumentEmbeddingPolicies::default(),
+            embedding_policies_seen: 0,
+            revision_policies: crate::DocumentRevisionPolicies::default(),
+            revision_policies_seen: 0,
+            style_policies: crate::DocumentStylePolicies::default(),
+            style_policies_seen: 0,
+            style_restrictions: crate::DocumentStyleRestrictions::default(),
+            style_restrictions_seen: 0,
+            booklet_printing: crate::DocumentBookletPrinting::default(),
+            booklet_printing_seen: 0,
+            privacy_policies: crate::DocumentPrivacyPolicies::default(),
+            privacy_policies_seen: 0,
+            line_spacing_compatibility: crate::DocumentLineSpacingCompatibility::default(),
+            line_spacing_compatibility_seen: 0,
+            east_asian_compatibility: crate::DocumentEastAsianCompatibility::default(),
+            east_asian_compatibility_seen: 0,
+            table_layout_compatibility: crate::DocumentTableLayoutCompatibility::default(),
+            table_layout_compatibility_seen: 0,
+            legacy_layout_compatibility: crate::DocumentLegacyLayoutCompatibility::default(),
+            legacy_layout_compatibility_seen: 0,
+            asian_grid_compatibility: crate::DocumentAsianGridCompatibility::default(),
+            asian_grid_compatibility_seen: 0,
+            compatibility_policy: crate::DocumentCompatibilityPolicy::default(),
+            compatibility_policy_seen: 0,
+            word_2003_compatibility: crate::DocumentWord2003Compatibility::default(),
+            word_2003_compatibility_seen: 0,
             theme_data: None,
             saw_theme_data: false,
             color_scheme_mapping: None,
@@ -878,8 +1712,12 @@ impl<'a> Parser<'a> {
             latent_styles: None,
             data_store: None,
             saw_data_store: false,
+            mail_merge: None,
             math_properties: None,
+            default_tab_width_twips: None,
             language_defaults: crate::DocumentLanguageDefaults::default(),
+            default_formatting: crate::DocumentDefaultFormatting::default(),
+            default_font_selectors_seen: 0,
             saw_info_group: false,
             document_direction: None,
             gutter_on_right: false,
@@ -898,6 +1736,7 @@ impl<'a> Parser<'a> {
             list_override_table: super::list::ListOverrideTable::new(),
             saw_list_override_table: false,
             legacy_section_numbering: crate::LegacySectionNumbering::new(),
+            legacy_paragraph_numbering: Vec::new(),
             paragraph_group_table: None,
             sections: Vec::new(),
             section_properties_active: false,
@@ -909,6 +1748,10 @@ impl<'a> Parser<'a> {
             body_text_len: 0,
             next_bookmark_order: 0,
             shapes: Vec::new(),
+            drawing_order: Vec::new(),
+            body_story_events: Vec::new(),
+            revision_event_indices: Vec::new(),
+            background_shape_index: None,
             legacy_text_boxes: Vec::new(),
             legacy_drawings: Vec::new(),
             legacy_text_box_text_bytes: 0,
@@ -929,6 +1772,9 @@ impl<'a> Parser<'a> {
             note_options: crate::NoteOptions::default(),
             note_options_closed: false,
             note_separators: crate::NoteSeparatorTable::new(),
+            current_note_separator_active: false,
+            current_note_separator_elements: Vec::new(),
+            current_note_separator_drawings: DrawingStoryCapture::default(),
             revisions: Vec::new(),
             revision_authors: Vec::new(),
             saw_revision_table: false,
@@ -936,6 +1782,15 @@ impl<'a> Parser<'a> {
             revision_text_bytes: 0,
             current_header_footer: None,
             current_note_buffer: SmallVec::new(),
+            current_note_shapes: Vec::new(),
+            current_note_shape_groups: Vec::new(),
+            current_note_drawing_order: Vec::new(),
+            current_note_story_events: Vec::new(),
+            current_hf_shapes: Vec::new(),
+            current_hf_shape_groups: Vec::new(),
+            current_hf_drawing_order: Vec::new(),
+            current_hf_story_events: Vec::new(),
+            current_hf_story_offset: 0,
             current_hf_type: None,
         }
     }
@@ -1044,8 +1899,8 @@ impl<'a> Parser<'a> {
                             | ControlWord::Object
                             | ControlWord::Result
                             | ControlWord::Picture
-                            | ControlWord::Shape
-                            | ControlWord::ShapeGroup,
+                            | ControlWord::Shape(_)
+                            | ControlWord::ShapeGroup(_),
                         ) => NoteGuardContext {
                             body_flow: false,
                             visible_field_result: false,
@@ -1133,13 +1988,11 @@ impl<'a> Parser<'a> {
                     | ControlWord::SectionFootnoteNumbering(_)
                     | ControlWord::SectionEndnoteNumbering(_),
                 ) if contexts.len() != 1
-                    && !contexts
-                        .last()
-                        .is_some_and(|context| {
-                            context.visible_field_result
-                                || context.visible_section_format
-                                || context.inert_section_format
-                        }) =>
+                    && !contexts.last().is_some_and(|context| {
+                        context.visible_field_result
+                            || context.visible_section_format
+                            || context.inert_section_format
+                    }) =>
                 {
                     return Err(RtfError::MalformedDocument(
                         "RTF section note options must be root controls or visible field-result formatting"
@@ -1164,6 +2017,7 @@ impl<'a> Parser<'a> {
         self.finalize_table()?;
         self.finalize_bookmarks()?;
         self.finalize_annotations()?;
+        let body_story_events = self.finalize_body_story_events()?;
 
         let revision_save = if self.saw_revision_save_table || self.saw_revision_save_root {
             Some(crate::RevisionSaveMetadata::new(
@@ -1189,6 +2043,10 @@ impl<'a> Parser<'a> {
             .data_store
             .map(|data| crate::DocumentDataStore::new(Cow::Owned(data)))
             .transpose()?;
+        let protection_user_table = self
+            .saw_protection_user_table
+            .then(|| crate::ProtectionUserTable::new(self.protection_users))
+            .transpose()?;
 
         for section in &self.sections {
             section.properties.columns.validate()?;
@@ -1201,17 +2059,55 @@ impl<'a> Parser<'a> {
             blocks: self.blocks,
             tables: self.tables,
             pictures: self.pictures,
+            picture_compatibility_records: self.picture_compatibility_records,
             fields: self.fields,
             form_fields: self.form_fields,
             generator: self.generator,
             revision_save,
             xml_namespaces: self.xml_namespaces,
             saw_xml_namespace_table: self.saw_xml_namespace_table,
+            protection_user_table,
+            hyphenation: self.hyphenation,
+            external_references: self.external_references,
+            document_view: self.document_view,
+            review_display: self.review_display,
+            window_caption: self.window_caption,
+            xsl_transform: self.xsl_transform,
+            xsl_transform_usage: self.xsl_transform_usage,
+            style_list_filter: self.style_list_filter,
+            style_sort_method: self.style_sort_method,
+            save_preferences: self.save_preferences,
+            write_reservations: self.write_reservations,
+            origin_metadata: self.origin_metadata,
+            file_settings: self.file_settings,
+            output_settings: self.output_settings,
+            rendering_settings: self.rendering_settings,
+            processing_settings: self.processing_settings,
+            drawing_grid: self.drawing_grid,
+            print_layout_settings: self.print_layout_settings,
+            theme_languages: self.theme_languages,
+            xml_policies: self.xml_policies,
+            embedding_policies: self.embedding_policies,
+            revision_policies: self.revision_policies,
+            style_policies: self.style_policies,
+            style_restrictions: self.style_restrictions,
+            booklet_printing: self.booklet_printing,
+            privacy_policies: self.privacy_policies,
+            line_spacing_compatibility: self.line_spacing_compatibility,
+            east_asian_compatibility: self.east_asian_compatibility,
+            table_layout_compatibility: self.table_layout_compatibility,
+            legacy_layout_compatibility: self.legacy_layout_compatibility,
+            asian_grid_compatibility: self.asian_grid_compatibility,
+            compatibility_policy: self.compatibility_policy,
+            word_2003_compatibility: self.word_2003_compatibility,
             theme,
             latent_styles: self.latent_styles,
             data_store,
+            mail_merge: self.mail_merge,
             math_properties: self.math_properties,
+            default_tab_width_twips: self.default_tab_width_twips,
             language_defaults: self.language_defaults,
+            default_formatting: self.default_formatting,
             document_direction: self.document_direction,
             gutter_on_right: self.gutter_on_right,
             objects: self.objects,
@@ -1222,10 +2118,14 @@ impl<'a> Parser<'a> {
             list_table: self.list_table,
             list_override_table: self.list_override_table,
             legacy_section_numbering: self.legacy_section_numbering,
+            legacy_paragraph_numbering: self.legacy_paragraph_numbering,
             paragraph_group_table: self.paragraph_group_table,
             sections: self.sections,
             bookmarks: self.bookmarks,
             shapes: self.shapes,
+            drawing_order: self.drawing_order,
+            body_story_events,
+            background_shape_index: self.background_shape_index,
             legacy_text_boxes: self.legacy_text_boxes,
             legacy_drawings: self.legacy_drawings,
             shape_groups: self.shape_groups,
@@ -1266,17 +2166,42 @@ impl<'a> Parser<'a> {
             self.current_state_mut()?.visible_section_format = true;
         }
 
-        let nested_destination=match (self.tokens.get(self.pos),self.tokens.get(self.pos+1)){
-            (Some(Token::Control(ControlWord::NestedTableProperties(param))),_)=>Some((true,*param,1)),
-            (Some(Token::Control(ControlWord::NoNestedTables(param))),_)=>Some((false,*param,1)),
-            (Some(Token::Control(ControlWord::IgnorableDestination)),Some(Token::Control(ControlWord::NestedTableProperties(param))))=>Some((true,*param,2)),
-            (Some(Token::Control(ControlWord::IgnorableDestination)),Some(Token::Control(ControlWord::NoNestedTables(param))))=>Some((false,*param,2)),
-            _=>None,
+        let nested_destination = match (self.tokens.get(self.pos), self.tokens.get(self.pos + 1)) {
+            (Some(Token::Control(ControlWord::NestedTableProperties(param))), _) => {
+                Some((true, *param, 1))
+            },
+            (Some(Token::Control(ControlWord::NoNestedTables(param))), _) => {
+                Some((false, *param, 1))
+            },
+            (
+                Some(Token::Control(ControlWord::IgnorableDestination)),
+                Some(Token::Control(ControlWord::NestedTableProperties(param))),
+            ) => Some((true, *param, 2)),
+            (
+                Some(Token::Control(ControlWord::IgnorableDestination)),
+                Some(Token::Control(ControlWord::NoNestedTables(param))),
+            ) => Some((false, *param, 2)),
+            _ => None,
         };
-        if let Some((properties,param,consumed))=nested_destination{
-            require_parameterless(param,if properties{"nesttableprops"}else{"nonesttables"})?;self.pos+=consumed;
-            if properties{self.current_state_mut()?.destination=Destination::NestedTableProperties;self.parse_content()?;}else{self.current_state_mut()?.destination=Destination::Other;self.skip_until_close_brace()?;}
-            self.states.pop();return Ok(());
+        if let Some((properties, param, consumed)) = nested_destination {
+            require_parameterless(
+                param,
+                if properties {
+                    "nesttableprops"
+                } else {
+                    "nonesttables"
+                },
+            )?;
+            self.pos += consumed;
+            if properties {
+                self.current_state_mut()?.destination = Destination::NestedTableProperties;
+                self.parse_content()?;
+            } else {
+                self.current_state_mut()?.destination = Destination::Other;
+                self.skip_until_close_brace()?;
+            }
+            self.states.pop();
+            return Ok(());
         }
 
         if self.current_state()?.revision_type.is_some()
@@ -1295,8 +2220,8 @@ impl<'a> Parser<'a> {
                         | ControlWord::ListOverrideTable
                         | ControlWord::RevisionTable
                         | ControlWord::Info
-                        | ControlWord::Shape
-                        | ControlWord::ShapeGroup
+                        | ControlWord::Shape(_)
+                        | ControlWord::ShapeGroup(_)
                         | ControlWord::Picture
                         | ControlWord::Object
                         | ControlWord::Result
@@ -1339,9 +2264,22 @@ impl<'a> Parser<'a> {
                     self.states.pop();
                     return Ok(());
                 },
+                Token::Control(ControlWord::LegacyParagraphNumbering(_)) => {
+                    self.parse_legacy_paragraph_numbering()?;
+                    self.states.pop();
+                    return Ok(());
+                },
                 Token::Control(ControlWord::LegacyDrawingObject) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF legacy drawing-object destination must be starred".to_string(),
+                    ));
+                },
+                Token::Control(
+                    ControlWord::DefaultCharacterProperties(_)
+                    | ControlWord::DefaultParagraphProperties(_),
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF defchp and defpap destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::UnicodeAlternate) => {
@@ -1354,7 +2292,10 @@ impl<'a> Parser<'a> {
                         || (self.unicode_alternate_depth == 1 && self.states.len() == 4);
                     if self.saw_font_table
                         || !valid_scope
-                        || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+                        || self
+                            .blocks
+                            .iter()
+                            .any(|block| !block.text.trim().is_empty())
                     {
                         return Err(RtfError::MalformedDocument(
                             "RTF font table must occur exactly once at document scope before body text".to_string(),
@@ -1421,21 +2362,84 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::DefaultCharacterProperties(_))) => {
+                            self.parse_default_formatting_destination(
+                                crate::DefaultFormattingDestination::Character,
+                            )?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::DefaultParagraphProperties(_))) => {
+                            self.parse_default_formatting_destination(
+                                crate::DefaultFormattingDestination::Paragraph,
+                            )?;
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::BlipUid)) => {
                             return Err(RtfError::MalformedDocument(
                                 "RTF blipuid destination may occur only inside pict".to_string(),
                             ));
                         },
+                        Some(Token::Control(ControlWord::PictureProperties(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF picprop destination may occur only inside pict".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::ShapeBinaryValue(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF svb destination may occur only inside sv".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::ShapeThemeValue(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF hsv destination may occur only after sv inside sp".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::ShapeResult(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF shprslt destination may occur only inside a root shape"
+                                    .to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::ShapeText(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF shptxt destination may occur only inside a shape".to_string(),
+                            ));
+                        },
                         Some(Token::Control(
-                            ControlWord::GeneratedListText
-                            | ControlWord::LegacyGeneratedListText,
+                            ControlWord::Object | ControlWord::InvalidObjectDestinationParameter,
+                        )) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF object destination must not be starred".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(
+                            ControlWord::GeneratedListText | ControlWord::LegacyGeneratedListText,
                         )) => {
                             return Err(RtfError::MalformedDocument(
                                 "RTF generated list-marker destinations must not be starred"
                                     .to_string(),
                             ));
                         },
-                        Some(Token::Control(control)) if Self::is_legacy_drawing_control(control) => {
+                        Some(Token::Control(ControlWord::LegacyParagraphNumbering(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF pn destination must not be starred".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(
+                            ControlWord::StyleSortMethod(_)
+                            | ControlWord::FromHtml(_)
+                            | ControlWord::DocumentType(_)
+                            | ControlWord::DefaultTabWidth(_),
+                        )) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF numeric document property must not be starred".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(control))
+                            if Self::is_legacy_drawing_control(control) =>
+                        {
                             return Err(RtfError::MalformedDocument(
                                 "RTF legacy drawing controls must occur inside a starred do destination"
                                     .to_string(),
@@ -1460,32 +2464,249 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::LegacyDrawingObject)) => {
                             if self.legacy_do_starts_with_text_box() {
                                 if let Some(text_box) = self.parse_legacy_text_box()? {
+                                    let index = self.legacy_text_boxes.len();
                                     self.legacy_text_boxes.push(text_box);
+                                    self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                                        crate::BodyStoryEvent::LegacyTextBox(index),
+                                    ));
                                 }
                             } else if let Some(drawing) = self.parse_legacy_drawing()? {
+                                let index = self.legacy_drawings.len();
                                 self.legacy_drawings.push(drawing);
+                                self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                                    crate::BodyStoryEvent::LegacyDrawing(index),
+                                ));
                             }
                             self.states.pop();
                             return Ok(());
                         },
-                        Some(Token::Control(control @ (
-                            ControlWord::FootnoteSeparator
+                        Some(Token::Control(
+                            control @ (ControlWord::FootnoteSeparator
                             | ControlWord::FootnoteContinuationSeparator
                             | ControlWord::FootnoteContinuationNotice
                             | ControlWord::EndnoteSeparator
                             | ControlWord::EndnoteContinuationSeparator
-                            | ControlWord::EndnoteContinuationNotice
-                        ))) => {
+                            | ControlWord::EndnoteContinuationNotice),
+                        )) => {
                             let kind = match control {
-                                ControlWord::FootnoteSeparator => crate::NoteSeparatorKind::FootnoteSeparator,
-                                ControlWord::FootnoteContinuationSeparator => crate::NoteSeparatorKind::FootnoteContinuationSeparator,
-                                ControlWord::FootnoteContinuationNotice => crate::NoteSeparatorKind::FootnoteContinuationNotice,
-                                ControlWord::EndnoteSeparator => crate::NoteSeparatorKind::EndnoteSeparator,
-                                ControlWord::EndnoteContinuationSeparator => crate::NoteSeparatorKind::EndnoteContinuationSeparator,
+                                ControlWord::FootnoteSeparator => {
+                                    crate::NoteSeparatorKind::FootnoteSeparator
+                                },
+                                ControlWord::FootnoteContinuationSeparator => {
+                                    crate::NoteSeparatorKind::FootnoteContinuationSeparator
+                                },
+                                ControlWord::FootnoteContinuationNotice => {
+                                    crate::NoteSeparatorKind::FootnoteContinuationNotice
+                                },
+                                ControlWord::EndnoteSeparator => {
+                                    crate::NoteSeparatorKind::EndnoteSeparator
+                                },
+                                ControlWord::EndnoteContinuationSeparator => {
+                                    crate::NoteSeparatorKind::EndnoteContinuationSeparator
+                                },
                                 _ => crate::NoteSeparatorKind::EndnoteContinuationNotice,
                             };
                             let separator = self.parse_note_separator_destination(kind)?;
                             self.note_separators.add(separator)?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(
+                            ControlWord::HideReviewMarkup(_)
+                            | ControlWord::HideReviewComments(_)
+                            | ControlWord::HideReviewInsertionsAndDeletions(_)
+                            | ControlWord::UseXslTransform(_)
+                            | ControlWord::ReadOnlyRecommended(_)
+                            | ControlWord::SavePreviousPicture(_)
+                            | ControlWord::FromText(_)
+                            | ControlWord::MakeBackup(_)
+                            | ControlWord::DefaultSaveFormat(_)
+                            | ControlWord::BoilerplateDocument(_)
+                            | ControlWord::Word97CompatibilityMode(_)
+                            | ControlWord::PostScriptOverText(_)
+                            | ControlWord::HorizontalDocument(_)
+                            | ControlWord::VerticalDocument(_)
+                            | ControlWord::CompressJustification(_)
+                            | ControlWord::ExpandJustification(_)
+                            | ControlWord::LineBasedOnGrid(_)
+                            | ControlWord::FractionalCharacterWidths(_)
+                            | ControlWord::AbstractNumberingCleanup(_)
+                            | ControlWord::DocumentEventMask(_)
+                            | ControlWord::DrawingGridFollowsMargins(_)
+                            | ControlWord::SnapToDrawingGrid(_)
+                            | ControlWord::DrawingGridHorizontalSpacing(_)
+                            | ControlWord::DrawingGridVerticalSpacing(_)
+                            | ControlWord::DrawingGridHorizontalOrigin(_)
+                            | ControlWord::DrawingGridVerticalOrigin(_)
+                            | ControlWord::DrawingGridHorizontalShow(_)
+                            | ControlWord::DrawingGridVerticalShow(_)
+                            | ControlWord::ParallelGutter(_)
+                            | ControlWord::PrintTwoOnOne(_)
+                            | ControlWord::ThemeLanguage(_)
+                            | ControlWord::ThemeLanguageEastAsian(_)
+                            | ControlWord::ThemeLanguageComplexScript(_)
+                            | ControlWord::RelyOnVml(_)
+                            | ControlWord::ValidateXml(_)
+                            | ControlWord::ShowPlaceholderText(_)
+                            | ControlWord::IgnoreMixedContent(_)
+                            | ControlWord::SaveInvalidXml(_)
+                            | ControlWord::ShowXmlErrors(_)
+                            | ControlWord::DoNotEmbedSystemFonts(_)
+                            | ControlWord::DoNotEmbedLinguisticData(_)
+                            | ControlWord::TrackMoves(_)
+                            | ControlWord::TrackFormatting(_)
+                            | ControlWord::LockDocumentTheme(_)
+                            | ControlWord::LockQuickFormatSet(_)
+                            | ControlWord::UseNormalStyleForLists(_)
+                            | ControlWord::UpdateStylesFromTemplate(_)
+                            | ControlWord::DeclareStyleRestrictions(_)
+                            | ControlWord::EnforceStyleRestrictions(_)
+                            | ControlWord::StyleRestrictionsBackwardCompatibility(_)
+                            | ControlWord::AllowAutoFormatOverride(_)
+                            | ControlWord::BookFold(_)
+                            | ControlWord::ReverseBookFold(_)
+                            | ControlWord::BookFoldSheets(_)
+                            | ControlWord::RemovePersonalInformation(_)
+                            | ControlWord::RemoveDateTimeInformation(_)
+                            | ControlWord::HyphenateAutomatically(_)
+                            | ControlWord::HyphenateCapitalizedWords(_)
+                            | ControlWord::HyphenationConsecutiveLines(_)
+                            | ControlWord::HyphenationHotZone(_)
+                            | ControlWord::SuppressRaisedLoweredExtraSpacing(_)
+                            | ControlWord::SuppressTopPageExtraSpacing(_)
+                            | ControlWord::SuppressSpaceBeforeAfterHardBreak(_)
+                            | ControlWord::SuppressWordPerfectExtraLineSpacing(_)
+                            | ControlWord::SuppressBottomPageExtraSpacing(_)
+                            | ControlWord::DoNotBalanceSbcsDbcs(_)
+                            | ControlWord::ExpandSpacingAtShiftReturn(_)
+                            | ControlWord::DoNotAddSpaceForUnderline(_)
+                            | ControlWord::DoNotUnderlineTrailingSpaces(_)
+                            | ControlWord::DoNotTranslateBackslashToYen(_)
+                            | ControlWord::LegacyAsianLineBreakingRules(_)
+                            | ControlWord::CombineLegacyTableBorders(_)
+                            | ControlWord::DoNotAlignTableRowsIndependently(_)
+                            | ControlWord::DoNotUseRawTableWidth(_)
+                            | ControlWord::KeepTableRowsTogether(_)
+                            | ControlWord::DoNotAdjustTableLineHeight(_)
+                            | ControlWord::DoNotBreakWrappedTablesAcrossPages(_)
+                            | ControlWord::PreventAutofitGrowthIntoMargins(_)
+                            | ControlWord::UseWord2003TableStyleRules(_)
+                            | ControlWord::DoNotUseWord97ShapeLayout(_)
+                            | ControlWord::UseLegacyFootnoteLayout(_)
+                            | ControlWord::UseHtmlParagraphAutoSpacing(_)
+                            | ControlWord::PreserveLastTabAlignment(_)
+                            | ControlWord::UseWord95AutoSpacing(_)
+                            | ControlWord::ApplyThaiLineBreakingRules(_)
+                            | ControlWord::SnapTextToGridInsideTable(_)
+                            | ControlWord::AllowHangingPunctuation(_)
+                            | ControlWord::UseAsianLineBreakingRules(_)
+                            | ControlWord::CompressPunctuationAtLineStart(_)
+                            | ControlWord::NoCompatibilityOptions(_)
+                            | ControlWord::NoUiCompatibility(_)
+                            | ControlWord::NoFeatureThrottle(_)
+                            | ControlWord::ForceCompatibilityUpgrade(_)
+                            | ControlWord::PreserveAutofitTableWidthAroundShapes(_)
+                            | ControlWord::UseHangingIndentAsNumberingTab(_)
+                            | ControlWord::UseLegacyKinsokuCharacters(_)
+                            | ControlWord::UseLegacyFloatingObjectIndentation(_)
+                            | ControlWord::AllowContextualSpacingInTables(_)
+                            | ControlWord::IgnoreCellVerticalAlignmentWithFloatingObjects(_)
+                            | ControlWord::IgnoreTextBoxVerticalAlignment(_)
+                            | ControlWord::SplitPageBreakParagraph(_)
+                            | ControlWord::UseFixedWidthHangul(_)
+                            | ControlWord::UseLegacyAutofitWidthExpansion(_)
+                            | ControlWord::UseCachedColumnBalancing(_)
+                            | ControlWord::UnderlineNumberingSuffix(_)
+                            | ControlWord::DoNotSplitRowsAroundFloatingTables(_)
+                            | ControlWord::UseAnsiKerningPairs(_),
+                        )) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF document-property flag must not be starred".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::WindowCaption)) => {
+                            if self.states.len() != 3 || self.section_note_options_closed {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF window caption must precede visible text at document root"
+                                        .to_string(),
+                                ));
+                            }
+                            if self.window_caption.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF window caption destination".to_string(),
+                                ));
+                            }
+                            self.window_caption =
+                                Some(self.parse_window_caption_destination(true)?);
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::XslTransform)) => {
+                            if self.states.len() != 3 || self.section_note_options_closed {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF XSL transform must precede visible text at document root"
+                                        .to_string(),
+                                ));
+                            }
+                            if self.xsl_transform.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF XSL transform destination".to_string(),
+                                ));
+                            }
+                            self.xsl_transform = Some(self.parse_xsl_transform_destination()?);
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::StyleListFilter(parameter))) => {
+                            if self.states.len() != 3 || self.section_note_options_closed {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF style-list filter must precede visible text at document root"
+                                        .to_string(),
+                                ));
+                            }
+                            if self.style_list_filter.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF style-list filter destination".to_string(),
+                                ));
+                            }
+                            self.style_list_filter =
+                                Some(self.parse_style_list_filter_destination(*parameter)?);
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(
+                            control @ (ControlWord::WriteReservation(_)
+                            | ControlWord::WriteReservationHash(_)),
+                        )) => {
+                            if self.states.len() != 3 || self.section_note_options_closed {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF write reservation must precede visible text at document root"
+                                        .to_string(),
+                                ));
+                            }
+                            match control {
+                                ControlWord::WriteReservation(_) => {
+                                    if self.write_reservations.legacy.is_some() {
+                                        return Err(RtfError::MalformedDocument(
+                                            "duplicate RTF legacy write-reservation destination"
+                                                .to_string(),
+                                        ));
+                                    }
+                                    self.write_reservations.legacy =
+                                        Some(self.parse_legacy_write_reservation_destination()?);
+                                },
+                                ControlWord::WriteReservationHash(_) => {
+                                    if self.write_reservations.hash.is_some() {
+                                        return Err(RtfError::MalformedDocument(
+                                            "duplicate RTF write-reservation hash destination"
+                                                .to_string(),
+                                        ));
+                                    }
+                                    self.write_reservations.hash =
+                                        Some(self.parse_write_reservation_hash_destination()?);
+                                },
+                                _ => unreachable!(),
+                            }
                             self.states.pop();
                             return Ok(());
                         },
@@ -1536,6 +2757,76 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::XmlNamespaceTable)) => {
                             self.pos += 1;
                             self.parse_xml_namespace_table()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::ProtectionUserTable)) => {
+                            self.pos += 1;
+                            self.parse_protection_user_table()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(
+                            control @ (ControlWord::NextFile | ControlWord::DocumentTemplate),
+                        )) => {
+                            if self.states.len() != 3 || self.section_note_options_closed {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF external document references must precede visible text at document root"
+                                        .to_string(),
+                                ));
+                            }
+                            let duplicate = match control {
+                                ControlWord::NextFile => {
+                                    self.external_references.next_file.is_some()
+                                },
+                                ControlWord::DocumentTemplate => {
+                                    self.external_references.template.is_some()
+                                },
+                                _ => unreachable!(),
+                            };
+                            if duplicate {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF external document reference destination"
+                                        .to_string(),
+                                ));
+                            }
+                            let value = self.parse_external_reference_destination(*control)?;
+                            match control {
+                                ControlWord::NextFile => {
+                                    self.external_references.next_file = Some(value)
+                                },
+                                ControlWord::DocumentTemplate => {
+                                    self.external_references.template = Some(value)
+                                },
+                                _ => unreachable!(),
+                            }
+                            self.external_references.validate()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(
+                            control @ (ControlWord::DocumentViewKind(_)
+                            | ControlWord::DocumentViewScale(_)
+                            | ControlWord::DocumentZoomKind(_)
+                            | ControlWord::DocumentViewBackgroundShapes(_)
+                            | ControlWord::DocumentViewNoPageBoundaries(_)),
+                        )) => {
+                            if self.states.len() != 3 || self.section_note_options_closed {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF document-view controls must precede visible text at document root"
+                                        .to_string(),
+                                ));
+                            }
+                            let control = *control;
+                            self.pos += 2;
+                            if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+                                return Err(RtfError::MalformedDocument(
+                                    "starred RTF document-view group must contain exactly one control"
+                                        .to_string(),
+                                ));
+                            }
+                            self.pos += 1;
+                            self.apply_document_view_control(&control)?;
                             self.states.pop();
                             return Ok(());
                         },
@@ -1603,6 +2894,16 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::MailMerge)) => {
+                            if self.mail_merge.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple mailmerge destinations".to_string(),
+                                ));
+                            }
+                            self.mail_merge = Some(self.parse_mail_merge_destination()?);
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::MathProperties)) => {
                             if self.math_properties.is_some() {
                                 return Err(RtfError::MalformedDocument(
@@ -1663,12 +2964,55 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
-                        Some(Token::Control(ControlWord::BackgroundDestination)) => {
-                            self.pos += 2;
-                            if let Some(state) = self.states.last_mut() {
-                                state.destination = Destination::Other;
+                        Some(Token::Control(ControlWord::Shape(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF shp destination must not be starred".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::ShapeGroup(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF shpgrp destination must not be starred".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::ListPicture(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF listpicture is misplaced".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::ShapePicture(parameter))) => {
+                            require_parameterless(*parameter, "shppict")?;
+                            self.parse_body_picture_compatibility(
+                                crate::PictureCompatibilityKind::ShapePicture,
+                                true,
+                            )?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::NonShapePicture(_))) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF nonshppict destination must not be starred".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::BackgroundDestination(parameter))) => {
+                            require_parameterless(*parameter, "background")?;
+                            if self.states.len() != 3 || self.section_note_options_closed {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF background destination must precede visible text at document root".to_string(),
+                                ));
                             }
-                            self.parse_content()?;
+                            if self.background_shape_index.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple background destinations".to_string(),
+                                ));
+                            }
+                            if self.shapes.len() >= MAX_SHAPES {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF shape count exceeds the safety limit".to_string(),
+                                ));
+                            }
+                            let shape = self.parse_background_destination()?;
+                            self.background_shape_index = Some(self.shapes.len());
+                            self.shapes.push(shape);
                             self.states.pop();
                             return Ok(());
                         },
@@ -1716,6 +3060,39 @@ impl<'a> Parser<'a> {
                         "RTF generator destination must be starred".to_string(),
                     ));
                 },
+                Token::Control(ControlWord::WindowCaption) => {
+                    if self.states.len() != 3 || self.section_note_options_closed {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF window caption must precede visible text at document root"
+                                .to_string(),
+                        ));
+                    }
+                    if self.window_caption.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF window caption destination".to_string(),
+                        ));
+                    }
+                    self.window_caption = Some(self.parse_window_caption_destination(false)?);
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::XslTransform) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF XSL transform destination must be starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::StyleListFilter(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF style-list filter destination must be starred".to_string(),
+                    ));
+                },
+                Token::Control(
+                    ControlWord::WriteReservation(_) | ControlWord::WriteReservationHash(_),
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF write-reservation destinations must be starred".to_string(),
+                    ));
+                },
                 Token::Control(ControlWord::RevisionSaveTable) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF revision-save table must be starred".to_string(),
@@ -1724,6 +3101,16 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::XmlNamespaceTable) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF XML namespace table must be starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ProtectionUserTable) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF protection-user table must be starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::NextFile | ControlWord::DocumentTemplate) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF external document reference destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ThemeData | ControlWord::ColorSchemeMapping) => {
@@ -1751,6 +3138,11 @@ impl<'a> Parser<'a> {
                         "RTF datastore destination must be starred".to_string(),
                     ));
                 },
+                Token::Control(ControlWord::MailMerge) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF mailmerge destination must be starred".to_string(),
+                    ));
+                },
                 Token::Control(ControlWord::MathProperties) => {
                     if self.math_properties.is_some() {
                         return Err(RtfError::MalformedDocument(
@@ -1770,25 +3162,273 @@ impl<'a> Parser<'a> {
                     self.states.pop();
                     return Ok(());
                 },
-                Token::Control(ControlWord::Shape) => {
-                    if self.shapes.len() >= MAX_SHAPES {
+                Token::Control(ControlWord::Shape(parameter)) => {
+                    require_parameterless(*parameter, "shp")?;
+                    let state = self.current_state()?;
+                    let owner = if matches!(state.destination, Destination::FieldResult)
+                        && !self.field_drawing_captures.is_empty()
+                    {
+                        RootDrawingOwner::FieldResult
+                    } else if self.current_note_separator_active {
+                        RootDrawingOwner::NoteSeparator
+                    } else if matches!(
+                        state.destination,
+                        Destination::Footnote | Destination::Endnote
+                    ) {
+                        RootDrawingOwner::Note
+                    } else if self.current_hf_type.is_some() {
+                        RootDrawingOwner::HeaderFooter
+                    } else if state.in_table
+                        && matches!(state.destination, Destination::DocumentBody)
+                    {
+                        RootDrawingOwner::Cell(state.table_nesting_level.max(1))
+                    } else {
+                        RootDrawingOwner::Body
+                    };
+                    if let RootDrawingOwner::Cell(level) = owner {
+                        self.drain_nested_to(level)?;
+                        if level >= 2 {
+                            self.ensure_nested_builder(level)?;
+                        }
+                    }
+                    let count = match owner {
+                        RootDrawingOwner::FieldResult => {
+                            self.field_drawing_captures.last().unwrap().shapes.len()
+                        },
+                        RootDrawingOwner::NoteSeparator => {
+                            self.current_note_separator_drawings.shapes.len()
+                        },
+                        RootDrawingOwner::Note => self.current_note_shapes.len(),
+                        RootDrawingOwner::HeaderFooter => self.current_hf_shapes.len(),
+                        RootDrawingOwner::Cell(1) => self.current_cell_drawings.shapes.len(),
+                        RootDrawingOwner::Cell(level) => self
+                            .ensure_nested_builder(level)?
+                            .cell_drawings
+                            .shapes
+                            .len(),
+                        RootDrawingOwner::Body => self.shapes.len(),
+                    };
+                    if count >= MAX_SHAPES {
                         return Err(RtfError::MalformedDocument(
                             "RTF shape count exceeds the safety limit".to_string(),
                         ));
                     }
-                    let shape = self.parse_shape_destination()?;
-                    self.shapes.push(shape);
+                    let mut shape = self.parse_shape_destination(true)?;
+                    match owner {
+                        RootDrawingOwner::FieldResult => {
+                            let capture = self.field_drawing_captures.last_mut().unwrap();
+                            shape.position = capture.story_offset;
+                            let drawing = crate::StoryDrawing::Shape(capture.shapes.len());
+                            capture.drawing_order.push(drawing);
+                            capture
+                                .story_events
+                                .push(crate::StoryEvent::Drawing(drawing));
+                            capture.shapes.push(shape);
+                        },
+                        RootDrawingOwner::NoteSeparator => {
+                            shape.position = self.current_note_separator_drawings.story_offset;
+                            self.current_note_separator_elements.push(
+                                crate::NoteSeparatorElement::Drawing(crate::StoryDrawing::Shape(
+                                    self.current_note_separator_drawings.shapes.len(),
+                                )),
+                            );
+                            self.current_note_separator_drawings.shapes.push(shape);
+                        },
+                        RootDrawingOwner::Note => {
+                            shape.position = self.current_note_buffer.len();
+                            let drawing =
+                                crate::StoryDrawing::Shape(self.current_note_shapes.len());
+                            self.current_note_drawing_order.push(drawing);
+                            self.current_note_story_events
+                                .push(crate::StoryEvent::Drawing(drawing));
+                            self.current_note_shapes.push(shape);
+                        },
+                        RootDrawingOwner::HeaderFooter => {
+                            shape.position = self.current_hf_story_offset;
+                            let drawing = crate::StoryDrawing::Shape(self.current_hf_shapes.len());
+                            self.current_hf_drawing_order.push(drawing);
+                            self.current_hf_story_events
+                                .push(crate::StoryEvent::Drawing(drawing));
+                            self.current_hf_shapes.push(shape);
+                        },
+                        RootDrawingOwner::Cell(1) => {
+                            shape.position = self.current_cell_text.len();
+                            let drawing =
+                                crate::StoryDrawing::Shape(self.current_cell_drawings.shapes.len());
+                            self.current_cell_drawings.drawing_order.push(drawing);
+                            self.current_cell_story_events
+                                .push(crate::CellStoryEvent::Drawing(drawing));
+                            self.current_cell_drawings.shapes.push(shape);
+                        },
+                        RootDrawingOwner::Cell(level) => {
+                            let builder = self.ensure_nested_builder(level)?;
+                            shape.position = builder.cell_text.len();
+                            let drawing =
+                                crate::StoryDrawing::Shape(builder.cell_drawings.shapes.len());
+                            builder.cell_drawings.drawing_order.push(drawing);
+                            builder
+                                .cell_story_events
+                                .push(crate::CellStoryEvent::Drawing(drawing));
+                            builder.cell_drawings.shapes.push(shape);
+                        },
+                        RootDrawingOwner::Body => {
+                            shape.position = self.body_text_len;
+                            let drawing = crate::StoryDrawing::Shape(self.shapes.len());
+                            self.drawing_order.push(drawing);
+                            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                                crate::BodyStoryEvent::Drawing(drawing),
+                            ));
+                            self.shapes.push(shape);
+                        },
+                    }
                     self.states.pop();
                     return Ok(());
                 },
-                Token::Control(ControlWord::ShapeGroup) => {
-                    if self.shape_groups.len() >= MAX_SHAPE_GROUPS {
+                Token::Control(ControlWord::NonShapePicture(parameter)) => {
+                    require_parameterless(*parameter, "nonshppict")?;
+                    self.parse_body_picture_compatibility(
+                        crate::PictureCompatibilityKind::NonShapePicture,
+                        false,
+                    )?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::ShapePicture(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shppict destination must be starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ShapeGroup(parameter)) => {
+                    require_parameterless(*parameter, "shpgrp")?;
+                    let state = self.current_state()?;
+                    let owner = if matches!(state.destination, Destination::FieldResult)
+                        && !self.field_drawing_captures.is_empty()
+                    {
+                        RootDrawingOwner::FieldResult
+                    } else if self.current_note_separator_active {
+                        RootDrawingOwner::NoteSeparator
+                    } else if matches!(
+                        state.destination,
+                        Destination::Footnote | Destination::Endnote
+                    ) {
+                        RootDrawingOwner::Note
+                    } else if self.current_hf_type.is_some() {
+                        RootDrawingOwner::HeaderFooter
+                    } else if state.in_table
+                        && matches!(state.destination, Destination::DocumentBody)
+                    {
+                        RootDrawingOwner::Cell(state.table_nesting_level.max(1))
+                    } else {
+                        RootDrawingOwner::Body
+                    };
+                    if let RootDrawingOwner::Cell(level) = owner {
+                        self.drain_nested_to(level)?;
+                        if level >= 2 {
+                            self.ensure_nested_builder(level)?;
+                        }
+                    }
+                    let count = match owner {
+                        RootDrawingOwner::FieldResult => self
+                            .field_drawing_captures
+                            .last()
+                            .unwrap()
+                            .shape_groups
+                            .len(),
+                        RootDrawingOwner::NoteSeparator => {
+                            self.current_note_separator_drawings.shape_groups.len()
+                        },
+                        RootDrawingOwner::Note => self.current_note_shape_groups.len(),
+                        RootDrawingOwner::HeaderFooter => self.current_hf_shape_groups.len(),
+                        RootDrawingOwner::Cell(1) => self.current_cell_drawings.shape_groups.len(),
+                        RootDrawingOwner::Cell(level) => self
+                            .ensure_nested_builder(level)?
+                            .cell_drawings
+                            .shape_groups
+                            .len(),
+                        RootDrawingOwner::Body => self.shape_groups.len(),
+                    };
+                    if count >= MAX_SHAPE_GROUPS {
                         return Err(RtfError::MalformedDocument(
                             "RTF shape group count exceeds the safety limit".to_string(),
                         ));
                     }
-                    let group = self.parse_shape_group_destination()?;
-                    self.shape_groups.push(group);
+                    let mut group = self.parse_shape_group_destination()?;
+                    match owner {
+                        RootDrawingOwner::FieldResult => {
+                            let capture = self.field_drawing_captures.last_mut().unwrap();
+                            group.position = capture.story_offset;
+                            let drawing =
+                                crate::StoryDrawing::ShapeGroup(capture.shape_groups.len());
+                            capture.drawing_order.push(drawing);
+                            capture
+                                .story_events
+                                .push(crate::StoryEvent::Drawing(drawing));
+                            capture.shape_groups.push(group);
+                        },
+                        RootDrawingOwner::NoteSeparator => {
+                            group.position = self.current_note_separator_drawings.story_offset;
+                            self.current_note_separator_elements.push(
+                                crate::NoteSeparatorElement::Drawing(
+                                    crate::StoryDrawing::ShapeGroup(
+                                        self.current_note_separator_drawings.shape_groups.len(),
+                                    ),
+                                ),
+                            );
+                            self.current_note_separator_drawings
+                                .shape_groups
+                                .push(group);
+                        },
+                        RootDrawingOwner::Note => {
+                            group.position = self.current_note_buffer.len();
+                            let drawing = crate::StoryDrawing::ShapeGroup(
+                                self.current_note_shape_groups.len(),
+                            );
+                            self.current_note_drawing_order.push(drawing);
+                            self.current_note_story_events
+                                .push(crate::StoryEvent::Drawing(drawing));
+                            self.current_note_shape_groups.push(group);
+                        },
+                        RootDrawingOwner::HeaderFooter => {
+                            group.position = self.current_hf_story_offset;
+                            let drawing =
+                                crate::StoryDrawing::ShapeGroup(self.current_hf_shape_groups.len());
+                            self.current_hf_drawing_order.push(drawing);
+                            self.current_hf_story_events
+                                .push(crate::StoryEvent::Drawing(drawing));
+                            self.current_hf_shape_groups.push(group);
+                        },
+                        RootDrawingOwner::Cell(1) => {
+                            group.position = self.current_cell_text.len();
+                            let drawing = crate::StoryDrawing::ShapeGroup(
+                                self.current_cell_drawings.shape_groups.len(),
+                            );
+                            self.current_cell_drawings.drawing_order.push(drawing);
+                            self.current_cell_story_events
+                                .push(crate::CellStoryEvent::Drawing(drawing));
+                            self.current_cell_drawings.shape_groups.push(group);
+                        },
+                        RootDrawingOwner::Cell(level) => {
+                            let builder = self.ensure_nested_builder(level)?;
+                            group.position = builder.cell_text.len();
+                            let drawing = crate::StoryDrawing::ShapeGroup(
+                                builder.cell_drawings.shape_groups.len(),
+                            );
+                            builder.cell_drawings.drawing_order.push(drawing);
+                            builder
+                                .cell_story_events
+                                .push(crate::CellStoryEvent::Drawing(drawing));
+                            builder.cell_drawings.shape_groups.push(group);
+                        },
+                        RootDrawingOwner::Body => {
+                            group.position = self.body_text_len;
+                            let drawing = crate::StoryDrawing::ShapeGroup(self.shape_groups.len());
+                            self.drawing_order.push(drawing);
+                            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                                crate::BodyStoryEvent::Drawing(drawing),
+                            ));
+                            self.shape_groups.push(group);
+                        },
+                    }
                     self.states.pop();
                     return Ok(());
                 },
@@ -1802,6 +3442,31 @@ impl<'a> Parser<'a> {
                     self.states.pop();
                     return Ok(());
                 },
+                Token::Control(ControlWord::PictureProperties(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF picprop destination may occur only inside pict".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ShapeBinaryValue(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF svb destination may occur only inside sv".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ShapeThemeValue(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF hsv destination may occur only after sv inside sp".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ShapeResult(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shprslt destination may occur only inside a root shape".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ShapeText(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shptxt destination may occur only inside a shape".to_string(),
+                    ));
+                },
                 Token::Control(ControlWord::Object) => {
                     if self.objects.len() >= MAX_OBJECTS {
                         return Err(RtfError::MalformedDocument(
@@ -1809,9 +3474,18 @@ impl<'a> Parser<'a> {
                         ));
                     }
                     let object = self.parse_object_destination()?;
+                    let index = self.objects.len();
                     self.objects.push(object);
+                    self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                        crate::BodyStoryEvent::Object(index),
+                    ));
                     self.states.pop();
                     return Ok(());
+                },
+                Token::Control(ControlWord::InvalidObjectDestinationParameter) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF object destination must not have a parameter".to_string(),
+                    ));
                 },
                 Token::Control(ControlWord::Result) => {
                     // Mark as result destination and skip
@@ -1822,6 +3496,11 @@ impl<'a> Parser<'a> {
                     self.skip_until_close_brace()?;
                     self.states.pop();
                     return Ok(());
+                },
+                Token::Control(ControlWord::InvalidObjectResultDestinationParameter) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF object result destination must not have a parameter".to_string(),
+                    ));
                 },
                 Token::Control(ControlWord::Field) => {
                     // Parse field group
@@ -1955,6 +3634,18 @@ impl<'a> Parser<'a> {
                 "RTF revision marker has no tracked text".to_string(),
             ));
         }
+        if self.current_state()?.revision_type == Some(super::annotation::RevisionType::Insertion)
+            && self.current_state()?.revision_event_id
+                != self
+                    .states
+                    .get(self.states.len().saturating_sub(2))
+                    .and_then(|state| state.revision_event_id)
+            && let Some(id) = self.current_state()?.revision_event_id
+        {
+            self.record_revision_end(id)?;
+        }
+
+        Self::validate_drop_cap_state(self.current_state()?, "paragraph group")?;
 
         // Pop state
         self.states.pop();
@@ -2005,24 +3696,35 @@ impl<'a> Parser<'a> {
         kind: crate::NoteSeparatorKind,
     ) -> RtfResult<crate::NoteSeparator<'a>> {
         if self.states.len() != 3
-            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+            || self
+                .blocks
+                .iter()
+                .any(|block| !block.text.trim().is_empty())
         {
             return Err(RtfError::MalformedDocument(
                 "RTF note separators must occur at document scope before body text".to_string(),
             ));
         }
         self.pos += 2; // ignorable marker and destination
-        let mut elements = Vec::new();
+        self.current_note_separator_active = true;
+        self.current_note_separator_elements.clear();
+        self.current_note_separator_drawings = DrawingStoryCapture::default();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
-        self.parse_note_separator_elements(&mut elements, &mut unicode_skip, 0)?;
-        let separator = crate::NoteSeparator { kind, elements };
+        self.parse_note_separator_elements(&mut unicode_skip, 0)?;
+        self.current_note_separator_active = false;
+        let drawings = std::mem::take(&mut self.current_note_separator_drawings);
+        let separator = crate::NoteSeparator {
+            kind,
+            elements: std::mem::take(&mut self.current_note_separator_elements),
+            shapes: drawings.shapes,
+            shape_groups: drawings.shape_groups,
+        };
         separator.validate()?;
         Ok(separator)
     }
 
     fn parse_note_separator_elements(
         &mut self,
-        elements: &mut Vec<crate::NoteSeparatorElement<'a>>,
         unicode_skip: &mut i32,
         depth: usize,
     ) -> RtfResult<()> {
@@ -2038,55 +3740,79 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Some(Token::OpenBrace) => {
+                    if self.is_root_drawing_group() {
+                        self.parse_group()?;
+                        continue;
+                    }
                     let direct = self.tokens.get(self.pos + 1);
                     let starred = self.tokens.get(self.pos + 2);
-                    if matches!(direct, Some(Token::Control(
-                        ControlWord::Field
-                        | ControlWord::Object
-                        | ControlWord::Picture
-                        | ControlWord::Shape
-                        | ControlWord::ShapeGroup
-                        | ControlWord::Footnote
-                        | ControlWord::Endnote
-                    ))) || (matches!(direct, Some(Token::Control(ControlWord::IgnorableDestination)))
-                        && matches!(starred, Some(Token::Control(
+                    if matches!(
+                        direct,
+                        Some(Token::Control(
                             ControlWord::Field
-                            | ControlWord::Object
-                            | ControlWord::Picture
-                            | ControlWord::Shape
-                            | ControlWord::ShapeGroup
-                        ))))
-                    {
+                                | ControlWord::Object
+                                | ControlWord::Picture
+                                | ControlWord::Shape(_)
+                                | ControlWord::ShapeGroup(_)
+                                | ControlWord::Footnote
+                                | ControlWord::Endnote
+                        ))
+                    ) || (matches!(
+                        direct,
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) && matches!(
+                        starred,
+                        Some(Token::Control(
+                            ControlWord::Field
+                                | ControlWord::Object
+                                | ControlWord::Picture
+                                | ControlWord::Shape(_)
+                                | ControlWord::ShapeGroup(_)
+                        ))
+                    )) {
                         return Err(RtfError::MalformedDocument(
                             "RTF note separator cannot contain fields, objects, pictures, or active destinations".to_string(),
                         ));
                     }
                     self.pos += 1;
-                    self.parse_note_separator_elements(elements, unicode_skip, depth + 1)?;
+                    self.parse_note_separator_elements(unicode_skip, depth + 1)?;
                     continue;
                 },
                 Some(Token::Text(text)) => {
                     let decoded = self.decode_transport_text(text)?;
-                    Self::push_note_separator_text(elements, decoded);
+                    self.push_note_separator_text(decoded);
                 },
                 Some(Token::Control(ControlWord::Unicode(first))) => {
                     let decoded = self.parse_style_unicode(*first, *unicode_skip)?;
-                    Self::push_note_separator_text(elements, decoded);
+                    self.push_note_separator_text(decoded);
                     continue;
                 },
-                Some(Token::Control(ControlWord::UnicodeSkip(value))) => *unicode_skip = (*value).max(0),
-                Some(Token::Control(ControlWord::NoteSeparatorCharacter)) => {
-                    elements.push(crate::NoteSeparatorElement::SeparatorMark)
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    *unicode_skip = (*value).max(0)
                 },
-                Some(Token::Control(ControlWord::NoteContinuationSeparatorCharacter)) => {
-                    elements.push(crate::NoteSeparatorElement::ContinuationSeparatorMark)
+                Some(Token::Control(ControlWord::NoteSeparatorCharacter)) => self
+                    .current_note_separator_elements
+                    .push(crate::NoteSeparatorElement::SeparatorMark),
+                Some(Token::Control(ControlWord::NoteContinuationSeparatorCharacter)) => self
+                    .current_note_separator_elements
+                    .push(crate::NoteSeparatorElement::ContinuationSeparatorMark),
+                Some(Token::Control(ControlWord::Par)) => {
+                    self.current_note_separator_elements
+                        .push(crate::NoteSeparatorElement::ParagraphBreak);
+                    self.current_note_separator_drawings.story_offset += 1;
                 },
-                Some(Token::Control(ControlWord::Par)) => elements.push(crate::NoteSeparatorElement::ParagraphBreak),
-                Some(Token::Control(ControlWord::Line)) => elements.push(crate::NoteSeparatorElement::LineBreak),
-                Some(Token::Control(ControlWord::Tab)) => Self::push_note_separator_text(elements, "\t".to_string()),
-                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
-                    Self::push_note_separator_text(elements, control_symbol_text(control).unwrap_or_default().to_string())
+                Some(Token::Control(ControlWord::Line)) => {
+                    self.current_note_separator_elements
+                        .push(crate::NoteSeparatorElement::LineBreak);
+                    self.current_note_separator_drawings.story_offset += 1;
                 },
+                Some(Token::Control(ControlWord::Tab)) => {
+                    self.push_note_separator_text("\t".to_string())
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => self
+                    .push_note_separator_text(
+                        control_symbol_text(control).unwrap_or_default().to_string(),
+                    ),
                 Some(Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF note separator cannot contain binary data".to_string(),
@@ -2096,15 +3822,21 @@ impl<'a> Parser<'a> {
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
-            if elements.len() > crate::note_separator::MAX_NOTE_SEPARATOR_ELEMENTS {
+            if self.current_note_separator_elements.len()
+                > crate::note_separator::MAX_NOTE_SEPARATOR_ELEMENTS
+            {
                 return Err(RtfError::MalformedDocument(
                     "RTF note separator contains too many elements".to_string(),
                 ));
             }
-            let text_bytes = elements.iter().map(|element| match element {
-                crate::NoteSeparatorElement::Text(text) => text.len(),
-                _ => 0,
-            }).sum::<usize>();
+            let text_bytes = self
+                .current_note_separator_elements
+                .iter()
+                .map(|element| match element {
+                    crate::NoteSeparatorElement::Text(text) => text.len(),
+                    _ => 0,
+                })
+                .sum::<usize>();
             if text_bytes > crate::note_separator::MAX_NOTE_SEPARATOR_TEXT_BYTES {
                 return Err(RtfError::MalformedDocument(
                     "RTF note-separator text exceeds the safety limit".to_string(),
@@ -2114,17 +3846,18 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
-    fn push_note_separator_text(
-        elements: &mut Vec<crate::NoteSeparatorElement<'a>>,
-        text: String,
-    ) {
+    fn push_note_separator_text(&mut self, text: String) {
         if text.is_empty() {
             return;
         }
-        if let Some(crate::NoteSeparatorElement::Text(existing)) = elements.last_mut() {
+        self.current_note_separator_drawings.story_offset += text.len();
+        if let Some(crate::NoteSeparatorElement::Text(existing)) =
+            self.current_note_separator_elements.last_mut()
+        {
             existing.to_mut().push_str(&text);
         } else {
-            elements.push(crate::NoteSeparatorElement::Text(Cow::Owned(text)));
+            self.current_note_separator_elements
+                .push(crate::NoteSeparatorElement::Text(Cow::Owned(text)));
         }
     }
 
@@ -2134,11 +3867,7 @@ impl<'a> Parser<'a> {
                 "RTF navigation-entry count limit exceeded".to_string(),
             ));
         }
-        if self.current_state()?.in_table {
-            return Err(RtfError::MalformedDocument(
-                "RTF positional navigation entries inside tables are unsupported".to_string(),
-            ));
-        }
+        let state = self.prepare_revision_event()?;
         let entry = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::IndexEntry)) => self.parse_index_entry()?,
             Some(Token::Control(ControlWord::TableOfContentsEntry)) => {
@@ -2168,7 +3897,21 @@ impl<'a> Parser<'a> {
                 "RTF navigation-entry aggregate text limit exceeded".to_string(),
             ));
         }
+        let index = self.navigation_entries.len();
         self.navigation_entries.push(entry);
+        if state.in_table || state.table_nesting_level >= 2 {
+            self.push_cell_story_event(
+                state.table_nesting_level,
+                crate::CellStoryEvent::NavigationEntry(crate::CellStoryReference {
+                    index,
+                    position: self.navigation_entries[index].position(),
+                }),
+            )?;
+        } else {
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::NavigationEntry(index),
+            ));
+        }
         Ok(())
     }
 
@@ -2178,8 +3921,7 @@ impl<'a> Parser<'a> {
     ) -> RtfResult<()> {
         if self.current_state()?.destination != Destination::DocumentBody {
             return Err(RtfError::MalformedDocument(
-                "RTF generated list marker may occur only in the visible document body"
-                    .to_string(),
+                "RTF generated list marker may occur only in the visible document body".to_string(),
             ));
         }
         if self.generated_list_markers.len()
@@ -2228,7 +3970,11 @@ impl<'a> Parser<'a> {
                                 .to_string(),
                         ));
                     }
+                    let index = self.generated_list_markers.len();
                     self.generated_list_markers.push(marker);
+                    self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                        crate::BodyStoryEvent::GeneratedListMarker(index),
+                    ));
                     return Ok(());
                 },
                 Some(Token::CloseBrace) => {
@@ -2245,8 +3991,8 @@ impl<'a> Parser<'a> {
                             ControlWord::Field
                                 | ControlWord::Object
                                 | ControlWord::Picture
-                                | ControlWord::Shape
-                                | ControlWord::ShapeGroup
+                                | ControlWord::Shape(_)
+                                | ControlWord::ShapeGroup(_)
                                 | ControlWord::FormField
                                 | ControlWord::DataField
                         ))
@@ -2282,8 +4028,8 @@ impl<'a> Parser<'a> {
                     ControlWord::Field
                     | ControlWord::Object
                     | ControlWord::Picture
-                    | ControlWord::Shape
-                    | ControlWord::ShapeGroup
+                    | ControlWord::Shape(_)
+                    | ControlWord::ShapeGroup(_)
                     | ControlWord::FormField
                     | ControlWord::DataField
                     | ControlWord::Par
@@ -2315,7 +4061,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_index_entry(&mut self) -> RtfResult<NavigationEntry<'a>> {
-        let position = self.body_text_len;
+        let position = self.current_story_position()?;
         self.pos += 1; // \xe
         let mut text = String::new();
         let mut index_id = None;
@@ -2333,59 +4079,62 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     break;
                 },
-                Some(Token::OpenBrace) => match (self.tokens.get(self.pos + 1), self.tokens.get(self.pos + 2)) {
-                    (Some(Token::Control(ControlWord::IndexReplacementText)), _) => {
-                        if !saw_text || saw_reference {
-                            return Err(RtfError::MalformedDocument(
+                Some(Token::OpenBrace) => {
+                    match (self.tokens.get(self.pos + 1), self.tokens.get(self.pos + 2)) {
+                        (Some(Token::Control(ControlWord::IndexReplacementText)), _) => {
+                            if !saw_text || saw_reference {
+                                return Err(RtfError::MalformedDocument(
                                 "RTF index entry has a misplaced or duplicate txe/rxe destination".to_string(),
                             ));
-                        }
-                        page_reference = IndexPageReference::ReplacementText(Cow::Owned(
-                            self.parse_navigation_subdestination(false)?,
-                        ));
-                        saw_reference = true;
-                    },
-                    (Some(Token::Control(ControlWord::IndexBookmarkRange)), _) => {
-                        if !saw_text || saw_reference {
-                            return Err(RtfError::MalformedDocument(
+                            }
+                            page_reference = IndexPageReference::ReplacementText(Cow::Owned(
+                                self.parse_navigation_subdestination(false)?,
+                            ));
+                            saw_reference = true;
+                        },
+                        (Some(Token::Control(ControlWord::IndexBookmarkRange)), _) => {
+                            if !saw_text || saw_reference {
+                                return Err(RtfError::MalformedDocument(
                                 "RTF index entry has a misplaced or duplicate txe/rxe destination".to_string(),
                             ));
-                        }
-                        page_reference = IndexPageReference::BookmarkRange(Cow::Owned(
-                            self.parse_navigation_subdestination(false)?,
-                        ));
-                        saw_reference = true;
-                    },
-                    (
-                        Some(Token::Control(ControlWord::IgnorableDestination)),
-                        Some(Token::Control(ControlWord::IndexPronunciation)),
-                    ) => {
-                        if !saw_yomi || yomi.is_some() {
-                            return Err(RtfError::MalformedDocument(
-                                "RTF pxe pronunciation requires one preceding yxe".to_string(),
+                            }
+                            page_reference = IndexPageReference::BookmarkRange(Cow::Owned(
+                                self.parse_navigation_subdestination(false)?,
                             ));
-                        }
-                        yomi = Some(Cow::Owned(self.parse_navigation_subdestination(true)?));
-                    },
-                    (Some(Token::Control(ControlWord::IndexYomi)), _) => {
-                        if !saw_text || saw_yomi || yomi.is_some() {
-                            return Err(RtfError::MalformedDocument(
-                                "RTF index entry has a misplaced or duplicate yxe group"
-                                    .to_string(),
-                            ));
-                        }
-                        yomi = Some(Cow::Owned(self.parse_index_yomi_group()?));
-                        saw_yomi = true;
-                    },
-                    _ => {
-                        if saw_reference || yomi.is_some() {
-                            return Err(RtfError::MalformedDocument(
-                                "RTF index entry text must precede its subdestinations".to_string(),
-                            ));
-                        }
-                        self.parse_navigation_text_group(&mut text, true, 1)?;
-                        saw_text = !text.is_empty();
-                    },
+                            saw_reference = true;
+                        },
+                        (
+                            Some(Token::Control(ControlWord::IgnorableDestination)),
+                            Some(Token::Control(ControlWord::IndexPronunciation)),
+                        ) => {
+                            if !saw_yomi || yomi.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF pxe pronunciation requires one preceding yxe".to_string(),
+                                ));
+                            }
+                            yomi = Some(Cow::Owned(self.parse_navigation_subdestination(true)?));
+                        },
+                        (Some(Token::Control(ControlWord::IndexYomi)), _) => {
+                            if !saw_text || saw_yomi || yomi.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF index entry has a misplaced or duplicate yxe group"
+                                        .to_string(),
+                                ));
+                            }
+                            yomi = Some(Cow::Owned(self.parse_index_yomi_group()?));
+                            saw_yomi = true;
+                        },
+                        _ => {
+                            if saw_reference || yomi.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF index entry text must precede its subdestinations"
+                                        .to_string(),
+                                ));
+                            }
+                            self.parse_navigation_text_group(&mut text, true, 1)?;
+                            saw_text = !text.is_empty();
+                        },
+                    }
                 },
                 Some(Token::Control(ControlWord::IndexIdentifier(value))) => {
                     if saw_text || index_id.is_some() {
@@ -2488,7 +4237,7 @@ impl<'a> Parser<'a> {
         &mut self,
         suppress_page_number: bool,
     ) -> RtfResult<NavigationEntry<'a>> {
-        let position = self.body_text_len;
+        let position = self.current_story_position()?;
         self.pos += 1; // \tc or \tcn
         let mut text = String::new();
         let mut table_id = b'C';
@@ -2717,8 +4466,8 @@ impl<'a> Parser<'a> {
                 | ControlWord::Object
                 | ControlWord::Result
                 | ControlWord::Picture
-                | ControlWord::Shape
-                | ControlWord::ShapeGroup
+                | ControlWord::Shape(_)
+                | ControlWord::ShapeGroup(_)
                 | ControlWord::DocumentVariable
                 | ControlWord::UserProperties
                 | ControlWord::Annotation
@@ -2786,11 +4535,15 @@ impl<'a> Parser<'a> {
             .name
             .len()
             .checked_add(variable.value.len())
-            .ok_or_else(|| RtfError::MalformedDocument("document-variable size overflow".to_string()))?;
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("document-variable size overflow".to_string())
+            })?;
         self.document_variable_text_bytes = self
             .document_variable_text_bytes
             .checked_add(added)
-            .ok_or_else(|| RtfError::MalformedDocument("document-variable size overflow".to_string()))?;
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("document-variable size overflow".to_string())
+            })?;
         if self.document_variable_text_bytes > MAX_DOCUMENT_VARIABLE_TEXT_BYTES {
             return Err(RtfError::MalformedDocument(format!(
                 "RTF document-variable text exceeds {MAX_DOCUMENT_VARIABLE_TEXT_BYTES} bytes"
@@ -2869,7 +4622,11 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-        if self.user_properties.iter().any(|property| property.name == name) {
+        if self
+            .user_properties
+            .iter()
+            .any(|property| property.name == name)
+        {
             return Err(RtfError::MalformedDocument(format!(
                 "duplicate RTF user-property name: {name}"
             )));
@@ -2884,7 +4641,9 @@ impl<'a> Parser<'a> {
             .checked_add(property.text_bytes().ok_or_else(|| {
                 RtfError::MalformedDocument("user-property size overflow".to_string())
             })?)
-            .ok_or_else(|| RtfError::MalformedDocument("user-property size overflow".to_string()))?;
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("user-property size overflow".to_string())
+            })?;
         if self.user_property_text_bytes > MAX_USER_PROPERTY_TEXT_BYTES {
             return Err(RtfError::MalformedDocument(format!(
                 "RTF user-property text exceeds {MAX_USER_PROPERTY_TEXT_BYTES} bytes"
@@ -2918,11 +4677,7 @@ impl<'a> Parser<'a> {
         self.parse_inert_text_group_contents(limit, "document-variable")
     }
 
-    fn parse_inert_text_group_contents(
-        &mut self,
-        limit: usize,
-        kind: &str,
-    ) -> RtfResult<String> {
+    fn parse_inert_text_group_contents(&mut self, limit: usize, kind: &str) -> RtfResult<String> {
         let mut bytes = SmallVec::<[u8; 128]>::new();
         let mut output = String::new();
         let mut unicode_skip = self.states.last().map_or(1, |state| state.unicode_skip);
@@ -2938,14 +4693,14 @@ impl<'a> Parser<'a> {
                     break;
                 },
                 Token::OpenBrace => {
-                    return Err(RtfError::MalformedDocument(
-                        format!("nested groups are not allowed in RTF {kind} text"),
-                    ));
+                    return Err(RtfError::MalformedDocument(format!(
+                        "nested groups are not allowed in RTF {kind} text"
+                    )));
                 },
                 Token::Binary(_) => {
-                    return Err(RtfError::MalformedDocument(
-                        format!("binary data is not allowed in RTF {kind} text"),
-                    ));
+                    return Err(RtfError::MalformedDocument(format!(
+                        "binary data is not allowed in RTF {kind} text"
+                    )));
                 },
                 Token::Text(text) => {
                     let mut transport = SmallVec::<[u8; 128]>::new();
@@ -2965,7 +4720,9 @@ impl<'a> Parser<'a> {
                         let decoded = self
                             .states
                             .last()
-                            .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| state.encoding)
+                            .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| {
+                                state.encoding
+                            })
                             .decode(&bytes);
                         output.push_str(&decoded);
                         bytes.clear();
@@ -2999,7 +4756,9 @@ impl<'a> Parser<'a> {
                             let decoded = self
                                 .states
                                 .last()
-                                .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| state.encoding)
+                                .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| {
+                                    state.encoding
+                                })
                                 .decode(&bytes);
                             output.push_str(&decoded);
                             bytes.clear();
@@ -3007,9 +4766,9 @@ impl<'a> Parser<'a> {
                         output.push_str(text);
                         self.pos += 1;
                     } else {
-                        return Err(RtfError::MalformedDocument(
-                            format!("active controls are not allowed in RTF {kind} text"),
-                        ));
+                        return Err(RtfError::MalformedDocument(format!(
+                            "active controls are not allowed in RTF {kind} text"
+                        )));
                     }
                 },
             }
@@ -3023,7 +4782,9 @@ impl<'a> Parser<'a> {
             let decoded = self
                 .states
                 .last()
-                .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| state.encoding)
+                .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| {
+                    state.encoding
+                })
                 .decode(&bytes);
             output.push_str(&decoded);
         }
@@ -3063,13 +4824,30 @@ impl<'a> Parser<'a> {
                 Token::Control(control) => {
                     match control {
                         ControlWord::Par | ControlWord::Line => {
-                            let structural_table_boundary=self.finalize_table_before_non_table_body_content(true)?;
+                            let structural_table_boundary =
+                                self.finalize_table_before_non_table_body_content(true)?;
                             self.pos += 1;
                             // Paragraph break - flush current text
                             if !text_buffer.is_empty() {
                                 self.flush_text_buffer(&mut text_buffer)?;
                             }
-                            if !structural_table_boundary{text_buffer.push(b'\n');}
+                            if !structural_table_boundary {
+                                text_buffer.push(b'\n');
+                            }
+                            let state = self.current_state_mut()?;
+                            state.paragraph_content_started = false;
+                            state.paragraph_numbering_declared = false;
+                        },
+                        ControlWord::Page(param) => {
+                            require_parameterless(*param, "page")?;
+                            if !text_buffer.is_empty() {
+                                self.flush_text_buffer(&mut text_buffer)?;
+                            }
+                            self.record_body_page_break()?;
+                            self.pos += 1;
+                        },
+                        ControlWord::LegacyParagraphNumbering(_) => {
+                            return Err(RtfError::MalformedDocument("RTF pn control must be the first control in its own destination group".to_string()));
                         },
                         ControlWord::Tab => {
                             self.finalize_table_before_non_table_body_content(true)?;
@@ -3079,9 +4857,11 @@ impl<'a> Parser<'a> {
                         ControlWord::Unicode(code) => {
                             self.finalize_table_before_non_table_body_content(true)?;
                             // Handle Unicode character with potential fallback
-                            if self.states.last().is_some_and(|state| {
-                                state.destination == Destination::DocumentBody
-                            }) {
+                            if self
+                                .states
+                                .last()
+                                .is_some_and(|state| state.destination == Destination::DocumentBody)
+                            {
                                 self.section_note_options_closed = true;
                                 self.root_section_format_run = false;
                             }
@@ -3136,8 +4916,43 @@ impl<'a> Parser<'a> {
                             if !text_buffer.is_empty() {
                                 self.flush_text_buffer(&mut text_buffer)?;
                             }
+                            let starting = match control {
+                                ControlWord::Revised(true) => {
+                                    Some(super::annotation::RevisionType::Insertion)
+                                },
+                                ControlWord::Deleted(true) => {
+                                    Some(super::annotation::RevisionType::Deletion)
+                                },
+                                _ => None,
+                            };
+                            if matches!(control, ControlWord::Revised(false))
+                                && let Some(id) = self.current_state()?.revision_event_id
+                            {
+                                self.record_revision_end(id)?;
+                            }
+                            let in_table = self.current_state()?.in_table
+                                || self.current_state()?.table_nesting_level >= 2;
+                            let event_id = starting.map(|kind| {
+                                let id = self.revision_event_indices.len();
+                                self.revision_event_indices.push(None);
+                                if !in_table {
+                                    self.body_story_events.push(match kind {
+                                        super::annotation::RevisionType::Insertion => {
+                                            ParsedBodyStoryEvent::RevisionStart(id)
+                                        },
+                                        super::annotation::RevisionType::Deletion => {
+                                            ParsedBodyStoryEvent::RevisionDeletion(id)
+                                        },
+                                        _ => unreachable!(),
+                                    });
+                                }
+                                id
+                            });
                             self.pos += 1;
                             self.apply_control_word(control)?;
+                            if let Some(id) = event_id {
+                                self.current_state_mut()?.revision_event_id = Some(id);
+                            }
                         },
                         ControlWord::FormProtection(_)
                         | ControlWord::AnnotationProtection(_)
@@ -3146,6 +4961,13 @@ impl<'a> Parser<'a> {
                         | ControlWord::AllProtection(_)
                         | ControlWord::EnforceProtection(_)
                         | ControlWord::ProtectionLevel(_) => {
+                            if !text_buffer.is_empty() {
+                                self.flush_text_buffer(&mut text_buffer)?;
+                            }
+                            self.pos += 1;
+                            self.apply_control_word(control)?;
+                        },
+                        ControlWord::ColorBackground(_) => {
                             if !text_buffer.is_empty() {
                                 self.flush_text_buffer(&mut text_buffer)?;
                             }
@@ -3167,21 +4989,33 @@ impl<'a> Parser<'a> {
                         continue;
                     }
                     self.finalize_table_before_non_table_body_content(!text.trim().is_empty())?;
-                    if self.states.last().is_some_and(|state| {
-                        state.destination == Destination::DocumentBody
-                    }) && !text.trim().is_empty()
+                    if self
+                        .states
+                        .last()
+                        .is_some_and(|state| state.destination == Destination::DocumentBody)
+                        && !text.trim().is_empty()
                     {
                         self.note_options_closed = true;
                         self.section_note_options_closed = true;
                         self.root_section_format_run = false;
                     }
                     // Check if we're in a table
-                    if self.current_state().is_ok_and(|s|s.destination==Destination::DocumentBody&&(s.in_table||s.table_nesting_level>=2)) {
-                        let state=self.current_state()?.clone();let encoding = state.encoding;
+                    if self.current_state().is_ok_and(|s| {
+                        s.destination == Destination::DocumentBody
+                            && (s.in_table || s.table_nesting_level >= 2)
+                    }) {
+                        let state = self.current_state()?.clone();
+                        let encoding = state.encoding;
                         let mut bytes = SmallVec::<[u8; 64]>::new();
                         append_transport_bytes(&mut bytes, text)?;
-                        self.append_table_text(encoding.decode(&bytes).as_bytes(),state.table_nesting_level)?;
-                    } else if self.current_state().is_ok_and(|s|s.destination==Destination::DocumentBody) {
+                        self.append_table_text(
+                            encoding.decode(&bytes).as_bytes(),
+                            state.table_nesting_level,
+                        )?;
+                    } else if self
+                        .current_state()
+                        .is_ok_and(|s| s.destination == Destination::DocumentBody)
+                    {
                         append_transport_bytes(&mut text_buffer, text)?;
                     }
                 },
@@ -3225,6 +5059,9 @@ impl<'a> Parser<'a> {
                 RtfError::MalformedDocument("RTF body text length overflow".to_string())
             })?;
             self.blocks.push(block);
+            if !decoded_str.trim().is_empty() {
+                self.current_state_mut()?.paragraph_content_started = true;
+            }
             self.append_revision_text(&state, text, start, self.body_text_len)?;
         }
 
@@ -3240,10 +5077,12 @@ impl<'a> Parser<'a> {
 
     fn append_semantic_text(&mut self, text: &str) -> RtfResult<()> {
         self.finalize_table_before_non_table_body_content(!text.is_empty())?;
-        let state = self.current_state()?.clone();
-        if state.destination != Destination::DocumentBody { return Ok(()); }
-        if state.in_table||state.table_nesting_level>=2 {
-            self.append_table_text(text.as_bytes(),state.table_nesting_level)?;
+        let state = self.prepare_revision_event()?;
+        if state.destination != Destination::DocumentBody {
+            return Ok(());
+        }
+        if state.in_table || state.table_nesting_level >= 2 {
+            self.append_table_text(text.as_bytes(), state.table_nesting_level)?;
             return Ok(());
         }
         let text = self.arena.alloc_str(text);
@@ -3259,7 +5098,38 @@ impl<'a> Parser<'a> {
             state.formatting,
             state.paragraph,
         ));
+        self.current_state_mut()?.paragraph_content_started = true;
         self.append_revision_text(&state, text, start, self.body_text_len)
+    }
+
+    fn record_body_page_break(&mut self) -> RtfResult<()> {
+        let state = self.current_state()?.clone();
+        if state.destination != Destination::DocumentBody {
+            return Err(RtfError::MalformedDocument(
+                "RTF page is not permitted in this destination".to_string(),
+            ));
+        }
+        if state.table_nesting_level >= 2 {
+            let builder = self.ensure_nested_builder(state.table_nesting_level)?;
+            builder
+                .cell_story_events
+                .push(crate::CellStoryEvent::PageBreak(crate::PageBreak::new(
+                    builder.cell_text.len(),
+                )));
+        } else if state.in_table {
+            self.current_cell_story_events
+                .push(crate::CellStoryEvent::PageBreak(crate::PageBreak::new(
+                    self.current_cell_text.len(),
+                )));
+        } else {
+            self.note_options_closed = true;
+            self.section_note_options_closed = true;
+            self.root_section_format_run = false;
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::PageBreak(crate::PageBreak::new(self.body_text_len)),
+            ));
+        }
+        Ok(())
     }
 
     fn append_revision_text(
@@ -3290,9 +5160,7 @@ impl<'a> Parser<'a> {
             .revision_text_bytes
             .checked_add(text.len())
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
-                    "RTF aggregate revision text size overflow".to_string(),
-                )
+                RtfError::MalformedDocument("RTF aggregate revision text size overflow".to_string())
             })?;
         if self.revision_text_bytes > super::annotation::MAX_REVISION_TEXT_TOTAL_BYTES {
             return Err(RtfError::MalformedDocument(
@@ -3300,7 +5168,14 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        if let Some(previous) = self.revisions.last_mut()
+        let previous_event_revision = state.revision_event_id.and_then(|event_id| {
+            self.revision_event_indices.get(event_id).copied().flatten()
+        });
+        let event_continues_previous = previous_event_revision.is_some_and(|index| {
+            Some(index) == self.revisions.len().checked_sub(1)
+        });
+        if event_continues_previous
+            && let Some(previous) = self.revisions.last_mut()
             && previous.revision_type == revision_type
             && previous.id == id
             && previous.author == author
@@ -3318,6 +5193,9 @@ impl<'a> Parser<'a> {
             }
             previous.content.to_mut().push_str(text);
             previous.range_end = end;
+            if let Some(event_id) = state.revision_event_id {
+                self.revision_event_indices[event_id] = Some(self.revisions.len() - 1);
+            }
             return Ok(());
         }
         if self.revisions.len() >= MAX_REVISIONS {
@@ -3336,12 +5214,1674 @@ impl<'a> Parser<'a> {
         };
         revision.validate()?;
         self.revisions.push(revision);
+        if let Some(event_id) = state.revision_event_id {
+            self.revision_event_indices[event_id] = Some(self.revisions.len() - 1);
+        }
+        if (state.in_table || state.table_nesting_level >= 2)
+            && previous_event_revision.is_none()
+        {
+            let index = self.revisions.len() - 1;
+            let event = match revision_type {
+                super::annotation::RevisionType::Insertion => {
+                    crate::CellStoryEvent::RevisionStart(crate::CellStoryReference {
+                        index,
+                        position: start,
+                    })
+                },
+                super::annotation::RevisionType::Deletion => {
+                    crate::CellStoryEvent::RevisionDeletion(crate::CellStoryReference {
+                        index,
+                        position: start,
+                    })
+                },
+                _ => unreachable!(),
+            };
+            self.push_cell_story_event(state.table_nesting_level, event)?;
+        }
+        Ok(())
+    }
+
+    fn prepare_revision_event(&mut self) -> RtfResult<State> {
+        let mut state = self.current_state()?.clone();
+        if let Some(kind) = state.revision_type
+            && state.revision_event_id.is_none()
+        {
+            let id = self.revision_event_indices.len();
+            self.revision_event_indices.push(None);
+            if !state.in_table && state.table_nesting_level < 2 {
+                self.body_story_events.push(match kind {
+                    super::annotation::RevisionType::Insertion => {
+                        ParsedBodyStoryEvent::RevisionStart(id)
+                    },
+                    super::annotation::RevisionType::Deletion => {
+                        ParsedBodyStoryEvent::RevisionDeletion(id)
+                    },
+                    _ => unreachable!(),
+                });
+            }
+            state.revision_event_id = Some(id);
+            self.current_state_mut()?.revision_event_id = Some(id);
+        }
+        Ok(state)
+    }
+
+    fn current_story_position(&mut self) -> RtfResult<usize> {
+        let state = self.current_state()?.clone();
+        if state.table_nesting_level >= 2 {
+            Ok(self
+                .ensure_nested_builder(state.table_nesting_level)?
+                .cell_text
+                .len())
+        } else if state.in_table {
+            Ok(self.current_cell_text.len())
+        } else {
+            Ok(self.body_text_len)
+        }
+    }
+
+    fn push_cell_story_event(
+        &mut self,
+        raw_level: u8,
+        event: crate::CellStoryEvent,
+    ) -> RtfResult<()> {
+        if raw_level >= 2 {
+            self.ensure_nested_builder(raw_level)?
+                .cell_story_events
+                .push(event);
+        } else {
+            self.current_cell_story_events.push(event);
+        }
+        Ok(())
+    }
+
+    fn record_revision_end(&mut self, id: usize) -> RtfResult<()> {
+        let state = self.current_state()?.clone();
+        if state.in_table || state.table_nesting_level >= 2 {
+            let index = self
+                .revision_event_indices
+                .get(id)
+                .copied()
+                .flatten()
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF revision event has no tracked text".to_string(),
+                    )
+                })?;
+            let position = self.current_story_position()?;
+            self.push_cell_story_event(
+                state.table_nesting_level,
+                crate::CellStoryEvent::RevisionEnd(crate::CellStoryReference {
+                    index,
+                    position,
+                }),
+            )
+        } else {
+            self.body_story_events
+                .push(ParsedBodyStoryEvent::RevisionEnd(id));
+            Ok(())
+        }
+    }
+
+    fn close_revision_at_cell_boundary(&mut self, level: u8) -> RtfResult<()> {
+        let state = self.current_state()?.clone();
+        if state.revision_type == Some(super::annotation::RevisionType::Insertion)
+            && let Some(id) = state.revision_event_id
+            && self
+                .revision_event_indices
+                .get(id)
+                .is_some_and(Option::is_some)
+        {
+            self.record_revision_end(id)?;
+        }
+        if (state.in_table || state.table_nesting_level >= level)
+            && state.revision_type.is_some()
+        {
+            self.current_state_mut()?.revision_event_id = None;
+        }
         Ok(())
     }
 
     /// Apply a control word to the current state.
     fn apply_control_word(&mut self, control: &ControlWord) -> RtfResult<()> {
-        if let ControlWord::TableNestingLevel(parameter)=control{let value=parameter.ok_or_else(||RtfError::MalformedDocument("RTF itap requires a numeric parameter".to_string()))?;let level=u8::try_from(value).map_err(|_|RtfError::MalformedDocument("RTF itap is outside 0..=32".to_string()))?;if usize::from(level)>crate::MAX_TABLE_NESTING_DEPTH{return Err(RtfError::MalformedDocument("RTF itap is outside 0..=32".to_string()))}let previous=self.current_state()?.table_nesting_level;self.current_state_mut()?.table_nesting_level=level;let previous=if previous>=2{previous}else{1};let effective=if level>=2{level}else{1};if effective<previous{self.drain_nested_to(effective)?;}return Ok(())}
+        if let ControlWord::Page(parameter) = control {
+            require_parameterless(*parameter, "page")?;
+            return Err(RtfError::MalformedDocument(
+                "RTF page is not permitted in this destination".to_string(),
+            ));
+        }
+        if matches!(
+            control,
+            ControlWord::DefaultFont(_)
+                | ControlWord::AssociatedDefaultFont(_)
+                | ControlWord::StylesheetDefaultBidiFont(_)
+                | ControlWord::StylesheetDefaultDoubleByteFont(_)
+                | ControlWord::StylesheetDefaultHighAnsiFont(_)
+                | ControlWord::StylesheetDefaultLowAnsiFont(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF default-font selectors must occur in the root document header".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::DefaultFont(v) => (1, "deff", v),
+                ControlWord::AssociatedDefaultFont(v) => (2, "adeff", v),
+                ControlWord::StylesheetDefaultBidiFont(v) => (4, "stshfbi", v),
+                ControlWord::StylesheetDefaultDoubleByteFont(v) => (8, "stshfdbch", v),
+                ControlWord::StylesheetDefaultHighAnsiFont(v) => (16, "stshfhich", v),
+                ControlWord::StylesheetDefaultLowAnsiFont(v) => (32, "stshfloch", v),
+                _ => unreachable!(),
+            };
+            if self.default_font_selectors_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} default-font selector"
+                )));
+            }
+            let value = u16::try_from(parameter.ok_or_else(|| {
+                RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+            })?)
+            .map_err(|_| {
+                RtfError::MalformedDocument(format!("RTF {name} value must be in 0..=65535"))
+            })?;
+            self.default_font_selectors_seen |= bit;
+            let fonts = &mut self.default_formatting.fonts;
+            match control {
+                ControlWord::DefaultFont(_) => fonts.primary = Some(value),
+                ControlWord::AssociatedDefaultFont(_) => fonts.associated = Some(value),
+                ControlWord::StylesheetDefaultBidiFont(_) => fonts.stylesheet_bidi = Some(value),
+                ControlWord::StylesheetDefaultDoubleByteFont(_) => {
+                    fonts.stylesheet_double_byte = Some(value)
+                },
+                ControlWord::StylesheetDefaultHighAnsiFont(_) => {
+                    fonts.stylesheet_high_ansi = Some(value)
+                },
+                ControlWord::StylesheetDefaultLowAnsiFont(_) => {
+                    fonts.stylesheet_low_ansi = Some(value)
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if let ControlWord::DefaultTabWidth(parameter) = control {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF deftab must precede visible text at document root".to_string(),
+                ));
+            }
+            if self.default_tab_width_twips.is_some() {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF deftab document property".to_string(),
+                ));
+            }
+            let value = parameter.ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF deftab requires a nonnegative numeric parameter".to_string(),
+                )
+            })?;
+            let value = u32::try_from(value).map_err(|_| {
+                RtfError::MalformedDocument(
+                    "RTF deftab requires a nonnegative numeric parameter".to_string(),
+                )
+            })?;
+            self.default_tab_width_twips = Some(value);
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::MakeBackup(_)
+                | ControlWord::DefaultSaveFormat(_)
+                | ControlWord::BoilerplateDocument(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF file-setting flag must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::MakeBackup(parameter) => (1, "makebackup", parameter),
+                ControlWord::DefaultSaveFormat(parameter) => (2, "defformat", parameter),
+                ControlWord::BoilerplateDocument(parameter) => (4, "doctemp", parameter),
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.file_settings_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.file_settings_seen |= bit;
+            match control {
+                ControlWord::MakeBackup(_) => self.file_settings.automatic_backup = true,
+                ControlWord::DefaultSaveFormat(_) => {
+                    self.file_settings.default_save_format_rtf = true;
+                },
+                ControlWord::BoilerplateDocument(_) => {
+                    self.file_settings.template_or_stationery = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::Word97CompatibilityMode(_) | ControlWord::PostScriptOverText(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF output-setting flag must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::Word97CompatibilityMode(parameter) => (1, "muser", parameter),
+                ControlWord::PostScriptOverText(parameter) => (2, "psover", parameter),
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.output_settings_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.output_settings_seen |= bit;
+            match control {
+                ControlWord::Word97CompatibilityMode(_) => {
+                    self.output_settings.word97_compatibility_marker = true;
+                },
+                ControlWord::PostScriptOverText(_) => {
+                    self.output_settings.postscript_over_text = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::HorizontalDocument(_)
+                | ControlWord::VerticalDocument(_)
+                | ControlWord::CompressJustification(_)
+                | ControlWord::ExpandJustification(_)
+                | ControlWord::LineBasedOnGrid(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF rendering flag must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::HorizontalDocument(parameter) => (1, "horzdoc", parameter),
+                ControlWord::VerticalDocument(parameter) => (1, "vertdoc", parameter),
+                ControlWord::CompressJustification(parameter) => (2, "jcompress", parameter),
+                ControlWord::ExpandJustification(parameter) => (2, "jexpand", parameter),
+                ControlWord::LineBasedOnGrid(parameter) => (4, "lnongrid", parameter),
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.rendering_settings_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate or conflicting RTF {name} rendering property"
+                )));
+            }
+            self.rendering_settings_seen |= bit;
+            match control {
+                ControlWord::HorizontalDocument(_) => {
+                    self.rendering_settings.orientation =
+                        Some(crate::DocumentRenderingOrientation::Horizontal);
+                },
+                ControlWord::VerticalDocument(_) => {
+                    self.rendering_settings.orientation =
+                        Some(crate::DocumentRenderingOrientation::Vertical);
+                },
+                ControlWord::CompressJustification(_) => {
+                    self.rendering_settings.justification_mode =
+                        Some(crate::DocumentJustificationMode::Compress);
+                },
+                ControlWord::ExpandJustification(_) => {
+                    self.rendering_settings.justification_mode =
+                        Some(crate::DocumentJustificationMode::Expand);
+                },
+                ControlWord::LineBasedOnGrid(_) => {
+                    self.rendering_settings.line_based_on_grid = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::FractionalCharacterWidths(_)
+                | ControlWord::AbstractNumberingCleanup(_)
+                | ControlWord::DocumentEventMask(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF processing property must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, _parameter) = match control {
+                ControlWord::FractionalCharacterWidths(parameter) => (1, "fracwidth", parameter),
+                ControlWord::AbstractNumberingCleanup(parameter) => {
+                    (2, "ilfomacatclnup", parameter)
+                },
+                ControlWord::DocumentEventMask(parameter) => (4, "grfdocevents", parameter),
+                _ => unreachable!(),
+            };
+            if self.processing_settings_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.processing_settings_seen |= bit;
+            match control {
+                ControlWord::FractionalCharacterWidths(None) => {
+                    self.processing_settings
+                        .fractional_character_widths_for_printing = true;
+                },
+                ControlWord::FractionalCharacterWidths(Some(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF fracwidth must not have a numeric parameter".to_string(),
+                    ));
+                },
+                ControlWord::AbstractNumberingCleanup(Some(0)) => {
+                    self.processing_settings.abstract_numbering_cleanup =
+                        Some(crate::AbstractNumberingCleanupStatus::Reviewed);
+                },
+                ControlWord::AbstractNumberingCleanup(Some(1)) => {
+                    self.processing_settings.abstract_numbering_cleanup =
+                        Some(crate::AbstractNumberingCleanupStatus::Incomplete);
+                },
+                ControlWord::AbstractNumberingCleanup(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF ilfomacatclnup must have value 0 or 1".to_string(),
+                    ));
+                },
+                ControlWord::DocumentEventMask(Some(value @ 0..=0x7fff)) => {
+                    self.processing_settings.event_mask = Some(
+                        crate::DocumentEventMask::from_bits(*value as u16)
+                            .expect("validated document event mask"),
+                    );
+                },
+                ControlWord::DocumentEventMask(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF grfdocevents must have a value from 0 through 32767".to_string(),
+                    ));
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::DrawingGridFollowsMargins(_)
+                | ControlWord::SnapToDrawingGrid(_)
+                | ControlWord::DrawingGridHorizontalSpacing(_)
+                | ControlWord::DrawingGridVerticalSpacing(_)
+                | ControlWord::DrawingGridHorizontalOrigin(_)
+                | ControlWord::DrawingGridVerticalOrigin(_)
+                | ControlWord::DrawingGridHorizontalShow(_)
+                | ControlWord::DrawingGridVerticalShow(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF drawing-grid property must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name) = match control {
+                ControlWord::DrawingGridFollowsMargins(_) => (1, "dgmargin"),
+                ControlWord::SnapToDrawingGrid(_) => (2, "dgsnap"),
+                ControlWord::DrawingGridHorizontalSpacing(_) => (4, "dghspace"),
+                ControlWord::DrawingGridVerticalSpacing(_) => (8, "dgvspace"),
+                ControlWord::DrawingGridHorizontalOrigin(_) => (16, "dghorigin"),
+                ControlWord::DrawingGridVerticalOrigin(_) => (32, "dgvorigin"),
+                ControlWord::DrawingGridHorizontalShow(_) => (64, "dghshow"),
+                ControlWord::DrawingGridVerticalShow(_) => (128, "dgvshow"),
+                _ => unreachable!(),
+            };
+            if self.drawing_grid_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} drawing-grid property"
+                )));
+            }
+            self.drawing_grid_seen |= bit;
+            match control {
+                ControlWord::DrawingGridFollowsMargins(None) => {
+                    self.drawing_grid.follows_margins = true;
+                },
+                ControlWord::SnapToDrawingGrid(None) => {
+                    self.drawing_grid.snap_to_grid = true;
+                },
+                ControlWord::DrawingGridFollowsMargins(Some(_))
+                | ControlWord::SnapToDrawingGrid(Some(_)) => {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF {name} must not have a numeric parameter"
+                    )));
+                },
+                ControlWord::DrawingGridHorizontalSpacing(Some(value @ 0..=32767)) => {
+                    self.drawing_grid.horizontal_spacing = Some(
+                        crate::DrawingGridSpacing::new(*value as u16)
+                            .expect("validated horizontal drawing-grid spacing"),
+                    );
+                },
+                ControlWord::DrawingGridVerticalSpacing(Some(value @ 0..=32767)) => {
+                    self.drawing_grid.vertical_spacing = Some(
+                        crate::DrawingGridSpacing::new(*value as u16)
+                            .expect("validated vertical drawing-grid spacing"),
+                    );
+                },
+                ControlWord::DrawingGridHorizontalOrigin(Some(value @ -32768..=32767)) => {
+                    self.drawing_grid.horizontal_origin_twips = Some(*value as i16);
+                },
+                ControlWord::DrawingGridVerticalOrigin(Some(value @ -32768..=32767)) => {
+                    self.drawing_grid.vertical_origin_twips = Some(*value as i16);
+                },
+                ControlWord::DrawingGridHorizontalShow(Some(value @ 0..=32767)) => {
+                    self.drawing_grid.horizontal_line_interval = Some(
+                        crate::DrawingGridLineInterval::new(*value as u16)
+                            .expect("validated horizontal drawing-grid interval"),
+                    );
+                },
+                ControlWord::DrawingGridVerticalShow(Some(value @ 0..=32767)) => {
+                    self.drawing_grid.vertical_line_interval = Some(
+                        crate::DrawingGridLineInterval::new(*value as u16)
+                            .expect("validated vertical drawing-grid interval"),
+                    );
+                },
+                _ => {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF {name} has a missing or out-of-range numeric parameter"
+                    )));
+                },
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::FacingPages(_)
+                | ControlWord::MirrorMargins(_)
+                | ControlWord::DocumentGutter(_)
+                | ControlWord::ParallelGutter(_)
+                | ControlWord::PrintTwoOnOne(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF print-layout setting must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name) = match control {
+                ControlWord::FacingPages(_) => (1, "facingp"),
+                ControlWord::MirrorMargins(_) => (2, "margmirror"),
+                ControlWord::DocumentGutter(_) => (4, "gutter"),
+                ControlWord::ParallelGutter(_) => (8, "gutterprl"),
+                ControlWord::PrintTwoOnOne(_) => (16, "twoonone"),
+                _ => unreachable!(),
+            };
+            if self.print_layout_settings_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.print_layout_settings_seen |= bit;
+            match control {
+                ControlWord::FacingPages(enabled) => {
+                    self.print_layout_settings.facing_pages = *enabled;
+                },
+                ControlWord::MirrorMargins(parameter) => {
+                    if parameter.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF margmirror must not have a numeric parameter".to_string(),
+                        ));
+                    }
+                    self.print_layout_settings.mirror_margins = true;
+                },
+                ControlWord::DocumentGutter(Some(value @ 0..=31_680)) => {
+                    let value = *value as u32;
+                    self.print_layout_settings.document_gutter_twips = Some(value);
+                    for (index, section) in self.sections.iter_mut().enumerate() {
+                        if !self
+                            .section_gutter_overrides
+                            .get(index)
+                            .copied()
+                            .unwrap_or(false)
+                        {
+                            section.properties.margin_gutter = value as i32;
+                        }
+                    }
+                },
+                ControlWord::DocumentGutter(_) => {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF gutter must have a numeric parameter in 0..={} twips",
+                        crate::MAX_DOCUMENT_GUTTER_TWIPS
+                    )));
+                },
+                ControlWord::ParallelGutter(_) => {
+                    if let ControlWord::ParallelGutter(Some(_)) = control {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF gutterprl must not have a numeric parameter".to_string(),
+                        ));
+                    }
+                    self.print_layout_settings.parallel_gutter = true;
+                },
+                ControlWord::PrintTwoOnOne(_) => {
+                    if let ControlWord::PrintTwoOnOne(Some(_)) = control {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF twoonone must not have a numeric parameter".to_string(),
+                        ));
+                    }
+                    self.print_layout_settings
+                        .two_logical_pages_per_physical_page = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::ThemeLanguage(_)
+                | ControlWord::ThemeLanguageEastAsian(_)
+                | ControlWord::ThemeLanguageComplexScript(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF theme language must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::ThemeLanguage(parameter) => (1, "themelang", parameter),
+                ControlWord::ThemeLanguageEastAsian(parameter) => (2, "themelangfe", parameter),
+                ControlWord::ThemeLanguageComplexScript(parameter) => (4, "themelangcs", parameter),
+                _ => unreachable!(),
+            };
+            if self.theme_languages_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            let value = parameter.ok_or_else(|| {
+                RtfError::MalformedDocument(format!(
+                    "RTF {name} control requires a numeric language ID"
+                ))
+            })?;
+            let language = crate::LanguageId::from_rtf(value)?;
+            self.theme_languages_seen |= bit;
+            match control {
+                ControlWord::ThemeLanguage(_) => self.theme_languages.primary = Some(language),
+                ControlWord::ThemeLanguageEastAsian(_) => {
+                    self.theme_languages.east_asian = Some(language);
+                },
+                ControlWord::ThemeLanguageComplexScript(_) => {
+                    self.theme_languages.complex_script = Some(language);
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::RelyOnVml(_)
+                | ControlWord::ValidateXml(_)
+                | ControlWord::ShowPlaceholderText(_)
+                | ControlWord::IgnoreMixedContent(_)
+                | ControlWord::SaveInvalidXml(_)
+                | ControlWord::ShowXmlErrors(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF XML policy must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::RelyOnVml(parameter) => (1, "relyonvml", parameter),
+                ControlWord::ValidateXml(parameter) => (2, "validatexml", parameter),
+                ControlWord::ShowPlaceholderText(parameter) => (4, "showplaceholdtext", parameter),
+                ControlWord::IgnoreMixedContent(parameter) => (8, "ignoremixedcontent", parameter),
+                ControlWord::SaveInvalidXml(parameter) => (16, "saveinvalidxml", parameter),
+                ControlWord::ShowXmlErrors(parameter) => (32, "showxmlerrors", parameter),
+                _ => unreachable!(),
+            };
+            if self.xml_policies_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            let enabled = match parameter {
+                Some(0) => false,
+                Some(1) => true,
+                _ => {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF {name} must have numeric value 0 or 1"
+                    )));
+                },
+            };
+            self.xml_policies_seen |= bit;
+            match control {
+                ControlWord::RelyOnVml(_) => self.xml_policies.rely_on_vml = Some(enabled),
+                ControlWord::ValidateXml(_) => {
+                    self.xml_policies.validate_custom_xml = Some(enabled);
+                },
+                ControlWord::ShowPlaceholderText(_) => {
+                    self.xml_policies.show_placeholder_text = Some(enabled);
+                },
+                ControlWord::IgnoreMixedContent(_) => {
+                    self.xml_policies.ignore_mixed_content = Some(enabled);
+                },
+                ControlWord::SaveInvalidXml(_) => {
+                    self.xml_policies.save_invalid_xml = Some(enabled);
+                },
+                ControlWord::ShowXmlErrors(_) => {
+                    self.xml_policies.show_xml_errors = Some(enabled);
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::DoNotEmbedSystemFonts(_) | ControlWord::DoNotEmbedLinguisticData(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF embedding policy must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::DoNotEmbedSystemFonts(parameter) => {
+                    (1, "donotembedsysfont", parameter)
+                },
+                ControlWord::DoNotEmbedLinguisticData(parameter) => {
+                    (2, "donotembedlingdata", parameter)
+                },
+                _ => unreachable!(),
+            };
+            if self.embedding_policies_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            let enabled = match parameter {
+                Some(0) => false,
+                Some(1) => true,
+                _ => {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF {name} must have numeric value 0 or 1"
+                    )));
+                },
+            };
+            self.embedding_policies_seen |= bit;
+            match control {
+                ControlWord::DoNotEmbedSystemFonts(_) => {
+                    self.embedding_policies.do_not_embed_system_fonts = Some(enabled);
+                },
+                ControlWord::DoNotEmbedLinguisticData(_) => {
+                    self.embedding_policies.do_not_embed_linguistic_data = Some(enabled);
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::TrackMoves(_) | ControlWord::TrackFormatting(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF revision policy must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::TrackMoves(parameter) => (1, "trackmoves", parameter),
+                ControlWord::TrackFormatting(parameter) => (2, "trackformatting", parameter),
+                _ => unreachable!(),
+            };
+            if self.revision_policies_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            let enabled = match parameter {
+                Some(0) => false,
+                Some(1) => true,
+                _ => {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF {name} must have numeric value 0 or 1"
+                    )));
+                },
+            };
+            self.revision_policies_seen |= bit;
+            match control {
+                ControlWord::TrackMoves(_) => self.revision_policies.track_moves = Some(enabled),
+                ControlWord::TrackFormatting(_) => {
+                    self.revision_policies.track_formatting = Some(enabled);
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::LockDocumentTheme(_)
+                | ControlWord::LockQuickFormatSet(_)
+                | ControlWord::UseNormalStyleForLists(_)
+                | ControlWord::UpdateStylesFromTemplate(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF style policy must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::LockDocumentTheme(parameter) => (1, "stylelocktheme", parameter),
+                ControlWord::LockQuickFormatSet(parameter) => (2, "stylelockqfset", parameter),
+                ControlWord::UseNormalStyleForLists(parameter) => {
+                    (4, "usenormstyforlist", parameter)
+                },
+                ControlWord::UpdateStylesFromTemplate(parameter) => (8, "linkstyles", parameter),
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.style_policies_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.style_policies_seen |= bit;
+            match control {
+                ControlWord::LockDocumentTheme(_) => self.style_policies.lock_theme = true,
+                ControlWord::LockQuickFormatSet(_) => {
+                    self.style_policies.lock_quick_format_set = true;
+                },
+                ControlWord::UseNormalStyleForLists(_) => {
+                    self.style_policies.use_normal_style_for_lists = true;
+                },
+                ControlWord::UpdateStylesFromTemplate(_) => {
+                    self.style_policies.update_styles_from_template = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::DeclareStyleRestrictions(_)
+                | ControlWord::EnforceStyleRestrictions(_)
+                | ControlWord::StyleRestrictionsBackwardCompatibility(_)
+                | ControlWord::AllowAutoFormatOverride(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF style restriction must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::DeclareStyleRestrictions(parameter) => (1, "stylelock", parameter),
+                ControlWord::EnforceStyleRestrictions(parameter) => {
+                    (2, "stylelockenforced", parameter)
+                },
+                ControlWord::StyleRestrictionsBackwardCompatibility(parameter) => {
+                    (4, "stylelockbackcomp", parameter)
+                },
+                ControlWord::AllowAutoFormatOverride(parameter) => {
+                    (8, "autofmtoverride", parameter)
+                },
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.style_restrictions_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.style_restrictions_seen |= bit;
+            match control {
+                ControlWord::DeclareStyleRestrictions(_) => {
+                    self.style_restrictions.restrictions_present = true;
+                },
+                ControlWord::EnforceStyleRestrictions(_) => {
+                    self.style_restrictions.enforced = true;
+                },
+                ControlWord::StyleRestrictionsBackwardCompatibility(_) => {
+                    self.style_restrictions.backward_compatibility = true;
+                },
+                ControlWord::AllowAutoFormatOverride(_) => {
+                    self.style_restrictions.allow_auto_format_override = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::BookFold(_)
+                | ControlWord::ReverseBookFold(_)
+                | ControlWord::BookFoldSheets(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF booklet-printing property must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, parameter, requires_parameter) = match control {
+                ControlWord::BookFold(parameter) => (1, "bookfold", parameter, false),
+                ControlWord::ReverseBookFold(parameter) => (2, "bookfoldrev", parameter, false),
+                ControlWord::BookFoldSheets(parameter) => (4, "bookfoldsheets", parameter, true),
+                _ => unreachable!(),
+            };
+            if requires_parameter != parameter.is_some() {
+                let requirement = if requires_parameter {
+                    "requires a numeric parameter"
+                } else {
+                    "must not have a numeric parameter"
+                };
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} {requirement}"
+                )));
+            }
+            if self.booklet_printing_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            if let Some(value) = parameter {
+                if *value < 0 || *value % 4 != 0 {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF bookfoldsheets must be a nonnegative multiple of four".to_string(),
+                    ));
+                }
+                self.booklet_printing.sheets_per_booklet = Some(*value as u32);
+            } else {
+                match control {
+                    ControlWord::BookFold(_) => self.booklet_printing.book_fold = true,
+                    ControlWord::ReverseBookFold(_) => {
+                        self.booklet_printing.reverse_book_fold = true;
+                    },
+                    _ => unreachable!(),
+                }
+            }
+            self.booklet_printing_seen |= bit;
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::RemovePersonalInformation(_) | ControlWord::RemoveDateTimeInformation(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF privacy policy must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::RemovePersonalInformation(parameter) => {
+                    (1, "rempersonalinfo", parameter)
+                },
+                ControlWord::RemoveDateTimeInformation(parameter) => (2, "remdttm", parameter),
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.privacy_policies_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.privacy_policies_seen |= bit;
+            match control {
+                ControlWord::RemovePersonalInformation(_) => {
+                    self.privacy_policies.remove_personal_information = true;
+                },
+                ControlWord::RemoveDateTimeInformation(_) => {
+                    self.privacy_policies.remove_date_time_information = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::PreserveAutofitTableWidthAroundShapes(_)
+                | ControlWord::UseHangingIndentAsNumberingTab(_)
+                | ControlWord::UseLegacyKinsokuCharacters(_)
+                | ControlWord::UseLegacyFloatingObjectIndentation(_)
+                | ControlWord::AllowContextualSpacingInTables(_)
+                | ControlWord::IgnoreCellVerticalAlignmentWithFloatingObjects(_)
+                | ControlWord::IgnoreTextBoxVerticalAlignment(_)
+                | ControlWord::SplitPageBreakParagraph(_)
+                | ControlWord::UseFixedWidthHangul(_)
+                | ControlWord::UseLegacyAutofitWidthExpansion(_)
+                | ControlWord::UseCachedColumnBalancing(_)
+                | ControlWord::UnderlineNumberingSuffix(_)
+                | ControlWord::DoNotSplitRowsAroundFloatingTables(_)
+                | ControlWord::UseAnsiKerningPairs(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF Word 2003 compatibility flag must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::PreserveAutofitTableWidthAroundShapes(parameter) => {
+                    (1, "noafcnsttbl", parameter)
+                },
+                ControlWord::UseHangingIndentAsNumberingTab(parameter) => {
+                    (2, "noindnmbrts", parameter)
+                },
+                ControlWord::UseLegacyKinsokuCharacters(parameter) => (4, "felnbrelev", parameter),
+                ControlWord::UseLegacyFloatingObjectIndentation(parameter) => {
+                    (8, "indrlsweleven", parameter)
+                },
+                ControlWord::AllowContextualSpacingInTables(parameter) => {
+                    (16, "nocxsptable", parameter)
+                },
+                ControlWord::IgnoreCellVerticalAlignmentWithFloatingObjects(parameter) => {
+                    (32, "notcvasp", parameter)
+                },
+                ControlWord::IgnoreTextBoxVerticalAlignment(parameter) => {
+                    (64, "notvatxbx", parameter)
+                },
+                ControlWord::SplitPageBreakParagraph(parameter) => (128, "spltpgpar", parameter),
+                ControlWord::UseFixedWidthHangul(parameter) => (256, "hwelev", parameter),
+                ControlWord::UseLegacyAutofitWidthExpansion(parameter) => {
+                    (512, "afelev", parameter)
+                },
+                ControlWord::UseCachedColumnBalancing(parameter) => {
+                    (1024, "cachedcolbal", parameter)
+                },
+                ControlWord::UnderlineNumberingSuffix(parameter) => (2048, "utinl", parameter),
+                ControlWord::DoNotSplitRowsAroundFloatingTables(parameter) => {
+                    (4096, "notbrkcnstfrctbl", parameter)
+                },
+                ControlWord::UseAnsiKerningPairs(parameter) => (8192, "krnprsnet", parameter),
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.word_2003_compatibility_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.word_2003_compatibility_seen |= bit;
+            match control {
+                ControlWord::PreserveAutofitTableWidthAroundShapes(_) => {
+                    self.word_2003_compatibility
+                        .preserve_autofit_table_width_around_shapes = true
+                },
+                ControlWord::UseHangingIndentAsNumberingTab(_) => {
+                    self.word_2003_compatibility
+                        .use_hanging_indent_as_numbering_tab = true
+                },
+                ControlWord::UseLegacyKinsokuCharacters(_) => {
+                    self.word_2003_compatibility.use_legacy_kinsoku_characters = true
+                },
+                ControlWord::UseLegacyFloatingObjectIndentation(_) => {
+                    self.word_2003_compatibility
+                        .use_legacy_floating_object_indentation = true
+                },
+                ControlWord::AllowContextualSpacingInTables(_) => {
+                    self.word_2003_compatibility
+                        .allow_contextual_spacing_in_tables = true
+                },
+                ControlWord::IgnoreCellVerticalAlignmentWithFloatingObjects(_) => {
+                    self.word_2003_compatibility
+                        .ignore_cell_vertical_alignment_with_floating_objects = true
+                },
+                ControlWord::IgnoreTextBoxVerticalAlignment(_) => {
+                    self.word_2003_compatibility
+                        .ignore_text_box_vertical_alignment = true
+                },
+                ControlWord::SplitPageBreakParagraph(_) => {
+                    self.word_2003_compatibility.split_page_break_paragraph = true
+                },
+                ControlWord::UseFixedWidthHangul(_) => {
+                    self.word_2003_compatibility.use_fixed_width_hangul = true
+                },
+                ControlWord::UseLegacyAutofitWidthExpansion(_) => {
+                    self.word_2003_compatibility
+                        .use_legacy_autofit_width_expansion = true
+                },
+                ControlWord::UseCachedColumnBalancing(_) => {
+                    self.word_2003_compatibility.use_cached_column_balancing = true
+                },
+                ControlWord::UnderlineNumberingSuffix(_) => {
+                    self.word_2003_compatibility.underline_numbering_suffix = true
+                },
+                ControlWord::DoNotSplitRowsAroundFloatingTables(_) => {
+                    self.word_2003_compatibility
+                        .do_not_split_rows_around_floating_tables = true
+                },
+                ControlWord::UseAnsiKerningPairs(_) => {
+                    self.word_2003_compatibility.use_ansi_kerning_pairs = true
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::NoCompatibilityOptions(_)
+                | ControlWord::NoUiCompatibility(_)
+                | ControlWord::NoFeatureThrottle(_)
+                | ControlWord::ForceCompatibilityUpgrade(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF compatibility policy must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::NoCompatibilityOptions(parameter) => (1, "nocompatoptions", parameter),
+                ControlWord::NoUiCompatibility(parameter) => (2, "nouicompat", parameter),
+                ControlWord::NoFeatureThrottle(parameter) => (4, "nofeaturethrottle", parameter),
+                ControlWord::ForceCompatibilityUpgrade(parameter) => (8, "forceupgrade", parameter),
+                _ => unreachable!(),
+            };
+            if self.compatibility_policy_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            match control {
+                ControlWord::NoFeatureThrottle(_) => {
+                    let value = parameter.ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF nofeaturethrottle requires parameter 0 or 1".to_string(),
+                        )
+                    })?;
+                    self.compatibility_policy.feature_throttle = Some(
+                        crate::DocumentFeatureThrottle::from_rtf(value).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF nofeaturethrottle parameter must be 0 or 1".to_string(),
+                            )
+                        })?,
+                    );
+                },
+                _ if parameter.is_some() => {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF {name} must not have a numeric parameter"
+                    )));
+                },
+                ControlWord::NoCompatibilityOptions(_) => {
+                    self.compatibility_policy.reset_options_to_defaults = true;
+                },
+                ControlWord::NoUiCompatibility(_) => {
+                    self.compatibility_policy.feature_throttle =
+                        Some(crate::DocumentFeatureThrottle::Unrestricted);
+                },
+                ControlWord::ForceCompatibilityUpgrade(_) => {
+                    self.compatibility_policy.force_upgrade = true;
+                },
+                _ => unreachable!(),
+            }
+            self.compatibility_policy_seen |= bit;
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::ApplyThaiLineBreakingRules(_)
+                | ControlWord::SnapTextToGridInsideTable(_)
+                | ControlWord::AllowHangingPunctuation(_)
+                | ControlWord::UseAsianLineBreakingRules(_)
+                | ControlWord::CompressPunctuationAtLineStart(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF Asian grid compatibility flag must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::ApplyThaiLineBreakingRules(parameter) => {
+                    (1, "ApplyBrkRules", parameter)
+                },
+                ControlWord::SnapTextToGridInsideTable(parameter) => {
+                    (2, "snaptogridincell", parameter)
+                },
+                ControlWord::AllowHangingPunctuation(parameter) => (4, "wrppunct", parameter),
+                ControlWord::UseAsianLineBreakingRules(parameter) => (8, "asianbrkrule", parameter),
+                ControlWord::CompressPunctuationAtLineStart(parameter) => {
+                    (16, "toplinepunct", parameter)
+                },
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.asian_grid_compatibility_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.asian_grid_compatibility_seen |= bit;
+            match control {
+                ControlWord::ApplyThaiLineBreakingRules(_) => {
+                    self.asian_grid_compatibility.apply_thai_line_breaking_rules = true;
+                },
+                ControlWord::SnapTextToGridInsideTable(_) => {
+                    self.asian_grid_compatibility.snap_text_to_grid_inside_table = true;
+                },
+                ControlWord::AllowHangingPunctuation(_) => {
+                    self.asian_grid_compatibility.allow_hanging_punctuation = true;
+                },
+                ControlWord::UseAsianLineBreakingRules(_) => {
+                    self.asian_grid_compatibility.use_asian_line_breaking_rules = true;
+                },
+                ControlWord::CompressPunctuationAtLineStart(_) => {
+                    self.asian_grid_compatibility
+                        .compress_punctuation_at_line_start = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::DoNotUseWord97ShapeLayout(_)
+                | ControlWord::UseLegacyFootnoteLayout(_)
+                | ControlWord::UseHtmlParagraphAutoSpacing(_)
+                | ControlWord::PreserveLastTabAlignment(_)
+                | ControlWord::UseWord95AutoSpacing(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF legacy layout compatibility flag must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::DoNotUseWord97ShapeLayout(parameter) => (1, "splytwnine", parameter),
+                ControlWord::UseLegacyFootnoteLayout(parameter) => (2, "ftnlytwnine", parameter),
+                ControlWord::UseHtmlParagraphAutoSpacing(parameter) => (4, "htmautsp", parameter),
+                ControlWord::PreserveLastTabAlignment(parameter) => (8, "useltbaln", parameter),
+                ControlWord::UseWord95AutoSpacing(parameter) => (16, "oldas", parameter),
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.legacy_layout_compatibility_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.legacy_layout_compatibility_seen |= bit;
+            match control {
+                ControlWord::DoNotUseWord97ShapeLayout(_) => {
+                    self.legacy_layout_compatibility
+                        .do_not_use_word_97_shape_layout = true;
+                },
+                ControlWord::UseLegacyFootnoteLayout(_) => {
+                    self.legacy_layout_compatibility.use_legacy_footnote_layout = true;
+                },
+                ControlWord::UseHtmlParagraphAutoSpacing(_) => {
+                    self.legacy_layout_compatibility
+                        .use_html_paragraph_auto_spacing = true;
+                },
+                ControlWord::PreserveLastTabAlignment(_) => {
+                    self.legacy_layout_compatibility.preserve_last_tab_alignment = true;
+                },
+                ControlWord::UseWord95AutoSpacing(_) => {
+                    self.legacy_layout_compatibility.use_word_95_auto_spacing = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::CombineLegacyTableBorders(_)
+                | ControlWord::DoNotAlignTableRowsIndependently(_)
+                | ControlWord::DoNotUseRawTableWidth(_)
+                | ControlWord::KeepTableRowsTogether(_)
+                | ControlWord::DoNotAdjustTableLineHeight(_)
+                | ControlWord::DoNotBreakWrappedTablesAcrossPages(_)
+                | ControlWord::PreventAutofitGrowthIntoMargins(_)
+                | ControlWord::UseWord2003TableStyleRules(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF table-layout compatibility flag must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::CombineLegacyTableBorders(parameter) => (1, "otblrul", parameter),
+                ControlWord::DoNotAlignTableRowsIndependently(parameter) => {
+                    (2, "alntblind", parameter)
+                },
+                ControlWord::DoNotUseRawTableWidth(parameter) => (4, "lytcalctblwd", parameter),
+                ControlWord::KeepTableRowsTogether(parameter) => (8, "lyttblrtgr", parameter),
+                ControlWord::DoNotAdjustTableLineHeight(parameter) => {
+                    (16, "nolnhtadjtbl", parameter)
+                },
+                ControlWord::DoNotBreakWrappedTablesAcrossPages(parameter) => {
+                    (32, "nobrkwrptbl", parameter)
+                },
+                ControlWord::PreventAutofitGrowthIntoMargins(parameter) => {
+                    (64, "nogrowautofit", parameter)
+                },
+                ControlWord::UseWord2003TableStyleRules(parameter) => {
+                    (128, "newtblstyruls", parameter)
+                },
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.table_layout_compatibility_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.table_layout_compatibility_seen |= bit;
+            match control {
+                ControlWord::CombineLegacyTableBorders(_) => {
+                    self.table_layout_compatibility.combine_borders_like_word_5 = true;
+                },
+                ControlWord::DoNotAlignTableRowsIndependently(_) => {
+                    self.table_layout_compatibility
+                        .do_not_align_rows_independently = true;
+                },
+                ControlWord::DoNotUseRawTableWidth(_) => {
+                    self.table_layout_compatibility.do_not_use_raw_table_width = true;
+                },
+                ControlWord::KeepTableRowsTogether(_) => {
+                    self.table_layout_compatibility.keep_rows_together = true;
+                },
+                ControlWord::DoNotAdjustTableLineHeight(_) => {
+                    self.table_layout_compatibility.do_not_adjust_line_height = true;
+                },
+                ControlWord::DoNotBreakWrappedTablesAcrossPages(_) => {
+                    self.table_layout_compatibility
+                        .do_not_break_wrapped_tables_across_pages = true;
+                },
+                ControlWord::PreventAutofitGrowthIntoMargins(_) => {
+                    self.table_layout_compatibility
+                        .prevent_autofit_growth_into_margins = true;
+                },
+                ControlWord::UseWord2003TableStyleRules(_) => {
+                    self.table_layout_compatibility
+                        .use_word_2003_table_style_rules = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::DoNotBalanceSbcsDbcs(_)
+                | ControlWord::ExpandSpacingAtShiftReturn(_)
+                | ControlWord::DoNotAddSpaceForUnderline(_)
+                | ControlWord::DoNotUnderlineTrailingSpaces(_)
+                | ControlWord::DoNotTranslateBackslashToYen(_)
+                | ControlWord::LegacyAsianLineBreakingRules(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF East Asian compatibility flag must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::DoNotBalanceSbcsDbcs(parameter) => (1, "dntblnsbdb", parameter),
+                ControlWord::ExpandSpacingAtShiftReturn(parameter) => (2, "expshrtn", parameter),
+                ControlWord::DoNotAddSpaceForUnderline(parameter) => (4, "nospaceforul", parameter),
+                ControlWord::DoNotUnderlineTrailingSpaces(parameter) => {
+                    (8, "noultrlspc", parameter)
+                },
+                ControlWord::DoNotTranslateBackslashToYen(parameter) => {
+                    (16, "noxlattoyen", parameter)
+                },
+                ControlWord::LegacyAsianLineBreakingRules(parameter) => {
+                    (32, "lnbrkrule", parameter)
+                },
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.east_asian_compatibility_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.east_asian_compatibility_seen |= bit;
+            match control {
+                ControlWord::DoNotBalanceSbcsDbcs(_) => {
+                    self.east_asian_compatibility.do_not_balance_sbcs_dbcs = true;
+                },
+                ControlWord::ExpandSpacingAtShiftReturn(_) => {
+                    self.east_asian_compatibility.expand_spacing_at_shift_return = true;
+                },
+                ControlWord::DoNotAddSpaceForUnderline(_) => {
+                    self.east_asian_compatibility.do_not_add_space_for_underline = true;
+                },
+                ControlWord::DoNotUnderlineTrailingSpaces(_) => {
+                    self.east_asian_compatibility
+                        .do_not_underline_trailing_spaces = true;
+                },
+                ControlWord::DoNotTranslateBackslashToYen(_) => {
+                    self.east_asian_compatibility
+                        .do_not_translate_backslash_to_yen = true;
+                },
+                ControlWord::LegacyAsianLineBreakingRules(_) => {
+                    self.east_asian_compatibility.use_legacy_line_breaking_rules = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::SuppressRaisedLoweredExtraSpacing(_)
+                | ControlWord::SuppressTopPageExtraSpacing(_)
+                | ControlWord::SuppressSpaceBeforeAfterHardBreak(_)
+                | ControlWord::SuppressWordPerfectExtraLineSpacing(_)
+                | ControlWord::SuppressBottomPageExtraSpacing(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF line-spacing compatibility flag must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::SuppressRaisedLoweredExtraSpacing(parameter) => {
+                    (1, "noextrasprl", parameter)
+                },
+                ControlWord::SuppressTopPageExtraSpacing(parameter) => (2, "sprstsp", parameter),
+                ControlWord::SuppressSpaceBeforeAfterHardBreak(parameter) => {
+                    (4, "sprsspbf", parameter)
+                },
+                ControlWord::SuppressWordPerfectExtraLineSpacing(parameter) => {
+                    (8, "sprslnsp", parameter)
+                },
+                ControlWord::SuppressBottomPageExtraSpacing(parameter) => {
+                    (16, "sprsbsp", parameter)
+                },
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.line_spacing_compatibility_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.line_spacing_compatibility_seen |= bit;
+            match control {
+                ControlWord::SuppressRaisedLoweredExtraSpacing(_) => {
+                    self.line_spacing_compatibility
+                        .suppress_extra_spacing_for_raised_lowered_text = true;
+                },
+                ControlWord::SuppressTopPageExtraSpacing(_) => {
+                    self.line_spacing_compatibility
+                        .suppress_extra_spacing_at_top_of_page = true;
+                },
+                ControlWord::SuppressSpaceBeforeAfterHardBreak(_) => {
+                    self.line_spacing_compatibility
+                        .suppress_space_before_after_hard_break = true;
+                },
+                ControlWord::SuppressWordPerfectExtraLineSpacing(_) => {
+                    self.line_spacing_compatibility
+                        .suppress_wordperfect_extra_line_spacing = true;
+                },
+                ControlWord::SuppressBottomPageExtraSpacing(_) => {
+                    self.line_spacing_compatibility
+                        .suppress_extra_spacing_at_bottom_of_page = true;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if matches!(control, ControlWord::FromText(_) | ControlWord::FromHtml(_)) {
+            if self.states.len() != 2 || self.section_note_options_closed || self.saw_font_table {
+                return Err(RtfError::MalformedDocument(
+                    "RTF document origin must occur in the header before font tables and visible text"
+                        .to_string(),
+                ));
+            }
+            if self.origin_metadata.origin.is_some() {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate or conflicting RTF document-origin property".to_string(),
+                ));
+            }
+            self.origin_metadata.origin = Some(match control {
+                ControlWord::FromText(None) => crate::DocumentOrigin::PlainTextEmail,
+                ControlWord::FromText(Some(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF fromtext must not have a numeric parameter".to_string(),
+                    ));
+                },
+                ControlWord::FromHtml(version) => crate::DocumentOrigin::HtmlEmail {
+                    version: version
+                        .map(crate::HtmlEmailVersion::from_rtf_value)
+                        .transpose()?,
+                },
+                _ => unreachable!(),
+            });
+            return Ok(());
+        }
+        if let ControlWord::DocumentType(parameter) = control {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF document type must precede visible text at document root".to_string(),
+                ));
+            }
+            if self.origin_metadata.auto_format_type.is_some() {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF document type property".to_string(),
+                ));
+            }
+            self.origin_metadata.auto_format_type = Some(
+                crate::DocumentAutoFormatType::from_rtf_value(parameter.unwrap_or(0))?,
+            );
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::ReadOnlyRecommended(_) | ControlWord::SavePreviousPicture(_)
+        ) {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF save preference must precede visible text at document root".to_string(),
+                ));
+            }
+            let (bit, name, parameter) = match control {
+                ControlWord::ReadOnlyRecommended(parameter) => {
+                    (1, "readonlyrecommended", parameter)
+                },
+                ControlWord::SavePreviousPicture(parameter) => (2, "saveprevpict", parameter),
+                _ => unreachable!(),
+            };
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} must not have a numeric parameter"
+                )));
+            }
+            if self.save_preferences_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(format!(
+                    "duplicate RTF {name} document property"
+                )));
+            }
+            self.save_preferences_seen |= bit;
+            match control {
+                ControlWord::ReadOnlyRecommended(_) => {
+                    self.save_preferences.read_only =
+                        crate::DocumentReadOnlyRecommendation::Recommended;
+                },
+                ControlWord::SavePreviousPicture(_) => {
+                    self.save_preferences.thumbnail =
+                        crate::DocumentThumbnailPreference::RequiredIfSupported;
+                },
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if let ControlWord::StyleSortMethod(parameter) = control {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF style-sort method must precede visible text at document root".to_string(),
+                ));
+            }
+            if self.style_sort_method_seen {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF style-sort method document property".to_string(),
+                ));
+            }
+            self.style_sort_method = Some(crate::DocumentStyleSortMethod::from_rtf_value(
+                parameter.unwrap_or(1),
+            )?);
+            self.style_sort_method_seen = true;
+            return Ok(());
+        }
+        if let ControlWord::UseXslTransform(parameter) = control {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF usexform must precede visible text at document root".to_string(),
+                ));
+            }
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(
+                    "RTF usexform must not have a numeric parameter".to_string(),
+                ));
+            }
+            if self.use_xsl_transform_seen {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF usexform document property".to_string(),
+                ));
+            }
+            self.use_xsl_transform_seen = true;
+            self.xsl_transform_usage = crate::DocumentXslTransformUsage::Requested;
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::HideReviewMarkup(_)
+                | ControlWord::HideReviewComments(_)
+                | ControlWord::HideReviewInsertionsAndDeletions(_)
+        ) {
+            let at_root = self.states.len() == 2
+                && self
+                    .states
+                    .last()
+                    .is_some_and(|state| state.destination == Destination::DocumentBody);
+            if !at_root || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF review-display flags must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            self.apply_review_display_control(control)?;
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::DocumentViewKind(_)
+                | ControlWord::DocumentViewScale(_)
+                | ControlWord::DocumentZoomKind(_)
+                | ControlWord::DocumentViewBackgroundShapes(_)
+                | ControlWord::DocumentViewNoPageBoundaries(_)
+        ) {
+            let at_root = self.states.len() == 2
+                && self
+                    .states
+                    .last()
+                    .is_some_and(|state| state.destination == Destination::DocumentBody);
+            if !at_root || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF document-view controls must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            self.apply_document_view_control(control)?;
+            return Ok(());
+        }
+        if matches!(
+            control,
+            ControlWord::HyphenateAutomatically(_)
+                | ControlWord::HyphenateCapitalizedWords(_)
+                | ControlWord::HyphenationConsecutiveLines(_)
+                | ControlWord::HyphenationHotZone(_)
+        ) {
+            let at_root = self.states.len() == 2
+                && self
+                    .states
+                    .last()
+                    .is_some_and(|state| state.destination == Destination::DocumentBody);
+            // This flag closes as soon as visible body text (including pending text that has
+            // not yet been flushed into a StyleBlock) enters the document stream.
+            let body_started = self.section_note_options_closed;
+            if !at_root || body_started {
+                return Err(RtfError::MalformedDocument(
+                    "RTF document hyphenation controls must precede visible text at document root"
+                        .to_string(),
+                ));
+            }
+            self.apply_document_hyphenation_control(control)?;
+            return Ok(());
+        }
+        if let ControlWord::TableNestingLevel(parameter) = control {
+            let value = parameter.ok_or_else(|| {
+                RtfError::MalformedDocument("RTF itap requires a numeric parameter".to_string())
+            })?;
+            let level = u8::try_from(value).map_err(|_| {
+                RtfError::MalformedDocument("RTF itap is outside 0..=32".to_string())
+            })?;
+            if usize::from(level) > crate::MAX_TABLE_NESTING_DEPTH {
+                return Err(RtfError::MalformedDocument(
+                    "RTF itap is outside 0..=32".to_string(),
+                ));
+            }
+            let previous = self.current_state()?.table_nesting_level;
+            self.current_state_mut()?.table_nesting_level = level;
+            let previous = if previous >= 2 { previous } else { 1 };
+            let effective = if level >= 2 { level } else { 1 };
+            if effective < previous {
+                self.drain_nested_to(effective)?;
+            }
+            return Ok(());
+        }
         match control {
             ControlWord::RevisionSaveRoot(value) => {
                 if self.states.len() != 2 || self.saw_revision_save_root {
@@ -3368,9 +6908,20 @@ impl<'a> Parser<'a> {
                     "orphan RTF rsid control outside rsidtbl".to_string(),
                 ));
             },
-            ControlWord::BlipTag(_) | ControlWord::BlipUnitsPerInch(_) => {
+            ControlWord::BlipTag(_)
+            | ControlWord::BlipUnitsPerInch(_)
+            | ControlWord::PictureScaled(_)
+            | ControlWord::PictureBitmap(_)
+            | ControlWord::PictureBitsPerPixel(_)
+            | ControlWord::PictureCropLeft(_)
+            | ControlWord::PictureCropRight(_)
+            | ControlWord::PictureCropTop(_)
+            | ControlWord::PictureCropBottom(_)
+            | ControlWord::WindowsBitmapBitsPerPixel(_)
+            | ControlWord::WindowsBitmapPlanes(_)
+            | ControlWord::WindowsBitmapWidthBytes(_) => {
                 return Err(RtfError::MalformedDocument(
-                    "orphan RTF picture identity control outside pict".to_string(),
+                    "orphan RTF picture metadata control outside pict".to_string(),
                 ));
             },
             control @ (ControlWord::NoteKinds(_)
@@ -3475,6 +7026,18 @@ impl<'a> Parser<'a> {
                     "orphan RTF xmlns control outside xmlnstbl".to_string(),
                 ));
             },
+            ControlWord::ListPicture(_)
+            | ControlWord::ShapePicture(_)
+            | ControlWord::NonShapePicture(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF listpicture and shppict are misplaced".to_string(),
+                ));
+            },
+            ControlWord::BackgroundDestination(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF background must be a starred root destination".to_string(),
+                ));
+            },
             ControlWord::ThemeData | ControlWord::ColorSchemeMapping => {
                 return Err(RtfError::MalformedDocument(
                     "orphan RTF theme destination control".to_string(),
@@ -3500,6 +7063,37 @@ impl<'a> Parser<'a> {
             ControlWord::DataStore => {
                 return Err(RtfError::MalformedDocument(
                     "orphan RTF datastore destination control".to_string(),
+                ));
+            },
+            ControlWord::MailMerge
+            | ControlWord::MailMergeConnectString
+            | ControlWord::MailMergeConnectStringData
+            | ControlWord::MailMergeDataSource
+            | ControlWord::MailMergeHeaderSource
+            | ControlWord::MailMergeLinkToQuery(_)
+            | ControlWord::MailMergeQuery
+            | ControlWord::MailMergeDataSourceObject
+            | ControlWord::MailMergeActiveRecord(_)
+            | ControlWord::MailMergeColumnDelimiter(_)
+            | ControlWord::MailMergeColumnCount(_)
+            | ControlWord::MailMergeDynamicAddress(_)
+            | ControlWord::MailMergeFirstRowHeader(_)
+            | ControlWord::MailMergeFilter
+            | ControlWord::MailMergeFieldMapData
+            | ControlWord::MailMergeFieldMapColumn(_)
+            | ControlWord::MailMergeHash(_)
+            | ControlWord::MailMergeId(_)
+            | ControlWord::MailMergeMappedName
+            | ControlWord::MailMergeName
+            | ControlWord::MailMergeRecipientData
+            | ControlWord::MailMergeSort
+            | ControlWord::MailMergeSourceType(_)
+            | ControlWord::MailMergeTable
+            | ControlWord::MailMergeUdl
+            | ControlWord::MailMergeUdlData
+            | ControlWord::MailMergeUniqueTag => {
+                return Err(RtfError::MalformedDocument(
+                    "orphan or misplaced RTF mail-merge control".to_string(),
                 ));
             },
             ControlWord::MathProperties
@@ -3564,7 +7158,11 @@ impl<'a> Parser<'a> {
             },
             ControlWord::AnnotationProtection(value) => {
                 self.ensure_protection_scope()?;
-                Self::set_protection_flag(&mut self.info.protection.annotations, *value, "annotprot")?;
+                Self::set_protection_flag(
+                    &mut self.info.protection.annotations,
+                    *value,
+                    "annotprot",
+                )?;
                 return Ok(());
             },
             ControlWord::RevisionProtection(value) => {
@@ -3584,7 +7182,11 @@ impl<'a> Parser<'a> {
             },
             ControlWord::EnforceProtection(Some(value)) => {
                 self.ensure_protection_scope()?;
-                Self::set_required_protection_flag(&mut self.info.protection.enforced, *value, "enforceprot")?;
+                Self::set_required_protection_flag(
+                    &mut self.info.protection.enforced,
+                    *value,
+                    "enforceprot",
+                )?;
                 return Ok(());
             },
             ControlWord::EnforceProtection(None) => {
@@ -3632,8 +7234,19 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
+        if Self::apply_paragraph_shading_control(state, control)? {
+            return Ok(());
+        }
+
+        if apply_associated_character_control(&mut state.formatting.associated, control)? {
+            return Ok(());
+        }
+
         match control {
             // Font formatting
+            ControlWord::CharacterStyle(value) => {
+                state.formatting.character_style = Some(character_style_reference(*value)?);
+            },
             ControlWord::FontNumber(n) => {
                 state.formatting.font_ref = *n as FontRef;
             },
@@ -3641,12 +7254,10 @@ impl<'a> Parser<'a> {
                 state.formatting.language = Some(crate::LanguageId::from_rtf(*value)?);
             },
             ControlWord::LanguageEastAsian(value) => {
-                state.formatting.east_asian_language =
-                    Some(crate::LanguageId::from_rtf(*value)?);
+                state.formatting.east_asian_language = Some(crate::LanguageId::from_rtf(*value)?);
             },
             ControlWord::LanguageNoProof(value) => {
-                state.formatting.language_no_proof =
-                    Some(crate::LanguageId::from_rtf(*value)?);
+                state.formatting.language_no_proof = Some(crate::LanguageId::from_rtf(*value)?);
             },
             ControlWord::LanguageEastAsianNoProof(value) => {
                 state.formatting.east_asian_language_no_proof =
@@ -3659,28 +7270,47 @@ impl<'a> Parser<'a> {
             ControlWord::RightToLeftCharacter => {
                 state.formatting.direction = Some(TextDirection::RightToLeft);
             },
+            ControlWord::LowAnsiCharacter(parameter) => {
+                state.formatting.character_type = Some(character_type_selector(
+                    *parameter,
+                    "loch",
+                    crate::CharacterType::LowAnsi,
+                )?);
+            },
+            ControlWord::HighAnsiCharacter(parameter) => {
+                state.formatting.character_type = Some(character_type_selector(
+                    *parameter,
+                    "hich",
+                    crate::CharacterType::HighAnsi,
+                )?);
+            },
+            ControlWord::DoubleByteCharacter(parameter) => {
+                state.formatting.character_type = Some(character_type_selector(
+                    *parameter,
+                    "dbch",
+                    crate::CharacterType::DoubleByte,
+                )?);
+            },
+            ControlWord::FontComplexScript(value) => {
+                state.formatting.complex_script = Some(complex_script_selector(*value)?);
+            },
+            ControlWord::CharacterGrid(value) => {
+                state.formatting.character_grid = Some(character_grid(*value)?);
+            },
             ControlWord::FontSize(size) => {
                 if let Some(nz) = NonZeroU16::new((*size).max(0) as u16) {
                     state.formatting.font_size = nz;
                 }
             },
-            ControlWord::AssociatedFontNumber(value) => {
-                state.formatting.associated.font_ref = Some(associated_font_ref(*value)?);
-            },
-            ControlWord::AssociatedFontSize(value) => {
-                state.formatting.associated.font_size = Some(associated_font_size(*value)?);
-            },
-            ControlWord::AssociatedLanguage(value) => {
-                state.formatting.associated.language = Some(associated_language(*value)?);
-            },
-            ControlWord::AssociatedBold(value) => {
-                state.formatting.associated.bold = Some(*value);
-            },
-            ControlWord::AssociatedItalic(value) => {
-                state.formatting.associated.italic = Some(*value);
-            },
             ControlWord::ColorForeground(c) => {
                 state.formatting.color_ref = *c as ColorRef;
+            },
+            ControlWord::ColorBackground(value) => {
+                state.formatting.background_color = Some(Self::required_character_value(
+                    *value,
+                    "cb",
+                    u16::MAX,
+                )?);
             },
 
             // Character formatting
@@ -3722,11 +7352,35 @@ impl<'a> Parser<'a> {
             },
             ControlWord::Strike(b) => state.formatting.strike = *b,
             ControlWord::DoubleStrike(b) => state.formatting.double_strike = *b,
-            ControlWord::Superscript(b) => { state.formatting.superscript = *b; if *b { state.formatting.subscript = false; } state.formatting.character_positioning.set_superscript(*b); },
-            ControlWord::Subscript(b) => { state.formatting.subscript = *b; if *b { state.formatting.superscript = false; } state.formatting.character_positioning.set_subscript(*b); },
-            ControlWord::NoSuperSub => { state.formatting.superscript = false; state.formatting.subscript = false; state.formatting.character_positioning.clear_baseline(); },
-            ControlWord::BaselineUp(value) => { state.formatting.superscript = false; state.formatting.subscript = false; state.formatting.character_positioning.set_raised(*value)?; },
-            ControlWord::BaselineDown(value) => { state.formatting.superscript = false; state.formatting.subscript = false; state.formatting.character_positioning.set_lowered(*value)?; },
+            ControlWord::Superscript(b) => {
+                state.formatting.superscript = *b;
+                if *b {
+                    state.formatting.subscript = false;
+                }
+                state.formatting.character_positioning.set_superscript(*b);
+            },
+            ControlWord::Subscript(b) => {
+                state.formatting.subscript = *b;
+                if *b {
+                    state.formatting.superscript = false;
+                }
+                state.formatting.character_positioning.set_subscript(*b);
+            },
+            ControlWord::NoSuperSub => {
+                state.formatting.superscript = false;
+                state.formatting.subscript = false;
+                state.formatting.character_positioning.clear_baseline();
+            },
+            ControlWord::BaselineUp(value) => {
+                state.formatting.superscript = false;
+                state.formatting.subscript = false;
+                state.formatting.character_positioning.set_raised(*value)?;
+            },
+            ControlWord::BaselineDown(value) => {
+                state.formatting.superscript = false;
+                state.formatting.subscript = false;
+                state.formatting.character_positioning.set_lowered(*value)?;
+            },
             ControlWord::SmallCaps(b) => state.formatting.smallcaps = *b,
             ControlWord::AllCaps(b) => state.formatting.all_caps = *b,
             ControlWord::Hidden(b) => state.formatting.hidden = *b,
@@ -3734,10 +7388,28 @@ impl<'a> Parser<'a> {
             ControlWord::Shadow(b) => state.formatting.shadow = *b,
             ControlWord::Emboss(b) => state.formatting.emboss = *b,
             ControlWord::Imprint(b) => state.formatting.imprint = *b,
-            ControlWord::CharSpacing(n) => { state.formatting.character_positioning.set_quarter_point_expansion(*n)?; state.formatting.char_spacing = *n; },
-            ControlWord::CharSpacingTwips(n) => { state.formatting.character_positioning.set_twip_expansion(*n)?; state.formatting.char_spacing = *n; },
-            ControlWord::CharScale(n) => { state.formatting.character_positioning.set_scale(*n)?; state.formatting.char_scale = *n; },
-            ControlWord::Kerning(n) => { state.formatting.character_positioning.set_kerning(*n)?; state.formatting.kerning = *n; },
+            ControlWord::CharSpacing(n) => {
+                state
+                    .formatting
+                    .character_positioning
+                    .set_quarter_point_expansion(*n)?;
+                state.formatting.char_spacing = *n;
+            },
+            ControlWord::CharSpacingTwips(n) => {
+                state
+                    .formatting
+                    .character_positioning
+                    .set_twip_expansion(*n)?;
+                state.formatting.char_spacing = *n;
+            },
+            ControlWord::CharScale(n) => {
+                state.formatting.character_positioning.set_scale(*n)?;
+                state.formatting.char_scale = *n;
+            },
+            ControlWord::Kerning(n) => {
+                state.formatting.character_positioning.set_kerning(*n)?;
+                state.formatting.kerning = *n;
+            },
             ControlWord::Highlight(c) => state.formatting.highlight_color = Some(*c as ColorRef),
             ControlWord::Plain => {
                 // Reset to default formatting
@@ -3752,6 +7424,9 @@ impl<'a> Parser<'a> {
             },
 
             // Paragraph alignment
+            ControlWord::ParagraphStyle(value) => {
+                state.paragraph.paragraph_style = Some(paragraph_style_reference(*value)?);
+            },
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
             ControlWord::Center => state.paragraph.alignment = Alignment::Center,
@@ -3765,6 +7440,8 @@ impl<'a> Parser<'a> {
             ControlWord::Pard => {
                 // Reset to default paragraph properties
                 state.paragraph = Paragraph::default();
+                state.drop_cap_kind = None;
+                state.drop_cap_lines = None;
                 state.pending_tab_alignment = None;
                 state.pending_tab_leader = None;
                 state.in_table = false;
@@ -3775,38 +7452,129 @@ impl<'a> Parser<'a> {
             ControlWord::SpaceAfter(n) => state.paragraph.spacing.after = *n,
             ControlWord::SpaceBetween(n) => state.paragraph.spacing.line = *n,
             ControlWord::LineMultiple(b) => state.paragraph.spacing.line_multiple = *b,
-            ControlWord::SpaceBeforeAuto(value) => state.paragraph.spacing_policy.automatic_before = required_paragraph_bool(*value, "sbauto")?,
-            ControlWord::SpaceAfterAuto(value) => state.paragraph.spacing_policy.automatic_after = required_paragraph_bool(*value, "saauto")?,
-            ControlWord::ListSpaceBefore(value) => state.paragraph.spacing_policy.list_before = Some(required_list_spacing(*value, "lisb")?),
-            ControlWord::ListSpaceAfter(value) => state.paragraph.spacing_policy.list_after = Some(required_list_spacing(*value, "lisa")?),
-            ControlWord::NoSnapLineGrid(value) => { strict_paragraph_selector(*value, "nosnaplinegrid")?; state.paragraph.spacing_policy.snap_to_line_grid = false; },
-            ControlWord::ContextualSpacing(value) => { strict_paragraph_selector(*value, "contextualspace")?; state.paragraph.spacing_policy.contextual_spacing = true; },
+            ControlWord::SpaceBeforeAuto(value) => {
+                state.paragraph.spacing_policy.automatic_before =
+                    required_paragraph_bool(*value, "sbauto")?
+            },
+            ControlWord::SpaceAfterAuto(value) => {
+                state.paragraph.spacing_policy.automatic_after =
+                    required_paragraph_bool(*value, "saauto")?
+            },
+            ControlWord::ListSpaceBefore(value) => {
+                state.paragraph.spacing_policy.list_before =
+                    Some(required_list_spacing(*value, "lisb")?)
+            },
+            ControlWord::ListSpaceAfter(value) => {
+                state.paragraph.spacing_policy.list_after =
+                    Some(required_list_spacing(*value, "lisa")?)
+            },
+            ControlWord::NoSnapLineGrid(value) => {
+                strict_paragraph_selector(*value, "nosnaplinegrid")?;
+                state.paragraph.spacing_policy.snap_to_line_grid = false;
+            },
+            ControlWord::ContextualSpacing(value) => {
+                strict_paragraph_selector(*value, "contextualspace")?;
+                state.paragraph.spacing_policy.contextual_spacing = true;
+            },
 
             // Paragraph indentation
             ControlWord::LeftIndent(n) => state.paragraph.indentation.left = *n,
             ControlWord::RightIndent(n) => state.paragraph.indentation.right = *n,
             ControlWord::FirstLineIndent(n) => state.paragraph.indentation.first_line = *n,
-            ControlWord::LogicalLeftIndent(v)=>state.paragraph.logical_indentation.start=Some(required_paragraph_indent(*v,"lin")?), ControlWord::LogicalRightIndent(v)=>state.paragraph.logical_indentation.end=Some(required_paragraph_indent(*v,"rin")?), ControlWord::CharacterFirstLineIndent(v)=>state.paragraph.logical_indentation.first_line_character_units=Some(required_paragraph_indent(*v,"cufi")?), ControlWord::CharacterLeftIndent(v)=>state.paragraph.logical_indentation.left_character_units=Some(required_paragraph_indent(*v,"culi")?), ControlWord::CharacterRightIndent(v)=>state.paragraph.logical_indentation.right_character_units=Some(required_paragraph_indent(*v,"curi")?), ControlWord::MirrorIndents(v)=>{strict_paragraph_selector(*v,"indmirror")?;state.paragraph.logical_indentation.mirrored=true;},
+            ControlWord::LogicalLeftIndent(v) => {
+                state.paragraph.logical_indentation.start =
+                    Some(required_paragraph_indent(*v, "lin")?)
+            },
+            ControlWord::LogicalRightIndent(v) => {
+                state.paragraph.logical_indentation.end =
+                    Some(required_paragraph_indent(*v, "rin")?)
+            },
+            ControlWord::CharacterFirstLineIndent(v) => {
+                state
+                    .paragraph
+                    .logical_indentation
+                    .first_line_character_units = Some(required_paragraph_indent(*v, "cufi")?)
+            },
+            ControlWord::CharacterLeftIndent(v) => {
+                state.paragraph.logical_indentation.left_character_units =
+                    Some(required_paragraph_indent(*v, "culi")?)
+            },
+            ControlWord::CharacterRightIndent(v) => {
+                state.paragraph.logical_indentation.right_character_units =
+                    Some(required_paragraph_indent(*v, "curi")?)
+            },
+            ControlWord::MirrorIndents(v) => {
+                strict_paragraph_selector(*v, "indmirror")?;
+                state.paragraph.logical_indentation.mirrored = true;
+            },
 
             // Paragraph additional properties
             ControlWord::KeepTogether => state.paragraph.keep_together = true,
             ControlWord::KeepNext => state.paragraph.keep_next = true,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
-            ControlWord::ParagraphHyphenation(value) => state.paragraph.line_breaking.automatic_hyphenation = strict_paragraph_toggle(*value, "hyphpar")?,
-            ControlWord::AutoSpaceAlphabetic(value) => state.paragraph.line_breaking.auto_space_alphabetic = strict_paragraph_toggle(*value, "aspalpha")?,
-            ControlWord::AutoSpaceNumbers(value) => state.paragraph.line_breaking.auto_space_numbers = strict_paragraph_toggle(*value, "aspnum")?,
-            ControlWord::AdjustRightIndent(value) => state.paragraph.line_breaking.adjust_right_indent = strict_paragraph_toggle(*value, "adjustright")?,
-            ControlWord::WrapDefault(value) => { strict_paragraph_selector(*value, "wrapdefault")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::Default; },
-            ControlWord::NoCharacterWrap(value) => { strict_paragraph_selector(*value, "nocwrap")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoCharacterWrap; },
-            ControlWord::NoWordWrap(value) => { strict_paragraph_selector(*value, "nowwrap")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoWordWrap; },
-            ControlWord::NoOverflow(value) => { strict_paragraph_selector(*value, "nooverflow")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoOverflow; },
-            ControlWord::FontAlignAuto(value) => { strict_paragraph_selector(*value, "faauto")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Auto; },
-            ControlWord::FontAlignHanging(value) => { strict_paragraph_selector(*value, "fahang")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Hanging; },
-            ControlWord::FontAlignCenter(value) => { strict_paragraph_selector(*value, "facenter")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Center; },
-            ControlWord::FontAlignRoman(value) => { strict_paragraph_selector(*value, "faroman")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Roman; },
-            ControlWord::FontAlignVariable(value) => { strict_paragraph_selector(*value, "favar")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Variable; },
-            ControlWord::FontAlignFixed(value) => { strict_paragraph_selector(*value, "fafixed")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Fixed; },
+            ControlWord::DropCapLines(_) | ControlWord::DropCapType(_) => {
+                Self::apply_drop_cap_control(state, control)?;
+            },
+            ControlWord::ParagraphHyphenation(value) => {
+                state.paragraph.line_breaking.automatic_hyphenation =
+                    strict_paragraph_toggle(*value, "hyphpar")?
+            },
+            ControlWord::AutoSpaceAlphabetic(value) => {
+                state.paragraph.line_breaking.auto_space_alphabetic =
+                    strict_paragraph_toggle(*value, "aspalpha")?
+            },
+            ControlWord::AutoSpaceNumbers(value) => {
+                state.paragraph.line_breaking.auto_space_numbers =
+                    strict_paragraph_toggle(*value, "aspnum")?
+            },
+            ControlWord::AdjustRightIndent(value) => {
+                state.paragraph.line_breaking.adjust_right_indent =
+                    strict_paragraph_toggle(*value, "adjustright")?
+            },
+            ControlWord::WrapDefault(value) => {
+                strict_paragraph_selector(*value, "wrapdefault")?;
+                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::Default;
+            },
+            ControlWord::NoCharacterWrap(value) => {
+                strict_paragraph_selector(*value, "nocwrap")?;
+                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoCharacterWrap;
+            },
+            ControlWord::NoWordWrap(value) => {
+                strict_paragraph_selector(*value, "nowwrap")?;
+                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoWordWrap;
+            },
+            ControlWord::NoOverflow(value) => {
+                strict_paragraph_selector(*value, "nooverflow")?;
+                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoOverflow;
+            },
+            ControlWord::FontAlignAuto(value) => {
+                strict_paragraph_selector(*value, "faauto")?;
+                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Auto;
+            },
+            ControlWord::FontAlignHanging(value) => {
+                strict_paragraph_selector(*value, "fahang")?;
+                state.paragraph.line_breaking.font_alignment =
+                    crate::ParagraphFontAlignment::Hanging;
+            },
+            ControlWord::FontAlignCenter(value) => {
+                strict_paragraph_selector(*value, "facenter")?;
+                state.paragraph.line_breaking.font_alignment =
+                    crate::ParagraphFontAlignment::Center;
+            },
+            ControlWord::FontAlignRoman(value) => {
+                strict_paragraph_selector(*value, "faroman")?;
+                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Roman;
+            },
+            ControlWord::FontAlignVariable(value) => {
+                strict_paragraph_selector(*value, "favar")?;
+                state.paragraph.line_breaking.font_alignment =
+                    crate::ParagraphFontAlignment::Variable;
+            },
+            ControlWord::FontAlignFixed(value) => {
+                strict_paragraph_selector(*value, "fafixed")?;
+                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Fixed;
+            },
             ControlWord::ListOverrideIndex(value) => {
                 state.paragraph.list_override = Some(*value);
             },
@@ -3828,11 +7596,6 @@ impl<'a> Parser<'a> {
             // Tracked revisions
             ControlWord::Revised(value) => {
                 if *value {
-                    if state.in_table {
-                        return Err(RtfError::MalformedDocument(
-                            "RTF positional revisions inside tables are unsupported".to_string(),
-                        ));
-                    }
                     if state.revision_type.is_some() {
                         return Err(RtfError::MalformedDocument(
                             "conflicting or duplicate RTF revision marker".to_string(),
@@ -3843,15 +7606,11 @@ impl<'a> Parser<'a> {
                     state.revision_type = None;
                     state.revision_author_id = None;
                     state.revision_date = None;
+                    state.revision_event_id = None;
                 }
             },
             ControlWord::Deleted(value) => {
                 if *value {
-                    if state.in_table {
-                        return Err(RtfError::MalformedDocument(
-                            "RTF positional revisions inside tables are unsupported".to_string(),
-                        ));
-                    }
                     if state.revision_type.is_some() {
                         return Err(RtfError::MalformedDocument(
                             "conflicting or duplicate RTF revision marker".to_string(),
@@ -3862,6 +7621,7 @@ impl<'a> Parser<'a> {
                     state.revision_type = None;
                     state.revision_author_id = None;
                     state.revision_date = None;
+                    state.revision_event_id = None;
                 }
             },
             ControlWord::RevisionAuthor(value) => {
@@ -3937,59 +7697,473 @@ impl<'a> Parser<'a> {
             ControlWord::InTable => {
                 state.in_table = true;
             },
+            ControlWord::TableStyle(value) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    state.table_style = Some(table_style_reference(*value)?);
+                }
+            },
             ControlWord::TableRowDefaults => {
                 // Start a new row definition
                 state.cell_boundaries.clear();
-                state.table_row_padding=Default::default();state.table_row_spacing=Default::default();state.table_row_positioning=Default::default();state.table_row_direction=None;state.table_row_layout=Default::default();state.table_row_borders=Default::default();state.table_row_shading=Default::default();state.table_row_geometry=Default::default();state.table_autoformat_flags=Default::default();state.table_row_banding=Default::default();state.table_row_index_seen=false;state.table_row_band_index_seen=false;state.table_last_row_seen=false;state.table_width_unit=None;state.table_width_value=None;state.table_leading_width_unit=None;state.table_leading_width_value=None;state.table_trailing_width_unit=None;state.table_trailing_width_value=None;state.table_indent_value=None;state.table_indent_unit=None;state.pending_cell_padding=Default::default();state.pending_cell_spacing=Default::default();state.pending_cell_layout=Default::default();state.pending_cell_merge=Default::default();state.pending_cell_borders=Default::default();state.pending_cell_shading=Default::default();state.pending_cell_width_unit=None;state.pending_cell_width_value=None;state.table_row_shading_seen=0;state.pending_cell_shading_seen=0;state.active_table_border=None;state.active_table_border_seen=0;state.cell_distances.clear();state.cell_layouts.clear();state.cell_merges.clear();state.cell_decorations.clear();state.cell_widths.clear();
-                let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination==Destination::NestedTableProperties{if level<2{return Err(RtfError::MalformedDocument("RTF nesttableprops lacks itap level 2 or greater".to_string()))}let row=&mut self.ensure_nested_builder(level)?.row;row.set_direction(None);row.set_layout(Default::default());}else{self.drain_nested_to(1)?;self.start_table_if_needed();if let Some(row)=&mut self.current_row{row.set_direction(None);row.set_layout(Default::default());}}
+                state.table_style = None;
+                state.table_row_padding = Default::default();
+                state.table_row_spacing = Default::default();
+                state.table_row_positioning = Default::default();
+                state.table_row_direction = None;
+                state.table_row_layout = Default::default();
+                state.table_row_borders = Default::default();
+                state.table_row_shading = Default::default();
+                state.table_row_geometry = Default::default();
+                state.table_autoformat_flags = Default::default();
+                state.table_row_banding = Default::default();
+                state.table_row_index_seen = false;
+                state.table_row_band_index_seen = false;
+                state.table_last_row_seen = false;
+                state.table_width_unit = None;
+                state.table_width_value = None;
+                state.table_leading_width_unit = None;
+                state.table_leading_width_value = None;
+                state.table_trailing_width_unit = None;
+                state.table_trailing_width_value = None;
+                state.table_indent_value = None;
+                state.table_indent_unit = None;
+                state.pending_cell_padding = Default::default();
+                state.pending_cell_spacing = Default::default();
+                state.pending_cell_layout = Default::default();
+                state.pending_cell_merge = Default::default();
+                state.pending_cell_borders = Default::default();
+                state.pending_cell_shading = Default::default();
+                state.pending_cell_width_unit = None;
+                state.pending_cell_width_value = None;
+                state.table_row_shading_seen = 0;
+                state.pending_cell_shading_seen = 0;
+                state.active_table_border = None;
+                state.active_table_border_seen = 0;
+                state.cell_distances.clear();
+                state.cell_layouts.clear();
+                state.cell_merges.clear();
+                state.cell_decorations.clear();
+                state.cell_widths.clear();
+                let destination = state.destination;
+                let level = state.table_nesting_level;
+                let _ = state;
+                if destination == Destination::NestedTableProperties {
+                    if level < 2 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF nesttableprops lacks itap level 2 or greater".to_string(),
+                        ));
+                    }
+                    let row = &mut self.ensure_nested_builder(level)?.row;
+                    row.set_table_style(None);
+                    row.set_direction(None);
+                    row.set_layout(Default::default());
+                } else {
+                    self.drain_nested_to(1)?;
+                    self.start_table_if_needed();
+                    if let Some(row) = &mut self.current_row {
+                        row.set_table_style(None);
+                        row.set_direction(None);
+                        row.set_layout(Default::default());
+                    }
+                }
             },
-            ControlWord::TableRowIndex(value)=>{if state.table_row_index_seen{return Err(RtfError::MalformedDocument("duplicate RTF irow control".to_string()))}let value=value.ok_or_else(||RtfError::MalformedDocument("RTF irow requires a numeric parameter".to_string()))?;state.table_row_banding.row_index=Some(u16::try_from(value).map_err(|_|RtfError::MalformedDocument("RTF irow must be in 0..=65535".to_string()))?);state.table_row_index_seen=true},
-            ControlWord::TableRowBandIndex(value)=>{if state.table_row_band_index_seen{return Err(RtfError::MalformedDocument("duplicate RTF irowband control".to_string()))}let value=value.ok_or_else(||RtfError::MalformedDocument("RTF irowband requires a numeric parameter".to_string()))?;state.table_row_banding.band_index=Some(if value==-1{crate::TableRowBandIndex::Header}else{crate::TableRowBandIndex::Row(u16::try_from(value).map_err(|_|RtfError::MalformedDocument("RTF irowband must be -1 or in 0..=65535".to_string()))?)});state.table_row_band_index_seen=true},
-            ControlWord::TableLastRow(param)=>{require_parameterless(*param,"lastrow")?;if state.table_last_row_seen{return Err(RtfError::MalformedDocument("duplicate RTF lastrow control".to_string()))}state.table_row_banding.last_row=true;state.table_last_row_seen=true},
-            ControlWord::TableAutoformatFlag(flag,param)=>{require_parameterless(*param,"table autoformat flag")?;if !state.table_autoformat_flags.insert(*flag){return Err(RtfError::MalformedDocument("duplicate RTF table autoformat flag".to_string()))}},
-            ControlWord::LeftToRightRow(param) => {require_parameterless(*param,"ltrrow")?;state.table_row_direction=Some(TextDirection::LeftToRight)},
-            ControlWord::RightToLeftRow(param) => {require_parameterless(*param,"rtlrow")?;state.table_row_direction=Some(TextDirection::RightToLeft)},
-            ControlWord::TableRowGap(param)=>{let value=table_geometry_twips(*param,"trgaph",false)?;state.table_row_geometry.set_half_gap_twips(Some(value as u16));},
-            ControlWord::TableRowLeft(param)=>{let value=table_geometry_twips(*param,"trleft",true)?;state.table_row_geometry.set_left_edge_twips(Some(value));},
-            ControlWord::TableRowHeight(param)=>state.table_row_geometry.set_height(table_row_height(*param)?),
-            ControlWord::TablePreferredWidthUnit(scope,param)=>{let unit=table_width_unit(*param)?;let target=match scope{crate::TableDistanceScope::Row=>&mut state.table_width_unit,crate::TableDistanceScope::Cell=>&mut state.pending_cell_width_unit};if target.replace(unit).is_some(){return Err(RtfError::MalformedDocument("RTF preferred-width unit is duplicated".to_string()))}},
-            ControlWord::TablePreferredWidthValue(scope,param)=>{let value=param.ok_or_else(||RtfError::MalformedDocument("RTF preferred-width value requires a parameter".to_string()))?;let target=match scope{crate::TableDistanceScope::Row=>&mut state.table_width_value,crate::TableDistanceScope::Cell=>&mut state.pending_cell_width_value};if target.replace(value).is_some(){return Err(RtfError::MalformedDocument("RTF preferred-width value is duplicated".to_string()))}},
-            ControlWord::TableInvisibleWidthUnit(trailing,param)=>{let unit=table_width_unit(*param)?;let target=if *trailing{&mut state.table_trailing_width_unit}else{&mut state.table_leading_width_unit};if target.replace(unit).is_some(){return Err(RtfError::MalformedDocument("RTF invisible-width unit is duplicated".to_string()))}},
-            ControlWord::TableInvisibleWidthValue(trailing,param)=>{let value=param.ok_or_else(||RtfError::MalformedDocument("RTF invisible-width value requires a parameter".to_string()))?;let target=if *trailing{&mut state.table_trailing_width_value}else{&mut state.table_leading_width_value};if target.replace(value).is_some(){return Err(RtfError::MalformedDocument("RTF invisible-width value is duplicated".to_string()))}},
-            ControlWord::TableAutoFit(param)=>state.table_row_geometry.set_auto_fit(match param{Some(0)=>false,Some(1)=>true,None=>return Err(RtfError::MalformedDocument("RTF trautofit requires 0 or 1".to_string())),Some(_)=>return Err(RtfError::MalformedDocument("RTF trautofit accepts only 0 or 1".to_string()))}),
-            ControlWord::TableIndentValue(param)=>{let value=match param{None=>0,Some(_)=>table_geometry_twips(*param,"tblind",true)?};if state.table_indent_value.replace(value).is_some(){return Err(RtfError::MalformedDocument("RTF tblind is duplicated".to_string()))}},
-            ControlWord::TableIndentUnit(param)=>{let unit=table_indent_unit(*param)?;if state.table_indent_unit.replace(unit).is_some(){return Err(RtfError::MalformedDocument("RTF tblindtype is duplicated".to_string()))}},
-            ControlWord::TableRowHeader(param)=>{require_parameterless(*param,"trhdr")?;state.table_row_layout.header=true},
-            ControlWord::TableRowKeep(param)=>{require_parameterless(*param,"trkeep")?;state.table_row_layout.keep_together=true},
-            ControlWord::TableRowKeepFollow(param)=>{require_parameterless(*param,"trkeepfollow")?;state.table_row_layout.keep_with_following=true},
-            ControlWord::TableRowAlignment(value,param)=>{require_parameterless(*param,"table row alignment")?;state.table_row_layout.alignment=Some(*value)},
-            ControlWord::TableCellVerticalAlignment(value,param)=>{require_parameterless(*param,"cell vertical alignment")?;state.pending_cell_layout.vertical_alignment=Some(*value)},
-            ControlWord::TableCellTextFlow(value,param)=>{require_parameterless(*param,"cell text flow")?;state.pending_cell_layout.text_flow=Some(*value)},
-            ControlWord::TableCellFitText(param)=>{require_parameterless(*param,"clFitText")?;state.pending_cell_layout.fit_text=true},
-            ControlWord::TableCellNoWrap(param)=>{require_parameterless(*param,"clNoWrap")?;state.pending_cell_layout.no_wrap=true},
-            ControlWord::TableCellHideMark(param)=>{require_parameterless(*param,"clhidemark")?;state.pending_cell_layout.hide_mark=true},
-            ControlWord::TableCellMerge(axis,role,param)=>{require_parameterless(*param,"table cell merge")?;let pending=match axis{crate::TableCellMergeAxis::Horizontal=>&mut state.pending_cell_merge.horizontal,crate::TableCellMergeAxis::Vertical=>&mut state.pending_cell_merge.vertical};if pending.replace(*role).is_some(){return Err(RtfError::MalformedDocument("RTF cell definition has duplicate or conflicting merge roles on one axis".to_string()))}},
+            ControlWord::TableRowIndex(value) => {
+                if state.table_row_index_seen {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate RTF irow control".to_string(),
+                    ));
+                }
+                let value = value.ok_or_else(|| {
+                    RtfError::MalformedDocument("RTF irow requires a numeric parameter".to_string())
+                })?;
+                state.table_row_banding.row_index = Some(u16::try_from(value).map_err(|_| {
+                    RtfError::MalformedDocument("RTF irow must be in 0..=65535".to_string())
+                })?);
+                state.table_row_index_seen = true
+            },
+            ControlWord::TableRowBandIndex(value) => {
+                if state.table_row_band_index_seen {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate RTF irowband control".to_string(),
+                    ));
+                }
+                let value = value.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF irowband requires a numeric parameter".to_string(),
+                    )
+                })?;
+                state.table_row_banding.band_index = Some(if value == -1 {
+                    crate::TableRowBandIndex::Header
+                } else {
+                    crate::TableRowBandIndex::Row(u16::try_from(value).map_err(|_| {
+                        RtfError::MalformedDocument(
+                            "RTF irowband must be -1 or in 0..=65535".to_string(),
+                        )
+                    })?)
+                });
+                state.table_row_band_index_seen = true
+            },
+            ControlWord::TableLastRow(param) => {
+                require_parameterless(*param, "lastrow")?;
+                if state.table_last_row_seen {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate RTF lastrow control".to_string(),
+                    ));
+                }
+                state.table_row_banding.last_row = true;
+                state.table_last_row_seen = true
+            },
+            ControlWord::TableAutoformatFlag(flag, param) => {
+                require_parameterless(*param, "table autoformat flag")?;
+                if !state.table_autoformat_flags.insert(*flag) {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate RTF table autoformat flag".to_string(),
+                    ));
+                }
+            },
+            ControlWord::LeftToRightRow(param) => {
+                require_parameterless(*param, "ltrrow")?;
+                state.table_row_direction = Some(TextDirection::LeftToRight)
+            },
+            ControlWord::RightToLeftRow(param) => {
+                require_parameterless(*param, "rtlrow")?;
+                state.table_row_direction = Some(TextDirection::RightToLeft)
+            },
+            ControlWord::TableRowGap(param) => {
+                let value = table_geometry_twips(*param, "trgaph", false)?;
+                state
+                    .table_row_geometry
+                    .set_half_gap_twips(Some(value as u16));
+            },
+            ControlWord::TableRowLeft(param) => {
+                let value = table_geometry_twips(*param, "trleft", true)?;
+                state.table_row_geometry.set_left_edge_twips(Some(value));
+            },
+            ControlWord::TableRowHeight(param) => state
+                .table_row_geometry
+                .set_height(table_row_height(*param)?),
+            ControlWord::TablePreferredWidthUnit(scope, param) => {
+                let unit = table_width_unit(*param)?;
+                let target = match scope {
+                    crate::TableDistanceScope::Row => &mut state.table_width_unit,
+                    crate::TableDistanceScope::Cell => &mut state.pending_cell_width_unit,
+                };
+                if target.replace(unit).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF preferred-width unit is duplicated".to_string(),
+                    ));
+                }
+            },
+            ControlWord::TablePreferredWidthValue(scope, param) => {
+                let value = param.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF preferred-width value requires a parameter".to_string(),
+                    )
+                })?;
+                let target = match scope {
+                    crate::TableDistanceScope::Row => &mut state.table_width_value,
+                    crate::TableDistanceScope::Cell => &mut state.pending_cell_width_value,
+                };
+                if target.replace(value).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF preferred-width value is duplicated".to_string(),
+                    ));
+                }
+            },
+            ControlWord::TableInvisibleWidthUnit(trailing, param) => {
+                let unit = table_width_unit(*param)?;
+                let target = if *trailing {
+                    &mut state.table_trailing_width_unit
+                } else {
+                    &mut state.table_leading_width_unit
+                };
+                if target.replace(unit).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF invisible-width unit is duplicated".to_string(),
+                    ));
+                }
+            },
+            ControlWord::TableInvisibleWidthValue(trailing, param) => {
+                let value = param.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF invisible-width value requires a parameter".to_string(),
+                    )
+                })?;
+                let target = if *trailing {
+                    &mut state.table_trailing_width_value
+                } else {
+                    &mut state.table_leading_width_value
+                };
+                if target.replace(value).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF invisible-width value is duplicated".to_string(),
+                    ));
+                }
+            },
+            ControlWord::TableAutoFit(param) => {
+                state.table_row_geometry.set_auto_fit(match param {
+                    Some(0) => false,
+                    Some(1) => true,
+                    None => {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF trautofit requires 0 or 1".to_string(),
+                        ));
+                    },
+                    Some(_) => {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF trautofit accepts only 0 or 1".to_string(),
+                        ));
+                    },
+                })
+            },
+            ControlWord::TableIndentValue(param) => {
+                let value = match param {
+                    None => 0,
+                    Some(_) => table_geometry_twips(*param, "tblind", true)?,
+                };
+                if state.table_indent_value.replace(value).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF tblind is duplicated".to_string(),
+                    ));
+                }
+            },
+            ControlWord::TableIndentUnit(param) => {
+                let unit = table_indent_unit(*param)?;
+                if state.table_indent_unit.replace(unit).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF tblindtype is duplicated".to_string(),
+                    ));
+                }
+            },
+            ControlWord::TableRowHeader(param) => {
+                require_parameterless(*param, "trhdr")?;
+                state.table_row_layout.header = true
+            },
+            ControlWord::TableRowKeep(param) => {
+                require_parameterless(*param, "trkeep")?;
+                state.table_row_layout.keep_together = true
+            },
+            ControlWord::TableRowKeepFollow(param) => {
+                require_parameterless(*param, "trkeepfollow")?;
+                state.table_row_layout.keep_with_following = true
+            },
+            ControlWord::TableRowAlignment(value, param) => {
+                require_parameterless(*param, "table row alignment")?;
+                state.table_row_layout.alignment = Some(*value)
+            },
+            ControlWord::TableCellVerticalAlignment(value, param) => {
+                require_parameterless(*param, "cell vertical alignment")?;
+                state.pending_cell_layout.vertical_alignment = Some(*value)
+            },
+            ControlWord::TableCellTextFlow(value, param) => {
+                require_parameterless(*param, "cell text flow")?;
+                state.pending_cell_layout.text_flow = Some(*value)
+            },
+            ControlWord::TableCellFitText(param) => {
+                require_parameterless(*param, "clFitText")?;
+                state.pending_cell_layout.fit_text = true
+            },
+            ControlWord::TableCellNoWrap(param) => {
+                require_parameterless(*param, "clNoWrap")?;
+                state.pending_cell_layout.no_wrap = true
+            },
+            ControlWord::TableCellHideMark(param) => {
+                require_parameterless(*param, "clhidemark")?;
+                state.pending_cell_layout.hide_mark = true
+            },
+            ControlWord::TableCellMerge(axis, role, param) => {
+                require_parameterless(*param, "table cell merge")?;
+                let pending = match axis {
+                    crate::TableCellMergeAxis::Horizontal => {
+                        &mut state.pending_cell_merge.horizontal
+                    },
+                    crate::TableCellMergeAxis::Vertical => &mut state.pending_cell_merge.vertical,
+                };
+                if pending.replace(*role).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF cell definition has duplicate or conflicting merge roles on one axis"
+                            .to_string(),
+                    ));
+                }
+            },
             ControlWord::TableRightToLeft(value) => {
-                let direction=Some(if *value{TextDirection::RightToLeft}else{TextDirection::LeftToRight});let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination==Destination::NestedTableProperties{self.ensure_nested_builder(level)?.table.set_direction(direction);}else{self.start_table_if_needed();if let Some(table)=&mut self.current_table{table.set_direction(direction);}}
+                let direction = Some(if *value {
+                    TextDirection::RightToLeft
+                } else {
+                    TextDirection::LeftToRight
+                });
+                let destination = state.destination;
+                let level = state.table_nesting_level;
+                let _ = state;
+                if destination == Destination::NestedTableProperties {
+                    self.ensure_nested_builder(level)?
+                        .table
+                        .set_direction(direction);
+                } else {
+                    self.start_table_if_needed();
+                    if let Some(table) = &mut self.current_table {
+                        table.set_direction(direction);
+                    }
+                }
             },
             ControlWord::CellX(boundary) => {
                 // Cell boundary definition
                 state.cell_boundaries.push(*boundary);
-                if state.cell_distances.len()>=crate::MAX_TABLE_CELLS_PER_ROW{return Err(RtfError::MalformedDocument("RTF row exceeds 4096 cell definitions".to_string()))}let width=resolve_preferred_width(state.pending_cell_width_unit.take(),state.pending_cell_width_value.take())?;state.cell_widths.push(width);state.cell_distances.push((std::mem::take(&mut state.pending_cell_padding),std::mem::take(&mut state.pending_cell_spacing)));state.cell_layouts.push(std::mem::take(&mut state.pending_cell_layout));state.cell_merges.push(std::mem::take(&mut state.pending_cell_merge));state.cell_decorations.push((std::mem::take(&mut state.pending_cell_borders),std::mem::take(&mut state.pending_cell_shading)));state.pending_cell_shading_seen=0;state.active_table_border=None;state.active_table_border_seen=0;
+                if state.cell_distances.len() >= crate::MAX_TABLE_CELLS_PER_ROW {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF row exceeds 4096 cell definitions".to_string(),
+                    ));
+                }
+                let width = resolve_preferred_width(
+                    state.pending_cell_width_unit.take(),
+                    state.pending_cell_width_value.take(),
+                )?;
+                state.cell_widths.push(width);
+                state.cell_distances.push((
+                    std::mem::take(&mut state.pending_cell_padding),
+                    std::mem::take(&mut state.pending_cell_spacing),
+                ));
+                state
+                    .cell_layouts
+                    .push(std::mem::take(&mut state.pending_cell_layout));
+                state
+                    .cell_merges
+                    .push(std::mem::take(&mut state.pending_cell_merge));
+                state.cell_decorations.push((
+                    std::mem::take(&mut state.pending_cell_borders),
+                    std::mem::take(&mut state.pending_cell_shading),
+                ));
+                state.pending_cell_shading_seen = 0;
+                state.active_table_border = None;
+                state.active_table_border_seen = 0;
             },
-            ControlWord::TableDistanceValue(target,value)=>apply_table_distance(state,*target,*value,false)?,
-            ControlWord::TableDistanceUnit(target,value)=>apply_table_distance(state,*target,*value,true)?,
-            ControlWord::TableHorizontalReference(value,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){require_parameterless(*param,"floating-table horizontal reference")?;state.table_row_positioning.horizontal_reference=Some(*value)},
-            ControlWord::TableVerticalReference(value,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){require_parameterless(*param,"floating-table vertical reference")?;state.table_row_positioning.vertical_reference=Some(*value)},
-            ControlWord::TableHorizontalPosition(value,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){require_parameterless(*param,"floating-table horizontal position")?;state.table_row_positioning.horizontal_position=Some(*value)},
-            ControlWord::TableVerticalPosition(value,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){require_parameterless(*param,"floating-table vertical position")?;state.table_row_positioning.vertical_position=Some(*value)},
-            ControlWord::TableHorizontalOffset(negative,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){let value=floating_table_offset(*param,*negative,"horizontal")?;state.table_row_positioning.horizontal_position=Some(if *negative{crate::TableHorizontalPosition::NegativeOffset(value)}else{crate::TableHorizontalPosition::Offset(value)})},
-            ControlWord::TableVerticalOffset(negative,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){let value=floating_table_offset(*param,*negative,"vertical")?;state.table_row_positioning.vertical_position=Some(if *negative{crate::TableVerticalPosition::NegativeOffset(value)}else{crate::TableVerticalPosition::Offset(value)})},
-            ControlWord::TableWrapDistance(edge,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){*state.table_row_positioning.wrap_distances.side_mut(*edge)=Some(floating_table_wrap_distance(*param)?)},
-            ControlWord::TableNoOverlap(param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){state.table_row_positioning.no_overlap=match *param{None|Some(1)=>true,Some(0)=>false,Some(_)=>return Err(RtfError::MalformedDocument("RTF tabsnoovrlp accepts only 0 or 1".to_string()))}},
-            ControlWord::NestedTableCell(param)=>{require_parameterless(*param,"nestcell")?;let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination!=Destination::DocumentBody||level<2{return Err(RtfError::MalformedDocument("RTF nestcell requires visible nested-table text and itap 2 or greater".to_string()))}self.finalize_nested_cell(level)?;},
-            ControlWord::NestedTableRow(param)=>{require_parameterless(*param,"nestrow")?;let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination!=Destination::NestedTableProperties||level<2{return Err(RtfError::MalformedDocument("RTF nestrow requires a nesttableprops destination and itap 2 or greater".to_string()))}self.finalize_nested_row(level)?;},
-            ControlWord::NestedTableProperties(_)|ControlWord::NoNestedTables(_)=>return Err(RtfError::MalformedDocument("RTF nested-table destination control is misplaced".to_string())),
+            ControlWord::TableDistanceValue(target, value) => {
+                apply_table_distance(state, *target, *value, false)?
+            },
+            ControlWord::TableDistanceUnit(target, value) => {
+                apply_table_distance(state, *target, *value, true)?
+            },
+            ControlWord::TableHorizontalReference(value, param) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    require_parameterless(*param, "floating-table horizontal reference")?;
+                    state.table_row_positioning.horizontal_reference = Some(*value)
+                }
+            },
+            ControlWord::TableVerticalReference(value, param) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    require_parameterless(*param, "floating-table vertical reference")?;
+                    state.table_row_positioning.vertical_reference = Some(*value)
+                }
+            },
+            ControlWord::TableHorizontalPosition(value, param) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    require_parameterless(*param, "floating-table horizontal position")?;
+                    state.table_row_positioning.horizontal_position = Some(*value)
+                }
+            },
+            ControlWord::TableVerticalPosition(value, param) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    require_parameterless(*param, "floating-table vertical position")?;
+                    state.table_row_positioning.vertical_position = Some(*value)
+                }
+            },
+            ControlWord::TableHorizontalOffset(negative, param) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    let value = floating_table_offset(*param, *negative, "horizontal")?;
+                    state.table_row_positioning.horizontal_position = Some(if *negative {
+                        crate::TableHorizontalPosition::NegativeOffset(value)
+                    } else {
+                        crate::TableHorizontalPosition::Offset(value)
+                    })
+                }
+            },
+            ControlWord::TableVerticalOffset(negative, param) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    let value = floating_table_offset(*param, *negative, "vertical")?;
+                    state.table_row_positioning.vertical_position = Some(if *negative {
+                        crate::TableVerticalPosition::NegativeOffset(value)
+                    } else {
+                        crate::TableVerticalPosition::Offset(value)
+                    })
+                }
+            },
+            ControlWord::TableWrapDistance(edge, param) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    *state.table_row_positioning.wrap_distances.side_mut(*edge) =
+                        Some(floating_table_wrap_distance(*param)?)
+                }
+            },
+            ControlWord::TableNoOverlap(param) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    state.table_row_positioning.no_overlap = match *param {
+                        None | Some(1) => true,
+                        Some(0) => false,
+                        Some(_) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF tabsnoovrlp accepts only 0 or 1".to_string(),
+                            ));
+                        },
+                    }
+                }
+            },
+            ControlWord::NestedTableCell(param) => {
+                require_parameterless(*param, "nestcell")?;
+                let destination = state.destination;
+                let level = state.table_nesting_level;
+                let _ = state;
+                if destination != Destination::DocumentBody || level < 2 {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF nestcell requires visible nested-table text and itap 2 or greater"
+                            .to_string(),
+                    ));
+                }
+                self.finalize_nested_cell(level)?;
+            },
+            ControlWord::NestedTableRow(param) => {
+                require_parameterless(*param, "nestrow")?;
+                let destination = state.destination;
+                let level = state.table_nesting_level;
+                let _ = state;
+                if destination != Destination::NestedTableProperties || level < 2 {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF nestrow requires a nesttableprops destination and itap 2 or greater"
+                            .to_string(),
+                    ));
+                }
+                self.finalize_nested_row(level)?;
+            },
+            ControlWord::NestedTableProperties(_) | ControlWord::NoNestedTables(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF nested-table destination control is misplaced".to_string(),
+                ));
+            },
             ControlWord::TableCell => {
                 // Cell break - finalize current cell
                 self.start_table_if_needed();
@@ -3997,15 +8171,250 @@ impl<'a> Parser<'a> {
             },
             ControlWord::TableRow => {
                 // Row break - finalize current row
-                let row_geometry=resolve_row_geometry(state)?;let row_padding=state.table_row_padding.clone();let row_spacing=state.table_row_spacing.clone();let row_positioning=state.table_row_positioning.clone();let row_direction=state.table_row_direction;let row_layout=state.table_row_layout;let row_borders=state.table_row_borders.clone();let row_shading=state.table_row_shading;let autoformat_flags=state.table_autoformat_flags;let banding=state.table_row_banding;let boundaries=state.cell_boundaries.clone();let cell_distances=state.cell_distances.clone();let cell_layouts=state.cell_layouts.clone();let cell_merges=state.cell_merges.clone();let cell_decorations=state.cell_decorations.clone();let cell_widths=state.cell_widths.clone();let _=state;self.drain_nested_to(1)?;self.finalize_cell(false)?;if let Some(row)=&mut self.current_row{if !boundaries.is_empty()&&boundaries.len()!=row.cell_count(){return Err(RtfError::MalformedDocument("RTF row cell boundaries do not match cell count".to_string()))}for(index,cell)in row.cells_mut().iter_mut().enumerate(){if let Some((padding,spacing))=cell_distances.get(index){cell.set_padding(padding.clone());cell.set_spacing(spacing.clone());}if let Some(layout)=cell_layouts.get(index){cell.set_layout(*layout);}if let Some(merge)=cell_merges.get(index){cell.set_merge(*merge);}cell.set_right_boundary(boundaries.get(index).copied());cell.set_preferred_width(cell_widths.get(index).copied().flatten());if let Some((borders,shading))=cell_decorations.get(index){cell.set_borders(borders.clone());cell.set_shading(*shading);}}row.set_direction(row_direction);row.set_layout(row_layout);row.set_padding(row_padding);row.set_spacing(row_spacing);row.set_positioning(row_positioning);row.set_borders(row_borders);row.set_shading(row_shading);row.set_geometry(row_geometry);row.set_autoformat_flags(autoformat_flags);row.set_banding(banding);}
+                let row_geometry = resolve_row_geometry(state)?;
+                let table_style = state.table_style;
+                let row_padding = state.table_row_padding.clone();
+                let row_spacing = state.table_row_spacing.clone();
+                let row_positioning = state.table_row_positioning.clone();
+                let row_direction = state.table_row_direction;
+                let row_layout = state.table_row_layout;
+                let row_borders = state.table_row_borders.clone();
+                let row_shading = state.table_row_shading;
+                let autoformat_flags = state.table_autoformat_flags;
+                let banding = state.table_row_banding;
+                let boundaries = state.cell_boundaries.clone();
+                let cell_distances = state.cell_distances.clone();
+                let cell_layouts = state.cell_layouts.clone();
+                let cell_merges = state.cell_merges.clone();
+                let cell_decorations = state.cell_decorations.clone();
+                let cell_widths = state.cell_widths.clone();
+                let _ = state;
+                self.drain_nested_to(1)?;
+                self.finalize_cell(false)?;
+                if let Some(row) = &mut self.current_row {
+                    if !boundaries.is_empty() && boundaries.len() != row.cell_count() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF row cell boundaries do not match cell count".to_string(),
+                        ));
+                    }
+                    for (index, cell) in row.cells_mut().iter_mut().enumerate() {
+                        if let Some((padding, spacing)) = cell_distances.get(index) {
+                            cell.set_padding(padding.clone());
+                            cell.set_spacing(spacing.clone());
+                        }
+                        if let Some(layout) = cell_layouts.get(index) {
+                            cell.set_layout(*layout);
+                        }
+                        if let Some(merge) = cell_merges.get(index) {
+                            cell.set_merge(*merge);
+                        }
+                        cell.set_right_boundary(boundaries.get(index).copied());
+                        cell.set_preferred_width(cell_widths.get(index).copied().flatten());
+                        if let Some((borders, shading)) = cell_decorations.get(index) {
+                            cell.set_borders(borders.clone());
+                            cell.set_shading(*shading);
+                        }
+                    }
+                    row.set_table_style(table_style);
+                    row.set_direction(row_direction);
+                    row.set_layout(row_layout);
+                    row.set_padding(row_padding);
+                    row.set_spacing(row_spacing);
+                    row.set_positioning(row_positioning);
+                    row.set_borders(row_borders);
+                    row.set_shading(row_shading);
+                    row.set_geometry(row_geometry);
+                    row.set_autoformat_flags(autoformat_flags);
+                    row.set_banding(banding);
+                }
                 self.finalize_row()?;
             },
 
+            ControlWord::ProtectionUserTable
+            | ControlWord::NextFile
+            | ControlWord::DocumentTemplate
+            | ControlWord::WindowCaption
+            | ControlWord::XslTransform
+            | ControlWord::StyleListFilter(_)
+            | ControlWord::WriteReservation(_)
+            | ControlWord::WriteReservationHash(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF destination control is misplaced".to_string(),
+                ));
+            },
             _ => {
                 // Ignore unknown or unhandled control words
             },
         }
 
+        Ok(())
+    }
+
+    fn apply_review_display_control(&mut self, control: &ControlWord<'_>) -> RtfResult<()> {
+        let (bit, name, parameter) = match control {
+            ControlWord::HideReviewMarkup(parameter) => (1, "donotshowmarkup", parameter),
+            ControlWord::HideReviewComments(parameter) => (2, "donotshowcomments", parameter),
+            ControlWord::HideReviewInsertionsAndDeletions(parameter) => {
+                (4, "donotshowinsdel", parameter)
+            },
+            _ => return Ok(()),
+        };
+        if parameter.is_some() {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF {name} must not have a numeric parameter"
+            )));
+        }
+        if self.review_display_seen & bit != 0 {
+            return Err(RtfError::MalformedDocument(format!(
+                "duplicate RTF {name} document property"
+            )));
+        }
+        self.review_display_seen |= bit;
+        match control {
+            ControlWord::HideReviewMarkup(_) => self.review_display.hide_markup = true,
+            ControlWord::HideReviewComments(_) => self.review_display.hide_comments = true,
+            ControlWord::HideReviewInsertionsAndDeletions(_) => {
+                self.review_display.hide_insertions_and_deletions = true;
+            },
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+
+    fn apply_document_view_control(&mut self, control: &ControlWord<'_>) -> RtfResult<()> {
+        let (bit, name) = match control {
+            ControlWord::DocumentViewKind(_) => (1, "viewkind"),
+            ControlWord::DocumentViewScale(_) => (2, "viewscale"),
+            ControlWord::DocumentZoomKind(_) => (4, "viewzk"),
+            ControlWord::DocumentViewBackgroundShapes(_) => (8, "viewbksp"),
+            ControlWord::DocumentViewNoPageBoundaries(_) => (16, "viewnobound"),
+            _ => return Ok(()),
+        };
+        if self.document_view_seen & bit != 0 {
+            return Err(RtfError::MalformedDocument(format!(
+                "duplicate RTF {name} document property"
+            )));
+        }
+        self.document_view_seen |= bit;
+        let value = match control {
+            ControlWord::DocumentViewKind(value)
+            | ControlWord::DocumentViewScale(value)
+            | ControlWord::DocumentZoomKind(value)
+            | ControlWord::DocumentViewBackgroundShapes(value) => value.ok_or_else(|| {
+                RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+            })?,
+            ControlWord::DocumentViewNoPageBoundaries(value) => {
+                if value.is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF viewnobound must not have a numeric parameter".to_string(),
+                    ));
+                }
+                0
+            },
+            _ => unreachable!(),
+        };
+        match control {
+            ControlWord::DocumentViewKind(_) => {
+                self.document_view.kind = Some(crate::DocumentViewKind::from_rtf(value)?);
+            },
+            ControlWord::DocumentViewScale(_) => {
+                let value = u16::try_from(value).map_err(|_| {
+                    RtfError::MalformedDocument(format!(
+                        "RTF viewscale must be in 1..={}",
+                        crate::MAX_DOCUMENT_VIEW_SCALE_PERCENT
+                    ))
+                })?;
+                if value == 0 || value > crate::MAX_DOCUMENT_VIEW_SCALE_PERCENT {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF viewscale must be in 1..={}",
+                        crate::MAX_DOCUMENT_VIEW_SCALE_PERCENT
+                    )));
+                }
+                self.document_view.scale_percent = Some(value);
+            },
+            ControlWord::DocumentZoomKind(_) => {
+                self.document_view.zoom_kind = Some(crate::DocumentZoomKind::from_rtf(value)?);
+            },
+            ControlWord::DocumentViewBackgroundShapes(_) => {
+                self.document_view.background_shapes = Some(match value {
+                    0 => false,
+                    1 => true,
+                    _ => {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF viewbksp accepts only 0 or 1".to_string(),
+                        ));
+                    },
+                });
+            },
+            ControlWord::DocumentViewNoPageBoundaries(_) => {
+                self.document_view.hide_page_boundaries = true;
+            },
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+
+    fn apply_document_hyphenation_control(&mut self, control: &ControlWord<'_>) -> RtfResult<()> {
+        let (bit, name) = match control {
+            ControlWord::HyphenateAutomatically(_) => (1, "hyphauto"),
+            ControlWord::HyphenateCapitalizedWords(_) => (2, "hyphcaps"),
+            ControlWord::HyphenationConsecutiveLines(_) => (4, "hyphconsec"),
+            ControlWord::HyphenationHotZone(_) => (8, "hyphhotz"),
+            _ => return Ok(()),
+        };
+        if self.hyphenation_seen & bit != 0 {
+            return Err(RtfError::MalformedDocument(format!(
+                "duplicate RTF {name} document property"
+            )));
+        }
+        self.hyphenation_seen |= bit;
+        let strict_toggle = |value: Option<i32>| match value {
+            None | Some(1) => Ok(true),
+            Some(0) => Ok(false),
+            Some(_) => Err(RtfError::MalformedDocument(format!(
+                "RTF {name} accepts only 0 or 1"
+            ))),
+        };
+        match control {
+            ControlWord::HyphenateAutomatically(value) => {
+                self.hyphenation.automatic = Some(strict_toggle(*value)?);
+            },
+            ControlWord::HyphenateCapitalizedWords(value) => {
+                self.hyphenation.capitalized_words = Some(strict_toggle(*value)?);
+            },
+            ControlWord::HyphenationConsecutiveLines(value) => {
+                let value = value.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF hyphconsec requires a numeric parameter".to_string(),
+                    )
+                })?;
+                self.hyphenation.consecutive_line_limit =
+                    Some(u32::try_from(value).map_err(|_| {
+                        RtfError::MalformedDocument(format!(
+                            "RTF hyphconsec must be in 0..={}",
+                            crate::MAX_HYPHENATION_CONSECUTIVE_LINES
+                        ))
+                    })?);
+            },
+            ControlWord::HyphenationHotZone(value) => {
+                let value = value.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF hyphhotz requires a numeric parameter".to_string(),
+                    )
+                })?;
+                let value = u32::try_from(value).map_err(|_| {
+                    RtfError::MalformedDocument("RTF hyphhotz cannot be negative".to_string())
+                })?;
+                if value > crate::MAX_HYPHENATION_HOT_ZONE_TWIPS {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF hyphenation hot zone exceeds {} twips",
+                        crate::MAX_HYPHENATION_HOT_ZONE_TWIPS
+                    )));
+                }
+                self.hyphenation.hot_zone_twips = Some(value);
+            },
+            _ => {},
+        }
         Ok(())
     }
 
@@ -4039,13 +8448,26 @@ impl<'a> Parser<'a> {
             let border = self.parse_page_border_run()?;
             if self.sections.is_empty() {
                 if self.sections.len() >= MAX_SECTIONS {
-                    return Err(RtfError::MalformedDocument("RTF section count exceeds limit".to_string()));
+                    return Err(RtfError::MalformedDocument(
+                        "RTF section count exceeds limit".to_string(),
+                    ));
                 }
-                self.sections.push(super::section::Section::new());
+                let mut section = super::section::Section::new();
+                section.properties.margin_gutter = self
+                    .print_layout_settings
+                    .document_gutter_twips
+                    .unwrap_or_default() as i32;
+                self.sections.push(section);
+                self.section_gutter_overrides.push(false);
             }
-            let section = self.sections.last_mut().ok_or_else(|| RtfError::MalformedDocument("no active RTF section".to_string()))?;
+            let section = self
+                .sections
+                .last_mut()
+                .ok_or_else(|| RtfError::MalformedDocument("no active RTF section".to_string()))?;
             if section.properties.page_borders.get(side).is_some() {
-                return Err(RtfError::MalformedDocument("duplicate RTF page-border edge".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF page-border edge".to_string(),
+                ));
             }
             section.properties.page_borders.set(side, border);
             self.section_properties_active = true;
@@ -4091,8 +8513,7 @@ impl<'a> Parser<'a> {
                 .sections
                 .last()
                 .is_none_or(|section| section.headers_footers.is_empty());
-        let in_root_section_format_run =
-            in_root_document_body && self.root_section_format_run;
+        let in_root_section_format_run = in_root_document_body && self.root_section_format_run;
         if is_section_note_control
             && !in_root_section_prefix
             && !in_visible_section_format
@@ -4115,24 +8536,58 @@ impl<'a> Parser<'a> {
                 .last()
                 .map(|section| section.properties.clone())
                 .unwrap_or_default();
+            let inherited_gutter_override = self
+                .section_gutter_overrides
+                .last()
+                .copied()
+                .unwrap_or(false);
             let mut section = super::section::Section::new();
             section.properties = inherited;
+            if self.sections.is_empty() {
+                section.properties.margin_gutter = self
+                    .print_layout_settings
+                    .document_gutter_twips
+                    .unwrap_or_default() as i32;
+            }
             self.sections.push(section);
+            self.section_gutter_overrides
+                .push(inherited_gutter_override);
             self.section_properties_active = true;
+        }
+        if matches!(control, ControlWord::SectionDefault) {
+            if let Some(overridden) = self.section_gutter_overrides.last_mut() {
+                *overridden = false;
+            }
+        } else if matches!(control, ControlWord::MarginGutter(_)) {
+            if let Some(overridden) = self.section_gutter_overrides.last_mut() {
+                *overridden = true;
+            }
         }
         let section = self.sections.last_mut().ok_or_else(|| {
             RtfError::ParserError("failed to create RTF section state".to_string())
         })?;
         let properties = &mut section.properties;
         match control {
+            ControlWord::SectionStyle(value) => {
+                properties.section_style = Some(section_style_reference(*value)?);
+            },
             ControlWord::SectionDefault => {
                 *properties = super::section::SectionProperties::default();
-                self.states.last_mut().ok_or_else(|| {
-                    RtfError::ParserError("missing RTF parser state".to_string())
-                })?.section_column_number = None;
+                properties.margin_gutter = self
+                    .print_layout_settings
+                    .document_gutter_twips
+                    .unwrap_or_default() as i32;
+                self.states
+                    .last_mut()
+                    .ok_or_else(|| RtfError::ParserError("missing RTF parser state".to_string()))?
+                    .section_column_number = None;
             },
             ControlWord::PageBorderOptions(value) => {
-                let value = value.ok_or_else(|| RtfError::MalformedDocument("RTF pgbrdropt requires a numeric parameter".to_string()))?;
+                let value = value.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF pgbrdropt requires a numeric parameter".to_string(),
+                    )
+                })?;
                 properties.page_borders.set_option_value(value)?;
             },
             ControlWord::PageBorderSurroundHeader => properties.page_borders.surround_header = true,
@@ -4210,9 +8665,10 @@ impl<'a> Parser<'a> {
                 }
                 properties.columns.count = count;
                 properties.columns.explicit.clear();
-                self.states.last_mut().ok_or_else(|| {
-                    RtfError::ParserError("missing RTF parser state".to_string())
-                })?.section_column_number = None;
+                self.states
+                    .last_mut()
+                    .ok_or_else(|| RtfError::ParserError("missing RTF parser state".to_string()))?
+                    .section_column_number = None;
             },
             ControlWord::ColumnSpace(value) => {
                 let value = value.unwrap_or(720);
@@ -4225,45 +8681,63 @@ impl<'a> Parser<'a> {
             },
             ControlWord::ColumnSeparator(value) => properties.columns.separator = *value,
             ControlWord::ColumnNumber(value) => {
-                let value = value.ok_or_else(|| RtfError::MalformedDocument(
-                    "RTF colno requires a numeric parameter".to_string(),
-                ))?;
-                let number = u16::try_from(value).map_err(|_| RtfError::MalformedDocument(
-                    "RTF colno must select an existing one-based section column".to_string(),
-                ))?;
-                let expected = u16::try_from(properties.columns.explicit.len() + 1)
-                    .unwrap_or(u16::MAX);
+                let value = value.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF colno requires a numeric parameter".to_string(),
+                    )
+                })?;
+                let number = u16::try_from(value).map_err(|_| {
+                    RtfError::MalformedDocument(
+                        "RTF colno must select an existing one-based section column".to_string(),
+                    )
+                })?;
+                let expected =
+                    u16::try_from(properties.columns.explicit.len() + 1).unwrap_or(u16::MAX);
                 if number != expected || number > properties.columns.count {
                     return Err(RtfError::MalformedDocument(
                         "RTF explicit section columns must use sequential one-based colno values"
                             .to_string(),
                     ));
                 }
-                properties.columns.explicit.push(super::section::SectionColumn {
-                    width: 0,
-                    space_after: None,
-                });
-                self.states.last_mut().ok_or_else(|| {
-                    RtfError::ParserError("missing RTF parser state".to_string())
-                })?.section_column_number = Some(number);
+                properties
+                    .columns
+                    .explicit
+                    .push(super::section::SectionColumn {
+                        width: 0,
+                        space_after: None,
+                    });
+                self.states
+                    .last_mut()
+                    .ok_or_else(|| RtfError::ParserError("missing RTF parser state".to_string()))?
+                    .section_column_number = Some(number);
             },
             ControlWord::ColumnWidth(value) => {
-                let value = value.ok_or_else(|| RtfError::MalformedDocument(
-                    "RTF colw requires a numeric parameter".to_string(),
-                ))?;
+                let value = value.ok_or_else(|| {
+                    RtfError::MalformedDocument("RTF colw requires a numeric parameter".to_string())
+                })?;
                 if !(1..=super::section::MAX_SECTION_COLUMN_TWIPS).contains(&value) {
                     return Err(RtfError::MalformedDocument(
                         "RTF section-column width must be in 1..=31680 twips".to_string(),
                     ));
                 }
-                let number = self.states.last().and_then(|state| state.section_column_number)
-                    .ok_or_else(|| RtfError::MalformedDocument(
-                        "RTF colw requires a preceding colno in the active group".to_string(),
-                    ))?;
-                let column = properties.columns.explicit.get_mut(usize::from(number - 1))
-                    .ok_or_else(|| RtfError::MalformedDocument(
-                        "RTF colw refers to an undefined section column".to_string(),
-                    ))?;
+                let number = self
+                    .states
+                    .last()
+                    .and_then(|state| state.section_column_number)
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF colw requires a preceding colno in the active group".to_string(),
+                        )
+                    })?;
+                let column = properties
+                    .columns
+                    .explicit
+                    .get_mut(usize::from(number - 1))
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF colw refers to an undefined section column".to_string(),
+                        )
+                    })?;
                 if column.width != 0 {
                     return Err(RtfError::MalformedDocument(
                         "duplicate RTF colw for one section column".to_string(),
@@ -4272,22 +8746,34 @@ impl<'a> Parser<'a> {
                 column.width = value;
             },
             ControlWord::ColumnSpaceRight(value) => {
-                let value = value.ok_or_else(|| RtfError::MalformedDocument(
-                    "RTF colsr requires a numeric parameter".to_string(),
-                ))?;
+                let value = value.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF colsr requires a numeric parameter".to_string(),
+                    )
+                })?;
                 if !(0..=super::section::MAX_SECTION_COLUMN_TWIPS).contains(&value) {
                     return Err(RtfError::MalformedDocument(
                         "RTF section-column spacing must be in 0..=31680 twips".to_string(),
                     ));
                 }
-                let number = self.states.last().and_then(|state| state.section_column_number)
-                    .ok_or_else(|| RtfError::MalformedDocument(
-                        "RTF colsr requires a preceding colno in the active group".to_string(),
-                    ))?;
-                let column = properties.columns.explicit.get_mut(usize::from(number - 1))
-                    .ok_or_else(|| RtfError::MalformedDocument(
-                        "RTF colsr refers to an undefined section column".to_string(),
-                    ))?;
+                let number = self
+                    .states
+                    .last()
+                    .and_then(|state| state.section_column_number)
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF colsr requires a preceding colno in the active group".to_string(),
+                        )
+                    })?;
+                let column = properties
+                    .columns
+                    .explicit
+                    .get_mut(usize::from(number - 1))
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF colsr refers to an undefined section column".to_string(),
+                        )
+                    })?;
                 if column.width == 0 {
                     return Err(RtfError::MalformedDocument(
                         "RTF colsr must follow colw for its section column".to_string(),
@@ -4334,11 +8820,8 @@ impl<'a> Parser<'a> {
                         "RTF line-number increment must be in 0..=65535".to_string(),
                     ));
                 }
-                properties.line_numbering.increment = if value == 0 {
-                    None
-                } else {
-                    Some(value as u16)
-                };
+                properties.line_numbering.increment =
+                    if value == 0 { None } else { Some(value as u16) };
             },
             ControlWord::LineNumberDistance(value) => {
                 let value = value.unwrap_or(360);
@@ -4381,7 +8864,9 @@ impl<'a> Parser<'a> {
         let mut saw_style = false;
         let mut seen = 0u8;
         loop {
-            let Some(Token::Control(control)) = self.tokens.get(self.pos) else { break; };
+            let Some(Token::Control(control)) = self.tokens.get(self.pos) else {
+                break;
+            };
             let style = match control {
                 ControlWord::BorderNone => Some(crate::PageBorderStyle::None),
                 ControlWord::BorderSingle => Some(crate::PageBorderStyle::Single),
@@ -4393,15 +8878,33 @@ impl<'a> Parser<'a> {
                 ControlWord::BorderDotDotDash => Some(crate::PageBorderStyle::DotDotDash),
                 ControlWord::BorderDouble => Some(crate::PageBorderStyle::Double),
                 ControlWord::BorderTriple => Some(crate::PageBorderStyle::Triple),
-                ControlWord::BorderThinThickSmall => Some(crate::PageBorderStyle::ThinThickSmallGap),
-                ControlWord::BorderThickThinSmall => Some(crate::PageBorderStyle::ThickThinSmallGap),
-                ControlWord::BorderThinThickThinSmall => Some(crate::PageBorderStyle::ThinThickThinSmallGap),
-                ControlWord::BorderThinThickMedium => Some(crate::PageBorderStyle::ThinThickMediumGap),
-                ControlWord::BorderThickThinMedium => Some(crate::PageBorderStyle::ThickThinMediumGap),
-                ControlWord::BorderThinThickThinMedium => Some(crate::PageBorderStyle::ThinThickThinMediumGap),
-                ControlWord::BorderThinThickLarge => Some(crate::PageBorderStyle::ThinThickLargeGap),
-                ControlWord::BorderThickThinLarge => Some(crate::PageBorderStyle::ThickThinLargeGap),
-                ControlWord::BorderThinThickThinLarge => Some(crate::PageBorderStyle::ThinThickThinLargeGap),
+                ControlWord::BorderThinThickSmall => {
+                    Some(crate::PageBorderStyle::ThinThickSmallGap)
+                },
+                ControlWord::BorderThickThinSmall => {
+                    Some(crate::PageBorderStyle::ThickThinSmallGap)
+                },
+                ControlWord::BorderThinThickThinSmall => {
+                    Some(crate::PageBorderStyle::ThinThickThinSmallGap)
+                },
+                ControlWord::BorderThinThickMedium => {
+                    Some(crate::PageBorderStyle::ThinThickMediumGap)
+                },
+                ControlWord::BorderThickThinMedium => {
+                    Some(crate::PageBorderStyle::ThickThinMediumGap)
+                },
+                ControlWord::BorderThinThickThinMedium => {
+                    Some(crate::PageBorderStyle::ThinThickThinMediumGap)
+                },
+                ControlWord::BorderThinThickLarge => {
+                    Some(crate::PageBorderStyle::ThinThickLargeGap)
+                },
+                ControlWord::BorderThickThinLarge => {
+                    Some(crate::PageBorderStyle::ThickThinLargeGap)
+                },
+                ControlWord::BorderThinThickThinLarge => {
+                    Some(crate::PageBorderStyle::ThinThickThinLargeGap)
+                },
                 ControlWord::BorderWave => Some(crate::PageBorderStyle::Wavy),
                 ControlWord::BorderWavyDouble => Some(crate::PageBorderStyle::DoubleWavy),
                 ControlWord::BorderStriped => Some(crate::PageBorderStyle::Striped),
@@ -4412,7 +8915,11 @@ impl<'a> Parser<'a> {
                 _ => None,
             };
             if let Some(style) = style {
-                if saw_style { return Err(RtfError::MalformedDocument("duplicate RTF page-border style".to_string())); }
+                if saw_style {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate RTF page-border style".to_string(),
+                    ));
+                }
                 saw_style = true;
                 border.style = style;
                 self.pos += 1;
@@ -4420,39 +8927,96 @@ impl<'a> Parser<'a> {
             }
             match control {
                 ControlWord::PageBorderArt(value) => {
-                    if saw_style { return Err(RtfError::MalformedDocument("duplicate RTF page-border style/art".to_string())); }
-                    let value = value.ok_or_else(|| RtfError::MalformedDocument("RTF brdrart requires a numeric parameter".to_string()))?;
-                    border.art = Some(u8::try_from(value).map_err(|_| RtfError::MalformedDocument("invalid RTF page-border art".to_string()))?);
+                    if saw_style {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF page-border style/art".to_string(),
+                        ));
+                    }
+                    let value = value.ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF brdrart requires a numeric parameter".to_string(),
+                        )
+                    })?;
+                    border.art = Some(u8::try_from(value).map_err(|_| {
+                        RtfError::MalformedDocument("invalid RTF page-border art".to_string())
+                    })?);
                     saw_style = true;
                 },
                 ControlWord::BorderWidth(value) => {
-                    if !saw_style || seen & 1 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border width".to_string())); }
-                    border.width = u8::try_from(value.ok_or_else(|| RtfError::MalformedDocument("RTF page brdrw requires a numeric parameter".to_string()))?).map_err(|_| RtfError::MalformedDocument("invalid RTF page-border width".to_string()))?;
+                    if !saw_style || seen & 1 != 0 {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF page-border width".to_string(),
+                        ));
+                    }
+                    border.width = u8::try_from(value.ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF page brdrw requires a numeric parameter".to_string(),
+                        )
+                    })?)
+                    .map_err(|_| {
+                        RtfError::MalformedDocument("invalid RTF page-border width".to_string())
+                    })?;
                     seen |= 1;
                 },
                 ControlWord::BorderColor(value) => {
-                    if !saw_style || seen & 2 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border color".to_string())); }
-                    border.color_ref = u16::try_from(value.ok_or_else(|| RtfError::MalformedDocument("RTF page brdrcf requires a numeric parameter".to_string()))?).map_err(|_| RtfError::MalformedDocument("invalid RTF page-border color".to_string()))?;
+                    if !saw_style || seen & 2 != 0 {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF page-border color".to_string(),
+                        ));
+                    }
+                    border.color_ref = u16::try_from(value.ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF page brdrcf requires a numeric parameter".to_string(),
+                        )
+                    })?)
+                    .map_err(|_| {
+                        RtfError::MalformedDocument("invalid RTF page-border color".to_string())
+                    })?;
                     seen |= 2;
                 },
                 ControlWord::BorderSpace(value) => {
-                    if !saw_style || seen & 4 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border spacing".to_string())); }
-                    border.space = u16::try_from(value.ok_or_else(|| RtfError::MalformedDocument("RTF page brsp requires a numeric parameter".to_string()))?).map_err(|_| RtfError::MalformedDocument("invalid RTF page-border spacing".to_string()))?;
+                    if !saw_style || seen & 4 != 0 {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF page-border spacing".to_string(),
+                        ));
+                    }
+                    border.space = u16::try_from(value.ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF page brsp requires a numeric parameter".to_string(),
+                        )
+                    })?)
+                    .map_err(|_| {
+                        RtfError::MalformedDocument("invalid RTF page-border spacing".to_string())
+                    })?;
                     seen |= 4;
                 },
                 ControlWord::BorderShadow => {
-                    if !saw_style || seen & 8 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border shadow".to_string())); }
-                    border.shadow = true; seen |= 8;
+                    if !saw_style || seen & 8 != 0 {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF page-border shadow".to_string(),
+                        ));
+                    }
+                    border.shadow = true;
+                    seen |= 8;
                 },
                 ControlWord::BorderFrame => {
-                    if !saw_style || seen & 16 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border frame".to_string())); }
-                    border.frame = true; seen |= 16;
+                    if !saw_style || seen & 16 != 0 {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF page-border frame".to_string(),
+                        ));
+                    }
+                    border.frame = true;
+                    seen |= 16;
                 },
                 _ => break,
             }
             self.pos += 1;
         }
-        if !saw_style { return Err(RtfError::MalformedDocument("RTF page-border edge requires a style or art control".to_string())); }
+        if !saw_style {
+            return Err(RtfError::MalformedDocument(
+                "RTF page-border edge requires a style or art control".to_string(),
+            ));
+        }
         border.validate()?;
         Ok(border)
     }
@@ -4474,6 +9038,11 @@ impl<'a> Parser<'a> {
                     let author = self.parse_revision_author_group()?;
                     self.push_revision_author(author)?;
                     continue;
+                },
+                Some(Token::Control(ControlWord::Page(_))) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF page is not permitted in a stylesheet".to_string(),
+                    ));
                 },
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
@@ -4539,9 +9108,7 @@ impl<'a> Parser<'a> {
                             "RTF revision-save IDs must be positive signed integers".to_string(),
                         ));
                     }
-                    if self.revision_save_ids.len()
-                        >= crate::revision_save::MAX_REVISION_SAVE_IDS
-                    {
+                    if self.revision_save_ids.len() >= crate::revision_save::MAX_REVISION_SAVE_IDS {
                         return Err(RtfError::MalformedDocument(
                             "RTF revision-save ID count exceeds the safety limit".to_string(),
                         ));
@@ -4571,6 +9138,458 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
+    fn parse_mail_merge_destination(&mut self) -> RtfResult<crate::MailMerge<'a>> {
+        self.pos += 1; // ignorable-destination marker
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::MailMerge))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF mailmerge destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut merge = crate::MailMerge::default();
+        let mut saw_link_to_query = false;
+
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    merge.validate()?;
+                    return Ok(merge);
+                },
+                Some(Token::OpenBrace) => {
+                    let control = self.mail_merge_child_control()?;
+                    match control {
+                        ControlWord::MailMergeConnectString => {
+                            if merge.connect_string.is_some() {
+                                return Err(duplicate_mail_merge("connection string"));
+                            }
+                            merge.connect_string = Some(self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeConnectString,
+                                2,
+                            )?);
+                        },
+                        ControlWord::MailMergeConnectStringData => {
+                            if merge.connect_string_data.is_some() {
+                                return Err(duplicate_mail_merge("connection-string data"));
+                            }
+                            merge.connect_string_data =
+                                Some(self.parse_mail_merge_text_destination(
+                                    &ControlWord::MailMergeConnectStringData,
+                                    2,
+                                )?);
+                        },
+                        ControlWord::MailMergeQuery => {
+                            if merge.query.is_some() {
+                                return Err(duplicate_mail_merge("query"));
+                            }
+                            merge.query = Some(self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeQuery,
+                                2,
+                            )?);
+                        },
+                        ControlWord::MailMergeDataSource => {
+                            if merge.data_source.is_some() {
+                                return Err(duplicate_mail_merge("data source"));
+                            }
+                            merge.data_source = Some(self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeDataSource,
+                                2,
+                            )?);
+                        },
+                        ControlWord::MailMergeHeaderSource => {
+                            if merge.header_source.is_some() {
+                                return Err(duplicate_mail_merge("header source"));
+                            }
+                            merge.header_source = Some(self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeHeaderSource,
+                                2,
+                            )?);
+                        },
+                        ControlWord::MailMergeDataSourceObject => {
+                            if merge.data_source_object.is_some() {
+                                return Err(duplicate_mail_merge("data-source object"));
+                            }
+                            merge.data_source_object =
+                                Some(self.parse_mail_merge_data_source_object(2)?);
+                        },
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "unsupported nested RTF mail-merge destination".to_string(),
+                            ));
+                        },
+                    }
+                },
+                Some(Token::Control(ControlWord::MailMergeLinkToQuery(value))) => {
+                    if saw_link_to_query {
+                        return Err(duplicate_mail_merge("link-to-query flag"));
+                    }
+                    saw_link_to_query = true;
+                    merge.link_to_query = *value;
+                    self.pos += 1;
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => self.pos += 1,
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF mailmerge destination contains active or misplaced data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn mail_merge_child_control(&self) -> RtfResult<ControlWord<'a>> {
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "expected nested RTF mail-merge group".to_string(),
+            ));
+        }
+        match (self.tokens.get(self.pos + 1), self.tokens.get(self.pos + 2)) {
+            (
+                Some(Token::Control(ControlWord::IgnorableDestination)),
+                Some(Token::Control(control)),
+            ) => Ok(control.clone()),
+            _ => Err(RtfError::MalformedDocument(
+                "nested RTF mail-merge destinations must be starred".to_string(),
+            )),
+        }
+    }
+
+    fn parse_mail_merge_text_destination(
+        &mut self,
+        expected: &ControlWord<'_>,
+        depth: usize,
+    ) -> RtfResult<Cow<'a, str>> {
+        if depth > crate::MAX_MAIL_MERGE_NESTING_DEPTH {
+            return Err(RtfError::MalformedDocument(
+                "RTF mail-merge nesting depth exceeds the safety limit".to_string(),
+            ));
+        }
+        self.expect_token(Token::OpenBrace)?;
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "RTF mail-merge text destination must be starred".to_string(),
+            ));
+        }
+        self.pos += 1;
+        if !matches!(self.tokens.get(self.pos), Some(Token::Control(control)) if control == expected)
+        {
+            return Err(RtfError::MalformedDocument(
+                "unexpected RTF mail-merge text destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut value = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(Cow::Owned(value));
+                },
+                Some(Token::Text(text)) => {
+                    value.push_str(&self.decode_transport_text(text)?);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
+                    unicode_skip = (*count).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF mail-merge text contains active, nested, or binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if value.len() > crate::MAX_MAIL_MERGE_STRING_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF mail-merge string exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn parse_mail_merge_data_source_object(
+        &mut self,
+        depth: usize,
+    ) -> RtfResult<crate::MailMergeDataSourceObject<'a>> {
+        if depth > crate::MAX_MAIL_MERGE_NESTING_DEPTH {
+            return Err(RtfError::MalformedDocument(
+                "RTF mail-merge nesting depth exceeds the safety limit".to_string(),
+            ));
+        }
+        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(Token::Control(ControlWord::IgnorableDestination))?;
+        self.expect_token(Token::Control(ControlWord::MailMergeDataSourceObject))?;
+        let mut object = crate::MailMergeDataSourceObject::default();
+        let mut saw_dynamic_address = false;
+        let mut saw_first_row_header = false;
+
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    object.validate()?;
+                    return Ok(object);
+                },
+                Some(Token::Control(control)) => {
+                    match control {
+                        ControlWord::MailMergeActiveRecord(value) => {
+                            if object.active_record.is_some() {
+                                return Err(duplicate_mail_merge("active record"));
+                            }
+                            object.active_record =
+                                Some(nonnegative_mail_merge(*value, "active record")?);
+                        },
+                        ControlWord::MailMergeColumnDelimiter(value) => {
+                            if object.column_delimiter.replace(*value).is_some() {
+                                return Err(duplicate_mail_merge("column delimiter"));
+                            }
+                        },
+                        ControlWord::MailMergeColumnCount(value) => {
+                            if object.column_count.is_some() {
+                                return Err(duplicate_mail_merge("column count"));
+                            }
+                            object.column_count =
+                                Some(nonnegative_mail_merge(*value, "column count")?);
+                        },
+                        ControlWord::MailMergeDynamicAddress(value) => {
+                            if saw_dynamic_address {
+                                return Err(duplicate_mail_merge("dynamic-address flag"));
+                            }
+                            saw_dynamic_address = true;
+                            object.dynamic_address = Some(*value);
+                        },
+                        ControlWord::MailMergeFirstRowHeader(value) => {
+                            if saw_first_row_header {
+                                return Err(duplicate_mail_merge("first-row-header flag"));
+                            }
+                            saw_first_row_header = true;
+                            object.first_row_header = Some(*value);
+                        },
+                        ControlWord::MailMergeHash(value) => {
+                            if object.hash.replace(*value).is_some() {
+                                return Err(duplicate_mail_merge("data-source hash"));
+                            }
+                        },
+                        ControlWord::MailMergeId(value) => {
+                            if object.id.replace(*value).is_some() {
+                                return Err(duplicate_mail_merge("data-source ID"));
+                            }
+                        },
+                        ControlWord::MailMergeSourceType(value) => {
+                            if object
+                                .source_type
+                                .replace(crate::MailMergeDataSourceType::from_rtf(*value))
+                                .is_some()
+                            {
+                                return Err(duplicate_mail_merge("data-source type"));
+                            }
+                        },
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "misplaced control in RTF mmodso destination".to_string(),
+                            ));
+                        },
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace) => {
+                    let control = self.mail_merge_child_control()?;
+                    match control {
+                        ControlWord::MailMergeFilter => set_mail_merge_text(
+                            &mut object.filter,
+                            self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeFilter,
+                                depth + 1,
+                            )?,
+                            "filter",
+                        )?,
+                        ControlWord::MailMergeName => set_mail_merge_text(
+                            &mut object.name,
+                            self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeName,
+                                depth + 1,
+                            )?,
+                            "data-source name",
+                        )?,
+                        ControlWord::MailMergeSort => set_mail_merge_text(
+                            &mut object.sort,
+                            self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeSort,
+                                depth + 1,
+                            )?,
+                            "sort",
+                        )?,
+                        ControlWord::MailMergeTable => set_mail_merge_text(
+                            &mut object.table,
+                            self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeTable,
+                                depth + 1,
+                            )?,
+                            "table",
+                        )?,
+                        ControlWord::MailMergeUdl => set_mail_merge_text(
+                            &mut object.udl,
+                            self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeUdl,
+                                depth + 1,
+                            )?,
+                            "UDL",
+                        )?,
+                        ControlWord::MailMergeUdlData => set_mail_merge_text(
+                            &mut object.udl_data,
+                            self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeUdlData,
+                                depth + 1,
+                            )?,
+                            "UDL data",
+                        )?,
+                        ControlWord::MailMergeUniqueTag => set_mail_merge_text(
+                            &mut object.unique_tag,
+                            self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeUniqueTag,
+                                depth + 1,
+                            )?,
+                            "unique tag",
+                        )?,
+                        ControlWord::MailMergeRecipientData => {
+                            if object.recipient_data.len() >= crate::MAX_MAIL_MERGE_RECIPIENT_DATA {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF mail-merge recipient-data count exceeds the safety limit"
+                                        .to_string(),
+                                ));
+                            }
+                            let value = self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeRecipientData,
+                                depth + 1,
+                            )?;
+                            object.recipient_data.push(value);
+                        },
+                        ControlWord::MailMergeFieldMapData => {
+                            if object.field_mappings.len() >= crate::MAX_MAIL_MERGE_FIELD_MAPPINGS {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF mail-merge field-mapping count exceeds the safety limit"
+                                        .to_string(),
+                                ));
+                            }
+                            object
+                                .field_mappings
+                                .push(self.parse_mail_merge_field_mapping(depth + 1)?);
+                        },
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "unsupported nested RTF mmodso destination".to_string(),
+                            ));
+                        },
+                    }
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => self.pos += 1,
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF mmodso destination contains active or binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn parse_mail_merge_field_mapping(
+        &mut self,
+        depth: usize,
+    ) -> RtfResult<crate::MailMergeFieldMapping<'a>> {
+        if depth > crate::MAX_MAIL_MERGE_NESTING_DEPTH {
+            return Err(RtfError::MalformedDocument(
+                "RTF mail-merge nesting depth exceeds the safety limit".to_string(),
+            ));
+        }
+        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(Token::Control(ControlWord::IgnorableDestination))?;
+        self.expect_token(Token::Control(ControlWord::MailMergeFieldMapData))?;
+        let mut column = None;
+        let mut name = None;
+        let mut mapped_name = None;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let column = column.ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF field mapping is missing mmodsofmcolumn".to_string(),
+                        )
+                    })?;
+                    let name = name.ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF field mapping is missing mmodsoname".to_string(),
+                        )
+                    })?;
+                    let mapping = crate::MailMergeFieldMapping {
+                        column,
+                        name,
+                        mapped_name,
+                    };
+                    mapping.validate()?;
+                    return Ok(mapping);
+                },
+                Some(Token::Control(ControlWord::MailMergeFieldMapColumn(value))) => {
+                    if column.is_some() {
+                        return Err(duplicate_mail_merge("field-map column"));
+                    }
+                    column = Some(crate::MailMergeColumnIndex::from_rtf(*value)?);
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace) => {
+                    let control = self.mail_merge_child_control()?;
+                    match control {
+                        ControlWord::MailMergeName => set_mail_merge_text(
+                            &mut name,
+                            self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeName,
+                                depth + 1,
+                            )?,
+                            "field name",
+                        )?,
+                        ControlWord::MailMergeMappedName => set_mail_merge_text(
+                            &mut mapped_name,
+                            self.parse_mail_merge_text_destination(
+                                &ControlWord::MailMergeMappedName,
+                                depth + 1,
+                            )?,
+                            "mapped field name",
+                        )?,
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "unsupported nested RTF field-map destination".to_string(),
+                            ));
+                        },
+                    }
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => self.pos += 1,
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF field-map destination contains active or binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
     fn parse_data_store_destination(&mut self) -> RtfResult<Vec<u8>> {
         self.pos += 1; // ignorable-destination marker
         if !matches!(
@@ -4590,8 +9609,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     if high.is_some() {
                         return Err(RtfError::MalformedDocument(
-                            "RTF data-store payload has an odd hexadecimal digit count"
-                                .to_string(),
+                            "RTF data-store payload has an odd hexadecimal digit count".to_string(),
                         ));
                     }
                     if data.is_empty() {
@@ -4641,9 +9659,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_math_properties_destination(
-        &mut self,
-    ) -> RtfResult<crate::DocumentMathProperties> {
+    fn parse_math_properties_destination(&mut self) -> RtfResult<crate::DocumentMathProperties> {
         if matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::IgnorableDestination))
@@ -4664,11 +9680,9 @@ impl<'a> Parser<'a> {
         macro_rules! set_once {
             ($field:ident, $value:expr, $name:literal) => {{
                 if properties.$field.is_some() {
-                    return Err(RtfError::MalformedDocument(concat!(
-                        "duplicate RTF math property ",
-                        $name
-                    )
-                    .to_string()));
+                    return Err(RtfError::MalformedDocument(
+                        concat!("duplicate RTF math property ", $name).to_string(),
+                    ));
                 }
                 properties.$field = Some($value);
             }};
@@ -4706,21 +9720,17 @@ impl<'a> Parser<'a> {
                             crate::MathFlag::from_rtf(value),
                             "mdispDef"
                         ),
-                        ControlWord::MathInterEquationSpacing(value) => set_once!(
-                            inter_equation_spacing,
-                            value,
-                            "minterSp"
-                        ),
+                        ControlWord::MathInterEquationSpacing(value) => {
+                            set_once!(inter_equation_spacing, value, "minterSp")
+                        },
                         ControlWord::MathIntegralLimitPlacement(value) => set_once!(
                             integral_limit_placement,
                             crate::MathLimitPlacement::from_rtf(value),
                             "mintLim"
                         ),
-                        ControlWord::MathIntraEquationSpacing(value) => set_once!(
-                            intra_equation_spacing,
-                            value,
-                            "mintraSp"
-                        ),
+                        ControlWord::MathIntraEquationSpacing(value) => {
+                            set_once!(intra_equation_spacing, value, "mintraSp")
+                        },
                         ControlWord::MathLeftMargin(value) => {
                             set_once!(left_margin, value, "mlMargin")
                         },
@@ -4754,11 +9764,9 @@ impl<'a> Parser<'a> {
                         ControlWord::MathWrapIndent(value) => {
                             set_once!(wrap_indent, value, "mwrapIndent")
                         },
-                        ControlWord::MathWrapRight(value) => set_once!(
-                            wrap_right,
-                            crate::MathFlag::from_rtf(value),
-                            "mwrapRight"
-                        ),
+                        ControlWord::MathWrapRight(value) => {
+                            set_once!(wrap_right, crate::MathFlag::from_rtf(value), "mwrapRight")
+                        },
                         _ => {
                             return Err(RtfError::MalformedDocument(
                                 "RTF math-properties destination contains an unsupported control"
@@ -4781,15 +9789,23 @@ impl<'a> Parser<'a> {
 
     fn parse_paragraph_group_table(&mut self) -> RtfResult<crate::ParagraphGroupPropertyTable> {
         if self.states.len() != 3
-            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+            || self
+                .blocks
+                .iter()
+                .any(|block| !block.text.trim().is_empty())
         {
             return Err(RtfError::MalformedDocument(
                 "RTF pgptbl must occur at document scope before body text".to_string(),
             ));
         }
         self.pos += 1; // ignorable-destination marker
-        if !matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::ParagraphGroupTable))) {
-            return Err(RtfError::MalformedDocument("invalid RTF pgptbl destination".to_string()));
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::ParagraphGroupTable))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF pgptbl destination".to_string(),
+            ));
         }
         self.pos += 1;
         let mut table = crate::ParagraphGroupPropertyTable::new();
@@ -4801,7 +9817,10 @@ impl<'a> Parser<'a> {
                     return Ok(table);
                 },
                 Some(Token::OpenBrace)
-                    if matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::ParagraphGroup))) =>
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ParagraphGroup))
+                    ) =>
                 {
                     let id = u32::try_from(table.entries().len() + 1).map_err(|_| {
                         RtfError::MalformedDocument("RTF paragraph-group ID overflow".to_string())
@@ -4813,7 +9832,8 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) if text.trim().is_empty() => {},
                 Some(Token::OpenBrace) => {
                     return Err(RtfError::MalformedDocument(
-                        "RTF pgptbl cannot contain fields, objects, or unknown destinations".to_string(),
+                        "RTF pgptbl cannot contain fields, objects, or unknown destinations"
+                            .to_string(),
                     ));
                 },
                 Some(_) => {
@@ -4848,14 +9868,30 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     let entry = crate::ParagraphGroupProperty {
                         id,
-                        parent_id: u32::try_from(parent_id.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks ipgp".to_string()))?)
-                            .map_err(|_| RtfError::MalformedDocument("invalid RTF ipgp reference".to_string()))?,
-                        table_nesting_level: u8::try_from(nesting.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks itap".to_string()))?)
-                            .map_err(|_| RtfError::MalformedDocument("invalid RTF pgp itap value".to_string()))?,
-                        left_indent: left.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks li".to_string()))?,
-                        right_indent: right.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks ri".to_string()))?,
-                        space_before: before.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks sb".to_string()))?,
-                        space_after: after.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks sa".to_string()))?,
+                        parent_id: u32::try_from(parent_id.ok_or_else(|| {
+                            RtfError::MalformedDocument("RTF pgp entry lacks ipgp".to_string())
+                        })?)
+                        .map_err(|_| {
+                            RtfError::MalformedDocument("invalid RTF ipgp reference".to_string())
+                        })?,
+                        table_nesting_level: u8::try_from(nesting.ok_or_else(|| {
+                            RtfError::MalformedDocument("RTF pgp entry lacks itap".to_string())
+                        })?)
+                        .map_err(|_| {
+                            RtfError::MalformedDocument("invalid RTF pgp itap value".to_string())
+                        })?,
+                        left_indent: left.ok_or_else(|| {
+                            RtfError::MalformedDocument("RTF pgp entry lacks li".to_string())
+                        })?,
+                        right_indent: right.ok_or_else(|| {
+                            RtfError::MalformedDocument("RTF pgp entry lacks ri".to_string())
+                        })?,
+                        space_before: before.ok_or_else(|| {
+                            RtfError::MalformedDocument("RTF pgp entry lacks sb".to_string())
+                        })?,
+                        space_after: after.ok_or_else(|| {
+                            RtfError::MalformedDocument("RTF pgp entry lacks sa".to_string())
+                        })?,
                         borders,
                     };
                     entry.validate()?;
@@ -4863,43 +9899,87 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(control)) => match control {
                     ControlWord::ParagraphGroupParent(value) => {
-                        if !seen.insert("ipgp") { return Err(RtfError::MalformedDocument("duplicate RTF pgp ipgp".to_string())); }
+                        if !seen.insert("ipgp") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp ipgp".to_string(),
+                            ));
+                        }
                         parent_id = Some(*value);
                     },
                     ControlWord::TableNestingLevel(value) => {
-                        if !seen.insert("itap") { return Err(RtfError::MalformedDocument("duplicate RTF pgp itap".to_string())); }
-                        nesting = Some(value.ok_or_else(||RtfError::MalformedDocument("RTF pgp itap requires a numeric parameter".to_string()))?);
+                        if !seen.insert("itap") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp itap".to_string(),
+                            ));
+                        }
+                        nesting = Some(value.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF pgp itap requires a numeric parameter".to_string(),
+                            )
+                        })?);
                     },
                     ControlWord::LeftIndent(value) => {
-                        if !seen.insert("li") { return Err(RtfError::MalformedDocument("duplicate RTF pgp li".to_string())); }
+                        if !seen.insert("li") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp li".to_string(),
+                            ));
+                        }
                         left = Some(*value);
                     },
                     ControlWord::RightIndent(value) => {
-                        if !seen.insert("ri") { return Err(RtfError::MalformedDocument("duplicate RTF pgp ri".to_string())); }
+                        if !seen.insert("ri") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp ri".to_string(),
+                            ));
+                        }
                         right = Some(*value);
                     },
                     ControlWord::SpaceBefore(value) => {
-                        if !seen.insert("sb") { return Err(RtfError::MalformedDocument("duplicate RTF pgp sb".to_string())); }
+                        if !seen.insert("sb") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp sb".to_string(),
+                            ));
+                        }
                         before = Some(*value);
                     },
                     ControlWord::SpaceAfter(value) => {
-                        if !seen.insert("sa") { return Err(RtfError::MalformedDocument("duplicate RTF pgp sa".to_string())); }
+                        if !seen.insert("sa") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp sa".to_string(),
+                            ));
+                        }
                         after = Some(*value);
                     },
                     ControlWord::BorderTop => {
-                        if !seen.insert("brdrt") { return Err(RtfError::MalformedDocument("duplicate RTF pgp top border".to_string())); }
+                        if !seen.insert("brdrt") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp top border".to_string(),
+                            ));
+                        }
                         current_border = Some(0u8);
                     },
                     ControlWord::BorderBottom => {
-                        if !seen.insert("brdrb") { return Err(RtfError::MalformedDocument("duplicate RTF pgp bottom border".to_string())); }
+                        if !seen.insert("brdrb") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp bottom border".to_string(),
+                            ));
+                        }
                         current_border = Some(1u8);
                     },
                     ControlWord::BorderLeft => {
-                        if !seen.insert("brdrl") { return Err(RtfError::MalformedDocument("duplicate RTF pgp left border".to_string())); }
+                        if !seen.insert("brdrl") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp left border".to_string(),
+                            ));
+                        }
                         current_border = Some(2u8);
                     },
                     ControlWord::BorderRight => {
-                        if !seen.insert("brdrr") { return Err(RtfError::MalformedDocument("duplicate RTF pgp right border".to_string())); }
+                        if !seen.insert("brdrr") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp right border".to_string(),
+                            ));
+                        }
                         current_border = Some(3u8);
                     },
                     ControlWord::BorderNone
@@ -4914,12 +9994,18 @@ impl<'a> Parser<'a> {
                             Some(1) => &mut borders.bottom,
                             Some(2) => &mut borders.left,
                             Some(3) => &mut borders.right,
-                            _ => return Err(RtfError::MalformedDocument("RTF pgp border style has no side".to_string())),
+                            _ => {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF pgp border style has no side".to_string(),
+                                ));
+                            },
                         };
                         if border.style != crate::BorderStyle::None
                             && !matches!(control, ControlWord::BorderNone)
                         {
-                            return Err(RtfError::MalformedDocument("duplicate RTF pgp border style".to_string()));
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pgp border style".to_string(),
+                            ));
                         }
                         border.style = match control {
                             ControlWord::BorderNone => crate::BorderStyle::None,
@@ -4932,22 +10018,79 @@ impl<'a> Parser<'a> {
                         };
                     },
                     ControlWord::BorderWidth(value) => {
-                        let border = match current_border { Some(0) => &mut borders.top, Some(1) => &mut borders.bottom, Some(2) => &mut borders.left, Some(3) => &mut borders.right, _ => return Err(RtfError::MalformedDocument("RTF pgp border width has no side".to_string())) };
-                        border.width = value.ok_or_else(|| RtfError::MalformedDocument("RTF pgp brdrw requires a numeric parameter".to_string()))?;
+                        let border = match current_border {
+                            Some(0) => &mut borders.top,
+                            Some(1) => &mut borders.bottom,
+                            Some(2) => &mut borders.left,
+                            Some(3) => &mut borders.right,
+                            _ => {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF pgp border width has no side".to_string(),
+                                ));
+                            },
+                        };
+                        border.width = value.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF pgp brdrw requires a numeric parameter".to_string(),
+                            )
+                        })?;
                     },
                     ControlWord::BorderColor(value) => {
-                        let border = match current_border { Some(0) => &mut borders.top, Some(1) => &mut borders.bottom, Some(2) => &mut borders.left, Some(3) => &mut borders.right, _ => return Err(RtfError::MalformedDocument("RTF pgp border color has no side".to_string())) };
-                        border.color_ref = u16::try_from(value.ok_or_else(|| RtfError::MalformedDocument("RTF pgp brdrcf requires a numeric parameter".to_string()))?).map_err(|_| RtfError::MalformedDocument("invalid RTF pgp border color".to_string()))?;
+                        let border = match current_border {
+                            Some(0) => &mut borders.top,
+                            Some(1) => &mut borders.bottom,
+                            Some(2) => &mut borders.left,
+                            Some(3) => &mut borders.right,
+                            _ => {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF pgp border color has no side".to_string(),
+                                ));
+                            },
+                        };
+                        border.color_ref = u16::try_from(value.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF pgp brdrcf requires a numeric parameter".to_string(),
+                            )
+                        })?)
+                        .map_err(|_| {
+                            RtfError::MalformedDocument("invalid RTF pgp border color".to_string())
+                        })?;
                     },
                     ControlWord::BorderSpace(value) => {
-                        let border = match current_border { Some(0) => &mut borders.top, Some(1) => &mut borders.bottom, Some(2) => &mut borders.left, Some(3) => &mut borders.right, _ => return Err(RtfError::MalformedDocument("RTF pgp border space has no side".to_string())) };
-                        border.space = value.ok_or_else(|| RtfError::MalformedDocument("RTF pgp brsp requires a numeric parameter".to_string()))?;
+                        let border = match current_border {
+                            Some(0) => &mut borders.top,
+                            Some(1) => &mut borders.bottom,
+                            Some(2) => &mut borders.left,
+                            Some(3) => &mut borders.right,
+                            _ => {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF pgp border space has no side".to_string(),
+                                ));
+                            },
+                        };
+                        border.space = value.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF pgp brsp requires a numeric parameter".to_string(),
+                            )
+                        })?;
                     },
-                    _ => return Err(RtfError::MalformedDocument("unsupported control in RTF pgp entry".to_string())),
+                    _ => {
+                        return Err(RtfError::MalformedDocument(
+                            "unsupported control in RTF pgp entry".to_string(),
+                        ));
+                    },
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {},
-                Some(Token::OpenBrace) => return Err(RtfError::MalformedDocument("RTF pgp entry cannot contain nested destinations".to_string())),
-                Some(_) => return Err(RtfError::MalformedDocument("invalid content in RTF pgp entry".to_string())),
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF pgp entry cannot contain nested destinations".to_string(),
+                    ));
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "invalid content in RTF pgp entry".to_string(),
+                    ));
+                },
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
@@ -4957,7 +10100,10 @@ impl<'a> Parser<'a> {
 
     fn parse_legacy_section_numbering_level(&mut self) -> RtfResult<()> {
         if self.states.len() != 3
-            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+            || self
+                .blocks
+                .iter()
+                .any(|block| !block.text.trim().is_empty())
         {
             return Err(RtfError::MalformedDocument(
                 "RTF pnseclvl destinations must occur at document scope before body text"
@@ -5023,9 +10169,8 @@ impl<'a> Parser<'a> {
                             "duplicate RTF pntxtb destination".to_string(),
                         ));
                     }
-                    text_before = self.parse_legacy_numbering_text(
-                        ControlWord::LegacyNumberingTextBefore,
-                    )?;
+                    text_before =
+                        self.parse_legacy_numbering_text(ControlWord::LegacyNumberingTextBefore)?;
                     continue;
                 },
                 Some(Token::OpenBrace)
@@ -5039,9 +10184,8 @@ impl<'a> Parser<'a> {
                             "duplicate RTF pntxta destination".to_string(),
                         ));
                     }
-                    text_after = self.parse_legacy_numbering_text(
-                        ControlWord::LegacyNumberingTextAfter,
-                    )?;
+                    text_after =
+                        self.parse_legacy_numbering_text(ControlWord::LegacyNumberingTextAfter)?;
                     continue;
                 },
                 Some(Token::OpenBrace) => {
@@ -5052,47 +10196,120 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(control)) => {
                     let (key, new_format) = match control {
-                        ControlWord::LegacyNumberingDecimal => ("format", Some(crate::LegacyNumberingFormat::Decimal)),
-                        ControlWord::LegacyNumberingUpperRoman => ("format", Some(crate::LegacyNumberingFormat::UpperRoman)),
-                        ControlWord::LegacyNumberingLowerRoman => ("format", Some(crate::LegacyNumberingFormat::LowerRoman)),
-                        ControlWord::LegacyNumberingUpperLetter => ("format", Some(crate::LegacyNumberingFormat::UpperLetter)),
-                        ControlWord::LegacyNumberingLowerLetter => ("format", Some(crate::LegacyNumberingFormat::LowerLetter)),
+                        ControlWord::LegacyNumberingDecimal(param) => {
+                            require_parameterless(*param, "pndec")?;
+                            ("format", Some(crate::LegacyNumberingFormat::Decimal))
+                        },
+                        ControlWord::LegacyNumberingUpperRoman(param) => {
+                            require_parameterless(*param, "pnucrm")?;
+                            ("format", Some(crate::LegacyNumberingFormat::UpperRoman))
+                        },
+                        ControlWord::LegacyNumberingLowerRoman(param) => {
+                            require_parameterless(*param, "pnlcrm")?;
+                            ("format", Some(crate::LegacyNumberingFormat::LowerRoman))
+                        },
+                        ControlWord::LegacyNumberingUpperLetter(param) => {
+                            require_parameterless(*param, "pnucltr")?;
+                            ("format", Some(crate::LegacyNumberingFormat::UpperLetter))
+                        },
+                        ControlWord::LegacyNumberingLowerLetter(param) => {
+                            require_parameterless(*param, "pnlcltr")?;
+                            ("format", Some(crate::LegacyNumberingFormat::LowerLetter))
+                        },
                         ControlWord::LegacyNumberingStart(value) => {
-                            if !seen.insert("start") { return Err(RtfError::MalformedDocument("duplicate RTF pnstart".to_string())); }
-                            start_at = Some(*value);
+                            if !seen.insert("start") {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF pnstart".to_string(),
+                                ));
+                            }
+                            start_at = Some(value.ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF pnstart requires a numeric parameter".to_string(),
+                                )
+                            })?);
                             self.pos += 1;
                             continue;
                         },
                         ControlWord::LegacyNumberingIndent(value) => {
-                            if !seen.insert("indent") { return Err(RtfError::MalformedDocument("duplicate RTF pnindent".to_string())); }
-                            indent = Some(*value);
+                            if !seen.insert("indent") {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF pnindent".to_string(),
+                                ));
+                            }
+                            indent = Some(value.ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF pnindent requires a numeric parameter".to_string(),
+                                )
+                            })?);
                             self.pos += 1;
                             continue;
                         },
                         ControlWord::LegacyNumberingSpace(value) => {
-                            if !seen.insert("space") { return Err(RtfError::MalformedDocument("duplicate RTF pnsp".to_string())); }
-                            space = Some(*value);
+                            if !seen.insert("space") {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF pnsp".to_string(),
+                                ));
+                            }
+                            space = Some(value.ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF pnsp requires a numeric parameter".to_string(),
+                                )
+                            })?);
                             self.pos += 1;
                             continue;
                         },
-                        ControlWord::LegacyNumberingHanging => {
-                            if !seen.insert("hanging") { return Err(RtfError::MalformedDocument("duplicate RTF pnhang".to_string())); }
+                        ControlWord::LegacyNumberingHanging(param) => {
+                            require_parameterless(*param, "pnhang")?;
+                            if !seen.insert("hanging") {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF pnhang".to_string(),
+                                ));
+                            }
                             hanging = true;
                             self.pos += 1;
                             continue;
                         },
-                        ControlWord::LegacyNumberingPrevious => {
-                            if !seen.insert("previous") { return Err(RtfError::MalformedDocument("duplicate RTF pnprev".to_string())); }
+                        ControlWord::LegacyNumberingPrevious(param) => {
+                            require_parameterless(*param, "pnprev")?;
+                            if !seen.insert("previous") {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF pnprev".to_string(),
+                                ));
+                            }
                             previous = true;
                             self.pos += 1;
                             continue;
                         },
-                        ControlWord::LegacyNumberingAlignLeft => ("alignment", None),
-                        ControlWord::LegacyNumberingAlignCenter => ("alignment-center", None),
-                        ControlWord::LegacyNumberingAlignRight => ("alignment-right", None),
+                        ControlWord::LegacyNumberingAlignLeft(param) => {
+                            require_parameterless(*param, "pnql")?;
+                            ("alignment", None)
+                        },
+                        ControlWord::LegacyNumberingAlignCenter(param) => {
+                            require_parameterless(*param, "pnqc")?;
+                            ("alignment-center", None)
+                        },
+                        ControlWord::LegacyNumberingAlignRight(param) => {
+                            require_parameterless(*param, "pnqr")?;
+                            ("alignment-right", None)
+                        },
                         ControlWord::LegacyNumberingFont(value) => {
-                            if !seen.insert("font") { return Err(RtfError::MalformedDocument("duplicate RTF pnf".to_string())); }
-                            font_ref = Some(u16::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF pnf reference".to_string()))?);
+                            if !seen.insert("font") {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF pnf".to_string(),
+                                ));
+                            }
+                            font_ref = Some(
+                                u16::try_from(value.ok_or_else(|| {
+                                    RtfError::MalformedDocument(
+                                        "RTF pnf requires a numeric parameter".to_string(),
+                                    )
+                                })?)
+                                .map_err(|_| {
+                                    RtfError::MalformedDocument(
+                                        "invalid RTF pnf reference".to_string(),
+                                    )
+                                })?,
+                            );
                             self.pos += 1;
                             continue;
                         },
@@ -5116,8 +10333,12 @@ impl<'a> Parser<'a> {
                             ));
                         }
                         alignment = Some(match control {
-                            ControlWord::LegacyNumberingAlignCenter => crate::LegacyNumberingAlignment::Center,
-                            ControlWord::LegacyNumberingAlignRight => crate::LegacyNumberingAlignment::Right,
+                            ControlWord::LegacyNumberingAlignCenter(_) => {
+                                crate::LegacyNumberingAlignment::Center
+                            },
+                            ControlWord::LegacyNumberingAlignRight(_) => {
+                                crate::LegacyNumberingAlignment::Right
+                            },
                             _ => crate::LegacyNumberingAlignment::Left,
                         });
                     }
@@ -5133,6 +10354,405 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_legacy_paragraph_numbering(&mut self) -> RtfResult<()> {
+        let parameter = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacyParagraphNumbering(parameter))) => *parameter,
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF pn destination".to_string(),
+                ));
+            },
+        };
+        require_parameterless(parameter, "pn")?;
+        let parent = self.states.len().checked_sub(2).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF pn destination has no paragraph owner".to_string())
+        })?;
+        let owner = &self.states[parent];
+        if owner.destination != Destination::DocumentBody
+            || owner.in_table
+            || owner.table_nesting_level >= 2
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF pn destination must belong to a non-table paragraph".to_string(),
+            ));
+        }
+        if owner.paragraph_content_started {
+            return Err(RtfError::MalformedDocument(
+                "RTF pn destination must precede paragraph content".to_string(),
+            ));
+        }
+        if owner.paragraph_numbering_declared {
+            return Err(RtfError::MalformedDocument(
+                "duplicate RTF pn destination in one paragraph".to_string(),
+            ));
+        }
+        if self.legacy_paragraph_numbering.len() >= crate::MAX_LEGACY_PARAGRAPH_NUMBERING_RECORDS {
+            return Err(RtfError::MalformedDocument(
+                "RTF contains too many pn destinations".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut level = None;
+        let mut format = None;
+        let mut alignment = None;
+        let mut start_at = None;
+        let mut indent = None;
+        let mut space = None;
+        let mut across = false;
+        let mut number_once = false;
+        let mut previous = false;
+        let mut restart = false;
+        let mut hanging = false;
+        let mut bidi = None;
+        let mut font_ref = None;
+        let mut font_size = None;
+        let mut color_ref = None;
+        let mut bold = None;
+        let mut italic = None;
+        let mut caps = None;
+        let mut small_caps = None;
+        let mut strike = None;
+        let mut underline = None;
+        let mut text_before = None;
+        let mut text_after = None;
+        let mut revision = crate::LegacyParagraphNumberingRevision::default();
+        let mut seen = std::collections::HashSet::new();
+        macro_rules! once {
+            ($key:expr, $name:expr) => {
+                if !seen.insert($key) {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "duplicate RTF {} in pn destination",
+                        $name
+                    )));
+                }
+            };
+        }
+        fn value(parameter: Option<i32>, name: &str) -> RtfResult<i32> {
+            parameter.ok_or_else(|| {
+                RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+            })
+        }
+        fn toggle(parameter: Option<i32>, name: &str) -> RtfResult<bool> {
+            match parameter {
+                None | Some(1) => Ok(true),
+                Some(0) => Ok(false),
+                Some(_) => Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} accepts only 0 or 1"
+                ))),
+            }
+        }
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let mut record =
+                        crate::LegacyParagraphNumbering::new(level.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF pn destination is missing its pnlvl selector".to_string(),
+                            )
+                        })?);
+                    record.format = format;
+                    record.alignment = alignment;
+                    record.start_at = start_at;
+                    record.indent = indent;
+                    record.space = space;
+                    record.across = across;
+                    record.number_once = number_once;
+                    record.previous = previous;
+                    record.restart = restart;
+                    record.hanging = hanging;
+                    record.bidi = bidi;
+                    record.font_ref = font_ref;
+                    record.font_size = font_size;
+                    record.color_ref = color_ref;
+                    record.bold = bold;
+                    record.italic = italic;
+                    record.caps = caps;
+                    record.small_caps = small_caps;
+                    record.strike = strike;
+                    record.underline = underline;
+                    record.text_before = text_before.map(Cow::Owned);
+                    record.text_after = text_after.map(Cow::Owned);
+                    record.revision = revision;
+                    record.validate()?;
+                    let index =
+                        u32::try_from(self.legacy_paragraph_numbering.len()).map_err(|_| {
+                            RtfError::MalformedDocument("RTF pn record index overflow".to_string())
+                        })?;
+                    self.legacy_paragraph_numbering.push(record);
+                    self.states[parent].paragraph.legacy_numbering = Some(index);
+                    self.states[parent].paragraph_numbering_declared = true;
+                    if let Some(state) = self.states.last_mut() {
+                        state.paragraph.legacy_numbering = Some(index);
+                        state.paragraph_numbering_declared = true;
+                    }
+                    return Ok(());
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::LegacyNumberingTextBefore))
+                    ) =>
+                {
+                    once!("text-before", "pntxtb");
+                    text_before = Some(
+                        self.parse_legacy_numbering_text(ControlWord::LegacyNumberingTextBefore)?,
+                    );
+                    continue;
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::LegacyNumberingTextAfter))
+                    ) =>
+                {
+                    once!("text-after", "pntxta");
+                    text_after = Some(
+                        self.parse_legacy_numbering_text(ControlWord::LegacyNumberingTextAfter)?,
+                    );
+                    continue;
+                },
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF pn destination cannot contain nested active content".to_string(),
+                    ));
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {},
+                Some(Token::Control(control)) => match control {
+                    ControlWord::LegacyNumberingLevel(parameter) => {
+                        once!("level", "pnlvl");
+                        let v = value(*parameter, "pnlvl")?;
+                        level = Some(crate::LegacyParagraphNumberingLevel::Explicit(
+                            u8::try_from(v).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF pnlvl value must be in 1..=9".to_string(),
+                                )
+                            })?,
+                        ));
+                    },
+                    ControlWord::LegacyNumberingLevelBullet(parameter) => {
+                        require_parameterless(*parameter, "pnlvlblt")?;
+                        once!("level", "pnlvlblt");
+                        level = Some(crate::LegacyParagraphNumberingLevel::Bullet);
+                    },
+                    ControlWord::LegacyNumberingLevelBody(parameter) => {
+                        require_parameterless(*parameter, "pnlvlbody")?;
+                        once!("level", "pnlvlbody");
+                        level = Some(crate::LegacyParagraphNumberingLevel::Body);
+                    },
+                    ControlWord::LegacyNumberingLevelContinue(parameter) => {
+                        require_parameterless(*parameter, "pnlvlcont")?;
+                        once!("level", "pnlvlcont");
+                        level = Some(crate::LegacyParagraphNumberingLevel::Continue);
+                    },
+                    ControlWord::LegacyNumberingDecimal(parameter) => {
+                        require_parameterless(*parameter, "pndec")?;
+                        once!("format", "numbering format");
+                        format = Some(crate::LegacyParagraphNumberingFormat::Decimal);
+                    },
+                    ControlWord::LegacyNumberingUpperRoman(parameter) => {
+                        require_parameterless(*parameter, "pnucrm")?;
+                        once!("format", "numbering format");
+                        format = Some(crate::LegacyParagraphNumberingFormat::UpperRoman);
+                    },
+                    ControlWord::LegacyNumberingLowerRoman(parameter) => {
+                        require_parameterless(*parameter, "pnlcrm")?;
+                        once!("format", "numbering format");
+                        format = Some(crate::LegacyParagraphNumberingFormat::LowerRoman);
+                    },
+                    ControlWord::LegacyNumberingUpperLetter(parameter) => {
+                        require_parameterless(*parameter, "pnucltr")?;
+                        once!("format", "numbering format");
+                        format = Some(crate::LegacyParagraphNumberingFormat::UpperLetter);
+                    },
+                    ControlWord::LegacyNumberingLowerLetter(parameter) => {
+                        require_parameterless(*parameter, "pnlcltr")?;
+                        once!("format", "numbering format");
+                        format = Some(crate::LegacyParagraphNumberingFormat::LowerLetter);
+                    },
+                    ControlWord::LegacyNumberingFormat(kind, parameter) => {
+                        require_parameterless(*parameter, "pn numbering-format selector")?;
+                        once!("format", "numbering format");
+                        format = Some(*kind);
+                    },
+                    ControlWord::Pngblip => {
+                        once!("format", "numbering format");
+                        format = Some(crate::LegacyParagraphNumberingFormat::GbLip);
+                    },
+                    ControlWord::LegacyNumberingAlignLeft(parameter)
+                    | ControlWord::LegacyNumberingAlignCenter(parameter)
+                    | ControlWord::LegacyNumberingAlignRight(parameter) => {
+                        require_parameterless(*parameter, "pn alignment")?;
+                        once!("alignment", "alignment");
+                        alignment = Some(match control {
+                            ControlWord::LegacyNumberingAlignCenter(_) => {
+                                crate::LegacyParagraphNumberingAlignment::Center
+                            },
+                            ControlWord::LegacyNumberingAlignRight(_) => {
+                                crate::LegacyParagraphNumberingAlignment::Right
+                            },
+                            _ => crate::LegacyParagraphNumberingAlignment::Left,
+                        });
+                    },
+                    ControlWord::LegacyNumberingStart(parameter) => {
+                        once!("start", "pnstart");
+                        start_at = Some(value(*parameter, "pnstart")?);
+                    },
+                    ControlWord::LegacyNumberingIndent(parameter) => {
+                        once!("indent", "pnindent");
+                        indent = Some(value(*parameter, "pnindent")?);
+                    },
+                    ControlWord::LegacyNumberingSpace(parameter) => {
+                        once!("space", "pnsp");
+                        space = Some(value(*parameter, "pnsp")?);
+                    },
+                    ControlWord::LegacyNumberingFont(parameter) => {
+                        once!("font", "pnf");
+                        font_ref =
+                            Some(u16::try_from(value(*parameter, "pnf")?).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF pnf value must be in 0..=65535".to_string(),
+                                )
+                            })?);
+                    },
+                    ControlWord::LegacyNumberingFontSize(parameter) => {
+                        once!("font-size", "pnfs");
+                        font_size =
+                            Some(u16::try_from(value(*parameter, "pnfs")?).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF pnfs value must be in 1..=65535".to_string(),
+                                )
+                            })?);
+                    },
+                    ControlWord::LegacyNumberingColor(parameter) => {
+                        once!("color", "pncf");
+                        color_ref =
+                            Some(u16::try_from(value(*parameter, "pncf")?).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF pncf value must be in 0..=65535".to_string(),
+                                )
+                            })?);
+                    },
+                    ControlWord::LegacyNumberingAcross(parameter)
+                    | ControlWord::LegacyNumberingOnce(parameter)
+                    | ControlWord::LegacyNumberingPrevious(parameter)
+                    | ControlWord::LegacyNumberingRestart(parameter)
+                    | ControlWord::LegacyNumberingHanging(parameter) => {
+                        require_parameterless(*parameter, "pn flag")?;
+                        let (key, target) = match control {
+                            ControlWord::LegacyNumberingAcross(_) => ("across", &mut across),
+                            ControlWord::LegacyNumberingOnce(_) => ("once", &mut number_once),
+                            ControlWord::LegacyNumberingPrevious(_) => ("previous", &mut previous),
+                            ControlWord::LegacyNumberingRestart(_) => ("restart", &mut restart),
+                            _ => ("hanging", &mut hanging),
+                        };
+                        once!(key, key);
+                        *target = true;
+                    },
+                    ControlWord::LegacyNumberingBidiA(parameter)
+                    | ControlWord::LegacyNumberingBidiB(parameter) => {
+                        require_parameterless(*parameter, "pn bidi selector")?;
+                        once!("bidi", "bidi selector");
+                        bidi = Some(if matches!(control, ControlWord::LegacyNumberingBidiA(_)) {
+                            crate::LegacyParagraphNumberingBidi::A
+                        } else {
+                            crate::LegacyParagraphNumberingBidi::B
+                        });
+                    },
+                    ControlWord::LegacyNumberingBold(parameter)
+                    | ControlWord::LegacyNumberingItalic(parameter)
+                    | ControlWord::LegacyNumberingCaps(parameter)
+                    | ControlWord::LegacyNumberingSmallCaps(parameter)
+                    | ControlWord::LegacyNumberingStrike(parameter) => {
+                        let (key, target) = match control {
+                            ControlWord::LegacyNumberingBold(_) => ("bold", &mut bold),
+                            ControlWord::LegacyNumberingItalic(_) => ("italic", &mut italic),
+                            ControlWord::LegacyNumberingCaps(_) => ("caps", &mut caps),
+                            ControlWord::LegacyNumberingSmallCaps(_) => {
+                                ("small-caps", &mut small_caps)
+                            },
+                            _ => ("strike", &mut strike),
+                        };
+                        once!(key, key);
+                        *target = Some(toggle(*parameter, key)?);
+                    },
+                    ControlWord::LegacyNumberingUnderlineToggle(parameter) => {
+                        once!("underline", "underline");
+                        underline = Some(if toggle(*parameter, "pnul")? {
+                            crate::LegacyParagraphNumberingUnderline::Single
+                        } else {
+                            crate::LegacyParagraphNumberingUnderline::None
+                        });
+                    },
+                    ControlWord::LegacyNumberingUnderline(kind, parameter) => {
+                        require_parameterless(*parameter, "pn underline selector")?;
+                        once!("underline", "underline");
+                        underline = Some(*kind);
+                    },
+                    ControlWord::LegacyNumberingRevisionAuthor(parameter) => {
+                        once!("revision-author", "pnrauth");
+                        revision.author =
+                            Some(u16::try_from(value(*parameter, "pnrauth")?).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF pnrauth value must be in 0..=65535".to_string(),
+                                )
+                            })?);
+                    },
+                    ControlWord::LegacyNumberingRevisionDate(parameter) => {
+                        once!("revision-date", "pnrdate");
+                        revision.date = Some(value(*parameter, "pnrdate")?);
+                    },
+                    ControlWord::LegacyNumberingRevisionFormat(parameter) => {
+                        once!("revision-format", "pnrnfc");
+                        revision.number_format = Some(value(*parameter, "pnrnfc")?);
+                    },
+                    ControlWord::LegacyNumberingRevisionNoTrack(parameter) => {
+                        require_parameterless(*parameter, "pnrnot")?;
+                        once!("revision-no-track", "pnrnot");
+                        revision.no_tracking = true;
+                    },
+                    ControlWord::LegacyNumberingRevisionParagraph(parameter) => {
+                        once!("revision-paragraph", "pnrpnbr");
+                        revision.paragraph_number = Some(value(*parameter, "pnrpnbr")?);
+                    },
+                    ControlWord::LegacyNumberingRevisionRgb(parameter) => {
+                        once!("revision-rgb", "pnrrgb");
+                        revision.rgb =
+                            Some(u32::try_from(value(*parameter, "pnrrgb")?).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF pnrrgb must be non-negative".to_string(),
+                                )
+                            })?);
+                    },
+                    ControlWord::LegacyNumberingRevisionStart(parameter) => {
+                        once!("revision-start", "pnrstart");
+                        revision.start = Some(value(*parameter, "pnrstart")?);
+                    },
+                    ControlWord::LegacyNumberingRevisionStop(parameter) => {
+                        once!("revision-stop", "pnrstop");
+                        revision.stop = Some(value(*parameter, "pnrstop")?);
+                    },
+                    ControlWord::LegacyNumberingRevisionTextStart(parameter) => {
+                        once!("revision-text-start", "pnrxst");
+                        revision.text_start = Some(value(*parameter, "pnrxst")?);
+                    },
+                    _ => {
+                        return Err(RtfError::MalformedDocument(
+                            "unsupported control in RTF pn destination".to_string(),
+                        ));
+                    },
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "invalid content in RTF pn destination".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+        }
     }
 
     fn parse_legacy_numbering_text(&mut self, expected: ControlWord<'a>) -> RtfResult<String> {
@@ -5171,7 +10791,9 @@ impl<'a> Parser<'a> {
                 // Character-type selectors affect only which run font decodes
                 // the following text. `dbch` is emitted by Word in pnseclvl
                 // punctuation destinations and carries no textual payload.
-                Some(Token::Control(ControlWord::Unknown("dbch", None))) => {},
+                Some(Token::Control(
+                    ControlWord::Unknown("dbch", None) | ControlWord::DoubleByteCharacter(None),
+                )) => {},
                 Some(Token::Control(_)) | Some(Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF legacy-numbering text contains a non-text control".to_string(),
@@ -5245,11 +10867,9 @@ impl<'a> Parser<'a> {
                     macro_rules! set_once {
                         ($slot:expr, $value:expr, $name:literal) => {{
                             if $slot.is_some() {
-                                return Err(RtfError::MalformedDocument(concat!(
-                                    "duplicate RTF latent-style ",
-                                    $name
-                                )
-                                .to_string()));
+                                return Err(RtfError::MalformedDocument(
+                                    concat!("duplicate RTF latent-style ", $name).to_string(),
+                                ));
                             }
                             $slot = Some($value);
                         }};
@@ -5314,9 +10934,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_latent_style_exceptions(
-        &mut self,
-    ) -> RtfResult<Vec<crate::LatentStyleException<'a>>> {
+    fn parse_latent_style_exceptions(&mut self) -> RtfResult<Vec<crate::LatentStyleException<'a>>> {
         self.expect_token(Token::OpenBrace)?;
         if !matches!(
             self.tokens.get(self.pos),
@@ -5366,11 +10984,10 @@ impl<'a> Parser<'a> {
                     macro_rules! set_once {
                         ($slot:expr, $value:expr, $name:literal) => {{
                             if $slot.is_some() {
-                                return Err(RtfError::MalformedDocument(concat!(
-                                    "duplicate RTF latent-style exception ",
-                                    $name
-                                )
-                                .to_string()));
+                                return Err(RtfError::MalformedDocument(
+                                    concat!("duplicate RTF latent-style exception ", $name)
+                                        .to_string(),
+                                ));
                             }
                             $slot = Some($value);
                         }};
@@ -5412,8 +11029,7 @@ impl<'a> Parser<'a> {
                                             .to_string(),
                                     ));
                                 }
-                                if entries.len()
-                                    >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS
+                                if entries.len() >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS
                                 {
                                     return Err(RtfError::MalformedDocument(
                                         "RTF latent-style exception count exceeds the safety limit"
@@ -5462,9 +11078,7 @@ impl<'a> Parser<'a> {
                                 "RTF latent-style exception name cannot be empty".to_string(),
                             ));
                         }
-                        if entries.len()
-                            >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS
-                        {
+                        if entries.len() >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS {
                             return Err(RtfError::MalformedDocument(
                                 "RTF latent-style exception count exceeds the safety limit"
                                     .to_string(),
@@ -5526,11 +11140,13 @@ impl<'a> Parser<'a> {
         self.pos += 1; // ignorable-destination marker
         let matches_expected = matches!(
             (&expected, self.tokens.get(self.pos)),
-            (ControlWord::ThemeData, Some(Token::Control(ControlWord::ThemeData)))
-                | (
-                    ControlWord::ColorSchemeMapping,
-                    Some(Token::Control(ControlWord::ColorSchemeMapping))
-                )
+            (
+                ControlWord::ThemeData,
+                Some(Token::Control(ControlWord::ThemeData))
+            ) | (
+                ControlWord::ColorSchemeMapping,
+                Some(Token::Control(ControlWord::ColorSchemeMapping))
+            )
         );
         if !matches_expected {
             return Err(RtfError::MalformedDocument(
@@ -5614,15 +11230,476 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
                     self.pos += 1;
                 },
-                Some(Token::Binary(_))
-                | Some(Token::Control(_))
-                | Some(Token::Text(_)) => {
+                Some(Token::Binary(_)) | Some(Token::Control(_)) | Some(Token::Text(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF XML namespace table contains ungrouped, active, or binary data"
                             .to_string(),
                     ));
                 },
                 None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn parse_window_caption_destination(
+        &mut self,
+        starred: bool,
+    ) -> RtfResult<crate::DocumentWindowCaption<'a>> {
+        if starred {
+            self.pos += 1;
+        }
+        if self.tokens.get(self.pos) != Some(&Token::Control(ControlWord::WindowCaption)) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF window caption destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut value = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let value = self.arena.alloc_str(&value);
+                    return crate::DocumentWindowCaption::new(Cow::Borrowed(value));
+                },
+                Some(Token::Text(text)) => {
+                    value.extend(
+                        self.decode_transport_text(text)?
+                            .chars()
+                            .filter(|character| !matches!(character, '\r' | '\n')),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(skip))) => {
+                    unicode_skip = (*skip).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF window caption contains active, nested, or binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if value.len() > crate::MAX_WINDOW_CAPTION_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF window caption exceeds the resource limit".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn parse_xsl_transform_destination(&mut self) -> RtfResult<crate::DocumentXslTransform<'a>> {
+        self.pos += 1;
+        if self.tokens.get(self.pos) != Some(&Token::Control(ControlWord::XslTransform)) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF XSL transform destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut location = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let location = self.arena.alloc_str(&location);
+                    return crate::DocumentXslTransform::new(Cow::Borrowed(location));
+                },
+                Some(Token::Text(text)) => {
+                    location.extend(
+                        self.decode_transport_text(text)?
+                            .chars()
+                            .filter(|character| !matches!(character, '\r' | '\n')),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    location.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(skip))) => {
+                    unicode_skip = (*skip).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    location.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF XSL transform contains active, nested, or binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if location.len() > crate::MAX_DOCUMENT_XSL_TRANSFORM_LOCATION_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF XSL transform location exceeds the resource limit".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn parse_style_list_filter_destination(
+        &mut self,
+        parameter: Option<i32>,
+    ) -> RtfResult<crate::DocumentStyleListFilter> {
+        self.pos += 1;
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::StyleListFilter(_)))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF style-list filter destination".to_string(),
+            ));
+        }
+        if parameter.is_some() {
+            return Err(RtfError::MalformedDocument(
+                "RTF style-list filter must be a delimited four-digit hexadecimal string"
+                    .to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut value = String::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if value.len() != 4 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF style-list filter must contain exactly four hexadecimal digits"
+                                .to_string(),
+                        ));
+                    }
+                    let bits = u16::from_str_radix(&value, 16).map_err(|_| {
+                        RtfError::MalformedDocument(
+                            "invalid RTF style-list filter hexadecimal value".to_string(),
+                        )
+                    })?;
+                    return Ok(crate::DocumentStyleListFilter::from_parsed_bits(bits));
+                },
+                Some(Token::Text(text)) => {
+                    value.extend(
+                        self.decode_transport_text(text)?
+                            .chars()
+                            .filter(|character| !matches!(character, '\r' | '\n')),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF style-list filter contains active, nested, or binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if value.len() > 4 {
+                return Err(RtfError::MalformedDocument(
+                    "RTF style-list filter exceeds its four-digit resource bound".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn parse_legacy_write_reservation_destination(
+        &mut self,
+    ) -> RtfResult<crate::LegacyWriteReservation<'a>> {
+        self.pos += 1;
+        match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::WriteReservation(None))) => {},
+            Some(Token::Control(ControlWord::WriteReservation(Some(_)))) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF writereservation must not have a numeric parameter".to_string(),
+                ));
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF legacy write-reservation destination".to_string(),
+                ));
+            },
+        }
+        self.pos += 1;
+        let mut data = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let data = self.arena.alloc_str(&data);
+                    return crate::LegacyWriteReservation::new(Cow::Borrowed(data));
+                },
+                Some(Token::Text(text)) => {
+                    data.extend(
+                        self.decode_transport_text(text)?
+                            .chars()
+                            .filter(|character| !matches!(character, '\r' | '\n')),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    data.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(skip))) => {
+                    unicode_skip = (*skip).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    data.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF legacy write reservation contains active, nested, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if data.len() > crate::MAX_WRITE_RESERVATION_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF legacy write-reservation payload exceeds the resource limit".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn parse_write_reservation_hash_destination(
+        &mut self,
+    ) -> RtfResult<crate::WriteReservationHash<'a>> {
+        self.pos += 1;
+        match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::WriteReservationHash(None))) => {},
+            Some(Token::Control(ControlWord::WriteReservationHash(Some(_)))) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF writereservhash must not have a numeric parameter".to_string(),
+                ));
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF write-reservation hash destination".to_string(),
+                ));
+            },
+        }
+        self.pos += 1;
+        let mut encoded = String::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if encoded.is_empty()
+                        || encoded.len() % 2 != 0
+                        || !encoded.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF write-reservation hash must contain an even number of hexadecimal digits"
+                                .to_string(),
+                        ));
+                    }
+                    let mut data = Vec::with_capacity(encoded.len() / 2);
+                    for pair in encoded.as_bytes().chunks_exact(2) {
+                        let pair = std::str::from_utf8(pair).map_err(|_| {
+                            RtfError::MalformedDocument(
+                                "invalid RTF write-reservation hash encoding".to_string(),
+                            )
+                        })?;
+                        data.push(u8::from_str_radix(pair, 16).map_err(|_| {
+                            RtfError::MalformedDocument(
+                                "invalid RTF write-reservation hash encoding".to_string(),
+                            )
+                        })?);
+                    }
+                    return crate::WriteReservationHash::new(Cow::Owned(data));
+                },
+                Some(Token::Text(text)) => {
+                    encoded.extend(
+                        self.decode_transport_text(text)?
+                            .chars()
+                            .filter(|character| !matches!(character, '\r' | '\n')),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF write-reservation hash contains active, nested, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if encoded.len() > crate::MAX_WRITE_RESERVATION_BYTES * 2 {
+                return Err(RtfError::MalformedDocument(
+                    "RTF write-reservation hash exceeds the resource limit".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn parse_external_reference_destination(
+        &mut self,
+        expected: ControlWord<'a>,
+    ) -> RtfResult<Cow<'a, str>> {
+        self.pos += 1;
+        if self.tokens.get(self.pos) != Some(&Token::Control(expected)) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF external document reference destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut value = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let value = self.arena.alloc_str(value.trim());
+                    if value.is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF external document reference name cannot be empty".to_string(),
+                        ));
+                    }
+                    return Ok(Cow::Borrowed(value));
+                },
+                Some(Token::Text(text)) => {
+                    value.extend(
+                        self.decode_transport_text(text)?
+                            .chars()
+                            .filter(|character| !matches!(character, '\r' | '\n')),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(skip))) => {
+                    unicode_skip = (*skip).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF external document reference contains active, nested, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if value.len() > crate::MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF external document reference exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn parse_protection_user_table(&mut self) -> RtfResult<()> {
+        if self.saw_protection_user_table {
+            return Err(RtfError::MalformedDocument(
+                "RTF contains multiple protection-user tables".to_string(),
+            ));
+        }
+        self.saw_protection_user_table = true;
+        self.pos += 1; // protusertbl
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if self.protection_users.is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF protection-user table cannot be empty".to_string(),
+                        ));
+                    }
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => self.parse_protection_user_entry()?,
+                Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
+                    self.pos += 1;
+                },
+                Some(Token::Binary(_)) | Some(Token::Control(_)) | Some(Token::Text(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF protection-user table contains ungrouped, active, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn parse_protection_user_entry(&mut self) -> RtfResult<()> {
+        if self.protection_users.len() >= crate::MAX_PROTECTION_USERS {
+            return Err(RtfError::MalformedDocument(
+                "RTF protection-user count exceeds the safety limit".to_string(),
+            ));
+        }
+        self.expect_token(Token::OpenBrace)?;
+        let mut name = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let user = crate::ProtectionUser::new(Cow::Borrowed(
+                        self.arena.alloc_str(name.trim()),
+                    ))?;
+                    self.protection_user_text_bytes = self
+                        .protection_user_text_bytes
+                        .checked_add(user.name.len())
+                        .ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF protection-user aggregate size overflow".to_string(),
+                            )
+                        })?;
+                    if self.protection_user_text_bytes > crate::MAX_PROTECTION_USER_TOTAL_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF protection-user aggregate text exceeds the safety limit"
+                                .to_string(),
+                        ));
+                    }
+                    self.protection_users.push(user);
+                    return Ok(());
+                },
+                Some(Token::Text(text)) => {
+                    name.extend(
+                        self.decode_transport_text(text)?
+                            .chars()
+                            .filter(|character| !matches!(character, '\r' | '\n')),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    name.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    name.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF protection-user entry contains active, nested, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if name.len() > crate::MAX_PROTECTION_USER_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF protection username exceeds the safety limit".to_string(),
+                ));
             }
         }
     }
@@ -5683,8 +11760,7 @@ impl<'a> Parser<'a> {
                         > crate::xml_namespace::MAX_XML_NAMESPACE_TOTAL_BYTES
                     {
                         return Err(RtfError::MalformedDocument(
-                            "RTF XML namespace aggregate text exceeds the safety limit"
-                                .to_string(),
+                            "RTF XML namespace aggregate text exceeds the safety limit".to_string(),
                         ));
                     }
                     self.xml_namespaces.push(entry);
@@ -5852,16 +11928,14 @@ impl<'a> Parser<'a> {
                     "RTF aggregate revision-author size overflow".to_string(),
                 )
             })?;
-        if self.revision_author_text_bytes
-            > super::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES
+        if self.revision_author_text_bytes > super::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES
         {
             return Err(RtfError::MalformedDocument(
                 "RTF aggregate revision-author text exceeds the safety limit".to_string(),
             ));
         }
-        let author = super::annotation::RevisionAuthor::new(Cow::Borrowed(
-            self.arena.alloc_str(&author),
-        ))?;
+        let author =
+            super::annotation::RevisionAuthor::new(Cow::Borrowed(self.arena.alloc_str(&author)))?;
         author.validate()?;
         self.revision_authors.push(author);
         Ok(())
@@ -5869,10 +11943,19 @@ impl<'a> Parser<'a> {
 
     fn parse_list_table(&mut self) -> RtfResult<()> {
         if self.saw_list_table {
-            return Err(RtfError::MalformedDocument("RTF document contains multiple list tables".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF document contains multiple list tables".to_string(),
+            ));
         }
-        if self.states.len() != 3 || self.blocks.iter().any(|block| !block.text.trim().is_empty()) {
-            return Err(RtfError::MalformedDocument("RTF list table must occur in the root header".to_string()));
+        if self.states.len() != 3
+            || self
+                .blocks
+                .iter()
+                .any(|block| !block.text.trim().is_empty())
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF list table must occur in the root header".to_string(),
+            ));
         }
         self.saw_list_table = true;
         self.pos += 1; // `listtable`
@@ -5892,16 +11975,56 @@ impl<'a> Parser<'a> {
                         Some([
                             Token::OpenBrace,
                             Token::Control(ControlWord::IgnorableDestination),
-                            Token::Control(ControlWord::ListPicture),
+                            Token::Control(ControlWord::ListPicture(None)),
                         ])
                     ) =>
                 {
-                    self.list_table.picture_bullet_count = self
-                        .list_table
-                        .picture_bullet_count
-                        .checked_add(1)
-                        .ok_or_else(|| RtfError::MalformedDocument("RTF list-picture count overflow".to_string()))?;
-                    self.skip_group()?;
+                    if self.list_table.picture_bullet_count != 0 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF list table contains multiple listpicture destinations".to_string(),
+                        ));
+                    }
+                    let indices = self.parse_list_picture_destination()?;
+                    self.list_table
+                        .set_picture_bullet_picture_indices(indices)?;
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::ListPicture(Some(_))),
+                        ])
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF listpicture does not accept a parameter".to_string(),
+                    ));
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ListPicture(_)))
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF listpicture destination must be starred".to_string(),
+                    ));
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::ShapePicture(_)),
+                        ])
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shppict must be nested in listpicture".to_string(),
+                    ));
                 },
                 Some(Token::OpenBrace) => self.skip_group()?,
                 Some(Token::CloseBrace) => {
@@ -5914,6 +12037,109 @@ impl<'a> Parser<'a> {
             }
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_list_picture_destination(&mut self) -> RtfResult<Vec<Option<usize>>> {
+        self.pos += 3; // opening brace, \*, and \listpicture
+        let mut indices = Vec::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::Text(text)) if text.chars().all(char::is_whitespace) => self.pos += 1,
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::ShapePicture(None)),
+                        ])
+                    ) =>
+                {
+                    if indices.len() >= 65_536 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF list-picture record count exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    indices.push(Some(self.parse_list_shape_picture_destination()?));
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::ShapePicture(Some(_))),
+                        ])
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shppict does not accept a parameter".to_string(),
+                    ));
+                },
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if indices.is_empty() {
+                        indices.push(None);
+                    }
+                    return Ok(indices);
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF listpicture contains content outside a shppict record".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn parse_list_shape_picture_destination(&mut self) -> RtfResult<usize> {
+        self.pos += 3; // opening brace, \*, and \shppict
+        while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
+            if !text.chars().all(char::is_whitespace) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shppict contains text outside pict".to_string(),
+                ));
+            }
+            self.pos += 1;
+        }
+        if !matches!(
+            self.tokens.get(self.pos..self.pos + 2),
+            Some([Token::OpenBrace, Token::Control(ControlWord::Picture)])
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "RTF list shppict must contain exactly one pict destination".to_string(),
+            ));
+        }
+        self.pos += 1; // pict opening brace
+        let index = self.pictures.len();
+        self.parse_picture()?;
+        if self.pictures.len() != index + 1 {
+            return Err(RtfError::MalformedDocument(
+                "RTF list picture payload cannot be empty".to_string(),
+            ));
+        }
+        if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF list pict destination is not closed".to_string(),
+            ));
+        }
+        self.pos += 1;
+        while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
+            if !text.chars().all(char::is_whitespace) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shppict contains trailing text".to_string(),
+                ));
+            }
+            self.pos += 1;
+        }
+        if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF list shppict must contain exactly one pict destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        Ok(index)
     }
 
     fn parse_list_definition(&mut self) -> RtfResult<()> {
@@ -6096,13 +12322,17 @@ impl<'a> Parser<'a> {
                             )
                         })?;
                         if level.tabs.len() >= MAX_LIST_TABS {
-                            return Err(RtfError::MalformedDocument("RTF list level has too many tabs".to_string()));
+                            return Err(RtfError::MalformedDocument(
+                                "RTF list level has too many tabs".to_string(),
+                            ));
                         }
                         level.tabs.push(value);
                     },
                     ControlWord::ListLevelPicture(value) => {
                         level.picture_index = Some(u32::try_from(*value).map_err(|_| {
-                            RtfError::MalformedDocument("RTF list picture index cannot be negative".to_string())
+                            RtfError::MalformedDocument(
+                                "RTF list picture index cannot be negative".to_string(),
+                            )
                         })?);
                     },
                     _ => {},
@@ -6119,7 +12349,11 @@ impl<'a> Parser<'a> {
         self.pos += if matches!(
             self.tokens.get(self.pos + 1),
             Some(Token::Control(ControlWord::IgnorableDestination))
-        ) { 3 } else { 2 };
+        ) {
+            3
+        } else {
+            2
+        };
         let mut value = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         while self.pos < self.tokens.len() {
@@ -6133,7 +12367,10 @@ impl<'a> Parser<'a> {
                     }
                     if strip_length {
                         let mut chars = trimmed.chars();
-                        if chars.next().is_some_and(|ch| u32::from(ch) <= u8::MAX.into()) {
+                        if chars
+                            .next()
+                            .is_some_and(|ch| u32::from(ch) <= u8::MAX.into())
+                        {
                             return Ok(chars.collect());
                         }
                     }
@@ -6191,12 +12428,20 @@ impl<'a> Parser<'a> {
 
     fn parse_list_override_table(&mut self) -> RtfResult<()> {
         if self.saw_list_override_table {
-            return Err(RtfError::MalformedDocument("RTF document contains multiple list override tables".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF document contains multiple list override tables".to_string(),
+            ));
         }
-        if !self.saw_list_table || self.states.len() != 3
-            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+        if !self.saw_list_table
+            || self.states.len() != 3
+            || self
+                .blocks
+                .iter()
+                .any(|block| !block.text.trim().is_empty())
         {
-            return Err(RtfError::MalformedDocument("RTF list override table must follow listtable in the root header".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF list override table must follow listtable in the root header".to_string(),
+            ));
         }
         self.saw_list_override_table = true;
         self.pos += 1; // `listoverridetable`
@@ -6244,7 +12489,9 @@ impl<'a> Parser<'a> {
                     let mut has_format_override = false;
                     let mut level_start_at = None;
                     let override_index = u8::try_from(override_levels.len()).map_err(|_| {
-                        RtfError::MalformedDocument("RTF list override has too many levels".to_string())
+                        RtfError::MalformedDocument(
+                            "RTF list override has too many levels".to_string(),
+                        )
                     })?;
                     while self.pos < self.tokens.len() {
                         match self.tokens.get(self.pos) {
@@ -6327,6 +12574,381 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the standard RTF stylesheet destination.
+    fn default_character_property_key(control: &ControlWord<'_>) -> Option<&'static str> {
+        Some(match control {
+            ControlWord::CharacterStyle(_) => "character-style",
+            ControlWord::FontNumber(_) => "font",
+            ControlWord::FontSize(_) => "font-size",
+            ControlWord::AssociatedFontNumber(_) => "associated-font",
+            ControlWord::AssociatedFontSize(_) => "associated-font-size",
+            ControlWord::AssociatedLanguage(_) => "associated-language",
+            ControlWord::AssociatedBold(_) => "associated-bold",
+            ControlWord::AssociatedAllCaps(_) => "associated-caps",
+            ControlWord::AssociatedColor(_) => "associated-color",
+            ControlWord::AssociatedBaselineDown(_) | ControlWord::AssociatedBaselineUp(_) => {
+                "associated-baseline"
+            },
+            ControlWord::AssociatedExpansion(_) => "associated-expansion",
+            ControlWord::AssociatedItalic(_) => "associated-italic",
+            ControlWord::AssociatedOutline(_) => "associated-outline",
+            ControlWord::AssociatedSmallCaps(_) => "associated-small-caps",
+            ControlWord::AssociatedShadow(_) => "associated-shadow",
+            ControlWord::AssociatedStrike(_) => "associated-strike",
+            ControlWord::AssociatedUnderline(_)
+            | ControlWord::AssociatedUnderlineDotted(_)
+            | ControlWord::AssociatedUnderlineDouble(_)
+            | ControlWord::AssociatedUnderlineNone(_)
+            | ControlWord::AssociatedUnderlineWords(_) => "associated-underline",
+            ControlWord::ColorForeground(_) => "color",
+            ControlWord::ColorBackground(_) => "background-color",
+            ControlWord::Highlight(_) => "highlight",
+            ControlWord::Bold(_) => "bold",
+            ControlWord::Italic(_) => "italic",
+            ControlWord::Underline(_)
+            | ControlWord::UnderlineNone
+            | ControlWord::UnderlineDouble
+            | ControlWord::UnderlineDotted
+            | ControlWord::UnderlineDashed
+            | ControlWord::UnderlineDashDot
+            | ControlWord::UnderlineDashDotDot
+            | ControlWord::UnderlineWords
+            | ControlWord::UnderlineThick
+            | ControlWord::UnderlineWave => "underline",
+            ControlWord::Strike(_) => "strike",
+            ControlWord::DoubleStrike(_) => "double-strike",
+            ControlWord::Superscript(_)
+            | ControlWord::Subscript(_)
+            | ControlWord::NoSuperSub
+            | ControlWord::BaselineUp(_)
+            | ControlWord::BaselineDown(_) => "baseline",
+            ControlWord::SmallCaps(_) => "small-caps",
+            ControlWord::AllCaps(_) => "caps",
+            ControlWord::Hidden(_) => "hidden",
+            ControlWord::Outline(_) => "outline",
+            ControlWord::Shadow(_) => "shadow",
+            ControlWord::Emboss(_) => "emboss",
+            ControlWord::Imprint(_) => "imprint",
+            ControlWord::CharSpacing(_) | ControlWord::CharSpacingTwips(_) => "expansion",
+            ControlWord::CharScale(_) => "scale",
+            ControlWord::Kerning(_) => "kerning",
+            ControlWord::Language(_) => "language",
+            ControlWord::LanguageEastAsian(_) => "language-east-asian",
+            ControlWord::LanguageNoProof(_) => "language-no-proof",
+            ControlWord::LanguageEastAsianNoProof(_) => "language-east-asian-no-proof",
+            ControlWord::NoProof(_) => "no-proof",
+            ControlWord::LeftToRightCharacter | ControlWord::RightToLeftCharacter => "direction",
+            ControlWord::FontComplexScript(_) => "complex-script",
+            ControlWord::CharacterGrid(_) => "character-grid",
+            _ => return None,
+        })
+    }
+
+    fn default_paragraph_property_key(control: &ControlWord<'_>) -> Option<&'static str> {
+        Some(match control {
+            ControlWord::ParagraphStyle(_) => "paragraph-style",
+            ControlWord::LeftAlign
+            | ControlWord::RightAlign
+            | ControlWord::Center
+            | ControlWord::Justify => "alignment",
+            ControlWord::LeftToRightParagraph | ControlWord::RightToLeftParagraph => "direction",
+            ControlWord::SpaceBefore(_) => "space-before",
+            ControlWord::SpaceAfter(_) => "space-after",
+            ControlWord::SpaceBetween(_) => "line-space",
+            ControlWord::LineMultiple(_) => "line-multiple",
+            ControlWord::SpaceBeforeAuto(_) => "space-before-auto",
+            ControlWord::SpaceAfterAuto(_) => "space-after-auto",
+            ControlWord::ListSpaceBefore(_) => "list-space-before",
+            ControlWord::ListSpaceAfter(_) => "list-space-after",
+            ControlWord::NoSnapLineGrid(_) => "snap-grid",
+            ControlWord::ContextualSpacing(_) => "contextual-space",
+            ControlWord::LeftIndent(_) => "left-indent",
+            ControlWord::RightIndent(_) => "right-indent",
+            ControlWord::FirstLineIndent(_) => "first-indent",
+            ControlWord::LogicalLeftIndent(_) => "logical-left",
+            ControlWord::LogicalRightIndent(_) => "logical-right",
+            ControlWord::CharacterFirstLineIndent(_) => "char-first",
+            ControlWord::CharacterLeftIndent(_) => "char-left",
+            ControlWord::CharacterRightIndent(_) => "char-right",
+            ControlWord::MirrorIndents(_) => "mirror-indent",
+            ControlWord::KeepTogether => "keep",
+            ControlWord::KeepNext => "keep-next",
+            ControlWord::PageBreakBefore => "page-break",
+            ControlWord::WidowControl | ControlWord::NoWidowControl(_) => "widow",
+            ControlWord::DropCapLines(_) => "drop-cap-lines",
+            ControlWord::DropCapType(_) => "drop-cap-type",
+            ControlWord::ParagraphHyphenation(_) => "hyphenation",
+            ControlWord::AutoSpaceAlphabetic(_) => "auto-alpha",
+            ControlWord::AutoSpaceNumbers(_) => "auto-number",
+            ControlWord::AdjustRightIndent(_) => "adjust-right",
+            ControlWord::WrapDefault(_)
+            | ControlWord::NoCharacterWrap(_)
+            | ControlWord::NoWordWrap(_)
+            | ControlWord::NoOverflow(_) => "wrapping",
+            ControlWord::FontAlignAuto(_)
+            | ControlWord::FontAlignHanging(_)
+            | ControlWord::FontAlignCenter(_)
+            | ControlWord::FontAlignRoman(_)
+            | ControlWord::FontAlignVariable(_)
+            | ControlWord::FontAlignFixed(_) => "font-alignment",
+            ControlWord::ListOverrideIndex(_) => "list-override",
+            ControlWord::ListLevelIndex(_) => "list-level",
+            ControlWord::Shading(_) => "shading",
+            ControlWord::ForegroundPattern(_) => "shading-foreground",
+            ControlWord::BackgroundPattern(_) => "shading-background",
+            _ => return None,
+        })
+    }
+
+    fn parse_default_formatting_destination(
+        &mut self,
+        kind: crate::DefaultFormattingDestination,
+    ) -> RtfResult<()> {
+        if self.states.len() != 3
+            || self.section_note_options_closed
+            || self.states[self.states.len() - 2].destination != Destination::DocumentBody
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF default-formatting destination must occur once in the root document header"
+                    .to_string(),
+            ));
+        }
+        if match kind {
+            crate::DefaultFormattingDestination::Character => {
+                self.default_formatting.character().is_some()
+            },
+            crate::DefaultFormattingDestination::Paragraph => {
+                self.default_formatting.paragraph().is_some()
+            },
+        } {
+            return Err(RtfError::MalformedDocument(
+                "duplicate RTF default-formatting destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let expected = match kind {
+            crate::DefaultFormattingDestination::Character => {
+                ControlWord::DefaultCharacterProperties(None)
+            },
+            crate::DefaultFormattingDestination::Paragraph => {
+                ControlWord::DefaultParagraphProperties(None)
+            },
+        };
+        match (self.tokens.get(self.pos), expected) {
+            (
+                Some(Token::Control(ControlWord::DefaultCharacterProperties(parameter))),
+                ControlWord::DefaultCharacterProperties(_),
+            )
+            | (
+                Some(Token::Control(ControlWord::DefaultParagraphProperties(parameter))),
+                ControlWord::DefaultParagraphProperties(_),
+            ) => require_parameterless(
+                *parameter,
+                match kind {
+                    crate::DefaultFormattingDestination::Character => "defchp",
+                    crate::DefaultFormattingDestination::Paragraph => "defpap",
+                },
+            )?,
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF default-formatting destination".to_string(),
+                ));
+            },
+        }
+        self.pos += 1;
+        let mut state = State::default();
+        state.unicode_skip = self.current_state()?.unicode_skip;
+        let mut seen = std::collections::HashSet::new();
+        let mut script = None;
+        let mut low = None;
+        let mut high = None;
+        let mut double = None;
+        let mut itap = None;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    if script.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF defchp script selector lacks its af value".to_string(),
+                        ));
+                    }
+                    if state.pending_tab_alignment.is_some() || state.pending_tab_leader.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF defpap has an incomplete tab definition".to_string(),
+                        ));
+                    }
+                    Self::validate_drop_cap_state(&state, "defpap")?;
+                    self.pos += 1;
+                    match kind {
+                        crate::DefaultFormattingDestination::Character => self
+                            .default_formatting
+                            .set_character(crate::DefaultCharacterProperties {
+                                formatting: state.formatting,
+                                low_ansi_font: low,
+                                high_ansi_font: high,
+                                double_byte_font: double,
+                            }),
+                        crate::DefaultFormattingDestination::Paragraph => self
+                            .default_formatting
+                            .set_paragraph(crate::DefaultParagraphProperties {
+                                paragraph: state.paragraph,
+                                table_nesting_level: itap,
+                            }),
+                    }
+                    self.default_formatting.validate()?;
+                    return Ok(());
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {},
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF default-formatting destination cannot contain nested content"
+                            .to_string(),
+                    ));
+                },
+                Some(Token::Binary(_)) | Some(Token::Text(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF default-formatting destination contains active content".to_string(),
+                    ));
+                },
+                Some(Token::Control(control)) => match kind {
+                    crate::DefaultFormattingDestination::Character => {
+                        if matches!(
+                            control,
+                            ControlWord::LowAnsiCharacter(_)
+                                | ControlWord::HighAnsiCharacter(_)
+                                | ControlWord::DoubleByteCharacter(_)
+                        ) {
+                            if script.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF defchp script selector lacks its af value".to_string(),
+                                ));
+                            }
+                            let (parameter, key, value) = match control {
+                                ControlWord::LowAnsiCharacter(v) => (v, "loch", 0u8),
+                                ControlWord::HighAnsiCharacter(v) => (v, "hich", 1),
+                                ControlWord::DoubleByteCharacter(v) => (v, "dbch", 2),
+                                _ => unreachable!(),
+                            };
+                            require_parameterless(*parameter, key)?;
+                            if !seen.insert(key) {
+                                return Err(RtfError::MalformedDocument(format!(
+                                    "duplicate RTF {key} selector in defchp"
+                                )));
+                            }
+                            script = Some(value);
+                        } else if let ControlWord::AssociatedFontNumber(parameter) = control
+                            && script.is_some()
+                        {
+                            let value = associated_font_ref(*parameter)?;
+                            match script.take().unwrap() {
+                                0 => low = Some(value),
+                                1 => high = Some(value),
+                                _ => double = Some(value),
+                            }
+                        } else if Self::apply_character_decoration_control(&mut state, control)? {
+                        } else if let Some(key) = Self::default_character_property_key(control) {
+                            if !seen.insert(key) {
+                                return Err(RtfError::MalformedDocument(format!(
+                                    "duplicate RTF {key} property in defchp"
+                                )));
+                            }
+                            match control {
+                                ControlWord::FontNumber(value) => {
+                                    u16::try_from(*value).map_err(|_| {
+                                        RtfError::MalformedDocument(
+                                            "RTF defchp font value must be in 0..=65535"
+                                                .to_string(),
+                                        )
+                                    })?;
+                                },
+                                ControlWord::FontSize(value)
+                                    if !(1..=i32::from(u16::MAX)).contains(value) =>
+                                {
+                                    return Err(RtfError::MalformedDocument(
+                                        "RTF defchp fs value must be in 1..=65535".to_string(),
+                                    ));
+                                },
+                                ControlWord::ColorForeground(value)
+                                | ControlWord::Highlight(value) => {
+                                    u16::try_from(*value).map_err(|_| {
+                                        RtfError::MalformedDocument(
+                                            "RTF defchp color value must be in 0..=65535"
+                                                .to_string(),
+                                        )
+                                    })?;
+                                },
+                                ControlWord::ColorBackground(value) => {
+                                    Self::required_character_value(*value, "cb", u16::MAX)?;
+                                },
+                                ControlWord::Language(value)
+                                | ControlWord::LanguageEastAsian(value)
+                                | ControlWord::LanguageNoProof(value)
+                                | ControlWord::LanguageEastAsianNoProof(value) => {
+                                    crate::LanguageId::from_rtf(*value)?;
+                                },
+                                _ => {},
+                            }
+                            Self::apply_style_property(&mut state, control)?
+                        } else {
+                            return Err(RtfError::MalformedDocument(
+                                "unsupported control in RTF defchp destination".to_string(),
+                            ));
+                        }
+                    },
+                    crate::DefaultFormattingDestination::Paragraph => {
+                        if Self::apply_paragraph_tab_control(&mut state, control)? {
+                        } else if let ControlWord::TableNestingLevel(parameter) = control {
+                            if !seen.insert("itap") {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF itap property in defpap".to_string(),
+                                ));
+                            }
+                            let value = parameter.ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF defpap itap requires a numeric parameter".to_string(),
+                                )
+                            })?;
+                            itap = Some(u8::try_from(value).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF defpap itap value must be in 0..=32".to_string(),
+                                )
+                            })?);
+                            if itap.unwrap() > 32 {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF defpap itap value must be in 0..=32".to_string(),
+                                ));
+                            }
+                        } else if let Some(key) = Self::default_paragraph_property_key(control) {
+                            if !seen.insert(key) {
+                                return Err(RtfError::MalformedDocument(format!(
+                                    "duplicate RTF {key} property in defpap"
+                                )));
+                            }
+                            if matches!(control,ControlWord::LeftIndent(value)|ControlWord::RightIndent(value)|ControlWord::FirstLineIndent(value)|ControlWord::SpaceBefore(value)|ControlWord::SpaceAfter(value)|ControlWord::SpaceBetween(value) if value.unsigned_abs()>10_000_000)
+                            {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF defpap layout value exceeds the safety limit".to_string(),
+                                ));
+                            }
+                            match control {
+                                ControlWord::NoWidowControl(parameter) => {
+                                    require_parameterless(*parameter, "nowidctlpar")?;
+                                    state.paragraph.widow_control = false
+                                },
+                                _ => Self::apply_style_property(&mut state, control)?,
+                            }
+                        } else {
+                            return Err(RtfError::MalformedDocument(
+                                "unsupported control in RTF defpap destination".to_string(),
+                            ));
+                        }
+                    },
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1
+        }
+    }
+
     fn parse_stylesheet(&mut self) -> RtfResult<()> {
         if self.saw_stylesheet {
             return Err(RtfError::MalformedDocument(
@@ -6411,6 +13033,11 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     break;
                 },
+                Some(Token::Control(ControlWord::Page(_))) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF page is not permitted in a stylesheet".to_string(),
+                    ));
+                },
                 Some(Token::OpenBrace) => {
                     // Nested extension groups do not form part of the style name.
                     self.skip_group()?;
@@ -6451,16 +13078,19 @@ impl<'a> Parser<'a> {
                             ));
                         }
                         style_type = Some(super::stylesheet::StyleType::Paragraph);
-                        id = Some(Self::style_id(*value, "style")?);
+                        id = Some(paragraph_style_reference(*value)?);
                     },
-                    ControlWord::CharacterStyle(value) => {
-                        if style_type.is_some() || saw_content_before_selector {
+                    ControlWord::CharacterStyle(value) if style_type.is_none() => {
+                        if saw_content_before_selector {
                             return Err(RtfError::MalformedDocument(
                                 "RTF style selector is duplicated or out of order".to_string(),
                             ));
                         }
                         style_type = Some(super::stylesheet::StyleType::Character);
-                        id = Some(Self::style_id(*value, "style")?);
+                        id = Some(character_style_reference(*value)?);
+                    },
+                    ControlWord::CharacterStyle(value) => {
+                        state.formatting.character_style = Some(character_style_reference(*value)?);
                     },
                     ControlWord::SectionStyle(value) => {
                         if style_type.is_some() || saw_content_before_selector {
@@ -6469,7 +13099,7 @@ impl<'a> Parser<'a> {
                             ));
                         }
                         style_type = Some(super::stylesheet::StyleType::Section);
-                        id = Some(Self::style_id(*value, "style")?);
+                        id = Some(section_style_reference(*value)?);
                     },
                     ControlWord::TableStyle(value) => {
                         if style_type.is_some() || saw_content_before_selector {
@@ -6478,42 +13108,66 @@ impl<'a> Parser<'a> {
                             ));
                         }
                         style_type = Some(super::stylesheet::StyleType::Table);
-                        id = Some(Self::style_id(*value, "style")?);
+                        id = Some(table_style_reference(*value)?);
                     },
                     ControlWord::StyleBasedOn(value) => {
                         if !seen_metadata.insert("sbasedon") {
-                            return Err(RtfError::MalformedDocument("duplicate RTF sbasedon".to_string()));
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF sbasedon".to_string(),
+                            ));
                         }
                         based_on = Some(Self::style_id(*value, "based-on style")?);
                     },
                     ControlWord::StyleNext(value) => {
                         if !seen_metadata.insert("snext") {
-                            return Err(RtfError::MalformedDocument("duplicate RTF snext".to_string()));
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF snext".to_string(),
+                            ));
                         }
                         next_style = Some(Self::style_id(*value, "next style")?);
                     },
                     ControlWord::StyleLink(value) => {
                         if !seen_metadata.insert("slink") {
-                            return Err(RtfError::MalformedDocument("duplicate RTF slink".to_string()));
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF slink".to_string(),
+                            ));
                         }
                         linked_style = Some(Self::style_id(*value, "linked style")?);
                     },
-                    ControlWord::StyleAdditive(value) => set_style_once!("additive", additive, *value),
-                    ControlWord::StyleAutoUpdate(value) => set_style_once!("sautoupd", auto_update, *value),
+                    ControlWord::StyleAdditive(value) => {
+                        set_style_once!("additive", additive, *value)
+                    },
+                    ControlWord::StyleAutoUpdate(value) => {
+                        set_style_once!("sautoupd", auto_update, *value)
+                    },
                     ControlWord::StyleHidden(value) => set_style_once!("shidden", hidden, *value),
                     ControlWord::StyleLocked(value) => set_style_once!("slocked", locked, *value),
-                    ControlWord::StyleSemiHidden(value) => set_style_once!("ssemihidden", semi_hidden, *value),
-                    ControlWord::StyleUnhideWhenUsed(value) => set_style_once!("sunhideused", unhide_when_used, *value),
-                    ControlWord::StyleQuickFormat(value) => set_style_once!("sqformat", quick_format, *value),
-                    ControlWord::StylePriority(value) => set_style_once!("spriority", priority, Some(*value)),
+                    ControlWord::StyleSemiHidden(value) => {
+                        set_style_once!("ssemihidden", semi_hidden, *value)
+                    },
+                    ControlWord::StyleUnhideWhenUsed(value) => {
+                        set_style_once!("sunhideused", unhide_when_used, *value)
+                    },
+                    ControlWord::StyleQuickFormat(value) => {
+                        set_style_once!("sqformat", quick_format, *value)
+                    },
+                    ControlWord::StylePriority(value) => {
+                        set_style_once!("spriority", priority, Some(*value))
+                    },
                     ControlWord::StyleRevisionId(value) => {
                         if !seen_metadata.insert("styrsid") {
-                            return Err(RtfError::MalformedDocument("duplicate RTF styrsid".to_string()));
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF styrsid".to_string(),
+                            ));
                         }
                         revision_id = Some(*value);
                     },
-                    ControlWord::StylePersonal(value) => set_style_once!("spersonal", personal, *value),
-                    ControlWord::StyleCompose(value) => set_style_once!("scompose", compose, *value),
+                    ControlWord::StylePersonal(value) => {
+                        set_style_once!("spersonal", personal, *value)
+                    },
+                    ControlWord::StyleCompose(value) => {
+                        set_style_once!("scompose", compose, *value)
+                    },
                     ControlWord::StyleReply(value) => set_style_once!("sreply", reply, *value),
                     ControlWord::UnicodeSkip(value) => state.unicode_skip = (*value).max(0),
                     _ => {
@@ -6576,6 +13230,7 @@ impl<'a> Parser<'a> {
         style.linked_style = linked_style;
         style.formatting = state.formatting;
         if style_type == super::stylesheet::StyleType::Paragraph {
+            Self::validate_drop_cap_state(&state, "paragraph style")?;
             style.paragraph = Some(state.paragraph);
         }
         style.hidden = hidden;
@@ -6646,20 +13301,12 @@ impl<'a> Parser<'a> {
         Ok(decoded)
     }
 
-    fn required_character_value(
-        value: Option<i32>,
-        control: &str,
-        maximum: u16,
-    ) -> RtfResult<u16> {
+    fn required_character_value(value: Option<i32>, control: &str, maximum: u16) -> RtfResult<u16> {
         let value = value.ok_or_else(|| {
-            RtfError::MalformedDocument(format!(
-                "RTF {control} requires a numeric parameter"
-            ))
+            RtfError::MalformedDocument(format!("RTF {control} requires a numeric parameter"))
         })?;
         let value = u16::try_from(value).map_err(|_| {
-            RtfError::MalformedDocument(format!(
-                "RTF {control} value must be in 0..={maximum}"
-            ))
+            RtfError::MalformedDocument(format!("RTF {control} value must be in 0..={maximum}"))
         })?;
         if value > maximum {
             return Err(RtfError::MalformedDocument(format!(
@@ -6669,19 +13316,200 @@ impl<'a> Parser<'a> {
         Ok(value)
     }
 
-    fn table_border_style(control:&ControlWord<'_>)->Option<crate::BorderStyle>{use crate::BorderStyle as Style;Some(match control{ControlWord::BorderNone=>Style::None,ControlWord::BorderSingle=>Style::Single,ControlWord::BorderThick=>Style::Thick,ControlWord::BorderDotted=>Style::Dotted,ControlWord::BorderDashed=>Style::Dashed,ControlWord::BorderDashSmall=>Style::DashSmallGap,ControlWord::BorderDotDash=>Style::DotDash,ControlWord::BorderDotDotDash=>Style::DotDotDash,ControlWord::BorderDouble=>Style::Double,ControlWord::BorderTriple=>Style::Triple,ControlWord::BorderThinThickSmall=>Style::ThinThickSmall,ControlWord::BorderThickThinSmall=>Style::ThickThinSmall,ControlWord::BorderThinThickThinSmall=>Style::ThinThickThinSmall,ControlWord::BorderThinThickMedium=>Style::ThinThickMedium,ControlWord::BorderThickThinMedium=>Style::ThickThinMedium,ControlWord::BorderThinThickThinMedium=>Style::ThinThickThinMedium,ControlWord::BorderThinThickLarge=>Style::ThinThickLarge,ControlWord::BorderThickThinLarge=>Style::ThickThinLarge,ControlWord::BorderThinThickThinLarge=>Style::ThinThickThinLarge,ControlWord::BorderWave=>Style::Wavy,ControlWord::BorderWavyDouble=>Style::WavyDouble,ControlWord::BorderStriped=>Style::Striped,ControlWord::BorderEmbossed=>Style::Embossed,ControlWord::BorderEngraved=>Style::Engraved,ControlWord::BorderOutset=>Style::Outset,ControlWord::BorderInset=>Style::Inset,_=>return None})}
-
-    fn apply_table_decoration_control(state:&mut State,control:&ControlWord<'_>)->RtfResult<bool>{
-        const STYLE:u8=1;const WIDTH:u8=2;const COLOR:u8=4;const SPACE:u8=8;const SHADOW:u8=16;const FRAME:u8=32;
-        if let ControlWord::TableBorder(target,param)=control{require_parameterless(*param,"table border selector")?;state.active_table_border=Some(*target);state.active_table_border_seen=0;let slot=match target{crate::table::TableBorderTarget::Row(side)=>state.table_row_borders.side_mut(*side),crate::table::TableBorderTarget::Cell(side)=>state.pending_cell_borders.side_mut(*side)};*slot=Some(crate::Border::default());return Ok(true)}
-        let shading_control=matches!(control,ControlWord::TableShadingAmount(..)|ControlWord::TableShadingForeground(..)|ControlWord::TableShadingBackground(..)|ControlWord::TableShadingPattern(..)|ControlWord::TableRowShadingPatternIndex(..));
-        if shading_control{state.active_table_border=None;state.active_table_border_seen=0;let scope=match control{ControlWord::TableShadingAmount(scope,_)|ControlWord::TableShadingForeground(scope,_)|ControlWord::TableShadingBackground(scope,_)|ControlWord::TableShadingPattern(scope,_,_)=>*scope,ControlWord::TableRowShadingPatternIndex(_)=>crate::TableDistanceScope::Row,_=>unreachable!()};let(shading,seen)=match scope{crate::TableDistanceScope::Row=>(&mut state.table_row_shading,&mut state.table_row_shading_seen),crate::TableDistanceScope::Cell=>(&mut state.pending_cell_shading,&mut state.pending_cell_shading_seen)};let bit=match control{ControlWord::TableShadingAmount(..)=>1,ControlWord::TableShadingForeground(..)=>2,ControlWord::TableShadingBackground(..)=>4,ControlWord::TableShadingPattern(..)|ControlWord::TableRowShadingPatternIndex(..)=>8,_=>unreachable!()};if *seen&bit!=0{return Err(RtfError::MalformedDocument("duplicate RTF table shading component".to_string()))}*seen|=bit;match control{ControlWord::TableShadingAmount(_,value)=>shading.amount=Some(required_table_value(*value,"table shading",10_000)?),ControlWord::TableShadingForeground(_,value)=>shading.foreground_color=Some(required_table_value(*value,"table shading foreground color",u16::MAX)?),ControlWord::TableShadingBackground(_,value)=>shading.background_color=Some(required_table_value(*value,"table shading background color",u16::MAX)?),ControlWord::TableShadingPattern(_,pattern,param)=>{require_parameterless(*param,"table shading pattern")?;shading.pattern=Some(*pattern)},ControlWord::TableRowShadingPatternIndex(value)=>shading.pattern_index=Some(required_table_value(*value,"trpat",u16::MAX)?),_=>unreachable!()}return Ok(true)}
-        let Some(target)=state.active_table_border else{return Ok(false)};let(component,name)=if Self::table_border_style(control).is_some(){(STYLE,"style")}else{match control{ControlWord::BorderWidth(_)=>(WIDTH,"width"),ControlWord::BorderColor(_)=>(COLOR,"color"),ControlWord::BorderSpace(_)=>(SPACE,"spacing"),ControlWord::BorderShadow=>(SHADOW,"shadow"),ControlWord::BorderFrame=>(FRAME,"frame"),_=>{state.active_table_border=None;state.active_table_border_seen=0;return Ok(false)}}};if state.active_table_border_seen&component!=0{return Err(RtfError::MalformedDocument(format!("duplicate RTF table-border {name}")))}if component!=STYLE&&state.active_table_border_seen&STYLE==0{return Err(RtfError::MalformedDocument(format!("RTF table-border {name} precedes its style")))}state.active_table_border_seen|=component;let border=match target{crate::table::TableBorderTarget::Row(side)=>state.table_row_borders.side_mut(side),crate::table::TableBorderTarget::Cell(side)=>state.pending_cell_borders.side_mut(side)}.as_mut().expect("active table border");if let Some(style)=Self::table_border_style(control){border.style=style}else{match control{ControlWord::BorderWidth(value)=>border.width=i32::from(required_table_value(*value,"brdrw",75)?),ControlWord::BorderColor(value)=>border.color_ref=required_table_value(*value,"brdrcf",u16::MAX)?,ControlWord::BorderSpace(value)=>border.space=i32::from(required_table_value(*value,"brsp",crate::MAX_TABLE_DISTANCE_TWIPS as u16)?),ControlWord::BorderShadow=>border.shadow=true,ControlWord::BorderFrame=>border.frame=true,_=>unreachable!()}}Ok(true)
+    fn table_border_style(control: &ControlWord<'_>) -> Option<crate::BorderStyle> {
+        use crate::BorderStyle as Style;
+        Some(match control {
+            ControlWord::BorderNone => Style::None,
+            ControlWord::BorderSingle => Style::Single,
+            ControlWord::BorderThick => Style::Thick,
+            ControlWord::BorderDotted => Style::Dotted,
+            ControlWord::BorderDashed => Style::Dashed,
+            ControlWord::BorderDashSmall => Style::DashSmallGap,
+            ControlWord::BorderDotDash => Style::DotDash,
+            ControlWord::BorderDotDotDash => Style::DotDotDash,
+            ControlWord::BorderDouble => Style::Double,
+            ControlWord::BorderTriple => Style::Triple,
+            ControlWord::BorderThinThickSmall => Style::ThinThickSmall,
+            ControlWord::BorderThickThinSmall => Style::ThickThinSmall,
+            ControlWord::BorderThinThickThinSmall => Style::ThinThickThinSmall,
+            ControlWord::BorderThinThickMedium => Style::ThinThickMedium,
+            ControlWord::BorderThickThinMedium => Style::ThickThinMedium,
+            ControlWord::BorderThinThickThinMedium => Style::ThinThickThinMedium,
+            ControlWord::BorderThinThickLarge => Style::ThinThickLarge,
+            ControlWord::BorderThickThinLarge => Style::ThickThinLarge,
+            ControlWord::BorderThinThickThinLarge => Style::ThinThickThinLarge,
+            ControlWord::BorderWave => Style::Wavy,
+            ControlWord::BorderWavyDouble => Style::WavyDouble,
+            ControlWord::BorderStriped => Style::Striped,
+            ControlWord::BorderEmbossed => Style::Embossed,
+            ControlWord::BorderEngraved => Style::Engraved,
+            ControlWord::BorderOutset => Style::Outset,
+            ControlWord::BorderInset => Style::Inset,
+            _ => return None,
+        })
     }
 
-    fn character_border_style(
+    fn apply_table_decoration_control(
+        state: &mut State,
         control: &ControlWord<'_>,
-    ) -> Option<crate::CharacterBorderStyle> {
+    ) -> RtfResult<bool> {
+        const STYLE: u8 = 1;
+        const WIDTH: u8 = 2;
+        const COLOR: u8 = 4;
+        const SPACE: u8 = 8;
+        const SHADOW: u8 = 16;
+        const FRAME: u8 = 32;
+        if let ControlWord::TableBorder(target, param) = control {
+            require_parameterless(*param, "table border selector")?;
+            state.active_table_border = Some(*target);
+            state.active_table_border_seen = 0;
+            let slot = match target {
+                crate::table::TableBorderTarget::Row(side) => {
+                    state.table_row_borders.side_mut(*side)
+                },
+                crate::table::TableBorderTarget::Cell(side) => {
+                    state.pending_cell_borders.side_mut(*side)
+                },
+            };
+            *slot = Some(crate::Border::default());
+            return Ok(true);
+        }
+        let shading_control = matches!(
+            control,
+            ControlWord::TableShadingAmount(..)
+                | ControlWord::TableShadingForeground(..)
+                | ControlWord::TableShadingBackground(..)
+                | ControlWord::TableShadingPattern(..)
+                | ControlWord::TableRowShadingPatternIndex(..)
+        );
+        if shading_control {
+            state.active_table_border = None;
+            state.active_table_border_seen = 0;
+            let scope = match control {
+                ControlWord::TableShadingAmount(scope, _)
+                | ControlWord::TableShadingForeground(scope, _)
+                | ControlWord::TableShadingBackground(scope, _)
+                | ControlWord::TableShadingPattern(scope, _, _) => *scope,
+                ControlWord::TableRowShadingPatternIndex(_) => crate::TableDistanceScope::Row,
+                _ => unreachable!(),
+            };
+            let (shading, seen) = match scope {
+                crate::TableDistanceScope::Row => (
+                    &mut state.table_row_shading,
+                    &mut state.table_row_shading_seen,
+                ),
+                crate::TableDistanceScope::Cell => (
+                    &mut state.pending_cell_shading,
+                    &mut state.pending_cell_shading_seen,
+                ),
+            };
+            let bit = match control {
+                ControlWord::TableShadingAmount(..) => 1,
+                ControlWord::TableShadingForeground(..) => 2,
+                ControlWord::TableShadingBackground(..) => 4,
+                ControlWord::TableShadingPattern(..)
+                | ControlWord::TableRowShadingPatternIndex(..) => 8,
+                _ => unreachable!(),
+            };
+            if *seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF table shading component".to_string(),
+                ));
+            }
+            *seen |= bit;
+            match control {
+                ControlWord::TableShadingAmount(_, value) => {
+                    shading.amount = Some(required_table_value(*value, "table shading", 10_000)?)
+                },
+                ControlWord::TableShadingForeground(_, value) => {
+                    shading.foreground_color = Some(required_table_value(
+                        *value,
+                        "table shading foreground color",
+                        u16::MAX,
+                    )?)
+                },
+                ControlWord::TableShadingBackground(_, value) => {
+                    shading.background_color = Some(required_table_value(
+                        *value,
+                        "table shading background color",
+                        u16::MAX,
+                    )?)
+                },
+                ControlWord::TableShadingPattern(_, pattern, param) => {
+                    require_parameterless(*param, "table shading pattern")?;
+                    shading.pattern = Some(*pattern)
+                },
+                ControlWord::TableRowShadingPatternIndex(value) => {
+                    shading.pattern_index = Some(required_table_value(*value, "trpat", u16::MAX)?)
+                },
+                _ => unreachable!(),
+            }
+            return Ok(true);
+        }
+        let Some(target) = state.active_table_border else {
+            return Ok(false);
+        };
+        let (component, name) = if Self::table_border_style(control).is_some() {
+            (STYLE, "style")
+        } else {
+            match control {
+                ControlWord::BorderWidth(_) => (WIDTH, "width"),
+                ControlWord::BorderColor(_) => (COLOR, "color"),
+                ControlWord::BorderSpace(_) => (SPACE, "spacing"),
+                ControlWord::BorderShadow => (SHADOW, "shadow"),
+                ControlWord::BorderFrame => (FRAME, "frame"),
+                _ => {
+                    state.active_table_border = None;
+                    state.active_table_border_seen = 0;
+                    return Ok(false);
+                },
+            }
+        };
+        if state.active_table_border_seen & component != 0 {
+            return Err(RtfError::MalformedDocument(format!(
+                "duplicate RTF table-border {name}"
+            )));
+        }
+        if component != STYLE && state.active_table_border_seen & STYLE == 0 {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF table-border {name} precedes its style"
+            )));
+        }
+        state.active_table_border_seen |= component;
+        let border = match target {
+            crate::table::TableBorderTarget::Row(side) => state.table_row_borders.side_mut(side),
+            crate::table::TableBorderTarget::Cell(side) => {
+                state.pending_cell_borders.side_mut(side)
+            },
+        }
+        .as_mut()
+        .expect("active table border");
+        if let Some(style) = Self::table_border_style(control) {
+            border.style = style
+        } else {
+            match control {
+                ControlWord::BorderWidth(value) => {
+                    border.width = i32::from(required_table_value(*value, "brdrw", 75)?)
+                },
+                ControlWord::BorderColor(value) => {
+                    border.color_ref = required_table_value(*value, "brdrcf", u16::MAX)?
+                },
+                ControlWord::BorderSpace(value) => {
+                    border.space = i32::from(required_table_value(
+                        *value,
+                        "brsp",
+                        crate::MAX_TABLE_DISTANCE_TWIPS as u16,
+                    )?)
+                },
+                ControlWord::BorderShadow => border.shadow = true,
+                ControlWord::BorderFrame => border.frame = true,
+                _ => unreachable!(),
+            }
+        }
+        Ok(true)
+    }
+
+    fn character_border_style(control: &ControlWord<'_>) -> Option<crate::CharacterBorderStyle> {
         use crate::CharacterBorderStyle as Style;
         Some(match control {
             ControlWord::BorderNone => Style::None,
@@ -6807,8 +13635,7 @@ impl<'a> Parser<'a> {
                     border.width = Self::required_character_value(*value, "brdrw", 75)?;
                 },
                 ControlWord::BorderColor(value) => {
-                    border.color_ref =
-                        Self::required_character_value(*value, "brdrcf", u16::MAX)?;
+                    border.color_ref = Self::required_character_value(*value, "brdrcf", u16::MAX)?;
                 },
                 ControlWord::BorderSpace(value) => {
                     border.space = Self::required_character_value(*value, "brsp", u16::MAX)?;
@@ -6821,6 +13648,35 @@ impl<'a> Parser<'a> {
         Ok(true)
     }
 
+    fn apply_paragraph_shading_control(
+        state: &mut State,
+        control: &ControlWord<'_>,
+    ) -> RtfResult<bool> {
+        match control {
+            ControlWord::Shading(value) => state.paragraph.shading.set_amount(Some(
+                Self::required_character_value(*value, "shading", 10_000)?,
+            ))?,
+            ControlWord::ForegroundPattern(value) => state
+                .paragraph
+                .shading
+                .set_foreground_color(Some(Self::required_character_value(
+                    *value,
+                    "cfpat",
+                    u16::MAX,
+                )?)),
+            ControlWord::BackgroundPattern(value) => state
+                .paragraph
+                .shading
+                .set_background_color(Some(Self::required_character_value(
+                    *value,
+                    "cbpat",
+                    u16::MAX,
+                )?)),
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+
     fn apply_style_property(state: &mut State, control: &ControlWord<'_>) -> RtfResult<()> {
         if Self::apply_paragraph_tab_control(state, control)? {
             return Ok(());
@@ -6828,30 +13684,34 @@ impl<'a> Parser<'a> {
         if Self::apply_character_decoration_control(state, control)? {
             return Ok(());
         }
+        if Self::apply_paragraph_shading_control(state, control)? {
+            return Ok(());
+        }
+        if Self::apply_drop_cap_control(state, control)? {
+            return Ok(());
+        }
+        if apply_associated_character_control(&mut state.formatting.associated, control)? {
+            return Ok(());
+        }
         match control {
+            ControlWord::CharacterStyle(value) => {
+                state.formatting.character_style = Some(character_style_reference(*value)?);
+            },
             ControlWord::FontNumber(value) => state.formatting.font_ref = *value as FontRef,
             ControlWord::FontSize(value) => {
                 if let Some(size) = NonZeroU16::new((*value).clamp(1, i32::from(u16::MAX)) as u16) {
                     state.formatting.font_size = size;
                 }
             },
-            ControlWord::AssociatedFontNumber(value) => {
-                state.formatting.associated.font_ref = Some(associated_font_ref(*value)?);
-            },
-            ControlWord::AssociatedFontSize(value) => {
-                state.formatting.associated.font_size = Some(associated_font_size(*value)?);
-            },
-            ControlWord::AssociatedLanguage(value) => {
-                state.formatting.associated.language = Some(associated_language(*value)?);
-            },
-            ControlWord::AssociatedBold(value) => {
-                state.formatting.associated.bold = Some(*value);
-            },
-            ControlWord::AssociatedItalic(value) => {
-                state.formatting.associated.italic = Some(*value);
-            },
             ControlWord::ColorForeground(value) => {
                 state.formatting.color_ref = *value as ColorRef;
+            },
+            ControlWord::ColorBackground(value) => {
+                state.formatting.background_color = Some(Self::required_character_value(
+                    *value,
+                    "cb",
+                    u16::MAX,
+                )?);
             },
             ControlWord::Highlight(value) => {
                 state.formatting.highlight_color = Some(*value as ColorRef);
@@ -6878,11 +13738,38 @@ impl<'a> Parser<'a> {
             ControlWord::UnderlineWave => state.formatting.underline = UnderlineStyle::Wave,
             ControlWord::Strike(value) => state.formatting.strike = *value,
             ControlWord::DoubleStrike(value) => state.formatting.double_strike = *value,
-            ControlWord::Superscript(value) => { state.formatting.superscript = *value; if *value { state.formatting.subscript = false; } state.formatting.character_positioning.set_superscript(*value); },
-            ControlWord::Subscript(value) => { state.formatting.subscript = *value; if *value { state.formatting.superscript = false; } state.formatting.character_positioning.set_subscript(*value); },
-            ControlWord::NoSuperSub => { state.formatting.superscript = false; state.formatting.subscript = false; state.formatting.character_positioning.clear_baseline(); },
-            ControlWord::BaselineUp(value) => { state.formatting.superscript = false; state.formatting.subscript = false; state.formatting.character_positioning.set_raised(*value)?; },
-            ControlWord::BaselineDown(value) => { state.formatting.superscript = false; state.formatting.subscript = false; state.formatting.character_positioning.set_lowered(*value)?; },
+            ControlWord::Superscript(value) => {
+                state.formatting.superscript = *value;
+                if *value {
+                    state.formatting.subscript = false;
+                }
+                state
+                    .formatting
+                    .character_positioning
+                    .set_superscript(*value);
+            },
+            ControlWord::Subscript(value) => {
+                state.formatting.subscript = *value;
+                if *value {
+                    state.formatting.superscript = false;
+                }
+                state.formatting.character_positioning.set_subscript(*value);
+            },
+            ControlWord::NoSuperSub => {
+                state.formatting.superscript = false;
+                state.formatting.subscript = false;
+                state.formatting.character_positioning.clear_baseline();
+            },
+            ControlWord::BaselineUp(value) => {
+                state.formatting.superscript = false;
+                state.formatting.subscript = false;
+                state.formatting.character_positioning.set_raised(*value)?;
+            },
+            ControlWord::BaselineDown(value) => {
+                state.formatting.superscript = false;
+                state.formatting.subscript = false;
+                state.formatting.character_positioning.set_lowered(*value)?;
+            },
             ControlWord::SmallCaps(value) => state.formatting.smallcaps = *value,
             ControlWord::AllCaps(value) => state.formatting.all_caps = *value,
             ControlWord::Hidden(value) => state.formatting.hidden = *value,
@@ -6890,10 +13777,28 @@ impl<'a> Parser<'a> {
             ControlWord::Shadow(value) => state.formatting.shadow = *value,
             ControlWord::Emboss(value) => state.formatting.emboss = *value,
             ControlWord::Imprint(value) => state.formatting.imprint = *value,
-            ControlWord::CharSpacing(value) => { state.formatting.character_positioning.set_quarter_point_expansion(*value)?; state.formatting.char_spacing = *value; },
-            ControlWord::CharSpacingTwips(value) => { state.formatting.character_positioning.set_twip_expansion(*value)?; state.formatting.char_spacing = *value; },
-            ControlWord::CharScale(value) => { state.formatting.character_positioning.set_scale(*value)?; state.formatting.char_scale = *value; },
-            ControlWord::Kerning(value) => { state.formatting.character_positioning.set_kerning(*value)?; state.formatting.kerning = *value; },
+            ControlWord::CharSpacing(value) => {
+                state
+                    .formatting
+                    .character_positioning
+                    .set_quarter_point_expansion(*value)?;
+                state.formatting.char_spacing = *value;
+            },
+            ControlWord::CharSpacingTwips(value) => {
+                state
+                    .formatting
+                    .character_positioning
+                    .set_twip_expansion(*value)?;
+                state.formatting.char_spacing = *value;
+            },
+            ControlWord::CharScale(value) => {
+                state.formatting.character_positioning.set_scale(*value)?;
+                state.formatting.char_scale = *value;
+            },
+            ControlWord::Kerning(value) => {
+                state.formatting.character_positioning.set_kerning(*value)?;
+                state.formatting.kerning = *value;
+            },
             ControlWord::Language(value) => {
                 state.formatting.language = crate::LanguageId::from_rtf(*value).ok();
             },
@@ -6914,10 +13819,40 @@ impl<'a> Parser<'a> {
             ControlWord::RightToLeftCharacter => {
                 state.formatting.direction = Some(TextDirection::RightToLeft);
             },
+            ControlWord::LowAnsiCharacter(parameter) => {
+                state.formatting.character_type = Some(character_type_selector(
+                    *parameter,
+                    "loch",
+                    crate::CharacterType::LowAnsi,
+                )?);
+            },
+            ControlWord::HighAnsiCharacter(parameter) => {
+                state.formatting.character_type = Some(character_type_selector(
+                    *parameter,
+                    "hich",
+                    crate::CharacterType::HighAnsi,
+                )?);
+            },
+            ControlWord::DoubleByteCharacter(parameter) => {
+                state.formatting.character_type = Some(character_type_selector(
+                    *parameter,
+                    "dbch",
+                    crate::CharacterType::DoubleByte,
+                )?);
+            },
+            ControlWord::FontComplexScript(value) => {
+                state.formatting.complex_script = Some(complex_script_selector(*value)?);
+            },
+            ControlWord::CharacterGrid(value) => {
+                state.formatting.character_grid = Some(character_grid(*value)?);
+            },
             ControlWord::Plain => {
                 state.formatting = Formatting::default();
                 state.character_border_active = false;
                 state.character_border_seen = 0;
+            },
+            ControlWord::ParagraphStyle(value) => {
+                state.paragraph.paragraph_style = Some(paragraph_style_reference(*value)?);
             },
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
@@ -6931,6 +13866,8 @@ impl<'a> Parser<'a> {
             },
             ControlWord::Pard => {
                 state.paragraph = Paragraph::default();
+                state.drop_cap_kind = None;
+                state.drop_cap_lines = None;
                 state.pending_tab_alignment = None;
                 state.pending_tab_leader = None;
             },
@@ -6938,36 +13875,124 @@ impl<'a> Parser<'a> {
             ControlWord::SpaceAfter(value) => state.paragraph.spacing.after = *value,
             ControlWord::SpaceBetween(value) => state.paragraph.spacing.line = *value,
             ControlWord::LineMultiple(value) => state.paragraph.spacing.line_multiple = *value,
-            ControlWord::SpaceBeforeAuto(value) => state.paragraph.spacing_policy.automatic_before = required_paragraph_bool(*value, "sbauto")?,
-            ControlWord::SpaceAfterAuto(value) => state.paragraph.spacing_policy.automatic_after = required_paragraph_bool(*value, "saauto")?,
-            ControlWord::ListSpaceBefore(value) => state.paragraph.spacing_policy.list_before = Some(required_list_spacing(*value, "lisb")?),
-            ControlWord::ListSpaceAfter(value) => state.paragraph.spacing_policy.list_after = Some(required_list_spacing(*value, "lisa")?),
-            ControlWord::NoSnapLineGrid(value) => { strict_paragraph_selector(*value, "nosnaplinegrid")?; state.paragraph.spacing_policy.snap_to_line_grid = false; },
-            ControlWord::ContextualSpacing(value) => { strict_paragraph_selector(*value, "contextualspace")?; state.paragraph.spacing_policy.contextual_spacing = true; },
+            ControlWord::SpaceBeforeAuto(value) => {
+                state.paragraph.spacing_policy.automatic_before =
+                    required_paragraph_bool(*value, "sbauto")?
+            },
+            ControlWord::SpaceAfterAuto(value) => {
+                state.paragraph.spacing_policy.automatic_after =
+                    required_paragraph_bool(*value, "saauto")?
+            },
+            ControlWord::ListSpaceBefore(value) => {
+                state.paragraph.spacing_policy.list_before =
+                    Some(required_list_spacing(*value, "lisb")?)
+            },
+            ControlWord::ListSpaceAfter(value) => {
+                state.paragraph.spacing_policy.list_after =
+                    Some(required_list_spacing(*value, "lisa")?)
+            },
+            ControlWord::NoSnapLineGrid(value) => {
+                strict_paragraph_selector(*value, "nosnaplinegrid")?;
+                state.paragraph.spacing_policy.snap_to_line_grid = false;
+            },
+            ControlWord::ContextualSpacing(value) => {
+                strict_paragraph_selector(*value, "contextualspace")?;
+                state.paragraph.spacing_policy.contextual_spacing = true;
+            },
             ControlWord::LeftIndent(value) => state.paragraph.indentation.left = *value,
             ControlWord::RightIndent(value) => state.paragraph.indentation.right = *value,
             ControlWord::FirstLineIndent(value) => {
                 state.paragraph.indentation.first_line = *value;
             },
-            ControlWord::LogicalLeftIndent(v)=>state.paragraph.logical_indentation.start=Some(required_paragraph_indent(*v,"lin")?), ControlWord::LogicalRightIndent(v)=>state.paragraph.logical_indentation.end=Some(required_paragraph_indent(*v,"rin")?), ControlWord::CharacterFirstLineIndent(v)=>state.paragraph.logical_indentation.first_line_character_units=Some(required_paragraph_indent(*v,"cufi")?), ControlWord::CharacterLeftIndent(v)=>state.paragraph.logical_indentation.left_character_units=Some(required_paragraph_indent(*v,"culi")?), ControlWord::CharacterRightIndent(v)=>state.paragraph.logical_indentation.right_character_units=Some(required_paragraph_indent(*v,"curi")?), ControlWord::MirrorIndents(v)=>{strict_paragraph_selector(*v,"indmirror")?;state.paragraph.logical_indentation.mirrored=true;},
+            ControlWord::LogicalLeftIndent(v) => {
+                state.paragraph.logical_indentation.start =
+                    Some(required_paragraph_indent(*v, "lin")?)
+            },
+            ControlWord::LogicalRightIndent(v) => {
+                state.paragraph.logical_indentation.end =
+                    Some(required_paragraph_indent(*v, "rin")?)
+            },
+            ControlWord::CharacterFirstLineIndent(v) => {
+                state
+                    .paragraph
+                    .logical_indentation
+                    .first_line_character_units = Some(required_paragraph_indent(*v, "cufi")?)
+            },
+            ControlWord::CharacterLeftIndent(v) => {
+                state.paragraph.logical_indentation.left_character_units =
+                    Some(required_paragraph_indent(*v, "culi")?)
+            },
+            ControlWord::CharacterRightIndent(v) => {
+                state.paragraph.logical_indentation.right_character_units =
+                    Some(required_paragraph_indent(*v, "curi")?)
+            },
+            ControlWord::MirrorIndents(v) => {
+                strict_paragraph_selector(*v, "indmirror")?;
+                state.paragraph.logical_indentation.mirrored = true;
+            },
             ControlWord::KeepTogether => state.paragraph.keep_together = true,
             ControlWord::KeepNext => state.paragraph.keep_next = true,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
-            ControlWord::ParagraphHyphenation(value) => state.paragraph.line_breaking.automatic_hyphenation = strict_paragraph_toggle(*value, "hyphpar")?,
-            ControlWord::AutoSpaceAlphabetic(value) => state.paragraph.line_breaking.auto_space_alphabetic = strict_paragraph_toggle(*value, "aspalpha")?,
-            ControlWord::AutoSpaceNumbers(value) => state.paragraph.line_breaking.auto_space_numbers = strict_paragraph_toggle(*value, "aspnum")?,
-            ControlWord::AdjustRightIndent(value) => state.paragraph.line_breaking.adjust_right_indent = strict_paragraph_toggle(*value, "adjustright")?,
-            ControlWord::WrapDefault(value) => { strict_paragraph_selector(*value, "wrapdefault")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::Default; },
-            ControlWord::NoCharacterWrap(value) => { strict_paragraph_selector(*value, "nocwrap")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoCharacterWrap; },
-            ControlWord::NoWordWrap(value) => { strict_paragraph_selector(*value, "nowwrap")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoWordWrap; },
-            ControlWord::NoOverflow(value) => { strict_paragraph_selector(*value, "nooverflow")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoOverflow; },
-            ControlWord::FontAlignAuto(value) => { strict_paragraph_selector(*value, "faauto")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Auto; },
-            ControlWord::FontAlignHanging(value) => { strict_paragraph_selector(*value, "fahang")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Hanging; },
-            ControlWord::FontAlignCenter(value) => { strict_paragraph_selector(*value, "facenter")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Center; },
-            ControlWord::FontAlignRoman(value) => { strict_paragraph_selector(*value, "faroman")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Roman; },
-            ControlWord::FontAlignVariable(value) => { strict_paragraph_selector(*value, "favar")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Variable; },
-            ControlWord::FontAlignFixed(value) => { strict_paragraph_selector(*value, "fafixed")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Fixed; },
+            ControlWord::ParagraphHyphenation(value) => {
+                state.paragraph.line_breaking.automatic_hyphenation =
+                    strict_paragraph_toggle(*value, "hyphpar")?
+            },
+            ControlWord::AutoSpaceAlphabetic(value) => {
+                state.paragraph.line_breaking.auto_space_alphabetic =
+                    strict_paragraph_toggle(*value, "aspalpha")?
+            },
+            ControlWord::AutoSpaceNumbers(value) => {
+                state.paragraph.line_breaking.auto_space_numbers =
+                    strict_paragraph_toggle(*value, "aspnum")?
+            },
+            ControlWord::AdjustRightIndent(value) => {
+                state.paragraph.line_breaking.adjust_right_indent =
+                    strict_paragraph_toggle(*value, "adjustright")?
+            },
+            ControlWord::WrapDefault(value) => {
+                strict_paragraph_selector(*value, "wrapdefault")?;
+                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::Default;
+            },
+            ControlWord::NoCharacterWrap(value) => {
+                strict_paragraph_selector(*value, "nocwrap")?;
+                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoCharacterWrap;
+            },
+            ControlWord::NoWordWrap(value) => {
+                strict_paragraph_selector(*value, "nowwrap")?;
+                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoWordWrap;
+            },
+            ControlWord::NoOverflow(value) => {
+                strict_paragraph_selector(*value, "nooverflow")?;
+                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoOverflow;
+            },
+            ControlWord::FontAlignAuto(value) => {
+                strict_paragraph_selector(*value, "faauto")?;
+                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Auto;
+            },
+            ControlWord::FontAlignHanging(value) => {
+                strict_paragraph_selector(*value, "fahang")?;
+                state.paragraph.line_breaking.font_alignment =
+                    crate::ParagraphFontAlignment::Hanging;
+            },
+            ControlWord::FontAlignCenter(value) => {
+                strict_paragraph_selector(*value, "facenter")?;
+                state.paragraph.line_breaking.font_alignment =
+                    crate::ParagraphFontAlignment::Center;
+            },
+            ControlWord::FontAlignRoman(value) => {
+                strict_paragraph_selector(*value, "faroman")?;
+                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Roman;
+            },
+            ControlWord::FontAlignVariable(value) => {
+                strict_paragraph_selector(*value, "favar")?;
+                state.paragraph.line_breaking.font_alignment =
+                    crate::ParagraphFontAlignment::Variable;
+            },
+            ControlWord::FontAlignFixed(value) => {
+                strict_paragraph_selector(*value, "fafixed")?;
+                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Fixed;
+            },
             ControlWord::ListOverrideIndex(value) => {
                 state.paragraph.list_override = Some(*value);
             },
@@ -6977,6 +14002,67 @@ impl<'a> Parser<'a> {
                 }
             },
             _ => {},
+        }
+        Ok(())
+    }
+
+    fn apply_drop_cap_control(state: &mut State, control: &ControlWord<'_>) -> RtfResult<bool> {
+        match control {
+            ControlWord::DropCapLines(value) => {
+                let value = value.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF dropcapli requires a numeric parameter".to_string(),
+                    )
+                })?;
+                let lines = u16::try_from(value).map_err(|_| {
+                    RtfError::MalformedDocument(format!(
+                        "RTF dropcapli must be in 1..={}",
+                        crate::MAX_PARAGRAPH_DROP_CAP_LINES
+                    ))
+                })?;
+                if !(1..=crate::MAX_PARAGRAPH_DROP_CAP_LINES).contains(&lines) {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF dropcapli must be in 1..={}",
+                        crate::MAX_PARAGRAPH_DROP_CAP_LINES
+                    )));
+                }
+                state.drop_cap_lines = Some(lines as u8);
+            },
+            ControlWord::DropCapType(value) => {
+                state.drop_cap_kind = Some(match value {
+                    Some(1) => crate::ParagraphDropCapKind::InText,
+                    Some(2) => crate::ParagraphDropCapKind::Margin,
+                    Some(_) => {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF dropcapt accepts only 1 or 2".to_string(),
+                        ));
+                    },
+                    None => {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF dropcapt requires a numeric parameter".to_string(),
+                        ));
+                    },
+                });
+            },
+            _ => return Ok(false),
+        }
+        if let (Some(kind), Some(lines)) = (state.drop_cap_kind, state.drop_cap_lines) {
+            state.paragraph.drop_cap = Some(crate::ParagraphDropCap::new(
+                kind,
+                u16::from(lines),
+            )?);
+        }
+        Ok(true)
+    }
+
+    fn validate_drop_cap_state(state: &State, context: &str) -> RtfResult<()> {
+        if state.drop_cap_kind.is_some() != state.drop_cap_lines.is_some() {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF {context} has incomplete drop-cap properties"
+            )));
+        }
+        if let Some(drop_cap) = state.paragraph.drop_cap {
+            drop_cap.validate()?;
         }
         Ok(())
     }
@@ -7099,15 +14185,23 @@ impl<'a> Parser<'a> {
 
     fn parse_file_table(&mut self) -> RtfResult<crate::FileTable<'a>> {
         if self.states.len() != 3
-            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+            || self
+                .blocks
+                .iter()
+                .any(|block| !block.text.trim().is_empty())
         {
             return Err(RtfError::MalformedDocument(
                 "RTF filetbl must occur at document scope before body text".to_string(),
             ));
         }
         self.pos += 1; // ignorable-destination marker
-        if !matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::FileTable))) {
-            return Err(RtfError::MalformedDocument("invalid RTF filetbl destination".to_string()));
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::FileTable))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF filetbl destination".to_string(),
+            ));
         }
         self.pos += 1;
         let mut table = crate::FileTable::new();
@@ -7119,17 +14213,27 @@ impl<'a> Parser<'a> {
                     return Ok(table);
                 },
                 Some(Token::OpenBrace)
-                    if matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::FileEntry))) =>
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::FileEntry))
+                    ) =>
                 {
                     let entry = self.parse_file_table_entry()?;
                     table.add(entry)?;
                     continue;
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {},
-                Some(Token::OpenBrace) => return Err(RtfError::MalformedDocument(
-                    "RTF filetbl cannot contain fields, objects, or unknown destinations".to_string(),
-                )),
-                Some(_) => return Err(RtfError::MalformedDocument("invalid content in RTF filetbl".to_string())),
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF filetbl cannot contain fields, objects, or unknown destinations"
+                            .to_string(),
+                    ));
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "invalid content in RTF filetbl".to_string(),
+                    ));
+                },
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
@@ -7152,11 +14256,18 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     let trimmed = name.trim_end_matches(['\r', '\n', ' ']);
-                    let name = trimmed.strip_suffix(';').ok_or_else(|| {
-                        RtfError::MalformedDocument("RTF file-table name lacks its semicolon terminator".to_string())
-                    })?.trim();
+                    let name = trimmed
+                        .strip_suffix(';')
+                        .ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF file-table name lacks its semicolon terminator".to_string(),
+                            )
+                        })?
+                        .trim();
                     let mut entry = crate::FileTableEntry::new(
-                        id.ok_or_else(|| RtfError::MalformedDocument("RTF file entry lacks fid".to_string()))?,
+                        id.ok_or_else(|| {
+                            RtfError::MalformedDocument("RTF file entry lacks fid".to_string())
+                        })?,
                         Cow::Owned(name.to_string()),
                     );
                     entry.relative_path_level = relative;
@@ -7176,54 +14287,104 @@ impl<'a> Parser<'a> {
                     name.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
                     continue;
                 },
-                Some(Token::Control(ControlWord::UnicodeSkip(value))) => unicode_skip = (*value).max(0),
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0)
+                },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     name.push_str(control_symbol_text(control).unwrap_or_default())
                 },
                 Some(Token::Control(control)) => match control {
                     ControlWord::FileId(value) => {
-                        if !seen.insert("fid") { return Err(RtfError::MalformedDocument("duplicate RTF fid".to_string())); }
-                        id = Some(u32::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF fid".to_string()))?);
+                        if !seen.insert("fid") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF fid".to_string(),
+                            ));
+                        }
+                        id = Some(u32::try_from(*value).map_err(|_| {
+                            RtfError::MalformedDocument("invalid RTF fid".to_string())
+                        })?);
                     },
                     ControlWord::FileRelative(value) => {
-                        if !seen.insert("frelative") { return Err(RtfError::MalformedDocument("duplicate RTF frelative".to_string())); }
-                        relative = Some(u8::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF frelative".to_string()))?);
+                        if !seen.insert("frelative") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF frelative".to_string(),
+                            ));
+                        }
+                        relative = Some(u8::try_from(*value).map_err(|_| {
+                            RtfError::MalformedDocument("invalid RTF frelative".to_string())
+                        })?);
                     },
                     ControlWord::FileOperatingSystem(value) => {
-                        if !seen.insert("fosnum") { return Err(RtfError::MalformedDocument("duplicate RTF fosnum".to_string())); }
-                        operating_system = Some(u8::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF fosnum".to_string()))?);
+                        if !seen.insert("fosnum") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF fosnum".to_string(),
+                            ));
+                        }
+                        operating_system = Some(u8::try_from(*value).map_err(|_| {
+                            RtfError::MalformedDocument("invalid RTF fosnum".to_string())
+                        })?);
                     },
                     ControlWord::FileValidMac => {
-                        if !seen.insert("fvalidmac") { return Err(RtfError::MalformedDocument("duplicate RTF fvalidmac".to_string())); }
+                        if !seen.insert("fvalidmac") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF fvalidmac".to_string(),
+                            ));
+                        }
                         valid_on.mac = true;
                     },
                     ControlWord::FileValidDos => {
-                        if !seen.insert("fvaliddos") { return Err(RtfError::MalformedDocument("duplicate RTF fvaliddos".to_string())); }
+                        if !seen.insert("fvaliddos") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF fvaliddos".to_string(),
+                            ));
+                        }
                         valid_on.dos = true;
                     },
                     ControlWord::FileValidNtfs => {
-                        if !seen.insert("fvalidntfs") { return Err(RtfError::MalformedDocument("duplicate RTF fvalidntfs".to_string())); }
+                        if !seen.insert("fvalidntfs") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF fvalidntfs".to_string(),
+                            ));
+                        }
                         valid_on.ntfs = true;
                     },
                     ControlWord::FileValidHpfs => {
-                        if !seen.insert("fvalidhpfs") { return Err(RtfError::MalformedDocument("duplicate RTF fvalidhpfs".to_string())); }
+                        if !seen.insert("fvalidhpfs") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF fvalidhpfs".to_string(),
+                            ));
+                        }
                         valid_on.hpfs = true;
                     },
                     ControlWord::FileNetwork => {
-                        if !seen.insert("location") { return Err(RtfError::MalformedDocument("conflicting RTF file locations".to_string())); }
+                        if !seen.insert("location") {
+                            return Err(RtfError::MalformedDocument(
+                                "conflicting RTF file locations".to_string(),
+                            ));
+                        }
                         location = crate::FileLocation::Network;
                     },
                     ControlWord::FileNonFileSystem => {
-                        if !seen.insert("location") { return Err(RtfError::MalformedDocument("conflicting RTF file locations".to_string())); }
+                        if !seen.insert("location") {
+                            return Err(RtfError::MalformedDocument(
+                                "conflicting RTF file locations".to_string(),
+                            ));
+                        }
                         location = crate::FileLocation::NonFileSystem;
                     },
-                    _ => return Err(RtfError::MalformedDocument("unsupported control in RTF file entry".to_string())),
+                    _ => {
+                        return Err(RtfError::MalformedDocument(
+                            "unsupported control in RTF file entry".to_string(),
+                        ));
+                    },
                 },
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
             if name.len() > crate::file_table::MAX_FILE_NAME_BYTES {
-                return Err(RtfError::MalformedDocument("RTF file-table name exceeds the safety limit".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "RTF file-table name exceeds the safety limit".to_string(),
+                ));
             }
         }
         Err(RtfError::UnexpectedEof)
@@ -7277,38 +14438,72 @@ impl<'a> Parser<'a> {
                 Token::OpenBrace
                     if matches!(
                         self.tokens.get(self.pos + 1..self.pos + 3),
-                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontAlternateName)])
-                    ) => {
-                        if !seen.insert("falt") { return Err(RtfError::MalformedDocument("duplicate RTF falt destination".to_string())); }
-                        alternate_name = Some(self.parse_font_name_destination(ControlWord::FontAlternateName)?);
-                    },
+                        Some([
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::FontAlternateName)
+                        ])
+                    ) =>
+                {
+                    if !seen.insert("falt") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF falt destination".to_string(),
+                        ));
+                    }
+                    alternate_name =
+                        Some(self.parse_font_name_destination(ControlWord::FontAlternateName)?);
+                },
                 Token::OpenBrace
                     if matches!(
                         self.tokens.get(self.pos + 1..self.pos + 3),
-                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontNonTaggedName)])
-                    ) => {
-                        if !seen.insert("fname") { return Err(RtfError::MalformedDocument("duplicate RTF fname destination".to_string())); }
-                        non_tagged_name = Some(self.parse_font_name_destination(ControlWord::FontNonTaggedName)?);
-                    },
+                        Some([
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::FontNonTaggedName)
+                        ])
+                    ) =>
+                {
+                    if !seen.insert("fname") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF fname destination".to_string(),
+                        ));
+                    }
+                    non_tagged_name =
+                        Some(self.parse_font_name_destination(ControlWord::FontNonTaggedName)?);
+                },
                 Token::OpenBrace
                     if matches!(
                         self.tokens.get(self.pos + 1..self.pos + 3),
-                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontPanose)])
-                    ) => {
-                        if !seen.insert("panose") { return Err(RtfError::MalformedDocument("duplicate RTF panose destination".to_string())); }
-                        panose = Some(self.parse_font_panose_destination()?);
-                    },
+                        Some([
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::FontPanose)
+                        ])
+                    ) =>
+                {
+                    if !seen.insert("panose") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF panose destination".to_string(),
+                        ));
+                    }
+                    panose = Some(self.parse_font_panose_destination()?);
+                },
                 Token::OpenBrace
                     if matches!(
                         self.tokens.get(self.pos + 1..self.pos + 3),
-                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontEmbedded)])
+                        Some([
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::FontEmbedded)
+                        ])
                     ) || matches!(
                         self.tokens.get(self.pos + 1),
                         Some(Token::Control(ControlWord::FontEmbedded))
-                    ) => {
-                        if !seen.insert("fontemb") { return Err(RtfError::MalformedDocument("duplicate RTF fontemb destination".to_string())); }
-                        embedded = Some(self.parse_font_embedded_destination()?);
-                    },
+                    ) =>
+                {
+                    if !seen.insert("fontemb") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF fontemb destination".to_string(),
+                        ));
+                    }
+                    embedded = Some(self.parse_font_embedded_destination()?);
+                },
                 Token::OpenBrace => {
                     if matches!(
                         self.tokens.get(self.pos + 1),
@@ -7321,12 +14516,22 @@ impl<'a> Parser<'a> {
                     self.skip_group()?;
                 },
                 Token::Control(ControlWord::FontNumber(n)) => {
-                    if !seen.insert("font-number") { return Err(RtfError::MalformedDocument("duplicate RTF font ID".to_string())); }
-                    font_num = Some(FontRef::try_from(*n).map_err(|_| RtfError::MalformedDocument("invalid RTF font ID".to_string()))?);
+                    if !seen.insert("font-number") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF font ID".to_string(),
+                        ));
+                    }
+                    font_num = Some(FontRef::try_from(*n).map_err(|_| {
+                        RtfError::MalformedDocument("invalid RTF font ID".to_string())
+                    })?);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::FontFamily(family)) => {
-                    if !seen.insert("family") { return Err(RtfError::MalformedDocument("duplicate RTF font family".to_string())); }
+                    if !seen.insert("family") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF font family".to_string(),
+                        ));
+                    }
                     font_family = match *family {
                         "roman" => FontFamily::Roman,
                         "swiss" => FontFamily::Swiss,
@@ -7339,23 +14544,43 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::FontCharset(cs)) => {
-                    if !seen.insert("charset") { return Err(RtfError::MalformedDocument("duplicate RTF font charset".to_string())); }
-                    charset = Some(u8::try_from(*cs).map_err(|_| RtfError::MalformedDocument("invalid RTF font charset".to_string()))?);
+                    if !seen.insert("charset") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF font charset".to_string(),
+                        ));
+                    }
+                    charset = Some(u8::try_from(*cs).map_err(|_| {
+                        RtfError::MalformedDocument("invalid RTF font charset".to_string())
+                    })?);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::FontPitch(value)) => {
-                    if !seen.insert("pitch") { return Err(RtfError::MalformedDocument("duplicate RTF font pitch".to_string())); }
+                    if !seen.insert("pitch") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF font pitch".to_string(),
+                        ));
+                    }
                     pitch = match *value {
                         0 => crate::FontPitch::Default,
                         1 => crate::FontPitch::Fixed,
                         2 => crate::FontPitch::Variable,
-                        _ => return Err(RtfError::MalformedDocument("invalid RTF font pitch".to_string())),
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "invalid RTF font pitch".to_string(),
+                            ));
+                        },
                     };
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::FontCodePage(value)) => {
-                    if !seen.insert("code-page") { return Err(RtfError::MalformedDocument("duplicate RTF font code page".to_string())); }
-                    code_page = Some(u16::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF font code page".to_string()))?);
+                    if !seen.insert("code-page") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF font code page".to_string(),
+                        ));
+                    }
+                    code_page = Some(u16::try_from(*value).map_err(|_| {
+                        RtfError::MalformedDocument("invalid RTF font code page".to_string())
+                    })?);
                     self.pos += 1;
                 },
                 Token::Text(text) => {
@@ -7378,13 +14603,20 @@ impl<'a> Parser<'a> {
                 },
             }
             if name.len() > 4_096 {
-                return Err(RtfError::MalformedDocument("RTF font name exceeds the safety limit".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "RTF font name exceeds the safety limit".to_string(),
+                ));
             }
         }
 
-        let font_num = font_num.ok_or_else(|| RtfError::MalformedDocument("RTF font entry lacks an ID".to_string()))?;
+        let font_num = font_num
+            .ok_or_else(|| RtfError::MalformedDocument("RTF font entry lacks an ID".to_string()))?;
         let name = name.trim().strip_suffix(';').unwrap_or(name.trim()).trim();
-        let mut font = Font::new(Cow::Owned(name.to_string()), font_family, charset.unwrap_or(0));
+        let mut font = Font::new(
+            Cow::Owned(name.to_string()),
+            font_family,
+            charset.unwrap_or(0),
+        );
         font.alternate_name = alternate_name.map(Cow::Owned);
         font.non_tagged_name = non_tagged_name.map(Cow::Owned);
         font.panose = panose;
@@ -7407,10 +14639,15 @@ impl<'a> Parser<'a> {
 
     fn parse_font_name_destination(&mut self, expected: ControlWord<'a>) -> RtfResult<String> {
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
-            || !matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::IgnorableDestination)))
+            || !matches!(
+                self.tokens.get(self.pos + 1),
+                Some(Token::Control(ControlWord::IgnorableDestination))
+            )
             || self.tokens.get(self.pos + 2) != Some(&Token::Control(expected))
         {
-            return Err(RtfError::MalformedDocument("invalid RTF font-name destination".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF font-name destination".to_string(),
+            ));
         }
         self.pos += 3;
         let mut value = String::new();
@@ -7419,9 +14656,16 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let value = value.trim().strip_suffix(';').unwrap_or(value.trim()).trim().to_string();
+                    let value = value
+                        .trim()
+                        .strip_suffix(';')
+                        .unwrap_or(value.trim())
+                        .trim()
+                        .to_string();
                     if value.is_empty() || value.len() > 4_096 {
-                        return Err(RtfError::MalformedDocument("invalid or oversized RTF alternate font name".to_string()));
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or oversized RTF alternate font name".to_string(),
+                        ));
                     }
                     return Ok(value);
                 },
@@ -7430,16 +14674,24 @@ impl<'a> Parser<'a> {
                     value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
                     continue;
                 },
-                Some(Token::Control(ControlWord::UnicodeSkip(count))) => unicode_skip = (*count).max(0),
-                Some(Token::Control(control)) if control_symbol_text(control).is_some() => value.push_str(control_symbol_text(control).unwrap_or_default()),
+                Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
+                    unicode_skip = (*count).max(0)
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default())
+                },
                 Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument("RTF font-name destination contains non-text content".to_string()));
+                    return Err(RtfError::MalformedDocument(
+                        "RTF font-name destination contains non-text content".to_string(),
+                    ));
                 },
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
             if value.len() > 4_096 {
-                return Err(RtfError::MalformedDocument("RTF alternate font name exceeds the safety limit".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "RTF alternate font name exceeds the safety limit".to_string(),
+                ));
             }
         }
         Err(RtfError::UnexpectedEof)
@@ -7453,25 +14705,36 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     let compact: String = digits.chars().filter(|ch| !ch.is_whitespace()).collect();
-                    if compact.len() != 20 || !compact.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-                        return Err(RtfError::MalformedDocument("RTF panose must contain exactly ten hexadecimal bytes".to_string()));
+                    if compact.len() != 20 || !compact.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF panose must contain exactly ten hexadecimal bytes".to_string(),
+                        ));
                     }
                     let mut panose = [0u8; 10];
                     for (index, byte) in panose.iter_mut().enumerate() {
                         *byte = u8::from_str_radix(&compact[index * 2..index * 2 + 2], 16)
-                            .map_err(|_| RtfError::MalformedDocument("invalid RTF panose payload".to_string()))?;
+                            .map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "invalid RTF panose payload".to_string(),
+                                )
+                            })?;
                     }
                     return Ok(panose);
                 },
                 Some(Token::Text(text)) => digits.push_str(text),
                 Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument("RTF panose contains non-hexadecimal content".to_string()));
+                    return Err(RtfError::MalformedDocument(
+                        "RTF panose contains non-hexadecimal content".to_string(),
+                    ));
                 },
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
             if digits.len() > 64 {
-                return Err(RtfError::MalformedDocument("RTF panose payload exceeds the safety limit".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "RTF panose payload exceeds the safety limit".to_string(),
+                ));
             }
         }
         Err(RtfError::UnexpectedEof)
@@ -7480,11 +14743,16 @@ impl<'a> Parser<'a> {
     /// Parse the inert `fontemb` destination of a font-table entry.
     fn parse_font_embedded_destination(&mut self) -> RtfResult<crate::EmbeddedFont<'static>> {
         self.pos += 1; // opening brace
-        if matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::IgnorableDestination))) {
+        if matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
             self.pos += 1;
         }
         if self.tokens.get(self.pos) != Some(&Token::Control(ControlWord::FontEmbedded)) {
-            return Err(RtfError::MalformedDocument("invalid RTF fontemb destination".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF fontemb destination".to_string(),
+            ));
         }
         self.pos += 1;
         let mut embedded = crate::EmbeddedFont::default();
@@ -7497,7 +14765,9 @@ impl<'a> Parser<'a> {
                 Token::CloseBrace => {
                     self.pos += 1;
                     if high_nibble.is_some() {
-                        return Err(RtfError::MalformedDocument("RTF fontemb contains an odd number of hexadecimal digits".to_string()));
+                        return Err(RtfError::MalformedDocument(
+                            "RTF fontemb contains an odd number of hexadecimal digits".to_string(),
+                        ));
                     }
                     if !data.is_empty() {
                         embedded.data = Some(data);
@@ -7507,7 +14777,9 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::FontEmbeddedType(kind)) => {
                     if format_seen {
-                        return Err(RtfError::MalformedDocument("duplicate RTF embedded font format".to_string()));
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF embedded font format".to_string(),
+                        ));
                     }
                     format_seen = true;
                     embedded.format = match *kind {
@@ -7519,11 +14791,19 @@ impl<'a> Parser<'a> {
                 Token::OpenBrace => {
                     let is_font_file = matches!(
                         self.tokens.get(self.pos + 1..self.pos + 3),
-                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontFile)])
-                    ) || matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::FontFile)));
+                        Some([
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::FontFile)
+                        ])
+                    ) || matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::FontFile))
+                    );
                     if is_font_file {
                         if file_seen {
-                            return Err(RtfError::MalformedDocument("duplicate RTF fontfile destination".to_string()));
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF fontfile destination".to_string(),
+                            ));
                         }
                         file_seen = true;
                         let (file_name, file_code_page) = self.parse_font_file_destination()?;
@@ -7536,12 +14816,16 @@ impl<'a> Parser<'a> {
                 Token::Text(text) => {
                     for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
                         let nibble = Self::hex_nibble(byte).ok_or_else(|| {
-                            RtfError::MalformedDocument("RTF fontemb contains a non-hexadecimal character".to_string())
+                            RtfError::MalformedDocument(
+                                "RTF fontemb contains a non-hexadecimal character".to_string(),
+                            )
                         })?;
                         if let Some(high) = high_nibble.take() {
                             data.push((high << 4) | nibble);
                             if data.len() > crate::EmbeddedFont::MAX_DATA_BYTES {
-                                return Err(RtfError::MalformedDocument("RTF embedded font data exceeds the safety limit".to_string()));
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF embedded font data exceeds the safety limit".to_string(),
+                                ));
                             }
                         } else {
                             high_nibble = Some(nibble);
@@ -7551,11 +14835,15 @@ impl<'a> Parser<'a> {
                 },
                 Token::Binary(bytes) => {
                     if high_nibble.is_some() {
-                        return Err(RtfError::MalformedDocument("RTF fontemb binary payload splits a hexadecimal byte".to_string()));
+                        return Err(RtfError::MalformedDocument(
+                            "RTF fontemb binary payload splits a hexadecimal byte".to_string(),
+                        ));
                     }
                     data.extend_from_slice(bytes);
                     if data.len() > crate::EmbeddedFont::MAX_DATA_BYTES {
-                        return Err(RtfError::MalformedDocument("RTF embedded font data exceeds the safety limit".to_string()));
+                        return Err(RtfError::MalformedDocument(
+                            "RTF embedded font data exceeds the safety limit".to_string(),
+                        ));
                     }
                     self.pos += 1;
                 },
@@ -7568,11 +14856,16 @@ impl<'a> Parser<'a> {
     /// Parse the nested `fontfile` destination of a `fontemb` group.
     fn parse_font_file_destination(&mut self) -> RtfResult<(String, Option<u16>)> {
         self.pos += 1; // opening brace
-        if matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::IgnorableDestination))) {
+        if matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
             self.pos += 1;
         }
         if self.tokens.get(self.pos) != Some(&Token::Control(ControlWord::FontFile)) {
-            return Err(RtfError::MalformedDocument("invalid RTF fontfile destination".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF fontfile destination".to_string(),
+            ));
         }
         self.pos += 1;
         let mut name = String::new();
@@ -7584,13 +14877,17 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     let name = name.trim().to_string();
                     if name.is_empty() || name.len() > crate::EmbeddedFont::MAX_FILE_NAME_BYTES {
-                        return Err(RtfError::MalformedDocument("invalid or oversized RTF embedded font file name".to_string()));
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or oversized RTF embedded font file name".to_string(),
+                        ));
                     }
                     return Ok((name, code_page));
                 },
                 Some(Token::Control(ControlWord::FontCodePage(value))) => {
                     if code_page.is_some() {
-                        return Err(RtfError::MalformedDocument("duplicate RTF fontfile code page".to_string()));
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF fontfile code page".to_string(),
+                        ));
                     }
                     code_page = Some(u16::try_from(*value).map_err(|_| {
                         RtfError::MalformedDocument("invalid RTF fontfile code page".to_string())
@@ -7608,13 +14905,17 @@ impl<'a> Parser<'a> {
                     name.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument("RTF fontfile destination contains unsupported content".to_string()));
+                    return Err(RtfError::MalformedDocument(
+                        "RTF fontfile destination contains unsupported content".to_string(),
+                    ));
                 },
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
             if name.len() > crate::EmbeddedFont::MAX_FILE_NAME_BYTES {
-                return Err(RtfError::MalformedDocument("RTF embedded font file name exceeds the safety limit".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "RTF embedded font file name exceeds the safety limit".to_string(),
+                ));
             }
         }
         Err(RtfError::UnexpectedEof)
@@ -7748,23 +15049,41 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(control)) => {
                     match control {
-                        ControlWord::InfoVersion(value) => Self::set_info_number(&mut self.info.version, *value, "version")?,
-                        ControlWord::InfoRevision(value) => Self::set_info_number(&mut self.info.revision, *value, "vern")?,
-                        ControlWord::EditingTime(value) => Self::set_info_number(&mut self.info.editing_time, *value, "edmins")?,
-                        ControlWord::NumberOfPages(value) => Self::set_info_number(&mut self.info.pages, *value, "nofpages")?,
-                        ControlWord::NumberOfWords(value) => Self::set_info_number(&mut self.info.words, *value, "nofwords")?,
+                        ControlWord::InfoVersion(value) => {
+                            Self::set_info_number(&mut self.info.version, *value, "version")?
+                        },
+                        ControlWord::InfoRevision(value) => {
+                            Self::set_info_number(&mut self.info.revision, *value, "vern")?
+                        },
+                        ControlWord::EditingTime(value) => {
+                            Self::set_info_number(&mut self.info.editing_time, *value, "edmins")?
+                        },
+                        ControlWord::NumberOfPages(value) => {
+                            Self::set_info_number(&mut self.info.pages, *value, "nofpages")?
+                        },
+                        ControlWord::NumberOfWords(value) => {
+                            Self::set_info_number(&mut self.info.words, *value, "nofwords")?
+                        },
                         ControlWord::NumberOfCharacters(value) => {
                             Self::set_info_number(&mut self.info.characters, *value, "nofchars")?;
                         },
                         ControlWord::NumberOfCharactersWithSpaces(value) => {
-                            Self::set_info_number(&mut self.info.characters_with_spaces, *value, "nofcharsws")?;
+                            Self::set_info_number(
+                                &mut self.info.characters_with_spaces,
+                                *value,
+                                "nofcharsws",
+                            )?;
                         },
-                        ControlWord::DocumentId(value) => Self::set_info_number(&mut self.info.id, *value, "id")?,
+                        ControlWord::DocumentId(value) => {
+                            Self::set_info_number(&mut self.info.id, *value, "id")?
+                        },
                         _ => {},
                     }
                     self.pos += 1;
                 },
-                Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => self.pos += 1,
+                Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
+                    self.pos += 1
+                },
                 Some(Token::Text(_) | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF info group contains active text or binary data".to_string(),
@@ -7864,9 +15183,15 @@ impl<'a> Parser<'a> {
                 is_public,
                 order: self.next_bookmark_order,
             };
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::BookmarkStart(self.next_bookmark_order),
+            ));
             self.next_bookmark_order += 1;
             self.open_bookmarks.entry(name).or_default().push(bookmark);
         } else if let Some(open) = self.open_bookmarks.get_mut(&name).and_then(Vec::pop) {
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::BookmarkEnd(open.order),
+            ));
             self.bookmark_spans.push(BookmarkSpan {
                 bookmark: open,
                 end: self.body_text_len,
@@ -7878,6 +15203,9 @@ impl<'a> Parser<'a> {
     fn finalize_bookmarks(&mut self) -> RtfResult<()> {
         for bookmarks in self.open_bookmarks.values_mut() {
             for bookmark in bookmarks.drain(..) {
+                self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                    crate::BodyStoryEvent::BookmarkEnd(bookmark.order),
+                ));
                 self.bookmark_spans.push(BookmarkSpan {
                     bookmark,
                     end: self.body_text_len,
@@ -7985,6 +15313,8 @@ impl<'a> Parser<'a> {
             }
             self.annotation_ranges
                 .insert(reference, (self.body_text_len, None));
+            self.body_story_events
+                .push(ParsedBodyStoryEvent::AnnotationStart(reference));
         } else {
             let range = self.annotation_ranges.get_mut(&reference).ok_or_else(|| {
                 RtfError::MalformedDocument(
@@ -7997,6 +15327,8 @@ impl<'a> Parser<'a> {
                 ));
             }
             range.1 = Some(self.body_text_len);
+            self.body_story_events
+                .push(ParsedBodyStoryEvent::AnnotationEnd(reference));
         }
         Ok(())
     }
@@ -8020,11 +15352,31 @@ impl<'a> Parser<'a> {
         let mut icon = None;
         let mut time = None;
         let mut text = String::new();
+        let mut shapes = Vec::new();
+        let mut shape_groups = Vec::new();
+        let mut drawing_order = Vec::new();
+        let mut story_events = Vec::new();
         let mut depth = 1usize;
         let mut fallback_skip = 0usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => {
+                    if self.is_root_drawing_group() {
+                        let order_start = drawing_order.len();
+                        self.parse_story_drawing_group(
+                            text.len(),
+                            &mut shapes,
+                            &mut shape_groups,
+                            &mut drawing_order,
+                        )?;
+                        story_events.extend(
+                            drawing_order[order_start..]
+                                .iter()
+                                .copied()
+                                .map(crate::StoryEvent::Drawing),
+                        );
+                        continue;
+                    }
                     let nested =
                         match (self.tokens.get(self.pos + 1), self.tokens.get(self.pos + 2)) {
                             (
@@ -8114,6 +15466,12 @@ impl<'a> Parser<'a> {
                     self.current_state_mut()?.unicode_skip = (*count).max(0);
                 },
                 Some(Token::Control(ControlWord::Par | ControlWord::Line)) => text.push('\n'),
+                Some(Token::Control(ControlWord::Page(param))) => {
+                    require_parameterless(*param, "page")?;
+                    story_events.push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                        text.len(),
+                    )));
+                },
                 Some(Token::Control(ControlWord::Tab)) => text.push('\t'),
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     text.push_str(control_symbol_text(control).unwrap_or_default());
@@ -8175,6 +15533,10 @@ impl<'a> Parser<'a> {
             initials: Cow::Owned(std::mem::take(&mut self.pending_annotation_initials)),
             date: date.map(Cow::Owned),
             text: Cow::Owned(text.trim_end_matches(['\r', '\n']).to_string()),
+            shapes,
+            shape_groups,
+            drawing_order,
+            story_events,
             position,
             range_end,
             parent_id: parent_id.map(Cow::Owned),
@@ -8184,7 +15546,16 @@ impl<'a> Parser<'a> {
         self.pending_annotation_author_seen = false;
         self.pending_annotation_initials_seen = false;
         annotation.validate()?;
+        let index = self.annotations.len();
         self.annotations.push(annotation);
+        if !has_reference {
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::AnnotationStart(index),
+            ));
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::AnnotationEnd(index),
+            ));
+        }
         Ok(())
     }
 
@@ -8240,8 +15611,8 @@ impl<'a> Parser<'a> {
                 | ControlWord::Object
                 | ControlWord::Result
                 | ControlWord::Picture
-                | ControlWord::Shape
-                | ControlWord::ShapeGroup
+                | ControlWord::Shape(_)
+                | ControlWord::ShapeGroup(_)
                 | ControlWord::DocumentVariable
                 | ControlWord::UserProperties
                 | ControlWord::Annotation
@@ -8265,6 +15636,77 @@ impl<'a> Parser<'a> {
             ));
         }
         Ok(())
+    }
+
+    fn finalize_body_story_events(&mut self) -> RtfResult<Vec<crate::BodyStoryEvent>> {
+        let annotation_indices: HashMap<i32, usize> = self
+            .annotations
+            .iter()
+            .enumerate()
+            .filter(|(_, annotation)| annotation.has_reference)
+            .map(|(index, annotation)| (annotation.id, index))
+            .collect();
+        let mut output = Vec::with_capacity(self.body_story_events.len());
+        for event in self.body_story_events.drain(..) {
+            let resolved = match event {
+                ParsedBodyStoryEvent::Resolved(event) => event,
+                ParsedBodyStoryEvent::AnnotationStart(reference) => {
+                    crate::BodyStoryEvent::AnnotationStart(
+                        *annotation_indices.get(&reference).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF annotation start has no resolved comment".to_string(),
+                            )
+                        })?,
+                    )
+                },
+                ParsedBodyStoryEvent::AnnotationEnd(reference) => {
+                    crate::BodyStoryEvent::AnnotationEnd(
+                        *annotation_indices.get(&reference).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF annotation end has no resolved comment".to_string(),
+                            )
+                        })?,
+                    )
+                },
+                ParsedBodyStoryEvent::RevisionStart(id) => crate::BodyStoryEvent::RevisionStart(
+                    self.revision_event_indices
+                        .get(id)
+                        .copied()
+                        .flatten()
+                        .ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF revision event has no tracked text".to_string(),
+                            )
+                        })?,
+                ),
+                ParsedBodyStoryEvent::RevisionEnd(id) => crate::BodyStoryEvent::RevisionEnd(
+                    self.revision_event_indices
+                        .get(id)
+                        .copied()
+                        .flatten()
+                        .ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF revision event has no tracked text".to_string(),
+                            )
+                        })?,
+                ),
+                ParsedBodyStoryEvent::RevisionDeletion(id) => {
+                    crate::BodyStoryEvent::RevisionDeletion(
+                        self.revision_event_indices
+                            .get(id)
+                            .copied()
+                            .flatten()
+                            .ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF deletion event has no tracked text".to_string(),
+                                )
+                            })?,
+                    )
+                },
+            };
+            output.push(resolved);
+        }
+        Ok(output)
     }
 
     fn parse_info_text(&mut self, field: InfoTextField) -> RtfResult<()> {
@@ -8398,10 +15840,22 @@ impl<'a> Parser<'a> {
         let allocated = self.arena.alloc_str(&serialized);
         let value = Some(Cow::Borrowed(&*allocated));
         match field {
-            InfoTimeField::Creation => { self.info.creation_time = value; self.info.creation_timestamp = Some(timestamp); },
-            InfoTimeField::Revision => { self.info.revision_time = value; self.info.revision_timestamp = Some(timestamp); },
-            InfoTimeField::Print => { self.info.print_time = value; self.info.print_timestamp = Some(timestamp); },
-            InfoTimeField::Backup => { self.info.backup_time = value; self.info.backup_timestamp = Some(timestamp); },
+            InfoTimeField::Creation => {
+                self.info.creation_time = value;
+                self.info.creation_timestamp = Some(timestamp);
+            },
+            InfoTimeField::Revision => {
+                self.info.revision_time = value;
+                self.info.revision_timestamp = Some(timestamp);
+            },
+            InfoTimeField::Print => {
+                self.info.print_time = value;
+                self.info.print_timestamp = Some(timestamp);
+            },
+            InfoTimeField::Backup => {
+                self.info.backup_time = value;
+                self.info.backup_timestamp = Some(timestamp);
+            },
         }
         Ok(())
     }
@@ -8413,7 +15867,9 @@ impl<'a> Parser<'a> {
             )));
         }
         *slot = Some(u32::try_from(value).map_err(|_| {
-            RtfError::MalformedDocument(format!("RTF info numeric control {name} cannot be negative"))
+            RtfError::MalformedDocument(format!(
+                "RTF info numeric control {name} cannot be negative"
+            ))
         })?);
         Ok(())
     }
@@ -8618,12 +16074,14 @@ impl<'a> Parser<'a> {
             .map_err(|e| RtfError::InvalidUnicode(format!("Invalid Unicode sequence: {}", e)))?;
 
         let state = self.current_state()?.clone();
-        if state.destination==Destination::DocumentBody&&(state.in_table||state.table_nesting_level>=2) {
-            self.append_table_text(unicode_str.as_bytes(),state.table_nesting_level)?;
+        if state.destination == Destination::DocumentBody
+            && (state.in_table || state.table_nesting_level >= 2)
+        {
+            self.append_table_text(unicode_str.as_bytes(), state.table_nesting_level)?;
             if let Some(remainder) = fallback_remainder {
-                self.append_table_text(remainder.as_bytes(),state.table_nesting_level)?;
+                self.append_table_text(remainder.as_bytes(), state.table_nesting_level)?;
             }
-        } else if state.destination==Destination::DocumentBody {
+        } else if state.destination == Destination::DocumentBody {
             // Add the Unicode sequence to the document as its own formatted block.
             let allocated = self.arena.alloc_str(&unicode_str);
             let start = self.body_text_len;
@@ -8632,12 +16090,12 @@ impl<'a> Parser<'a> {
             } else {
                 let block =
                     StyleBlock::new(Cow::Borrowed(allocated), state.formatting, state.paragraph);
-                self.body_text_len = self
-                    .body_text_len
-                    .checked_add(allocated.len())
-                    .ok_or_else(|| {
-                        RtfError::MalformedDocument("RTF body text length overflow".into())
-                    })?;
+                self.body_text_len =
+                    self.body_text_len
+                        .checked_add(allocated.len())
+                        .ok_or_else(|| {
+                            RtfError::MalformedDocument("RTF body text length overflow".into())
+                        })?;
                 self.blocks.push(block);
                 self.append_revision_text(&state, allocated, start, self.body_text_len)?;
             }
@@ -8664,42 +16122,313 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn ensure_nested_builder(&mut self,level:u8)->RtfResult<&mut NestedTableBuilder<'a>>{
-        if !(2..=crate::MAX_TABLE_NESTING_DEPTH as u8).contains(&level){return Err(RtfError::MalformedDocument("RTF nested-table level is outside 2..=32".to_string()))}
-        let index=usize::from(level-2);if self.nested_table_builders.len()<index{return Err(RtfError::MalformedDocument("RTF nested-table level transition skips a parent level".to_string()))}
-        if self.nested_table_builders.len()==index{if level==2{self.start_table_if_needed();}self.nested_table_builders.push(NestedTableBuilder::new(level));}
+    fn ensure_nested_builder(&mut self, level: u8) -> RtfResult<&mut NestedTableBuilder<'a>> {
+        if !(2..=crate::MAX_TABLE_NESTING_DEPTH as u8).contains(&level) {
+            return Err(RtfError::MalformedDocument(
+                "RTF nested-table level is outside 2..=32".to_string(),
+            ));
+        }
+        let index = usize::from(level - 2);
+        if self.nested_table_builders.len() < index {
+            return Err(RtfError::MalformedDocument(
+                "RTF nested-table level transition skips a parent level".to_string(),
+            ));
+        }
+        if self.nested_table_builders.len() == index {
+            if level == 2 {
+                self.start_table_if_needed();
+            }
+            self.nested_table_builders
+                .push(NestedTableBuilder::new(level));
+        }
         Ok(&mut self.nested_table_builders[index])
     }
 
-    fn append_table_text(&mut self,text:&[u8],raw_level:u8)->RtfResult<()>{let level=if raw_level>=2{raw_level}else{1};self.drain_nested_to(level)?;if level==1{self.current_cell_text.extend_from_slice(text);}else{self.ensure_nested_builder(level)?.cell_text.extend_from_slice(text);}Ok(())}
+    fn append_table_text(&mut self, text: &[u8], raw_level: u8) -> RtfResult<()> {
+        let state = self.prepare_revision_event()?;
+        let level = if raw_level >= 2 { raw_level } else { 1 };
+        self.drain_nested_to(level)?;
+        let start = if level == 1 {
+            self.current_cell_text.len()
+        } else {
+            self.ensure_nested_builder(level)?.cell_text.len()
+        };
+        if state.revision_type == Some(super::annotation::RevisionType::Deletion) {
+            let decoded = std::str::from_utf8(text).map_err(|_| {
+                RtfError::MalformedDocument("invalid UTF-8 in table revision".to_string())
+            })?;
+            return self.append_revision_text(&state, decoded, start, start);
+        }
+        if level == 1 {
+            self.current_cell_text.extend_from_slice(text);
+        } else {
+            self.ensure_nested_builder(level)?
+                .cell_text
+                .extend_from_slice(text);
+        }
+        let end = start.checked_add(text.len()).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF table-cell text length overflow".to_string())
+        })?;
+        let decoded = std::str::from_utf8(text).map_err(|_| {
+            RtfError::MalformedDocument("invalid UTF-8 in table revision".to_string())
+        })?;
+        self.append_revision_text(&state, decoded, start, end)
+    }
 
-    fn drain_nested_to(&mut self,parent_level:u8)->RtfResult<()>{while self.nested_table_builders.last().is_some_and(|builder|builder.level>parent_level){let builder=self.nested_table_builders.pop().unwrap();if !builder.cell_text.is_empty()||!builder.cell_nested.is_empty()||builder.row.cell_count()>0{return Err(RtfError::MalformedDocument("RTF nested-table level ended before nestcell/nestrow".to_string()))}if builder.table.row_count()==0{return Err(RtfError::MalformedDocument("RTF nested table has no completed rows".to_string()))}builder.table.validate_merges().map_err(RtfError::MalformedDocument)?;if self.logical_table_count>=MAX_LOGICAL_TABLES{return Err(RtfError::MalformedDocument("RTF document exceeds 4096 logical tables".to_string()))}self.logical_table_count+=1;let entry=crate::CellNestedTable{text_offset:if parent_level==1{self.current_cell_text.len()}else{self.nested_table_builders.last().map_or(0,|parent|parent.cell_text.len())},table:builder.table};if parent_level==1{self.current_cell_nested.push(entry);}else{let parent=self.nested_table_builders.last_mut().ok_or_else(||RtfError::MalformedDocument("RTF nested table lacks a parent table".to_string()))?;if parent.level!=parent_level{return Err(RtfError::MalformedDocument("RTF nested-table parent level mismatch".to_string()))}parent.cell_nested.push(entry);}}Ok(())}
+    fn drain_nested_to(&mut self, parent_level: u8) -> RtfResult<()> {
+        while self
+            .nested_table_builders
+            .last()
+            .is_some_and(|builder| builder.level > parent_level)
+        {
+            let builder = self.nested_table_builders.pop().unwrap();
+            if !builder.cell_text.is_empty()
+                || !builder.cell_nested.is_empty()
+                || !builder.cell_drawings.drawing_order.is_empty()
+                || !builder.cell_story_events.is_empty()
+                || builder.row.cell_count() > 0
+            {
+                return Err(RtfError::MalformedDocument(
+                    "RTF nested-table level ended before nestcell/nestrow".to_string(),
+                ));
+            }
+            if builder.table.row_count() == 0 {
+                return Err(RtfError::MalformedDocument(
+                    "RTF nested table has no completed rows".to_string(),
+                ));
+            }
+            builder
+                .table
+                .validate_merges()
+                .map_err(RtfError::MalformedDocument)?;
+            if self.logical_table_count >= MAX_LOGICAL_TABLES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF document exceeds 4096 logical tables".to_string(),
+                ));
+            }
+            self.logical_table_count += 1;
+            let entry = crate::CellNestedTable {
+                text_offset: if parent_level == 1 {
+                    self.current_cell_text.len()
+                } else {
+                    self.nested_table_builders
+                        .last()
+                        .map_or(0, |parent| parent.cell_text.len())
+                },
+                table: builder.table,
+            };
+            if parent_level == 1 {
+                self.current_cell_story_events
+                    .push(crate::CellStoryEvent::NestedTable(
+                        self.current_cell_nested.len(),
+                    ));
+                self.current_cell_nested.push(entry);
+            } else {
+                let parent = self.nested_table_builders.last_mut().ok_or_else(|| {
+                    RtfError::MalformedDocument("RTF nested table lacks a parent table".to_string())
+                })?;
+                if parent.level != parent_level {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF nested-table parent level mismatch".to_string(),
+                    ));
+                }
+                parent
+                    .cell_story_events
+                    .push(crate::CellStoryEvent::NestedTable(parent.cell_nested.len()));
+                parent.cell_nested.push(entry);
+            }
+        }
+        Ok(())
+    }
 
-    fn finalize_nested_cell(&mut self,level:u8)->RtfResult<()>{self.drain_nested_to(level)?;let arena=self.arena;let builder=self.ensure_nested_builder(level)?;if builder.row.cell_count()>=crate::MAX_TABLE_CELLS_PER_ROW{return Err(RtfError::MalformedDocument("RTF table row exceeds 4096 cells".to_string()))}let text=std::str::from_utf8(&builder.cell_text).map_err(|_|RtfError::MalformedDocument("invalid UTF-8 in nested table cell".to_string()))?;let mut cell=crate::Cell::new(Cow::Borrowed(arena.alloc_str(text)));cell.nested_tables_mut().append(&mut builder.cell_nested);builder.row.add_cell(cell);builder.cell_text.clear();Ok(())}
+    fn finalize_nested_cell(&mut self, level: u8) -> RtfResult<()> {
+        self.drain_nested_to(level)?;
+        self.close_revision_at_cell_boundary(level)?;
+        let arena = self.arena;
+        let builder = self.ensure_nested_builder(level)?;
+        if builder.row.cell_count() >= crate::MAX_TABLE_CELLS_PER_ROW {
+            return Err(RtfError::MalformedDocument(
+                "RTF table row exceeds 4096 cells".to_string(),
+            ));
+        }
+        let text = std::str::from_utf8(&builder.cell_text).map_err(|_| {
+            RtfError::MalformedDocument("invalid UTF-8 in nested table cell".to_string())
+        })?;
+        let mut cell = crate::Cell::new(Cow::Borrowed(arena.alloc_str(text)));
+        cell.nested_tables_mut().append(&mut builder.cell_nested);
+        let drawings = std::mem::take(&mut builder.cell_drawings);
+        let events = std::mem::take(&mut builder.cell_story_events);
+        cell.set_story_content(
+            drawings.shapes,
+            drawings.shape_groups,
+            drawings.drawing_order,
+            events,
+        )?;
+        builder.row.add_cell(cell);
+        builder.cell_text.clear();
+        Ok(())
+    }
 
-    fn finalize_nested_row(&mut self,level:u8)->RtfResult<()>{self.drain_nested_to(level)?;let state=self.current_state()?.clone();let geometry=resolve_row_geometry(&state)?;let builder=self.ensure_nested_builder(level)?;if !builder.cell_text.is_empty()||!builder.cell_nested.is_empty(){return Err(RtfError::MalformedDocument("RTF nestrow encountered an unterminated nested cell".to_string()))}if builder.row.cell_count()==0{return Err(RtfError::MalformedDocument("RTF nestrow has no nestcell".to_string()))}if !state.cell_boundaries.is_empty()&&state.cell_boundaries.len()!=builder.row.cell_count(){return Err(RtfError::MalformedDocument("RTF nested row cell boundaries do not match nestcell count".to_string()))}for(index,cell)in builder.row.cells_mut().iter_mut().enumerate(){if let Some((padding,spacing))=state.cell_distances.get(index){cell.set_padding(padding.clone());cell.set_spacing(spacing.clone());}if let Some(layout)=state.cell_layouts.get(index){cell.set_layout(*layout);}if let Some(merge)=state.cell_merges.get(index){cell.set_merge(*merge);}cell.set_right_boundary(state.cell_boundaries.get(index).copied());cell.set_preferred_width(state.cell_widths.get(index).copied().flatten());if let Some((borders,shading))=state.cell_decorations.get(index){cell.set_borders(borders.clone());cell.set_shading(*shading);}}builder.row.set_direction(state.table_row_direction);builder.row.set_layout(state.table_row_layout);builder.row.set_padding(state.table_row_padding.clone());builder.row.set_spacing(state.table_row_spacing.clone());builder.row.set_positioning(state.table_row_positioning.clone());builder.row.set_borders(state.table_row_borders.clone());builder.row.set_shading(state.table_row_shading);builder.row.set_geometry(geometry);builder.row.set_autoformat_flags(state.table_autoformat_flags);builder.row.set_banding(state.table_row_banding);if builder.table.row_count()>=MAX_LOGICAL_TABLE_ROWS{return Err(RtfError::MalformedDocument("RTF logical table exceeds 65536 rows".to_string()))}if builder.table.rows().first().is_some_and(|first|first.positioning()!=builder.row.positioning()){return Err(RtfError::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()))}builder.table.add_row(std::mem::take(&mut builder.row));Ok(())}
+    fn finalize_nested_row(&mut self, level: u8) -> RtfResult<()> {
+        self.drain_nested_to(level)?;
+        let state = self.current_state()?.clone();
+        let geometry = resolve_row_geometry(&state)?;
+        let builder = self.ensure_nested_builder(level)?;
+        if !builder.cell_text.is_empty()
+            || !builder.cell_nested.is_empty()
+            || !builder.cell_drawings.drawing_order.is_empty()
+            || !builder.cell_story_events.is_empty()
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF nestrow encountered an unterminated nested cell".to_string(),
+            ));
+        }
+        if builder.row.cell_count() == 0 {
+            return Err(RtfError::MalformedDocument(
+                "RTF nestrow has no nestcell".to_string(),
+            ));
+        }
+        if !state.cell_boundaries.is_empty()
+            && state.cell_boundaries.len() != builder.row.cell_count()
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF nested row cell boundaries do not match nestcell count".to_string(),
+            ));
+        }
+        for (index, cell) in builder.row.cells_mut().iter_mut().enumerate() {
+            if let Some((padding, spacing)) = state.cell_distances.get(index) {
+                cell.set_padding(padding.clone());
+                cell.set_spacing(spacing.clone());
+            }
+            if let Some(layout) = state.cell_layouts.get(index) {
+                cell.set_layout(*layout);
+            }
+            if let Some(merge) = state.cell_merges.get(index) {
+                cell.set_merge(*merge);
+            }
+            cell.set_right_boundary(state.cell_boundaries.get(index).copied());
+            cell.set_preferred_width(state.cell_widths.get(index).copied().flatten());
+            if let Some((borders, shading)) = state.cell_decorations.get(index) {
+                cell.set_borders(borders.clone());
+                cell.set_shading(*shading);
+            }
+        }
+        builder.row.set_table_style(state.table_style);
+        builder.row.set_direction(state.table_row_direction);
+        builder.row.set_layout(state.table_row_layout);
+        builder.row.set_padding(state.table_row_padding.clone());
+        builder.row.set_spacing(state.table_row_spacing.clone());
+        builder
+            .row
+            .set_positioning(state.table_row_positioning.clone());
+        builder.row.set_borders(state.table_row_borders.clone());
+        builder.row.set_shading(state.table_row_shading);
+        builder.row.set_geometry(geometry);
+        builder
+            .row
+            .set_autoformat_flags(state.table_autoformat_flags);
+        builder.row.set_banding(state.table_row_banding);
+        if builder.table.row_count() >= MAX_LOGICAL_TABLE_ROWS {
+            return Err(RtfError::MalformedDocument(
+                "RTF logical table exceeds 65536 rows".to_string(),
+            ));
+        }
+        if builder
+            .table
+            .rows()
+            .first()
+            .is_some_and(|first| first.positioning() != builder.row.positioning())
+        {
+            return Err(RtfError::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()));
+        }
+        builder.table.add_row(std::mem::take(&mut builder.row));
+        Ok(())
+    }
 
     /// Finalize the current cell and add it to the current row.
-    fn finalize_cell(&mut self, explicit:bool)->RtfResult<()> {
+    fn finalize_cell(&mut self, explicit: bool) -> RtfResult<()> {
         self.drain_nested_to(1)?;
+        self.close_revision_at_cell_boundary(1)?;
         if explicit
             || !self.current_cell_text.is_empty()
             || !self.current_cell_nested.is_empty()
+            || !self.current_cell_drawings.drawing_order.is_empty()
+            || !self.current_cell_story_events.is_empty()
         {
-            if self.current_row.as_ref().map_or(0,|row|row.cell_count())>=crate::MAX_TABLE_CELLS_PER_ROW{return Err(RtfError::MalformedDocument("RTF table row exceeds 4096 cells".to_string()))}
+            if self.current_row.as_ref().map_or(0, |row| row.cell_count())
+                >= crate::MAX_TABLE_CELLS_PER_ROW
+            {
+                return Err(RtfError::MalformedDocument(
+                    "RTF table row exceeds 4096 cells".to_string(),
+                ));
+            }
             // Convert cell text to string
             if let Ok(text_str) = std::str::from_utf8(&self.current_cell_text) {
                 let allocated = self.arena.alloc_str(text_str);
-                let index=self.current_row.as_ref().map_or(0,|row|row.cell_count());let (padding,spacing)=self.current_state().ok().and_then(|state|state.cell_distances.get(index)).cloned().unwrap_or_default();let layout=self.current_state().ok().and_then(|state|state.cell_layouts.get(index)).copied().unwrap_or_default();let merge=self.current_state().ok().and_then(|state|state.cell_merges.get(index)).copied().unwrap_or_default();let boundary=self.current_state().ok().and_then(|state|state.cell_boundaries.get(index)).copied();let width=self.current_state().ok().and_then(|state|state.cell_widths.get(index)).copied().flatten();let(borders,shading)=self.current_state().ok().and_then(|state|state.cell_decorations.get(index)).cloned().unwrap_or_default();let mut cell = super::table::Cell::with_distances(Cow::Borrowed(allocated),padding,spacing);cell.set_layout(layout);cell.set_merge(merge);cell.set_right_boundary(boundary);cell.set_preferred_width(width);cell.set_borders(borders);cell.set_shading(shading);cell.nested_tables_mut().append(&mut self.current_cell_nested);
+                let index = self.current_row.as_ref().map_or(0, |row| row.cell_count());
+                let (padding, spacing) = self
+                    .current_state()
+                    .ok()
+                    .and_then(|state| state.cell_distances.get(index))
+                    .cloned()
+                    .unwrap_or_default();
+                let layout = self
+                    .current_state()
+                    .ok()
+                    .and_then(|state| state.cell_layouts.get(index))
+                    .copied()
+                    .unwrap_or_default();
+                let merge = self
+                    .current_state()
+                    .ok()
+                    .and_then(|state| state.cell_merges.get(index))
+                    .copied()
+                    .unwrap_or_default();
+                let boundary = self
+                    .current_state()
+                    .ok()
+                    .and_then(|state| state.cell_boundaries.get(index))
+                    .copied();
+                let width = self
+                    .current_state()
+                    .ok()
+                    .and_then(|state| state.cell_widths.get(index))
+                    .copied()
+                    .flatten();
+                let (borders, shading) = self
+                    .current_state()
+                    .ok()
+                    .and_then(|state| state.cell_decorations.get(index))
+                    .cloned()
+                    .unwrap_or_default();
+                let mut cell =
+                    super::table::Cell::with_distances(Cow::Borrowed(allocated), padding, spacing);
+                cell.set_layout(layout);
+                cell.set_merge(merge);
+                cell.set_right_boundary(boundary);
+                cell.set_preferred_width(width);
+                cell.set_borders(borders);
+                cell.set_shading(shading);
+                cell.nested_tables_mut()
+                    .append(&mut self.current_cell_nested);
+                let drawings = std::mem::take(&mut self.current_cell_drawings);
+                let events = std::mem::take(&mut self.current_cell_story_events);
+                cell.set_story_content(
+                    drawings.shapes,
+                    drawings.shape_groups,
+                    drawings.drawing_order,
+                    events,
+                )?;
 
                 // Add cell to current row
                 if let Some(row) = &mut self.current_row {
                     row.add_cell(cell);
                 }
             }
-
         }
         self.current_cell_text.clear();
+        self.current_cell_drawings = DrawingStoryCapture::default();
+        self.current_cell_story_events.clear();
         Ok(())
     }
 
@@ -8713,9 +16442,15 @@ impl<'a> Parser<'a> {
             && row.cell_count() > 0
         {
             if table.row_count() >= MAX_LOGICAL_TABLE_ROWS {
-                return Err(RtfError::MalformedDocument("RTF logical table exceeds 65536 rows".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "RTF logical table exceeds 65536 rows".to_string(),
+                ));
             }
-            if table.rows().first().is_some_and(|first| first.positioning() != row.positioning()) {
+            if table
+                .rows()
+                .first()
+                .is_some_and(|first| first.positioning() != row.positioning())
+            {
                 return Err(RtfError::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()));
             }
             table.add_row(row);
@@ -8738,19 +16473,32 @@ impl<'a> Parser<'a> {
         if let Some(table) = self.current_table.take()
             && table.row_count() > 0
         {
-            table.validate_merges().map_err(RtfError::MalformedDocument)?;
+            table
+                .validate_merges()
+                .map_err(RtfError::MalformedDocument)?;
             if self.logical_table_count >= MAX_LOGICAL_TABLES {
-                return Err(RtfError::MalformedDocument("RTF document exceeds 4096 logical tables".to_string()));
+                return Err(RtfError::MalformedDocument(
+                    "RTF document exceeds 4096 logical tables".to_string(),
+                ));
             }
-            self.logical_table_count+=1;self.tables.push(table);
+            self.logical_table_count += 1;
+            self.tables.push(table);
         }
         Ok(())
     }
 
-    fn finalize_table_before_non_table_body_content(&mut self, meaningful:bool)->RtfResult<bool> {
+    fn finalize_table_before_non_table_body_content(
+        &mut self,
+        meaningful: bool,
+    ) -> RtfResult<bool> {
         if meaningful
-            && self.current_table.as_ref().is_some_and(|table|table.row_count()>0)
-            && self.current_state().is_ok_and(|state|state.destination==Destination::DocumentBody&&!state.in_table)
+            && self
+                .current_table
+                .as_ref()
+                .is_some_and(|table| table.row_count() > 0)
+            && self.current_state().is_ok_and(|state| {
+                state.destination == Destination::DocumentBody && !state.in_table
+            })
         {
             self.finalize_table()?;
             return Ok(true);
@@ -8760,10 +16508,32 @@ impl<'a> Parser<'a> {
 
     /// Parse an `object` destination without activating or updating its content.
     fn parse_object_destination(&mut self) -> RtfResult<super::object::EmbeddedObject<'a>> {
-        use super::object::ObjectKind;
+        use super::object::{ObjectKind, ObjectResultKind};
 
+        let state = self.current_state()?;
+        if state.destination != Destination::DocumentBody || state.in_table {
+            return Err(RtfError::MalformedDocument(
+                "RTF object destination may occur only in the non-table document body".to_string(),
+            ));
+        }
         let mut object = super::object::EmbeddedObject::new();
+        object.position = self.body_text_len;
         let mut depth = 0usize;
+        let mut saw_class = false;
+        let mut saw_name = false;
+        let mut saw_class_id = false;
+        let mut saw_data = false;
+        let mut saw_result = false;
+        if matches!(
+            self.pos
+                .checked_sub(1)
+                .and_then(|index| self.tokens.get(index)),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "RTF object destination must not be starred".to_string(),
+            ));
+        }
         self.pos += 1; // consume \object
 
         while self.pos < self.tokens.len() {
@@ -8771,18 +16541,105 @@ impl<'a> Parser<'a> {
                 Token::OpenBrace
                     if self.nested_control_word() == Some(ControlWord::ObjectClass) =>
                 {
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || saw_class
+                        || saw_class_id
+                        || saw_data
+                        || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid RTF object class destination placement".to_string(),
+                        ));
+                    }
                     object.class_name = Cow::Owned(self.parse_object_text_destination()?);
+                    saw_class = true;
                 },
                 Token::OpenBrace if self.nested_control_word() == Some(ControlWord::ObjectName) => {
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || saw_name
+                        || saw_class_id
+                        || saw_data
+                        || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid RTF object name destination placement".to_string(),
+                        ));
+                    }
                     object.name = Cow::Owned(self.parse_object_text_destination()?);
+                    saw_name = true;
+                },
+                Token::OpenBrace
+                    if self.nested_control_word() == Some(ControlWord::OleClassId(None)) =>
+                {
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || saw_class_id
+                        || saw_data
+                        || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid RTF object CLSID destination placement".to_string(),
+                        ));
+                    }
+                    object.class_id = Cow::Owned(self.parse_object_text_destination()?);
+                    saw_class_id = true;
+                },
+                Token::OpenBrace
+                    if matches!(
+                        self.nested_control_word(),
+                        Some(ControlWord::OleClassId(Some(_)))
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF object CLSID destination must not have a parameter".to_string(),
+                    ));
                 },
                 Token::OpenBrace if self.nested_control_word() == Some(ControlWord::ObjectData) => {
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || saw_data
+                        || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid RTF object data destination placement".to_string(),
+                        ));
+                    }
                     object.data = self.parse_object_hex_destination()?;
+                    saw_data = true;
                 },
                 Token::OpenBrace if self.nested_control_word() == Some(ControlWord::Result) => {
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid RTF object result destination placement".to_string(),
+                        ));
+                    }
                     let (text, pictures) = self.parse_object_result_destination()?;
                     object.result_text = Cow::Owned(text);
                     object.result_picture_indices = pictures;
+                    saw_result = true;
+                },
+                Token::OpenBrace
+                    if matches!(
+                        self.nested_control_word(),
+                        Some(
+                            ControlWord::InvalidObjectDestinationParameter
+                                | ControlWord::InvalidObjectResultDestinationParameter
+                        )
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "parameterized RTF object subdestination is invalid".to_string(),
+                    ));
                 },
                 Token::OpenBrace => {
                     depth += 1;
@@ -8797,20 +16654,100 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ObjectEmbedded) => {
+                    if object.kind != ObjectKind::Unknown || saw_class_id || saw_data || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF object kind".to_string(),
+                        ));
+                    }
                     object.kind = ObjectKind::Embedded;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ObjectLink) => {
+                    if object.kind != ObjectKind::Unknown || saw_class_id || saw_data || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF object kind".to_string(),
+                        ));
+                    }
                     object.kind = ObjectKind::Link;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ObjectAutoLink) => {
+                    if object.kind != ObjectKind::Unknown || saw_class_id || saw_data || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF object kind".to_string(),
+                        ));
+                    }
                     object.kind = ObjectKind::AutoLink;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ObjectHtml) => {
+                    if object.kind != ObjectKind::Unknown || saw_class_id || saw_data || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF object kind".to_string(),
+                        ));
+                    }
                     object.kind = ObjectKind::Html;
                     self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectSubscriber(None)) => {
+                    object.kind = Self::set_object_kind(
+                        object.kind,
+                        ObjectKind::Subscriber,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectPublisher(None)) => {
+                    object.kind = Self::set_object_kind(
+                        object.kind,
+                        ObjectKind::Publisher,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectInstallableCommand(None)) => {
+                    object.kind = Self::set_object_kind(
+                        object.kind,
+                        ObjectKind::InstallableCommand,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectOleControl(None)) => {
+                    object.kind = Self::set_object_kind(
+                        object.kind,
+                        ObjectKind::OleControl,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(
+                    ControlWord::ObjectSubscriber(Some(_))
+                    | ControlWord::ObjectPublisher(Some(_))
+                    | ControlWord::ObjectInstallableCommand(Some(_))
+                    | ControlWord::ObjectOleControl(Some(_)),
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF object kind control must not have a parameter".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ObjectLinkSelf(None)) => {
+                    if object.link_self || saw_class_id || saw_data || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF object linkself modifier".to_string(),
+                        ));
+                    }
+                    object.link_self = true;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectLinkSelf(Some(_))) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF object linkself modifier must not have a parameter".to_string(),
+                    ));
                 },
                 Token::Control(ControlWord::ObjectWidth(value)) => {
                     object.width = *value;
@@ -8819,6 +16756,84 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ObjectHeight(value)) => {
                     object.height = *value;
                     self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectAlignment(Some(value))) => {
+                    Self::set_object_value(
+                        &mut object.alignment,
+                        *value,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectTranslationY(Some(value))) => {
+                    Self::set_object_value(
+                        &mut object.translation_y,
+                        *value,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectCropTop(Some(value))) => {
+                    Self::set_object_value(
+                        &mut object.crop_top,
+                        *value,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectCropBottom(Some(value))) => {
+                    Self::set_object_value(
+                        &mut object.crop_bottom,
+                        *value,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectCropLeft(Some(value))) => {
+                    Self::set_object_value(
+                        &mut object.crop_left,
+                        *value,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectCropRight(Some(value))) => {
+                    Self::set_object_value(
+                        &mut object.crop_right,
+                        *value,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectScaleX(Some(value))) => {
+                    Self::set_object_value(
+                        &mut object.scale_x,
+                        *value,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectScaleY(Some(value))) => {
+                    Self::set_object_value(
+                        &mut object.scale_y,
+                        *value,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(
+                    ControlWord::ObjectAlignment(None)
+                    | ControlWord::ObjectTranslationY(None)
+                    | ControlWord::ObjectCropTop(None)
+                    | ControlWord::ObjectCropBottom(None)
+                    | ControlWord::ObjectCropLeft(None)
+                    | ControlWord::ObjectCropRight(None)
+                    | ControlWord::ObjectScaleX(None)
+                    | ControlWord::ObjectScaleY(None),
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF object numeric modifier requires a parameter".to_string(),
+                    ));
                 },
                 Token::Control(ControlWord::ObjectLocked(value)) => {
                     object.locked = *value;
@@ -8832,10 +16847,113 @@ impl<'a> Parser<'a> {
                     object.set_size = *value;
                     self.pos += 1;
                 },
+                Token::Control(ControlWord::ObjectResultMerge(None)) => {
+                    if object.merge_result || saw_class_id || saw_data || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid or duplicate RTF object result merge modifier".to_string(),
+                        ));
+                    }
+                    object.merge_result = true;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectResultRtf(None)) => {
+                    Self::set_object_result_kind(
+                        &mut object,
+                        ObjectResultKind::Rtf,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectResultText(None)) => {
+                    Self::set_object_result_kind(
+                        &mut object,
+                        ObjectResultKind::Text,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectResultPicture(None)) => {
+                    Self::set_object_result_kind(
+                        &mut object,
+                        ObjectResultKind::Picture,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectResultBitmap(None)) => {
+                    Self::set_object_result_kind(
+                        &mut object,
+                        ObjectResultKind::Bitmap,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectResultHtml(None)) => {
+                    Self::set_object_result_kind(
+                        &mut object,
+                        ObjectResultKind::Html,
+                        saw_class_id || saw_data || saw_result,
+                    )?;
+                    self.pos += 1;
+                },
+                Token::Control(
+                    ControlWord::ObjectResultMerge(Some(_))
+                    | ControlWord::ObjectResultRtf(Some(_))
+                    | ControlWord::ObjectResultText(Some(_))
+                    | ControlWord::ObjectResultPicture(Some(_))
+                    | ControlWord::ObjectResultBitmap(Some(_))
+                    | ControlWord::ObjectResultHtml(Some(_)),
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF object result modifier must not have a parameter".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::InvalidObjectModifierParameter) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF object modifier has an invalid parameter".to_string(),
+                    ));
+                },
                 _ => self.pos += 1,
             }
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn set_object_kind(
+        current: super::object::ObjectKind,
+        value: super::object::ObjectKind,
+        too_late: bool,
+    ) -> RtfResult<super::object::ObjectKind> {
+        if current != super::object::ObjectKind::Unknown || too_late {
+            return Err(RtfError::MalformedDocument(
+                "invalid or duplicate RTF object kind".to_string(),
+            ));
+        }
+        Ok(value)
+    }
+
+    fn set_object_value(target: &mut Option<i32>, value: i32, too_late: bool) -> RtfResult<()> {
+        if target.is_some() || too_late {
+            return Err(RtfError::MalformedDocument(
+                "invalid or duplicate RTF object numeric modifier".to_string(),
+            ));
+        }
+        *target = Some(value);
+        Ok(())
+    }
+
+    fn set_object_result_kind(
+        object: &mut super::object::EmbeddedObject<'_>,
+        kind: super::object::ObjectResultKind,
+        too_late: bool,
+    ) -> RtfResult<()> {
+        if object.result_kind.is_some() || too_late {
+            return Err(RtfError::MalformedDocument(
+                "invalid or duplicate RTF object result kind".to_string(),
+            ));
+        }
+        object.result_kind = Some(kind);
+        Ok(())
     }
 
     fn parse_object_result_destination(&mut self) -> RtfResult<(String, Vec<usize>)> {
@@ -8902,21 +17020,17 @@ impl<'a> Parser<'a> {
 
     fn parse_object_text_destination(&mut self) -> RtfResult<String> {
         let mut text = String::new();
-        let mut depth = 0usize;
         self.pos += 1; // opening brace
         while self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
                 Token::OpenBrace => {
-                    depth += 1;
-                    self.pos += 1;
-                },
-                Token::CloseBrace if depth == 0 => {
-                    self.pos += 1;
-                    return Ok(text.trim().to_string());
+                    return Err(RtfError::MalformedDocument(
+                        "nested groups are not allowed in RTF object text metadata".to_string(),
+                    ));
                 },
                 Token::CloseBrace => {
-                    depth -= 1;
                     self.pos += 1;
+                    return Ok(text.trim().to_string());
                 },
                 Token::Control(ControlWord::Unicode(code)) => {
                     text.push_str(&self.parse_destination_unicode_sequence(*code)?);
@@ -9013,38 +17127,193 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse the unique starred root document-background destination.
+    fn parse_background_destination(&mut self) -> RtfResult<super::shape::Shape<'a>> {
+        self.pos += 2; // consume \* and \background
+        while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
+            if !text.chars().all(char::is_whitespace) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF background destination contains text outside its shape".to_string(),
+                ));
+            }
+            self.pos += 1;
+        }
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF background destination must contain exactly one shape group".to_string(),
+            ));
+        }
+        self.pos += 1;
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::Shape(None)))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "RTF background destination must contain an unstarred shp destination".to_string(),
+            ));
+        }
+        let mut shape = self.parse_shape_destination(true)?;
+        while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
+            if !text.chars().all(char::is_whitespace) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF background destination contains trailing text".to_string(),
+                ));
+            }
+            self.pos += 1;
+        }
+        if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF background destination must contain exactly one shape group".to_string(),
+            ));
+        }
+        self.pos += 1;
+        if shape
+            .properties
+            .iter()
+            .any(|property| property.name.is_empty())
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF background shape property names cannot be empty".to_string(),
+            ));
+        }
+        shape.is_background = true;
+        Ok(shape)
+    }
+
     /// Parse a `shp` destination and its nested shape-property groups.
-    fn parse_shape_destination(&mut self) -> RtfResult<super::shape::Shape<'a>> {
+    fn parse_shape_destination(
+        &mut self,
+        allow_shape_result: bool,
+    ) -> RtfResult<super::shape::Shape<'a>> {
         use super::shape::{Shape, ShapeType};
 
         let mut shape = Shape::new(ShapeType::Unknown);
-        let mut text = String::new();
+        shape.instruction_present = false;
         let mut depth = 0usize;
-        let mut text_depth = None;
+        let mut shape_instance_depth = None;
+        let mut saw_shape_instance = false;
+        let mut saw_property = false;
+        let mut saw_shape_info = false;
         let mut right = None;
         let mut bottom = None;
         let mut closed = false;
-        self.pos += 1; // consume \shp
+        let mut saw_shape_result = false;
+        let mut saw_shape_text = false;
+        let parameter = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::Shape(parameter))) => *parameter,
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shape parser is not at shp".to_string(),
+                ));
+            },
+        };
+        require_parameterless(parameter, "shp")?;
+        self.pos += 1;
 
         while self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
                 Token::OpenBrace
+                    if self
+                        .nested_control_word()
+                        .is_some_and(|control| matches!(control, ControlWord::ShapeText(_))) =>
+                {
+                    let valid_parent = shape_instance_depth == Some(depth);
+                    if !valid_parent || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shptxt must be one final destination after shape properties"
+                                .to_string(),
+                        ));
+                    }
+                    let (
+                        text,
+                        text_shapes,
+                        text_shape_groups,
+                        text_drawing_order,
+                        text_story_events,
+                        text_background_color,
+                    ) =
+                        self.parse_shape_text_destination()?;
+                    shape.text = Cow::Owned(text);
+                    shape.text_shapes = text_shapes;
+                    shape.text_shape_groups = text_shape_groups;
+                    shape.text_drawing_order = text_drawing_order;
+                    shape.text_story_events = text_story_events;
+                    shape.text_destination_present = true;
+                    shape.text_formatting = self.current_state().ok().map(|state| state.formatting);
+                    if let (Some(formatting), Some(background_color)) =
+                        (&mut shape.text_formatting, text_background_color)
+                    {
+                        formatting.background_color = Some(background_color);
+                    }
+                    saw_shape_text = true;
+                },
+                Token::OpenBrace
+                    if self
+                        .nested_control_word()
+                        .is_some_and(|control| matches!(control, ControlWord::ShapeResult(_))) =>
+                {
+                    if depth != 0 || !allow_shape_result || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shprslt must be a single direct child of a root shape".to_string(),
+                        ));
+                    }
+                    saw_shape_result = true;
+                    shape.result = self.parse_shape_result()?;
+                },
+                Token::OpenBrace
                     if self.nested_control_word() == Some(ControlWord::ShapeProperty) =>
                 {
+                    if shape_instance_depth != Some(depth) || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape properties must be direct shpinst children before shptxt"
+                                .to_string(),
+                        ));
+                    }
+                    saw_property = true;
                     if shape.properties.len() >= MAX_SHAPE_PROPERTIES {
                         return Err(RtfError::MalformedDocument(
                             "RTF shape property count exceeds the safety limit".to_string(),
                         ));
                     }
-                    let (name, value) = self.parse_shape_property_group()?;
-                    shape.properties.push(super::shape::ShapeProperty::new(
-                        Cow::Owned(name),
-                        Cow::Owned(value),
-                    ));
+                    let (name, value, binary_value, theme_value) =
+                        self.parse_shape_property_group()?;
+                    shape.properties.push(super::shape::ShapeProperty {
+                        name: Cow::Owned(name),
+                        value: Cow::Owned(value),
+                        binary_value: binary_value.map(Cow::Owned),
+                        theme_value,
+                    });
+                },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::ShapeInstance),
+                        ])
+                    ) =>
+                {
+                    if depth != 0
+                        || shape_instance_depth.is_some()
+                        || saw_shape_instance
+                        || saw_shape_text
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shpinst must be a single direct shape child before shptxt"
+                                .to_string(),
+                        ));
+                    }
+                    shape_instance_depth = Some(depth + 1);
+                    saw_shape_instance = true;
+                    shape.instruction_present = true;
+                    depth += 1;
+                    self.pos += 3;
                 },
                 Token::OpenBrace => {
-                    depth += 1;
-                    self.pos += 1;
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape contains a misplaced or unknown group".to_string(),
+                    ));
                 },
                 Token::CloseBrace if depth == 0 => {
                     self.pos += 1;
@@ -9052,49 +17321,106 @@ impl<'a> Parser<'a> {
                     break;
                 },
                 Token::CloseBrace => {
-                    if text_depth == Some(depth) {
-                        text_depth = None;
+                    if shape_instance_depth == Some(depth) {
+                        shape_instance_depth = None;
                     }
                     depth -= 1;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeType(value)) => {
-                    shape.shape_type = Self::shape_type_from_rtf(*value);
-                    self.pos += 1;
+                    let _ = value;
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shpinst destination must not have a parameter".to_string(),
+                    ));
                 },
                 Token::Control(ControlWord::ShapeLeft(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
                     shape.geometry.x = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeTop(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
                     shape.geometry.y = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeRight(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
                     right = Some(*value);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeBottom(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
                     bottom = Some(*value);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeWidth(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
                     shape.geometry.width = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeHeight(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
                     shape.geometry.height = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeRotation(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
                     shape.geometry.rotation = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeZOrder(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
                     shape.geometry.z_order = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeWrap(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
+                    shape.info.push(crate::ShapeGroupInfo::Wrap(*value));
                     shape.wrap_mode = match value {
                         1 => super::shape::WrapMode::None,
                         2 => super::shape::WrapMode::Square,
@@ -9105,6 +17431,13 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeBelowText(value)) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
+                    shape.info.push(crate::ShapeGroupInfo::BelowText(*value));
                     shape.behind_doc = *value;
                     if *value {
                         shape.wrap_mode = super::shape::WrapMode::Behind;
@@ -9112,54 +17445,100 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeLockAnchor) => {
+                    saw_shape_info = true;
+                    if saw_property || saw_shape_text || saw_shape_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape info must precede properties".to_string(),
+                        ));
+                    }
+                    shape.info.push(crate::ShapeGroupInfo::LockAnchor);
                     shape.locked = true;
                     self.pos += 1;
                 },
-                Token::Control(ControlWord::ShapeText) => {
-                    text_depth = Some(depth);
-                    self.pos += 1;
-                },
-                Token::Control(ControlWord::Unicode(code)) if text_depth.is_some() => {
-                    text.push_str(&self.parse_destination_unicode_sequence(*code)?);
-                    if text.len() > MAX_SHAPE_TEXT_BYTES {
-                        return Err(RtfError::MalformedDocument(
-                            "RTF shape text exceeds the safety limit".to_string(),
-                        ));
-                    }
-                },
-                Token::Control(ControlWord::Par | ControlWord::Line) if text_depth.is_some() => {
-                    text.push('\n');
-                    self.pos += 1;
-                },
-                Token::Control(ControlWord::Tab) if text_depth.is_some() => {
-                    text.push('\t');
-                    self.pos += 1;
-                },
-                Token::Control(control)
-                    if text_depth.is_some() && control_symbol_text(control).is_some() =>
+                Token::Control(ControlWord::PictureShapeId(Some(value)))
+                    if !saw_property && !saw_shape_text && !saw_shape_result =>
                 {
-                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    saw_shape_info = true;
+                    shape.info.push(crate::ShapeGroupInfo::ShapeId(*value));
                     self.pos += 1;
                 },
-                Token::Text(value) if text_depth.is_some() => {
-                    text.push_str(&self.decode_transport_text(value)?);
-                    if text.len() > MAX_SHAPE_TEXT_BYTES {
+                Token::Control(ControlWord::Unknown(name, parameter))
+                    if !saw_property && !saw_shape_text && !saw_shape_result =>
+                {
+                    let info = match (*name, *parameter) {
+                        ("shpfhdr", Some(value)) => crate::ShapeGroupInfo::InHeader(value != 0),
+                        ("shpbxpage", None) => crate::ShapeGroupInfo::HorizontalPage,
+                        ("shpbxmargin", None) => crate::ShapeGroupInfo::HorizontalMargin,
+                        ("shpbxcolumn", None) => crate::ShapeGroupInfo::HorizontalColumn,
+                        ("shpbxignore", None) => crate::ShapeGroupInfo::IgnoreHorizontal,
+                        ("shpbypage", None) => crate::ShapeGroupInfo::VerticalPage,
+                        ("shpbymargin", None) => crate::ShapeGroupInfo::VerticalMargin,
+                        ("shpbypara", None) => crate::ShapeGroupInfo::VerticalParagraph,
+                        ("shpbyignore", None) => crate::ShapeGroupInfo::IgnoreVertical,
+                        ("shpwrk", Some(value)) => crate::ShapeGroupInfo::WrapSide(value),
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF shape contains an unknown or malformed shape-info control"
+                                    .to_string(),
+                            ));
+                        },
+                    };
+                    if shape.info.len() >= 32 {
                         return Err(RtfError::MalformedDocument(
-                            "RTF shape text exceeds the safety limit".to_string(),
+                            "RTF shape-info count exceeds the safety limit".to_string(),
                         ));
                     }
+                    shape.info.push(info);
+                    saw_shape_info = true;
                     self.pos += 1;
                 },
-                _ => self.pos += 1,
+                Token::Text(value) if !value.bytes().all(|byte| byte.is_ascii_whitespace()) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape destination contains direct text".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ShapeResult(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shprslt destination must be grouped".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ShapeText(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shptxt destination must be grouped and unstarred".to_string(),
+                    ));
+                },
+                Token::Control(_) if saw_shape_text => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape controls must precede shptxt".to_string(),
+                    ));
+                },
+                Token::Text(_) => self.pos += 1,
+                Token::Binary(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape cannot contain direct binary data".to_string(),
+                    ));
+                },
+                Token::Control(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape contains a misplaced control".to_string(),
+                    ));
+                },
             }
         }
         if !closed {
             return Err(RtfError::UnexpectedEof);
         }
-        if !text.is_empty() {
-            shape.text = Cow::Owned(text);
-            shape.text_formatting = self.current_state().ok().map(|state| state.formatting);
+        let fallback_only = allow_shape_result
+            && shape.result.is_some()
+            && !saw_shape_info
+            && !saw_property
+            && !saw_shape_text;
+        if shape_instance_depth.is_some() || (!saw_shape_instance && !fallback_only) {
+            return Err(RtfError::MalformedDocument(
+                "RTF shape must contain exactly one starred shpinst".to_string(),
+            ));
         }
+        shape.validate()?;
         Self::apply_shape_properties(&mut shape);
         if let Some(right) = right {
             shape.geometry.width = right.saturating_sub(shape.geometry.x);
@@ -9170,7 +17549,420 @@ impl<'a> Parser<'a> {
         Ok(shape)
     }
 
-    fn parse_shape_property_group(&mut self) -> RtfResult<(String, String)> {
+    fn parse_shape_text_destination(
+        &mut self,
+    ) -> RtfResult<(
+        String,
+        Vec<super::shape::Shape<'a>>,
+        Vec<super::shape::ShapeGroup<'a>>,
+        Vec<crate::StoryDrawing>,
+        Vec<crate::StoryEvent>,
+        Option<ColorRef>,
+    )> {
+        match self.tokens.get(self.pos..self.pos + 3) {
+            Some(
+                [
+                    Token::OpenBrace,
+                    Token::Control(ControlWord::IgnorableDestination),
+                    Token::Control(ControlWord::ShapeText(_)),
+                ],
+            ) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shptxt destination must not be starred".to_string(),
+                ));
+            },
+            _ => {},
+        }
+        match self.tokens.get(self.pos..self.pos + 2) {
+            Some(
+                [
+                    Token::OpenBrace,
+                    Token::Control(ControlWord::ShapeText(None)),
+                ],
+            ) => {
+                self.pos += 2;
+            },
+            Some(
+                [
+                    Token::OpenBrace,
+                    Token::Control(ControlWord::ShapeText(Some(_))),
+                ],
+            ) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shptxt destination must not have a parameter".to_string(),
+                ));
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF shptxt destination".to_string(),
+                ));
+            },
+        }
+
+        let mut text = String::new();
+        let mut shapes = Vec::new();
+        let mut shape_groups = Vec::new();
+        let mut drawing_order = Vec::new();
+        let mut story_events = Vec::new();
+        let mut depth = 0usize;
+        let mut background_stack = vec![self.current_state()?.formatting.background_color];
+        let mut observed_background: Option<Option<ColorRef>> = None;
+        macro_rules! observe_background {
+            ($visible:expr) => {
+                if $visible {
+                    let current = *background_stack
+                        .last()
+                        .expect("shape-text background state");
+                    if let Some(observed) = observed_background {
+                        if observed != current {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF shape text has multiple visible background colors"
+                                    .to_string(),
+                            ));
+                        }
+                    } else {
+                        observed_background = Some(current);
+                    }
+                }
+            };
+        }
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) if depth == 0 => {
+                    self.pos += 1;
+                    return Ok((
+                        text,
+                        shapes,
+                        shape_groups,
+                        drawing_order,
+                        story_events,
+                        observed_background.flatten(),
+                    ));
+                },
+                Some(Token::CloseBrace) => {
+                    depth -= 1;
+                    background_stack.pop();
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace) if self.is_root_drawing_group() => {
+                    let order_start = drawing_order.len();
+                    self.parse_story_drawing_group(
+                        text.len(),
+                        &mut shapes,
+                        &mut shape_groups,
+                        &mut drawing_order,
+                    )?;
+                    story_events.extend(
+                        drawing_order[order_start..]
+                            .iter()
+                            .copied()
+                            .map(crate::StoryEvent::Drawing),
+                    );
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || self.nested_control_word().is_some_and(|control| {
+                        matches!(
+                            control,
+                            ControlWord::Picture
+                                | ControlWord::Object
+                                | ControlWord::InvalidObjectDestinationParameter
+                                | ControlWord::Shape(_)
+                                | ControlWord::ShapeGroup(_)
+                                | ControlWord::ShapeResult(_)
+                                | ControlWord::LegacyDrawingObject
+                        )
+                    }) =>
+                {
+                    self.skip_group()?;
+                },
+                Some(Token::OpenBrace) => {
+                    depth += 1;
+                    if depth > 64 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shptxt nesting exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    let inherited = *background_stack
+                        .last()
+                        .expect("shape-text background state");
+                    background_stack.push(inherited);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::ShapeText(_))) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shptxt cannot contain another shptxt destination".to_string(),
+                    ));
+                },
+                Some(Token::Control(ControlWord::Unicode(code))) => {
+                    let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    observe_background!(decoded.chars().any(|character| !character.is_whitespace()));
+                    text.push_str(&decoded);
+                },
+                Some(Token::Control(ControlWord::Par | ControlWord::Line)) => {
+                    text.push('\n');
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Page(param))) => {
+                    require_parameterless(*param, "page")?;
+                    story_events.push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                        text.len(),
+                    )));
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Tab)) => {
+                    text.push('\t');
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    let decoded = control_symbol_text(control).unwrap_or_default();
+                    observe_background!(decoded.chars().any(|character| !character.is_whitespace()));
+                    text.push_str(decoded);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::ColorBackground(value))) => {
+                    *background_stack
+                        .last_mut()
+                        .expect("shape-text background state") = Some(
+                        Self::required_character_value(*value, "cb", u16::MAX)?,
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Plain)) => {
+                    *background_stack
+                        .last_mut()
+                        .expect("shape-text background state") = None;
+                    self.pos += 1;
+                },
+                Some(Token::Text(value)) => {
+                    let decoded = self.decode_transport_text(value)?;
+                    observe_background!(decoded.chars().any(|character| !character.is_whitespace()));
+                    text.push_str(&decoded);
+                    self.pos += 1;
+                },
+                Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shptxt contains direct binary data".to_string(),
+                    ));
+                },
+                Some(Token::Control(_)) => self.pos += 1,
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if text.len() > MAX_SHAPE_TEXT_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shape text exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn is_root_drawing_group(&self) -> bool {
+        matches!(
+            self.tokens.get(self.pos..self.pos + 2),
+            Some([
+                Token::OpenBrace,
+                Token::Control(ControlWord::Shape(_) | ControlWord::ShapeGroup(_)),
+            ])
+        ) || matches!(
+            self.tokens.get(self.pos..self.pos + 3),
+            Some([
+                Token::OpenBrace,
+                Token::Control(ControlWord::IgnorableDestination),
+                Token::Control(ControlWord::Shape(_) | ControlWord::ShapeGroup(_)),
+            ])
+        )
+    }
+
+    fn parse_story_drawing_group(
+        &mut self,
+        position: usize,
+        shapes: &mut Vec<super::shape::Shape<'a>>,
+        shape_groups: &mut Vec<super::shape::ShapeGroup<'a>>,
+        drawing_order: &mut Vec<crate::StoryDrawing>,
+    ) -> RtfResult<()> {
+        let shape_start = self.shapes.len();
+        let group_start = self.shape_groups.len();
+        let order_start = self.drawing_order.len();
+        let body_event_start = self.body_story_events.len();
+        self.parse_group()?;
+        self.body_story_events.truncate(body_event_start);
+        let added = self.shapes.len().saturating_sub(shape_start)
+            + self.shape_groups.len().saturating_sub(group_start);
+        if added != 1 {
+            return Err(RtfError::MalformedDocument(
+                "RTF story drawing group must contain exactly one root shp or shpgrp destination"
+                    .to_string(),
+            ));
+        }
+        for mut shape in self.shapes.drain(shape_start..) {
+            shape.position = position;
+            shapes.push(shape);
+        }
+        for mut group in self.shape_groups.drain(group_start..) {
+            group.position = position;
+            shape_groups.push(group);
+        }
+        for drawing in self.drawing_order.drain(order_start..) {
+            match drawing {
+                crate::StoryDrawing::Shape(index) => {
+                    drawing_order.push(crate::StoryDrawing::Shape(index - shape_start));
+                },
+                crate::StoryDrawing::ShapeGroup(index) => {
+                    drawing_order.push(crate::StoryDrawing::ShapeGroup(index - group_start));
+                },
+            }
+        }
+        if shapes.len() > MAX_SHAPES || shape_groups.len() > MAX_SHAPE_GROUPS {
+            return Err(RtfError::MalformedDocument(
+                "RTF story drawing count exceeds the safety limit".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn parse_shape_result(&mut self) -> RtfResult<Option<crate::ShapeResult<'a>>> {
+        let control_index = match self.tokens.get(self.pos..self.pos + 3) {
+            Some(
+                [
+                    Token::OpenBrace,
+                    Token::Control(ControlWord::IgnorableDestination),
+                    Token::Control(ControlWord::ShapeResult(None)),
+                ],
+            ) => self.pos + 2,
+            Some(
+                [
+                    Token::OpenBrace,
+                    Token::Control(ControlWord::IgnorableDestination),
+                    Token::Control(ControlWord::ShapeResult(Some(_))),
+                ],
+            ) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shprslt destination must not have a parameter".to_string(),
+                ));
+            },
+            _ => match self.tokens.get(self.pos..self.pos + 2) {
+                Some(
+                    [
+                        Token::OpenBrace,
+                        Token::Control(ControlWord::ShapeResult(None)),
+                    ],
+                ) => self.pos + 1,
+                Some(
+                    [
+                        Token::OpenBrace,
+                        Token::Control(ControlWord::ShapeResult(Some(_))),
+                    ],
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shprslt destination must not have a parameter".to_string(),
+                    ));
+                },
+                _ => {
+                    return Err(RtfError::MalformedDocument(
+                        "invalid RTF shprslt destination".to_string(),
+                    ));
+                },
+            },
+        };
+        self.pos = control_index + 1;
+        self.skip_legacy_whitespace();
+        if matches!(
+            self.tokens.get(self.pos..self.pos + 3),
+            Some([
+                Token::OpenBrace,
+                Token::Control(ControlWord::IgnorableDestination),
+                Token::Control(ControlWord::LegacyDrawingObject),
+            ])
+        ) {
+            self.pos += 1;
+            let mut drawing = self.parse_legacy_drawing_at(0)?.ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF shprslt legacy drawing must contain one primitive".to_string(),
+                )
+            })?;
+            drawing.position = 0;
+            self.skip_legacy_whitespace();
+            if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shprslt must contain exactly one legacy drawing".to_string(),
+                ));
+            }
+            self.pos += 1;
+            let result = crate::ShapeResult { drawing };
+            result.validate()?;
+            return Ok(Some(result));
+        }
+        if matches!(
+            self.tokens.get(self.pos..self.pos + 2),
+            Some([
+                Token::OpenBrace,
+                Token::Control(ControlWord::LegacyDrawingObject),
+            ])
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "RTF shprslt legacy drawing destination must be starred".to_string(),
+            ));
+        }
+
+        let mut depth = 0usize;
+        let mut retained_bytes = 0usize;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF shprslt nesting depth overflow".to_string(),
+                        )
+                    })?;
+                    if depth > 64 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shprslt nesting exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::CloseBrace) if depth == 0 => {
+                    self.pos += 1;
+                    return Ok(None);
+                },
+                Some(Token::CloseBrace) => {
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Some(Token::Text(value)) => {
+                    retained_bytes = retained_bytes.saturating_add(value.len());
+                    if retained_bytes > 16 * 1_048_576 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shprslt content exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Binary(value)) => {
+                    retained_bytes = retained_bytes.saturating_add(value.len());
+                    if retained_bytes > 16 * 1_048_576 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shprslt content exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Control(_)) => self.pos += 1,
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn parse_shape_property_group(
+        &mut self,
+    ) -> RtfResult<(
+        String,
+        String,
+        Option<Vec<u8>>,
+        Option<crate::ShapeThemeValue>,
+    )> {
         #[derive(Clone, Copy, PartialEq, Eq)]
         enum PropertyPart {
             Name,
@@ -9179,19 +17971,99 @@ impl<'a> Parser<'a> {
 
         let mut name = String::new();
         let mut value = String::new();
+        let mut binary_value = None;
+        let mut theme_value = None;
+        let mut seen_name = false;
+        let mut seen_value = false;
         let mut part = None;
         let mut part_depth = None;
         let mut depth = 0usize;
         self.pos += 1; // consume the opening brace
         while self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) && matches!(
+                        self.tokens.get(self.pos + 2),
+                        Some(Token::Control(ControlWord::ShapeBinaryValue(_)))
+                    ) =>
+                {
+                    if part != Some(PropertyPart::Value)
+                        || binary_value.is_some()
+                        || !value.trim().is_empty()
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF svb must be the only value inside one sv destination".to_string(),
+                        ));
+                    }
+                    binary_value = Some(self.parse_shape_binary_value()?);
+                },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) && matches!(
+                        self.tokens.get(self.pos + 2),
+                        Some(Token::Control(ControlWord::ShapeThemeValue(_)))
+                    ) =>
+                {
+                    if depth != 0
+                        || part.is_some()
+                        || !seen_value
+                        || theme_value.is_some()
+                        || binary_value.is_some()
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF hsv must be the single direct child after scalar sv in sp"
+                                .to_string(),
+                        ));
+                    }
+                    theme_value = Some(self.parse_shape_theme_value()?);
+                },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ShapeBinaryValue(_)))
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF svb destination must be starred".to_string(),
+                    ));
+                },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ShapeThemeValue(_)))
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF hsv destination must be starred".to_string(),
+                    ));
+                },
                 Token::OpenBrace => {
                     depth += 1;
                     self.pos += 1;
                 },
                 Token::CloseBrace if depth == 0 => {
                     self.pos += 1;
-                    return Ok((name.trim().to_string(), value.trim().to_string()));
+                    if !seen_name || !seen_value {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF sp requires exactly one sn followed by one sv".to_string(),
+                        ));
+                    }
+                    if binary_value.is_some() && !value.trim().is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape property cannot mix scalar and binary values".to_string(),
+                        ));
+                    }
+                    return Ok((
+                        name.trim().to_string(),
+                        value.trim().to_string(),
+                        binary_value,
+                        theme_value,
+                    ));
                 },
                 Token::CloseBrace => {
                     if part_depth == Some(depth) {
@@ -9202,14 +18074,36 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapePropertyName) => {
+                    if depth != 1 || seen_name || seen_value || theme_value.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF sp requires exactly one direct sn before sv".to_string(),
+                        ));
+                    }
+                    seen_name = true;
                     part = Some(PropertyPart::Name);
                     part_depth = Some(depth);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapePropertyValue) => {
+                    if depth != 1 || !seen_name || seen_value || theme_value.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF sp requires exactly one direct sv after sn".to_string(),
+                        ));
+                    }
+                    seen_value = true;
                     part = Some(PropertyPart::Value);
                     part_depth = Some(depth);
                     self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeBinaryValue(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF svb destination must be grouped and starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ShapeThemeValue(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF hsv destination must be a direct starred group after sv".to_string(),
+                    ));
                 },
                 Token::Control(ControlWord::Unicode(code)) if part.is_some() => {
                     let decoded = self.parse_destination_unicode_sequence(*code)?;
@@ -9248,6 +18142,186 @@ impl<'a> Parser<'a> {
             }
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_shape_theme_value(&mut self) -> RtfResult<crate::ShapeThemeValue> {
+        match self.tokens.get(self.pos..self.pos + 3) {
+            Some(
+                [
+                    Token::OpenBrace,
+                    Token::Control(ControlWord::IgnorableDestination),
+                    Token::Control(ControlWord::ShapeThemeValue(None)),
+                ],
+            ) => self.pos += 3,
+            Some(
+                [
+                    Token::OpenBrace,
+                    Token::Control(ControlWord::IgnorableDestination),
+                    Token::Control(ControlWord::ShapeThemeValue(Some(_))),
+                ],
+            ) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF hsv destination must not have a parameter".to_string(),
+                ));
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF hsv destination".to_string(),
+                ));
+            },
+        }
+        let mut color = None;
+        let mut tint = None;
+        let mut shade = None;
+        let mut whitespace_bytes = 0usize;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let theme = crate::ShapeThemeValue {
+                        color: color.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF hsv requires exactly one accent selector".to_string(),
+                            )
+                        })?,
+                        tint: tint.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF hsv requires exactly one ctint value".to_string(),
+                            )
+                        })?,
+                        shade: shade.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF hsv requires exactly one cshade value".to_string(),
+                            )
+                        })?,
+                    };
+                    theme.validate()?;
+                    return Ok(theme);
+                },
+                Some(Token::Control(ControlWord::ShapeThemeColor(value, None)))
+                    if color.is_none() =>
+                {
+                    color = Some(*value);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::ShapeThemeTint(Some(value))))
+                    if tint.is_none() =>
+                {
+                    tint = Some(u8::try_from(*value).map_err(|_| {
+                        RtfError::MalformedDocument(
+                            "RTF hsv ctint must be between 0 and 255".to_string(),
+                        )
+                    })?);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::ShapeThemeShade(Some(value))))
+                    if shade.is_none() =>
+                {
+                    shade = Some(u8::try_from(*value).map_err(|_| {
+                        RtfError::MalformedDocument(
+                            "RTF hsv cshade must be between 0 and 255".to_string(),
+                        )
+                    })?);
+                    self.pos += 1;
+                },
+                Some(Token::Text(value))
+                    if value.bytes().all(|byte| byte.is_ascii_whitespace()) =>
+                {
+                    whitespace_bytes = whitespace_bytes.saturating_add(value.len());
+                    if whitespace_bytes > 4_096 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF hsv whitespace exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF hsv contains duplicate, parameterless, nested, or active content"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn parse_shape_binary_value(&mut self) -> RtfResult<Vec<u8>> {
+        match self.tokens.get(self.pos..self.pos + 3) {
+            Some(
+                [
+                    Token::OpenBrace,
+                    Token::Control(ControlWord::IgnorableDestination),
+                    Token::Control(ControlWord::ShapeBinaryValue(None)),
+                ],
+            ) => self.pos += 3,
+            Some(
+                [
+                    Token::OpenBrace,
+                    Token::Control(ControlWord::IgnorableDestination),
+                    Token::Control(ControlWord::ShapeBinaryValue(Some(_))),
+                ],
+            ) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF svb destination must not have a parameter".to_string(),
+                ));
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF svb destination".to_string(),
+                ));
+            },
+        }
+        let mut bytes = Vec::new();
+        let mut high_nibble = None;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if high_nibble.is_some() || bytes.is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF svb payload is empty or has an odd hexadecimal length".to_string(),
+                        ));
+                    }
+                    return Ok(bytes);
+                },
+                Some(Token::Text(text)) => {
+                    for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
+                        let nibble = Self::hex_nibble(byte).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF svb contains a non-hexadecimal character".to_string(),
+                            )
+                        })?;
+                        if let Some(high) = high_nibble.take() {
+                            bytes.push((high << 4) | nibble);
+                        } else {
+                            high_nibble = Some(nibble);
+                        }
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Binary(value)) => {
+                    if high_nibble.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF svb binary payload splits a hexadecimal byte".to_string(),
+                        ));
+                    }
+                    bytes.extend_from_slice(value);
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF svb contains nested or active content".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if bytes.len() > crate::MAX_SHAPE_PROPERTY_BINARY_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF svb payload exceeds the safety limit".to_string(),
+                ));
+            }
+        }
     }
 
     fn apply_shape_property(shape: &mut super::shape::Shape<'a>, name: &str, value: &str) {
@@ -9367,12 +18441,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_shape_group_destination(&mut self) -> RtfResult<super::shape::ShapeGroup<'a>> {
-        self.parse_shape_group_destination_at_depth(0)
+        self.parse_shape_group_destination_at_depth(0, true)
     }
 
     fn parse_shape_group_destination_at_depth(
         &mut self,
         nesting_depth: usize,
+        root: bool,
     ) -> RtfResult<super::shape::ShapeGroup<'a>> {
         if nesting_depth >= MAX_SHAPE_GROUP_DEPTH {
             return Err(RtfError::MalformedDocument(
@@ -9380,115 +18455,282 @@ impl<'a> Parser<'a> {
             ));
         }
         let mut group = super::shape::ShapeGroup::new();
-        let mut depth = 0usize;
         let mut right = None;
         let mut bottom = None;
+        let mut in_instance = false;
+        let mut saw_instance = false;
+        let mut saw_child = false;
+        let mut saw_result = false;
         let mut closed = false;
-        self.pos += 1; // consume \shpgrp
+        let parameter = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::ShapeGroup(parameter))) => *parameter,
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shape group parser is not at shpgrp".to_string(),
+                ));
+            },
+        };
+        require_parameterless(parameter, "shpgrp")?;
+        self.pos += 1;
 
         while self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
                 Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::ShapeInstance),
+                        ])
+                    ) =>
+                {
+                    if in_instance || saw_instance || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape group must contain exactly one shpinst".to_string(),
+                        ));
+                    }
+                    saw_instance = true;
+                    in_instance = true;
+                    self.pos += 3;
+                },
+                Token::OpenBrace
                     if self.nested_control_word() == Some(ControlWord::ShapeProperty) =>
                 {
+                    if !in_instance || saw_child {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape group properties must precede direct children inside shpinst"
+                                .to_string(),
+                        ));
+                    }
                     if group.properties.len() >= MAX_SHAPE_PROPERTIES {
                         return Err(RtfError::MalformedDocument(
                             "RTF shape group property count exceeds the safety limit".to_string(),
                         ));
                     }
-                    let (name, value) = self.parse_shape_property_group()?;
+                    let (name, value, binary_value, theme_value) =
+                        self.parse_shape_property_group()?;
                     if name == "wzName" {
                         group.name = Cow::Owned(value.clone());
                     }
-                    group.properties.push(super::shape::ShapeProperty::new(
-                        Cow::Owned(name),
-                        Cow::Owned(value),
-                    ));
-                },
-                Token::OpenBrace if self.nested_shape_control() == Some(ControlWord::Shape) => {
-                    if group.shapes.len() >= MAX_SHAPES_PER_GROUP {
-                        return Err(RtfError::MalformedDocument(
-                            "RTF shape group child count exceeds the safety limit".to_string(),
-                        ));
-                    }
-                    self.pos += 1;
-                    if matches!(
-                        self.tokens.get(self.pos),
-                        Some(Token::Control(ControlWord::IgnorableDestination))
-                    ) {
-                        self.pos += 1;
-                    }
-                    group.add_shape(self.parse_shape_destination()?);
+                    group.properties.push(super::shape::ShapeProperty {
+                        name: Cow::Owned(name),
+                        value: Cow::Owned(value),
+                        binary_value: binary_value.map(Cow::Owned),
+                        theme_value,
+                    });
                 },
                 Token::OpenBrace
-                    if self.nested_shape_control() == Some(ControlWord::ShapeGroup) =>
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::Shape(_)))
+                    ) =>
                 {
-                    if group.groups.len() >= MAX_GROUPS_PER_GROUP {
+                    if !in_instance || group.child_order.len() >= MAX_SHAPES_PER_GROUP {
                         return Err(RtfError::MalformedDocument(
-                            "RTF nested shape group count exceeds the safety limit".to_string(),
+                            "RTF shape group child is misplaced or exceeds the safety limit"
+                                .to_string(),
                         ));
                     }
+                    saw_child = true;
                     self.pos += 1;
+                    group.add_shape(self.parse_shape_destination(false)?);
+                },
+                Token::OpenBrace
                     if matches!(
-                        self.tokens.get(self.pos),
-                        Some(Token::Control(ControlWord::IgnorableDestination))
-                    ) {
-                        self.pos += 1;
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ShapeGroup(_)))
+                    ) =>
+                {
+                    if !in_instance
+                        || group.groups.len() >= MAX_GROUPS_PER_GROUP
+                        || group.child_order.len() >= MAX_SHAPES_PER_GROUP
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF nested shape group is misplaced or exceeds the safety limit"
+                                .to_string(),
+                        ));
                     }
-                    let nested = self
-                        .parse_shape_group_destination_at_depth(nesting_depth.saturating_add(1))?;
+                    saw_child = true;
+                    self.pos += 1;
+                    let nested = self.parse_shape_group_destination_at_depth(
+                        nesting_depth.saturating_add(1),
+                        false,
+                    )?;
                     group.add_group(nested);
                 },
+                Token::OpenBrace
+                    if self
+                        .nested_control_word()
+                        .is_some_and(|control| matches!(control, ControlWord::ShapeResult(_))) =>
+                {
+                    if in_instance || !root || !saw_instance || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shprslt may occur once after root shape-group shpinst".to_string(),
+                        ));
+                    }
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group shprslt destination must be starred".to_string(),
+                        ));
+                    }
+                    group.result = self.parse_shape_result()?;
+                    saw_result = true;
+                },
                 Token::OpenBrace => {
-                    depth += 1;
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape group contains a misplaced or unknown group".to_string(),
+                    ));
+                },
+                Token::CloseBrace if in_instance => {
+                    in_instance = false;
                     self.pos += 1;
                 },
-                Token::CloseBrace if depth == 0 => {
+                Token::CloseBrace => {
                     self.pos += 1;
                     closed = true;
                     break;
                 },
-                Token::CloseBrace => {
-                    depth -= 1;
-                    self.pos += 1;
-                },
                 Token::Control(ControlWord::ShapeLeft(value)) => {
+                    if saw_child || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group geometry must precede children".to_string(),
+                        ));
+                    }
                     group.geometry.x = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeTop(value)) => {
+                    if saw_child || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group geometry must precede children".to_string(),
+                        ));
+                    }
                     group.geometry.y = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeRight(value)) => {
+                    if saw_child || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group geometry must precede children".to_string(),
+                        ));
+                    }
                     right = Some(*value);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeBottom(value)) => {
+                    if saw_child || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group geometry must precede children".to_string(),
+                        ));
+                    }
                     bottom = Some(*value);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeWidth(value)) => {
+                    if saw_child || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group geometry must precede children".to_string(),
+                        ));
+                    }
                     group.geometry.width = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeHeight(value)) => {
+                    if saw_child || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group geometry must precede children".to_string(),
+                        ));
+                    }
                     group.geometry.height = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeRotation(value)) => {
+                    if saw_child || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group geometry must precede children".to_string(),
+                        ));
+                    }
                     group.geometry.rotation = *value;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeZOrder(value)) => {
+                    if saw_child || saw_result {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group geometry must precede children".to_string(),
+                        ));
+                    }
                     group.geometry.z_order = *value;
                     self.pos += 1;
                 },
-                _ => self.pos += 1,
+                Token::Control(ControlWord::PictureShapeId(Some(value)))
+                    if !saw_child && !saw_result =>
+                {
+                    group.info.push(crate::ShapeGroupInfo::ShapeId(*value));
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeWrap(value)) if !saw_child && !saw_result => {
+                    group.info.push(crate::ShapeGroupInfo::Wrap(*value));
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeBelowText(value)) if !saw_child && !saw_result => {
+                    group.info.push(crate::ShapeGroupInfo::BelowText(*value));
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeLockAnchor) if !saw_child && !saw_result => {
+                    group.info.push(crate::ShapeGroupInfo::LockAnchor);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::Unknown(name, parameter))
+                    if !saw_child && !saw_result =>
+                {
+                    let info = match (*name, *parameter) {
+                        ("shpfhdr", Some(value)) => crate::ShapeGroupInfo::InHeader(value != 0),
+                        ("shpbxpage", None) => crate::ShapeGroupInfo::HorizontalPage,
+                        ("shpbxmargin", None) => crate::ShapeGroupInfo::HorizontalMargin,
+                        ("shpbxcolumn", None) => crate::ShapeGroupInfo::HorizontalColumn,
+                        ("shpbxignore", None) => crate::ShapeGroupInfo::IgnoreHorizontal,
+                        ("shpbypage", None) => crate::ShapeGroupInfo::VerticalPage,
+                        ("shpbymargin", None) => crate::ShapeGroupInfo::VerticalMargin,
+                        ("shpbypara", None) => crate::ShapeGroupInfo::VerticalParagraph,
+                        ("shpbyignore", None) => crate::ShapeGroupInfo::IgnoreVertical,
+                        ("shpwrk", Some(value)) => crate::ShapeGroupInfo::WrapSide(value),
+                        _ => return Err(RtfError::MalformedDocument(
+                            "RTF shape group contains an unknown or malformed shape-info control"
+                                .to_string(),
+                        )),
+                    };
+                    if group.info.len() >= 32 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-group info count exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    group.info.push(info);
+                    self.pos += 1;
+                },
+                Token::Text(text) if text.chars().all(char::is_whitespace) => self.pos += 1,
+                Token::Binary(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape group cannot contain direct binary data".to_string(),
+                    ));
+                },
+                _ => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape group contains misplaced content".to_string(),
+                    ));
+                },
             }
         }
         if !closed {
             return Err(RtfError::UnexpectedEof);
+        }
+        if in_instance || !saw_instance {
+            return Err(RtfError::MalformedDocument(
+                "RTF shape group must contain exactly one starred shpinst".to_string(),
+            ));
         }
         if let Some(right) = right {
             group.geometry.width = right.saturating_sub(group.geometry.x);
@@ -9496,14 +18738,10 @@ impl<'a> Parser<'a> {
         if let Some(bottom) = bottom {
             group.geometry.height = bottom.saturating_sub(group.geometry.y);
         }
-        Ok(group)
-    }
-
-    fn nested_shape_control(&self) -> Option<ControlWord<'a>> {
-        match self.nested_control_word()? {
-            control @ (ControlWord::Shape | ControlWord::ShapeGroup) => Some(control),
-            _ => None,
+        if root {
+            group.validate()?;
         }
+        Ok(group)
     }
 
     fn nested_control_word(&self) -> Option<ControlWord<'a>> {
@@ -9646,6 +18884,16 @@ impl<'a> Parser<'a> {
                     })?;
                     let text_box = crate::LegacyTextBox {
                         text: Cow::Borrowed(self.arena.alloc_str(&text) as &str),
+                        shapes: std::mem::take(&mut builder.shapes)
+                            .into_iter()
+                            .map(|shape| shape)
+                            .collect(),
+                        shape_groups: std::mem::take(&mut builder.shape_groups)
+                            .into_iter()
+                            .map(|group| group)
+                            .collect(),
+                        drawing_order: std::mem::take(&mut builder.drawing_order),
+                        story_events: std::mem::take(&mut builder.story_events),
                         position: self.body_text_len,
                         horizontal_anchor: builder.horizontal_anchor,
                         vertical_anchor: builder.vertical_anchor,
@@ -9658,8 +18906,7 @@ impl<'a> Parser<'a> {
                         direction: builder.direction.unwrap_or_default(),
                     };
                     text_box.validate()?;
-                    if self.legacy_text_boxes.len()
-                        >= crate::legacy_text_box::MAX_LEGACY_TEXT_BOXES
+                    if self.legacy_text_boxes.len() >= crate::legacy_text_box::MAX_LEGACY_TEXT_BOXES
                     {
                         return Err(RtfError::MalformedDocument(
                             "RTF legacy text-box count exceeds the safety limit".to_string(),
@@ -9750,6 +18997,45 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace) => {
+                    if self.is_root_drawing_group() {
+                        let mut shapes = Vec::new();
+                        let mut groups = Vec::new();
+                        let mut order = Vec::new();
+                        self.parse_story_drawing_group(
+                            text.len(),
+                            &mut shapes,
+                            &mut groups,
+                            &mut order,
+                        )?;
+                        let shape_base = builder.shapes.len();
+                        let group_base = builder.shape_groups.len();
+                        builder
+                            .shapes
+                            .extend(shapes.into_iter().map(super::shape::Shape::into_owned));
+                        builder
+                            .shape_groups
+                            .extend(groups.into_iter().map(super::shape::ShapeGroup::into_owned));
+                        let order_start = builder.drawing_order.len();
+                        builder.drawing_order.extend(order.into_iter().map(
+                            |drawing| match drawing {
+                                crate::StoryDrawing::Shape(index) => {
+                                    crate::StoryDrawing::Shape(shape_base + index)
+                                },
+                                crate::StoryDrawing::ShapeGroup(index) => {
+                                    crate::StoryDrawing::ShapeGroup(group_base + index)
+                                },
+                            },
+                        ));
+                        builder.story_events.extend(
+                            builder
+                                .drawing_order
+                                .iter()
+                                .skip(order_start)
+                                .copied()
+                                .map(crate::StoryEvent::Drawing),
+                        );
+                        continue;
+                    }
                     if matches!(
                         self.tokens.get(self.pos + 1),
                         Some(Token::Control(ControlWord::IgnorableDestination))
@@ -9759,13 +19045,11 @@ impl<'a> Parser<'a> {
                             ControlWord::Field
                                 | ControlWord::Object
                                 | ControlWord::Picture
-                                | ControlWord::Shape
                                 | ControlWord::FormField
                         ))
                     ) {
                         return Err(RtfError::MalformedDocument(
-                            "RTF legacy text box contains an active nested destination"
-                                .to_string(),
+                            "RTF legacy text box contains an active nested destination".to_string(),
                         ));
                     }
                     depth += 1;
@@ -9791,6 +19075,13 @@ impl<'a> Parser<'a> {
                     text.push('\n');
                     self.pos += 1;
                 },
+                Some(Token::Control(ControlWord::Page(param))) => {
+                    require_parameterless(*param, "page")?;
+                    builder
+                        .story_events
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(text.len())));
+                    self.pos += 1;
+                },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     text.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
@@ -9799,7 +19090,7 @@ impl<'a> Parser<'a> {
                     ControlWord::Field
                     | ControlWord::Object
                     | ControlWord::Picture
-                    | ControlWord::Shape
+                    | ControlWord::Shape(_)
                     | ControlWord::FormField,
                 )) => {
                     return Err(RtfError::MalformedDocument(
@@ -9917,7 +19208,8 @@ impl<'a> Parser<'a> {
     }
 
     fn skip_legacy_whitespace(&mut self) {
-        while matches!(self.tokens.get(self.pos), Some(Token::Text(text)) if text.trim().is_empty()) {
+        while matches!(self.tokens.get(self.pos), Some(Token::Text(text)) if text.trim().is_empty())
+        {
             self.pos += 1;
         }
     }
@@ -9928,6 +19220,13 @@ impl<'a> Parser<'a> {
                 "RTF legacy drawing may occur only in the document body".to_string(),
             ));
         }
+        self.parse_legacy_drawing_at(self.body_text_len)
+    }
+
+    fn parse_legacy_drawing_at(
+        &mut self,
+        position: usize,
+    ) -> RtfResult<Option<crate::LegacyDrawing<'a>>> {
         self.pos += 2;
         let mut horizontal_anchor = None;
         let mut vertical_anchor = None;
@@ -9936,15 +19235,43 @@ impl<'a> Parser<'a> {
         loop {
             self.skip_legacy_whitespace();
             match self.tokens.get(self.pos) {
-                Some(Token::Control(ControlWord::LegacyAnchorXPage)) => Self::set_legacy_once(&mut horizontal_anchor, crate::LegacyHorizontalAnchor::Page, "horizontal anchor")?,
-                Some(Token::Control(ControlWord::LegacyAnchorXMargin)) => Self::set_legacy_once(&mut horizontal_anchor, crate::LegacyHorizontalAnchor::Margin, "horizontal anchor")?,
-                Some(Token::Control(ControlWord::LegacyAnchorXColumn)) => Self::set_legacy_once(&mut horizontal_anchor, crate::LegacyHorizontalAnchor::Column, "horizontal anchor")?,
-                Some(Token::Control(ControlWord::LegacyAnchorYPage)) => Self::set_legacy_once(&mut vertical_anchor, crate::LegacyVerticalAnchor::Page, "vertical anchor")?,
-                Some(Token::Control(ControlWord::LegacyAnchorYMargin)) => Self::set_legacy_once(&mut vertical_anchor, crate::LegacyVerticalAnchor::Margin, "vertical anchor")?,
-                Some(Token::Control(ControlWord::LegacyAnchorYParagraph)) => Self::set_legacy_once(&mut vertical_anchor, crate::LegacyVerticalAnchor::Paragraph, "vertical anchor")?,
-                Some(Token::Control(ControlWord::LegacyDrawingHeight(value))) => Self::set_legacy_once(&mut z_order, *value, "z-order")?,
+                Some(Token::Control(ControlWord::LegacyAnchorXPage)) => Self::set_legacy_once(
+                    &mut horizontal_anchor,
+                    crate::LegacyHorizontalAnchor::Page,
+                    "horizontal anchor",
+                )?,
+                Some(Token::Control(ControlWord::LegacyAnchorXMargin)) => Self::set_legacy_once(
+                    &mut horizontal_anchor,
+                    crate::LegacyHorizontalAnchor::Margin,
+                    "horizontal anchor",
+                )?,
+                Some(Token::Control(ControlWord::LegacyAnchorXColumn)) => Self::set_legacy_once(
+                    &mut horizontal_anchor,
+                    crate::LegacyHorizontalAnchor::Column,
+                    "horizontal anchor",
+                )?,
+                Some(Token::Control(ControlWord::LegacyAnchorYPage)) => Self::set_legacy_once(
+                    &mut vertical_anchor,
+                    crate::LegacyVerticalAnchor::Page,
+                    "vertical anchor",
+                )?,
+                Some(Token::Control(ControlWord::LegacyAnchorYMargin)) => Self::set_legacy_once(
+                    &mut vertical_anchor,
+                    crate::LegacyVerticalAnchor::Margin,
+                    "vertical anchor",
+                )?,
+                Some(Token::Control(ControlWord::LegacyAnchorYParagraph)) => Self::set_legacy_once(
+                    &mut vertical_anchor,
+                    crate::LegacyVerticalAnchor::Paragraph,
+                    "vertical anchor",
+                )?,
+                Some(Token::Control(ControlWord::LegacyDrawingHeight(value))) => {
+                    Self::set_legacy_once(&mut z_order, *value, "z-order")?
+                },
                 Some(Token::Control(ControlWord::LegacyDrawingLock)) => {
-                    if locked { return Err(Self::legacy_error("duplicate dolock")); }
+                    if locked {
+                        return Err(Self::legacy_error("duplicate dolock"));
+                    }
                     locked = true;
                 },
                 Some(Token::Control(control)) if Self::legacy_primitive_start(control) => break,
@@ -9952,7 +19279,9 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     return Ok(None);
                 },
-                Some(_) => return Err(Self::legacy_error("invalid or out-of-order dohead control")),
+                Some(_) => {
+                    return Err(Self::legacy_error("invalid or out-of-order dohead control"));
+                },
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
@@ -9964,16 +19293,20 @@ impl<'a> Parser<'a> {
         }
         self.pos += 1;
         let drawing = crate::LegacyDrawing {
-            position: self.body_text_len,
-            horizontal_anchor: horizontal_anchor.ok_or_else(|| Self::legacy_error("missing horizontal anchor"))?,
-            vertical_anchor: vertical_anchor.ok_or_else(|| Self::legacy_error("missing vertical anchor"))?,
+            position,
+            horizontal_anchor: horizontal_anchor
+                .ok_or_else(|| Self::legacy_error("missing horizontal anchor"))?,
+            vertical_anchor: vertical_anchor
+                .ok_or_else(|| Self::legacy_error("missing vertical anchor"))?,
             z_order: z_order.ok_or_else(|| Self::legacy_error("missing dodhgt"))?,
             locked,
             primitive,
         };
         drawing.validate()?;
         if self.legacy_drawings.len() >= crate::MAX_LEGACY_DRAWINGS {
-            return Err(Self::legacy_error("top-level count exceeds the safety limit"));
+            return Err(Self::legacy_error(
+                "top-level count exceeds the safety limit",
+            ));
         }
         Ok(Some(drawing))
     }
@@ -9991,42 +19324,77 @@ impl<'a> Parser<'a> {
 
     fn parse_legacy_geometry(&mut self) -> RtfResult<crate::LegacyDrawingGeometry> {
         self.skip_legacy_whitespace();
-        let x = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingX(value))) => *value, _ => return Err(Self::legacy_error("geometry must begin with dpx")) };
+        let x = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacyDrawingX(value))) => *value,
+            _ => return Err(Self::legacy_error("geometry must begin with dpx")),
+        };
         self.pos += 1;
         self.skip_legacy_whitespace();
-        let y = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingY(value))) => *value, _ => return Err(Self::legacy_error("dpx must be followed by dpy")) };
+        let y = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacyDrawingY(value))) => *value,
+            _ => return Err(Self::legacy_error("dpx must be followed by dpy")),
+        };
         self.pos += 1;
         self.skip_legacy_whitespace();
-        let width = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingWidth(value))) => *value, _ => return Err(Self::legacy_error("dpy must be followed by dpxsize")) };
+        let width = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacyDrawingWidth(value))) => *value,
+            _ => return Err(Self::legacy_error("dpy must be followed by dpxsize")),
+        };
         self.pos += 1;
         self.skip_legacy_whitespace();
-        let height = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingHeightSize(value))) => *value, _ => return Err(Self::legacy_error("dpxsize must be followed by dpysize")) };
+        let height = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacyDrawingHeightSize(value))) => *value,
+            _ => return Err(Self::legacy_error("dpxsize must be followed by dpysize")),
+        };
         self.pos += 1;
-        let geometry = crate::LegacyDrawingGeometry { x, y, width, height };
+        let geometry = crate::LegacyDrawingGeometry {
+            x,
+            y,
+            width,
+            height,
+        };
         geometry.validate()?;
         Ok(geometry)
     }
 
     fn parse_legacy_point(&mut self) -> RtfResult<crate::LegacyDrawingPoint> {
         self.skip_legacy_whitespace();
-        let x = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingPointX(value))) => *value, _ => return Err(Self::legacy_error("point must begin with dpptx")) };
+        let x = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacyDrawingPointX(value))) => *value,
+            _ => return Err(Self::legacy_error("point must begin with dpptx")),
+        };
         self.pos += 1;
         self.skip_legacy_whitespace();
-        let y = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingPointY(value))) => *value, _ => return Err(Self::legacy_error("dpptx must be followed by dppty")) };
+        let y = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacyDrawingPointY(value))) => *value,
+            _ => return Err(Self::legacy_error("dpptx must be followed by dppty")),
+        };
         self.pos += 1;
         Ok(crate::LegacyDrawingPoint { x, y })
     }
 
-    fn parse_legacy_primitive(&mut self, depth: usize) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+    fn parse_legacy_primitive(
+        &mut self,
+        depth: usize,
+    ) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
         if depth > crate::MAX_LEGACY_DRAWING_DEPTH {
             return Err(Self::legacy_error("nesting exceeds the safety limit"));
         }
-        self.legacy_drawing_primitives = self.legacy_drawing_primitives.checked_add(1).ok_or_else(|| Self::legacy_error("primitive count overflow"))?;
+        self.legacy_drawing_primitives = self
+            .legacy_drawing_primitives
+            .checked_add(1)
+            .ok_or_else(|| Self::legacy_error("primitive count overflow"))?;
         if self.legacy_drawing_primitives > crate::MAX_LEGACY_DRAWING_PRIMITIVES {
-            return Err(Self::legacy_error("primitive count exceeds the safety limit"));
+            return Err(Self::legacy_error(
+                "primitive count exceeds the safety limit",
+            ));
         }
         self.skip_legacy_whitespace();
-        let control = self.tokens.get(self.pos).cloned().ok_or(RtfError::UnexpectedEof)?;
+        let control = self
+            .tokens
+            .get(self.pos)
+            .cloned()
+            .ok_or(RtfError::UnexpectedEof)?;
         self.pos += 1;
         match control {
             Token::Control(ControlWord::LegacyDrawingGroup) => self.parse_legacy_group(depth),
@@ -10034,21 +19402,42 @@ impl<'a> Parser<'a> {
             Token::Control(ControlWord::LegacyDrawingLine) => {
                 let start = self.parse_legacy_point()?;
                 let end = self.parse_legacy_point()?;
-                let (geometry, properties, _) = self.parse_legacy_simple_tail(LegacySimpleKind::Line)?;
-                Ok(crate::LegacyDrawingPrimitive::Line { start, end, geometry, properties })
+                let (geometry, properties, _) =
+                    self.parse_legacy_simple_tail(LegacySimpleKind::Line)?;
+                Ok(crate::LegacyDrawingPrimitive::Line {
+                    start,
+                    end,
+                    geometry,
+                    properties,
+                })
             },
             Token::Control(ControlWord::LegacyDrawingRectangle) => {
-                let (geometry, properties, rounded) = self.parse_legacy_simple_tail(LegacySimpleKind::Rectangle)?;
-                Ok(crate::LegacyDrawingPrimitive::Rectangle { rounded: rounded != 0, geometry, properties })
+                let (geometry, properties, rounded) =
+                    self.parse_legacy_simple_tail(LegacySimpleKind::Rectangle)?;
+                Ok(crate::LegacyDrawingPrimitive::Rectangle {
+                    rounded: rounded != 0,
+                    geometry,
+                    properties,
+                })
             },
             Token::Control(ControlWord::LegacyDrawingEllipse) => {
-                let (geometry, properties, _) = self.parse_legacy_simple_tail(LegacySimpleKind::Ellipse)?;
-                Ok(crate::LegacyDrawingPrimitive::Ellipse { geometry, properties })
+                let (geometry, properties, _) =
+                    self.parse_legacy_simple_tail(LegacySimpleKind::Ellipse)?;
+                Ok(crate::LegacyDrawingPrimitive::Ellipse {
+                    geometry,
+                    properties,
+                })
             },
             Token::Control(ControlWord::LegacyDrawingPolyline) => self.parse_legacy_polyline(),
             Token::Control(ControlWord::LegacyDrawingArc) => {
-                let (geometry, properties, flags) = self.parse_legacy_simple_tail(LegacySimpleKind::Arc)?;
-                Ok(crate::LegacyDrawingPrimitive::Arc { flip_x: flags & 1 != 0, flip_y: flags & 2 != 0, geometry, properties })
+                let (geometry, properties, flags) =
+                    self.parse_legacy_simple_tail(LegacySimpleKind::Arc)?;
+                Ok(crate::LegacyDrawingPrimitive::Arc {
+                    flip_x: flags & 1 != 0,
+                    flip_y: flags & 2 != 0,
+                    geometry,
+                    properties,
+                })
             },
             Token::Control(ControlWord::LegacyTextBox) => self.parse_nested_legacy_text_box(),
             _ => Err(Self::legacy_error("expected a drawing primitive")),
@@ -10058,7 +19447,9 @@ impl<'a> Parser<'a> {
     fn parse_legacy_group(&mut self, depth: usize) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
         self.skip_legacy_whitespace();
         let declared = match self.tokens.get(self.pos) {
-            Some(Token::Control(ControlWord::LegacyDrawingCount(value))) if *value > 0 => usize::try_from(*value).map_err(|_| Self::legacy_error("invalid dpcount"))?,
+            Some(Token::Control(ControlWord::LegacyDrawingCount(value))) if *value > 0 => {
+                usize::try_from(*value).map_err(|_| Self::legacy_error("invalid dpcount"))?
+            },
             _ => return Err(Self::legacy_error("dpgroup lacks positive dpcount")),
         };
         self.pos += 1;
@@ -10067,8 +19458,13 @@ impl<'a> Parser<'a> {
         loop {
             self.skip_legacy_whitespace();
             match self.tokens.get(self.pos) {
-                Some(Token::Control(ControlWord::LegacyDrawingEndGroup)) => { self.pos += 1; break; },
-                Some(Token::Control(control)) if Self::legacy_primitive_start(control) => children.push(self.parse_legacy_primitive(depth + 1)?),
+                Some(Token::Control(ControlWord::LegacyDrawingEndGroup)) => {
+                    self.pos += 1;
+                    break;
+                },
+                Some(Token::Control(control)) if Self::legacy_primitive_start(control) => {
+                    children.push(self.parse_legacy_primitive(depth + 1)?)
+                },
                 Some(_) => return Err(Self::legacy_error("invalid content in dpgroup")),
                 None => return Err(RtfError::UnexpectedEof),
             }
@@ -10077,44 +19473,129 @@ impl<'a> Parser<'a> {
             return Err(Self::legacy_error("dpcount does not match group children"));
         }
         let end_geometry = self.parse_legacy_geometry()?;
-        Ok(crate::LegacyDrawingPrimitive::Group { geometry, children, end_geometry })
+        Ok(crate::LegacyDrawingPrimitive::Group {
+            geometry,
+            children,
+            end_geometry,
+        })
     }
 
     fn parse_legacy_polyline(&mut self) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
         self.skip_legacy_whitespace();
-        let closed = if matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::LegacyDrawingPolygon))) { self.pos += 1; true } else { false };
+        let closed = if matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::LegacyDrawingPolygon))
+        ) {
+            self.pos += 1;
+            true
+        } else {
+            false
+        };
         self.skip_legacy_whitespace();
         let count = match self.tokens.get(self.pos) {
-            Some(Token::Control(ControlWord::LegacyDrawingCount(value))) => usize::try_from(*value).map_err(|_| Self::legacy_error("invalid polyline point count"))?,
+            Some(Token::Control(ControlWord::LegacyDrawingCount(value))) => usize::try_from(*value)
+                .map_err(|_| Self::legacy_error("invalid polyline point count"))?,
             _ => return Err(Self::legacy_error("dppolyline lacks dppolycount")),
         };
-        if count == 0 || count > crate::MAX_LEGACY_DRAWING_POINTS { return Err(Self::legacy_error("polyline point count exceeds the safety limit")); }
+        if count == 0 || count > crate::MAX_LEGACY_DRAWING_POINTS {
+            return Err(Self::legacy_error(
+                "polyline point count exceeds the safety limit",
+            ));
+        }
         self.pos += 1;
         let mut points = Vec::with_capacity(count);
-        for _ in 0..count { points.push(self.parse_legacy_point()?); }
-        self.legacy_drawing_points = self.legacy_drawing_points.checked_add(count).ok_or_else(|| Self::legacy_error("point count overflow"))?;
-        if self.legacy_drawing_points > crate::MAX_LEGACY_DRAWING_TOTAL_POINTS { return Err(Self::legacy_error("aggregate point count exceeds the safety limit")); }
-        let (geometry, properties, _) = self.parse_legacy_simple_tail(LegacySimpleKind::Polyline)?;
-        Ok(crate::LegacyDrawingPrimitive::Polyline { closed, points, geometry, properties })
+        for _ in 0..count {
+            points.push(self.parse_legacy_point()?);
+        }
+        self.legacy_drawing_points = self
+            .legacy_drawing_points
+            .checked_add(count)
+            .ok_or_else(|| Self::legacy_error("point count overflow"))?;
+        if self.legacy_drawing_points > crate::MAX_LEGACY_DRAWING_TOTAL_POINTS {
+            return Err(Self::legacy_error(
+                "aggregate point count exceeds the safety limit",
+            ));
+        }
+        let (geometry, properties, _) =
+            self.parse_legacy_simple_tail(LegacySimpleKind::Polyline)?;
+        Ok(crate::LegacyDrawingPrimitive::Polyline {
+            closed,
+            points,
+            geometry,
+            properties,
+        })
     }
 
     fn parse_nested_legacy_text_box(&mut self) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
         let mut margin = None;
         let mut direction = None;
         let mut text = None;
+        let mut shapes = Vec::new();
+        let mut shape_groups = Vec::new();
+        let mut drawing_order = Vec::new();
+        let mut story_events = Vec::new();
         loop {
             self.skip_legacy_whitespace();
             match self.tokens.get(self.pos) {
-                Some(Token::Control(ControlWord::LegacyTextBoxMargin(value))) => { Self::set_legacy_once(&mut margin, *value, "text-box margin")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyTextLeftRightTopBottom)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::LeftToRightTopToBottom, "text direction")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyTextLeftRightTopBottomVertical)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::LeftToRightTopToBottomVertical, "text direction")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyTextTopBottomRightLeft)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::TopToBottomRightToLeft, "text direction")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyTextTopBottomRightLeftVertical)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::TopToBottomRightToLeftVertical, "text direction")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyTextBottomTopLeftRight)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::BottomToTopLeftToRight, "text direction")?; self.pos += 1; },
-                Some(Token::OpenBrace) if matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::LegacyTextBoxText))) => {
-                    if text.is_some() { return Err(Self::legacy_error("duplicate dptxbxtext")); }
+                Some(Token::Control(ControlWord::LegacyTextBoxMargin(value))) => {
+                    Self::set_legacy_once(&mut margin, *value, "text-box margin")?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyTextLeftRightTopBottom)) => {
+                    Self::set_legacy_once(
+                        &mut direction,
+                        crate::LegacyTextDirection::LeftToRightTopToBottom,
+                        "text direction",
+                    )?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyTextLeftRightTopBottomVertical)) => {
+                    Self::set_legacy_once(
+                        &mut direction,
+                        crate::LegacyTextDirection::LeftToRightTopToBottomVertical,
+                        "text direction",
+                    )?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyTextTopBottomRightLeft)) => {
+                    Self::set_legacy_once(
+                        &mut direction,
+                        crate::LegacyTextDirection::TopToBottomRightToLeft,
+                        "text direction",
+                    )?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyTextTopBottomRightLeftVertical)) => {
+                    Self::set_legacy_once(
+                        &mut direction,
+                        crate::LegacyTextDirection::TopToBottomRightToLeftVertical,
+                        "text direction",
+                    )?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyTextBottomTopLeftRight)) => {
+                    Self::set_legacy_once(
+                        &mut direction,
+                        crate::LegacyTextDirection::BottomToTopLeftToRight,
+                        "text direction",
+                    )?;
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::LegacyTextBoxText))
+                    ) =>
+                {
+                    if text.is_some() {
+                        return Err(Self::legacy_error("duplicate dptxbxtext"));
+                    }
                     let mut dummy = LegacyTextBoxBuilder::default();
                     text = Some(self.parse_legacy_text_box_text(&mut dummy)?);
+                    shapes = dummy.shapes;
+                    shape_groups = dummy.shape_groups;
+                    drawing_order = dummy.drawing_order;
+                    story_events = dummy.story_events;
                 },
                 _ => break,
             }
@@ -10122,66 +19603,189 @@ impl<'a> Parser<'a> {
         let geometry = self.parse_legacy_geometry()?;
         let properties = self.parse_legacy_properties_until_boundary()?;
         let text = text.ok_or_else(|| Self::legacy_error("text box lacks dptxbxtext"))?;
-        self.legacy_text_box_text_bytes = self.legacy_text_box_text_bytes.checked_add(text.len()).ok_or_else(|| Self::legacy_error("text-box text size overflow"))?;
-        if self.legacy_text_box_text_bytes > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_TOTAL_BYTES { return Err(Self::legacy_error("text-box text exceeds aggregate safety limit")); }
+        self.legacy_text_box_text_bytes =
+            self.legacy_text_box_text_bytes
+                .checked_add(text.len())
+                .ok_or_else(|| Self::legacy_error("text-box text size overflow"))?;
+        if self.legacy_text_box_text_bytes > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_TOTAL_BYTES
+        {
+            return Err(Self::legacy_error(
+                "text-box text exceeds aggregate safety limit",
+            ));
+        }
         let text_box = crate::LegacyTextBox {
             text: Cow::Borrowed(self.arena.alloc_str(&text)),
+            shapes,
+            shape_groups,
+            drawing_order,
+            story_events,
             position: self.body_text_len,
             horizontal_anchor: None,
             vertical_anchor: None,
-            x: Some(geometry.x), y: Some(geometry.y), width: Some(geometry.width), height: Some(geometry.height),
+            x: Some(geometry.x),
+            y: Some(geometry.y),
+            width: Some(geometry.width),
+            height: Some(geometry.height),
             margin,
             z_order: None,
             direction: direction.unwrap_or_default(),
         };
         text_box.validate()?;
-        Ok(crate::LegacyDrawingPrimitive::TextBox { text_box, properties })
+        Ok(crate::LegacyDrawingPrimitive::TextBox {
+            text_box,
+            properties,
+        })
     }
 
-    fn parse_legacy_callout(&mut self, depth: usize) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
-        let mut callout_type = None; let mut angle = None; let mut attachment = None; let mut descent = None;
-        let mut accent = false; let mut smart_attach = false; let mut best_fit = false; let mut minus_x = false; let mut minus_y = false; let mut border = false;
-        let mut offset = None; let mut length = None;
+    fn parse_legacy_callout(
+        &mut self,
+        depth: usize,
+    ) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+        let mut callout_type = None;
+        let mut angle = None;
+        let mut attachment = None;
+        let mut descent = None;
+        let mut accent = false;
+        let mut smart_attach = false;
+        let mut best_fit = false;
+        let mut minus_x = false;
+        let mut minus_y = false;
+        let mut border = false;
+        let mut offset = None;
+        let mut length = None;
         loop {
             self.skip_legacy_whitespace();
             match self.tokens.get(self.pos) {
-                Some(Token::Control(ControlWord::LegacyCalloutType(value))) => { Self::set_legacy_once(&mut callout_type, *value, "callout type")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyCalloutAngle(value))) => { let value = u8::try_from(*value).map_err(|_| Self::legacy_error("invalid callout angle"))?; if !matches!(value, 0|30|45|60|90) { return Err(Self::legacy_error("invalid callout angle")); } Self::set_legacy_once(&mut angle, value, "callout angle")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyCalloutAttachment(value))) => { Self::set_legacy_once(&mut attachment, *value, "callout attachment")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyCalloutDescent(value))) => { Self::set_legacy_once(&mut descent, *value, "callout descent")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyCalloutOffset(value))) => { Self::set_legacy_once(&mut offset, *value, "callout offset")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyCalloutLength(value))) => { Self::set_legacy_once(&mut length, *value, "callout length")?; self.pos += 1; },
-                Some(Token::Control(ControlWord::LegacyCalloutAccent)) if !accent => { accent=true; self.pos+=1; },
-                Some(Token::Control(ControlWord::LegacyCalloutSmartAttach)) if !smart_attach => { smart_attach=true; self.pos+=1; },
-                Some(Token::Control(ControlWord::LegacyCalloutBestFit)) if !best_fit => { best_fit=true; self.pos+=1; },
-                Some(Token::Control(ControlWord::LegacyCalloutMinusX)) if !minus_x => { minus_x=true; self.pos+=1; },
-                Some(Token::Control(ControlWord::LegacyCalloutMinusY)) if !minus_y => { minus_y=true; self.pos+=1; },
-                Some(Token::Control(ControlWord::LegacyCalloutBorder)) if !border => { border=true; self.pos+=1; },
+                Some(Token::Control(ControlWord::LegacyCalloutType(value))) => {
+                    Self::set_legacy_once(&mut callout_type, *value, "callout type")?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutAngle(value))) => {
+                    let value = u8::try_from(*value)
+                        .map_err(|_| Self::legacy_error("invalid callout angle"))?;
+                    if !matches!(value, 0 | 30 | 45 | 60 | 90) {
+                        return Err(Self::legacy_error("invalid callout angle"));
+                    }
+                    Self::set_legacy_once(&mut angle, value, "callout angle")?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutAttachment(value))) => {
+                    Self::set_legacy_once(&mut attachment, *value, "callout attachment")?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutDescent(value))) => {
+                    Self::set_legacy_once(&mut descent, *value, "callout descent")?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutOffset(value))) => {
+                    Self::set_legacy_once(&mut offset, *value, "callout offset")?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutLength(value))) => {
+                    Self::set_legacy_once(&mut length, *value, "callout length")?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutAccent)) if !accent => {
+                    accent = true;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutSmartAttach)) if !smart_attach => {
+                    smart_attach = true;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutBestFit)) if !best_fit => {
+                    best_fit = true;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutMinusX)) if !minus_x => {
+                    minus_x = true;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutMinusY)) if !minus_y => {
+                    minus_y = true;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::LegacyCalloutBorder)) if !border => {
+                    border = true;
+                    self.pos += 1;
+                },
                 _ => break,
             }
         }
         let geometry = self.parse_legacy_geometry()?;
         self.skip_legacy_whitespace();
-        if !matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::LegacyDrawingPolyline))) { return Err(Self::legacy_error("callout lacks polyline")); }
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::LegacyDrawingPolyline))
+        ) {
+            return Err(Self::legacy_error("callout lacks polyline"));
+        }
         let polyline = Box::new(self.parse_legacy_primitive(depth + 1)?);
         self.skip_legacy_whitespace();
-        if !matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::LegacyTextBox))) { return Err(Self::legacy_error("callout lacks trailing text box")); }
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::LegacyTextBox))
+        ) {
+            return Err(Self::legacy_error("callout lacks trailing text box"));
+        }
         let text_box = Box::new(self.parse_legacy_primitive(depth + 1)?);
         let properties = self.parse_legacy_properties_until_boundary()?;
-        Ok(crate::LegacyDrawingPrimitive::Callout(crate::LegacyCallout {
-            callout_type: callout_type.ok_or_else(|| Self::legacy_error("callout lacks type"))?, angle, accent, smart_attach, best_fit, minus_x, minus_y, border, attachment, descent,
-            offset: offset.ok_or_else(|| Self::legacy_error("callout lacks offset"))?, length: length.ok_or_else(|| Self::legacy_error("callout lacks length"))?, polyline, text_box, geometry, properties,
-        }))
+        Ok(crate::LegacyDrawingPrimitive::Callout(
+            crate::LegacyCallout {
+                callout_type: callout_type
+                    .ok_or_else(|| Self::legacy_error("callout lacks type"))?,
+                angle,
+                accent,
+                smart_attach,
+                best_fit,
+                minus_x,
+                minus_y,
+                border,
+                attachment,
+                descent,
+                offset: offset.ok_or_else(|| Self::legacy_error("callout lacks offset"))?,
+                length: length.ok_or_else(|| Self::legacy_error("callout lacks length"))?,
+                polyline,
+                text_box,
+                geometry,
+                properties,
+            },
+        ))
     }
 
-    fn parse_legacy_simple_tail(&mut self, kind: LegacySimpleKind) -> RtfResult<(crate::LegacyDrawingGeometry, crate::LegacyDrawingProperties, u8)> {
+    fn parse_legacy_simple_tail(
+        &mut self,
+        kind: LegacySimpleKind,
+    ) -> RtfResult<(
+        crate::LegacyDrawingGeometry,
+        crate::LegacyDrawingProperties,
+        u8,
+    )> {
         let mut flags = 0u8;
         loop {
             self.skip_legacy_whitespace();
             match (kind, self.tokens.get(self.pos)) {
-                (LegacySimpleKind::Rectangle, Some(Token::Control(ControlWord::LegacyDrawingRoundRectangle))) if flags == 0 => { flags=1; self.pos+=1; },
-                (LegacySimpleKind::Arc, Some(Token::Control(ControlWord::LegacyDrawingArcFlipX))) if flags & 1 == 0 => { flags|=1; self.pos+=1; },
-                (LegacySimpleKind::Arc, Some(Token::Control(ControlWord::LegacyDrawingArcFlipY))) if flags & 2 == 0 => { flags|=2; self.pos+=1; },
+                (
+                    LegacySimpleKind::Rectangle,
+                    Some(Token::Control(ControlWord::LegacyDrawingRoundRectangle)),
+                ) if flags == 0 => {
+                    flags = 1;
+                    self.pos += 1;
+                },
+                (
+                    LegacySimpleKind::Arc,
+                    Some(Token::Control(ControlWord::LegacyDrawingArcFlipX)),
+                ) if flags & 1 == 0 => {
+                    flags |= 1;
+                    self.pos += 1;
+                },
+                (
+                    LegacySimpleKind::Arc,
+                    Some(Token::Control(ControlWord::LegacyDrawingArcFlipY)),
+                ) if flags & 2 == 0 => {
+                    flags |= 2;
+                    self.pos += 1;
+                },
                 _ => break,
             }
         }
@@ -10190,16 +19794,115 @@ impl<'a> Parser<'a> {
         Ok((geometry, properties, flags))
     }
 
-    fn parse_legacy_properties_until_boundary(&mut self) -> RtfResult<crate::LegacyDrawingProperties> {
+    fn parse_legacy_properties_until_boundary(
+        &mut self,
+    ) -> RtfResult<crate::LegacyDrawingProperties> {
         let mut builder = LegacyPropertiesBuilder::default();
         loop {
             self.skip_legacy_whitespace();
-            let Some(Token::Control(control)) = self.tokens.get(self.pos) else { break };
-            if Self::legacy_primitive_start(control) || matches!(control, ControlWord::LegacyDrawingEndGroup) { break; }
-            if !builder.apply(control)? { break; }
+            let Some(Token::Control(control)) = self.tokens.get(self.pos) else {
+                break;
+            };
+            if Self::legacy_primitive_start(control)
+                || matches!(control, ControlWord::LegacyDrawingEndGroup)
+            {
+                break;
+            }
+            if !builder.apply(control)? {
+                break;
+            }
             self.pos += 1;
         }
         builder.finish()
+    }
+
+    /// Parse picture/image content.
+    fn parse_body_picture_compatibility(
+        &mut self,
+        kind: crate::PictureCompatibilityKind,
+        starred: bool,
+    ) -> RtfResult<()> {
+        if self.current_state()?.destination != Destination::DocumentBody {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture-compatibility wrapper must occur in document body text".to_string(),
+            ));
+        }
+        if self.picture_compatibility_records.len() >= crate::MAX_PICTURE_COMPATIBILITY_RECORDS {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture-compatibility record count exceeds the safety limit".to_string(),
+            ));
+        }
+        self.pos += if starred { 2 } else { 1 };
+        while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
+            if !text.chars().all(char::is_whitespace) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF picture-compatibility wrapper contains text outside pict".to_string(),
+                ));
+            }
+            self.pos += 1;
+        }
+        if !matches!(
+            self.tokens.get(self.pos..self.pos + 2),
+            Some([Token::OpenBrace, Token::Control(ControlWord::Picture)])
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture-compatibility wrapper must contain exactly one pict destination"
+                    .to_string(),
+            ));
+        }
+        self.pos += 1;
+        let picture_index = self.pictures.len();
+        self.parse_picture()?;
+        if self.pictures.len() != picture_index + 1 {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture-compatibility payload cannot be empty".to_string(),
+            ));
+        }
+        if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture-compatibility pict destination is not closed".to_string(),
+            ));
+        }
+        self.pos += 1;
+        while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
+            if !text.chars().all(char::is_whitespace) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF picture-compatibility wrapper contains trailing text".to_string(),
+                ));
+            }
+            self.pos += 1;
+        }
+        if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture-compatibility wrapper must contain exactly one pict destination"
+                    .to_string(),
+            ));
+        }
+        self.pos += 1;
+        if self
+            .picture_compatibility_records
+            .last()
+            .is_some_and(|record| {
+                record.position > self.body_text_len
+                    || (record.position == self.body_text_len && record.kind == kind)
+            })
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture-compatibility wrappers are duplicated or out of body order"
+                    .to_string(),
+            ));
+        }
+        let index = self.picture_compatibility_records.len();
+        self.picture_compatibility_records
+            .push(crate::PictureCompatibilityRecord {
+                position: self.body_text_len,
+                kind,
+                picture_index,
+            });
+        self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+            crate::BodyStoryEvent::PictureCompatibility(index),
+        ));
+        Ok(())
     }
 
     /// Parse picture/image content.
@@ -10207,6 +19910,7 @@ impl<'a> Parser<'a> {
     /// Pictures in RTF have the format:
     /// {\pict\emfblip\picw<width>\pich<height>...<hex data>}
     fn parse_picture(&mut self) -> RtfResult<()> {
+        let shape_properties = self.scan_picture_shape_properties()?;
         self.pos += 1; // Skip \pict
 
         let mut image_type = super::picture::ImageType::Unknown;
@@ -10216,6 +19920,9 @@ impl<'a> Parser<'a> {
         let mut goal_height = None;
         let mut scale_x = None;
         let mut scale_y = None;
+        let mut scaled = false;
+        let mut crop = crate::PictureCrop::default();
+        let mut bitmap = crate::PictureBitmapMetadata::default();
         let mut blip_tag = None;
         let mut blip_upi = None;
         let mut blip_uid = None;
@@ -10240,8 +19947,10 @@ impl<'a> Parser<'a> {
                         ControlWord::Wmetafile(_) | ControlWord::Pmmetafile(_) => {
                             image_type = super::picture::ImageType::Wmf
                         },
-                        ControlWord::Dibitmap(_) | ControlWord::Wbitmap(_) => {
-                            image_type = super::picture::ImageType::Dib
+                        ControlWord::Dibitmap(_) => image_type = super::picture::ImageType::Dib,
+                        ControlWord::Wbitmap(_) => {
+                            image_type = super::picture::ImageType::Dib;
+                            bitmap.windows_bitmap = true;
                         },
                         ControlWord::PictureWidth(w) => width = Some(*w),
                         ControlWord::PictureHeight(h) => height = Some(*h),
@@ -10249,6 +19958,92 @@ impl<'a> Parser<'a> {
                         ControlWord::PictureGoalHeight(h) => goal_height = Some(*h),
                         ControlWord::PictureScaleX(s) => scale_x = Some(*s),
                         ControlWord::PictureScaleY(s) => scale_y = Some(*s),
+                        ControlWord::PictureScaled(parameter) => {
+                            if data_started || scaled || parameter.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF picscaled is duplicated, parameterized, or late"
+                                        .to_string(),
+                                ));
+                            }
+                            scaled = true;
+                        },
+                        ControlWord::PictureBitmap(parameter) => {
+                            if data_started || bitmap.bitmap_source || parameter.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF picbmp is duplicated, parameterized, or late".to_string(),
+                                ));
+                            }
+                            bitmap.bitmap_source = true;
+                        },
+                        ControlWord::PictureBitsPerPixel(value) => {
+                            if data_started || bitmap.bits_per_pixel.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF picbpp is duplicated or late".to_string(),
+                                ));
+                            }
+                            bitmap.bits_per_pixel =
+                                Some(Self::positive_picture_u16(*value, "picbpp")?);
+                        },
+                        ControlWord::WindowsBitmapBitsPerPixel(value) => {
+                            if data_started || bitmap.windows_bits_per_pixel.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF wbmbitspixel is duplicated or late".to_string(),
+                                ));
+                            }
+                            bitmap.windows_bits_per_pixel =
+                                Some(Self::positive_picture_u16(*value, "wbmbitspixel")?);
+                        },
+                        ControlWord::WindowsBitmapPlanes(value) => {
+                            if data_started || bitmap.planes.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF wbmplanes is duplicated or late".to_string(),
+                                ));
+                            }
+                            bitmap.planes = Some(Self::positive_picture_u16(*value, "wbmplanes")?);
+                        },
+                        ControlWord::WindowsBitmapWidthBytes(value) => {
+                            if data_started || bitmap.width_bytes.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF wbmwidthbytes is duplicated or late".to_string(),
+                                ));
+                            }
+                            let value = value.ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF wbmwidthbytes requires a parameter".to_string(),
+                                )
+                            })?;
+                            bitmap.width_bytes = Some(
+                                u32::try_from(value)
+                                    .ok()
+                                    .filter(|value| *value != 0)
+                                    .ok_or_else(|| {
+                                        RtfError::MalformedDocument(
+                                            "RTF wbmwidthbytes must be positive".to_string(),
+                                        )
+                                    })?,
+                            );
+                        },
+                        ControlWord::PictureCropLeft(value) => Self::set_picture_crop(
+                            &mut crop.left,
+                            *value,
+                            data_started,
+                            "piccropl",
+                        )?,
+                        ControlWord::PictureCropRight(value) => Self::set_picture_crop(
+                            &mut crop.right,
+                            *value,
+                            data_started,
+                            "piccropr",
+                        )?,
+                        ControlWord::PictureCropTop(value) => {
+                            Self::set_picture_crop(&mut crop.top, *value, data_started, "piccropt")?
+                        },
+                        ControlWord::PictureCropBottom(value) => Self::set_picture_crop(
+                            &mut crop.bottom,
+                            *value,
+                            data_started,
+                            "piccropb",
+                        )?,
                         ControlWord::BlipTag(value) => {
                             if data_started || blip_tag.is_some() || identity_stage > 1 {
                                 return Err(RtfError::MalformedDocument(
@@ -10373,22 +20168,375 @@ impl<'a> Parser<'a> {
             picture.goal_height = goal_height;
             picture.scale_x = scale_x;
             picture.scale_y = scale_y;
+            picture.scaled = scaled;
+            picture.crop = crop;
+            picture.bitmap = bitmap;
             if blip_tag.is_some() || blip_upi.is_some() || blip_uid.is_some() {
                 let identity = super::picture::PictureIdentity {
                     tag: blip_tag,
                     units_per_inch: blip_upi,
-                    uid: blip_uid.map(|uid| {
-                        Cow::Borrowed(self.arena.alloc_slice_copy(&uid) as &[u8])
-                    }),
+                    uid: blip_uid
+                        .map(|uid| Cow::Borrowed(self.arena.alloc_slice_copy(&uid) as &[u8])),
                 };
                 identity.validate()?;
                 picture.identity = Some(identity);
             }
 
+            picture.shape_properties = shape_properties;
+            picture.validate()?;
             self.pictures.push(picture);
         }
 
         Ok(())
+    }
+
+    fn positive_picture_u16(value: Option<i32>, name: &str) -> RtfResult<u16> {
+        value
+            .and_then(|value| u16::try_from(value).ok())
+            .filter(|value| *value != 0)
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(format!(
+                    "RTF {name} must have a positive 16-bit parameter"
+                ))
+            })
+    }
+
+    fn set_picture_crop(
+        slot: &mut Option<i32>,
+        value: Option<i32>,
+        data_started: bool,
+        name: &str,
+    ) -> RtfResult<()> {
+        if data_started || slot.is_some() {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF {name} is duplicated or occurs after picture data"
+            )));
+        }
+        *slot = Some(value.ok_or_else(|| {
+            RtfError::MalformedDocument(format!("RTF {name} requires a parameter"))
+        })?);
+        Ok(())
+    }
+
+    fn scan_picture_shape_properties(
+        &mut self,
+    ) -> RtfResult<Option<crate::PictureShapeProperties<'a>>> {
+        let original_pos = self.pos;
+        let result = self.scan_picture_shape_properties_inner();
+        self.pos = original_pos;
+        result
+    }
+
+    fn scan_picture_shape_properties_inner(
+        &mut self,
+    ) -> RtfResult<Option<crate::PictureShapeProperties<'a>>> {
+        let mut index = self.pos + 1;
+        let mut depth = 0usize;
+        let mut properties = None;
+        let mut saw_picture_content = false;
+        while index < self.tokens.len() {
+            match self.tokens.get(index) {
+                Some(Token::OpenBrace) if depth == 0 => {
+                    let starred = matches!(
+                        self.tokens.get(index + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    );
+                    let control_index = index + if starred { 2 } else { 1 };
+                    if matches!(
+                        self.tokens.get(control_index),
+                        Some(Token::Control(ControlWord::PictureProperties(_)))
+                    ) {
+                        if !starred {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF picprop destination must be starred".to_string(),
+                            ));
+                        }
+                        if properties.is_some() {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF picture contains multiple picprop destinations".to_string(),
+                            ));
+                        }
+                        if saw_picture_content {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF picprop must precede picture payload data".to_string(),
+                            ));
+                        }
+                        self.pos = index;
+                        properties = Some(self.parse_picture_shape_properties()?);
+                        index = self.pos;
+                        continue;
+                    }
+                    depth = 1;
+                    index += 1;
+                },
+                Some(Token::OpenBrace) => {
+                    depth += 1;
+                    index += 1;
+                },
+                Some(Token::CloseBrace) if depth == 0 => break,
+                Some(Token::CloseBrace) => {
+                    depth -= 1;
+                    index += 1;
+                },
+                Some(Token::Control(ControlWord::PictureProperties(_))) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF picprop destination must be a direct child group of pict".to_string(),
+                    ));
+                },
+                Some(Token::Text(value))
+                    if value.bytes().all(|byte| byte.is_ascii_whitespace()) =>
+                {
+                    index += 1;
+                },
+                Some(Token::Text(_) | Token::Binary(_)) => {
+                    if depth == 0 {
+                        saw_picture_content = true;
+                    }
+                    index += 1;
+                },
+                Some(_) => {
+                    index += 1;
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+        Ok(properties)
+    }
+
+    fn parse_picture_shape_properties(&mut self) -> RtfResult<crate::PictureShapeProperties<'a>> {
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
+            || !matches!(
+                self.tokens.get(self.pos + 1),
+                Some(Token::Control(ControlWord::IgnorableDestination))
+            )
+        {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF picprop destination".to_string(),
+            ));
+        }
+        match self.tokens.get(self.pos + 2) {
+            Some(Token::Control(ControlWord::PictureProperties(None))) => self.pos += 3,
+            Some(Token::Control(ControlWord::PictureProperties(Some(_)))) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF picprop destination must not have a parameter".to_string(),
+                ));
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF picprop destination".to_string(),
+                ));
+            },
+        }
+
+        let mut result = crate::PictureShapeProperties::default();
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::Text(value))
+                    if value.bytes().all(|byte| byte.is_ascii_whitespace()) =>
+                {
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::PictureShapeId(Some(value)))) => {
+                    if result.shape_id.replace(*value).is_some() || !result.properties.is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shplid must occur at most once before picture properties"
+                                .to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::PictureShapeId(None))) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shplid requires a parameter".to_string(),
+                    ));
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ShapeProperty))
+                    ) =>
+                {
+                    if result.properties.len() >= crate::MAX_PICTURE_SHAPE_PROPERTIES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF picture shape-property count exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    result.properties.push(self.parse_picture_shape_property()?);
+                },
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    result.validate()?;
+                    return Ok(result);
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "invalid content or ordering in RTF picprop destination".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_picture_shape_property(&mut self) -> RtfResult<crate::ShapeProperty<'a>> {
+        self.pos += 2; // opening brace and \sp
+        self.skip_picture_property_whitespace();
+        let name = self.parse_picture_property_text(ControlWord::ShapePropertyName, "sn")?;
+        self.skip_picture_property_whitespace();
+        let (value, binary_value) = self.parse_picture_property_value()?;
+        self.skip_picture_property_whitespace();
+        let theme_value = if matches!(
+            self.tokens.get(self.pos..self.pos + 3),
+            Some([
+                Token::OpenBrace,
+                Token::Control(ControlWord::IgnorableDestination),
+                Token::Control(ControlWord::ShapeThemeValue(_)),
+            ])
+        ) {
+            let value = self.parse_shape_theme_value()?;
+            self.skip_picture_property_whitespace();
+            Some(value)
+        } else {
+            None
+        };
+        if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture sp must contain one sn, one sv, and at most one trailing hsv"
+                    .to_string(),
+            ));
+        }
+        self.pos += 1;
+        Ok(crate::ShapeProperty {
+            name: Cow::Borrowed(self.arena.alloc_str(&name) as &str),
+            value: Cow::Borrowed(self.arena.alloc_str(&value) as &str),
+            binary_value: binary_value.map(Cow::Owned),
+            theme_value,
+        })
+    }
+
+    fn parse_picture_property_value(&mut self) -> RtfResult<(String, Option<Vec<u8>>)> {
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
+            || !matches!(
+                self.tokens.get(self.pos + 1),
+                Some(Token::Control(ControlWord::ShapePropertyValue))
+            )
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture sp requires an unstarred sv destination".to_string(),
+            ));
+        }
+        self.pos += 2;
+        let mut text = String::new();
+        let mut binary_value = None;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if binary_value.is_some() && !text.trim().is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF picture property cannot mix scalar and binary values".to_string(),
+                        ));
+                    }
+                    return Ok((text.trim().to_string(), binary_value));
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) && matches!(
+                        self.tokens.get(self.pos + 2),
+                        Some(Token::Control(ControlWord::ShapeBinaryValue(_)))
+                    ) =>
+                {
+                    if binary_value.is_some() || !text.trim().is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF svb must be the only picture property value".to_string(),
+                        ));
+                    }
+                    binary_value = Some(self.parse_shape_binary_value()?);
+                },
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(
+                        "nested groups are not allowed in RTF picture sv".to_string(),
+                    ));
+                },
+                Some(Token::Control(ControlWord::Unicode(code))) if binary_value.is_none() => {
+                    text.push_str(&self.parse_destination_unicode_sequence(*code)?);
+                },
+                Some(Token::Control(control))
+                    if binary_value.is_none() && control_symbol_text(control).is_some() =>
+                {
+                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::Text(value)) => {
+                    text.push_str(&self.decode_transport_text(value)?);
+                    self.pos += 1;
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "active controls are not allowed in RTF picture sv".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn skip_picture_property_whitespace(&mut self) {
+        while matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Text(value)) if value.bytes().all(|byte| byte.is_ascii_whitespace())
+        ) {
+            self.pos += 1;
+        }
+    }
+
+    fn parse_picture_property_text(
+        &mut self,
+        expected: ControlWord,
+        name: &str,
+    ) -> RtfResult<String> {
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
+            || self.tokens.get(self.pos + 1) != Some(&Token::Control(expected))
+        {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF picture sp requires an unstarred {name} destination"
+            )));
+        }
+        self.pos += 2;
+        let mut text = String::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(text.trim().to_string());
+                },
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "nested groups are not allowed in RTF picture {name}"
+                    )));
+                },
+                Some(Token::Control(ControlWord::Unicode(code))) => {
+                    text.push_str(&self.parse_destination_unicode_sequence(*code)?);
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::Text(value)) => {
+                    text.push_str(&self.decode_transport_text(value)?);
+                    self.pos += 1;
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "active controls are not allowed in RTF picture {name}"
+                    )));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
     }
 
     fn parse_picture_uid(&mut self) -> RtfResult<Vec<u8>> {
@@ -10401,8 +20549,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     if high_nibble.is_some() {
                         return Err(RtfError::MalformedDocument(
-                            "RTF blipuid contains an odd number of hexadecimal digits"
-                                .to_string(),
+                            "RTF blipuid contains an odd number of hexadecimal digits".to_string(),
                         ));
                     }
                     if !bytes.is_empty() && bytes.len() != 16 {
@@ -10447,13 +20594,48 @@ impl<'a> Parser<'a> {
     /// Fields in RTF have the format:
     /// {\field{\*\fldinst INSTRUCTION}{\fldrslt RESULT}}
     fn parse_field(&mut self) -> RtfResult<()> {
-        let field_position = self.body_text_len;
-        let enclosing_destination = self.current_state()?.destination;
-        let field_in_table = self.current_state()?.in_table;
+        let state = self.current_state()?;
+        let enclosing_destination = state.destination;
+        let field_in_table = state.in_table;
+        let table_level = state.table_nesting_level.max(1);
+        let mut field_owner = match enclosing_destination {
+            Destination::FieldResult => crate::FieldOwner::FieldResult,
+            Destination::Header => crate::FieldOwner::Header,
+            Destination::Footer => crate::FieldOwner::Footer,
+            Destination::Footnote => crate::FieldOwner::Footnote,
+            Destination::Endnote => crate::FieldOwner::Endnote,
+            Destination::DocumentBody if field_in_table => {
+                crate::FieldOwner::TableCell(table_level)
+            },
+            Destination::DocumentBody => crate::FieldOwner::Body,
+            _ => crate::FieldOwner::Other,
+        };
+        let field_position = match field_owner {
+            crate::FieldOwner::FieldResult => self
+                .field_drawing_captures
+                .last()
+                .map_or(0, |capture| capture.story_offset),
+            crate::FieldOwner::Header | crate::FieldOwner::Footer => self.current_hf_story_offset,
+            crate::FieldOwner::Footnote | crate::FieldOwner::Endnote => {
+                self.current_note_buffer.len()
+            },
+            crate::FieldOwner::TableCell(1) => self.current_cell_text.len(),
+            crate::FieldOwner::TableCell(level) => self
+                .nested_table_builders
+                .get(usize::from(level - 2))
+                .map_or(0, |builder| builder.cell_text.len()),
+            crate::FieldOwner::Body => self.body_text_len,
+            _ => 0,
+        };
         self.pos += 1; // Skip \field
+        let mut field_status = crate::FieldStatus::default();
+        let mut field_status_seen = 0_u8;
+        let mut saw_field_destination = false;
 
         let mut instruction = SmallVec::<[u8; 128]>::new();
         let mut result = SmallVec::<[u8; 128]>::new();
+        self.field_drawing_captures
+            .push(DrawingStoryCapture::default());
         let mut form_field = None;
         let mut data_field = None;
         let mut in_instruction;
@@ -10466,7 +20648,66 @@ impl<'a> Parser<'a> {
                     // End of outer field group
                     break;
                 },
+                Token::Control(control) => {
+                    let status_control = match control {
+                        ControlWord::FieldDirty(parameter) => Some(("flddirty", parameter, 1_u8)),
+                        ControlWord::FieldEdit(parameter) => Some(("fldedit", parameter, 2_u8)),
+                        ControlWord::FieldLock(parameter) => Some(("fldlock", parameter, 4_u8)),
+                        ControlWord::FieldPrivate(parameter) => Some(("fldpriv", parameter, 8_u8)),
+                        _ => None,
+                    };
+
+                    if let Some((name, parameter, bit)) = status_control {
+                        if saw_field_destination {
+                            return Err(RtfError::MalformedDocument(format!(
+                                "RTF field state control \\{name} must precede field destinations"
+                            )));
+                        }
+                        if parameter.is_some() {
+                            return Err(RtfError::MalformedDocument(format!(
+                                "RTF field state control \\{name} does not accept a parameter"
+                            )));
+                        }
+                        if field_status_seen & bit != 0 {
+                            return Err(RtfError::MalformedDocument(format!(
+                                "duplicate RTF field state control \\{name}"
+                            )));
+                        }
+                        field_status_seen |= bit;
+                        match control {
+                            ControlWord::FieldDirty(_) => field_status.dirty = true,
+                            ControlWord::FieldEdit(_) => field_status.edited = true,
+                            ControlWord::FieldLock(_) => field_status.locked = true,
+                            ControlWord::FieldPrivate(_) => field_status.private = true,
+                            _ => unreachable!(),
+                        }
+                    }
+                    self.pos += 1;
+                },
                 Token::OpenBrace => {
+                    let is_status_control = |token: Option<&Token>| {
+                        matches!(
+                            token,
+                            Some(Token::Control(
+                                ControlWord::FieldDirty(_)
+                                    | ControlWord::FieldEdit(_)
+                                    | ControlWord::FieldLock(_)
+                                    | ControlWord::FieldPrivate(_)
+                            ))
+                        )
+                    };
+                    let grouped_status = is_status_control(self.tokens.get(self.pos + 1))
+                        || (matches!(
+                            self.tokens.get(self.pos + 1),
+                            Some(Token::Control(ControlWord::IgnorableDestination))
+                        ) && is_status_control(self.tokens.get(self.pos + 2)));
+                    if grouped_status {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF field state controls must occur directly in the field group"
+                                .to_string(),
+                        ));
+                    }
+                    saw_field_destination = true;
                     self.pos += 1;
                     // Check for fldinst or fldrslt
                     if self.pos < self.tokens.len() {
@@ -10547,6 +20788,17 @@ impl<'a> Parser<'a> {
                                     result.push(b'\n');
                                     self.pos += 1;
                                 },
+                                Token::Control(ControlWord::Page(param)) if in_result => {
+                                    require_parameterless(*param, "page")?;
+                                    self.field_drawing_captures
+                                        .last_mut()
+                                        .unwrap()
+                                        .story_events
+                                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                                            result.len(),
+                                        )));
+                                    self.pos += 1;
+                                },
                                 Token::Control(ControlWord::Tab) if in_result => {
                                     result.push(b'\t');
                                     self.pos += 1;
@@ -10562,15 +20814,18 @@ impl<'a> Parser<'a> {
                                     }
                                     self.pos += 1;
                                 },
+                                Token::OpenBrace if in_result && self.is_root_drawing_group() => {
+                                    self.field_drawing_captures.last_mut().unwrap().story_offset =
+                                        result.len();
+                                    self.parse_group()?;
+                                },
                                 Token::OpenBrace if in_instruction => {
                                     let destination = match (
                                         self.tokens.get(self.pos + 1),
                                         self.tokens.get(self.pos + 2),
                                     ) {
                                         (
-                                            Some(Token::Control(
-                                                ControlWord::IgnorableDestination,
-                                            )),
+                                            Some(Token::Control(ControlWord::IgnorableDestination)),
                                             Some(Token::Control(control)),
                                         ) => Some(control),
                                         (Some(Token::Control(control)), _) => Some(control),
@@ -10584,8 +20839,7 @@ impl<'a> Parser<'a> {
                                                         .to_string(),
                                                 ));
                                             }
-                                            form_field =
-                                                Some(self.parse_form_field_destination()?);
+                                            form_field = Some(self.parse_form_field_destination()?);
                                         },
                                         Some(ControlWord::DataField) => {
                                             if data_field.is_some() {
@@ -10597,14 +20851,13 @@ impl<'a> Parser<'a> {
                                             data_field = Some(self.parse_data_field_destination()?);
                                         },
                                         _ => {
-                                            nested_depth = nested_depth.checked_add(1).ok_or_else(
-                                                || {
+                                            nested_depth =
+                                                nested_depth.checked_add(1).ok_or_else(|| {
                                                     RtfError::MalformedDocument(
                                                         "field instruction nesting depth overflow"
                                                             .to_string(),
                                                     )
-                                                },
-                                            )?;
+                                                })?;
                                             self.pos += 1;
                                         },
                                     }
@@ -10615,16 +20868,20 @@ impl<'a> Parser<'a> {
                                         Some(Token::Control(ControlWord::Field))
                                     ) =>
                                 {
+                                    self.field_drawing_captures.last_mut().unwrap().story_offset =
+                                        result.len();
                                     self.pos += 1;
                                     self.parse_field()?;
                                     self.skip_until_close_brace()?;
                                 },
                                 Token::OpenBrace => {
-                                    nested_depth = nested_depth.checked_add(1).ok_or_else(|| {
-                                        RtfError::MalformedDocument(
-                                            "field instruction nesting depth overflow".to_string(),
-                                        )
-                                    })?;
+                                    nested_depth =
+                                        nested_depth.checked_add(1).ok_or_else(|| {
+                                            RtfError::MalformedDocument(
+                                                "field instruction nesting depth overflow"
+                                                    .to_string(),
+                                            )
+                                        })?;
                                     self.pos += 1;
                                 },
                                 _ => {
@@ -10632,8 +20889,7 @@ impl<'a> Parser<'a> {
                                 },
                             }
                             if instruction.len() > super::form_field::MAX_FORM_FIELD_STRING_BYTES
-                                || result.len()
-                                    > super::form_field::MAX_FORM_FIELD_STRING_BYTES
+                                || result.len() > super::form_field::MAX_FORM_FIELD_STRING_BYTES
                             {
                                 return Err(RtfError::MalformedDocument(
                                     "RTF field instruction or result exceeds the safety limit"
@@ -10652,6 +20908,9 @@ impl<'a> Parser<'a> {
         let result_text = std::str::from_utf8(&result).map_err(|_| {
             RtfError::MalformedDocument("RTF field result is not valid UTF-8".to_string())
         })?;
+        let field_drawings = self.field_drawing_captures.pop().ok_or_else(|| {
+            RtfError::MalformedDocument("RTF field drawing capture stack underflow".to_string())
+        })?;
 
         // Create the generic field record if we have an instruction.
         if !instruction.is_empty()
@@ -10663,6 +20922,7 @@ impl<'a> Parser<'a> {
             // Parse field type from allocated instruction
             let mut field = super::field::Field::parse_instruction(inst_alloc);
             field.instruction = Cow::Borrowed(inst_alloc);
+            field.status = field_status;
 
             // Add result if available
             if !result.is_empty()
@@ -10672,7 +20932,58 @@ impl<'a> Parser<'a> {
                 field.result = Cow::Borrowed(res_alloc);
             }
 
+            field.shapes = field_drawings.shapes;
+            field.shape_groups = field_drawings.shape_groups;
+            field.drawing_order = field_drawings.drawing_order;
+            field.result_events = field_drawings.story_events;
+            if form_field.is_some() {
+                field_owner = crate::FieldOwner::FormField;
+            }
+            field.owner = field_owner;
+            field.position = field_position;
+            field.range_end = field_position;
+            field.validate()?;
+
+            if self.fields.len() >= crate::field::MAX_GENERIC_FIELDS {
+                return Err(RtfError::MalformedDocument(
+                    "RTF generic field count exceeds the safety limit".to_string(),
+                ));
+            }
+            let field_index = self.fields.len();
             self.fields.push(field);
+            let story_field = crate::StoryField {
+                field_index,
+                position: field_position,
+            };
+            match field_owner {
+                crate::FieldOwner::Body => self.body_story_events.push(
+                    ParsedBodyStoryEvent::Resolved(crate::BodyStoryEvent::Field(field_index)),
+                ),
+                crate::FieldOwner::Header | crate::FieldOwner::Footer => self
+                    .current_hf_story_events
+                    .push(crate::StoryEvent::Field(story_field)),
+                crate::FieldOwner::Footnote | crate::FieldOwner::Endnote => self
+                    .current_note_story_events
+                    .push(crate::StoryEvent::Field(story_field)),
+                crate::FieldOwner::TableCell(1) => self
+                    .current_cell_story_events
+                    .push(crate::CellStoryEvent::Field(story_field)),
+                crate::FieldOwner::TableCell(level) => self
+                    .ensure_nested_builder(level)?
+                    .cell_story_events
+                    .push(crate::CellStoryEvent::Field(story_field)),
+                crate::FieldOwner::FieldResult => self
+                    .field_drawing_captures
+                    .last_mut()
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF nested field lacks a parent result story".to_string(),
+                        )
+                    })?
+                    .story_events
+                    .push(crate::StoryEvent::Field(story_field)),
+                _ => {},
+            }
         }
 
         self.current_state_mut()?.destination = enclosing_destination;
@@ -10719,13 +21030,15 @@ impl<'a> Parser<'a> {
                     .map(|text| Cow::Borrowed(self.arena.alloc_str(&text) as &str))
                     .collect(),
                 has_list_box: builder.has_list_box.unwrap_or(false),
-                data: Cow::Borrowed(self.arena.alloc_slice_copy(
-                    data_field.as_deref().unwrap_or_default(),
-                )),
-                result_text: Cow::Borrowed(
+                data: Cow::Borrowed(
                     self.arena
-                        .alloc_str(if field_in_table { "" } else { result_text }),
+                        .alloc_slice_copy(data_field.as_deref().unwrap_or_default()),
                 ),
+                result_text: Cow::Borrowed(self.arena.alloc_str(if field_in_table {
+                    ""
+                } else {
+                    result_text
+                })),
                 position: field_position,
                 range_end: if field_in_table {
                     field_position
@@ -10737,20 +21050,27 @@ impl<'a> Parser<'a> {
             let added = form_field.text_bytes().ok_or_else(|| {
                 RtfError::MalformedDocument("RTF form-field aggregate size overflow".to_string())
             })?;
-            self.form_field_text_bytes = self
-                .form_field_text_bytes
-                .checked_add(added)
-                .ok_or_else(|| {
-                    RtfError::MalformedDocument(
-                        "RTF form-field aggregate size overflow".to_string(),
-                    )
-                })?;
+            self.form_field_text_bytes =
+                self.form_field_text_bytes
+                    .checked_add(added)
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF form-field aggregate size overflow".to_string(),
+                        )
+                    })?;
             if self.form_field_text_bytes > super::form_field::MAX_FORM_FIELD_TOTAL_BYTES {
                 return Err(RtfError::MalformedDocument(
                     "RTF form-field aggregate text exceeds the safety limit".to_string(),
                 ));
             }
+            let index = self.form_fields.len();
             self.form_fields.push(form_field);
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::FormFieldStart(index),
+            ));
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::FormFieldEnd(index),
+            ));
         } else if data_field.is_some() {
             // Data fields attached to non-form fields are inert legacy payloads and
             // are intentionally not exposed as executable/external content.
@@ -10795,17 +21115,15 @@ impl<'a> Parser<'a> {
                         self.tokens.get(self.pos + 1),
                         Some(Token::Control(ControlWord::IgnorableDestination))
                     );
-                    let control = match (
-                        self.tokens.get(self.pos + 1),
-                        self.tokens.get(self.pos + 2),
-                    ) {
-                        (
-                            Some(Token::Control(ControlWord::IgnorableDestination)),
-                            Some(Token::Control(control)),
-                        ) => Some(control),
-                        (Some(Token::Control(control)), _) => Some(control),
-                        _ => None,
-                    };
+                    let control =
+                        match (self.tokens.get(self.pos + 1), self.tokens.get(self.pos + 2)) {
+                            (
+                                Some(Token::Control(ControlWord::IgnorableDestination)),
+                                Some(Token::Control(control)),
+                            ) => Some(control),
+                            (Some(Token::Control(control)), _) => Some(control),
+                            _ => None,
+                        };
                     if !starred
                         && matches!(
                             control,
@@ -10895,11 +21213,9 @@ impl<'a> Parser<'a> {
                     macro_rules! set_once {
                         ($slot:expr, $value:expr, $name:literal) => {{
                             if $slot.is_some() {
-                                return Err(RtfError::MalformedDocument(concat!(
-                                    "duplicate RTF formfield ",
-                                    $name
-                                )
-                                .to_string()));
+                                return Err(RtfError::MalformedDocument(
+                                    concat!("duplicate RTF formfield ", $name).to_string(),
+                                ));
                             }
                             $slot = Some($value);
                         }};
@@ -11100,7 +21416,13 @@ impl<'a> Parser<'a> {
             .ok_or_else(|| RtfError::MalformedDocument("Header/footer type not set".to_string()))?;
 
         let mut hf = super::section::HeaderFooter::new(hf_type);
+        self.current_hf_shapes.clear();
+        self.current_hf_shape_groups.clear();
+        self.current_hf_drawing_order.clear();
+        self.current_hf_story_events.clear();
+        self.current_hf_story_offset = 0;
         let mut text_buffer = SmallVec::<[u8; 256]>::new();
+        let mut pending_paragraph_break = false;
         let default_state = State::default();
         let mut inert_section_format = false;
 
@@ -11125,54 +21447,83 @@ impl<'a> Parser<'a> {
                 },
                 Token::OpenBrace => {
                     inert_section_format = false;
-                    if !text_buffer.is_empty() {
-                        if let Ok(text) = std::str::from_utf8(&text_buffer) {
-                            let state = self.current_state().ok().unwrap_or(&default_state);
-                            let text_alloc = self.arena.alloc_str(text);
-                            let para = super::section::HeaderFooterParagraph::new(
-                                Cow::Borrowed(text_alloc),
-                                state.formatting,
-                                state.paragraph,
-                            );
-                            hf.add_paragraph(para);
-                        }
-                        text_buffer.clear();
-                    }
-                    self.parse_group()?;
+                    self.parse_header_footer_group(
+                        &mut hf,
+                        &mut text_buffer,
+                        &mut pending_paragraph_break,
+                    )?;
                 },
                 Token::Control(ControlWord::Par | ControlWord::Line) => {
                     inert_section_format = false;
                     self.pos += 1;
-                    if !text_buffer.is_empty() {
-                        if let Ok(text) = std::str::from_utf8(&text_buffer) {
-                            let state = self.current_state().ok().unwrap_or(&default_state);
-                            let text_alloc = self.arena.alloc_str(text);
-                            let para = super::section::HeaderFooterParagraph::new(
-                                Cow::Borrowed(text_alloc),
-                                state.formatting,
-                                state.paragraph,
-                            );
-                            hf.add_paragraph(para);
-                        }
-                        text_buffer.clear();
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
                     }
+                    let text = std::str::from_utf8(&text_buffer).map_err(|error| {
+                        RtfError::InvalidUnicode(format!(
+                            "invalid UTF-8 in header/footer story: {error}"
+                        ))
+                    })?;
+                    let state = self.current_state().ok().unwrap_or(&default_state);
+                    let text_alloc = self.arena.alloc_str(text);
+                    hf.add_paragraph(super::section::HeaderFooterParagraph::new(
+                        Cow::Borrowed(text_alloc),
+                        state.formatting,
+                        state.paragraph,
+                    ));
+                    text_buffer.clear();
+                    pending_paragraph_break = true;
+                },
+                Token::Control(ControlWord::Page(param)) => {
+                    require_parameterless(*param, "page")?;
+                    self.pos += 1;
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        pending_paragraph_break = false;
+                    }
+                    self.current_hf_story_events.push(crate::StoryEvent::PageBreak(
+                        crate::PageBreak::new(self.current_hf_story_offset),
+                    ));
                 },
                 Token::Control(ControlWord::Tab) => {
                     inert_section_format = false;
                     self.pos += 1;
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        pending_paragraph_break = false;
+                    }
                     text_buffer.push(b'\t');
+                    self.current_hf_story_offset = self.current_hf_story_offset.saturating_add(1);
                 },
                 Token::Control(ControlWord::Unicode(code)) => {
                     inert_section_format = false;
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        pending_paragraph_break = false;
+                    }
                     let decoded = self.parse_destination_unicode_sequence(*code)?;
                     text_buffer.extend_from_slice(decoded.as_bytes());
+                    self.current_hf_story_offset =
+                        self.current_hf_story_offset.saturating_add(decoded.len());
                 },
                 Token::Control(control) if control_symbol_text(control).is_some() => {
                     inert_section_format = false;
                     self.pos += 1;
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        pending_paragraph_break = false;
+                    }
                     text_buffer.extend_from_slice(
                         control_symbol_text(control).unwrap_or_default().as_bytes(),
                     );
+                    self.current_hf_story_offset = self
+                        .current_hf_story_offset
+                        .saturating_add(control_symbol_text(control).unwrap_or_default().len());
                 },
                 Token::Control(ControlWord::SectionDefault) => {
                     self.pos += 1;
@@ -11182,9 +21533,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     inert_section_format = false;
                 },
-                Token::Control(control)
-                    if inert_section_format && is_section_control(control) =>
-                {
+                Token::Control(control) if inert_section_format && is_section_control(control) => {
                     self.pos += 1;
                 },
                 Token::Control(control) => {
@@ -11196,8 +21545,15 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     if !decoded.is_empty() {
                         inert_section_format = false;
+                        if pending_paragraph_break {
+                            self.current_hf_story_offset =
+                                self.current_hf_story_offset.saturating_add(1);
+                            pending_paragraph_break = false;
+                        }
                     }
                     text_buffer.extend_from_slice(decoded.as_bytes());
+                    self.current_hf_story_offset =
+                        self.current_hf_story_offset.saturating_add(decoded.len());
                 },
                 _ => {
                     self.pos += 1;
@@ -11205,17 +21561,191 @@ impl<'a> Parser<'a> {
             }
         }
 
+        while hf.text().len() < self.current_hf_story_offset {
+            hf.add_paragraph(super::section::HeaderFooterParagraph::new(
+                Cow::Borrowed(""),
+                default_state.formatting,
+                default_state.paragraph,
+            ));
+        }
+        hf.shapes = std::mem::take(&mut self.current_hf_shapes);
+        hf.shape_groups = std::mem::take(&mut self.current_hf_shape_groups);
+        hf.drawing_order = std::mem::take(&mut self.current_hf_drawing_order);
+        hf.story_events = std::mem::take(&mut self.current_hf_story_events);
+        crate::field::validate_story_events(
+            &hf.text(),
+            &hf.shapes,
+            &hf.shape_groups,
+            &hf.drawing_order,
+            &hf.story_events,
+            "header/footer",
+        )?;
+
         // Add header/footer to the current section or create a new section
         if let Some(section) = self.sections.last_mut() {
             section.add_header_footer(hf);
         } else {
             let mut section = super::section::Section::new();
+            section.properties.margin_gutter = self
+                .print_layout_settings
+                .document_gutter_twips
+                .unwrap_or_default() as i32;
             section.add_header_footer(hf);
             self.sections.push(section);
+            self.section_gutter_overrides.push(false);
         }
 
         self.current_hf_type = None;
         Ok(())
+    }
+
+    fn parse_header_footer_group(
+        &mut self,
+        hf: &mut super::section::HeaderFooter<'a>,
+        text_buffer: &mut SmallVec<[u8; 256]>,
+        pending_paragraph_break: &mut bool,
+    ) -> RtfResult<()> {
+        if self.is_root_drawing_group() {
+            if *pending_paragraph_break {
+                self.current_hf_story_offset = self.current_hf_story_offset.saturating_add(1);
+                *pending_paragraph_break = false;
+            }
+            return self.parse_group();
+        }
+        if matches!(
+            self.tokens.get(self.pos + 1),
+            Some(Token::Control(ControlWord::Field))
+        ) {
+            if *pending_paragraph_break {
+                self.current_hf_story_offset = self.current_hf_story_offset.saturating_add(1);
+                *pending_paragraph_break = false;
+            }
+            self.pos += 1;
+            self.parse_field()?;
+            return self.skip_until_close_brace();
+        }
+        if matches!(
+            self.tokens.get(self.pos..self.pos + 3),
+            Some([
+                Token::OpenBrace,
+                Token::Control(ControlWord::IgnorableDestination),
+                Token::Control(ControlWord::LegacyDrawingObject),
+            ])
+        ) {
+            return self.parse_group();
+        }
+        if matches!(
+            self.tokens.get(self.pos + 1),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            return self.skip_group();
+        }
+        let state = self.current_state()?.clone();
+        self.states.push(state);
+        self.pos += 1;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => {
+                    self.parse_header_footer_group(hf, text_buffer, pending_paragraph_break)?
+                },
+                Some(Token::Control(ControlWord::Tab)) => {
+                    self.pos += 1;
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    text_buffer.push(b'\t');
+                    self.current_hf_story_offset += 1;
+                },
+                Some(Token::Control(ControlWord::Par | ControlWord::Line)) => {
+                    self.pos += 1;
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                    }
+                    let text = std::str::from_utf8(text_buffer).map_err(|error| {
+                        RtfError::InvalidUnicode(format!(
+                            "invalid UTF-8 in header/footer story: {error}"
+                        ))
+                    })?;
+                    let state = self.current_state()?.clone();
+                    let text_alloc = self.arena.alloc_str(text);
+                    hf.add_paragraph(super::section::HeaderFooterParagraph::new(
+                        Cow::Borrowed(text_alloc),
+                        state.formatting,
+                        state.paragraph,
+                    ));
+                    text_buffer.clear();
+                    *pending_paragraph_break = true;
+                },
+                Some(Token::Control(ControlWord::Page(param))) => {
+                    require_parameterless(*param, "page")?;
+                    self.pos += 1;
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    self.current_hf_story_events.push(crate::StoryEvent::PageBreak(
+                        crate::PageBreak::new(self.current_hf_story_offset),
+                    ));
+                },
+                Some(Token::Control(ControlWord::Unicode(code))) => {
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    let code = *code;
+                    let decoded = self.parse_destination_unicode_sequence(code)?;
+                    text_buffer.extend_from_slice(decoded.as_bytes());
+                    self.current_hf_story_offset += decoded.len();
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    let value = control_symbol_text(control).unwrap_or_default();
+                    text_buffer.extend_from_slice(value.as_bytes());
+                    self.current_hf_story_offset += value.len();
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) => {
+                    let control = *control;
+                    self.pos += 1;
+                    self.apply_control_word(&control)?;
+                },
+                Some(Token::Text(text)) => {
+                    let decoded = self.decode_transport_text(text)?;
+                    self.pos += 1;
+                    if !decoded.is_empty() && *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    text_buffer.extend_from_slice(decoded.as_bytes());
+                    self.current_hf_story_offset += decoded.len();
+                },
+                Some(Token::Binary(_)) => {
+                    self.states.pop();
+                    return Err(RtfError::MalformedDocument(
+                        "RTF header/footer story cannot contain direct binary data".to_string(),
+                    ));
+                },
+                None => {
+                    self.states.pop();
+                    return Err(RtfError::UnexpectedEof);
+                },
+            }
+        }
     }
 
     fn parse_destination_unicode_sequence(&mut self, first_code: i32) -> RtfResult<String> {
@@ -11259,7 +21789,16 @@ impl<'a> Parser<'a> {
 
     /// Parse footnote or endnote content.
     fn parse_note(&mut self, is_footnote: bool) -> RtfResult<()> {
+        if self.notes.len() >= super::section::MAX_NOTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF note count exceeds the safety limit".to_string(),
+            ));
+        }
         self.current_note_buffer.clear();
+        self.current_note_shapes.clear();
+        self.current_note_shape_groups.clear();
+        self.current_note_drawing_order.clear();
+        self.current_note_story_events.clear();
         let mut reference = String::from(if is_footnote { "1" } else { "i" });
 
         while self.pos < self.tokens.len() {
@@ -11269,7 +21808,7 @@ impl<'a> Parser<'a> {
                     break;
                 },
                 Token::OpenBrace => {
-                    self.parse_group()?;
+                    self.parse_note_group()?;
                 },
                 Token::Control(ControlWord::FootnoteNumber(n)) => {
                     self.pos += 1;
@@ -11278,6 +21817,22 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::Tab) => {
                     self.pos += 1;
                     self.current_note_buffer.push(b'\t');
+                },
+                Token::Control(ControlWord::Par | ControlWord::Line) => {
+                    self.pos += 1;
+                    self.current_note_buffer.push(b'\n');
+                },
+                Token::Control(ControlWord::Page(param)) => {
+                    require_parameterless(*param, "page")?;
+                    self.pos += 1;
+                    self.current_note_story_events.push(crate::StoryEvent::PageBreak(
+                        crate::PageBreak::new(self.current_note_buffer.len()),
+                    ));
+                },
+                Token::Control(ControlWord::Unicode(code)) => {
+                    let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    self.current_note_buffer
+                        .extend_from_slice(decoded.as_bytes());
                 },
                 Token::Control(control) if control_symbol_text(control).is_some() => {
                     self.pos += 1;
@@ -11299,26 +21854,153 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
             }
-        }
-
-        if !self.current_note_buffer.is_empty()
-            && let Ok(content) = std::str::from_utf8(&self.current_note_buffer)
-        {
-            let content_alloc = self.arena.alloc_str(content);
-            let mut note = if is_footnote {
-                super::section::Note::footnote(Cow::Owned(reference), Cow::Borrowed(content_alloc))
-            } else {
-                super::section::Note::endnote(Cow::Owned(reference), Cow::Borrowed(content_alloc))
-            };
-
-            if let Ok(state) = self.current_state() {
-                note.formatting = state.formatting;
+            if self.current_note_buffer.len() > super::section::MAX_NOTE_BODY_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF note body exceeds the safety limit".to_string(),
+                ));
             }
-
-            self.notes.push(note);
         }
+
+        let content = std::str::from_utf8(&self.current_note_buffer)
+            .map_err(|error| RtfError::InvalidUnicode(format!("invalid note Unicode: {error}")))?;
+        let content_alloc = self.arena.alloc_str(content);
+        let mut note = if is_footnote {
+            super::section::Note::footnote(Cow::Owned(reference), Cow::Borrowed(content_alloc))
+        } else {
+            super::section::Note::endnote(Cow::Owned(reference), Cow::Borrowed(content_alloc))
+        };
+        note.position = self.body_text_len;
+        note.shapes = std::mem::take(&mut self.current_note_shapes);
+        note.shape_groups = std::mem::take(&mut self.current_note_shape_groups);
+        note.drawing_order = std::mem::take(&mut self.current_note_drawing_order);
+        note.story_events = std::mem::take(&mut self.current_note_story_events);
+
+        if let Ok(state) = self.current_state() {
+            note.formatting = state.formatting;
+        }
+
+        let aggregate = note.text_bytes().and_then(|initial| {
+            self.notes.iter().try_fold(initial, |size, existing| {
+                size.checked_add(existing.text_bytes()?)
+            })
+        });
+        if aggregate.is_none_or(|size| size > super::section::MAX_NOTE_TEXT_TOTAL_BYTES) {
+            return Err(RtfError::MalformedDocument(
+                "RTF note aggregate text exceeds the safety limit".to_string(),
+            ));
+        }
+        note.validate()?;
+        let index = self.notes.len();
+        self.notes.push(note);
+        self.body_story_events
+            .push(ParsedBodyStoryEvent::Resolved(crate::BodyStoryEvent::Note(
+                index,
+            )));
 
         Ok(())
+    }
+
+    fn parse_note_group(&mut self) -> RtfResult<()> {
+        if self.is_root_drawing_group() {
+            return self.parse_group();
+        }
+        if matches!(
+            self.tokens.get(self.pos + 1),
+            Some(Token::Control(ControlWord::Field))
+        ) {
+            self.pos += 1;
+            self.parse_field()?;
+            return self.skip_until_close_brace();
+        }
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF note nested-group parser is not at an opening brace".to_string(),
+            ));
+        }
+        if matches!(
+            self.tokens.get(self.pos + 1),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            return self.skip_group();
+        }
+        if self.states.len() >= MAX_STORY_GROUP_DEPTH {
+            return Err(RtfError::MalformedDocument(
+                "RTF note-story group nesting exceeds the safety limit".to_string(),
+            ));
+        }
+        let state = self.current_state()?.clone();
+        self.states.push(state);
+        self.pos += 1;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => self.parse_note_group()?,
+                Some(Token::Control(ControlWord::Tab)) => {
+                    self.pos += 1;
+                    self.current_note_buffer.push(b'\t');
+                },
+                Some(Token::Control(ControlWord::Par | ControlWord::Line)) => {
+                    self.pos += 1;
+                    self.current_note_buffer.push(b'\n');
+                },
+                Some(Token::Control(ControlWord::Page(param))) => {
+                    require_parameterless(*param, "page")?;
+                    self.pos += 1;
+                    self.current_note_story_events.push(crate::StoryEvent::PageBreak(
+                        crate::PageBreak::new(self.current_note_buffer.len()),
+                    ));
+                },
+                Some(Token::Control(ControlWord::Unicode(code))) => {
+                    let code = *code;
+                    let decoded = self.parse_destination_unicode_sequence(code)?;
+                    self.current_note_buffer
+                        .extend_from_slice(decoded.as_bytes());
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    self.current_note_buffer.extend_from_slice(
+                        control_symbol_text(control).unwrap_or_default().as_bytes(),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Footnote | ControlWord::Endnote)) => {
+                    self.states.pop();
+                    return Err(RtfError::MalformedDocument(
+                        "RTF note story cannot contain a nested note destination".to_string(),
+                    ));
+                },
+                Some(Token::Control(control)) => {
+                    let control = *control;
+                    self.pos += 1;
+                    self.apply_control_word(&control)?;
+                },
+                Some(Token::Text(text)) => {
+                    let decoded = self.decode_transport_text(text)?;
+                    self.pos += 1;
+                    self.current_note_buffer
+                        .extend_from_slice(decoded.as_bytes());
+                },
+                Some(Token::Binary(_)) => {
+                    self.states.pop();
+                    return Err(RtfError::MalformedDocument(
+                        "RTF note story cannot contain direct binary data".to_string(),
+                    ));
+                },
+                None => {
+                    self.states.pop();
+                    return Err(RtfError::UnexpectedEof);
+                },
+            }
+            if self.current_note_buffer.len() > super::section::MAX_NOTE_BODY_BYTES {
+                self.states.pop();
+                return Err(RtfError::MalformedDocument(
+                    "RTF note body exceeds the safety limit".to_string(),
+                ));
+            }
+        }
     }
 }
 
@@ -11339,6 +22021,8 @@ pub struct ParsedDocument<'a> {
     pub tables: Vec<super::table::Table<'a>>,
     /// Extracted pictures
     pub pictures: Vec<super::picture::Picture<'a>>,
+    /// Positional body picture-wrapper records referencing `pictures`.
+    pub picture_compatibility_records: Vec<crate::PictureCompatibilityRecord>,
     /// Extracted fields
     pub fields: Vec<super::field::Field<'a>>,
     pub form_fields: Vec<super::form_field::FormField<'a>>,
@@ -11346,11 +22030,48 @@ pub struct ParsedDocument<'a> {
     pub revision_save: Option<crate::RevisionSaveMetadata>,
     pub xml_namespaces: Vec<crate::XmlNamespace<'a>>,
     pub saw_xml_namespace_table: bool,
+    pub protection_user_table: Option<crate::ProtectionUserTable<'a>>,
+    pub hyphenation: crate::DocumentHyphenation,
+    pub external_references: crate::DocumentExternalReferences<'a>,
+    pub document_view: crate::DocumentView,
+    pub review_display: crate::DocumentReviewDisplay,
+    pub window_caption: Option<crate::DocumentWindowCaption<'a>>,
+    pub xsl_transform: Option<crate::DocumentXslTransform<'a>>,
+    pub xsl_transform_usage: crate::DocumentXslTransformUsage,
+    pub style_list_filter: Option<crate::DocumentStyleListFilter>,
+    pub style_sort_method: Option<crate::DocumentStyleSortMethod>,
+    pub save_preferences: crate::DocumentSavePreferences,
+    pub write_reservations: crate::DocumentWriteReservations<'a>,
+    pub origin_metadata: crate::DocumentOriginMetadata,
+    pub file_settings: crate::DocumentFileSettings,
+    pub output_settings: crate::DocumentOutputSettings,
+    pub rendering_settings: crate::DocumentRenderingSettings,
+    pub processing_settings: crate::DocumentProcessingSettings,
+    pub drawing_grid: crate::DocumentDrawingGrid,
+    pub print_layout_settings: crate::DocumentPrintLayoutSettings,
+    pub theme_languages: crate::DocumentThemeLanguages,
+    pub xml_policies: crate::DocumentXmlPolicies,
+    pub embedding_policies: crate::DocumentEmbeddingPolicies,
+    pub revision_policies: crate::DocumentRevisionPolicies,
+    pub style_policies: crate::DocumentStylePolicies,
+    pub style_restrictions: crate::DocumentStyleRestrictions,
+    pub booklet_printing: crate::DocumentBookletPrinting,
+    pub privacy_policies: crate::DocumentPrivacyPolicies,
+    pub line_spacing_compatibility: crate::DocumentLineSpacingCompatibility,
+    pub east_asian_compatibility: crate::DocumentEastAsianCompatibility,
+    pub table_layout_compatibility: crate::DocumentTableLayoutCompatibility,
+    pub legacy_layout_compatibility: crate::DocumentLegacyLayoutCompatibility,
+    pub asian_grid_compatibility: crate::DocumentAsianGridCompatibility,
+    pub compatibility_policy: crate::DocumentCompatibilityPolicy,
+    pub word_2003_compatibility: crate::DocumentWord2003Compatibility,
     pub theme: Option<crate::DocumentTheme<'a>>,
     pub latent_styles: Option<crate::LatentStyles<'a>>,
     pub data_store: Option<crate::DocumentDataStore<'a>>,
+    pub mail_merge: Option<crate::MailMerge<'a>>,
     pub math_properties: Option<crate::DocumentMathProperties>,
+    pub default_tab_width_twips: Option<u32>,
     pub language_defaults: crate::DocumentLanguageDefaults,
+    pub default_formatting: crate::DocumentDefaultFormatting,
     pub document_direction: Option<crate::TextDirection>,
     pub gutter_on_right: bool,
     /// Embedded and linked objects
@@ -11368,6 +22089,7 @@ pub struct ParsedDocument<'a> {
     /// List override table
     pub list_override_table: super::list::ListOverrideTable,
     pub legacy_section_numbering: crate::LegacySectionNumbering<'a>,
+    pub legacy_paragraph_numbering: Vec<crate::LegacyParagraphNumbering<'a>>,
     pub paragraph_group_table: Option<crate::ParagraphGroupPropertyTable>,
     /// Sections
     pub sections: Vec<super::section::Section<'a>>,
@@ -11375,6 +22097,11 @@ pub struct ParsedDocument<'a> {
     pub bookmarks: super::bookmark::BookmarkTable<'a>,
     /// Shapes
     pub shapes: Vec<super::shape::Shape<'a>>,
+    /// Exact source order of non-background root drawings in the body story.
+    pub drawing_order: Vec<crate::StoryDrawing>,
+    pub body_story_events: Vec<crate::BodyStoryEvent>,
+    /// Index in `shapes` owned by the unique document-background destination.
+    pub background_shape_index: Option<usize>,
     /// Inert legacy drawing text boxes.
     pub legacy_text_boxes: Vec<crate::LegacyTextBox<'a>>,
     pub legacy_drawings: Vec<crate::LegacyDrawing<'a>>,

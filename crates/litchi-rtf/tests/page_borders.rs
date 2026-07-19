@@ -5,7 +5,10 @@ use litchi_rtf::{
 
 #[test]
 fn parses_libreoffice_page_border_export_and_round_trips_deterministically() {
-    let fixture = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/page-border.rtf"));
+    let fixture = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/page-border.rtf"
+    ));
     let document = RtfDocument::parse(fixture).unwrap();
     let borders = document.sections()[0].properties.page_borders;
     assert_eq!(borders.top.unwrap().width, 10);
@@ -14,7 +17,9 @@ fn parses_libreoffice_page_border_export_and_round_trips_deterministically() {
     assert_eq!(borders.right.unwrap().width, 40);
     assert_eq!(borders.top.unwrap().space, 480);
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(&document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
     let text = String::from_utf8(output).unwrap();
     let expected = r#"\pgbrdrt\brdrs\brdrw10\brdrcf0\brsp480\pgbrdrl\brdrs\brdrw20\brdrcf0\brsp480\pgbrdrb\brdrs\brdrw30\brdrcf0\brsp480\pgbrdrr\brdrs\brdrw40\brdrcf0\brsp480"#;
     assert!(text.contains(expected), "{text}");
@@ -42,11 +47,20 @@ fn writer_emits_typed_options_and_art_in_canonical_order() {
     section.properties.page_borders.depth = PageBorderDepth::Behind;
     section.properties.page_borders.offset = PageBorderOffset::Page;
     section.properties.page_borders.surround_header = true;
-    section.properties.page_borders.top = Some(PageBorder { art: Some(42), width: 12, color_ref: 3, space: 20, ..PageBorder::default() });
+    section.properties.page_borders.top = Some(PageBorder {
+        art: Some(42),
+        width: 12,
+        color_ref: 3,
+        space: 20,
+        ..PageBorder::default()
+    });
     let mut output = Vec::new();
     RtfWriter::new(&mut output).write_section(&section).unwrap();
     let text = String::from_utf8(output).unwrap();
-    assert!(text.contains(r#"\pgbrdropt43\pgbrdrhead\pgbrdrt\brdrart42\brdrw12\brdrcf3\brsp20"#), "{text}");
+    assert!(
+        text.contains(r#"\pgbrdropt43\pgbrdrhead\pgbrdrt\brdrart42\brdrw12\brdrcf3\brsp20"#),
+        "{text}"
+    );
 }
 
 #[test]
@@ -65,7 +79,12 @@ fn rejects_malformed_page_borders_and_negative_libreoffice_fixture() {
         r#"{\rtf1\pgbrdropt16 Body}"#,
         r#"{\rtf1\pgbrdropt64 Body}"#,
         r#"{\rtf1\pgbrdrt\brdrs\brdrw10\pgbrdrt\brdrs Body}"#,
-    ] { assert!(RtfDocument::parse(rtf).is_err(), "accepted {rtf}"); }
-    let negative = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/sw/qa/writerfilter/rtftok/data/negative-page-border.rtf"));
+    ] {
+        assert!(RtfDocument::parse(rtf).is_err(), "accepted {rtf}");
+    }
+    let negative = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/sw/qa/writerfilter/rtftok/data/negative-page-border.rtf"
+    ));
     assert!(RtfDocument::parse(negative).is_err());
 }

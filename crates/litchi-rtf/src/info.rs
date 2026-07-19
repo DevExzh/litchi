@@ -137,20 +137,47 @@ pub struct DocumentInfo<'a> {
 }
 
 impl<'a> DocumentInfo<'a> {
-    pub fn new() -> Self { Self::default() }
-    pub fn with_title(mut self, value: Cow<'a, str>) -> Self { self.title = Some(value); self }
-    pub fn with_author(mut self, value: Cow<'a, str>) -> Self { self.author = Some(value); self }
-    pub fn with_subject(mut self, value: Cow<'a, str>) -> Self { self.subject = Some(value); self }
-    pub fn with_keywords(mut self, value: Cow<'a, str>) -> Self { self.keywords = Some(value); self }
-    pub fn with_comment(mut self, value: Cow<'a, str>) -> Self { self.comment = Some(value); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn with_title(mut self, value: Cow<'a, str>) -> Self {
+        self.title = Some(value);
+        self
+    }
+    pub fn with_author(mut self, value: Cow<'a, str>) -> Self {
+        self.author = Some(value);
+        self
+    }
+    pub fn with_subject(mut self, value: Cow<'a, str>) -> Self {
+        self.subject = Some(value);
+        self
+    }
+    pub fn with_keywords(mut self, value: Cow<'a, str>) -> Self {
+        self.keywords = Some(value);
+        self
+    }
+    pub fn with_comment(mut self, value: Cow<'a, str>) -> Self {
+        self.comment = Some(value);
+        self
+    }
 
     pub(crate) fn validate(&self) -> RtfResult<()> {
         for value in [
-            self.title.as_deref(), self.subject.as_deref(), self.author.as_deref(),
-            self.manager.as_deref(), self.company.as_deref(), self.operator.as_deref(),
-            self.category.as_deref(), self.keywords.as_deref(), self.comment.as_deref(),
-            self.document_comment.as_deref(), self.hyperlink_base.as_deref(),
-        ].into_iter().flatten() {
+            self.title.as_deref(),
+            self.subject.as_deref(),
+            self.author.as_deref(),
+            self.manager.as_deref(),
+            self.company.as_deref(),
+            self.operator.as_deref(),
+            self.category.as_deref(),
+            self.keywords.as_deref(),
+            self.comment.as_deref(),
+            self.document_comment.as_deref(),
+            self.hyperlink_base.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
             if value.len() > MAX_INFO_TEXT_BYTES {
                 return Err(RtfError::MalformedDocument(
                     "RTF info text exceeds the metadata safety limit".to_string(),
@@ -158,9 +185,18 @@ impl<'a> DocumentInfo<'a> {
             }
         }
         for value in [
-            self.version, self.revision, self.editing_time, self.pages, self.words,
-            self.characters, self.characters_with_spaces, self.id,
-        ].into_iter().flatten() {
+            self.version,
+            self.revision,
+            self.editing_time,
+            self.pages,
+            self.words,
+            self.characters,
+            self.characters_with_spaces,
+            self.id,
+        ]
+        .into_iter()
+        .flatten()
+        {
             if value > i32::MAX as u32 {
                 return Err(RtfError::MalformedDocument(
                     "RTF info numeric value exceeds the signed control-word range".to_string(),

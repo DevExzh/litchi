@@ -21,19 +21,51 @@ fn parses_implicit_normal_all_types_list_metadata_and_round_trips() {
         r#"{\*\ts4 Table;}"#,
         r#"{\s5\ls4\ilvl2 List;}"#,
         r#"}Body}"#,
-    )).unwrap();
+    ))
+    .unwrap();
     let sheet = document.stylesheet();
     assert_eq!(sheet.styles().len(), 6);
-    assert_eq!(sheet.get_typed(StyleType::Paragraph, 0).unwrap().name, "Normal");
-    assert!(sheet.get_typed(StyleType::Paragraph, 0).unwrap().formatting.bold);
-    assert_eq!(sheet.get_typed(StyleType::Paragraph, 1).unwrap().name, "Heading \u{10c}");
-    assert_eq!(sheet.get_typed(StyleType::Paragraph, 5).unwrap().paragraph.unwrap().list_override, Some(4));
-    assert_eq!(sheet.get_typed(StyleType::Paragraph, 5).unwrap().paragraph.unwrap().list_level, Some(2));
+    assert_eq!(
+        sheet.get_typed(StyleType::Paragraph, 0).unwrap().name,
+        "Normal"
+    );
+    assert!(
+        sheet
+            .get_typed(StyleType::Paragraph, 0)
+            .unwrap()
+            .formatting
+            .bold
+    );
+    assert_eq!(
+        sheet.get_typed(StyleType::Paragraph, 1).unwrap().name,
+        "Heading \u{10c}"
+    );
+    assert_eq!(
+        sheet
+            .get_typed(StyleType::Paragraph, 5)
+            .unwrap()
+            .paragraph
+            .unwrap()
+            .list_override,
+        Some(4)
+    );
+    assert_eq!(
+        sheet
+            .get_typed(StyleType::Paragraph, 5)
+            .unwrap()
+            .paragraph
+            .unwrap()
+            .list_level,
+        Some(2)
+    );
     assert!(sheet.get_typed(StyleType::Character, 2).is_some());
     assert!(sheet.get_typed(StyleType::Section, 3).is_some());
     assert!(sheet.get_typed(StyleType::Table, 4).is_some());
     let chain = sheet.inheritance_chain(StyleType::Paragraph, 1).unwrap();
-    assert_eq!(chain.iter().map(|style| style.id).collect::<Vec<_>>(), vec![0, 1]);
+    assert_eq!(
+        chain.iter().map(|style| style.id).collect::<Vec<_>>(),
+        vec![0, 1]
+    );
 
     let reparsed = RtfDocument::parse_bytes(&write_stylesheet(&document)).unwrap();
     assert_eq!(reparsed.stylesheet(), sheet);
@@ -68,15 +100,31 @@ fn parses_real_libreoffice_stylesheet_types_and_implicit_normal() {
         "sw/qa/extras/rtfexport/data/fdo55504-1-min.rtf",
         "sw/qa/writerfilter/filters-test/data/pass/TCI-TN65GP-DDRHDLL-partial.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let sheet = document.stylesheet();
-        assert_eq!(sheet.get_typed(StyleType::Paragraph, 0).unwrap().name, "Normal");
-        assert!(sheet.styles().iter().any(|style| style.style_type == StyleType::Character));
-        assert!(sheet.styles().iter().any(|style| style.style_type == StyleType::Table));
+        assert_eq!(
+            sheet.get_typed(StyleType::Paragraph, 0).unwrap().name,
+            "Normal"
+        );
+        assert!(
+            sheet
+                .styles()
+                .iter()
+                .any(|style| style.style_type == StyleType::Character)
+        );
+        assert!(
+            sheet
+                .styles()
+                .iter()
+                .any(|style| style.style_type == StyleType::Table)
+        );
         let reparsed = RtfDocument::parse_bytes(&write_stylesheet(&document)).unwrap();
         assert_eq!(reparsed.stylesheet(), sheet);
     }

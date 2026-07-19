@@ -51,21 +51,61 @@ fn supports_all_42_section_numbering_control_spellings() {
         ("sftnnrlc", "saftnnrlc", NoteNumberingStyle::LowercaseRoman),
         ("sftnnruc", "saftnnruc", NoteNumberingStyle::UppercaseRoman),
         ("sftnnchi", "saftnnchi", NoteNumberingStyle::Chicago),
-        ("sftnnchosung", "saftnnchosung", NoteNumberingStyle::KoreanChosung),
+        (
+            "sftnnchosung",
+            "saftnnchosung",
+            NoteNumberingStyle::KoreanChosung,
+        ),
         ("sftnncnum", "saftnncnum", NoteNumberingStyle::Circle),
-        ("sftnndbnum", "saftnndbnum", NoteNumberingStyle::KanjiDigitless),
-        ("sftnndbnumd", "saftnndbnumd", NoteNumberingStyle::KanjiWithDigit),
-        ("sftnndbnumt", "saftnndbnumt", NoteNumberingStyle::KanjiThree),
+        (
+            "sftnndbnum",
+            "saftnndbnum",
+            NoteNumberingStyle::KanjiDigitless,
+        ),
+        (
+            "sftnndbnumd",
+            "saftnndbnumd",
+            NoteNumberingStyle::KanjiWithDigit,
+        ),
+        (
+            "sftnndbnumt",
+            "saftnndbnumt",
+            NoteNumberingStyle::KanjiThree,
+        ),
         ("sftnndbnumk", "saftnndbnumk", NoteNumberingStyle::KanjiFour),
         ("sftnndbar", "saftnndbar", NoteNumberingStyle::DoubleByte),
-        ("sftnnganada", "saftnnganada", NoteNumberingStyle::KoreanGanada),
+        (
+            "sftnnganada",
+            "saftnnganada",
+            NoteNumberingStyle::KoreanGanada,
+        ),
         ("sftnngbnum", "saftnngbnum", NoteNumberingStyle::ChineseOne),
-        ("sftnngbnumd", "saftnngbnumd", NoteNumberingStyle::ChineseTwo),
-        ("sftnngbnuml", "saftnngbnuml", NoteNumberingStyle::ChineseThree),
-        ("sftnngbnumk", "saftnngbnumk", NoteNumberingStyle::ChineseFour),
+        (
+            "sftnngbnumd",
+            "saftnngbnumd",
+            NoteNumberingStyle::ChineseTwo,
+        ),
+        (
+            "sftnngbnuml",
+            "saftnngbnuml",
+            NoteNumberingStyle::ChineseThree,
+        ),
+        (
+            "sftnngbnumk",
+            "saftnngbnumk",
+            NoteNumberingStyle::ChineseFour,
+        ),
         ("sftnnzodiac", "saftnnzodiac", NoteNumberingStyle::ZodiacOne),
-        ("sftnnzodiacd", "saftnnzodiacd", NoteNumberingStyle::ZodiacTwo),
-        ("sftnnzodiacl", "saftnnzodiacl", NoteNumberingStyle::ZodiacThree),
+        (
+            "sftnnzodiacd",
+            "saftnnzodiacd",
+            NoteNumberingStyle::ZodiacTwo,
+        ),
+        (
+            "sftnnzodiacl",
+            "saftnnzodiacl",
+            NoteNumberingStyle::ZodiacThree,
+        ),
     ];
 
     for (footnote, endnote, style) in cases {
@@ -87,10 +127,9 @@ fn supports_all_42_section_numbering_control_spellings() {
 
 #[test]
 fn preserves_inheritance_and_sectd_reset() {
-    let inherited = RtfDocument::parse(
-        r#"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sftnstart2 Second}"#,
-    )
-    .unwrap();
+    let inherited =
+        RtfDocument::parse(r#"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sftnstart2 Second}"#)
+            .unwrap();
     assert_eq!(inherited.sections().len(), 2);
     let first = inherited.sections()[0].properties.note_options;
     let second = inherited.sections()[1].properties.note_options;
@@ -98,10 +137,8 @@ fn preserves_inheritance_and_sectd_reset() {
     assert_eq!(second.footnote_numbering, first.footnote_numbering);
     assert_eq!(second.footnote_start, Some(2));
 
-    let reset = RtfDocument::parse(
-        r#"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sectd Second}"#,
-    )
-    .unwrap();
+    let reset =
+        RtfDocument::parse(r#"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sectd Second}"#).unwrap();
     assert_eq!(reset.sections().len(), 2);
     assert!(reset.sections()[1].properties.note_options.is_empty());
 }
@@ -139,9 +176,11 @@ fn rejects_invalid_values_and_non_root_or_late_section_note_options() {
         endnote_start: Some(0),
         ..SectionNoteOptions::default()
     };
-    assert!(RtfWriter::new(Vec::new())
-        .write_section_note_options(&invalid)
-        .is_err());
+    assert!(
+        RtfWriter::new(Vec::new())
+            .write_section_note_options(&invalid)
+            .is_err()
+    );
 }
 
 #[test]
@@ -159,10 +198,12 @@ fn permits_inert_section_note_controls_only_in_body_field_results() {
     );
     let document = RtfDocument::parse(source).unwrap();
     assert_eq!(document.fields().len(), 2);
-    assert!(document
-        .sections()
-        .iter()
-        .all(|section| section.properties.note_options.is_empty()));
+    assert!(
+        document
+            .sections()
+            .iter()
+            .all(|section| section.properties.note_options.is_empty())
+    );
 
     let malformed = [
         r#"{\rtf1{\field{\*\fldinst TOC \sftnbj}{\fldrslt X}}}"#,
@@ -184,10 +225,9 @@ fn permits_inert_section_note_controls_only_in_body_field_results() {
 
 #[test]
 fn permits_section_note_controls_in_explicit_body_section_format_snapshots() {
-    let document = RtfDocument::parse(
-        r#"{\rtf1\sectd\sftnnar Before{\sectd\sftnbj{\b snapshot}}After}"#,
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r#"{\rtf1\sectd\sftnnar Before{\sectd\sftnbj{\b snapshot}}After}"#)
+            .unwrap();
     assert_eq!(document.text(), "BeforesnapshotAfter");
 
     for source in [
@@ -260,13 +300,14 @@ fn permits_inert_section_format_runs_at_direct_field_instruction_level() {
     ))
     .unwrap();
     assert_eq!(document.fields().len(), 1);
-    assert!(document
-        .sections()
-        .iter()
-        .all(|section| section.properties.note_options.is_empty()));
+    assert!(
+        document
+            .sections()
+            .iter()
+            .all(|section| section.properties.note_options.is_empty())
+    );
 
-    let nested =
-        r#"{\rtf1{\field{\*\fldinst IF {\sectd\sftnbj} x}{\fldrslt value}}}"#;
+    let nested = r#"{\rtf1{\field{\*\fldinst IF {\sectd\sftnbj} x}{\fldrslt value}}}"#;
     assert!(RtfDocument::parse(nested).is_err());
 }
 
@@ -274,10 +315,12 @@ fn permits_inert_section_format_runs_at_direct_field_instruction_level() {
 fn ignores_section_note_controls_after_the_parsed_document_group() {
     let document = RtfDocument::parse(r#"{\rtf1 Body}\sectd\sftnbj"#).unwrap();
     assert_eq!(document.text(), "Body");
-    assert!(document
-        .sections()
-        .iter()
-        .all(|section| section.properties.note_options.is_empty()));
+    assert!(
+        document
+            .sections()
+            .iter()
+            .all(|section| section.properties.note_options.is_empty())
+    );
 
     assert!(RtfDocument::parse(r#"{\rtf1 Body\sftnbj}"#).is_err());
 }

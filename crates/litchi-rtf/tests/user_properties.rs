@@ -39,12 +39,18 @@ fn parses_all_typed_values_in_normative_order() {
             if value.year == 2016 && value.month == 1 && value.day == 30
                 && value.hour.is_none() && lexical == "2016. 01. 30."
     ));
-    assert_eq!(properties[4].value.property_type(), UserPropertyType::DateTime);
+    assert_eq!(
+        properties[4].value.property_type(),
+        UserPropertyType::DateTime
+    );
     assert!(matches!(
         &properties[5].value,
         UserPropertyValue::Unknown { type_code: 999, lexical } if lexical == "opaque"
     ));
-    assert_eq!(properties[5].value.property_type(), UserPropertyType::Unknown(999));
+    assert_eq!(
+        properties[5].value.property_type(),
+        UserPropertyType::Unknown(999)
+    );
     assert_eq!(properties[6].name, "Caf\u{e9}");
     assert!(matches!(
         &properties[6].value,
@@ -70,9 +76,8 @@ fn parses_libreoffice_user_property_fixtures_when_available() {
     }
     for fixture in fixtures {
         let source = std::fs::read_to_string(root.join(fixture)).unwrap();
-        let document = RtfDocument::parse(&source).unwrap_or_else(|error| {
-            panic!("failed to parse {fixture}: {error}")
-        });
+        let document = RtfDocument::parse(&source)
+            .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         assert!(!document.user_properties().is_empty(), "{fixture}");
     }
     let source = std::fs::read_to_string(root.join("rtfexport/data/tdf158762.rtf")).unwrap();
@@ -82,7 +87,11 @@ fn parses_libreoffice_user_property_fixtures_when_available() {
 
     let source = std::fs::read_to_string(root.join("rtfexport/data/custom-doc-props.rtf")).unwrap();
     let document = RtfDocument::parse(&source).unwrap();
-    let date = document.user_properties().iter().find(|property| property.name == "d").unwrap();
+    let date = document
+        .user_properties()
+        .iter()
+        .find(|property| property.name == "d")
+        .unwrap();
     assert!(matches!(
         &date.value,
         UserPropertyValue::Date { value, .. }
@@ -91,7 +100,9 @@ fn parses_libreoffice_user_property_fixtures_when_available() {
     let owned = date.clone().into_owned();
     assert_eq!(owned, *date);
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(&document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.user_properties(), document.user_properties());
 }

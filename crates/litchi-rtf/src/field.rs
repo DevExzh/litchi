@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 const MAX_INSTRUCTION_LEN: usize = 65_536;
 const MAX_TOKENS: usize = 256;
+pub(crate) const MAX_GENERIC_FIELDS: usize = 65_536;
 
 /// Field type in RTF documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,6 +20,70 @@ pub enum FieldType {
     Equation,
     Index,
     Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldOwner {
+    Detached,
+    Body,
+    Header,
+    Footer,
+    Footnote,
+    Endnote,
+    TableCell(u8),
+    FieldResult,
+    FormField,
+    Other,
+}
+
+/// A zero-width explicit `\page` control at a UTF-8 story boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PageBreak {
+    pub position: usize,
+}
+
+impl PageBreak {
+    pub const fn new(position: usize) -> Self {
+        Self { position }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BodyStoryEvent {
+    PageBreak(PageBreak),
+    Drawing(crate::StoryDrawing),
+    Field(usize),
+    BookmarkStart(usize),
+    BookmarkEnd(usize),
+    AnnotationStart(usize),
+    AnnotationEnd(usize),
+    Note(usize),
+    Object(usize),
+    PictureCompatibility(usize),
+    FormFieldStart(usize),
+    FormFieldEnd(usize),
+    RevisionStart(usize),
+    RevisionEnd(usize),
+    RevisionDeletion(usize),
+    GeneratedListMarker(usize),
+    LegacyTextBox(usize),
+    LegacyDrawing(usize),
+    NavigationEntry(usize),
+}
+
+/// A generic field reference embedded in a non-body text story.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StoryField {
+    pub field_index: usize,
+    pub position: usize,
+}
+
+/// Exact source order of drawings and generic fields in a text story.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoryEvent {
+    PageBreak(PageBreak),
+    Drawing(crate::StoryDrawing),
+    Field(StoryField),
 }
 
 /// One token from a field instruction.
@@ -83,12 +148,32 @@ pub enum ParsedFieldCode<'a> {
     Malformed(FieldCodeError),
 }
 
+/// Presence-only state carried by a generic RTF field.
+///
+/// Each `false` value means the corresponding control word was omitted.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FieldStatus {
+    pub dirty: bool,
+    pub edited: bool,
+    pub locked: bool,
+    pub private: bool,
+}
+
 /// Parsed RTF field.
 #[derive(Debug, Clone)]
 pub struct Field<'a> {
     pub field_type: FieldType,
     pub instruction: Cow<'a, str>,
     pub result: Cow<'a, str>,
+    pub status: FieldStatus,
+    pub shapes: Vec<crate::Shape<'a>>,
+    pub shape_groups: Vec<crate::ShapeGroup<'a>>,
+    pub drawing_order: Vec<crate::StoryDrawing>,
+    /// Exact source order of drawings and nested generic fields in the result story.
+    pub result_events: Vec<StoryEvent>,
+    pub owner: FieldOwner,
+    pub position: usize,
+    pub range_end: usize,
 }
 
 impl<'a> Field<'a> {
@@ -98,6 +183,14 @@ impl<'a> Field<'a> {
             field_type,
             instruction,
             result,
+            status: FieldStatus::default(),
+            shapes: Vec::new(),
+            shape_groups: Vec::new(),
+            drawing_order: Vec::new(),
+            result_events: Vec::new(),
+            owner: FieldOwner::Detached,
+            position: 0,
+            range_end: 0,
         }
     }
 
@@ -113,8 +206,7 @@ impl<'a> Field<'a> {
                 FieldType::Page
             },
             ParsedFieldCode::Other { ref keyword, .. }
-                if keyword.eq_ignore_ascii_case("DATE")
-                    || keyword.eq_ignore_ascii_case("TIME") =>
+                if keyword.eq_ignore_ascii_case("DATE") || keyword.eq_ignore_ascii_case("TIME") =>
             {
                 FieldType::Date
             },
@@ -140,7 +232,109 @@ impl<'a> Field<'a> {
             field_type,
             instruction: Cow::Borrowed(instruction),
             result: Cow::Borrowed(""),
+            status: FieldStatus::default(),
+            shapes: Vec::new(),
+            shape_groups: Vec::new(),
+            drawing_order: Vec::new(),
+            result_events: Vec::new(),
+            owner: FieldOwner::Detached,
+            position: 0,
+            range_end: 0,
         }
+    }
+
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    pub fn set_status(&mut self, status: FieldStatus) {
+        self.status = status;
+    }
+
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self.position > self.range_end {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF generic field range moves backwards".to_string(),
+            ));
+        }
+        if self.position != self.range_end {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF generic fields must be zero-width enclosing-story events".to_string(),
+            ));
+        }
+        validate_story_events(
+            self.result.as_ref(),
+            &self.shapes,
+            &self.shape_groups,
+            &self.drawing_order,
+            &self.result_events,
+            "field result",
+        )
+    }
+
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
+        let mut shapes = self.shapes.clone();
+        let mut order = self.drawing_order.clone();
+        order.push(crate::StoryDrawing::Shape(shapes.len()));
+        shapes.push(shape);
+        crate::shape::validate_story_drawings(
+            self.result.as_ref(),
+            &shapes,
+            &self.shape_groups,
+            &order,
+            "field result",
+        )?;
+        self.shapes = shapes;
+        self.drawing_order = order;
+        self.result_events
+            .push(StoryEvent::Drawing(crate::StoryDrawing::Shape(
+                self.shapes.len() - 1,
+            )));
+        Ok(())
+    }
+
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
+        let mut groups = self.shape_groups.clone();
+        let mut order = self.drawing_order.clone();
+        order.push(crate::StoryDrawing::ShapeGroup(groups.len()));
+        groups.push(group);
+        crate::shape::validate_story_drawings(
+            self.result.as_ref(),
+            &self.shapes,
+            &groups,
+            &order,
+            "field result",
+        )?;
+        self.shape_groups = groups;
+        self.drawing_order = order;
+        self.result_events
+            .push(StoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(
+                self.shape_groups.len() - 1,
+            )));
+        Ok(())
+    }
+
+    pub fn clear_drawings(&mut self) {
+        self.shapes.clear();
+        self.shape_groups.clear();
+        self.drawing_order.clear();
+        self.result_events
+            .retain(|event| !matches!(event, StoryEvent::Drawing(_)));
+    }
+
+    pub fn page_breaks(&self) -> impl Iterator<Item = PageBreak> + '_ {
+        self.result_events.iter().filter_map(|event| match event {
+            StoryEvent::PageBreak(value) => Some(*value),
+            _ => None,
+        })
+    }
+
+    pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
+        push_story_page_break(&mut self.result_events, self.result.as_ref(), position, "field result")
+    }
+
+    pub fn clear_page_breaks(&mut self) {
+        self.result_events.retain(|event| !matches!(event, StoryEvent::PageBreak(_)));
     }
 
     /// Parse this field's instruction into bounded, typed semantics.
@@ -179,6 +373,85 @@ impl<'a> Field<'a> {
     }
 }
 
+pub(crate) fn validate_story_events(
+    text: &str,
+    shapes: &[crate::Shape<'_>],
+    shape_groups: &[crate::ShapeGroup<'_>],
+    drawing_order: &[crate::StoryDrawing],
+    events: &[StoryEvent],
+    label: &str,
+) -> crate::RtfResult<()> {
+    crate::shape::validate_story_drawings(text, shapes, shape_groups, drawing_order, label)?;
+    let mut drawings = Vec::with_capacity(drawing_order.len());
+    let mut fields = std::collections::BTreeSet::new();
+    let mut previous = None;
+    for event in events {
+        let position = match *event {
+            StoryEvent::PageBreak(value) => {
+                if text.get(value.position..value.position).is_none() {
+                    return Err(crate::RtfError::MalformedDocument(format!(
+                        "RTF {label} page break is not at a UTF-8 boundary"
+                    )));
+                }
+                value.position
+            },
+            StoryEvent::Drawing(drawing) => {
+                drawings.push(drawing);
+                match drawing {
+                    crate::StoryDrawing::Shape(index) if index < shapes.len() => {
+                        shapes[index].position
+                    },
+                    crate::StoryDrawing::ShapeGroup(index) if index < shape_groups.len() => {
+                        shape_groups[index].position
+                    },
+                    _ => {
+                        return Err(crate::RtfError::MalformedDocument(format!(
+                            "RTF {label} story order has an invalid drawing reference"
+                        )));
+                    },
+                }
+            },
+            StoryEvent::Field(field) => {
+                if !fields.insert(field.field_index)
+                    || text.get(field.position..field.position).is_none()
+                {
+                    return Err(crate::RtfError::MalformedDocument(format!(
+                        "RTF {label} story order has an invalid or duplicate field reference"
+                    )));
+                }
+                field.position
+            },
+        };
+        if previous.is_some_and(|value| value > position) {
+            return Err(crate::RtfError::MalformedDocument(format!(
+                "RTF {label} story order moves backwards"
+            )));
+        }
+        previous = Some(position);
+    }
+    if drawings != drawing_order {
+        return Err(crate::RtfError::MalformedDocument(format!(
+            "RTF {label} story order is incomplete or changes drawing order"
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn push_story_page_break(
+    events: &mut Vec<StoryEvent>,
+    text: &str,
+    position: usize,
+    label: &str,
+) -> crate::RtfResult<()> {
+    if text.get(position..position).is_none() {
+        return Err(crate::RtfError::MalformedDocument(format!(
+            "RTF {label} page break is not at a UTF-8 boundary"
+        )));
+    }
+    events.push(StoryEvent::PageBreak(PageBreak::new(position)));
+    Ok(())
+}
+
 /// Parse a field instruction without evaluating it.
 pub fn parse_field_code(instruction: &str) -> ParsedFieldCode<'_> {
     match parse_field_code_inner(instruction) {
@@ -196,11 +469,7 @@ fn parse_field_code_inner(instruction: &str) -> Result<ParsedFieldCode<'_>, Fiel
     if keyword.value.eq_ignore_ascii_case("HYPERLINK") {
         return parse_hyperlink(tokens).map(ParsedFieldCode::Hyperlink);
     }
-    for (name, constructor) in [
-        ("REF", 0u8),
-        ("PAGEREF", 1u8),
-        ("NOTEREF", 2u8),
-    ] {
+    for (name, constructor) in [("REF", 0u8), ("PAGEREF", 1u8), ("NOTEREF", 2u8)] {
         if keyword.value.eq_ignore_ascii_case(name) {
             let code = parse_reference(tokens)?;
             return Ok(match constructor {
@@ -248,17 +517,21 @@ fn parse_hyperlink(tokens: Vec<FieldCodeToken<'_>>) -> Result<HyperlinkCode<'_>,
                         _ => &mut code.coordinates,
                     };
                     if slot.replace(value).is_some() {
-                        return Err(FieldCodeError::DuplicateOperand(match normalized.as_str() {
-                            "l" => "\\l",
-                            "o" => "\\o",
-                            "t" => "\\t",
-                            _ => "\\m",
-                        }));
+                        return Err(FieldCodeError::DuplicateOperand(
+                            match normalized.as_str() {
+                                "l" => "\\l",
+                                "o" => "\\o",
+                                "t" => "\\t",
+                                _ => "\\m",
+                            },
+                        ));
                     }
                     index += 2;
                 },
                 _ => {
-                    let value = tokens.get(index + 1).filter(|next| switch_name(next).is_none());
+                    let value = tokens
+                        .get(index + 1)
+                        .filter(|next| switch_name(next).is_none());
                     code.unknown_switches.push(FieldSwitch {
                         name: Cow::Owned(name.to_string()),
                         value: value.map(|token| token.value.clone()),
@@ -274,7 +547,9 @@ fn parse_hyperlink(tokens: Vec<FieldCodeToken<'_>>) -> Result<HyperlinkCode<'_>,
         }
     }
     if code.external_target.is_none() && code.bookmark.is_none() {
-        return Err(FieldCodeError::MissingOperand("hyperlink target or \\l bookmark"));
+        return Err(FieldCodeError::MissingOperand(
+            "hyperlink target or \\l bookmark",
+        ));
     }
     Ok(code)
 }
@@ -307,7 +582,9 @@ fn parse_reference(tokens: Vec<FieldCodeToken<'_>>) -> Result<ReferenceCode<'_>,
             "p" => return Err(FieldCodeError::DuplicateOperand("\\p")),
             "f" => return Err(FieldCodeError::DuplicateOperand("\\f")),
             _ => {
-                let value = tokens.get(index + 1).filter(|next| switch_name(next).is_none());
+                let value = tokens
+                    .get(index + 1)
+                    .filter(|next| switch_name(next).is_none());
                 code.unknown_switches.push(FieldSwitch {
                     name: Cow::Owned(name.to_string()),
                     value: value.map(|token| token.value.clone()),
@@ -372,8 +649,8 @@ fn tokenize(instruction: &str) -> Result<Vec<FieldCodeToken<'_>>, FieldCodeError
                         closed = true;
                         break;
                     },
-                    b'\\' if index + 1 < bytes.len()
-                        && matches!(bytes[index + 1], b'\\' | b'"') =>
+                    b'\\'
+                        if index + 1 < bytes.len() && matches!(bytes[index + 1], b'\\' | b'"') =>
                     {
                         value.push(bytes[index + 1] as char);
                         index += 2;
@@ -429,14 +706,32 @@ mod tests {
 
     #[test]
     fn exact_case_insensitive_keywords_and_distinct_references() {
-        assert!(matches!(parse_field_code("hyperlink \"https://e\""), ParsedFieldCode::Hyperlink(_)));
+        assert!(matches!(
+            parse_field_code("hyperlink \"https://e\""),
+            ParsedFieldCode::Hyperlink(_)
+        ));
         for invalid in ["HYPERLINKER x", "REFRESH x", "PAGEREFERENCE x"] {
-            assert!(matches!(parse_field_code(invalid), ParsedFieldCode::Other { .. }));
-            assert_eq!(Field::parse_instruction(invalid).field_type, FieldType::Unknown);
+            assert!(matches!(
+                parse_field_code(invalid),
+                ParsedFieldCode::Other { .. }
+            ));
+            assert_eq!(
+                Field::parse_instruction(invalid).field_type,
+                FieldType::Unknown
+            );
         }
-        assert!(matches!(parse_field_code("REF mark \\h"), ParsedFieldCode::Reference(_)));
-        assert!(matches!(parse_field_code("PAGEREF mark \\p"), ParsedFieldCode::PageReference(_)));
-        assert!(matches!(parse_field_code("NOTEREF mark \\f"), ParsedFieldCode::NoteReference(_)));
+        assert!(matches!(
+            parse_field_code("REF mark \\h"),
+            ParsedFieldCode::Reference(_)
+        ));
+        assert!(matches!(
+            parse_field_code("PAGEREF mark \\p"),
+            ParsedFieldCode::PageReference(_)
+        ));
+        assert!(matches!(
+            parse_field_code("NOTEREF mark \\f"),
+            ParsedFieldCode::NoteReference(_)
+        ));
     }
 
     #[test]
@@ -489,7 +784,10 @@ mod tests {
             "REF",
             r#"REF a \h \h"#,
         ] {
-            assert!(matches!(parse_field_code(instruction), ParsedFieldCode::Malformed(_)));
+            assert!(matches!(
+                parse_field_code(instruction),
+                ParsedFieldCode::Malformed(_)
+            ));
         }
     }
 
@@ -503,10 +801,14 @@ mod tests {
                 .join("../../3rdparty/libreoffice-core/sw/qa/extras")
                 .join(relative);
             let document = crate::RtfDocument::from_bytes(&std::fs::read(path).unwrap()).unwrap();
-            assert!(document.fields().iter().any(|field| {
-                field.extract_bookmark().as_deref() == Some(expected)
-                    && field.extract_url().as_deref() == Some(format!("#{expected}").as_str())
-            }), "fixture {relative} fields: {:?}", document.fields());
+            assert!(
+                document.fields().iter().any(|field| {
+                    field.extract_bookmark().as_deref() == Some(expected)
+                        && field.extract_url().as_deref() == Some(format!("#{expected}").as_str())
+                }),
+                "fixture {relative} fields: {:?}",
+                document.fields()
+            );
         }
 
         let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

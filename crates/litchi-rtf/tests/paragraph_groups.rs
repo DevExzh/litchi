@@ -27,9 +27,14 @@ fn parses_resolves_and_round_trips_paragraph_group_table() {
     let mut first = Vec::new();
     RtfWriter::new(&mut first).write_document(&doc).unwrap();
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
-    assert_eq!(doc.paragraph_group_table(), reparsed.paragraph_group_table());
+    assert_eq!(
+        doc.paragraph_group_table(),
+        reparsed.paragraph_group_table()
+    );
     let mut second = Vec::new();
-    RtfWriter::new(&mut second).write_document(&reparsed).unwrap();
+    RtfWriter::new(&mut second)
+        .write_document(&reparsed)
+        .unwrap();
     assert_eq!(first, second);
 }
 
@@ -48,7 +53,10 @@ fn rejects_malformed_paragraph_group_tables() {
         r#"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0\u20320?}}}"#,
     ];
     for source in malformed {
-        assert!(RtfDocument::parse(source).is_err(), "accepted malformed RTF: {source}");
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "accepted malformed RTF: {source}"
+        );
     }
 }
 
@@ -58,7 +66,10 @@ fn parses_real_libreoffice_paragraph_group_fixture() {
         "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569-2.rtf"
     );
     let marker = br"{\*\pgptbl";
-    let start = fixture.windows(marker.len()).position(|window| window == marker).unwrap();
+    let start = fixture
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .unwrap();
     let mut depth = 0usize;
     let mut end = None;
     for (offset, byte) in fixture[start..].iter().enumerate() {
@@ -83,8 +94,10 @@ fn parses_real_libreoffice_paragraph_group_fixture() {
     assert_eq!(table.get(2).unwrap().parent_id, 13);
     assert_eq!(table.get(13).unwrap().parent_id, 17);
     assert_eq!(table.parent_of(17).unwrap().id, 11);
-    assert!(table
-        .entries()
-        .iter()
-        .any(|entry| entry.borders.has_any_border()));
+    assert!(
+        table
+            .entries()
+            .iter()
+            .any(|entry| entry.borders.has_any_border())
+    );
 }

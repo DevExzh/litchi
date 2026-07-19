@@ -3,7 +3,9 @@ use std::fs;
 
 fn round_trip(document: &RtfDocument<'_>) -> RtfDocument<'static> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(document)
+        .unwrap();
     RtfDocument::parse_bytes(&output).unwrap()
 }
 
@@ -24,7 +26,10 @@ fn parses_all_protection_controls_and_round_trips_inert_hash() {
     assert_eq!(protection.enforced, Some(true));
     assert_eq!(protection.level, Some(ProtectionLevel::Level2));
     assert_eq!(protection.password_hash.as_deref(), Some("aBcD0123"));
-    assert_eq!(protection.protection_type(), ProtectionType::RevisionTracking);
+    assert_eq!(
+        protection.protection_type(),
+        ProtectionType::RevisionTracking
+    );
     assert_eq!(document.text(), "Body");
 
     let reparsed = round_trip(&document);
@@ -54,7 +59,10 @@ fn rejects_malformed_duplicate_or_misplaced_protection() {
 
 #[test]
 fn parses_real_libreoffice_protection_fixtures() {
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/sw/qa/extras/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/sw/qa/extras/"
+    );
 
     let read_only = fs::read(format!("{root}rtfimport/data/read-only-protect.rtf")).unwrap();
     let document = RtfDocument::parse_bytes(&read_only).unwrap();
@@ -71,5 +79,8 @@ fn parses_real_libreoffice_protection_fixtures() {
 
     let password = fs::read(format!("{root}rtfexport/data/fdo55504-1-min.rtf")).unwrap();
     let document = RtfDocument::parse_bytes(&password).unwrap();
-    assert_eq!(document.protection().password_hash.as_deref(), Some("00000000"));
+    assert_eq!(
+        document.protection().password_hash.as_deref(),
+        Some("00000000")
+    );
 }

@@ -27,21 +27,64 @@ pub enum ControlWord<'a> {
     ColorTable,
     StyleSheet,
     Info,
+    DefaultCharacterProperties(Option<i32>),
+    DefaultParagraphProperties(Option<i32>),
+    DefaultFont(Option<i32>),
+    AssociatedDefaultFont(Option<i32>),
+    StylesheetDefaultBidiFont(Option<i32>),
+    StylesheetDefaultDoubleByteFont(Option<i32>),
+    StylesheetDefaultHighAnsiFont(Option<i32>),
+    StylesheetDefaultLowAnsiFont(Option<i32>),
+    LowAnsiCharacter(Option<i32>),
+    HighAnsiCharacter(Option<i32>),
+    DoubleByteCharacter(Option<i32>),
+    FontComplexScript(Option<i32>),
+    CharacterGrid(Option<i32>),
+    NoWidowControl(Option<i32>),
     LegacySectionNumberingLevel(i32),
-    LegacyNumberingDecimal,
-    LegacyNumberingUpperRoman,
-    LegacyNumberingLowerRoman,
-    LegacyNumberingUpperLetter,
-    LegacyNumberingLowerLetter,
-    LegacyNumberingStart(i32),
-    LegacyNumberingIndent(i32),
-    LegacyNumberingSpace(i32),
-    LegacyNumberingHanging,
-    LegacyNumberingPrevious,
-    LegacyNumberingAlignLeft,
-    LegacyNumberingAlignCenter,
-    LegacyNumberingAlignRight,
-    LegacyNumberingFont(i32),
+    LegacyParagraphNumbering(Option<i32>),
+    LegacyNumberingLevel(Option<i32>),
+    LegacyNumberingLevelBullet(Option<i32>),
+    LegacyNumberingLevelBody(Option<i32>),
+    LegacyNumberingLevelContinue(Option<i32>),
+    LegacyNumberingDecimal(Option<i32>),
+    LegacyNumberingUpperRoman(Option<i32>),
+    LegacyNumberingLowerRoman(Option<i32>),
+    LegacyNumberingUpperLetter(Option<i32>),
+    LegacyNumberingLowerLetter(Option<i32>),
+    LegacyNumberingFormat(crate::LegacyParagraphNumberingFormat, Option<i32>),
+    LegacyNumberingStart(Option<i32>),
+    LegacyNumberingIndent(Option<i32>),
+    LegacyNumberingSpace(Option<i32>),
+    LegacyNumberingHanging(Option<i32>),
+    LegacyNumberingPrevious(Option<i32>),
+    LegacyNumberingAcross(Option<i32>),
+    LegacyNumberingOnce(Option<i32>),
+    LegacyNumberingRestart(Option<i32>),
+    LegacyNumberingBidiA(Option<i32>),
+    LegacyNumberingBidiB(Option<i32>),
+    LegacyNumberingAlignLeft(Option<i32>),
+    LegacyNumberingAlignCenter(Option<i32>),
+    LegacyNumberingAlignRight(Option<i32>),
+    LegacyNumberingFont(Option<i32>),
+    LegacyNumberingFontSize(Option<i32>),
+    LegacyNumberingColor(Option<i32>),
+    LegacyNumberingBold(Option<i32>),
+    LegacyNumberingItalic(Option<i32>),
+    LegacyNumberingCaps(Option<i32>),
+    LegacyNumberingSmallCaps(Option<i32>),
+    LegacyNumberingStrike(Option<i32>),
+    LegacyNumberingUnderlineToggle(Option<i32>),
+    LegacyNumberingUnderline(crate::LegacyParagraphNumberingUnderline, Option<i32>),
+    LegacyNumberingRevisionAuthor(Option<i32>),
+    LegacyNumberingRevisionDate(Option<i32>),
+    LegacyNumberingRevisionFormat(Option<i32>),
+    LegacyNumberingRevisionNoTrack(Option<i32>),
+    LegacyNumberingRevisionParagraph(Option<i32>),
+    LegacyNumberingRevisionRgb(Option<i32>),
+    LegacyNumberingRevisionStart(Option<i32>),
+    LegacyNumberingRevisionStop(Option<i32>),
+    LegacyNumberingRevisionTextStart(Option<i32>),
     LegacyNumberingTextBefore,
     LegacyNumberingTextAfter,
     GeneratedListText,
@@ -52,10 +95,10 @@ pub enum ControlWord<'a> {
     TableNestingLevel(Option<i32>),
 
     // Stylesheet entries and metadata
-    ParagraphStyle(i32),
-    CharacterStyle(i32),
-    SectionStyle(i32),
-    TableStyle(i32),
+    ParagraphStyle(Option<i32>),
+    CharacterStyle(Option<i32>),
+    SectionStyle(Option<i32>),
+    TableStyle(Option<i32>),
     StyleBasedOn(i32),
     StyleNext(i32),
     StyleLink(i32),
@@ -74,8 +117,19 @@ pub enum ControlWord<'a> {
 
     // Embedded content
     Picture,
+    PictureProperties(Option<i32>),
+    PictureShapeId(Option<i32>),
+    InvalidPictureShapePropertyParameter,
+    ShapeBinaryValue(Option<i32>),
+    ShapeThemeValue(Option<i32>),
+    ShapeThemeColor(crate::ShapeThemeColor, Option<i32>),
+    ShapeThemeTint(Option<i32>),
+    ShapeThemeShade(Option<i32>),
+    ShapeResult(Option<i32>),
     Object,
+    InvalidObjectDestinationParameter,
     Result,
+    InvalidObjectResultDestinationParameter,
     ObjectClass,
     DocumentVariable,
     UserProperties,
@@ -89,11 +143,32 @@ pub enum ControlWord<'a> {
     ObjectLink,
     ObjectAutoLink,
     ObjectHtml,
+    ObjectSubscriber(Option<i32>),
+    ObjectPublisher(Option<i32>),
+    ObjectInstallableCommand(Option<i32>),
+    ObjectOleControl(Option<i32>),
+    ObjectLinkSelf(Option<i32>),
     ObjectWidth(i32),
     ObjectHeight(i32),
+    ObjectAlignment(Option<i32>),
+    ObjectTranslationY(Option<i32>),
+    ObjectCropTop(Option<i32>),
+    ObjectCropBottom(Option<i32>),
+    ObjectCropLeft(Option<i32>),
+    ObjectCropRight(Option<i32>),
+    ObjectScaleX(Option<i32>),
+    ObjectScaleY(Option<i32>),
     ObjectLocked(bool),
     ObjectUpdate(bool),
     ObjectSetSize(bool),
+    ObjectResultMerge(Option<i32>),
+    ObjectResultRtf(Option<i32>),
+    ObjectResultText(Option<i32>),
+    ObjectResultPicture(Option<i32>),
+    ObjectResultBitmap(Option<i32>),
+    ObjectResultHtml(Option<i32>),
+    OleClassId(Option<i32>),
+    InvalidObjectModifierParameter,
 
     // Picture properties
     PictureWidth(i32),
@@ -102,6 +177,16 @@ pub enum ControlWord<'a> {
     PictureGoalHeight(i32),
     PictureScaleX(i32),
     PictureScaleY(i32),
+    PictureScaled(Option<i32>),
+    PictureBitmap(Option<i32>),
+    PictureBitsPerPixel(Option<i32>),
+    PictureCropLeft(Option<i32>),
+    PictureCropRight(Option<i32>),
+    PictureCropTop(Option<i32>),
+    PictureCropBottom(Option<i32>),
+    WindowsBitmapBitsPerPixel(Option<i32>),
+    WindowsBitmapPlanes(Option<i32>),
+    WindowsBitmapWidthBytes(Option<i32>),
     Emfblip,
     Pngblip,
     Jpegblip,
@@ -118,10 +203,10 @@ pub enum ControlWord<'a> {
     Field,
     FieldInstruction,
     FieldResult,
-    FieldLock,
-    FieldDirty,
-    FieldEdit,
-    FieldPrivate,
+    FieldLock(Option<i32>),
+    FieldDirty(Option<i32>),
+    FieldEdit(Option<i32>),
+    FieldPrivate(Option<i32>),
     FormField,
     DataField,
     FormFieldType(i32),
@@ -166,6 +251,33 @@ pub enum ControlWord<'a> {
     LatentStyleQuickFormat(i32),
     LatentStylePriority(i32),
     DataStore,
+    MailMerge,
+    MailMergeConnectString,
+    MailMergeConnectStringData,
+    MailMergeDataSource,
+    MailMergeHeaderSource,
+    MailMergeLinkToQuery(bool),
+    MailMergeQuery,
+    MailMergeDataSourceObject,
+    MailMergeActiveRecord(i32),
+    MailMergeColumnDelimiter(i32),
+    MailMergeColumnCount(i32),
+    MailMergeDynamicAddress(bool),
+    MailMergeFirstRowHeader(bool),
+    MailMergeFilter,
+    MailMergeFieldMapData,
+    MailMergeFieldMapColumn(i32),
+    MailMergeHash(i32),
+    MailMergeId(i32),
+    MailMergeMappedName,
+    MailMergeName,
+    MailMergeRecipientData,
+    MailMergeSort,
+    MailMergeSourceType(i32),
+    MailMergeTable,
+    MailMergeUdl,
+    MailMergeUdlData,
+    MailMergeUniqueTag,
     MathProperties,
     MathBreakBinary(i32),
     MathBreakBinarySubtraction(i32),
@@ -183,6 +295,7 @@ pub enum ControlWord<'a> {
     MathSmallFractions(i32),
     MathWrapIndent(i32),
     MathWrapRight(i32),
+    DefaultTabWidth(Option<i32>),
     DefaultLanguage(i32),
     DefaultLanguageEastAsian(i32),
     DefaultLanguageComplexScript(i32),
@@ -211,6 +324,129 @@ pub enum ControlWord<'a> {
     EnforceProtection(Option<i32>),
     ProtectionLevel(Option<i32>),
     Password,
+    ProtectionUserTable,
+    HyphenateAutomatically(Option<i32>),
+    HyphenateCapitalizedWords(Option<i32>),
+    HyphenationConsecutiveLines(Option<i32>),
+    HyphenationHotZone(Option<i32>),
+    NextFile,
+    DocumentTemplate,
+    DocumentViewKind(Option<i32>),
+    DocumentViewScale(Option<i32>),
+    DocumentZoomKind(Option<i32>),
+    DocumentViewBackgroundShapes(Option<i32>),
+    DocumentViewNoPageBoundaries(Option<i32>),
+    HideReviewMarkup(Option<i32>),
+    HideReviewComments(Option<i32>),
+    HideReviewInsertionsAndDeletions(Option<i32>),
+    WindowCaption,
+    XslTransform,
+    UseXslTransform(Option<i32>),
+    StyleListFilter(Option<i32>),
+    StyleSortMethod(Option<i32>),
+    ReadOnlyRecommended(Option<i32>),
+    SavePreviousPicture(Option<i32>),
+    WriteReservation(Option<i32>),
+    WriteReservationHash(Option<i32>),
+    FromText(Option<i32>),
+    FromHtml(Option<i32>),
+    DocumentType(Option<i32>),
+    MakeBackup(Option<i32>),
+    DefaultSaveFormat(Option<i32>),
+    BoilerplateDocument(Option<i32>),
+    Word97CompatibilityMode(Option<i32>),
+    PostScriptOverText(Option<i32>),
+    HorizontalDocument(Option<i32>),
+    VerticalDocument(Option<i32>),
+    CompressJustification(Option<i32>),
+    ExpandJustification(Option<i32>),
+    LineBasedOnGrid(Option<i32>),
+    FractionalCharacterWidths(Option<i32>),
+    AbstractNumberingCleanup(Option<i32>),
+    DocumentEventMask(Option<i32>),
+    DrawingGridFollowsMargins(Option<i32>),
+    SnapToDrawingGrid(Option<i32>),
+    DrawingGridHorizontalSpacing(Option<i32>),
+    DrawingGridVerticalSpacing(Option<i32>),
+    DrawingGridHorizontalOrigin(Option<i32>),
+    DrawingGridVerticalOrigin(Option<i32>),
+    DrawingGridHorizontalShow(Option<i32>),
+    DrawingGridVerticalShow(Option<i32>),
+    ParallelGutter(Option<i32>),
+    PrintTwoOnOne(Option<i32>),
+    ThemeLanguage(Option<i32>),
+    ThemeLanguageEastAsian(Option<i32>),
+    ThemeLanguageComplexScript(Option<i32>),
+    RelyOnVml(Option<i32>),
+    ValidateXml(Option<i32>),
+    ShowPlaceholderText(Option<i32>),
+    IgnoreMixedContent(Option<i32>),
+    SaveInvalidXml(Option<i32>),
+    ShowXmlErrors(Option<i32>),
+    DoNotEmbedSystemFonts(Option<i32>),
+    DoNotEmbedLinguisticData(Option<i32>),
+    TrackMoves(Option<i32>),
+    TrackFormatting(Option<i32>),
+    LockDocumentTheme(Option<i32>),
+    LockQuickFormatSet(Option<i32>),
+    UseNormalStyleForLists(Option<i32>),
+    UpdateStylesFromTemplate(Option<i32>),
+    DeclareStyleRestrictions(Option<i32>),
+    EnforceStyleRestrictions(Option<i32>),
+    StyleRestrictionsBackwardCompatibility(Option<i32>),
+    AllowAutoFormatOverride(Option<i32>),
+    BookFold(Option<i32>),
+    ReverseBookFold(Option<i32>),
+    BookFoldSheets(Option<i32>),
+    RemovePersonalInformation(Option<i32>),
+    RemoveDateTimeInformation(Option<i32>),
+    SuppressRaisedLoweredExtraSpacing(Option<i32>),
+    SuppressTopPageExtraSpacing(Option<i32>),
+    SuppressSpaceBeforeAfterHardBreak(Option<i32>),
+    SuppressWordPerfectExtraLineSpacing(Option<i32>),
+    SuppressBottomPageExtraSpacing(Option<i32>),
+    DoNotBalanceSbcsDbcs(Option<i32>),
+    ExpandSpacingAtShiftReturn(Option<i32>),
+    DoNotAddSpaceForUnderline(Option<i32>),
+    DoNotUnderlineTrailingSpaces(Option<i32>),
+    DoNotTranslateBackslashToYen(Option<i32>),
+    LegacyAsianLineBreakingRules(Option<i32>),
+    CombineLegacyTableBorders(Option<i32>),
+    DoNotAlignTableRowsIndependently(Option<i32>),
+    DoNotUseRawTableWidth(Option<i32>),
+    KeepTableRowsTogether(Option<i32>),
+    DoNotAdjustTableLineHeight(Option<i32>),
+    DoNotBreakWrappedTablesAcrossPages(Option<i32>),
+    PreventAutofitGrowthIntoMargins(Option<i32>),
+    UseWord2003TableStyleRules(Option<i32>),
+    DoNotUseWord97ShapeLayout(Option<i32>),
+    UseLegacyFootnoteLayout(Option<i32>),
+    UseHtmlParagraphAutoSpacing(Option<i32>),
+    PreserveLastTabAlignment(Option<i32>),
+    UseWord95AutoSpacing(Option<i32>),
+    ApplyThaiLineBreakingRules(Option<i32>),
+    SnapTextToGridInsideTable(Option<i32>),
+    AllowHangingPunctuation(Option<i32>),
+    UseAsianLineBreakingRules(Option<i32>),
+    CompressPunctuationAtLineStart(Option<i32>),
+    NoCompatibilityOptions(Option<i32>),
+    NoUiCompatibility(Option<i32>),
+    NoFeatureThrottle(Option<i32>),
+    ForceCompatibilityUpgrade(Option<i32>),
+    PreserveAutofitTableWidthAroundShapes(Option<i32>),
+    UseHangingIndentAsNumberingTab(Option<i32>),
+    UseLegacyKinsokuCharacters(Option<i32>),
+    UseLegacyFloatingObjectIndentation(Option<i32>),
+    AllowContextualSpacingInTables(Option<i32>),
+    IgnoreCellVerticalAlignmentWithFloatingObjects(Option<i32>),
+    IgnoreTextBoxVerticalAlignment(Option<i32>),
+    SplitPageBreakParagraph(Option<i32>),
+    UseFixedWidthHangul(Option<i32>),
+    UseLegacyAutofitWidthExpansion(Option<i32>),
+    UseCachedColumnBalancing(Option<i32>),
+    UnderlineNumberingSuffix(Option<i32>),
+    DoNotSplitRowsAroundFloatingTables(Option<i32>),
+    UseAnsiKerningPairs(Option<i32>),
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -236,8 +472,22 @@ pub enum ControlWord<'a> {
     AssociatedFontNumber(Option<i32>),
     AssociatedFontSize(Option<i32>),
     AssociatedLanguage(Option<i32>),
-    AssociatedBold(bool),
-    AssociatedItalic(bool),
+    AssociatedBold(Option<i32>),
+    AssociatedAllCaps(Option<i32>),
+    AssociatedColor(Option<i32>),
+    AssociatedBaselineDown(Option<i32>),
+    AssociatedExpansion(Option<i32>),
+    AssociatedItalic(Option<i32>),
+    AssociatedOutline(Option<i32>),
+    AssociatedSmallCaps(Option<i32>),
+    AssociatedShadow(Option<i32>),
+    AssociatedStrike(Option<i32>),
+    AssociatedUnderline(Option<i32>),
+    AssociatedUnderlineDotted(Option<i32>),
+    AssociatedUnderlineDouble(Option<i32>),
+    AssociatedUnderlineNone(Option<i32>),
+    AssociatedUnderlineWords(Option<i32>),
+    AssociatedBaselineUp(Option<i32>),
     FontAlternateName,
     FontNonTaggedName,
     FontPanose,
@@ -263,7 +513,7 @@ pub enum ControlWord<'a> {
     Green(i32),
     Blue(i32),
     ColorForeground(i32),
-    ColorBackground(i32),
+    ColorBackground(Option<i32>),
 
     // Character formatting
     Bold(bool),
@@ -305,6 +555,7 @@ pub enum ControlWord<'a> {
 
     // Paragraph formatting
     Par,
+    Page(Option<i32>),
     Pard,
     LeftAlign,
     RightAlign,
@@ -325,13 +576,20 @@ pub enum ControlWord<'a> {
     LeftIndent(i32),
     RightIndent(i32),
     FirstLineIndent(i32),
-    LogicalLeftIndent(Option<i32>), LogicalRightIndent(Option<i32>), CharacterFirstLineIndent(Option<i32>), CharacterLeftIndent(Option<i32>), CharacterRightIndent(Option<i32>), MirrorIndents(Option<i32>),
+    LogicalLeftIndent(Option<i32>),
+    LogicalRightIndent(Option<i32>),
+    CharacterFirstLineIndent(Option<i32>),
+    CharacterLeftIndent(Option<i32>),
+    CharacterRightIndent(Option<i32>),
+    MirrorIndents(Option<i32>),
 
     // Paragraph additional properties
     KeepTogether,
     KeepNext,
     PageBreakBefore,
     WidowControl,
+    DropCapLines(Option<i32>),
+    DropCapType(Option<i32>),
     ParagraphHyphenation(Option<i32>),
     AutoSpaceAlphabetic(Option<i32>),
     AutoSpaceNumbers(Option<i32>),
@@ -387,12 +645,20 @@ pub enum ControlWord<'a> {
     TableCellFitText(Option<i32>),
     TableCellNoWrap(Option<i32>),
     TableCellHideMark(Option<i32>),
-    TableCellMerge(crate::TableCellMergeAxis, crate::TableCellMergeRole, Option<i32>),
+    TableCellMerge(
+        crate::TableCellMergeAxis,
+        crate::TableCellMergeRole,
+        Option<i32>,
+    ),
     TableBorder(crate::table::TableBorderTarget, Option<i32>),
     TableShadingAmount(crate::TableDistanceScope, Option<i32>),
     TableShadingForeground(crate::TableDistanceScope, Option<i32>),
     TableShadingBackground(crate::TableDistanceScope, Option<i32>),
-    TableShadingPattern(crate::TableDistanceScope, crate::ShadingPattern, Option<i32>),
+    TableShadingPattern(
+        crate::TableDistanceScope,
+        crate::ShadingPattern,
+        Option<i32>,
+    ),
     TableRowShadingPatternIndex(Option<i32>),
     NestedTableCell(Option<i32>),
     NestedTableRow(Option<i32>),
@@ -446,9 +712,9 @@ pub enum ControlWord<'a> {
     PageBorderArt(Option<i32>),
 
     // Shading
-    Shading(i32),
-    ForegroundPattern(i32),
-    BackgroundPattern(i32),
+    Shading(Option<i32>),
+    ForegroundPattern(Option<i32>),
+    BackgroundPattern(Option<i32>),
 
     // Tab stops
     TabLeft(Option<i32>),
@@ -472,7 +738,9 @@ pub enum ControlWord<'a> {
     ListHybrid(bool),
     ListName,
     ListStyleName,
-    ListPicture,
+    ListPicture(Option<i32>),
+    ShapePicture(Option<i32>),
+    NonShapePicture(Option<i32>),
     ListId(i32),
     ListOverrideTable,
     ListOverride,
@@ -507,6 +775,9 @@ pub enum ControlWord<'a> {
     MarginTop(i32),
     MarginBottom(i32),
     MarginGutter(i32),
+    FacingPages(bool),
+    MirrorMargins(Option<i32>),
+    DocumentGutter(Option<i32>),
     HeaderDistance(i32),
     FooterDistance(i32),
     Landscape,
@@ -601,7 +872,7 @@ pub enum ControlWord<'a> {
     RevisionProperty(i32),
 
     // Shapes
-    Shape,
+    Shape(Option<i32>),
     ShapeInstance,
     ShapeType(i32),
     ShapeLeft(i32),
@@ -615,11 +886,11 @@ pub enum ControlWord<'a> {
     ShapeWrap(i32),
     ShapeBelowText(bool),
     ShapeLockAnchor,
-    ShapeGroup,
+    ShapeGroup(Option<i32>),
     ShapeProperty,
     ShapePropertyName,
     ShapePropertyValue,
-    ShapeText,
+    ShapeText(Option<i32>),
     LegacyDrawingObject,
     LegacyTextBox,
     LegacyTextBoxText,
@@ -695,7 +966,7 @@ pub enum ControlWord<'a> {
     LegacyDrawingShadow,
     LegacyDrawingShadowX(i32),
     LegacyDrawingShadowY(i32),
-    BackgroundDestination,
+    BackgroundDestination(Option<i32>),
 
     // Document info
     Title,
@@ -735,7 +1006,6 @@ pub enum ControlWord<'a> {
     // Special
     Tab,
     Line,
-    Page,
     Section,
     SectionDefault,
     NonBreakingSpace,
@@ -976,21 +1246,196 @@ impl<'a> Lexer<'a> {
             "colortbl" => ControlWord::ColorTable,
             "stylesheet" => ControlWord::StyleSheet,
             "info" => ControlWord::Info,
+            "defchp" => ControlWord::DefaultCharacterProperties(param),
+            "defpap" => ControlWord::DefaultParagraphProperties(param),
+            "deff" => ControlWord::DefaultFont(param),
+            "adeff" => ControlWord::AssociatedDefaultFont(param),
+            "stshfbi" => ControlWord::StylesheetDefaultBidiFont(param),
+            "stshfdbch" => ControlWord::StylesheetDefaultDoubleByteFont(param),
+            "stshfhich" => ControlWord::StylesheetDefaultHighAnsiFont(param),
+            "stshfloch" => ControlWord::StylesheetDefaultLowAnsiFont(param),
+            "pn" => ControlWord::LegacyParagraphNumbering(param),
+            "pnlvl" => ControlWord::LegacyNumberingLevel(param),
+            "pnlvlblt" => ControlWord::LegacyNumberingLevelBullet(param),
+            "pnlvlbody" => ControlWord::LegacyNumberingLevelBody(param),
+            "pnlvlcont" => ControlWord::LegacyNumberingLevelContinue(param),
             "pnseclvl" => ControlWord::LegacySectionNumberingLevel(param_value),
-            "pndec" => ControlWord::LegacyNumberingDecimal,
-            "pnucrm" => ControlWord::LegacyNumberingUpperRoman,
-            "pnlcrm" => ControlWord::LegacyNumberingLowerRoman,
-            "pnucltr" => ControlWord::LegacyNumberingUpperLetter,
-            "pnlcltr" => ControlWord::LegacyNumberingLowerLetter,
-            "pnstart" => ControlWord::LegacyNumberingStart(param_value),
-            "pnindent" => ControlWord::LegacyNumberingIndent(param_value),
-            "pnsp" => ControlWord::LegacyNumberingSpace(param_value),
-            "pnhang" => ControlWord::LegacyNumberingHanging,
-            "pnprev" => ControlWord::LegacyNumberingPrevious,
-            "pnql" => ControlWord::LegacyNumberingAlignLeft,
-            "pnqc" => ControlWord::LegacyNumberingAlignCenter,
-            "pnqr" => ControlWord::LegacyNumberingAlignRight,
-            "pnf" => ControlWord::LegacyNumberingFont(param_value),
+            "pndec" => ControlWord::LegacyNumberingDecimal(param),
+            "pnucrm" => ControlWord::LegacyNumberingUpperRoman(param),
+            "pnlcrm" => ControlWord::LegacyNumberingLowerRoman(param),
+            "pnucltr" => ControlWord::LegacyNumberingUpperLetter(param),
+            "pnlcltr" => ControlWord::LegacyNumberingLowerLetter(param),
+            "pnaiu" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::Aiueo,
+                param,
+            ),
+            "pnaiud" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::AiueoDbChar,
+                param,
+            ),
+            "pnaiueo" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::AiueoExtended,
+                param,
+            ),
+            "pnaiueod" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::AiueoExtendedDbChar,
+                param,
+            ),
+            "pnchosung" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::Chosung,
+                param,
+            ),
+            "pncard" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::CardinalText,
+                param,
+            ),
+            "pndecd" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::DecimalWithPeriod,
+                param,
+            ),
+            "pnord" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::Ordinal,
+                param,
+            ),
+            "pnordt" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::OrdinalText,
+                param,
+            ),
+            "pncnum" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::ChineseCounting,
+                param,
+            ),
+            "pndbnum" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::ChineseCountingDbChar,
+                param,
+            ),
+            "pndbnumd" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::ChineseCountingKorean,
+                param,
+            ),
+            "pndbnumk" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::ChineseCountingLegal,
+                param,
+            ),
+            "pndbnuml" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::ChineseCountingThousand,
+                param,
+            ),
+            "pndbnumt" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::ChineseCountingTraditional,
+                param,
+            ),
+            "pnganada" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::Ganada,
+                param,
+            ),
+            "pngbnum" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::GbCounting,
+                param,
+            ),
+            "pngbnumd" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::GbCountingDbChar,
+                param,
+            ),
+            "pngbnumk" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::GbCountingKorean,
+                param,
+            ),
+            "pngbnuml" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::GbCountingLegal,
+                param,
+            ),
+            "pniroha" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::Iroha,
+                param,
+            ),
+            "pnirohad" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::IrohaDbChar,
+                param,
+            ),
+            "pnzodiac" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::Zodiac,
+                param,
+            ),
+            "pnzodiacd" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::ZodiacDbChar,
+                param,
+            ),
+            "pnzodiacl" => ControlWord::LegacyNumberingFormat(
+                crate::LegacyParagraphNumberingFormat::ZodiacLegal,
+                param,
+            ),
+            "pnstart" => ControlWord::LegacyNumberingStart(param),
+            "pnindent" => ControlWord::LegacyNumberingIndent(param),
+            "pnsp" => ControlWord::LegacyNumberingSpace(param),
+            "pnhang" => ControlWord::LegacyNumberingHanging(param),
+            "pnprev" => ControlWord::LegacyNumberingPrevious(param),
+            "pnacross" => ControlWord::LegacyNumberingAcross(param),
+            "pnnumonce" => ControlWord::LegacyNumberingOnce(param),
+            "pnrestart" => ControlWord::LegacyNumberingRestart(param),
+            "pnbidia" => ControlWord::LegacyNumberingBidiA(param),
+            "pnbidib" => ControlWord::LegacyNumberingBidiB(param),
+            "pnql" => ControlWord::LegacyNumberingAlignLeft(param),
+            "pnqc" => ControlWord::LegacyNumberingAlignCenter(param),
+            "pnqr" => ControlWord::LegacyNumberingAlignRight(param),
+            "pnf" => ControlWord::LegacyNumberingFont(param),
+            "pnfs" => ControlWord::LegacyNumberingFontSize(param),
+            "pncf" => ControlWord::LegacyNumberingColor(param),
+            "pnb" => ControlWord::LegacyNumberingBold(param),
+            "pni" => ControlWord::LegacyNumberingItalic(param),
+            "pncaps" => ControlWord::LegacyNumberingCaps(param),
+            "pnscaps" => ControlWord::LegacyNumberingSmallCaps(param),
+            "pnstrike" => ControlWord::LegacyNumberingStrike(param),
+            "pnul" => ControlWord::LegacyNumberingUnderlineToggle(param),
+            "pnuld" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::Dotted,
+                param,
+            ),
+            "pnuldash" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::Dashed,
+                param,
+            ),
+            "pnuldashd" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::DashDot,
+                param,
+            ),
+            "pnuldashdd" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::DashDotDot,
+                param,
+            ),
+            "pnuldb" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::Double,
+                param,
+            ),
+            "pnulhair" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::Hairline,
+                param,
+            ),
+            "pnulnone" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::None,
+                param,
+            ),
+            "pnulth" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::Thick,
+                param,
+            ),
+            "pnulw" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::Words,
+                param,
+            ),
+            "pnulwave" => ControlWord::LegacyNumberingUnderline(
+                crate::LegacyParagraphNumberingUnderline::Wave,
+                param,
+            ),
+            "pnrauth" => ControlWord::LegacyNumberingRevisionAuthor(param),
+            "pnrdate" => ControlWord::LegacyNumberingRevisionDate(param),
+            "pnrnfc" => ControlWord::LegacyNumberingRevisionFormat(param),
+            "pnrnot" => ControlWord::LegacyNumberingRevisionNoTrack(param),
+            "pnrpnbr" => ControlWord::LegacyNumberingRevisionParagraph(param),
+            "pnrrgb" => ControlWord::LegacyNumberingRevisionRgb(param),
+            "pnrstart" => ControlWord::LegacyNumberingRevisionStart(param),
+            "pnrstop" => ControlWord::LegacyNumberingRevisionStop(param),
+            "pnrxst" => ControlWord::LegacyNumberingRevisionTextStart(param),
             "pntxtb" => ControlWord::LegacyNumberingTextBefore,
             "pntxta" => ControlWord::LegacyNumberingTextAfter,
             "pntext" => ControlWord::LegacyGeneratedListText,
@@ -1000,10 +1445,10 @@ impl<'a> Lexer<'a> {
             "itap" => ControlWord::TableNestingLevel(param),
 
             // Stylesheet entries and metadata
-            "s" => ControlWord::ParagraphStyle(param_value),
-            "cs" => ControlWord::CharacterStyle(param_value),
-            "ds" => ControlWord::SectionStyle(param_value),
-            "ts" => ControlWord::TableStyle(param_value),
+            "s" => ControlWord::ParagraphStyle(param),
+            "cs" => ControlWord::CharacterStyle(param),
+            "ds" => ControlWord::SectionStyle(param),
+            "ts" => ControlWord::TableStyle(param),
             "sbasedon" => ControlWord::StyleBasedOn(param_value),
             "snext" => ControlWord::StyleNext(param_value),
             "slink" => ControlWord::StyleLink(param_value),
@@ -1022,8 +1467,22 @@ impl<'a> Lexer<'a> {
 
             // Embedded content
             "pict" => ControlWord::Picture,
-            "object" => ControlWord::Object,
-            "result" => ControlWord::Result,
+            "picprop" => ControlWord::PictureProperties(param),
+            "shplid" => ControlWord::PictureShapeId(param),
+            "object" => {
+                if param.is_some() {
+                    ControlWord::InvalidObjectDestinationParameter
+                } else {
+                    ControlWord::Object
+                }
+            },
+            "result" => {
+                if param.is_some() {
+                    ControlWord::InvalidObjectResultDestinationParameter
+                } else {
+                    ControlWord::Result
+                }
+            },
             "objclass" => ControlWord::ObjectClass,
             "docvar" => ControlWord::DocumentVariable,
             "userprops" => ControlWord::UserProperties,
@@ -1033,15 +1492,83 @@ impl<'a> Lexer<'a> {
             "linkval" => ControlWord::LinkValue,
             "objname" => ControlWord::ObjectName,
             "objdata" => ControlWord::ObjectData,
-            "objemb" => ControlWord::ObjectEmbedded,
-            "objlink" => ControlWord::ObjectLink,
-            "objautlink" => ControlWord::ObjectAutoLink,
-            "objhtml" => ControlWord::ObjectHtml,
-            "objw" => ControlWord::ObjectWidth(param_value),
-            "objh" => ControlWord::ObjectHeight(param_value),
-            "objlock" => ControlWord::ObjectLocked(param_bool),
-            "objupdate" => ControlWord::ObjectUpdate(param_bool),
-            "objsetsize" => ControlWord::ObjectSetSize(param_bool),
+            "objemb" => {
+                if param.is_none() {
+                    ControlWord::ObjectEmbedded
+                } else {
+                    ControlWord::InvalidObjectModifierParameter
+                }
+            },
+            "objlink" => {
+                if param.is_none() {
+                    ControlWord::ObjectLink
+                } else {
+                    ControlWord::InvalidObjectModifierParameter
+                }
+            },
+            "objautlink" => {
+                if param.is_none() {
+                    ControlWord::ObjectAutoLink
+                } else {
+                    ControlWord::InvalidObjectModifierParameter
+                }
+            },
+            "objhtml" => {
+                if param.is_none() {
+                    ControlWord::ObjectHtml
+                } else {
+                    ControlWord::InvalidObjectModifierParameter
+                }
+            },
+            "objsub" => ControlWord::ObjectSubscriber(param),
+            "objpub" => ControlWord::ObjectPublisher(param),
+            "objicemb" => ControlWord::ObjectInstallableCommand(param),
+            "objocx" => ControlWord::ObjectOleControl(param),
+            "linkself" => ControlWord::ObjectLinkSelf(param),
+            "objw" => param.map_or(
+                ControlWord::InvalidObjectModifierParameter,
+                ControlWord::ObjectWidth,
+            ),
+            "objh" => param.map_or(
+                ControlWord::InvalidObjectModifierParameter,
+                ControlWord::ObjectHeight,
+            ),
+            "objalign" => ControlWord::ObjectAlignment(param),
+            "objtransy" => ControlWord::ObjectTranslationY(param),
+            "objcropt" => ControlWord::ObjectCropTop(param),
+            "objcropb" => ControlWord::ObjectCropBottom(param),
+            "objcropl" => ControlWord::ObjectCropLeft(param),
+            "objcropr" => ControlWord::ObjectCropRight(param),
+            "objscalex" => ControlWord::ObjectScaleX(param),
+            "objscaley" => ControlWord::ObjectScaleY(param),
+            "objlock" => {
+                if param.is_none() {
+                    ControlWord::ObjectLocked(true)
+                } else {
+                    ControlWord::InvalidObjectModifierParameter
+                }
+            },
+            "objupdate" => {
+                if param.is_none() {
+                    ControlWord::ObjectUpdate(true)
+                } else {
+                    ControlWord::InvalidObjectModifierParameter
+                }
+            },
+            "objsetsize" => {
+                if param.is_none() {
+                    ControlWord::ObjectSetSize(true)
+                } else {
+                    ControlWord::InvalidObjectModifierParameter
+                }
+            },
+            "rsltmerge" => ControlWord::ObjectResultMerge(param),
+            "rsltrtf" => ControlWord::ObjectResultRtf(param),
+            "rslttxt" => ControlWord::ObjectResultText(param),
+            "rsltpict" => ControlWord::ObjectResultPicture(param),
+            "rsltbmp" => ControlWord::ObjectResultBitmap(param),
+            "rslthtml" => ControlWord::ObjectResultHtml(param),
+            "oleclsid" => ControlWord::OleClassId(param),
 
             // Picture properties
             "picw" => ControlWord::PictureWidth(param_value),
@@ -1050,6 +1577,16 @@ impl<'a> Lexer<'a> {
             "pichgoal" => ControlWord::PictureGoalHeight(param_value),
             "picscalex" => ControlWord::PictureScaleX(param_value),
             "picscaley" => ControlWord::PictureScaleY(param_value),
+            "picscaled" => ControlWord::PictureScaled(param),
+            "picbmp" => ControlWord::PictureBitmap(param),
+            "picbpp" => ControlWord::PictureBitsPerPixel(param),
+            "piccropl" => ControlWord::PictureCropLeft(param),
+            "piccropr" => ControlWord::PictureCropRight(param),
+            "piccropt" => ControlWord::PictureCropTop(param),
+            "piccropb" => ControlWord::PictureCropBottom(param),
+            "wbmbitspixel" => ControlWord::WindowsBitmapBitsPerPixel(param),
+            "wbmplanes" => ControlWord::WindowsBitmapPlanes(param),
+            "wbmwidthbytes" => ControlWord::WindowsBitmapWidthBytes(param),
             "emfblip" => ControlWord::Emfblip,
             "pngblip" => ControlWord::Pngblip,
             "jpegblip" => ControlWord::Jpegblip,
@@ -1066,10 +1603,10 @@ impl<'a> Lexer<'a> {
             "field" => ControlWord::Field,
             "fldinst" => ControlWord::FieldInstruction,
             "fldrslt" => ControlWord::FieldResult,
-            "fldlock" => ControlWord::FieldLock,
-            "flddirty" => ControlWord::FieldDirty,
-            "fldedit" => ControlWord::FieldEdit,
-            "fldpriv" => ControlWord::FieldPrivate,
+            "fldlock" => ControlWord::FieldLock(param),
+            "flddirty" => ControlWord::FieldDirty(param),
+            "fldedit" => ControlWord::FieldEdit(param),
+            "fldpriv" => ControlWord::FieldPrivate(param),
             "formfield" => ControlWord::FormField,
             "datafield" => ControlWord::DataField,
             "fftype" => ControlWord::FormFieldType(param_value),
@@ -1114,6 +1651,33 @@ impl<'a> Lexer<'a> {
             "lsdqformat" => ControlWord::LatentStyleQuickFormat(param_value),
             "lsdpriority" => ControlWord::LatentStylePriority(param_value),
             "datastore" => ControlWord::DataStore,
+            "mailmerge" => ControlWord::MailMerge,
+            "mmconnectstr" => ControlWord::MailMergeConnectString,
+            "mmconnectstrdata" => ControlWord::MailMergeConnectStringData,
+            "mmdatasource" => ControlWord::MailMergeDataSource,
+            "mmheadersource" => ControlWord::MailMergeHeaderSource,
+            "mmlinktoquery" => ControlWord::MailMergeLinkToQuery(param_bool),
+            "mmquery" => ControlWord::MailMergeQuery,
+            "mmodso" => ControlWord::MailMergeDataSourceObject,
+            "mmodsoactive" => ControlWord::MailMergeActiveRecord(param_value),
+            "mmodsocoldelim" => ControlWord::MailMergeColumnDelimiter(param_value),
+            "mmodsocolumn" => ControlWord::MailMergeColumnCount(param_value),
+            "mmodsodynaddr" => ControlWord::MailMergeDynamicAddress(param_bool),
+            "mmodsofhdr" => ControlWord::MailMergeFirstRowHeader(param_bool),
+            "mmodsofilter" => ControlWord::MailMergeFilter,
+            "mmodsofldmpdata" => ControlWord::MailMergeFieldMapData,
+            "mmodsofmcolumn" => ControlWord::MailMergeFieldMapColumn(param_value),
+            "mmodsohash" => ControlWord::MailMergeHash(param_value),
+            "mmodsolid" => ControlWord::MailMergeId(param_value),
+            "mmodsomappedname" => ControlWord::MailMergeMappedName,
+            "mmodsoname" => ControlWord::MailMergeName,
+            "mmodsorecipdata" => ControlWord::MailMergeRecipientData,
+            "mmodsosort" => ControlWord::MailMergeSort,
+            "mmodsosrc" => ControlWord::MailMergeSourceType(param_value),
+            "mmodsotable" => ControlWord::MailMergeTable,
+            "mmodsoudl" => ControlWord::MailMergeUdl,
+            "mmodsoudldata" => ControlWord::MailMergeUdlData,
+            "mmodsouniquetag" => ControlWord::MailMergeUniqueTag,
             "mmathPr" => ControlWord::MathProperties,
             "mbrkBin" => ControlWord::MathBreakBinary(param.unwrap_or(0)),
             "mbrkBinSub" => ControlWord::MathBreakBinarySubtraction(param.unwrap_or(0)),
@@ -1131,6 +1695,7 @@ impl<'a> Lexer<'a> {
             "msmallFrac" => ControlWord::MathSmallFractions(param.unwrap_or(0)),
             "mwrapIndent" => ControlWord::MathWrapIndent(param.unwrap_or(1440)),
             "mwrapRight" => ControlWord::MathWrapRight(param.unwrap_or(0)),
+            "deftab" => ControlWord::DefaultTabWidth(param),
             "deflang" => ControlWord::DefaultLanguage(param_value),
             "deflangfe" => ControlWord::DefaultLanguageEastAsian(param_value),
             "adeflang" => ControlWord::DefaultLanguageComplexScript(param_value),
@@ -1159,6 +1724,129 @@ impl<'a> Lexer<'a> {
             "enforceprot" => ControlWord::EnforceProtection(param),
             "protlevel" => ControlWord::ProtectionLevel(param),
             "password" => ControlWord::Password,
+            "protusertbl" => ControlWord::ProtectionUserTable,
+            "hyphauto" => ControlWord::HyphenateAutomatically(param),
+            "hyphcaps" => ControlWord::HyphenateCapitalizedWords(param),
+            "hyphconsec" => ControlWord::HyphenationConsecutiveLines(param),
+            "hyphhotz" => ControlWord::HyphenationHotZone(param),
+            "nextfile" => ControlWord::NextFile,
+            "template" => ControlWord::DocumentTemplate,
+            "viewkind" => ControlWord::DocumentViewKind(param),
+            "viewscale" => ControlWord::DocumentViewScale(param),
+            "viewzk" => ControlWord::DocumentZoomKind(param),
+            "viewbksp" => ControlWord::DocumentViewBackgroundShapes(param),
+            "viewnobound" => ControlWord::DocumentViewNoPageBoundaries(param),
+            "donotshowmarkup" => ControlWord::HideReviewMarkup(param),
+            "donotshowcomments" => ControlWord::HideReviewComments(param),
+            "donotshowinsdel" => ControlWord::HideReviewInsertionsAndDeletions(param),
+            "windowcaption" => ControlWord::WindowCaption,
+            "xform" => ControlWord::XslTransform,
+            "usexform" => ControlWord::UseXslTransform(param),
+            "wgrffmtfilter" => ControlWord::StyleListFilter(param),
+            "stylesortmethod" => ControlWord::StyleSortMethod(param),
+            "readonlyrecommended" => ControlWord::ReadOnlyRecommended(param),
+            "saveprevpict" => ControlWord::SavePreviousPicture(param),
+            "writereservation" => ControlWord::WriteReservation(param),
+            "writereservhash" => ControlWord::WriteReservationHash(param),
+            "fromtext" => ControlWord::FromText(param),
+            "fromhtml" => ControlWord::FromHtml(param),
+            "doctype" => ControlWord::DocumentType(param),
+            "makebackup" => ControlWord::MakeBackup(param),
+            "defformat" => ControlWord::DefaultSaveFormat(param),
+            "doctemp" => ControlWord::BoilerplateDocument(param),
+            "muser" => ControlWord::Word97CompatibilityMode(param),
+            "psover" => ControlWord::PostScriptOverText(param),
+            "horzdoc" => ControlWord::HorizontalDocument(param),
+            "vertdoc" => ControlWord::VerticalDocument(param),
+            "jcompress" => ControlWord::CompressJustification(param),
+            "jexpand" => ControlWord::ExpandJustification(param),
+            "lnongrid" => ControlWord::LineBasedOnGrid(param),
+            "fracwidth" => ControlWord::FractionalCharacterWidths(param),
+            "ilfomacatclnup" => ControlWord::AbstractNumberingCleanup(param),
+            "grfdocevents" => ControlWord::DocumentEventMask(param),
+            "dgmargin" => ControlWord::DrawingGridFollowsMargins(param),
+            "dgsnap" => ControlWord::SnapToDrawingGrid(param),
+            "dghspace" => ControlWord::DrawingGridHorizontalSpacing(param),
+            "dgvspace" => ControlWord::DrawingGridVerticalSpacing(param),
+            "dghorigin" => ControlWord::DrawingGridHorizontalOrigin(param),
+            "dgvorigin" => ControlWord::DrawingGridVerticalOrigin(param),
+            "dghshow" => ControlWord::DrawingGridHorizontalShow(param),
+            "dgvshow" => ControlWord::DrawingGridVerticalShow(param),
+            "gutterprl" => ControlWord::ParallelGutter(param),
+            "twoonone" => ControlWord::PrintTwoOnOne(param),
+            "themelang" => ControlWord::ThemeLanguage(param),
+            "themelangfe" => ControlWord::ThemeLanguageEastAsian(param),
+            "themelangcs" => ControlWord::ThemeLanguageComplexScript(param),
+            "relyonvml" => ControlWord::RelyOnVml(param),
+            "validatexml" => ControlWord::ValidateXml(param),
+            "showplaceholdtext" => ControlWord::ShowPlaceholderText(param),
+            "ignoremixedcontent" => ControlWord::IgnoreMixedContent(param),
+            "saveinvalidxml" => ControlWord::SaveInvalidXml(param),
+            "showxmlerrors" => ControlWord::ShowXmlErrors(param),
+            "donotembedsysfont" => ControlWord::DoNotEmbedSystemFonts(param),
+            "donotembedlingdata" => ControlWord::DoNotEmbedLinguisticData(param),
+            "trackmoves" => ControlWord::TrackMoves(param),
+            "trackformatting" => ControlWord::TrackFormatting(param),
+            "stylelocktheme" => ControlWord::LockDocumentTheme(param),
+            "stylelockqfset" => ControlWord::LockQuickFormatSet(param),
+            "usenormstyforlist" => ControlWord::UseNormalStyleForLists(param),
+            "linkstyles" => ControlWord::UpdateStylesFromTemplate(param),
+            "stylelock" => ControlWord::DeclareStyleRestrictions(param),
+            "stylelockenforced" => ControlWord::EnforceStyleRestrictions(param),
+            "stylelockbackcomp" => ControlWord::StyleRestrictionsBackwardCompatibility(param),
+            "autofmtoverride" => ControlWord::AllowAutoFormatOverride(param),
+            "bookfold" => ControlWord::BookFold(param),
+            "bookfoldrev" => ControlWord::ReverseBookFold(param),
+            "bookfoldsheets" => ControlWord::BookFoldSheets(param),
+            "rempersonalinfo" => ControlWord::RemovePersonalInformation(param),
+            "remdttm" => ControlWord::RemoveDateTimeInformation(param),
+            "noextrasprl" => ControlWord::SuppressRaisedLoweredExtraSpacing(param),
+            "sprstsp" => ControlWord::SuppressTopPageExtraSpacing(param),
+            "sprsspbf" => ControlWord::SuppressSpaceBeforeAfterHardBreak(param),
+            "sprslnsp" => ControlWord::SuppressWordPerfectExtraLineSpacing(param),
+            "sprsbsp" => ControlWord::SuppressBottomPageExtraSpacing(param),
+            "dntblnsbdb" => ControlWord::DoNotBalanceSbcsDbcs(param),
+            "expshrtn" => ControlWord::ExpandSpacingAtShiftReturn(param),
+            "nospaceforul" => ControlWord::DoNotAddSpaceForUnderline(param),
+            "noultrlspc" => ControlWord::DoNotUnderlineTrailingSpaces(param),
+            "noxlattoyen" => ControlWord::DoNotTranslateBackslashToYen(param),
+            "lnbrkrule" => ControlWord::LegacyAsianLineBreakingRules(param),
+            "otblrul" => ControlWord::CombineLegacyTableBorders(param),
+            "alntblind" => ControlWord::DoNotAlignTableRowsIndependently(param),
+            "lytcalctblwd" => ControlWord::DoNotUseRawTableWidth(param),
+            "lyttblrtgr" => ControlWord::KeepTableRowsTogether(param),
+            "nolnhtadjtbl" => ControlWord::DoNotAdjustTableLineHeight(param),
+            "nobrkwrptbl" => ControlWord::DoNotBreakWrappedTablesAcrossPages(param),
+            "nogrowautofit" => ControlWord::PreventAutofitGrowthIntoMargins(param),
+            "newtblstyruls" => ControlWord::UseWord2003TableStyleRules(param),
+            "splytwnine" => ControlWord::DoNotUseWord97ShapeLayout(param),
+            "ftnlytwnine" => ControlWord::UseLegacyFootnoteLayout(param),
+            "htmautsp" => ControlWord::UseHtmlParagraphAutoSpacing(param),
+            "useltbaln" => ControlWord::PreserveLastTabAlignment(param),
+            "oldas" => ControlWord::UseWord95AutoSpacing(param),
+            "ApplyBrkRules" => ControlWord::ApplyThaiLineBreakingRules(param),
+            "snaptogridincell" => ControlWord::SnapTextToGridInsideTable(param),
+            "wrppunct" => ControlWord::AllowHangingPunctuation(param),
+            "asianbrkrule" => ControlWord::UseAsianLineBreakingRules(param),
+            "toplinepunct" => ControlWord::CompressPunctuationAtLineStart(param),
+            "nocompatoptions" => ControlWord::NoCompatibilityOptions(param),
+            "nouicompat" => ControlWord::NoUiCompatibility(param),
+            "nofeaturethrottle" => ControlWord::NoFeatureThrottle(param),
+            "forceupgrade" => ControlWord::ForceCompatibilityUpgrade(param),
+            "noafcnsttbl" => ControlWord::PreserveAutofitTableWidthAroundShapes(param),
+            "noindnmbrts" => ControlWord::UseHangingIndentAsNumberingTab(param),
+            "felnbrelev" => ControlWord::UseLegacyKinsokuCharacters(param),
+            "indrlsweleven" => ControlWord::UseLegacyFloatingObjectIndentation(param),
+            "nocxsptable" => ControlWord::AllowContextualSpacingInTables(param),
+            "notcvasp" => ControlWord::IgnoreCellVerticalAlignmentWithFloatingObjects(param),
+            "notvatxbx" => ControlWord::IgnoreTextBoxVerticalAlignment(param),
+            "spltpgpar" => ControlWord::SplitPageBreakParagraph(param),
+            "hwelev" => ControlWord::UseFixedWidthHangul(param),
+            "afelev" => ControlWord::UseLegacyAutofitWidthExpansion(param),
+            "cachedcolbal" => ControlWord::UseCachedColumnBalancing(param),
+            "utinl" => ControlWord::UnderlineNumberingSuffix(param),
+            "notbrkcnstfrctbl" => ControlWord::DoNotSplitRowsAroundFloatingTables(param),
+            "krnprsnet" => ControlWord::UseAnsiKerningPairs(param),
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,
@@ -1180,8 +1868,22 @@ impl<'a> Lexer<'a> {
             "af" => ControlWord::AssociatedFontNumber(param),
             "afs" => ControlWord::AssociatedFontSize(param),
             "alang" => ControlWord::AssociatedLanguage(param),
-            "ab" => ControlWord::AssociatedBold(param_bool),
-            "ai" => ControlWord::AssociatedItalic(param_bool),
+            "ab" => ControlWord::AssociatedBold(param),
+            "acaps" => ControlWord::AssociatedAllCaps(param),
+            "acf" => ControlWord::AssociatedColor(param),
+            "adn" => ControlWord::AssociatedBaselineDown(param),
+            "aexpnd" => ControlWord::AssociatedExpansion(param),
+            "ai" => ControlWord::AssociatedItalic(param),
+            "aoutl" => ControlWord::AssociatedOutline(param),
+            "ascaps" => ControlWord::AssociatedSmallCaps(param),
+            "ashad" => ControlWord::AssociatedShadow(param),
+            "astrike" => ControlWord::AssociatedStrike(param),
+            "aul" => ControlWord::AssociatedUnderline(param),
+            "auld" => ControlWord::AssociatedUnderlineDotted(param),
+            "auldb" => ControlWord::AssociatedUnderlineDouble(param),
+            "aulnone" => ControlWord::AssociatedUnderlineNone(param),
+            "aulw" => ControlWord::AssociatedUnderlineWords(param),
+            "aup" => ControlWord::AssociatedBaselineUp(param),
             "fcharset" => ControlWord::FontCharset(param_value),
             "fnil" => ControlWord::FontFamily("nil"),
             "froman" => ControlWord::FontFamily("roman"),
@@ -1218,7 +1920,7 @@ impl<'a> Lexer<'a> {
             "green" => ControlWord::Green(param_value),
             "blue" => ControlWord::Blue(param_value),
             "cf" => ControlWord::ColorForeground(param_value),
-            "cb" => ControlWord::ColorBackground(param_value),
+            "cb" => ControlWord::ColorBackground(param),
 
             // Character formatting
             "b" => ControlWord::Bold(param_bool),
@@ -1257,9 +1959,15 @@ impl<'a> Lexer<'a> {
             "chcfpat" => ControlWord::CharacterForegroundPattern(param),
             "chcbpat" => ControlWord::CharacterBackgroundPattern(param),
             "plain" => ControlWord::Plain,
+            "loch" => ControlWord::LowAnsiCharacter(param),
+            "hich" => ControlWord::HighAnsiCharacter(param),
+            "dbch" => ControlWord::DoubleByteCharacter(param),
+            "fcs" => ControlWord::FontComplexScript(param),
+            "cgrid" => ControlWord::CharacterGrid(param),
 
             // Paragraph
             "par" => ControlWord::Par,
+            "page" => ControlWord::Page(param),
             "pard" => ControlWord::Pard,
             "ql" => ControlWord::LeftAlign,
             "qr" => ControlWord::RightAlign,
@@ -1280,13 +1988,21 @@ impl<'a> Lexer<'a> {
             "li" => ControlWord::LeftIndent(param_value),
             "ri" => ControlWord::RightIndent(param_value),
             "fi" => ControlWord::FirstLineIndent(param_value),
-            "lin" => ControlWord::LogicalLeftIndent(param), "rin" => ControlWord::LogicalRightIndent(param), "cufi" => ControlWord::CharacterFirstLineIndent(param), "culi" => ControlWord::CharacterLeftIndent(param), "curi" => ControlWord::CharacterRightIndent(param), "indmirror" => ControlWord::MirrorIndents(param),
+            "lin" => ControlWord::LogicalLeftIndent(param),
+            "rin" => ControlWord::LogicalRightIndent(param),
+            "cufi" => ControlWord::CharacterFirstLineIndent(param),
+            "culi" => ControlWord::CharacterLeftIndent(param),
+            "curi" => ControlWord::CharacterRightIndent(param),
+            "indmirror" => ControlWord::MirrorIndents(param),
 
             // Paragraph additional properties
             "keep" => ControlWord::KeepTogether,
             "keepn" => ControlWord::KeepNext,
             "pagebb" => ControlWord::PageBreakBefore,
             "widctlpar" => ControlWord::WidowControl,
+            "nowidctlpar" => ControlWord::NoWidowControl(param),
+            "dropcapli" => ControlWord::DropCapLines(param),
+            "dropcapt" => ControlWord::DropCapType(param),
             "hyphpar" => ControlWord::ParagraphHyphenation(param),
             "aspalpha" => ControlWord::AutoSpaceAlphabetic(param),
             "aspnum" => ControlWord::AutoSpaceNumbers(param),
@@ -1307,17 +2023,39 @@ impl<'a> Lexer<'a> {
             "irow" => ControlWord::TableRowIndex(param),
             "irowband" => ControlWord::TableRowBandIndex(param),
             "lastrow" => ControlWord::TableLastRow(param),
-            "tbllkborder" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Border,param),
-            "tbllkshading" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Shading,param),
-            "tbllkfont" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Font,param),
-            "tbllkcolor" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Color,param),
-            "tbllkbestfit" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::BestFit,param),
-            "tbllkhdrrows" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::HeaderRows,param),
-            "tbllklastrow" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::LastRow,param),
-            "tbllkhdrcols" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::HeaderColumns,param),
-            "tbllklastcol" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::LastColumn,param),
-            "tbllknorowband" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::NoRowBanding,param),
-            "tbllknocolband" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::NoColumnBanding,param),
+            "tbllkborder" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Border, param)
+            },
+            "tbllkshading" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Shading, param)
+            },
+            "tbllkfont" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Font, param)
+            },
+            "tbllkcolor" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Color, param)
+            },
+            "tbllkbestfit" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::BestFit, param)
+            },
+            "tbllkhdrrows" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::HeaderRows, param)
+            },
+            "tbllklastrow" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::LastRow, param)
+            },
+            "tbllkhdrcols" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::HeaderColumns, param)
+            },
+            "tbllklastcol" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::LastColumn, param)
+            },
+            "tbllknorowband" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::NoRowBanding, param)
+            },
+            "tbllknocolband" => {
+                ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::NoColumnBanding, param)
+            },
             "row" => ControlWord::TableRow,
             "cell" => ControlWord::TableCell,
             "cellx" => ControlWord::CellX(param_value),
@@ -1325,139 +2063,587 @@ impl<'a> Lexer<'a> {
             "trgaph" => ControlWord::TableRowGap(param),
             "trleft" => ControlWord::TableRowLeft(param),
             "trrh" => ControlWord::TableRowHeight(param),
-            "trftsWidth" => ControlWord::TablePreferredWidthUnit(crate::TableDistanceScope::Row,param),
-            "trwWidth" => ControlWord::TablePreferredWidthValue(crate::TableDistanceScope::Row,param),
-            "trftsWidthB" => ControlWord::TableInvisibleWidthUnit(false,param),
-            "trwWidthB" => ControlWord::TableInvisibleWidthValue(false,param),
-            "trftsWidthA" => ControlWord::TableInvisibleWidthUnit(true,param),
-            "trwWidthA" => ControlWord::TableInvisibleWidthValue(true,param),
-            "clftsWidth" => ControlWord::TablePreferredWidthUnit(crate::TableDistanceScope::Cell,param),
-            "clwWidth" => ControlWord::TablePreferredWidthValue(crate::TableDistanceScope::Cell,param),
+            "trftsWidth" => {
+                ControlWord::TablePreferredWidthUnit(crate::TableDistanceScope::Row, param)
+            },
+            "trwWidth" => {
+                ControlWord::TablePreferredWidthValue(crate::TableDistanceScope::Row, param)
+            },
+            "trftsWidthB" => ControlWord::TableInvisibleWidthUnit(false, param),
+            "trwWidthB" => ControlWord::TableInvisibleWidthValue(false, param),
+            "trftsWidthA" => ControlWord::TableInvisibleWidthUnit(true, param),
+            "trwWidthA" => ControlWord::TableInvisibleWidthValue(true, param),
+            "clftsWidth" => {
+                ControlWord::TablePreferredWidthUnit(crate::TableDistanceScope::Cell, param)
+            },
+            "clwWidth" => {
+                ControlWord::TablePreferredWidthValue(crate::TableDistanceScope::Cell, param)
+            },
             "trautofit" => ControlWord::TableAutoFit(param),
             "tblind" => ControlWord::TableIndentValue(param),
             "tblindtype" => ControlWord::TableIndentUnit(param),
-            "trpaddl" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Left},param),
-            "trpaddr" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Right},param),
-            "trpaddt" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Top},param),
-            "trpaddb" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Bottom},param),
-            "trpaddfl" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Left},param),
-            "trpaddfr" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Right},param),
-            "trpaddft" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Top},param),
-            "trpaddfb" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Bottom},param),
-            "trspdl" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Left},param),
-            "trspdr" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Right},param),
-            "trspdt" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Top},param),
-            "trspdb" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Bottom},param),
-            "trspdfl" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Left},param),
-            "trspdfr" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Right},param),
-            "trspdft" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Top},param),
-            "trspdfb" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Row,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Bottom},param),
-            "clpadl" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Left},param),
-            "clpadr" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Right},param),
-            "clpadt" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Top},param),
-            "clpadb" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Bottom},param),
-            "clpadfl" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Left},param),
-            "clpadfr" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Right},param),
-            "clpadft" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Top},param),
-            "clpadfb" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Padding,edge:crate::TableEdge::Bottom},param),
-            "clspdl" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Left},param),
-            "clspdr" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Right},param),
-            "clspdt" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Top},param),
-            "clspdb" => ControlWord::TableDistanceValue(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Bottom},param),
-            "clspdfl" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Left},param),
-            "clspdfr" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Right},param),
-            "clspdft" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Top},param),
-            "clspdfb" => ControlWord::TableDistanceUnit(crate::TableDistanceTarget{scope:crate::TableDistanceScope::Cell,kind:crate::TableDistanceKind::Spacing,edge:crate::TableEdge::Bottom},param),
-            "tphcol" => ControlWord::TableHorizontalReference(crate::TableHorizontalReference::Column,param),
-            "tphmrg" => ControlWord::TableHorizontalReference(crate::TableHorizontalReference::Margin,param),
-            "tphpg" => ControlWord::TableHorizontalReference(crate::TableHorizontalReference::Page,param),
-            "tpvmrg" => ControlWord::TableVerticalReference(crate::TableVerticalReference::Margin,param),
-            "tpvpara" => ControlWord::TableVerticalReference(crate::TableVerticalReference::Paragraph,param),
-            "tpvpg" => ControlWord::TableVerticalReference(crate::TableVerticalReference::Page,param),
-            "tposx" => ControlWord::TableHorizontalOffset(false,param),
-            "tposnegx" => ControlWord::TableHorizontalOffset(true,param),
-            "tposxc" => ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Center,param),
-            "tposxi" => ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Inside,param),
-            "tposxl" => ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Left,param),
-            "tposxo" => ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Outside,param),
-            "tposxr" => ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Right,param),
-            "tposy" => ControlWord::TableVerticalOffset(false,param),
-            "tposnegy" => ControlWord::TableVerticalOffset(true,param),
-            "tposyb" => ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Bottom,param),
-            "tposyc" => ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Center,param),
-            "tposyil" => ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Inline,param),
-            "tposyin" => ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Inside,param),
-            "tposyout" => ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Outside,param),
-            "tposyt" => ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Top,param),
-            "tdfrmtxtLeft" => ControlWord::TableWrapDistance(crate::TableEdge::Left,param),
-            "tdfrmtxtRight" => ControlWord::TableWrapDistance(crate::TableEdge::Right,param),
-            "tdfrmtxtTop" => ControlWord::TableWrapDistance(crate::TableEdge::Top,param),
-            "tdfrmtxtBottom" => ControlWord::TableWrapDistance(crate::TableEdge::Bottom,param),
+            "trpaddl" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Left,
+                },
+                param,
+            ),
+            "trpaddr" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Right,
+                },
+                param,
+            ),
+            "trpaddt" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Top,
+                },
+                param,
+            ),
+            "trpaddb" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Bottom,
+                },
+                param,
+            ),
+            "trpaddfl" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Left,
+                },
+                param,
+            ),
+            "trpaddfr" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Right,
+                },
+                param,
+            ),
+            "trpaddft" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Top,
+                },
+                param,
+            ),
+            "trpaddfb" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Bottom,
+                },
+                param,
+            ),
+            "trspdl" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Left,
+                },
+                param,
+            ),
+            "trspdr" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Right,
+                },
+                param,
+            ),
+            "trspdt" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Top,
+                },
+                param,
+            ),
+            "trspdb" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Bottom,
+                },
+                param,
+            ),
+            "trspdfl" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Left,
+                },
+                param,
+            ),
+            "trspdfr" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Right,
+                },
+                param,
+            ),
+            "trspdft" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Top,
+                },
+                param,
+            ),
+            "trspdfb" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Row,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Bottom,
+                },
+                param,
+            ),
+            "clpadl" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Left,
+                },
+                param,
+            ),
+            "clpadr" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Right,
+                },
+                param,
+            ),
+            "clpadt" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Top,
+                },
+                param,
+            ),
+            "clpadb" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Bottom,
+                },
+                param,
+            ),
+            "clpadfl" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Left,
+                },
+                param,
+            ),
+            "clpadfr" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Right,
+                },
+                param,
+            ),
+            "clpadft" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Top,
+                },
+                param,
+            ),
+            "clpadfb" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Padding,
+                    edge: crate::TableEdge::Bottom,
+                },
+                param,
+            ),
+            "clspdl" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Left,
+                },
+                param,
+            ),
+            "clspdr" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Right,
+                },
+                param,
+            ),
+            "clspdt" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Top,
+                },
+                param,
+            ),
+            "clspdb" => ControlWord::TableDistanceValue(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Bottom,
+                },
+                param,
+            ),
+            "clspdfl" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Left,
+                },
+                param,
+            ),
+            "clspdfr" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Right,
+                },
+                param,
+            ),
+            "clspdft" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Top,
+                },
+                param,
+            ),
+            "clspdfb" => ControlWord::TableDistanceUnit(
+                crate::TableDistanceTarget {
+                    scope: crate::TableDistanceScope::Cell,
+                    kind: crate::TableDistanceKind::Spacing,
+                    edge: crate::TableEdge::Bottom,
+                },
+                param,
+            ),
+            "tphcol" => ControlWord::TableHorizontalReference(
+                crate::TableHorizontalReference::Column,
+                param,
+            ),
+            "tphmrg" => ControlWord::TableHorizontalReference(
+                crate::TableHorizontalReference::Margin,
+                param,
+            ),
+            "tphpg" => {
+                ControlWord::TableHorizontalReference(crate::TableHorizontalReference::Page, param)
+            },
+            "tpvmrg" => {
+                ControlWord::TableVerticalReference(crate::TableVerticalReference::Margin, param)
+            },
+            "tpvpara" => {
+                ControlWord::TableVerticalReference(crate::TableVerticalReference::Paragraph, param)
+            },
+            "tpvpg" => {
+                ControlWord::TableVerticalReference(crate::TableVerticalReference::Page, param)
+            },
+            "tposx" => ControlWord::TableHorizontalOffset(false, param),
+            "tposnegx" => ControlWord::TableHorizontalOffset(true, param),
+            "tposxc" => {
+                ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Center, param)
+            },
+            "tposxi" => {
+                ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Inside, param)
+            },
+            "tposxl" => {
+                ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Left, param)
+            },
+            "tposxo" => {
+                ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Outside, param)
+            },
+            "tposxr" => {
+                ControlWord::TableHorizontalPosition(crate::TableHorizontalPosition::Right, param)
+            },
+            "tposy" => ControlWord::TableVerticalOffset(false, param),
+            "tposnegy" => ControlWord::TableVerticalOffset(true, param),
+            "tposyb" => {
+                ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Bottom, param)
+            },
+            "tposyc" => {
+                ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Center, param)
+            },
+            "tposyil" => {
+                ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Inline, param)
+            },
+            "tposyin" => {
+                ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Inside, param)
+            },
+            "tposyout" => {
+                ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Outside, param)
+            },
+            "tposyt" => {
+                ControlWord::TableVerticalPosition(crate::TableVerticalPosition::Top, param)
+            },
+            "tdfrmtxtLeft" => ControlWord::TableWrapDistance(crate::TableEdge::Left, param),
+            "tdfrmtxtRight" => ControlWord::TableWrapDistance(crate::TableEdge::Right, param),
+            "tdfrmtxtTop" => ControlWord::TableWrapDistance(crate::TableEdge::Top, param),
+            "tdfrmtxtBottom" => ControlWord::TableWrapDistance(crate::TableEdge::Bottom, param),
             "tabsnoovrlp" => ControlWord::TableNoOverlap(param),
             "trhdr" => ControlWord::TableRowHeader(param),
             "trkeep" => ControlWord::TableRowKeep(param),
             "trkeepfollow" => ControlWord::TableRowKeepFollow(param),
-            "trql" => ControlWord::TableRowAlignment(crate::TableRowAlignment::Left,param),
-            "trqc" => ControlWord::TableRowAlignment(crate::TableRowAlignment::Center,param),
-            "trqr" => ControlWord::TableRowAlignment(crate::TableRowAlignment::Right,param),
-            "clvertalt" => ControlWord::TableCellVerticalAlignment(crate::TableCellVerticalAlignment::Top,param),
-            "clvertalc" => ControlWord::TableCellVerticalAlignment(crate::TableCellVerticalAlignment::Center,param),
-            "clvertalb" => ControlWord::TableCellVerticalAlignment(crate::TableCellVerticalAlignment::Bottom,param),
-            "cltxlrtb" => ControlWord::TableCellTextFlow(crate::TableCellTextFlow::LeftToRightTopToBottom,param),
-            "cltxtbrl" => ControlWord::TableCellTextFlow(crate::TableCellTextFlow::RightToLeftTopToBottom,param),
-            "cltxbtlr" => ControlWord::TableCellTextFlow(crate::TableCellTextFlow::LeftToRightBottomToTop,param),
-            "cltxlrtbv" => ControlWord::TableCellTextFlow(crate::TableCellTextFlow::LeftToRightTopToBottomVertical,param),
-            "cltxtbrlv" => ControlWord::TableCellTextFlow(crate::TableCellTextFlow::TopToBottomRightToLeftVertical,param),
+            "trql" => ControlWord::TableRowAlignment(crate::TableRowAlignment::Left, param),
+            "trqc" => ControlWord::TableRowAlignment(crate::TableRowAlignment::Center, param),
+            "trqr" => ControlWord::TableRowAlignment(crate::TableRowAlignment::Right, param),
+            "clvertalt" => ControlWord::TableCellVerticalAlignment(
+                crate::TableCellVerticalAlignment::Top,
+                param,
+            ),
+            "clvertalc" => ControlWord::TableCellVerticalAlignment(
+                crate::TableCellVerticalAlignment::Center,
+                param,
+            ),
+            "clvertalb" => ControlWord::TableCellVerticalAlignment(
+                crate::TableCellVerticalAlignment::Bottom,
+                param,
+            ),
+            "cltxlrtb" => ControlWord::TableCellTextFlow(
+                crate::TableCellTextFlow::LeftToRightTopToBottom,
+                param,
+            ),
+            "cltxtbrl" => ControlWord::TableCellTextFlow(
+                crate::TableCellTextFlow::RightToLeftTopToBottom,
+                param,
+            ),
+            "cltxbtlr" => ControlWord::TableCellTextFlow(
+                crate::TableCellTextFlow::LeftToRightBottomToTop,
+                param,
+            ),
+            "cltxlrtbv" => ControlWord::TableCellTextFlow(
+                crate::TableCellTextFlow::LeftToRightTopToBottomVertical,
+                param,
+            ),
+            "cltxtbrlv" => ControlWord::TableCellTextFlow(
+                crate::TableCellTextFlow::TopToBottomRightToLeftVertical,
+                param,
+            ),
             "clFitText" => ControlWord::TableCellFitText(param),
             "clNoWrap" => ControlWord::TableCellNoWrap(param),
             "clhidemark" => ControlWord::TableCellHideMark(param),
-            "clmgf" => ControlWord::TableCellMerge(crate::TableCellMergeAxis::Horizontal,crate::TableCellMergeRole::First,param),
-            "clmrg" => ControlWord::TableCellMerge(crate::TableCellMergeAxis::Horizontal,crate::TableCellMergeRole::Continuation,param),
-            "clvmgf" => ControlWord::TableCellMerge(crate::TableCellMergeAxis::Vertical,crate::TableCellMergeRole::First,param),
-            "clvmrg" => ControlWord::TableCellMerge(crate::TableCellMergeAxis::Vertical,crate::TableCellMergeRole::Continuation,param),
-            "trbrdrt" => ControlWord::TableBorder(crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Top),param),
-            "trbrdrl" => ControlWord::TableBorder(crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Left),param),
-            "trbrdrb" => ControlWord::TableBorder(crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Bottom),param),
-            "trbrdrr" => ControlWord::TableBorder(crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Right),param),
-            "trbrdrh" => ControlWord::TableBorder(crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Horizontal),param),
-            "trbrdrv" => ControlWord::TableBorder(crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Vertical),param),
-            "clbrdrt" => ControlWord::TableBorder(crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::Top),param),
-            "clbrdrl" => ControlWord::TableBorder(crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::Left),param),
-            "clbrdrb" => ControlWord::TableBorder(crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::Bottom),param),
-            "clbrdrr" => ControlWord::TableBorder(crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::Right),param),
-            "cldglu" => ControlWord::TableBorder(crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::UpperLeftToLowerRight),param),
-            "cldgll" => ControlWord::TableBorder(crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::UpperRightToLowerLeft),param),
-            "trshdng" => ControlWord::TableShadingAmount(crate::TableDistanceScope::Row,param),
-            "trcfpat" => ControlWord::TableShadingForeground(crate::TableDistanceScope::Row,param),
-            "trcbpat" => ControlWord::TableShadingBackground(crate::TableDistanceScope::Row,param),
+            "clmgf" => ControlWord::TableCellMerge(
+                crate::TableCellMergeAxis::Horizontal,
+                crate::TableCellMergeRole::First,
+                param,
+            ),
+            "clmrg" => ControlWord::TableCellMerge(
+                crate::TableCellMergeAxis::Horizontal,
+                crate::TableCellMergeRole::Continuation,
+                param,
+            ),
+            "clvmgf" => ControlWord::TableCellMerge(
+                crate::TableCellMergeAxis::Vertical,
+                crate::TableCellMergeRole::First,
+                param,
+            ),
+            "clvmrg" => ControlWord::TableCellMerge(
+                crate::TableCellMergeAxis::Vertical,
+                crate::TableCellMergeRole::Continuation,
+                param,
+            ),
+            "trbrdrt" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Top),
+                param,
+            ),
+            "trbrdrl" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Left),
+                param,
+            ),
+            "trbrdrb" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Bottom),
+                param,
+            ),
+            "trbrdrr" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Right),
+                param,
+            ),
+            "trbrdrh" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Horizontal),
+                param,
+            ),
+            "trbrdrv" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Row(crate::TableRowBorderSide::Vertical),
+                param,
+            ),
+            "clbrdrt" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::Top),
+                param,
+            ),
+            "clbrdrl" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::Left),
+                param,
+            ),
+            "clbrdrb" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::Bottom),
+                param,
+            ),
+            "clbrdrr" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Cell(crate::TableCellBorderSide::Right),
+                param,
+            ),
+            "cldglu" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Cell(
+                    crate::TableCellBorderSide::UpperLeftToLowerRight,
+                ),
+                param,
+            ),
+            "cldgll" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::Cell(
+                    crate::TableCellBorderSide::UpperRightToLowerLeft,
+                ),
+                param,
+            ),
+            "trshdng" => ControlWord::TableShadingAmount(crate::TableDistanceScope::Row, param),
+            "trcfpat" => ControlWord::TableShadingForeground(crate::TableDistanceScope::Row, param),
+            "trcbpat" => ControlWord::TableShadingBackground(crate::TableDistanceScope::Row, param),
             "trpat" => ControlWord::TableRowShadingPatternIndex(param),
-            "clshdng" => ControlWord::TableShadingAmount(crate::TableDistanceScope::Cell,param),
-            "clcfpat" => ControlWord::TableShadingForeground(crate::TableDistanceScope::Cell,param),
-            "clcbpat" => ControlWord::TableShadingBackground(crate::TableDistanceScope::Cell,param),
-            "trbghoriz" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::Horizontal,param),
-            "trbgvert" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::Vertical,param),
-            "trbgfdiag" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::ForwardDiagonal,param),
-            "trbgbdiag" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::BackwardDiagonal,param),
-            "trbgcross" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::Cross,param),
-            "trbgdcross" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::DiagonalCross,param),
-            "trbgdkhor" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::DarkHorizontal,param),
-            "trbgdkvert" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::DarkVertical,param),
-            "trbgdkfdiag" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::DarkForwardDiagonal,param),
-            "trbgdkbdiag" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::DarkBackwardDiagonal,param),
-            "trbgdkcross" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::DarkCross,param),
-            "trbgdkdcross" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Row,crate::ShadingPattern::DarkDiagonalCross,param),
-            "clbghoriz" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::Horizontal,param),
-            "clbgvert" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::Vertical,param),
-            "clbgfdiag" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::ForwardDiagonal,param),
-            "clbgbdiag" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::BackwardDiagonal,param),
-            "clbgcross" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::Cross,param),
-            "clbgdcross" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::DiagonalCross,param),
-            "clbgdkhor" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::DarkHorizontal,param),
-            "clbgdkvert" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::DarkVertical,param),
-            "clbgdkfdiag" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::DarkForwardDiagonal,param),
-            "clbgdkbdiag" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::DarkBackwardDiagonal,param),
-            "clbgdkcross" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::DarkCross,param),
-            "clbgdkdcross" => ControlWord::TableShadingPattern(crate::TableDistanceScope::Cell,crate::ShadingPattern::DarkDiagonalCross,param),
+            "clshdng" => ControlWord::TableShadingAmount(crate::TableDistanceScope::Cell, param),
+            "clcfpat" => {
+                ControlWord::TableShadingForeground(crate::TableDistanceScope::Cell, param)
+            },
+            "clcbpat" => {
+                ControlWord::TableShadingBackground(crate::TableDistanceScope::Cell, param)
+            },
+            "trbghoriz" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::Horizontal,
+                param,
+            ),
+            "trbgvert" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::Vertical,
+                param,
+            ),
+            "trbgfdiag" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::ForwardDiagonal,
+                param,
+            ),
+            "trbgbdiag" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::BackwardDiagonal,
+                param,
+            ),
+            "trbgcross" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::Cross,
+                param,
+            ),
+            "trbgdcross" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::DiagonalCross,
+                param,
+            ),
+            "trbgdkhor" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::DarkHorizontal,
+                param,
+            ),
+            "trbgdkvert" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::DarkVertical,
+                param,
+            ),
+            "trbgdkfdiag" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::DarkForwardDiagonal,
+                param,
+            ),
+            "trbgdkbdiag" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::DarkBackwardDiagonal,
+                param,
+            ),
+            "trbgdkcross" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::DarkCross,
+                param,
+            ),
+            "trbgdkdcross" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Row,
+                crate::ShadingPattern::DarkDiagonalCross,
+                param,
+            ),
+            "clbghoriz" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::Horizontal,
+                param,
+            ),
+            "clbgvert" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::Vertical,
+                param,
+            ),
+            "clbgfdiag" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::ForwardDiagonal,
+                param,
+            ),
+            "clbgbdiag" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::BackwardDiagonal,
+                param,
+            ),
+            "clbgcross" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::Cross,
+                param,
+            ),
+            "clbgdcross" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::DiagonalCross,
+                param,
+            ),
+            "clbgdkhor" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::DarkHorizontal,
+                param,
+            ),
+            "clbgdkvert" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::DarkVertical,
+                param,
+            ),
+            "clbgdkfdiag" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::DarkForwardDiagonal,
+                param,
+            ),
+            "clbgdkbdiag" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::DarkBackwardDiagonal,
+                param,
+            ),
+            "clbgdkcross" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::DarkCross,
+                param,
+            ),
+            "clbgdkdcross" => ControlWord::TableShadingPattern(
+                crate::TableDistanceScope::Cell,
+                crate::ShadingPattern::DarkDiagonalCross,
+                param,
+            ),
             "nestcell" => ControlWord::NestedTableCell(param),
             "nestrow" => ControlWord::NestedTableRow(param),
             "nesttableprops" => ControlWord::NestedTableProperties(param),
@@ -1510,9 +2696,9 @@ impl<'a> Lexer<'a> {
             "brdrart" => ControlWord::PageBorderArt(param),
 
             // Shading
-            "shading" => ControlWord::Shading(param_value),
-            "cfpat" => ControlWord::ForegroundPattern(param_value),
-            "cbpat" => ControlWord::BackgroundPattern(param_value),
+            "shading" => ControlWord::Shading(param),
+            "cfpat" => ControlWord::ForegroundPattern(param),
+            "cbpat" => ControlWord::BackgroundPattern(param),
 
             // Tab stops
             "tql" => ControlWord::TabLeft(param),
@@ -1537,7 +2723,9 @@ impl<'a> Lexer<'a> {
             "listname" => ControlWord::ListName,
             "liststylename" => ControlWord::ListStyleName,
             "listtext" => ControlWord::GeneratedListText,
-            "listpicture" | "listpict" => ControlWord::ListPicture,
+            "listpicture" | "listpict" => ControlWord::ListPicture(param),
+            "shppict" => ControlWord::ShapePicture(param),
+            "nonshppict" => ControlWord::NonShapePicture(param),
             "listid" => ControlWord::ListId(param_value),
             "listoverridetable" => ControlWord::ListOverrideTable,
             "listoverride" => ControlWord::ListOverride,
@@ -1574,6 +2762,9 @@ impl<'a> Lexer<'a> {
             "margt" | "margtsxn" => ControlWord::MarginTop(param_value),
             "margb" | "margbsxn" => ControlWord::MarginBottom(param_value),
             "guttersxn" => ControlWord::MarginGutter(param_value),
+            "facingp" => ControlWord::FacingPages(param_bool),
+            "margmirror" => ControlWord::MirrorMargins(param),
+            "gutter" => ControlWord::DocumentGutter(param),
             "headery" => ControlWord::HeaderDistance(param_value),
             "footery" => ControlWord::FooterDistance(param_value),
             "landscape" | "lndscpsxn" => ControlWord::Landscape,
@@ -1634,10 +2825,16 @@ impl<'a> Lexer<'a> {
             "ftnnrlc" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::LowercaseRoman),
             "ftnnruc" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::UppercaseRoman),
             "ftnnchi" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::Chicago),
-            "ftnnchosung" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::KoreanChosung),
+            "ftnnchosung" => {
+                ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::KoreanChosung)
+            },
             "ftnncnum" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::Circle),
-            "ftnndbnum" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::KanjiDigitless),
-            "ftnndbnumd" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::KanjiWithDigit),
+            "ftnndbnum" => {
+                ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::KanjiDigitless)
+            },
+            "ftnndbnumd" => {
+                ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::KanjiWithDigit)
+            },
             "ftnndbnumt" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::KanjiThree),
             "ftnndbnumk" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::KanjiFour),
             "ftnndbar" => ControlWord::FootnoteNumbering(crate::NoteNumberingStyle::DoubleByte),
@@ -1655,10 +2852,16 @@ impl<'a> Lexer<'a> {
             "aftnnrlc" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::LowercaseRoman),
             "aftnnruc" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::UppercaseRoman),
             "aftnnchi" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::Chicago),
-            "aftnnchosung" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::KoreanChosung),
+            "aftnnchosung" => {
+                ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::KoreanChosung)
+            },
             "aftnncnum" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::Circle),
-            "aftnndbnum" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::KanjiDigitless),
-            "aftnndbnumd" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::KanjiWithDigit),
+            "aftnndbnum" => {
+                ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::KanjiDigitless)
+            },
+            "aftnndbnumd" => {
+                ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::KanjiWithDigit)
+            },
             "aftnndbnumt" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::KanjiThree),
             "aftnndbnumk" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::KanjiFour),
             "aftnndbar" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::DoubleByte),
@@ -1670,57 +2873,139 @@ impl<'a> Lexer<'a> {
             "aftnnzodiac" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::ZodiacOne),
             "aftnnzodiacd" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::ZodiacTwo),
             "aftnnzodiacl" => ControlWord::EndnoteNumbering(crate::NoteNumberingStyle::ZodiacThree),
-            "sftntj" => ControlWord::SectionFootnotePlacement(crate::SectionFootnotePlacement::BeneathText),
-            "sftnbj" => ControlWord::SectionFootnotePlacement(crate::SectionFootnotePlacement::BottomOfPage),
+            "sftntj" => {
+                ControlWord::SectionFootnotePlacement(crate::SectionFootnotePlacement::BeneathText)
+            },
+            "sftnbj" => {
+                ControlWord::SectionFootnotePlacement(crate::SectionFootnotePlacement::BottomOfPage)
+            },
             "sftnstart" => ControlWord::SectionFootnoteStart(param_value),
             "saftnstart" => ControlWord::SectionEndnoteStart(param_value),
-            "sftnrstcont" => ControlWord::SectionFootnoteRestart(crate::FootnoteRestart::Continuous),
-            "sftnrestart" => ControlWord::SectionFootnoteRestart(crate::FootnoteRestart::EachSection),
+            "sftnrstcont" => {
+                ControlWord::SectionFootnoteRestart(crate::FootnoteRestart::Continuous)
+            },
+            "sftnrestart" => {
+                ControlWord::SectionFootnoteRestart(crate::FootnoteRestart::EachSection)
+            },
             "sftnrstpg" => ControlWord::SectionFootnoteRestart(crate::FootnoteRestart::EachPage),
             "saftnrstcont" => ControlWord::SectionEndnoteRestart(crate::EndnoteRestart::Continuous),
-            "saftnrestart" => ControlWord::SectionEndnoteRestart(crate::EndnoteRestart::EachSection),
+            "saftnrestart" => {
+                ControlWord::SectionEndnoteRestart(crate::EndnoteRestart::EachSection)
+            },
             "sftnnar" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::Arabic),
-            "sftnnalc" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::LowercaseLetter),
-            "sftnnauc" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::UppercaseLetter),
-            "sftnnrlc" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::LowercaseRoman),
-            "sftnnruc" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::UppercaseRoman),
+            "sftnnalc" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::LowercaseLetter)
+            },
+            "sftnnauc" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::UppercaseLetter)
+            },
+            "sftnnrlc" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::LowercaseRoman)
+            },
+            "sftnnruc" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::UppercaseRoman)
+            },
             "sftnnchi" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::Chicago),
-            "sftnnchosung" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KoreanChosung),
+            "sftnnchosung" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KoreanChosung)
+            },
             "sftnncnum" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::Circle),
-            "sftnndbnum" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KanjiDigitless),
-            "sftnndbnumd" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KanjiWithDigit),
-            "sftnndbnumt" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KanjiThree),
-            "sftnndbnumk" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KanjiFour),
-            "sftnndbar" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::DoubleByte),
-            "sftnnganada" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KoreanGanada),
-            "sftnngbnum" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ChineseOne),
-            "sftnngbnumd" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ChineseTwo),
-            "sftnngbnuml" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ChineseThree),
-            "sftnngbnumk" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ChineseFour),
-            "sftnnzodiac" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ZodiacOne),
-            "sftnnzodiacd" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ZodiacTwo),
-            "sftnnzodiacl" => ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ZodiacThree),
+            "sftnndbnum" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KanjiDigitless)
+            },
+            "sftnndbnumd" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KanjiWithDigit)
+            },
+            "sftnndbnumt" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KanjiThree)
+            },
+            "sftnndbnumk" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KanjiFour)
+            },
+            "sftnndbar" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::DoubleByte)
+            },
+            "sftnnganada" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::KoreanGanada)
+            },
+            "sftnngbnum" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ChineseOne)
+            },
+            "sftnngbnumd" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ChineseTwo)
+            },
+            "sftnngbnuml" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ChineseThree)
+            },
+            "sftnngbnumk" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ChineseFour)
+            },
+            "sftnnzodiac" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ZodiacOne)
+            },
+            "sftnnzodiacd" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ZodiacTwo)
+            },
+            "sftnnzodiacl" => {
+                ControlWord::SectionFootnoteNumbering(crate::NoteNumberingStyle::ZodiacThree)
+            },
             "saftnnar" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::Arabic),
-            "saftnnalc" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::LowercaseLetter),
-            "saftnnauc" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::UppercaseLetter),
-            "saftnnrlc" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::LowercaseRoman),
-            "saftnnruc" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::UppercaseRoman),
+            "saftnnalc" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::LowercaseLetter)
+            },
+            "saftnnauc" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::UppercaseLetter)
+            },
+            "saftnnrlc" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::LowercaseRoman)
+            },
+            "saftnnruc" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::UppercaseRoman)
+            },
             "saftnnchi" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::Chicago),
-            "saftnnchosung" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KoreanChosung),
+            "saftnnchosung" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KoreanChosung)
+            },
             "saftnncnum" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::Circle),
-            "saftnndbnum" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KanjiDigitless),
-            "saftnndbnumd" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KanjiWithDigit),
-            "saftnndbnumt" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KanjiThree),
-            "saftnndbnumk" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KanjiFour),
-            "saftnndbar" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::DoubleByte),
-            "saftnnganada" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KoreanGanada),
-            "saftnngbnum" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ChineseOne),
-            "saftnngbnumd" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ChineseTwo),
-            "saftnngbnuml" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ChineseThree),
-            "saftnngbnumk" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ChineseFour),
-            "saftnnzodiac" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ZodiacOne),
-            "saftnnzodiacd" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ZodiacTwo),
-            "saftnnzodiacl" => ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ZodiacThree),
+            "saftnndbnum" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KanjiDigitless)
+            },
+            "saftnndbnumd" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KanjiWithDigit)
+            },
+            "saftnndbnumt" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KanjiThree)
+            },
+            "saftnndbnumk" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KanjiFour)
+            },
+            "saftnndbar" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::DoubleByte)
+            },
+            "saftnnganada" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::KoreanGanada)
+            },
+            "saftnngbnum" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ChineseOne)
+            },
+            "saftnngbnumd" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ChineseTwo)
+            },
+            "saftnngbnuml" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ChineseThree)
+            },
+            "saftnngbnumk" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ChineseFour)
+            },
+            "saftnnzodiac" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ZodiacOne)
+            },
+            "saftnnzodiacd" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ZodiacTwo)
+            },
+            "saftnnzodiacl" => {
+                ControlWord::SectionEndnoteNumbering(crate::NoteNumberingStyle::ZodiacThree)
+            },
             "ftnsep" => ControlWord::FootnoteSeparator,
             "ftnsepc" => ControlWord::FootnoteContinuationSeparator,
             "ftncn" => ControlWord::FootnoteContinuationNotice,
@@ -1761,8 +3046,8 @@ impl<'a> Lexer<'a> {
             "revprop" => ControlWord::RevisionProperty(param_value),
 
             // Shapes
-            "shp" => ControlWord::Shape,
-            "shpgrp" => ControlWord::ShapeGroup,
+            "shp" => ControlWord::Shape(param),
+            "shpgrp" => ControlWord::ShapeGroup(param),
             "shpinst" => param.map_or(ControlWord::ShapeInstance, ControlWord::ShapeType),
             "shpleft" => ControlWord::ShapeLeft(param_value),
             "shptop" => ControlWord::ShapeTop(param_value),
@@ -1775,10 +3060,47 @@ impl<'a> Lexer<'a> {
             "shpwr" => ControlWord::ShapeWrap(param_value),
             "shpfblwtxt" => ControlWord::ShapeBelowText(param_bool),
             "shplockanchor" => ControlWord::ShapeLockAnchor,
-            "sp" => ControlWord::ShapeProperty,
-            "sn" => ControlWord::ShapePropertyName,
-            "sv" => ControlWord::ShapePropertyValue,
-            "shptxt" => ControlWord::ShapeText,
+            "sp" => {
+                if param.is_none() {
+                    ControlWord::ShapeProperty
+                } else {
+                    ControlWord::InvalidPictureShapePropertyParameter
+                }
+            },
+            "sn" => {
+                if param.is_none() {
+                    ControlWord::ShapePropertyName
+                } else {
+                    ControlWord::InvalidPictureShapePropertyParameter
+                }
+            },
+            "sv" => {
+                if param.is_none() {
+                    ControlWord::ShapePropertyValue
+                } else {
+                    ControlWord::InvalidPictureShapePropertyParameter
+                }
+            },
+            "svb" => ControlWord::ShapeBinaryValue(param),
+            "hsv" => ControlWord::ShapeThemeValue(param),
+            "caccentone" => ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Accent1, param),
+            "caccenttwo" => ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Accent2, param),
+            "caccentthree" => ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Accent3, param),
+            "caccentfour" => ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Accent4, param),
+            "caccentfive" => ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Accent5, param),
+            "caccentsix" => ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Accent6, param),
+            "cbackgroundone" => {
+                ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Background1, param)
+            },
+            "cbackgroundtwo" => {
+                ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Background2, param)
+            },
+            "ctextone" => ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Text1, param),
+            "ctexttwo" => ControlWord::ShapeThemeColor(crate::ShapeThemeColor::Text2, param),
+            "ctint" => ControlWord::ShapeThemeTint(param),
+            "cshade" => ControlWord::ShapeThemeShade(param),
+            "shprslt" => ControlWord::ShapeResult(param),
+            "shptxt" => ControlWord::ShapeText(param),
             "do" => ControlWord::LegacyDrawingObject,
             "dptxbx" => ControlWord::LegacyTextBox,
             "dptxbxtext" => ControlWord::LegacyTextBoxText,
@@ -1828,18 +3150,36 @@ impl<'a> Lexer<'a> {
             "dpcominusy" => ControlWord::LegacyCalloutMinusY,
             "dpcoborder" => ControlWord::LegacyCalloutBorder,
             "dpcodtop" => ControlWord::LegacyCalloutAttachment(crate::LegacyCalloutAttachment::Top),
-            "dpcodcenter" => ControlWord::LegacyCalloutAttachment(crate::LegacyCalloutAttachment::Center),
-            "dpcodbottom" => ControlWord::LegacyCalloutAttachment(crate::LegacyCalloutAttachment::Bottom),
-            "dpcodabs" => ControlWord::LegacyCalloutAttachment(crate::LegacyCalloutAttachment::Absolute),
+            "dpcodcenter" => {
+                ControlWord::LegacyCalloutAttachment(crate::LegacyCalloutAttachment::Center)
+            },
+            "dpcodbottom" => {
+                ControlWord::LegacyCalloutAttachment(crate::LegacyCalloutAttachment::Bottom)
+            },
+            "dpcodabs" => {
+                ControlWord::LegacyCalloutAttachment(crate::LegacyCalloutAttachment::Absolute)
+            },
             "dpcodescent" => ControlWord::LegacyCalloutDescent(param_value),
             "dpcooffset" => ControlWord::LegacyCalloutOffset(param_value),
             "dpcolength" => ControlWord::LegacyCalloutLength(param_value),
-            "dplinesolid" => ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::Solid),
-            "dplinehollow" => ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::Hollow),
-            "dplinedash" => ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::Dashed),
-            "dplinedot" => ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::Dotted),
-            "dplinedado" => ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::DashDot),
-            "dplinedadodo" => ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::DashDotDot),
+            "dplinesolid" => {
+                ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::Solid)
+            },
+            "dplinehollow" => {
+                ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::Hollow)
+            },
+            "dplinedash" => {
+                ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::Dashed)
+            },
+            "dplinedot" => {
+                ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::Dotted)
+            },
+            "dplinedado" => {
+                ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::DashDot)
+            },
+            "dplinedadodo" => {
+                ControlWord::LegacyDrawingLineStyle(crate::LegacyDrawingLineStyle::DashDotDot)
+            },
             "dplinegray" => ControlWord::LegacyDrawingLineGray(param_value),
             "dplinecor" => ControlWord::LegacyDrawingLineRed(param_value),
             "dplinecog" => ControlWord::LegacyDrawingLineGreen(param_value),
@@ -1857,18 +3197,26 @@ impl<'a> Lexer<'a> {
             "dpfillbgcb" => ControlWord::LegacyDrawingFillBackgroundBlue(param_value),
             "dpfillbgpal" => ControlWord::LegacyDrawingFillBackgroundPalette,
             "dpfillpat" => ControlWord::LegacyDrawingFillPattern(param_value),
-            "dpastartsol" => ControlWord::LegacyDrawingStartArrowFill(crate::LegacyDrawingArrowFill::Solid),
-            "dpastarthol" => ControlWord::LegacyDrawingStartArrowFill(crate::LegacyDrawingArrowFill::Hollow),
+            "dpastartsol" => {
+                ControlWord::LegacyDrawingStartArrowFill(crate::LegacyDrawingArrowFill::Solid)
+            },
+            "dpastarthol" => {
+                ControlWord::LegacyDrawingStartArrowFill(crate::LegacyDrawingArrowFill::Hollow)
+            },
             "dpastartl" => ControlWord::LegacyDrawingStartArrowLength(param_value),
             "dpastartw" => ControlWord::LegacyDrawingStartArrowWidth(param_value),
-            "dpaendsol" => ControlWord::LegacyDrawingEndArrowFill(crate::LegacyDrawingArrowFill::Solid),
-            "dpaendhol" => ControlWord::LegacyDrawingEndArrowFill(crate::LegacyDrawingArrowFill::Hollow),
+            "dpaendsol" => {
+                ControlWord::LegacyDrawingEndArrowFill(crate::LegacyDrawingArrowFill::Solid)
+            },
+            "dpaendhol" => {
+                ControlWord::LegacyDrawingEndArrowFill(crate::LegacyDrawingArrowFill::Hollow)
+            },
             "dpaendl" => ControlWord::LegacyDrawingEndArrowLength(param_value),
             "dpaendw" => ControlWord::LegacyDrawingEndArrowWidth(param_value),
             "dpshadow" => ControlWord::LegacyDrawingShadow,
             "dpshadx" => ControlWord::LegacyDrawingShadowX(param_value),
             "dpshady" => ControlWord::LegacyDrawingShadowY(param_value),
-            "background" => ControlWord::BackgroundDestination,
+            "background" => ControlWord::BackgroundDestination(param),
 
             // Document info
             "title" => ControlWord::Title,
@@ -1908,7 +3256,6 @@ impl<'a> Lexer<'a> {
             // Special
             "tab" => ControlWord::Tab,
             "line" => ControlWord::Line,
-            "page" => ControlWord::Page,
 
             // Binary data
             "bin" => ControlWord::Binary(param_value),
@@ -2237,7 +3584,10 @@ mod tests {
         let mut lexer = Lexer::new(input, &arena);
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 1);
-        assert!(matches!(tokens[0], Token::Control(ControlWord::Page)));
+        assert!(matches!(
+            tokens[0],
+            Token::Control(ControlWord::Page(None))
+        ));
     }
 
     #[test]

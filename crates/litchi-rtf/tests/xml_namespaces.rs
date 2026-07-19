@@ -42,9 +42,11 @@ fn mutation_and_empty_table_presence_round_trip() {
             XmlNamespace::new(4, Cow::Borrowed("https://schemas.example.test/x")).unwrap(),
         )
         .unwrap();
-    assert!(document
-        .push_xml_namespace(XmlNamespace::new(4, Cow::Borrowed("urn:duplicate")).unwrap())
-        .is_err());
+    assert!(
+        document
+            .push_xml_namespace(XmlNamespace::new(4, Cow::Borrowed("urn:duplicate")).unwrap())
+            .is_err()
+    );
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.xml_namespaces(), document.xml_namespaces());
     assert_eq!(reparsed.text(), "Body");
@@ -83,7 +85,10 @@ fn parses_bundled_libreoffice_xml_namespace_fixtures() {
         "sw/qa/extras/odfexport/data/tdf165315.rtf",
         "sw/qa/extras/rtfexport/data/FWDP90_min.rtf",
     ];
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/libreoffice-core/"
+    );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)
