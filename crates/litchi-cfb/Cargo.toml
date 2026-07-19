@@ -15,6 +15,7 @@ write = []
 
 [dependencies]
 chrono          = { workspace = true }
+encoding_rs     = { workspace = true }
 fixedbitset     = { workspace = true }
 litchi-core     = { workspace = true, features = ["ole"] }
 smallvec        = { workspace = true }

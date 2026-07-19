@@ -30,13 +30,17 @@ pub mod rel;
 pub mod signature;
 
 // Re-export commonly used types
-pub use error::{OpcError, Result};
 pub use content_type::ContentType;
+pub use error::{OpcError, Result};
 pub use package::OpcPackage;
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, XmlPart};
 pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
-pub use signature::{CertificateTrust, DigitalSignatureError, DigitalSignatureVerification,
-    EmbeddedCertificate, ReferenceVerification, Sha1Policy, SignatureVerificationPolicy,
-    VerificationStatus};
+pub use signature::{
+    CanonicalizationMethod, CertificateTrust, DigitalSignatureError,
+    DetachedDigitalSignatureVerification, DetachedSignatureReference, DigitalSignatureVerification,
+    EmbeddedCertificate, PackageSigner, ReferenceVerification, Sha1Policy, SignatureAlgorithm,
+    SignatureVerificationPolicy, VerificationStatus, author_detached_signature,
+    verify_detached_signature,
+};

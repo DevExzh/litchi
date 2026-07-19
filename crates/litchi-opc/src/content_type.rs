@@ -80,7 +80,8 @@ fn validate_content_type(value: &str) -> std::result::Result<(), String> {
             raw_value
         };
         if !is_token(parameter_value)
-            || (raw_value.contains('"') && !(raw_value.starts_with('"') && raw_value.ends_with('"')))
+            || (raw_value.contains('"')
+                && !(raw_value.starts_with('"') && raw_value.ends_with('"')))
         {
             return Err("content type parameter value is not an ASCII token".to_string());
         }
@@ -194,9 +195,7 @@ impl ContentTypeMap {
     }
 
     pub(crate) fn get(&self, pack_uri: &PackURI) -> Result<String> {
-        if let Some((_, content_type)) = self
-            .overrides
-            .get(&pack_uri.as_str().to_ascii_lowercase())
+        if let Some((_, content_type)) = self.overrides.get(&pack_uri.as_str().to_ascii_lowercase())
         {
             return Ok(content_type.as_str().to_string());
         }
@@ -340,9 +339,7 @@ fn validate_extension(extension: &str) -> Result<()> {
                 || matches!(byte, b'.' | b'/' | b'\\' | b'?' | b'#')
         })
     {
-        return Err(OpcError::InvalidContentTypeExtension(
-            extension.to_string(),
-        ));
+        return Err(OpcError::InvalidContentTypeExtension(extension.to_string()));
     }
     Ok(())
 }
@@ -430,9 +427,8 @@ mod tests {
 
     #[test]
     fn rejects_invalid_override_part_name() {
-        let xml = manifest(
-            r#"<Override PartName="word/document.xml" ContentType="application/xml"/>"#,
-        );
+        let xml =
+            manifest(r#"<Override PartName="word/document.xml" ContentType="application/xml"/>"#);
         assert!(matches!(
             ContentTypeMap::from_xml(xml.as_bytes()),
             Err(OpcError::InvalidPackUri(_))

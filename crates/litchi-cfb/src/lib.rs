@@ -16,7 +16,9 @@ pub mod writer;
 
 pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
 pub use metadata::{
-    OleMetadata, PropertySet, PropertySetGuid, PropertySetStream, PropertyValue,
+    DOCUMENT_SUMMARY_INFORMATION_FMTID, OleMetadata, OlePropertySetEditor, PropertySet,
+    PropertySetGuid, PropertySetStream, PropertyValue, StandardPropertySet,
+    SUMMARY_INFORMATION_FMTID, USER_DEFINED_PROPERTIES_FMTID,
 };
 pub use writer::OleWriter;
 

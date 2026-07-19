@@ -394,6 +394,11 @@ impl<R: Read + Seek> OleFile<R> {
         self.file_size
     }
 
+    /// Sector size used by this compound file.
+    pub fn sector_size(&self) -> usize {
+        self.sector_size
+    }
+
     /// Load the File Allocation Table (FAT)
     ///
     /// The FAT maps each sector to the next sector in the chain.
@@ -1422,6 +1427,11 @@ impl<R: Read + Seek> OleFile<R> {
     /// Get the root entry name
     pub fn get_root_name(&self) -> Option<&str> {
         self.root.as_ref().map(|r| r.name.as_str())
+    }
+
+    /// Root directory entry, including its CLSID.
+    pub fn root_entry(&self) -> Option<&DirectoryEntry> {
+        self.root.as_ref()
     }
 
     /// Check if a stream exists

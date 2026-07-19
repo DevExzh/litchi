@@ -194,10 +194,14 @@ impl Relationship {
     }
 }
 
-pub(crate) fn relationship_target_components(reference: &str) -> (&str, Option<&str>, Option<&str>) {
+pub(crate) fn relationship_target_components(
+    reference: &str,
+) -> (&str, Option<&str>, Option<&str>) {
     let (before_fragment, fragment) = reference
         .split_once('#')
-        .map_or((reference, None), |(before, fragment)| (before, Some(fragment)));
+        .map_or((reference, None), |(before, fragment)| {
+            (before, Some(fragment))
+        });
     let (path, query) = before_fragment
         .split_once('?')
         .map_or((before_fragment, None), |(path, query)| (path, Some(query)));

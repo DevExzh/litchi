@@ -10,10 +10,10 @@ use crate::error::{OpcError, Result};
 use crate::packuri::{PACKAGE_URI, PackURI, PartNameConflict};
 use crate::phys_pkg::PhysPkgReader;
 use crate::rel::{TargetMode, relationship_target_components};
+use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
-use quick_xml::XmlVersion;
 use smallvec::SmallVec;
 use std::collections::HashMap;
 
@@ -463,8 +463,7 @@ impl PackageReader {
 
     fn relationship_part_has_relationships(member_name: &str) -> bool {
         Self::is_relationship_member(member_name)
-            && (member_name.starts_with("_rels/_rels/")
-                || member_name.contains("/_rels/_rels/"))
+            && (member_name.starts_with("_rels/_rels/") || member_name.contains("/_rels/_rels/"))
     }
 
     /// Get an iterator over all serialized parts.
@@ -714,10 +713,7 @@ mod tests {
         let bytes = package_bytes(b"<Relationships><Relationship", b"document");
         let archive = soapberry_zip::office::LazyArchiveReader::new(&bytes).unwrap();
         let error = PackageReader::load_rels_lazy(&archive, &package_uri).unwrap_err();
-        assert!(matches!(
-            error,
-            OpcError::InvalidRelationshipsManifest(_)
-        ));
+        assert!(matches!(error, OpcError::InvalidRelationshipsManifest(_)));
     }
 
     #[test]
@@ -774,8 +770,7 @@ mod tests {
         };
         assert!(matches!(error, OpcError::EquivalentPartNames { .. }));
 
-        let bytes =
-            package_with_physical_parts("word/document.xml", "word/document.xml/image.gif");
+        let bytes = package_with_physical_parts("word/document.xml", "word/document.xml/image.gif");
         let physical = PhysPkgReader::new(&bytes).unwrap();
         let error = match PackageReader::from_phys_reader(&physical) {
             Ok(_) => panic!("derived part names unexpectedly loaded"),
@@ -786,9 +781,8 @@ mod tests {
 
     #[test]
     fn rejects_apache_poi_derived_part_name_fixture() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx",
-        );
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../3rdparty/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx");
         let bytes = std::fs::read(path).unwrap();
         let physical = PhysPkgReader::new(&bytes).unwrap();
         let error = match PackageReader::from_phys_reader(&physical) {
@@ -898,19 +892,15 @@ mod tests {
 
     #[test]
     fn rejects_poi_relationships_entity_fixture() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml",
-        );
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../3rdparty/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml");
         let bytes = std::fs::read(path).unwrap();
         let physical = PhysPkgReader::new(&bytes).unwrap();
         let error = match PackageReader::from_phys_reader(&physical) {
             Ok(_) => panic!("entity-bearing relationships fixture unexpectedly loaded"),
             Err(error) => error,
         };
-        assert!(matches!(
-            error,
-            OpcError::InvalidRelationshipsManifest(_)
-        ));
+        assert!(matches!(error, OpcError::InvalidRelationshipsManifest(_)));
     }
 
     #[test]
@@ -932,9 +922,11 @@ mod tests {
         let package = crate::OpcPackage::from_bytes(&bytes).unwrap();
         let original_targets = targets(&package);
         assert!(original_targets.iter().any(|target| target.contains('#')));
-        assert!(original_targets
-            .iter()
-            .any(|target| target.contains("Another Sheet")));
+        assert!(
+            original_targets
+                .iter()
+                .any(|target| target.contains("Another Sheet"))
+        );
 
         let serialized = crate::PackageWriter::to_bytes(&package).unwrap();
         let reloaded = crate::OpcPackage::from_bytes(&serialized).unwrap();

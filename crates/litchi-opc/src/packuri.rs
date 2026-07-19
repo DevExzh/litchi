@@ -394,7 +394,18 @@ fn is_pchar(byte: u8) -> bool {
     is_unreserved(byte)
         || matches!(
             byte,
-            b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'=' | b':' | b'@'
+            b'!' | b'$'
+                | b'&'
+                | b'\''
+                | b'('
+                | b')'
+                | b'*'
+                | b'+'
+                | b','
+                | b';'
+                | b'='
+                | b':'
+                | b'@'
         )
 }
 

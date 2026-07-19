@@ -36,7 +36,9 @@ pub enum OpcError {
     #[error("Duplicate default content type mapping for extension: {0}")]
     DuplicateContentTypeDefault(String),
 
-    #[error("Duplicate or ASCII-case-equivalent content type overrides: '{existing}' and '{candidate}'")]
+    #[error(
+        "Duplicate or ASCII-case-equivalent content type overrides: '{existing}' and '{candidate}'"
+    )]
     DuplicateContentTypeOverride { existing: String, candidate: String },
 
     #[error("Invalid content type extension: {0}")]

@@ -253,6 +253,11 @@ impl OpcPackage {
         Ok(())
     }
 
+    /// Remove a part by name, returning whether it existed.
+    pub fn remove_part(&mut self, partname: &PackURI) -> bool {
+        self.parts.remove(partname).is_some()
+    }
+
     /// Get an iterator over all parts in the package.
     pub fn iter_parts(&self) -> impl Iterator<Item = &dyn Part> {
         self.parts.values().map(|b| &**b as &dyn Part)
@@ -279,6 +284,27 @@ impl OpcPackage {
         policy: &crate::signature::SignatureVerificationPolicy,
     ) -> crate::signature::Result<Vec<crate::signature::DigitalSignatureVerification>> {
         crate::signature::verify_package(self, policy)
+    }
+
+    /// Add a package digital signature without removing existing valid signatures.
+    pub fn add_digital_signature(
+        &mut self,
+        signer: &crate::signature::PackageSigner,
+    ) -> crate::signature::Result<PackURI> {
+        crate::signature::add_package_signature(self, signer)
+    }
+
+    /// Replace every package digital signature with one new signature.
+    pub fn resign_digital_signature(
+        &mut self,
+        signer: &crate::signature::PackageSigner,
+    ) -> crate::signature::Result<PackURI> {
+        crate::signature::resign_package(self, signer)
+    }
+
+    /// Remove the complete package digital-signature graph.
+    pub fn clear_digital_signatures(&mut self) -> crate::signature::Result<()> {
+        crate::signature::clear_package_signatures(self)
     }
 
     /// Relate the package to a part.
@@ -542,10 +568,7 @@ mod tests {
         for (candidate, expected) in [
             ("/word/document.xml", PartNameConflict::Duplicate),
             ("/WORD/DOCUMENT.XML", PartNameConflict::Equivalent),
-            (
-                "/word/document.xml/image.gif",
-                PartNameConflict::Derived,
-            ),
+            ("/word/document.xml/image.gif", PartNameConflict::Derived),
         ] {
             let error = package
                 .try_add_part(Box::new(BlobPart::new(
@@ -561,10 +584,7 @@ mod tests {
                         PartNameConflict::Equivalent,
                         OpcError::EquivalentPartNames { .. }
                     )
-                    | (
-                        PartNameConflict::Derived,
-                        OpcError::DerivedPartNames { .. }
-                    )
+                    | (PartNameConflict::Derived, OpcError::DerivedPartNames { .. })
             ));
             assert_eq!(package.part_count(), 1);
             assert_eq!(package.get_part(&original_uri).unwrap().blob(), b"original");
