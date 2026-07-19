@@ -13,7 +13,9 @@ use super::{
     label_range::parse_label_ranges,
     parser::OdsParser,
     protection::parse_protection,
-    style_protection::{ConditionalCellStyle, CellStyleProtection, CellStyleRegistry},
+    style_protection::{
+        CellStyleProtection, CellStyleRegistry, ConditionalCellStyle, TableCellProtectionStyle,
+    },
     table_template::parse_table_templates,
     tracked_changes::parse_tracked_changes,
 };
@@ -71,6 +73,9 @@ pub struct Spreadsheet {
 }
 
 impl Spreadsheet {
+    crate::script_package::script_facade_methods!();
+    crate::annotation_package::annotation_facade_methods!(Spreadsheet);
+
     pub(crate) fn into_package(self) -> OwnedPackage {
         self.package
     }
@@ -164,6 +169,7 @@ impl Spreadsheet {
         let content_bytes = package.get_file("content.xml")?;
         let content = Content::from_bytes(&content_bytes)?;
         let named_definitions = OdsParser::parse_named_definitions(content.xml_content())?;
+        super::named_expression::validate_named_definition_collection(&named_definitions)?;
         let content_validations = parse_content_validations(content.xml_content())?;
         let database_ranges = parse_database_ranges(content.xml_content())?;
         let data_pilot_tables = parse_data_pilot_tables(content.xml_content())?;
@@ -283,6 +289,74 @@ impl Spreadsheet {
         crate::form::parse_form_parts(&parts)
     }
 
+    pub fn rdf_graphs(&self) -> Result<Vec<crate::OdfRdfGraph>> { crate::rdf_package::graphs(&self.package) }
+    pub fn add_rdf_graph(&mut self, preferred_path: Option<&str>, triples: &[crate::OdfRdfTriple]) -> Result<String> {
+        let (bytes, path) = crate::rdf_package::add_graph(&self.package, preferred_path, triples)?;
+        *self = Self::from_bytes(bytes)?; Ok(path)
+    }
+    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::OdfRdfTriple]) -> Result<()> {
+        let bytes = crate::rdf_package::replace_graph(&self.package, path, triples)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
+        let bytes = crate::rdf_package::remove_graph(&self.package, path)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::OdfRdfTriple) -> Result<usize> {
+        let index = self.rdf_graphs()?.into_iter().find(|graph| graph.path == path).ok_or_else(|| Error::InvalidFormat(format!("RDF graph '{path}' was not found")))?.triples.len();
+        let (bytes, _) = crate::rdf_package::add_triple(&self.package, path, triple)?;
+        *self = Self::from_bytes(bytes)?; Ok(index)
+    }
+    pub fn replace_rdf_triple(&mut self, path: &str, index: usize, triple: &crate::OdfRdfTriple) -> Result<()> {
+        let bytes = crate::rdf_package::replace_triple(&self.package, path, index, triple)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
+        let bytes = crate::rdf_package::remove_triple(&self.package, path, index)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::rdf_package::move_triple(&self.package, path, from, to)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+
+    pub fn add_form(&mut self, group_index: usize, form: &crate::OdfAuthoredForm) -> Result<usize> {
+        let (bytes, index) = crate::form_package::add_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), crate::form_package::FormHost::Spreadsheet, group_index, None, form)?;
+        *self = Self::from_bytes(bytes)?; Ok(index)
+    }
+    pub fn add_nested_form(&mut self, parent_form: usize, form: &crate::OdfAuthoredForm) -> Result<usize> {
+        let (bytes, index) = crate::form_package::add_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), crate::form_package::FormHost::Spreadsheet, 0, Some(parent_form), form)?;
+        *self = Self::from_bytes(bytes)?; Ok(index)
+    }
+    pub fn replace_form(&mut self, index: usize, form: &crate::OdfAuthoredForm) -> Result<()> {
+        let bytes = crate::form_package::replace_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, form)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn remove_form(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::form_package::remove_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn move_form(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::form_package::move_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), from, to)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn add_form_control(&mut self, form_index: usize, control: &crate::OdfAuthoredFormControl) -> Result<usize> {
+        let (bytes, index) = crate::form_package::add_control(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), form_index, control)?;
+        *self = Self::from_bytes(bytes)?; Ok(index)
+    }
+    pub fn replace_form_control(&mut self, index: usize, control: &crate::OdfAuthoredFormControl) -> Result<()> {
+        let bytes = crate::form_package::replace_control(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, control)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn remove_form_control(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::form_package::remove_control(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn move_form_control(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::form_package::move_control(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), from, to)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
     pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
         let mut parts = vec![(self.content.xml_content(), crate::OdfVariablePart::Content)];
@@ -301,6 +375,68 @@ impl Spreadsheet {
             |path| package.has_file(path),
             |path| package.manifest().get_media_type(path).map(str::to_string),
         )
+    }
+
+    pub fn embedded_chart(&self, index: usize) -> Result<crate::ChartDocument> {
+        crate::embedded_chart::open_embedded_chart(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index)
+    }
+
+    pub fn add_embedded_chart(&mut self, sheet_name: &str, definition: &crate::ChartDefinition) -> Result<usize> {
+        self.add_embedded_chart_with_storage(sheet_name, definition, crate::OdfEmbeddedChartStorage::PackageSubdocument)
+    }
+
+    pub fn add_embedded_chart_with_storage(&mut self, sheet_name: &str, definition: &crate::ChartDefinition, storage: crate::OdfEmbeddedChartStorage) -> Result<usize> {
+        let (bytes, index) = crate::embedded_chart::add_embedded_chart(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), crate::embedded_chart::EmbeddedChartHost::Sheet(sheet_name), storage, definition)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(index)
+    }
+
+    pub fn replace_embedded_chart(&mut self, index: usize, definition: &crate::ChartDefinition) -> Result<()> {
+        let bytes = crate::embedded_chart::replace_embedded_chart(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, definition)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    pub fn remove_embedded_chart(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::embedded_chart::remove_embedded_chart(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    pub fn add_embedded_resource(&mut self, sheet_name: &str, resource: &crate::OdfEmbeddedResource) -> Result<usize> {
+        let (bytes, index) = crate::embedded_package::add(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), crate::embedded_chart::EmbeddedChartHost::Sheet(sheet_name), resource)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(index)
+    }
+
+    pub fn replace_embedded_object(&mut self, index: usize, resource: &crate::OdfEmbeddedResource) -> Result<()> {
+        let bytes = crate::embedded_package::replace(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, crate::embedded_package::ResourceTarget::Object, resource)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+
+    pub fn replace_embedded_image(&mut self, index: usize, resource: &crate::OdfEmbeddedResource) -> Result<()> {
+        let bytes = crate::embedded_package::replace(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, crate::embedded_package::ResourceTarget::Image, resource)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+
+    pub fn remove_embedded_object(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::embedded_package::remove(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, crate::embedded_package::ResourceTarget::Object)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+
+    pub fn remove_embedded_image(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::embedded_package::remove(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, crate::embedded_package::ResourceTarget::Image)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+
+    pub fn move_embedded_object(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::embedded_package::reorder(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), from, to, crate::embedded_package::ResourceTarget::Object)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+
+    pub fn move_embedded_image(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::embedded_package::reorder(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), from, to, crate::embedded_package::ResourceTarget::Image)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
     }
 
     /// Return bytes only for inline or verified package-contained images.
@@ -361,6 +497,46 @@ impl Spreadsheet {
         &self.named_definitions
     }
 
+    /// Find either named-definition kind by name and scope.
+    pub fn find_named_definition(&self, name: &str, scope: &NamedDefinitionScope) -> Option<&NamedDefinition> {
+        self.named_definitions.iter().find(|value| value.name() == name && value.scope() == scope)
+    }
+
+    /// Add a global or sheet-local named definition atomically.
+    pub fn add_named_definition(&mut self, definition: &NamedDefinition) -> Result<()> {
+        let bytes = crate::ods_definition_package::add_named(&self.package, self.content.xml_content(), &self.named_definitions, definition)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Replace a named definition without changing its scope.
+    pub fn replace_named_definition(&mut self, name: &str, scope: &NamedDefinitionScope, replacement: &NamedDefinition) -> Result<()> {
+        let bytes = crate::ods_definition_package::replace_named(&self.package, self.content.xml_content(), &self.named_definitions, name, scope, replacement)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Update attributes while preserving unknown attributes and the original body.
+    pub fn update_named_definition(&mut self, name: &str, scope: &NamedDefinitionScope, update: &crate::NamedDefinitionUpdate) -> Result<()> {
+        let bytes = crate::ods_definition_package::update_named(&self.package, self.content.xml_content(), &self.named_definitions, name, scope, update)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Remove a named definition unless another named expression depends on it.
+    pub fn remove_named_definition(&mut self, name: &str, scope: &NamedDefinitionScope) -> Result<()> {
+        let bytes = crate::ods_definition_package::remove_named(&self.package, self.content.xml_content(), &self.named_definitions, name, scope)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Reorder named definitions within one global or sheet-local scope.
+    pub fn reorder_named_definition(&mut self, scope: &NamedDefinitionScope, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::ods_definition_package::reorder_named(&self.package, self.content.xml_content(), &self.named_definitions, scope, from, to)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
     /// Return document-level spreadsheet content validations in document order.
     pub fn content_validations(&self) -> &[ContentValidation] {
         &self.content_validations
@@ -373,9 +549,94 @@ impl Spreadsheet {
         &self.database_ranges
     }
 
+    /// Find a uniquely named database range.
+    pub fn find_database_range(&self, name: &str) -> Option<&DatabaseRange> {
+        self.database_ranges.iter().find(|range| range.name.as_deref() == Some(name))
+    }
+
+    /// Add a database range without refreshing or executing its source metadata.
+    pub fn add_database_range(&mut self, range: &DatabaseRange) -> Result<()> {
+        let bytes = crate::ods_definition_package::add_database(&self.package, self.content.xml_content(), &self.database_ranges, range)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Replace a database range atomically.
+    pub fn replace_database_range(&mut self, index: usize, range: &DatabaseRange) -> Result<()> {
+        let bytes = crate::ods_definition_package::replace_database(&self.package, self.content.xml_content(), &self.database_ranges, index, range)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Update attributes while preserving filter, sort, subtotal, source, and extension children.
+    pub fn update_database_range(&mut self, index: usize, update: &crate::DatabaseRangeUpdate) -> Result<()> {
+        let bytes = crate::ods_definition_package::update_database(&self.package, self.content.xml_content(), &self.database_ranges, index, update)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Remove a database range atomically.
+    pub fn remove_database_range(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::ods_definition_package::remove_database(&self.package, self.content.xml_content(), &self.database_ranges, index)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Reorder database ranges inside their schema container.
+    pub fn reorder_database_range(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::ods_definition_package::reorder_database(&self.package, self.content.xml_content(), &self.database_ranges, from, to)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
     /// Return data-pilot (pivot-table) declarations.
     pub fn data_pilot_tables(&self) -> &[DataPilotTable] {
         &self.data_pilot_tables
+    }
+
+    /// Find a data-pilot table by its collection-unique name.
+    pub fn find_data_pilot_table(&self, name: &str) -> Option<&DataPilotTable> {
+        self.data_pilot_tables.iter().find(|table| table.name == name)
+    }
+
+    /// Add a data-pilot declaration without executing its database, query, or service source.
+    pub fn add_data_pilot_table(&mut self, table: &DataPilotTable) -> Result<usize> {
+        let (bytes, index) = crate::data_pilot_package::add(&self.package, self.content.xml_content(), table)?;
+        let replacement = Self::from_bytes(bytes)?;
+        *self = replacement;
+        Ok(index)
+    }
+
+    /// Replace a complete data-pilot declaration atomically.
+    pub fn replace_data_pilot_table(&mut self, index: usize, table: &DataPilotTable) -> Result<()> {
+        let bytes = crate::data_pilot_package::replace(&self.package, self.content.xml_content(), index, table)?;
+        let replacement = Self::from_bytes(bytes)?;
+        *self = replacement;
+        Ok(())
+    }
+
+    /// Update top-level data-pilot metadata while preserving its original body and extensions.
+    pub fn update_data_pilot_table(&mut self, index: usize, update: &crate::DataPilotTableUpdate) -> Result<()> {
+        let bytes = crate::data_pilot_package::update(&self.package, self.content.xml_content(), index, update)?;
+        let replacement = Self::from_bytes(bytes)?;
+        *self = replacement;
+        Ok(())
+    }
+
+    /// Remove a data-pilot declaration atomically.
+    pub fn remove_data_pilot_table(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::data_pilot_package::remove(&self.package, self.content.xml_content(), index)?;
+        let replacement = Self::from_bytes(bytes)?;
+        *self = replacement;
+        Ok(())
+    }
+
+    /// Reorder data-pilot declarations within their schema container.
+    pub fn reorder_data_pilot_table(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::data_pilot_package::reorder(&self.package, self.content.xml_content(), from, to)?;
+        let replacement = Self::from_bytes(bytes)?;
+        *self = replacement;
+        Ok(())
     }
 
     /// Find a content-validation definition by name.
@@ -405,6 +666,11 @@ impl Spreadsheet {
     /// Find a standard ODF conditional table-cell style by style name.
     pub fn conditional_cell_style(&self, style_name: &str) -> Option<&ConditionalCellStyle> {
         self.cell_styles.conditional_style(style_name)
+    }
+
+    /// Automatic table-cell styles with an explicit `style:cell-protect` value.
+    pub fn table_cell_protection_styles(&self) -> &[TableCellProtectionStyle] {
+        self.cell_styles.automatic_protection_styles()
     }
 
     /// Return all named ranges, including global and sheet-local ranges.

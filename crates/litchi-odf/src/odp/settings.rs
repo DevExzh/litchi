@@ -2,16 +2,15 @@
 
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
+    XmlVersion,
     events::{BytesStart, Event},
     name::{Namespace, ResolveResult},
     reader::NsReader,
-    XmlVersion,
 };
 use std::collections::HashSet;
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-const PRESENTATION_NAMESPACE: &[u8] =
-    b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 const MAX_XML_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TEXT_BYTES: usize = 1024 * 1024;
 const MAX_CUSTOM_SHOWS: usize = 65_536;
@@ -148,6 +147,66 @@ impl PresentationSettings {
     }
 }
 
+/// Validate page-name references against the names that will be emitted on
+/// direct `draw:page` children.
+pub(crate) fn validate_presentation_page_references(
+    settings: Option<&PresentationSettings>,
+    page_names: &[String],
+) -> Result<()> {
+    let Some(settings) = settings else {
+        return Ok(());
+    };
+    settings.validate()?;
+
+    let mut unique_names = HashSet::with_capacity(page_names.len());
+    let mut ambiguous_names = HashSet::new();
+    for name in page_names {
+        if !unique_names.insert(name.as_str()) {
+            ambiguous_names.insert(name.as_str());
+        }
+    }
+
+    let validate_reference = |name: &str, description: &str| -> Result<()> {
+        if !unique_names.contains(name) {
+            return Err(invalid(format!(
+                "{description} references missing presentation page '{name}'"
+            )));
+        }
+        if ambiguous_names.contains(name) {
+            return Err(invalid(format!(
+                "{description} references ambiguous presentation page '{name}'"
+            )));
+        }
+        Ok(())
+    };
+
+    if let Some(name) = &settings.start_page {
+        validate_reference(name, "presentation:start-page")?;
+    }
+    for show in &settings.custom_shows {
+        for name in &show.pages {
+            validate_reference(
+                name,
+                &format!("custom presentation show '{}'", show.name),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn settings_reference_page(
+    settings: Option<&PresentationSettings>,
+    page_name: &str,
+) -> bool {
+    settings.is_some_and(|settings| {
+        settings.start_page.as_deref() == Some(page_name)
+            || settings
+                .custom_shows
+                .iter()
+                .any(|show| show.pages.iter().any(|name| name == page_name))
+    })
+}
+
 /// Parse the single direct `presentation:settings` child, if present.
 pub fn parse_presentation_settings(xml: &str) -> Result<Option<PresentationSettings>> {
     if xml.len() > MAX_XML_BYTES {
@@ -167,19 +226,16 @@ pub fn parse_presentation_settings(xml: &str) -> Result<Option<PresentationSetti
     loop {
         match reader.read_event_into(&mut buffer).map_err(xml_error)? {
             Event::Start(element) => {
-                depth = depth.checked_add(1).ok_or_else(|| invalid("XML nesting overflow"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XML nesting overflow"))?;
                 if element_is(&reader, &element, OFFICE_NAMESPACE, b"presentation") {
                     if found_presentation {
                         return Err(invalid("duplicate office:presentation element"));
                     }
                     found_presentation = true;
                     presentation_depth = Some(depth);
-                } else if element_is(
-                    &reader,
-                    &element,
-                    PRESENTATION_NAMESPACE,
-                    b"settings",
-                ) {
+                } else if element_is(&reader, &element, PRESENTATION_NAMESPACE, b"settings") {
                     if presentation_depth != Some(depth - 1) {
                         return Err(invalid(
                             "presentation:settings must be a direct office:presentation child",
@@ -194,7 +250,9 @@ pub fn parse_presentation_settings(xml: &str) -> Result<Option<PresentationSetti
                 } else if settings_depth == Some(depth - 1)
                     && element_is(&reader, &element, PRESENTATION_NAMESPACE, b"show")
                 {
-                    settings.custom_shows.push(parse_custom_show(&reader, &element)?);
+                    settings
+                        .custom_shows
+                        .push(parse_custom_show(&reader, &element)?);
                     show_depth = Some(depth);
                 } else if settings_depth.is_some() {
                     return Err(invalid(
@@ -203,12 +261,7 @@ pub fn parse_presentation_settings(xml: &str) -> Result<Option<PresentationSetti
                 }
             },
             Event::Empty(element) => {
-                if element_is(
-                    &reader,
-                    &element,
-                    PRESENTATION_NAMESPACE,
-                    b"settings",
-                ) {
+                if element_is(&reader, &element, PRESENTATION_NAMESPACE, b"settings") {
                     if presentation_depth != Some(depth) {
                         return Err(invalid(
                             "presentation:settings must be a direct office:presentation child",
@@ -222,7 +275,9 @@ pub fn parse_presentation_settings(xml: &str) -> Result<Option<PresentationSetti
                 } else if settings_depth == Some(depth)
                     && element_is(&reader, &element, PRESENTATION_NAMESPACE, b"show")
                 {
-                    settings.custom_shows.push(parse_custom_show(&reader, &element)?);
+                    settings
+                        .custom_shows
+                        .push(parse_custom_show(&reader, &element)?);
                 } else if settings_depth.is_some() {
                     return Err(invalid(
                         "presentation:settings may contain only presentation:show elements",
@@ -281,7 +336,9 @@ pub fn parse_presentation_settings(xml: &str) -> Result<Option<PresentationSetti
 }
 
 /// Serialize validated presentation settings in schema order.
-pub(crate) fn write_presentation_settings(settings: Option<&PresentationSettings>) -> Result<String> {
+pub(crate) fn write_presentation_settings(
+    settings: Option<&PresentationSettings>,
+) -> Result<String> {
     let Some(settings) = settings else {
         return Ok(String::new());
     };
@@ -347,7 +404,9 @@ fn parse_settings_attributes(
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
         if !matches!(namespace, ResolveResult::Bound(found) if found.as_ref() == PRESENTATION_NAMESPACE)
         {
-            return Err(invalid("unsupported presentation:settings attribute namespace"));
+            return Err(invalid(
+                "unsupported presentation:settings attribute namespace",
+            ));
         }
         let local = std::str::from_utf8(local_name.as_ref())
             .map_err(|_| invalid("presentation setting attribute name is not UTF-8"))?;
@@ -385,13 +444,20 @@ fn parse_settings_attributes(
             "transition-on-click" => {
                 settings.transition_on_click = Some(PresentationFeatureState::parse(local, &value)?)
             },
-            _ => return Err(invalid(format!("unsupported presentation:{local} attribute"))),
+            _ => {
+                return Err(invalid(format!(
+                    "unsupported presentation:{local} attribute"
+                )));
+            },
         }
     }
     Ok(())
 }
 
-fn parse_custom_show(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<CustomPresentationShow> {
+fn parse_custom_show(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<CustomPresentationShow> {
     let mut name = None;
     let mut pages = None;
     for attribute in element.attributes() {
@@ -445,7 +511,9 @@ fn parse_pages(value: &str) -> Result<Vec<String>> {
 fn validate_custom_show(show: &CustomPresentationShow) -> Result<()> {
     validate_text(&show.name, "presentation:name", false)?;
     if show.pages.is_empty() {
-        return Err(invalid("custom presentation show requires at least one page"));
+        return Err(invalid(
+            "custom presentation show requires at least one page",
+        ));
     }
     if show.pages.len() > MAX_CUSTOM_SHOW_PAGES {
         return Err(invalid("custom presentation show exceeds 65536 pages"));
@@ -453,7 +521,9 @@ fn validate_custom_show(show: &CustomPresentationShow) -> Result<()> {
     for page in &show.pages {
         validate_text(page, "presentation:pages item", false)?;
         if page.contains(',') {
-            return Err(invalid("custom presentation page names cannot contain commas"));
+            return Err(invalid(
+                "custom presentation page names cannot contain commas",
+            ));
         }
     }
     Ok(())
@@ -483,7 +553,9 @@ fn validate_duration(value: &str) -> Result<()> {
             index += 1;
         }
         if index == start {
-            return Err(invalid("presentation:pause has an invalid duration component"));
+            return Err(invalid(
+                "presentation:pause has an invalid duration component",
+            ));
         }
         let mut decimal = false;
         if index < bytes.len() && bytes[index] == b'.' {
@@ -498,7 +570,9 @@ fn validate_duration(value: &str) -> Result<()> {
             }
         }
         let Some(&designator) = bytes.get(index) else {
-            return Err(invalid("presentation:pause duration component lacks a designator"));
+            return Err(invalid(
+                "presentation:pause duration component lacks a designator",
+            ));
         };
         index += 1;
         let order = match (time, designator) {
@@ -508,13 +582,19 @@ fn validate_duration(value: &str) -> Result<()> {
             (true, b'H') => 4,
             (true, b'M') => 5,
             (true, b'S') => 6,
-            _ => return Err(invalid("presentation:pause has an invalid duration designator")),
+            _ => {
+                return Err(invalid(
+                    "presentation:pause has an invalid duration designator",
+                ));
+            },
         };
         if decimal && designator != b'S' {
             return Err(invalid("only presentation:pause seconds may be fractional"));
         }
         if order <= last_order {
-            return Err(invalid("presentation:pause duration components are out of order"));
+            return Err(invalid(
+                "presentation:pause duration components are out of order",
+            ));
         }
         last_order = order;
         components += 1;
@@ -544,21 +624,32 @@ fn validate_text(value: &str, description: &str, allow_empty: bool) -> Result<()
         return Err(invalid(format!("{description} cannot be empty")));
     }
     if value.chars().any(|character| {
-        character == '\0'
-            || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
+        character == '\0' || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
     }) {
-        return Err(invalid(format!("{description} contains invalid XML characters")));
+        return Err(invalid(format!(
+            "{description} contains invalid XML characters"
+        )));
     }
     Ok(())
 }
 
-fn element_is(reader: &NsReader<&[u8]>, element: &BytesStart<'_>, namespace: &[u8], local: &[u8]) -> bool {
+fn element_is(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &[u8],
+    local: &[u8],
+) -> bool {
     let (resolved, local_name) = reader.resolver().resolve_element(element.name());
     matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
         && local_name.as_ref() == local
 }
 
-fn end_is(reader: &NsReader<&[u8]>, element: &quick_xml::events::BytesEnd<'_>, namespace: &[u8], local: &[u8]) -> bool {
+fn end_is(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesEnd<'_>,
+    namespace: &[u8],
+    local: &[u8],
+) -> bool {
     let (resolved, local_name) = reader.resolver().resolve_element(element.name());
     matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
         && local_name.as_ref() == local
@@ -612,7 +703,10 @@ mod tests {
             r#"{PREFIX}<p:settings p:animations="disabled" p:endless="1" p:force-manual="false" p:full-screen="true" p:mouse-as-pen="false" p:mouse-visible="true" p:pause="PT1M2.5S" p:show="Short" p:show-end-of-presentation-slide="true" p:show-logo="false" p:start-page="page1" p:start-with-navigator="true" p:stay-on-top="false" p:transition-on-click="enabled"><p:show p:name="Short" p:pages="page1,page3"/></p:settings>{SUFFIX}"#
         );
         let settings = parse_presentation_settings(&xml).unwrap().unwrap();
-        assert_eq!(settings.animations, Some(PresentationFeatureState::Disabled));
+        assert_eq!(
+            settings.animations,
+            Some(PresentationFeatureState::Disabled)
+        );
         assert_eq!(settings.pause.as_deref(), Some("PT1M2.5S"));
         assert_eq!(settings.custom_shows[0].pages, ["page1", "page3"]);
         let written = write_presentation_settings(Some(&settings)).unwrap();
@@ -634,9 +728,9 @@ mod tests {
             show: Some("Executive".to_string()),
             ..PresentationSettings::default()
         };
-        settings.custom_shows.push(
-            CustomPresentationShow::new("Executive", vec!["page1".to_string()]).unwrap(),
-        );
+        settings
+            .custom_shows
+            .push(CustomPresentationShow::new("Executive", vec!["page1".to_string()]).unwrap());
         let mut builder = PresentationBuilder::new();
         builder.set_settings(Some(settings.clone())).unwrap();
         builder.add_slide_with_title("Title", "Body").unwrap();
@@ -656,12 +750,18 @@ mod tests {
             format!(r#"{PREFIX}<p:settings p:pause="P"/>{SUFFIX}"#),
             format!(r#"{PREFIX}<p:settings><p:show p:name="x"/></p:settings>{SUFFIX}"#),
             format!(r#"{PREFIX}<p:settings p:show="missing"/>{SUFFIX}"#),
-            format!(r#"{PREFIX}<p:settings><p:show p:name="x" p:pages="page1"/><p:show p:name="x" p:pages="page2"/></p:settings>{SUFFIX}"#),
-            format!(r#"{PREFIX}<p:settings><p:show p:name="x" p:pages="page1"><p:show p:name="nested" p:pages="page2"/></p:show></p:settings>{SUFFIX}"#),
+            format!(
+                r#"{PREFIX}<p:settings><p:show p:name="x" p:pages="page1"/><p:show p:name="x" p:pages="page2"/></p:settings>{SUFFIX}"#
+            ),
+            format!(
+                r#"{PREFIX}<p:settings><p:show p:name="x" p:pages="page1"><p:show p:name="nested" p:pages="page2"/></p:show></p:settings>{SUFFIX}"#
+            ),
         ] {
             assert!(parse_presentation_settings(&xml).is_err(), "accepted {xml}");
         }
-        let outside = format!(r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><p:settings/>{PREFIX}{SUFFIX}</o:document-content>"#);
+        let outside = format!(
+            r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><p:settings/>{PREFIX}{SUFFIX}</o:document-content>"#
+        );
         assert!(parse_presentation_settings(&outside).is_err());
         let active = format!(r#"{PREFIX}<!DOCTYPE x><p:settings/>{SUFFIX}"#);
         assert!(parse_presentation_settings(&active).is_err());

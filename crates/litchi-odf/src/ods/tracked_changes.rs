@@ -78,6 +78,8 @@ pub enum SpreadsheetTrackedCellValue {
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpreadsheetTrackedCell {
     pub address: Option<String>,
+    /// Style associated with the historical cell value.
+    pub style_name: Option<String>,
     pub matrix_covered: bool,
     pub formula: Option<String>,
     pub matrix_columns: Option<NonZeroUsize>,
@@ -94,7 +96,9 @@ pub enum SpreadsheetNestedDeletion {
         address: Option<SpreadsheetTrackedCellAddress>,
         cell: Option<SpreadsheetTrackedCell>,
     },
-    Change { change_id: Option<String> },
+    Change {
+        change_id: Option<String>,
+    },
 }
 
 /// A location removed from a previously tracked insertion or movement.
@@ -246,13 +250,8 @@ pub(crate) fn parse_tracked_changes(xml: &str) -> Result<Option<SpreadsheetTrack
                     && element.local_name().as_ref() == b"tracked-changes" =>
             {
                 ensure_tracked_location(direct_spreadsheet_child, result.is_some())?;
-                let root = build_subtree(
-                    &mut reader,
-                    namespace,
-                    &element,
-                    &mut aggregate,
-                    &mut nodes,
-                )?;
+                let root =
+                    build_subtree(&mut reader, namespace, &element, &mut aggregate, &mut nodes)?;
                 result = Some(parse_root(&root)?);
                 consumed = true;
             },
@@ -430,9 +429,9 @@ fn create_node(
     aggregate: &mut usize,
     nodes: &mut usize,
 ) -> Result<Node> {
-    *nodes = nodes.checked_add(1).ok_or_else(|| {
-        Error::InvalidFormat("tracked-change node count overflow".to_string())
-    })?;
+    *nodes = nodes
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormat("tracked-change node count overflow".to_string()))?;
     if *nodes > MAX_NODES {
         return Err(Error::InvalidFormat(format!(
             "tracked changes exceed {MAX_NODES} XML nodes"
@@ -507,7 +506,9 @@ fn add_semantic_leaf_text(node: &mut Node, aggregate: &mut usize) -> Result<()> 
             .transpose()?
             .unwrap_or(1);
         if count > MAX_VALUE_BYTES {
-            return Err(Error::InvalidFormat("text:s count exceeds 64 KiB".to_string()));
+            return Err(Error::InvalidFormat(
+                "text:s count exceeds 64 KiB".to_string(),
+            ));
         }
         append_size(aggregate, count)?;
         node.content.push(Content::Text(" ".repeat(count)));
@@ -655,18 +656,10 @@ fn parse_cell_content_change(node: &Node) -> Result<SpreadsheetCellContentChange
     let previous = required_child(node, Namespace::Table, "previous")?;
     reject_attributes(previous, &[(Namespace::Table, "id")])?;
     reject_children(previous, &["change-track-table-cell"], false)?;
-    let previous_cell = required_child(
-        previous,
-        Namespace::Table,
-        "change-track-table-cell",
-    )?;
+    let previous_cell = required_child(previous, Namespace::Table, "change-track-table-cell")?;
     Ok(SpreadsheetCellContentChange {
         metadata: parse_metadata(node)?,
-        address: parse_cell_address(required_child(
-            node,
-            Namespace::Table,
-            "cell-address",
-        )?)?,
+        address: parse_cell_address(required_child(node, Namespace::Table, "cell-address")?)?,
         previous_change_id: attribute(previous, Namespace::Table, "id").map(str::to_string),
         previous: parse_tracked_cell(previous_cell)?,
     })
@@ -675,11 +668,7 @@ fn parse_cell_content_change(node: &Node) -> Result<SpreadsheetCellContentChange
 fn parse_metadata(node: &Node) -> Result<SpreadsheetChangeMetadata> {
     let id = required_attribute(node, Namespace::Table, "id")?.to_string();
     ensure_nonempty(&id, "table:id")?;
-    let info = parse_change_info(required_child(
-        node,
-        Namespace::Office,
-        "change-info",
-    )?)?;
+    let info = parse_change_info(required_child(node, Namespace::Office, "change-info")?)?;
     let dependencies = optional_child(node, Namespace::Table, "dependencies")?
         .map(parse_dependencies)
         .transpose()?
@@ -855,8 +844,7 @@ fn parse_cut_offs(node: &Node) -> Result<Vec<SpreadsheetChangeCutOff>> {
                     },
                     _ => {
                         return Err(Error::InvalidFormat(
-                            "movement cut-off requires position or start/end positions"
-                                .to_string(),
+                            "movement cut-off requires position or start/end positions".to_string(),
                         ));
                     },
                 };
@@ -889,8 +877,7 @@ fn parse_range(node: &Node) -> Result<SpreadsheetTrackedRangeAddress> {
         ],
     )?;
     reject_children(node, &[], false)?;
-    let cell = ["table", "column", "row"]
-        .map(|name| attribute(node, Namespace::Table, name));
+    let cell = ["table", "column", "row"].map(|name| attribute(node, Namespace::Table, name));
     let range = [
         "start-table",
         "start-column",
@@ -959,6 +946,7 @@ fn parse_tracked_cell(node: &Node) -> Result<SpreadsheetTrackedCell> {
         node,
         &[
             (Namespace::Table, "cell-address"),
+            (Namespace::Table, "style-name"),
             (Namespace::Table, "matrix-covered"),
             (Namespace::Table, "formula"),
             (Namespace::Table, "number-matrix-columns-spanned"),
@@ -1031,27 +1019,641 @@ fn parse_tracked_cell(node: &Node) -> Result<SpreadsheetTrackedCell> {
     };
     Ok(SpreadsheetTrackedCell {
         address: attribute(node, Namespace::Table, "cell-address").map(str::to_string),
+        style_name: attribute(node, Namespace::Table, "style-name").map(str::to_string),
         matrix_covered: attribute(node, Namespace::Table, "matrix-covered")
             .map(|value| parse_bool(value, "table:matrix-covered"))
             .transpose()?
             .unwrap_or(false),
         formula: attribute(node, Namespace::Table, "formula").map(str::to_string),
-        matrix_columns: optional_positive_nonzero(
-            node,
-            "number-matrix-columns-spanned",
-        )?,
+        matrix_columns: optional_positive_nonzero(node, "number-matrix-columns-spanned")?,
         matrix_rows: optional_positive_nonzero(node, "number-matrix-rows-spanned")?,
         value,
         display_text,
     })
 }
 
+impl SpreadsheetTrackedChanges {
+    /// Validate references, dependency ordering and values before authoring.
+    pub fn validate(&self) -> Result<()> {
+        if self.changes.len() > MAX_NODES {
+            return tracked_invalid("spreadsheet tracked-change count exceeds resource limit");
+        }
+        let mut ids = std::collections::HashMap::with_capacity(self.changes.len());
+        let mut aggregate = 0usize;
+        let mut nodes = 1usize;
+        for (index, change) in self.changes.iter().enumerate() {
+            let metadata = change.metadata();
+            validate_tracked_string(&metadata.id, "table:id", false, &mut aggregate)?;
+            if ids.insert(metadata.id.as_str(), index).is_some() {
+                return tracked_invalid(format!(
+                    "duplicate spreadsheet tracked-change id '{}'",
+                    metadata.id
+                ));
+            }
+            nodes = nodes
+                .checked_add(2 + metadata.dependencies.len() + metadata.deletions.len())
+                .ok_or_else(|| Error::InvalidFormat("tracked-change node count overflow".into()))?;
+            validate_tracked_metadata(metadata, &mut aggregate)?;
+            match change {
+                SpreadsheetTrackedChange::Insertion(value) => {
+                    validate_tracked_position(value.position, "insertion position")?;
+                    validate_optional_tracked_position(value.table, "insertion table")?;
+                },
+                SpreadsheetTrackedChange::Deletion(value) => {
+                    validate_tracked_position(value.position, "deletion position")?;
+                    validate_optional_tracked_position(value.table, "deletion table")?;
+                    validate_optional_tracked_position(
+                        value.multi_deletion_spanned,
+                        "multi-deletion-spanned",
+                    )?;
+                    nodes = nodes.saturating_add(value.cut_offs.len());
+                    for cut_off in &value.cut_offs {
+                        match cut_off {
+                            SpreadsheetChangeCutOff::Insertion { change_id, position } => {
+                                validate_tracked_string(
+                                    change_id,
+                                    "insertion cut-off id",
+                                    false,
+                                    &mut aggregate,
+                                )?;
+                                validate_tracked_position(*position, "insertion cut-off position")?;
+                            },
+                            SpreadsheetChangeCutOff::MovementPoint { position } => {
+                                validate_tracked_position(*position, "movement cut-off position")?;
+                            },
+                            SpreadsheetChangeCutOff::MovementRange { start, end } => {
+                                validate_tracked_position(*start, "movement cut-off start")?;
+                                validate_tracked_position(*end, "movement cut-off end")?;
+                                if start >= end {
+                                    return tracked_invalid(
+                                        "movement cut-off start must precede end",
+                                    );
+                                }
+                            },
+                        }
+                    }
+                },
+                SpreadsheetTrackedChange::Movement(value) => {
+                    validate_tracked_range(&value.source)?;
+                    validate_tracked_range(&value.target)?;
+                    nodes = nodes.saturating_add(2);
+                },
+                SpreadsheetTrackedChange::CellContent(value) => {
+                    validate_tracked_address(&value.address)?;
+                    validate_tracked_cell(&value.previous, &mut aggregate)?;
+                    if let Some(id) = &value.previous_change_id {
+                        validate_tracked_string(
+                            id,
+                            "previous change id",
+                            false,
+                            &mut aggregate,
+                        )?;
+                    }
+                    nodes = nodes.saturating_add(3);
+                },
+            }
+        }
+        if nodes > MAX_NODES {
+            return tracked_invalid("spreadsheet tracked-change node count exceeds resource limit");
+        }
+
+        for change in &self.changes {
+            let metadata = change.metadata();
+            validate_tracked_reference(metadata.rejecting_change_id.as_deref(), &ids)?;
+            for id in &metadata.dependencies {
+                validate_tracked_reference(Some(id), &ids)?;
+            }
+            for deletion in &metadata.deletions {
+                let id = match deletion {
+                    SpreadsheetNestedDeletion::CellContent { change_id, .. }
+                    | SpreadsheetNestedDeletion::Change { change_id } => change_id.as_deref(),
+                };
+                validate_tracked_reference(id, &ids)?;
+            }
+            if let SpreadsheetTrackedChange::Deletion(value) = change {
+                for cut_off in &value.cut_offs {
+                    if let SpreadsheetChangeCutOff::Insertion { change_id, .. } = cut_off {
+                        validate_tracked_reference(Some(change_id), &ids)?;
+                    }
+                }
+            }
+            if let SpreadsheetTrackedChange::CellContent(value) = change {
+                validate_tracked_reference(value.previous_change_id.as_deref(), &ids)?;
+            }
+        }
+        let mut states = vec![0u8; self.changes.len()];
+        for index in 0..self.changes.len() {
+            visit_tracked_dependencies(index, &self.changes, &ids, &mut states)?;
+        }
+        Ok(())
+    }
+
+    /// Return canonical ODF XML for this `table:tracked-changes` fragment.
+    pub fn to_xml_fragment(&self) -> Result<String> {
+        self.validate()?;
+        let mut output = String::new();
+        write_tracked_changes_unchecked(&mut output, self);
+        Ok(output)
+    }
+}
+
+pub(crate) fn write_tracked_changes(
+    output: &mut String,
+    changes: Option<&SpreadsheetTrackedChanges>,
+) -> Result<()> {
+    if let Some(changes) = changes {
+        changes.validate()?;
+        write_tracked_changes_unchecked(output, changes);
+    }
+    Ok(())
+}
+
+fn tracked_invalid<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidFormat(message.into()))
+}
+
+fn validate_tracked_string(
+    value: &str,
+    label: &str,
+    empty_allowed: bool,
+    aggregate: &mut usize,
+) -> Result<()> {
+    if !empty_allowed && value.is_empty() {
+        return tracked_invalid(format!("{label} must not be empty"));
+    }
+    if value.len() > MAX_VALUE_BYTES {
+        return tracked_invalid(format!("{label} exceeds 64 KiB"));
+    }
+    append_size(aggregate, value.len())
+}
+
+fn validate_tracked_position(value: i64, label: &str) -> Result<()> {
+    if value < 0 {
+        return tracked_invalid(format!("{label} must be nonnegative"));
+    }
+    Ok(())
+}
+
+fn validate_optional_tracked_position(value: Option<i64>, label: &str) -> Result<()> {
+    value.map_or(Ok(()), |value| validate_tracked_position(value, label))
+}
+
+fn validate_tracked_address(address: &SpreadsheetTrackedCellAddress) -> Result<()> {
+    validate_tracked_position(address.table, "tracked cell table")?;
+    validate_tracked_position(address.column, "tracked cell column")?;
+    validate_tracked_position(address.row, "tracked cell row")
+}
+
+fn validate_tracked_range(range: &SpreadsheetTrackedRangeAddress) -> Result<()> {
+    match range {
+        SpreadsheetTrackedRangeAddress::Cell(address) => validate_tracked_address(address),
+        SpreadsheetTrackedRangeAddress::Range { start, end } => {
+            validate_tracked_address(start)?;
+            validate_tracked_address(end)?;
+            if (start.table, start.row, start.column) > (end.table, end.row, end.column) {
+                return tracked_invalid("tracked range start must not follow its end");
+            }
+            Ok(())
+        },
+    }
+}
+
+fn validate_tracked_cell(cell: &SpreadsheetTrackedCell, aggregate: &mut usize) -> Result<()> {
+    for (value, label) in [
+        (cell.address.as_deref(), "tracked cell address"),
+        (cell.style_name.as_deref(), "tracked cell style name"),
+        (cell.formula.as_deref(), "tracked cell formula"),
+    ] {
+        if let Some(value) = value {
+            validate_tracked_string(value, label, false, aggregate)?;
+        }
+    }
+    validate_tracked_string(
+        &cell.display_text,
+        "tracked cell display text",
+        true,
+        aggregate,
+    )?;
+    match &cell.value {
+        SpreadsheetTrackedCellValue::Number(value)
+        | SpreadsheetTrackedCellValue::Percentage(value) if !value.is_finite() => {
+            return tracked_invalid("tracked cell numeric value must be finite");
+        },
+        SpreadsheetTrackedCellValue::Currency { value, code } => {
+            if !value.is_finite() {
+                return tracked_invalid("tracked cell currency value must be finite");
+            }
+            validate_tracked_string(code, "tracked cell currency code", false, aggregate)?;
+        },
+        SpreadsheetTrackedCellValue::Date(value)
+        | SpreadsheetTrackedCellValue::Time(value)
+        | SpreadsheetTrackedCellValue::Text(value) => {
+            validate_tracked_string(value, "tracked cell value", true, aggregate)?;
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
+fn validate_tracked_metadata(
+    metadata: &SpreadsheetChangeMetadata,
+    aggregate: &mut usize,
+) -> Result<()> {
+    if let Some(id) = &metadata.rejecting_change_id {
+        validate_tracked_string(id, "rejecting change id", false, aggregate)?;
+    }
+    for value in [metadata.info.creator.as_deref(), metadata.info.date.as_deref()]
+        .into_iter()
+        .flatten()
+    {
+        validate_tracked_string(value, "change metadata", true, aggregate)?;
+    }
+    for comment in &metadata.info.comments {
+        validate_tracked_string(comment, "change comment", true, aggregate)?;
+    }
+    let mut seen = std::collections::HashSet::new();
+    for dependency in &metadata.dependencies {
+        validate_tracked_string(dependency, "dependency id", false, aggregate)?;
+        if dependency == &metadata.id || !seen.insert(dependency) {
+            return tracked_invalid(format!(
+                "change '{}' has a self or duplicate dependency",
+                metadata.id
+            ));
+        }
+    }
+    for deletion in &metadata.deletions {
+        match deletion {
+            SpreadsheetNestedDeletion::CellContent {
+                change_id,
+                address,
+                cell,
+            } => {
+                if let Some(id) = change_id {
+                    validate_tracked_string(id, "nested deletion id", false, aggregate)?;
+                }
+                if let Some(address) = address {
+                    validate_tracked_address(address)?;
+                }
+                if let Some(cell) = cell {
+                    validate_tracked_cell(cell, aggregate)?;
+                }
+                if address.is_none() && cell.is_none() {
+                    return tracked_invalid(
+                        "cell-content-deletion requires an address or cell",
+                    );
+                }
+            },
+            SpreadsheetNestedDeletion::Change { change_id } => {
+                if let Some(id) = change_id {
+                    validate_tracked_string(id, "nested change deletion id", false, aggregate)?;
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
+fn validate_tracked_reference(
+    reference: Option<&str>,
+    ids: &std::collections::HashMap<&str, usize>,
+) -> Result<()> {
+    if let Some(reference) = reference {
+        if !ids.contains_key(reference) {
+            return tracked_invalid(format!("tracked change references unknown id '{reference}'"));
+        }
+    }
+    Ok(())
+}
+
+fn visit_tracked_dependencies(
+    index: usize,
+    changes: &[SpreadsheetTrackedChange],
+    ids: &std::collections::HashMap<&str, usize>,
+    states: &mut [u8],
+) -> Result<()> {
+    match states[index] {
+        1 => return tracked_invalid("spreadsheet tracked-change dependency cycle"),
+        2 => return Ok(()),
+        _ => {},
+    }
+    states[index] = 1;
+    for dependency in &changes[index].metadata().dependencies {
+        visit_tracked_dependencies(ids[dependency.as_str()], changes, ids, states)?;
+    }
+    states[index] = 2;
+    Ok(())
+}
+
+fn write_tracked_changes_unchecked(output: &mut String, changes: &SpreadsheetTrackedChanges) {
+    output.push_str("<table:tracked-changes table:track-changes=\"");
+    output.push_str(if changes.enabled { "true" } else { "false" });
+    output.push_str("\">");
+    for change in &changes.changes {
+        match change {
+            SpreadsheetTrackedChange::Insertion(value) => {
+                output.push_str("<table:insertion");
+                write_common_tracked_attributes(output, &value.metadata);
+                push_tracked_attr(output, "table:type", tracked_dimension(value.dimension));
+                push_tracked_i64(output, "table:position", value.position);
+                if value.count.get() != 1 {
+                    push_tracked_attr(output, "table:count", &value.count.get().to_string());
+                }
+                if let Some(table) = value.table {
+                    push_tracked_i64(output, "table:table", table);
+                }
+                output.push('>');
+                write_tracked_metadata(output, &value.metadata);
+                output.push_str("</table:insertion>");
+            },
+            SpreadsheetTrackedChange::Deletion(value) => {
+                output.push_str("<table:deletion");
+                write_common_tracked_attributes(output, &value.metadata);
+                push_tracked_attr(output, "table:type", tracked_dimension(value.dimension));
+                push_tracked_i64(output, "table:position", value.position);
+                if let Some(table) = value.table {
+                    push_tracked_i64(output, "table:table", table);
+                }
+                if let Some(span) = value.multi_deletion_spanned {
+                    push_tracked_i64(output, "table:multi-deletion-spanned", span);
+                }
+                output.push('>');
+                write_tracked_metadata(output, &value.metadata);
+                write_tracked_cut_offs(output, &value.cut_offs);
+                output.push_str("</table:deletion>");
+            },
+            SpreadsheetTrackedChange::Movement(value) => {
+                output.push_str("<table:movement");
+                write_common_tracked_attributes(output, &value.metadata);
+                output.push('>');
+                write_tracked_metadata(output, &value.metadata);
+                write_tracked_range(output, "source-range-address", &value.source);
+                write_tracked_range(output, "target-range-address", &value.target);
+                output.push_str("</table:movement>");
+            },
+            SpreadsheetTrackedChange::CellContent(value) => {
+                output.push_str("<table:cell-content-change");
+                write_common_tracked_attributes(output, &value.metadata);
+                output.push('>');
+                write_tracked_metadata(output, &value.metadata);
+                write_tracked_address(output, "cell-address", &value.address);
+                output.push_str("<table:previous");
+                if let Some(id) = &value.previous_change_id {
+                    push_tracked_attr(output, "table:id", id);
+                }
+                output.push('>');
+                write_tracked_cell(output, &value.previous);
+                output.push_str("</table:previous></table:cell-content-change>");
+            },
+        }
+    }
+    output.push_str("</table:tracked-changes>");
+}
+
+fn write_common_tracked_attributes(output: &mut String, metadata: &SpreadsheetChangeMetadata) {
+    push_tracked_attr(output, "table:id", &metadata.id);
+    push_tracked_attr(
+        output,
+        "table:acceptance-state",
+        match metadata.acceptance {
+            SpreadsheetChangeAcceptance::Accepted => "accepted",
+            SpreadsheetChangeAcceptance::Rejected => "rejected",
+            SpreadsheetChangeAcceptance::Pending => "pending",
+        },
+    );
+    if let Some(id) = &metadata.rejecting_change_id {
+        push_tracked_attr(output, "table:rejecting-change-id", id);
+    }
+}
+
+fn write_tracked_metadata(output: &mut String, metadata: &SpreadsheetChangeMetadata) {
+    output.push_str("<office:change-info>");
+    if let Some(value) = &metadata.info.creator {
+        write_tracked_text(output, "dc:creator", value);
+    }
+    if let Some(value) = &metadata.info.date {
+        write_tracked_text(output, "dc:date", value);
+    }
+    for value in &metadata.info.comments {
+        write_tracked_text(output, "text:p", value);
+    }
+    output.push_str("</office:change-info>");
+    if !metadata.dependencies.is_empty() {
+        output.push_str("<table:dependencies>");
+        for id in &metadata.dependencies {
+            output.push_str("<table:dependency");
+            push_tracked_attr(output, "table:id", id);
+            output.push_str("/>");
+        }
+        output.push_str("</table:dependencies>");
+    }
+    if !metadata.deletions.is_empty() {
+        output.push_str("<table:deletions>");
+        for deletion in &metadata.deletions {
+            match deletion {
+                SpreadsheetNestedDeletion::CellContent { change_id, address, cell } => {
+                    output.push_str("<table:cell-content-deletion");
+                    if let Some(id) = change_id {
+                        push_tracked_attr(output, "table:id", id);
+                    }
+                    output.push('>');
+                    if let Some(address) = address {
+                        write_tracked_address(output, "cell-address", address);
+                    }
+                    if let Some(cell) = cell {
+                        write_tracked_cell(output, cell);
+                    }
+                    output.push_str("</table:cell-content-deletion>");
+                },
+                SpreadsheetNestedDeletion::Change { change_id } => {
+                    output.push_str("<table:change-deletion");
+                    if let Some(id) = change_id {
+                        push_tracked_attr(output, "table:id", id);
+                    }
+                    output.push_str("/>");
+                },
+            }
+        }
+        output.push_str("</table:deletions>");
+    }
+}
+
+fn write_tracked_cut_offs(output: &mut String, cut_offs: &[SpreadsheetChangeCutOff]) {
+    if cut_offs.is_empty() {
+        return;
+    }
+    output.push_str("<table:cut-offs>");
+    for value in cut_offs {
+        output.push_str(match value {
+            SpreadsheetChangeCutOff::Insertion { .. } => "<table:insertion-cut-off",
+            _ => "<table:movement-cut-off",
+        });
+        match value {
+            SpreadsheetChangeCutOff::Insertion { change_id, position } => {
+                push_tracked_attr(output, "table:id", change_id);
+                push_tracked_i64(output, "table:position", *position);
+            },
+            SpreadsheetChangeCutOff::MovementPoint { position } => {
+                push_tracked_i64(output, "table:position", *position);
+            },
+            SpreadsheetChangeCutOff::MovementRange { start, end } => {
+                push_tracked_i64(output, "table:start-position", *start);
+                push_tracked_i64(output, "table:end-position", *end);
+            },
+        }
+        output.push_str("/>");
+    }
+    output.push_str("</table:cut-offs>");
+}
+
+fn write_tracked_range(
+    output: &mut String,
+    name: &str,
+    range: &SpreadsheetTrackedRangeAddress,
+) {
+    output.push_str("<table:");
+    output.push_str(name);
+    match range {
+        SpreadsheetTrackedRangeAddress::Cell(value) => {
+            write_tracked_address_attrs(output, "", value)
+        },
+        SpreadsheetTrackedRangeAddress::Range { start, end } => {
+            write_tracked_address_attrs(output, "start-", start);
+            write_tracked_address_attrs(output, "end-", end);
+        },
+    }
+    output.push_str("/>");
+}
+
+fn write_tracked_address(output: &mut String, name: &str, value: &SpreadsheetTrackedCellAddress) {
+    output.push_str("<table:");
+    output.push_str(name);
+    write_tracked_address_attrs(output, "", value);
+    output.push_str("/>");
+}
+
+fn write_tracked_address_attrs(
+    output: &mut String,
+    prefix: &str,
+    value: &SpreadsheetTrackedCellAddress,
+) {
+    push_tracked_i64(output, &format!("table:{prefix}table"), value.table);
+    push_tracked_i64(output, &format!("table:{prefix}column"), value.column);
+    push_tracked_i64(output, &format!("table:{prefix}row"), value.row);
+}
+
+fn write_tracked_cell(output: &mut String, cell: &SpreadsheetTrackedCell) {
+    output.push_str("<table:change-track-table-cell");
+    for (name, value) in [
+        ("table:cell-address", cell.address.as_deref()),
+        ("table:style-name", cell.style_name.as_deref()),
+        ("table:formula", cell.formula.as_deref()),
+    ] {
+        if let Some(value) = value {
+            push_tracked_attr(output, name, value);
+        }
+    }
+    if cell.matrix_covered {
+        push_tracked_attr(output, "table:matrix-covered", "true");
+    }
+    if let Some(value) = cell.matrix_columns {
+        push_tracked_attr(
+            output,
+            "table:number-matrix-columns-spanned",
+            &value.get().to_string(),
+        );
+    }
+    if let Some(value) = cell.matrix_rows {
+        push_tracked_attr(
+            output,
+            "table:number-matrix-rows-spanned",
+            &value.get().to_string(),
+        );
+    }
+    match &cell.value {
+        SpreadsheetTrackedCellValue::Empty => {},
+        SpreadsheetTrackedCellValue::Boolean(value) => {
+            push_tracked_attr(output, "office:value-type", "boolean");
+            push_tracked_attr(output, "office:boolean-value", if *value { "true" } else { "false" });
+        },
+        SpreadsheetTrackedCellValue::Number(value) => write_tracked_number(output, "float", *value),
+        SpreadsheetTrackedCellValue::Percentage(value) => write_tracked_number(output, "percentage", *value),
+        SpreadsheetTrackedCellValue::Currency { value, code } => {
+            write_tracked_number(output, "currency", *value);
+            push_tracked_attr(output, "office:currency", code);
+        },
+        SpreadsheetTrackedCellValue::Date(value) => write_tracked_value(output, "date", "office:date-value", value),
+        SpreadsheetTrackedCellValue::Time(value) => write_tracked_value(output, "time", "office:time-value", value),
+        SpreadsheetTrackedCellValue::Text(value) => write_tracked_value(output, "string", "office:string-value", value),
+    }
+    if cell.display_text.is_empty() {
+        output.push_str("/>");
+    } else {
+        output.push('>');
+        for paragraph in cell.display_text.split('\n') {
+            write_tracked_text(output, "text:p", paragraph);
+        }
+        output.push_str("</table:change-track-table-cell>");
+    }
+}
+
+fn write_tracked_number(output: &mut String, value_type: &str, value: f64) {
+    push_tracked_attr(output, "office:value-type", value_type);
+    push_tracked_attr(output, "office:value", &value.to_string());
+}
+
+fn write_tracked_value(output: &mut String, value_type: &str, name: &str, value: &str) {
+    push_tracked_attr(output, "office:value-type", value_type);
+    push_tracked_attr(output, name, value);
+}
+
+fn tracked_dimension(value: SpreadsheetChangeDimension) -> &'static str {
+    match value {
+        SpreadsheetChangeDimension::Row => "row",
+        SpreadsheetChangeDimension::Column => "column",
+        SpreadsheetChangeDimension::Table => "table",
+    }
+}
+
+fn push_tracked_i64(output: &mut String, name: &str, value: i64) {
+    push_tracked_attr(output, name, &value.to_string());
+}
+
+fn push_tracked_attr(output: &mut String, name: &str, value: &str) {
+    output.push(' ');
+    output.push_str(name);
+    output.push_str("=\"");
+    escape_tracked_xml(output, value, true);
+    output.push('"');
+}
+
+fn write_tracked_text(output: &mut String, name: &str, value: &str) {
+    output.push('<');
+    output.push_str(name);
+    output.push('>');
+    escape_tracked_xml(output, value, false);
+    output.push_str("</");
+    output.push_str(name);
+    output.push('>');
+}
+
+fn escape_tracked_xml(output: &mut String, value: &str, attribute: bool) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' if attribute => output.push_str("&quot;"),
+            '\'' if attribute => output.push_str("&apos;"),
+            value => output.push(value),
+        }
+    }
+}
+
 fn optional_positive_nonzero(node: &Node, name: &str) -> Result<Option<NonZeroUsize>> {
     attribute(node, Namespace::Table, name)
         .map(|value| {
-            NonZeroUsize::new(parse_positive(value, &format!("table:{name}"))?).ok_or_else(|| {
-                Error::InvalidFormat(format!("table:{name} must be positive"))
-            })
+            NonZeroUsize::new(parse_positive(value, &format!("table:{name}"))?)
+                .ok_or_else(|| Error::InvalidFormat(format!("table:{name} must be positive")))
         })
         .transpose()
 }
@@ -1095,14 +1697,9 @@ fn attribute<'a>(node: &'a Node, namespace: Namespace, local: &str) -> Option<&'
         .map(|attribute| attribute.value.as_str())
 }
 
-fn required_attribute<'a>(
-    node: &'a Node,
-    namespace: Namespace,
-    local: &str,
-) -> Result<&'a str> {
-    attribute(node, namespace, local).ok_or_else(|| {
-        Error::InvalidFormat(format!("{} requires attribute {local}", node.local))
-    })
+fn required_attribute<'a>(node: &'a Node, namespace: Namespace, local: &str) -> Result<&'a str> {
+    attribute(node, namespace, local)
+        .ok_or_else(|| Error::InvalidFormat(format!("{} requires attribute {local}", node.local)))
 }
 
 fn children(node: &Node) -> impl Iterator<Item = &Node> {
@@ -1125,9 +1722,8 @@ fn optional_child<'a>(
     namespace: Namespace,
     local: &str,
 ) -> Result<Option<&'a Node>> {
-    let mut matches = children(node).filter(|child| {
-        child.namespace == namespace && child.local == local
-    });
+    let mut matches =
+        children(node).filter(|child| child.namespace == namespace && child.local == local);
     let result = matches.next();
     if matches.next().is_some() {
         return Err(Error::InvalidFormat(format!(
@@ -1139,9 +1735,8 @@ fn optional_child<'a>(
 }
 
 fn required_child<'a>(node: &'a Node, namespace: Namespace, local: &str) -> Result<&'a Node> {
-    optional_child(node, namespace, local)?.ok_or_else(|| {
-        Error::InvalidFormat(format!("{} requires child {local}", node.local))
-    })
+    optional_child(node, namespace, local)?
+        .ok_or_else(|| Error::InvalidFormat(format!("{} requires child {local}", node.local)))
 }
 
 fn reject_attributes(node: &Node, allowed: &[(Namespace, &str)]) -> Result<()> {
@@ -1163,11 +1758,10 @@ fn reject_attributes(node: &Node, allowed: &[(Namespace, &str)]) -> Result<()> {
 fn reject_children(node: &Node, table_children: &[&str], change_info: bool) -> Result<()> {
     require_whitespace(node)?;
     for child in children(node) {
-        let allowed = (change_info
-            && child.namespace == Namespace::Office
-            && child.local == "change-info")
-            || (child.namespace == Namespace::Table
-                && table_children.iter().any(|name| child.local == *name));
+        let allowed =
+            (change_info && child.namespace == Namespace::Office && child.local == "change-info")
+                || (child.namespace == Namespace::Table
+                    && table_children.iter().any(|name| child.local == *name));
         if !allowed {
             reject_known_child(child, &node.local)?;
         }
@@ -1193,9 +1787,11 @@ fn unexpected_child<T>(child: &Node, parent: &str) -> Result<T> {
 }
 
 fn require_whitespace(node: &Node) -> Result<()> {
-    if node.content.iter().any(|content| {
-        matches!(content, Content::Text(value) if !value.trim().is_empty())
-    }) {
+    if node
+        .content
+        .iter()
+        .any(|content| matches!(content, Content::Text(value) if !value.trim().is_empty()))
+    {
         return Err(Error::InvalidFormat(format!(
             "unexpected character data in {}",
             node.local
@@ -1380,9 +1976,7 @@ fn resolve_reference(name: &str) -> Result<String> {
         })
         .and_then(char::from_u32)
         .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "unsupported tracked-change entity '&{name};'"
-            ))
+            Error::InvalidFormat(format!("unsupported tracked-change entity '&{name};'"))
         })?;
         scalar
     };
@@ -1428,13 +2022,22 @@ mod tests {
         let SpreadsheetTrackedChange::Movement(movement) = &tracked.changes[2] else {
             panic!("expected movement")
         };
-        assert!(matches!(movement.source, SpreadsheetTrackedRangeAddress::Range { .. }));
+        assert!(matches!(
+            movement.source,
+            SpreadsheetTrackedRangeAddress::Range { .. }
+        ));
         let SpreadsheetTrackedChange::CellContent(change) = &tracked.changes[3] else {
             panic!("expected cell change")
         };
-        assert_eq!(change.metadata.acceptance, SpreadsheetChangeAcceptance::Accepted);
+        assert_eq!(
+            change.metadata.acceptance,
+            SpreadsheetChangeAcceptance::Accepted
+        );
         assert_eq!(change.metadata.info.comments, ["A & B"]);
-        assert_eq!(change.previous.value, SpreadsheetTrackedCellValue::Text("old".into()));
+        assert_eq!(
+            change.previous.value,
+            SpreadsheetTrackedCellValue::Text("old".into())
+        );
     }
 
     #[test]
@@ -1463,16 +2066,17 @@ mod tests {
     #[test]
     fn parses_libreoffice_change_tracking_fixtures() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let tracked_path = root.join(
-            "3rdparty/libreoffice-core/sc/qa/unit/data/ods/change-tracking.ods",
-        );
+        let tracked_path =
+            root.join("3rdparty/libreoffice-core/sc/qa/unit/data/ods/change-tracking.ods");
         let tracked = crate::Spreadsheet::open(tracked_path).unwrap();
         let changes = tracked.tracked_changes().unwrap();
         assert_eq!(changes.changes.len(), 2);
-        assert!(changes.changes.iter().all(|change| matches!(
-            change,
-            SpreadsheetTrackedChange::CellContent(_)
-        )));
+        assert!(
+            changes
+                .changes
+                .iter()
+                .all(|change| matches!(change, SpreadsheetTrackedChange::CellContent(_)))
+        );
 
         let protected_path = root.join(
             "3rdparty/libreoffice-core/sc/qa/extras/testdocuments/RecordChangesProtected.ods",

@@ -1,7 +1,7 @@
 use litchi_odf::{
     ChartDocument, Document, DrawingDocument, FlatOpenDocument, MasterDocument,
-    OdfVariableDeclaration, OdfVariableKind, OdfVariableValue, OpenDocumentPackage,
-    Presentation, Spreadsheet,
+    OdfVariableDeclaration, OdfVariableKind, OdfVariableValue, OpenDocumentPackage, Presentation,
+    Spreadsheet,
 };
 use std::io::{Cursor, Write};
 
@@ -24,8 +24,8 @@ fn content(body: &str) -> String {
 fn package(mimetype: &str, content: &str, styles: Option<&str>) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut output);
-    let stored = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let stored =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     let deflated = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
     zip.start_file("mimetype", stored).unwrap();
@@ -38,7 +38,10 @@ fn package(mimetype: &str, content: &str, styles: Option<&str>) -> Vec<u8> {
     }
     let manifest = format!(
         r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" m:version="1.3"><m:file-entry m:full-path="/" m:media-type="{mimetype}"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/>{}</m:manifest>"#,
-        styles.map_or("", |_| r#"<m:file-entry m:full-path="styles.xml" m:media-type="text/xml"/>"#)
+        styles.map_or(
+            "",
+            |_| r#"<m:file-entry m:full-path="styles.xml" m:media-type="text/xml"/>"#
+        )
     );
     zip.start_file("META-INF/manifest.xml", deflated).unwrap();
     zip.write_all(manifest.as_bytes()).unwrap();
@@ -136,7 +139,9 @@ fn packaged_content_styles_and_every_specialized_facade_expose_declarations() {
     let styles = format!(
         r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" o:version="1.3"><o:styles/><o:automatic-styles/><o:master-styles><s:master-page s:name="Standard"><s:header><t:user-field-decls><t:user-field-decl t:name="header" o:value-type="string" o:string-value="safe"/></t:user-field-decls><t:p><t:user-field-get t:name="header">safe</t:user-field-get></t:p></s:header></s:master-page></o:master-styles></o:document-styles>"#
     );
-    let text_content = content(&format!(r#"<o:text>{declaration}<t:p><t:variable-get t:name="body">1</t:variable-get></t:p></o:text>"#));
+    let text_content = content(&format!(
+        r#"<o:text>{declaration}<t:p><t:variable-get t:name="body">1</t:variable-get></t:p></o:text>"#
+    ));
     let bytes = package(
         "application/vnd.oasis.opendocument.text",
         &text_content,
@@ -246,9 +251,9 @@ fn parses_bundled_flat_fixtures() {
             continue;
         }
         let document = FlatOpenDocument::from_bytes(std::fs::read(path).unwrap()).unwrap();
-        let declarations = document.variable_declarations().unwrap_or_else(|error| {
-            panic!("failed declaration scan for {fixture}: {error}")
-        });
+        let declarations = document
+            .variable_declarations()
+            .unwrap_or_else(|error| panic!("failed declaration scan for {fixture}: {error}"));
         assert!(!declarations.groups.is_empty(), "{fixture}");
     }
 }
@@ -279,7 +284,11 @@ fn parses_bundled_odfpy_and_odfdo_package_oracles() {
             .unwrap()
             .variable_declarations()
             .unwrap();
-        assert!(declarations.find(OdfVariableKind::Sequence, "Illustration").is_some());
+        assert!(
+            declarations
+                .find(OdfVariableKind::Sequence, "Illustration")
+                .is_some()
+        );
     }
 }
 

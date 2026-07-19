@@ -158,9 +158,7 @@ impl OdfNotesConfiguration {
                 Some(OdfLineNumberFormat::LowerAlpha | OdfLineNumberFormat::UpperAlpha)
             )
         {
-            return invalid(
-                "style:num-letter-sync requires style:num-format 'a' or 'A'",
-            );
+            return invalid("style:num-letter-sync requires style:num-format 'a' or 'A'");
         }
         for (value, name) in [
             (
@@ -175,10 +173,7 @@ impl OdfNotesConfiguration {
                 self.default_style_name.as_deref(),
                 "text:default-style-name",
             ),
-            (
-                self.master_page_name.as_deref(),
-                "text:master-page-name",
-            ),
+            (self.master_page_name.as_deref(), "text:master-page-name"),
         ] {
             if let Some(value) = value {
                 validate_style_name_ref(value, name)?;
@@ -269,8 +264,7 @@ impl OdfNotesConfiguration {
             "text:footnotes-position",
             self.footnotes_position.map(OdfFootnotePosition::as_str),
         );
-        if self.continuation_notice_forward.is_none()
-            && self.continuation_notice_backward.is_none()
+        if self.continuation_notice_forward.is_none() && self.continuation_notice_backward.is_none()
         {
             output.push_str("/>");
             return Ok(output);
@@ -374,7 +368,7 @@ pub fn parse_notes_configurations(xml: &str) -> Result<OdfNotesConfigurations> {
                 if collect {
                     insert_configuration(&mut result, configuration)?;
                 }
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Text
                     && element.local_name().as_ref() == b"notes-configuration" =>
@@ -392,17 +386,13 @@ pub fn parse_notes_configurations(xml: &str) -> Result<OdfNotesConfigurations> {
                 if collect {
                     insert_configuration(&mut result, configuration)?;
                 }
-            }
-            Event::Start(element)
-                if element.local_name().as_ref() == b"notes-configuration" =>
-            {
+            },
+            Event::Start(element) if element.local_name().as_ref() == b"notes-configuration" => {
                 return invalid("notes-configuration uses the wrong namespace");
-            }
-            Event::Empty(element)
-                if element.local_name().as_ref() == b"notes-configuration" =>
-            {
+            },
+            Event::Empty(element) if element.local_name().as_ref() == b"notes-configuration" => {
                 return invalid("notes-configuration uses the wrong namespace");
-            }
+            },
             Event::Start(element) => {
                 depth = depth
                     .checked_add(1)
@@ -410,8 +400,7 @@ pub fn parse_notes_configurations(xml: &str) -> Result<OdfNotesConfigurations> {
                 if depth > MAX_XML_DEPTH {
                     return invalid(format!("ODF XML exceeds the {MAX_XML_DEPTH} depth limit"));
                 }
-                if namespace == NamespaceKind::Office
-                    && element.local_name().as_ref() == b"styles"
+                if namespace == NamespaceKind::Office && element.local_name().as_ref() == b"styles"
                 {
                     if styles_content_depth.replace(depth).is_some() {
                         return invalid("ODF XML contains nested office:styles elements");
@@ -423,7 +412,7 @@ pub fn parse_notes_configurations(xml: &str) -> Result<OdfNotesConfigurations> {
                 {
                     return invalid("ODF XML contains nested style:section-properties elements");
                 }
-            }
+            },
             Event::End(element) => {
                 if namespace == NamespaceKind::Office
                     && element.local_name().as_ref() == b"styles"
@@ -440,10 +429,10 @@ pub fn parse_notes_configurations(xml: &str) -> Result<OdfNotesConfigurations> {
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("invalid ODF XML depth".to_string()))?;
-            }
+            },
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in ODF note metadata"),
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -484,37 +473,36 @@ fn parse_attributes(
             .into_owned();
         validate_value(&value, "notes configuration attribute", true)?;
         match (namespace, local.as_ref()) {
-            (NamespaceKind::Text, b"note-class") => {
-                note_class = Some(OdfNoteClass::parse(&value)?)
-            }
+            (NamespaceKind::Text, b"note-class") => note_class = Some(OdfNoteClass::parse(&value)?),
             (NamespaceKind::Text, b"citation-style-name") => citation_style_name = Some(value),
             (NamespaceKind::Text, b"citation-body-style-name") => {
                 citation_body_style_name = Some(value)
-            }
+            },
             (NamespaceKind::Text, b"default-style-name") => default_style_name = Some(value),
             (NamespaceKind::Text, b"master-page-name") => master_page_name = Some(value),
             (NamespaceKind::Text, b"start-value") => {
                 start_value = Some(parse_nonnegative_integer(&value, "text:start-value")?)
-            }
+            },
             (NamespaceKind::Style, b"num-prefix") => number_prefix = Some(value),
             (NamespaceKind::Style, b"num-suffix") => number_suffix = Some(value),
             (NamespaceKind::Style, b"num-format") => {
                 number_format = Some(OdfLineNumberFormat::parse(value)?)
-            }
+            },
             (NamespaceKind::Style, b"num-letter-sync") => {
                 letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?)
-            }
+            },
             (NamespaceKind::Text, b"start-numbering-at") => {
                 start_numbering_at = Some(OdfNoteNumberingScope::parse(&value)?)
-            }
+            },
             (NamespaceKind::Text, b"footnotes-position") => {
                 footnotes_position = Some(OdfFootnotePosition::parse(&value)?)
-            }
+            },
             _ => return invalid("unsupported text:notes-configuration attribute"),
         }
     }
-    let note_class = note_class
-        .ok_or_else(|| Error::InvalidFormat("notes configuration requires text:note-class".to_string()))?;
+    let note_class = note_class.ok_or_else(|| {
+        Error::InvalidFormat("notes configuration requires text:note-class".to_string())
+    })?;
     Ok(OdfNotesConfiguration {
         note_class,
         citation_style_name,
@@ -554,7 +542,7 @@ fn parse_notices(
                 }
                 configuration.continuation_notice_forward =
                     Some(parse_notice(reader, b"note-continuation-notice-forward")?);
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Text
                     && element.local_name().as_ref() == b"note-continuation-notice-forward" =>
@@ -567,7 +555,7 @@ fn parse_notices(
                     return invalid("duplicate forward note continuation notice");
                 }
                 reject_attributes(&element)?;
-            }
+            },
             Event::Start(element)
                 if namespace == NamespaceKind::Text
                     && element.local_name().as_ref() == b"note-continuation-notice-backward" =>
@@ -578,7 +566,7 @@ fn parse_notices(
                 }
                 configuration.continuation_notice_backward =
                     Some(parse_notice(reader, b"note-continuation-notice-backward")?);
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Text
                     && element.local_name().as_ref() == b"note-continuation-notice-backward" =>
@@ -591,18 +579,17 @@ fn parse_notices(
                     return invalid("duplicate backward note continuation notice");
                 }
                 reject_attributes(&element)?;
-            }
+            },
             Event::End(element)
                 if namespace == NamespaceKind::Text
                     && element.local_name().as_ref() == b"notes-configuration" =>
             {
                 break;
-            }
-            Event::Text(text) => require_whitespace(
-                &text.decode().map_err(xml_error)?,
-                "notes-configuration",
-            )?,
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Text(text) => {
+                require_whitespace(&text.decode().map_err(xml_error)?, "notes-configuration")?
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in notes configuration"),
             Event::Eof => return invalid("unterminated text:notes-configuration"),
             _ => return invalid("unsupported child in text:notes-configuration"),
@@ -629,8 +616,8 @@ fn parse_notice(reader: &mut NsReader<&[u8]>, expected_local: &[u8]) -> Result<S
                     && element.local_name().as_ref() == expected_local =>
             {
                 break;
-            }
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated note continuation notice"),
             _ => return invalid("note continuation notices may contain text only"),
         }
@@ -700,7 +687,9 @@ fn locate_configuration(
     let mut open_target = None::<(usize, usize)>;
     let mut styles_site = None;
     loop {
-        let (resolved, event) = reader.read_resolved_event_into(&mut buffer).map_err(xml_error)?;
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(xml_error)?;
         let namespace = namespace_kind(&resolved);
         match event {
             Event::Start(ref element) => {
@@ -716,7 +705,7 @@ fn locate_configuration(
                     open_target = Some((depth, start));
                 }
                 stack.push((namespace, local));
-            }
+            },
             Event::Empty(ref element) => {
                 let end = reader.buffer_position() as usize;
                 let start = event_start(xml, end)?;
@@ -739,31 +728,36 @@ fn locate_configuration(
                             .to_string(),
                     ));
                 }
-            }
+            },
             Event::End(_) => {
                 let end = reader.buffer_position() as usize;
                 let start = event_start(xml, end)?;
                 let depth = stack.len();
                 if open_target.is_some_and(|(target_depth, _)| target_depth == depth) {
                     let (_, target_start) = open_target.take().expect("target depth checked");
-                    target = Some(XmlSpan { start: target_start, end });
+                    target = Some(XmlSpan {
+                        start: target_start,
+                        end,
+                    });
                 }
-                if matches!(stack.last(), Some((NamespaceKind::Office, local)) if local == b"styles") {
+                if matches!(stack.last(), Some((NamespaceKind::Office, local)) if local == b"styles")
+                {
                     if styles_site.is_some() {
                         return invalid("multiple office:styles elements are not supported");
                     }
                     styles_site = Some(StylesSite::Content(start));
                 }
                 stack.pop();
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
     Ok((
         target,
-        styles_site.ok_or_else(|| Error::InvalidFormat("document has no office:styles".to_string()))?,
+        styles_site
+            .ok_or_else(|| Error::InvalidFormat("document has no office:styles".to_string()))?,
     ))
 }
 
@@ -776,12 +770,20 @@ pub fn set_notes_configuration_xml(
     let (target, site) = locate_configuration(xml, configuration.note_class)?;
     let fragment = configuration.to_xml()?;
     if let Some(span) = target {
-        return Ok(format!("{}{}{}", &xml[..span.start], fragment, &xml[span.end..]));
+        return Ok(format!(
+            "{}{}{}",
+            &xml[..span.start],
+            fragment,
+            &xml[span.end..]
+        ));
     }
     match site {
-        StylesSite::Content(insertion) => {
-            Ok(format!("{}{}{}", &xml[..insertion], fragment, &xml[insertion..]))
-        }
+        StylesSite::Content(insertion) => Ok(format!(
+            "{}{}{}",
+            &xml[..insertion],
+            fragment,
+            &xml[insertion..]
+        )),
         StylesSite::Empty(span, qname) => {
             let raw = &xml[span.start..span.end];
             let slash = raw
@@ -795,7 +797,7 @@ pub fn set_notes_configuration_xml(
                 qname,
                 &xml[span.end..]
             ))
-        }
+        },
     }
 }
 
@@ -832,7 +834,10 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     }
 }
 
-fn append_reference(output: &mut String, reference: &quick_xml::events::BytesRef<'_>) -> Result<()> {
+fn append_reference(
+    output: &mut String,
+    reference: &quick_xml::events::BytesRef<'_>,
+) -> Result<()> {
     if let Some(character) = reference.resolve_char_ref().map_err(xml_error)? {
         let mut encoded = [0u8; 4];
         append_text(output, character.encode_utf8(&mut encoded))
@@ -953,7 +958,11 @@ fn write_attr(output: &mut String, name: &str, value: Option<&str>) {
 }
 
 fn write_bool_attr(output: &mut String, name: &str, value: Option<bool>) {
-    write_attr(output, name, value.map(|value| if value { "true" } else { "false" }));
+    write_attr(
+        output,
+        name,
+        value.map(|value| if value { "true" } else { "false" }),
+    );
 }
 
 fn write_u64_attr(output: &mut String, name: &str, value: Option<u64>) {
@@ -1022,7 +1031,10 @@ mod tests {
         let configurations = parse_notes_configurations(&xml).unwrap();
         let footnote = configurations.get(OdfNoteClass::Footnote).unwrap();
         assert_eq!(footnote.start_value, Some(2));
-        assert_eq!(footnote.number_format, Some(OdfLineNumberFormat::LowerAlpha));
+        assert_eq!(
+            footnote.number_format,
+            Some(OdfLineNumberFormat::LowerAlpha)
+        );
         assert_eq!(footnote.letter_sync, Some(true));
         assert_eq!(
             footnote.continuation_notice_forward.as_deref(),
@@ -1075,7 +1087,8 @@ mod tests {
                     value.letter_sync = Some(false);
                     value.start_numbering_at = Some(scope);
                     value.footnotes_position = Some(position);
-                    let parsed = parse_notes_configurations(&styles(&value.to_xml().unwrap())).unwrap();
+                    let parsed =
+                        parse_notes_configurations(&styles(&value.to_xml().unwrap())).unwrap();
                     assert_eq!(parsed.get(note_class), Some(&value));
                 }
             }
@@ -1090,23 +1103,57 @@ mod tests {
             OdfLineNumberFormat::Custom("①".to_string()),
         ] {
             let mut value = OdfNotesConfiguration::new(OdfNoteClass::Footnote);
-            value.letter_sync = matches!(format, OdfLineNumberFormat::LowerAlpha | OdfLineNumberFormat::UpperAlpha).then_some(true);
+            value.letter_sync = matches!(
+                format,
+                OdfLineNumberFormat::LowerAlpha | OdfLineNumberFormat::UpperAlpha
+            )
+            .then_some(true);
             value.number_format = Some(format);
-            assert_eq!(parse_notes_configurations(&styles(&value.to_xml().unwrap())).unwrap().footnote, Some(value));
+            assert_eq!(
+                parse_notes_configurations(&styles(&value.to_xml().unwrap()))
+                    .unwrap()
+                    .footnote,
+                Some(value)
+            );
         }
     }
 
     #[test]
     fn accepts_interleaved_notice_order_and_real_libreoffice() {
-        let reverse = styles(r#"<t:notes-configuration t:note-class="footnote"><t:note-continuation-notice-backward>back</t:note-continuation-notice-backward><t:note-continuation-notice-forward>forward</t:note-continuation-notice-forward></t:notes-configuration>"#);
+        let reverse = styles(
+            r#"<t:notes-configuration t:note-class="footnote"><t:note-continuation-notice-backward>back</t:note-continuation-notice-backward><t:note-continuation-notice-forward>forward</t:note-continuation-notice-forward></t:notes-configuration>"#,
+        );
         let parsed = parse_notes_configurations(&reverse).unwrap();
-        assert_eq!(parsed.footnote.as_ref().unwrap().continuation_notice_forward.as_deref(), Some("forward"));
-        assert_eq!(parsed.footnote.as_ref().unwrap().continuation_notice_backward.as_deref(), Some("back"));
+        assert_eq!(
+            parsed
+                .footnote
+                .as_ref()
+                .unwrap()
+                .continuation_notice_forward
+                .as_deref(),
+            Some("forward")
+        );
+        assert_eq!(
+            parsed
+                .footnote
+                .as_ref()
+                .unwrap()
+                .continuation_notice_backward
+                .as_deref(),
+            Some("back")
+        );
 
-        let fixture = include_str!("../../../3rdparty/libreoffice-core/sw/qa/uitest/data/tdf145178.fodt");
+        let fixture =
+            include_str!("../../../3rdparty/libreoffice-core/sw/qa/uitest/data/tdf145178.fodt");
         let real = parse_notes_configurations(fixture).unwrap();
-        assert_eq!(real.footnote.as_ref().unwrap().number_format, Some(OdfLineNumberFormat::Arabic));
-        assert_eq!(real.endnote.as_ref().unwrap().number_format, Some(OdfLineNumberFormat::LowerRoman));
+        assert_eq!(
+            real.footnote.as_ref().unwrap().number_format,
+            Some(OdfLineNumberFormat::Arabic)
+        );
+        assert_eq!(
+            real.endnote.as_ref().unwrap().number_format,
+            Some(OdfLineNumberFormat::LowerRoman)
+        );
         let flat = crate::FlatOpenDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();
         assert_eq!(flat.notes_configurations().unwrap(), real);
     }
@@ -1121,9 +1168,14 @@ mod tests {
             r#"<t:notes-configuration t:note-class="footnote"><t:note-continuation-notice-forward t:bad="1"/></t:notes-configuration>"#,
             r#"<t:notes-configuration xmlns:x="urn:wrong" t:note-class="footnote" x:note-class="endnote"/>"#,
         ] {
-            assert!(parse_notes_configurations(&styles(body)).is_err(), "accepted {body}");
+            assert!(
+                parse_notes_configurations(&styles(body)).is_err(),
+                "accepted {body}"
+            );
         }
-        let wrong_namespace = format!(r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:x="urn:wrong"><o:styles><x:notes-configuration t:note-class="footnote"/></o:styles></o:document-styles>"#);
+        let wrong_namespace = format!(
+            r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:x="urn:wrong"><o:styles><x:notes-configuration t:note-class="footnote"/></o:styles></o:document-styles>"#
+        );
         assert!(parse_notes_configurations(&wrong_namespace).is_err());
         let mut capped = OdfNotesConfiguration::new(OdfNoteClass::Footnote);
         capped.continuation_notice_forward = Some("x".repeat(MAX_VALUE_BYTES + 1));
@@ -1132,7 +1184,9 @@ mod tests {
 
     #[test]
     fn lossless_mutation_and_builder_package_access() {
-        let original = styles(r#"<!--keep--><style:list-style xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="L"/>"#);
+        let original = styles(
+            r#"<!--keep--><style:list-style xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="L"/>"#,
+        );
         let mut value = OdfNotesConfiguration::new(OdfNoteClass::Footnote);
         value.start_value = Some(2);
         let inserted = set_notes_configuration_xml(&original, &value).unwrap();
@@ -1141,11 +1195,17 @@ mod tests {
         let replaced = set_notes_configuration_xml(&inserted, &value).unwrap();
         assert!(replaced.contains("text:start-value=\"3\""));
         assert!(!replaced.contains("text:start-value=\"2\""));
-        assert_eq!(remove_notes_configuration_xml(&replaced, OdfNoteClass::Footnote).unwrap(), original);
+        assert_eq!(
+            remove_notes_configuration_xml(&replaced, OdfNoteClass::Footnote).unwrap(),
+            original
+        );
 
         let mut builder = crate::DocumentBuilder::new();
         builder.set_notes_configuration(value.clone()).unwrap();
         let package = crate::OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
-        assert_eq!(package.notes_configurations().unwrap().footnote, Some(value));
+        assert_eq!(
+            package.notes_configurations().unwrap().footnote,
+            Some(value)
+        );
     }
 }

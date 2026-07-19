@@ -581,7 +581,7 @@ impl PresentationBuilder {
     }
 
     /// Generate XML for a shape
-    pub(super) fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> Result<String> {
+    pub(crate) fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> Result<String> {
         let mut node_count = 0usize;
         Self::generate_shape_xml_at_depth(shape, idx, 0, None, &mut node_count)
     }
@@ -1015,6 +1015,15 @@ impl PresentationBuilder {
             self.declarations.as_ref(),
             self.slides.len(),
         )?);
+
+        let page_names = super::page_metadata::effective_page_names(
+            self.page_metadata.as_ref(),
+            self.slides.len(),
+        )?;
+        super::settings::validate_presentation_page_references(
+            self.settings.as_ref(),
+            &page_names,
+        )?;
 
         for (i, slide) in self.slides.iter().enumerate() {
             let slide_style = slide_style_name(slide, i);

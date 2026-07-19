@@ -11,8 +11,7 @@ use std::collections::HashSet;
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
-const PRESENTATION_NAMESPACE: &[u8] =
-    b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MAX_XML_BYTES: usize = 8 * 1024 * 1024;
@@ -173,10 +172,126 @@ impl PresentationPageMetadataCollection {
     }
 }
 
-/// Parse static metadata from direct `draw:page` children.
-pub fn parse_presentation_page_metadata(
-    xml: &str,
+/// Return the exact page names emitted for the current slide sequence.
+pub(crate) fn effective_page_names(
+    metadata: Option<&PresentationPageMetadataCollection>,
+    slide_count: usize,
+) -> Result<Vec<String>> {
+    if slide_count > MAX_PAGES {
+        return Err(invalid("presentation exceeds 65536 pages"));
+    }
+    if let Some(metadata) = metadata {
+        metadata.validate_for_slides(slide_count)?;
+    }
+    (0..slide_count)
+        .map(|index| {
+            metadata
+                .and_then(|value| value.page(index))
+                .and_then(|value| value.name.clone())
+                .map(Ok)
+                .unwrap_or_else(|| fallback_page_name(index))
+        })
+        .collect()
+}
+
+/// Materialize stable names and insert an empty metadata record for a new page.
+pub(crate) fn metadata_after_page_insert(
+    metadata: Option<&PresentationPageMetadataCollection>,
+    slide_count: usize,
+    insert_index: usize,
 ) -> Result<PresentationPageMetadataCollection> {
+    if insert_index > slide_count {
+        return Err(invalid("presentation page insertion index is out of bounds"));
+    }
+    let new_count = slide_count
+        .checked_add(1)
+        .ok_or_else(|| invalid("presentation page count overflow"))?;
+    if new_count > MAX_PAGES {
+        return Err(invalid("presentation exceeds 65536 pages"));
+    }
+    let old_names = effective_page_names(metadata, slide_count)?;
+    let used_names = old_names.iter().map(String::as_str).collect::<HashSet<_>>();
+    let mut candidate = new_count;
+    let new_name = loop {
+        let name = format!("page{candidate}");
+        if !used_names.contains(name.as_str()) {
+            break name;
+        }
+        candidate = candidate
+            .checked_add(1)
+            .ok_or_else(|| invalid("presentation page name counter overflow"))?;
+    };
+
+    let mut pages = Vec::with_capacity(new_count);
+    for old_index in 0..slide_count {
+        let new_index = if old_index >= insert_index {
+            old_index
+                .checked_add(1)
+                .ok_or_else(|| invalid("presentation page index overflow"))?
+        } else {
+            old_index
+        };
+        let mut page = metadata
+            .and_then(|value| value.page(old_index))
+            .cloned()
+            .unwrap_or_else(|| PresentationPageMetadata::new(new_index));
+        page.slide_index = new_index;
+        page.name.get_or_insert_with(|| old_names[old_index].clone());
+        pages.push(page);
+    }
+    let mut inserted = PresentationPageMetadata::new(insert_index);
+    inserted.name = Some(new_name);
+    pages.push(inserted);
+    pages.sort_by_key(|page| page.slide_index);
+    PresentationPageMetadataCollection::new(pages)
+}
+
+/// Materialize stable names and remove one page metadata record.
+pub(crate) fn metadata_after_page_remove(
+    metadata: Option<&PresentationPageMetadataCollection>,
+    slide_count: usize,
+    remove_index: usize,
+) -> Result<Option<PresentationPageMetadataCollection>> {
+    if remove_index >= slide_count {
+        return Err(invalid("presentation page removal index is out of bounds"));
+    }
+    let old_names = effective_page_names(metadata, slide_count)?;
+    let mut pages = Vec::with_capacity(slide_count.saturating_sub(1));
+    for old_index in 0..slide_count {
+        if old_index == remove_index {
+            continue;
+        }
+        let new_index = if old_index > remove_index {
+            old_index
+                .checked_sub(1)
+                .ok_or_else(|| invalid("presentation page index underflow"))?
+        } else {
+            old_index
+        };
+        let mut page = metadata
+            .and_then(|value| value.page(old_index))
+            .cloned()
+            .unwrap_or_else(|| PresentationPageMetadata::new(new_index));
+        page.slide_index = new_index;
+        page.name.get_or_insert_with(|| old_names[old_index].clone());
+        pages.push(page);
+    }
+    if pages.is_empty() {
+        Ok(None)
+    } else {
+        PresentationPageMetadataCollection::new(pages).map(Some)
+    }
+}
+
+fn fallback_page_name(slide_index: usize) -> Result<String> {
+    let ordinal = slide_index
+        .checked_add(1)
+        .ok_or_else(|| invalid("presentation page name index overflow"))?;
+    Ok(format!("page{ordinal}"))
+}
+
+/// Parse static metadata from direct `draw:page` children.
+pub fn parse_presentation_page_metadata(xml: &str) -> Result<PresentationPageMetadataCollection> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation page metadata XML exceeds 8 MiB"));
     }
@@ -190,7 +305,9 @@ pub fn parse_presentation_page_metadata(
     loop {
         match reader.read_event_into(&mut buffer).map_err(xml_error)? {
             Event::Start(element) => {
-                depth = depth.checked_add(1).ok_or_else(|| invalid("XML nesting overflow"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XML nesting overflow"))?;
                 if element_is(&reader, &element, OFFICE_NAMESPACE, b"presentation") {
                     if found_presentation {
                         return Err(invalid("duplicate office:presentation element"));
@@ -303,9 +420,7 @@ fn parse_page(
             (ResolveResult::Bound(found), b"name") if found == Namespace(DRAW_NAMESPACE) => {
                 &mut page.name
             },
-            (ResolveResult::Bound(found), b"style-name")
-                if found == Namespace(DRAW_NAMESPACE) =>
-            {
+            (ResolveResult::Bound(found), b"style-name") if found == Namespace(DRAW_NAMESPACE) => {
                 &mut page.style_name
             },
             (ResolveResult::Bound(found), b"master-page-name")
@@ -386,10 +501,11 @@ fn validate_text(value: &str, description: &str, allow_empty: bool) -> Result<()
         return Err(invalid(format!("{description} cannot be empty")));
     }
     if value.chars().any(|character| {
-        character == '\0'
-            || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
+        character == '\0' || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
     }) {
-        return Err(invalid(format!("{description} contains invalid XML characters")));
+        return Err(invalid(format!(
+            "{description} contains invalid XML characters"
+        )));
     }
     Ok(())
 }
@@ -402,13 +518,23 @@ fn write_attribute(output: &mut String, name: &str, value: &str) {
     output.push('"');
 }
 
-fn element_is(reader: &NsReader<&[u8]>, element: &BytesStart<'_>, namespace: &[u8], local: &[u8]) -> bool {
+fn element_is(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &[u8],
+    local: &[u8],
+) -> bool {
     let (resolved, local_name) = reader.resolver().resolve_element(element.name());
     matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
         && local_name.as_ref() == local
 }
 
-fn end_is(reader: &NsReader<&[u8]>, element: &quick_xml::events::BytesEnd<'_>, namespace: &[u8], local: &[u8]) -> bool {
+fn end_is(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesEnd<'_>,
+    namespace: &[u8],
+    local: &[u8],
+) -> bool {
     let (resolved, local_name) = reader.resolver().resolve_element(element.name());
     matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
         && local_name.as_ref() == local
@@ -419,7 +545,9 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {
-    invalid(format!("presentation page metadata XML parsing error: {error}"))
+    invalid(format!(
+        "presentation page metadata XML parsing error: {error}"
+    ))
 }
 
 #[cfg(test)]
@@ -477,7 +605,10 @@ mod tests {
             r#"<d:page d:name=""/>"#,
         ] {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
-            assert!(parse_presentation_page_metadata(&xml).is_err(), "accepted {xml}");
+            assert!(
+                parse_presentation_page_metadata(&xml).is_err(),
+                "accepted {xml}"
+            );
         }
         let active = format!("{PREFIX}<!DOCTYPE x><d:page/>{SUFFIX}");
         assert!(parse_presentation_page_metadata(&active).is_err());

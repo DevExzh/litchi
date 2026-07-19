@@ -223,7 +223,12 @@ impl OdfDrawingHatches {
                     value.checked_add(hatch.display_name.as_deref().map_or(0, str::len))
                 })
                 .and_then(|value| {
-                    value.checked_add(hatch.rotation.as_ref().map_or(0, |item| item.as_str().len()))
+                    value.checked_add(
+                        hatch
+                            .rotation
+                            .as_ref()
+                            .map_or(0, |item| item.as_str().len()),
+                    )
                 })
                 .ok_or_else(|| make_error("drawing hatch size overflow"))?;
             if aggregate > MAX_AGGREGATE_BYTES {
@@ -358,8 +363,8 @@ fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Odf
 fn attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Attributes> {
     let mut result = HashMap::new();
     for attribute in element.attributes() {
-        let attribute = attribute
-            .map_err(|error| make_error(format!("invalid hatch attribute: {error}")))?;
+        let attribute =
+            attribute.map_err(|error| make_error(format!("invalid hatch attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
@@ -388,13 +393,16 @@ fn required(values: &mut Attributes, local: &str, context: &str) -> Result<Strin
 
 fn reject_attributes(values: &Attributes) -> Result<()> {
     if let Some(((namespace, local), _)) = values.iter().next() {
-        return invalid(format!("unsupported draw:hatch attribute {namespace:?}:{local}"));
+        return invalid(format!(
+            "unsupported draw:hatch attribute {namespace:?}:{local}"
+        ));
     }
     Ok(())
 }
 
 fn ensure_location(stack: &[Frame]) -> Result<()> {
-    if !matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles") {
+    if !matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
+    {
         return invalid("draw:hatch must be a direct office:styles child");
     }
     Ok(())
@@ -425,9 +433,7 @@ fn reject_spoofed_name(namespace: NamespaceKind, local: &str) -> Result<()> {
 fn write_hatch(output: &mut String, hatch: &OdfDrawingHatch, standalone: bool) {
     output.push_str("<draw:hatch");
     if standalone {
-        output.push_str(
-            r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0""#,
-        );
+        output.push_str(r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0""#);
     }
     push_attribute(output, "draw:name", &hatch.name);
     if let Some(value) = &hatch.display_name {
@@ -473,9 +479,8 @@ fn validate_decimal(value: &str, complete: &str) -> Result<()> {
     let fraction = parts.next();
     if parts.next().is_some()
         || !integer.bytes().all(|byte| byte.is_ascii_digit())
-        || fraction.is_some_and(|part| {
-            part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit())
-        })
+        || fraction
+            .is_some_and(|part| part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()))
         || integer.is_empty() && fraction.is_none()
     {
         return invalid(format!("invalid hatch distance '{complete}'"));
@@ -490,9 +495,9 @@ fn validate_text(value: &str, context: &str, empty_allowed: bool) -> Result<()> 
     if value.len() > MAX_VALUE_BYTES {
         return invalid(format!("{context} exceeds 64 KiB"));
     }
-    if value.chars().any(|character| {
-        matches!(character, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}')
-    }) {
+    if value.chars().any(
+        |character| matches!(character, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}'),
+    ) {
         return invalid(format!("{context} contains an XML-prohibited character"));
     }
     Ok(())
@@ -526,9 +531,15 @@ mod tests {
         );
         let hatches = parse_drawing_hatches(&xml).unwrap();
         assert_eq!(hatches.hatches.len(), 3);
-        assert_eq!(hatches.hatches[0].display_name.as_deref(), Some("Single & Blue"));
+        assert_eq!(
+            hatches.hatches[0].display_name.as_deref(),
+            Some("Single & Blue")
+        );
         assert_eq!(hatches.hatches[0].distance.unwrap().value(), 0.5);
-        assert_eq!(hatches.hatches[2].rotation.as_ref().unwrap().as_str(), "1.02101761241558rad");
+        assert_eq!(
+            hatches.hatches[2].rotation.as_ref().unwrap().as_str(),
+            "1.02101761241558rad"
+        );
 
         let serialized = hatches.to_xml().unwrap();
         assert_eq!(parse_drawing_hatches(&serialized).unwrap(), hatches);
@@ -556,18 +567,29 @@ mod tests {
 
     #[test]
     fn parses_libreoffice_angle_fixture() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/libreoffice-core/xmloff/qa/unit/data/tdf161327_HatchAngle.fodg",
-        );
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../3rdparty/libreoffice-core/xmloff/qa/unit/data/tdf161327_HatchAngle.fodg");
         let Ok(xml) = std::fs::read_to_string(path) else {
             return;
         };
         let hatches = parse_drawing_hatches(&xml).unwrap();
         assert_eq!(hatches.hatches.len(), 4);
-        assert_eq!(hatches.hatches[0].rotation.as_ref().unwrap().as_str(), "58.5deg");
-        assert_eq!(hatches.hatches[1].rotation.as_ref().unwrap().as_str(), "65grad");
-        assert_eq!(hatches.hatches[2].rotation.as_ref().unwrap().as_str(), "1.02101761241558rad");
-        assert_eq!(hatches.hatches[3].rotation.as_ref().unwrap().as_str(), "585");
+        assert_eq!(
+            hatches.hatches[0].rotation.as_ref().unwrap().as_str(),
+            "58.5deg"
+        );
+        assert_eq!(
+            hatches.hatches[1].rotation.as_ref().unwrap().as_str(),
+            "65grad"
+        );
+        assert_eq!(
+            hatches.hatches[2].rotation.as_ref().unwrap().as_str(),
+            "1.02101761241558rad"
+        );
+        assert_eq!(
+            hatches.hatches[3].rotation.as_ref().unwrap().as_str(),
+            "585"
+        );
         assert_eq!(
             parse_drawing_hatches(&hatches.to_xml().unwrap())
                 .unwrap()

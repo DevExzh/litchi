@@ -1,8 +1,6 @@
 //! Inert, bounded OpenDocument text DDE connection declarations.
 
-use crate::{
-    OdfVariableBody, OdfVariableHeaderFooter, OdfVariablePart, OdfVariableScope,
-};
+use crate::{OdfVariableBody, OdfVariableHeaderFooter, OdfVariablePart, OdfVariableScope};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -156,29 +154,19 @@ fn parse_part(
                     )?;
                     add_declaration(declaration, parsed, names)?;
                     pending_declaration = Some(PendingElement { depth: depth + 1 });
-                } else if namespace.as_deref() == Some(TEXT)
-                    && local == "dde-connection-decls"
-                {
-                    start_group(
-                        element,
-                        part,
-                        depth,
-                        &stack,
-                        containers,
-                        &mut active,
-                    )?;
+                } else if namespace.as_deref() == Some(TEXT) && local == "dde-connection-decls" {
+                    start_group(element, part, depth, &stack, containers, &mut active)?;
                 } else if namespace.as_deref() == Some(TEXT) && local == "dde-connection" {
                     let usage = parse_use(&reader, element, part, &stack, aggregate)?;
                     add_use(usage, parsed)?;
                     pending_use = Some(PendingElement { depth: depth + 1 });
                 }
-                let master_page_name = if namespace.as_deref() == Some(STYLE)
-                    && local == "master-page"
-                {
-                    optional_attribute(&reader, element, STYLE, "name")?
-                } else {
-                    None
-                };
+                let master_page_name =
+                    if namespace.as_deref() == Some(STYLE) && local == "master-page" {
+                        optional_attribute(&reader, element, STYLE, "name")?
+                    } else {
+                        None
+                    };
                 stack.push(Frame {
                     namespace,
                     local,
@@ -192,7 +180,7 @@ fn parse_part(
                         "DDE connection XML nesting exceeds {MAX_DEPTH} levels"
                     ));
                 }
-            }
+            },
             Event::Empty(ref element) => {
                 if pending_declaration.is_some() || pending_use.is_some() {
                     return invalid("DDE connection elements cannot contain elements");
@@ -217,23 +205,14 @@ fn parse_part(
                         aggregate,
                     )?;
                     add_declaration(declaration, parsed, names)?;
-                } else if namespace.as_deref() == Some(TEXT)
-                    && local == "dde-connection-decls"
-                {
+                } else if namespace.as_deref() == Some(TEXT) && local == "dde-connection-decls" {
                     let mut temporary = None;
-                    start_group(
-                        element,
-                        part,
-                        depth,
-                        &stack,
-                        containers,
-                        &mut temporary,
-                    )?;
+                    start_group(element, part, depth, &stack, containers, &mut temporary)?;
                 } else if namespace.as_deref() == Some(TEXT) && local == "dde-connection" {
                     let usage = parse_use(&reader, element, part, &stack, aggregate)?;
                     add_use(usage, parsed)?;
                 }
-            }
+            },
             Event::End(_) => {
                 if pending_declaration
                     .as_ref()
@@ -256,7 +235,7 @@ fn parse_part(
                 stack
                     .pop()
                     .ok_or_else(|| make_error("DDE connection XML frame stack underflow"))?;
-            }
+            },
             Event::Text(ref text) => {
                 let value = text
                     .decode()
@@ -264,32 +243,29 @@ fn parse_part(
                 if (pending_declaration.is_some() || pending_use.is_some()) && !value.is_empty() {
                     return invalid("DDE connection elements must be empty");
                 }
-                if active.is_some()
-                    && pending_declaration.is_none()
-                    && !value.trim().is_empty()
-                {
+                if active.is_some() && pending_declaration.is_none() && !value.trim().is_empty() {
                     return invalid(
                         "text:dde-connection-decls may contain only connection declarations",
                     );
                 }
-            }
+            },
             Event::CData(ref value)
                 if pending_declaration.is_some() || pending_use.is_some() || active.is_some() =>
             {
                 if !value.is_empty() {
                     return invalid("DDE connection elements cannot contain CDATA");
                 }
-            }
+            },
             Event::GeneralRef(_)
                 if pending_declaration.is_some() || pending_use.is_some() || active.is_some() =>
             {
                 return invalid("DDE connection elements cannot contain entity references");
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid("DTDs and processing instructions are not allowed in DDE XML");
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -453,7 +429,8 @@ fn optional_attribute(
 ) -> Result<Option<String>> {
     let mut value = None;
     for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute.map_err(|error| make_error(format!("invalid XML attribute: {error}")))?;
+        let attribute =
+            attribute.map_err(|error| make_error(format!("invalid XML attribute: {error}")))?;
         let (resolved, resolved_local) = reader.resolver().resolve_attribute(attribute.key);
         if namespace_uri(&resolved)?.as_deref() == Some(namespace)
             && resolved_local.as_ref() == local.as_bytes()
@@ -553,11 +530,7 @@ fn get<'a>(attributes: &'a Attributes, namespace: &str, local: &str) -> Option<&
         .map(String::as_str)
 }
 
-fn required_nonempty(
-    attributes: &Attributes,
-    namespace: &str,
-    local: &str,
-) -> Result<String> {
+fn required_nonempty(attributes: &Attributes, namespace: &str, local: &str) -> Result<String> {
     match get(attributes, namespace, local) {
         Some(value) if !value.is_empty() => Ok(value.to_string()),
         _ => invalid(format!("DDE connection requires non-empty {local}")),
@@ -574,9 +547,7 @@ fn parse_bool(value: &str) -> Result<bool> {
 
 fn namespace_uri(result: &ResolveResult<'_>) -> Result<Option<String>> {
     match result {
-        ResolveResult::Bound(Namespace(value)) => {
-            Ok(Some(decode(value, "namespace URI")?))
-        }
+        ResolveResult::Bound(Namespace(value)) => Ok(Some(decode(value, "namespace URI")?)),
         ResolveResult::Unbound => Ok(None),
         ResolveResult::Unknown(prefix) => Err(make_error(format!(
             "unbound namespace prefix '{}'",
@@ -619,11 +590,8 @@ mod tests {
                     o:automatic-update="true"/>
             </t:dde-connection-decls><t:p><t:dde-connection t:connection-name="Prices"/></t:p>{SUFFIX}"#
         );
-        let inventory = parse_variable_declaration_parts(&[(
-            xml.as_str(),
-            OdfVariablePart::Content,
-        )])
-        .unwrap();
+        let inventory =
+            parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content)]).unwrap();
         assert_eq!(inventory.dde_connections.len(), 1);
         assert_eq!(inventory.dde_connection_uses.len(), 1);
         let declaration = &inventory.dde_connections[0];
@@ -663,11 +631,8 @@ mod tests {
         for body in bodies {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
             assert!(
-                parse_variable_declaration_parts(&[(
-                    xml.as_str(),
-                    OdfVariablePart::Content,
-                )])
-                .is_err(),
+                parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content,)])
+                    .is_err(),
                 "accepted {body}"
             );
         }

@@ -63,10 +63,7 @@ pub struct FlatOpenDocument {
 impl FlatOpenDocument {
     /// Parses the optional flat-document `office:settings` inventory.
     pub fn settings(&self) -> Result<crate::OdfSettings> {
-        crate::settings::parse_settings(
-            self.xml(),
-            crate::settings::SettingsDocumentKind::Flat,
-        )
+        crate::settings::parse_settings(self.xml(), crate::settings::SettingsDocumentKind::Flat)
     }
 
     /// Open and validate a flat OpenDocument XML file.
@@ -166,6 +163,63 @@ impl FlatOpenDocument {
             self.xml(),
             crate::OdfVariablePart::Flat,
         )])
+    }
+
+    /// Atomically insert or replace one variable declaration container.
+    ///
+    /// The group must target the flat part. Formulas and cached values remain
+    /// inert; this method only updates XML metadata and never evaluates fields.
+    pub fn set_variable_declaration_group(
+        &mut self,
+        group: &crate::OdfVariableDeclarationGroup,
+    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
+        if group.part != crate::OdfVariablePart::Flat {
+            return Err(Error::InvalidFormat(
+                "FlatOpenDocument requires OdfVariablePart::Flat".to_string(),
+            ));
+        }
+        let current = self.variable_declarations()?;
+        let old = current
+            .groups
+            .iter()
+            .find(|candidate| candidate.scope == group.scope && candidate.kind == group.kind)
+            .cloned();
+        let updated = crate::set_variable_declaration_group_xml(&self.xml, group)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::variable_declaration::parse_variable_declaration_parts(&[(
+            updated.as_str(),
+            crate::OdfVariablePart::Flat,
+        )])?;
+        self.xml = updated;
+        Ok(old)
+    }
+
+    /// Atomically remove one variable declaration container.
+    ///
+    /// Removal fails without mutation if any remaining field references a
+    /// declaration owned by the container.
+    pub fn remove_variable_declaration_group(
+        &mut self,
+        scope: &crate::OdfVariableScope,
+        kind: crate::OdfVariableKind,
+    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
+        let current = self.variable_declarations()?;
+        let Some(old) = current
+            .groups
+            .iter()
+            .find(|candidate| candidate.scope == *scope && candidate.kind == kind)
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        let updated = crate::remove_variable_declaration_group_xml(&self.xml, scope, kind)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::variable_declaration::parse_variable_declaration_parts(&[(
+            updated.as_str(),
+            crate::OdfVariablePart::Flat,
+        )])?;
+        self.xml = updated;
+        Ok(Some(old))
     }
 
     /// Discover inert inline and linked embedded objects.
@@ -300,6 +354,43 @@ fn validate_flat_document(xml: &str, family: OpenDocumentFamily) -> Result<()> {
 }
 
 impl OpenDocumentPackage {
+    /// Stage a `content.xml` replacement without mutating this package.
+    ///
+    /// Optional core parts and reproducible auxiliary entries are preserved;
+    /// invalidated signatures are omitted and encrypted packages are rejected
+    /// by the package writer.
+    pub(crate) fn with_replaced_content_xml(&self, content: String) -> Result<Self> {
+        std::str::from_utf8(content.as_bytes())
+            .map_err(|_| Error::InvalidFormat("invalid UTF-8 in content.xml".to_string()))?;
+
+        let mut writer = crate::core::PackageWriter::new();
+        writer.set_mimetype(&self.mimetype)?;
+        writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
+        for path in [
+            constants::ODF_STYLES,
+            constants::ODF_META,
+            constants::ODF_SETTINGS,
+        ] {
+            if self.package.has_file(path)? {
+                let bytes = self.package.get_file(path)?;
+                writer.add_file(path, &bytes)?;
+            }
+        }
+        writer.copy_auxiliary_files_from_except(
+            &self.package,
+            &[constants::ODF_SETTINGS.to_string()],
+            &[],
+        )?;
+        OpenDocumentPackage::from_bytes(writer.finish_to_bytes()?)
+    }
+
+    /// Replace `content.xml` while preserving optional core parts and every
+    /// auxiliary package entry that can be rewritten safely.
+    pub(crate) fn replace_content_xml(&mut self, content: String) -> Result<()> {
+        *self = self.with_replaced_content_xml(content)?;
+        Ok(())
+    }
+
     /// Open and validate a packaged OpenDocument file.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
@@ -406,11 +497,8 @@ impl OpenDocumentPackage {
         let Some(xml) = self.settings_xml()? else {
             return Ok(None);
         };
-        crate::settings::parse_settings(
-            &xml,
-            crate::settings::SettingsDocumentKind::Package,
-        )
-        .map(Some)
+        crate::settings::parse_settings(&xml, crate::settings::SettingsDocumentKind::Package)
+            .map(Some)
     }
 
     /// Extract common document metadata, or an empty value when `meta.xml` is absent.
@@ -492,6 +580,135 @@ impl OpenDocumentPackage {
             parts.push((styles, crate::OdfVariablePart::Styles));
         }
         crate::variable_declaration::parse_variable_declaration_parts(&parts)
+    }
+
+    /// Atomically insert or replace one variable declaration container.
+    ///
+    /// The group must target `content.xml` or `styles.xml`. Auxiliary package
+    /// entries remain byte-for-byte intact, and formulas remain inert.
+    pub fn set_variable_declaration_group(
+        &mut self,
+        group: &crate::OdfVariableDeclarationGroup,
+    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
+        if group.part == crate::OdfVariablePart::Flat {
+            return Err(Error::InvalidFormat(
+                "OpenDocumentPackage cannot write OdfVariablePart::Flat".to_string(),
+            ));
+        }
+
+        let current = self.variable_declarations()?;
+        let old = current
+            .groups
+            .iter()
+            .find(|candidate| {
+                candidate.part == group.part
+                    && candidate.scope == group.scope
+                    && candidate.kind == group.kind
+            })
+            .cloned();
+        let content = self.content_xml()?;
+        let styles = self.styles_xml()?;
+        let (content, styles) = match group.part {
+            crate::OdfVariablePart::Content => (
+                crate::set_variable_declaration_group_xml(&content, group)?,
+                styles,
+            ),
+            crate::OdfVariablePart::Styles => {
+                let styles = styles.ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "cannot write a styles declaration without styles.xml".to_string(),
+                    )
+                })?;
+                (
+                    content,
+                    Some(crate::set_variable_declaration_group_xml(&styles, group)?),
+                )
+            },
+            crate::OdfVariablePart::Flat => unreachable!(),
+        };
+
+        self.replace_variable_xml(content, styles, old)
+    }
+
+    /// Atomically remove one variable declaration container.
+    ///
+    /// Removal fails without mutation if any remaining field references a
+    /// declaration owned by the container.
+    pub fn remove_variable_declaration_group(
+        &mut self,
+        part: crate::OdfVariablePart,
+        scope: &crate::OdfVariableScope,
+        kind: crate::OdfVariableKind,
+    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
+        if part == crate::OdfVariablePart::Flat {
+            return Err(Error::InvalidFormat(
+                "OpenDocumentPackage cannot remove OdfVariablePart::Flat".to_string(),
+            ));
+        }
+
+        let current = self.variable_declarations()?;
+        let Some(old) = current
+            .groups
+            .iter()
+            .find(|candidate| {
+                candidate.part == part && candidate.scope == *scope && candidate.kind == kind
+            })
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        let content = self.content_xml()?;
+        let styles = self.styles_xml()?;
+        let (content, styles) = match part {
+            crate::OdfVariablePart::Content => (
+                crate::remove_variable_declaration_group_xml(&content, scope, kind)?,
+                styles,
+            ),
+            crate::OdfVariablePart::Styles => {
+                let styles = styles.ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "cannot remove a styles declaration without styles.xml".to_string(),
+                    )
+                })?;
+                (
+                    content,
+                    Some(crate::remove_variable_declaration_group_xml(
+                        &styles, scope, kind,
+                    )?),
+                )
+            },
+            crate::OdfVariablePart::Flat => unreachable!(),
+        };
+
+        self.replace_variable_xml(content, styles, Some(old))
+    }
+
+    fn replace_variable_xml(
+        &mut self,
+        content: String,
+        styles: Option<String>,
+        old: Option<crate::OdfVariableDeclarationGroup>,
+    ) -> Result<Option<crate::OdfVariableDeclarationGroup>> {
+        let mut parts = vec![(content.as_str(), crate::OdfVariablePart::Content)];
+        if let Some(styles) = styles.as_deref() {
+            parts.push((styles, crate::OdfVariablePart::Styles));
+        }
+        crate::variable_declaration::parse_variable_declaration_parts(&parts)?;
+
+        let mut writer = crate::core::PackageWriter::new();
+        writer.set_mimetype(&self.mimetype)?;
+        writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
+        if let Some(styles) = styles.as_deref() {
+            writer.add_file(constants::ODF_STYLES, styles.as_bytes())?;
+        }
+        if self.package.has_file(constants::ODF_META)? {
+            let bytes = self.package.get_file(constants::ODF_META)?;
+            writer.add_file(constants::ODF_META, &bytes)?;
+        }
+        writer.copy_auxiliary_files_from(&self.package)?;
+        let replacement = OpenDocumentPackage::from_bytes(writer.finish_to_bytes()?)?;
+        *self = replacement;
+        Ok(old)
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.
@@ -765,5 +982,64 @@ mod tests {
             Some("A & B")
         );
         assert_eq!(document.metadata().unwrap().title.as_deref(), Some("A & B"));
+    }
+
+    #[test]
+    fn flat_variable_declarations_expand_replace_and_remove_atomically() {
+        let xml = format!(
+            r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="{}"><o:body><o:text/></o:body></o:document>"#,
+            constants::ODF_TEXT,
+        );
+        let mut document = FlatOpenDocument::from_bytes(xml.into_bytes()).unwrap();
+        let scope = crate::OdfVariableScope::Body(crate::OdfVariableBody::Text);
+        let first = crate::OdfVariableDeclarationGroup {
+            kind: crate::OdfVariableKind::Simple,
+            part: crate::OdfVariablePart::Flat,
+            scope: scope.clone(),
+            declarations: vec![crate::OdfVariableDeclaration::Simple {
+                name: "counter".to_string(),
+                value_type: crate::OdfVariableValueType::Float,
+            }],
+        };
+        assert!(
+            document
+                .set_variable_declaration_group(&first)
+                .unwrap()
+                .is_none()
+        );
+        assert!(document.xml().contains("<o:text><text:variable-decls"));
+        assert!(
+            document
+                .variable_declarations()
+                .unwrap()
+                .find(crate::OdfVariableKind::Simple, "counter")
+                .is_some()
+        );
+
+        let second = crate::OdfVariableDeclarationGroup {
+            declarations: vec![crate::OdfVariableDeclaration::Simple {
+                name: "replacement".to_string(),
+                value_type: crate::OdfVariableValueType::String,
+            }],
+            ..first.clone()
+        };
+        assert_eq!(
+            document.set_variable_declaration_group(&second).unwrap(),
+            Some(first.clone()),
+        );
+        assert!(
+            document
+                .variable_declarations()
+                .unwrap()
+                .find(crate::OdfVariableKind::Simple, "replacement")
+                .is_some()
+        );
+        assert_eq!(
+            document
+                .remove_variable_declaration_group(&scope, crate::OdfVariableKind::Simple)
+                .unwrap(),
+            Some(second),
+        );
+        assert!(document.variable_declarations().unwrap().groups.is_empty());
     }
 }

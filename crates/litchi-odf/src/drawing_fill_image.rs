@@ -89,7 +89,12 @@ impl FromStr for OdfFillImageLength {
 
 impl fmt::Display for OdfFillImageLength {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}{}", canonical_number(self.value), self.unit.suffix())
+        write!(
+            formatter,
+            "{}{}",
+            canonical_number(self.value),
+            self.unit.suffix()
+        )
     }
 }
 
@@ -208,7 +213,7 @@ impl OdfDrawingFillImage {
                 } else if self.show.is_some() || self.actuate.is_some() {
                     return invalid("XLink modes require an xlink:href");
                 }
-            }
+            },
         }
         Ok(())
     }
@@ -242,7 +247,10 @@ impl OdfDrawingFillImages {
         for image in &self.images {
             image.validate()?;
             if !names.insert(image.name.as_str()) {
-                return invalid(format!("duplicate drawing fill-image name '{}'", image.name));
+                return invalid(format!(
+                    "duplicate drawing fill-image name '{}'",
+                    image.name
+                ));
             }
             aggregate = aggregate
                 .checked_add(image.name.len())
@@ -304,7 +312,7 @@ impl crate::OpenDocumentPackage {
                 } else {
                     Ok(None)
                 }
-            }
+            },
         }
     }
 }
@@ -399,7 +407,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<OdfDrawingFillImages> {
                 if stack.len() > MAX_DEPTH {
                     return invalid(format!("fill-image XML exceeds {MAX_DEPTH} levels"));
                 }
-            }
+            },
             Event::Empty(ref element) => {
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace, &local)?;
@@ -417,15 +425,10 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<OdfDrawingFillImages> {
                 } else if namespace == NamespaceKind::Draw && local == "fill-image" {
                     ensure_location(&stack)?;
                     ensure_count(result.images.len())?;
-                    let builder = parse_fill_start(
-                        &reader,
-                        element,
-                        stack.len(),
-                        &mut aggregate,
-                    )?;
+                    let builder = parse_fill_start(&reader, element, stack.len(), &mut aggregate)?;
                     result.images.push(finish_fill(builder, &mut inline_total)?);
                 }
-            }
+            },
             Event::End(_) => {
                 let frame = stack
                     .pop()
@@ -449,7 +452,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<OdfDrawingFillImages> {
                         &mut inline_total,
                     )?);
                 }
-            }
+            },
             Event::Text(ref text) if active.is_some() => {
                 let value = text
                     .xml_content(XmlVersion::Explicit1_0)
@@ -467,7 +470,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<OdfDrawingFillImages> {
                 } else if !value.chars().all(char::is_whitespace) {
                     return invalid("draw:fill-image may contain only office:binary-data");
                 }
-            }
+            },
             Event::CData(ref value)
                 if active
                     .as_ref()
@@ -482,15 +485,15 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<OdfDrawingFillImages> {
                     &value,
                     &mut aggregate,
                 )?;
-            }
+            },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
                 return invalid("draw:fill-image contains unsupported character data");
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid("DTDs and processing instructions are prohibited in fill images");
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -533,9 +536,9 @@ fn parse_fill_start(
     reject_attributes(&values)?;
     let link = href.map(OdfFillImageLink::new).transpose()?;
     match (&link, link_type.as_deref()) {
-        (Some(_), Some("simple")) => {}
+        (Some(_), Some("simple")) => {},
         (Some(_), _) => return invalid("linked fill image requires xlink:type='simple'"),
-        (None, None) if show.is_none() && actuate.is_none() => {}
+        (None, None) if show.is_none() && actuate.is_none() => {},
         (None, _) => return invalid("XLink attributes require xlink:href"),
     }
     Ok(FillBuilder {
@@ -661,7 +664,7 @@ fn namespace_kind(resolved: &ResolveResult<'_>) -> Result<NamespaceKind> {
             } else {
                 NamespaceKind::Other
             })
-        }
+        },
         ResolveResult::Unknown(prefix) => invalid(format!(
             "unbound XML namespace prefix '{}'",
             String::from_utf8_lossy(prefix.as_ref())
@@ -670,9 +673,10 @@ fn namespace_kind(resolved: &ResolveResult<'_>) -> Result<NamespaceKind> {
 }
 
 fn ensure_location(stack: &[Frame]) -> Result<()> {
-    if stack.last().is_some_and(|frame| {
-        frame.namespace == NamespaceKind::Office && frame.local == "styles"
-    }) {
+    if stack
+        .last()
+        .is_some_and(|frame| frame.namespace == NamespaceKind::Office && frame.local == "styles")
+    {
         Ok(())
     } else {
         invalid("draw:fill-image must be a direct child of office:styles")
@@ -713,18 +717,22 @@ fn required(
 
 fn reject_attributes(values: &Attributes) -> Result<()> {
     if let Some(((namespace, local), _)) = values.iter().next() {
-        return invalid(format!("unsupported fill-image attribute {namespace:?}:{local}"));
+        return invalid(format!(
+            "unsupported fill-image attribute {namespace:?}:{local}"
+        ));
     }
     Ok(())
 }
 
 fn validate_link(link: &OdfFillImageLink) -> Result<()> {
     validate_text(link.href(), "xlink:href", true, MAX_VALUE_BYTES)?;
-    if link.kind != if safe_package_path(link.href()) {
-        OdfFillImageLinkKind::PackagePart
-    } else {
-        OdfFillImageLinkKind::InertExternal
-    } {
+    if link.kind
+        != if safe_package_path(link.href()) {
+            OdfFillImageLinkKind::PackagePart
+        } else {
+            OdfFillImageLinkKind::InertExternal
+        }
+    {
         return invalid("fill-image link classification is inconsistent");
     }
     Ok(())
@@ -754,7 +762,9 @@ fn split_length(value: &str) -> Result<(&str, OdfFillImageLengthUnit)> {
             return Ok((number, unit));
         }
     }
-    invalid(format!("fill-image length lacks a supported unit: '{value}'"))
+    invalid(format!(
+        "fill-image length lacks a supported unit: '{value}'"
+    ))
 }
 
 fn validate_decimal(number: &str, original: &str) -> Result<()> {
@@ -772,9 +782,8 @@ fn validate_decimal(number: &str, original: &str) -> Result<()> {
     if parts.next().is_some()
         || integer.is_empty()
         || !integer.bytes().all(|byte| byte.is_ascii_digit())
-        || fraction.is_some_and(|part| {
-            part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit())
-        })
+        || fraction
+            .is_some_and(|part| part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()))
     {
         return invalid(format!("invalid fill-image length '{original}'"));
     }
@@ -827,7 +836,7 @@ fn write_fill_image(output: &mut String, image: &OdfDrawingFillImage, standalone
             output.push_str("><office:binary-data>");
             BASE64_STANDARD.encode_string(bytes, output);
             output.push_str("</office:binary-data></draw:fill-image>");
-        }
+        },
     }
 }
 
@@ -859,7 +868,11 @@ fn escape_xml(output: &mut String, value: &str) {
 }
 
 fn canonical_number(value: f64) -> String {
-    if value == 0.0 { "0".to_owned() } else { value.to_string() }
+    if value == 0.0 {
+        "0".to_owned()
+    } else {
+        value.to_string()
+    }
 }
 
 fn decode(value: &[u8], what: &str) -> Result<String> {
@@ -886,17 +899,30 @@ mod tests {
     const XLINK: &str = "http://www.w3.org/1999/xlink";
 
     fn wrap(body: &str) -> String {
-        format!(r#"<office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:svg="{SVG}" xmlns:xlink="{XLINK}">{body}</office:styles>"#)
+        format!(
+            r#"<office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:svg="{SVG}" xmlns:xlink="{XLINK}">{body}</office:styles>"#
+        )
     }
 
     #[test]
     fn parses_and_round_trips_linked_and_inline_images() {
-        let xml = wrap(r#"<draw:fill-image draw:name="package" draw:display-name="Package" svg:width="2.5cm" svg:height="30px" xlink:type="simple" xlink:href="Pictures/fill.png" xlink:show="embed" xlink:actuate="onLoad"/><draw:fill-image draw:name="inline"><office:binary-data>AAEC/w==</office:binary-data></draw:fill-image><draw:fill-image draw:name="remote" xlink:type="simple" xlink:href="https://example.invalid/image.png"/>"#);
+        let xml = wrap(
+            r#"<draw:fill-image draw:name="package" draw:display-name="Package" svg:width="2.5cm" svg:height="30px" xlink:type="simple" xlink:href="Pictures/fill.png" xlink:show="embed" xlink:actuate="onLoad"/><draw:fill-image draw:name="inline"><office:binary-data>AAEC/w==</office:binary-data></draw:fill-image><draw:fill-image draw:name="remote" xlink:type="simple" xlink:href="https://example.invalid/image.png"/>"#,
+        );
         let parsed = parse_drawing_fill_images(&xml).unwrap();
         assert_eq!(parsed.images.len(), 3);
-        assert_eq!(parsed.get("inline").unwrap().source.inline_bytes(), Some([0, 1, 2, 255].as_slice()));
-        assert_eq!(parsed.get("package").unwrap().source.link().unwrap().kind(), OdfFillImageLinkKind::PackagePart);
-        assert_eq!(parsed.get("remote").unwrap().source.link().unwrap().kind(), OdfFillImageLinkKind::InertExternal);
+        assert_eq!(
+            parsed.get("inline").unwrap().source.inline_bytes(),
+            Some([0, 1, 2, 255].as_slice())
+        );
+        assert_eq!(
+            parsed.get("package").unwrap().source.link().unwrap().kind(),
+            OdfFillImageLinkKind::PackagePart
+        );
+        assert_eq!(
+            parsed.get("remote").unwrap().source.link().unwrap().kind(),
+            OdfFillImageLinkKind::InertExternal
+        );
         let serialized = parsed.to_xml().unwrap();
         assert_eq!(parse_drawing_fill_images(&serialized).unwrap(), parsed);
     }
@@ -906,31 +932,68 @@ mod tests {
         for xml in [
             wrap(r#"<draw:fill-image draw:name="x"/>"#),
             wrap(r#"<draw:fill-image draw:name="x" xlink:href="Pictures/x.png"/>"#),
-            wrap(r#"<draw:fill-image draw:name="x" xlink:type="extended" xlink:href="Pictures/x.png"/>"#),
-            wrap(r#"<draw:fill-image draw:name="x" xlink:show="embed"><office:binary-data>AA==</office:binary-data></draw:fill-image>"#),
-            wrap(r#"<draw:fill-image draw:name="x"><office:binary-data>!!!</office:binary-data></draw:fill-image>"#),
-            wrap(r#"<draw:fill-image draw:name="x"><office:binary-data>AA==</office:binary-data><office:binary-data>AA==</office:binary-data></draw:fill-image>"#),
+            wrap(
+                r#"<draw:fill-image draw:name="x" xlink:type="extended" xlink:href="Pictures/x.png"/>"#,
+            ),
+            wrap(
+                r#"<draw:fill-image draw:name="x" xlink:show="embed"><office:binary-data>AA==</office:binary-data></draw:fill-image>"#,
+            ),
+            wrap(
+                r#"<draw:fill-image draw:name="x"><office:binary-data>!!!</office:binary-data></draw:fill-image>"#,
+            ),
+            wrap(
+                r#"<draw:fill-image draw:name="x"><office:binary-data>AA==</office:binary-data><office:binary-data>AA==</office:binary-data></draw:fill-image>"#,
+            ),
             wrap(r#"<draw:fill-image draw:name="x"><draw:image/></draw:fill-image>"#),
-            wrap(r#"<draw:fill-image draw:name="x"><office:binary-data>AA==</office:binary-data></draw:fill-image><draw:fill-image draw:name="x" xlink:type="simple" xlink:href="x"/>"#),
-            format!(r#"<office:document xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:xlink="{XLINK}"><draw:fill-image draw:name="x" xlink:type="simple" xlink:href="x"/></office:document>"#),
-            format!(r#"<!DOCTYPE x><office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:xlink="{XLINK}"><draw:fill-image draw:name="x" xlink:type="simple" xlink:href="x"/></office:styles>"#),
+            wrap(
+                r#"<draw:fill-image draw:name="x"><office:binary-data>AA==</office:binary-data></draw:fill-image><draw:fill-image draw:name="x" xlink:type="simple" xlink:href="x"/>"#,
+            ),
+            format!(
+                r#"<office:document xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:xlink="{XLINK}"><draw:fill-image draw:name="x" xlink:type="simple" xlink:href="x"/></office:document>"#
+            ),
+            format!(
+                r#"<!DOCTYPE x><office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:xlink="{XLINK}"><draw:fill-image draw:name="x" xlink:type="simple" xlink:href="x"/></office:styles>"#
+            ),
         ] {
             assert!(parse_drawing_fill_images(&xml).is_err(), "accepted {xml}");
         }
-        assert_eq!(OdfFillImageLink::new("../Pictures/x.png").unwrap().kind(), OdfFillImageLinkKind::InertExternal);
+        assert_eq!(
+            OdfFillImageLink::new("../Pictures/x.png").unwrap().kind(),
+            OdfFillImageLinkKind::InertExternal
+        );
     }
 
     #[test]
     fn parses_real_libreoffice_linked_and_inline_resources() {
-        let linked_xml = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/shape-fill-link.fodp"));
+        let linked_xml = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/shape-fill-link.fodp"
+        ));
         let linked = crate::FlatOpenDocument::from_bytes(linked_xml.as_bytes().to_vec()).unwrap();
         let images = linked.drawing_fill_images().unwrap();
-        assert_eq!(images.get("remote_bg").unwrap().source.link().unwrap().kind(), OdfFillImageLinkKind::InertExternal);
+        assert_eq!(
+            images
+                .get("remote_bg")
+                .unwrap()
+                .source
+                .link()
+                .unwrap()
+                .kind(),
+            OdfFillImageLinkKind::InertExternal
+        );
 
-        let inline_xml = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/xmloff/qa/unit/data/fill-image-base64.fodg"));
+        let inline_xml = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/xmloff/qa/unit/data/fill-image-base64.fodg"
+        ));
         let inline = crate::FlatOpenDocument::from_bytes(inline_xml.as_bytes().to_vec()).unwrap();
         let images = inline.drawing_fill_images().unwrap();
-        let bytes = images.get("libreoffice_5f_0").unwrap().source.inline_bytes().unwrap();
+        let bytes = images
+            .get("libreoffice_5f_0")
+            .unwrap()
+            .source
+            .inline_bytes()
+            .unwrap();
         assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
     }
 }

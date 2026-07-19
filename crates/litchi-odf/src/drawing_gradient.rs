@@ -12,8 +12,7 @@ use std::str::FromStr;
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const SVG_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
-const LOEXT_NS: &[u8] =
-    b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
+const LOEXT_NS: &[u8] = b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 const MAX_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_DEPTH: usize = 256;
 const MAX_GRADIENTS: usize = 65_536;
@@ -136,7 +135,11 @@ impl FromStr for OdfRgbColor {
 
 impl fmt::Display for OdfRgbColor {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "#{:02x}{:02x}{:02x}", self.red, self.green, self.blue)
+        write!(
+            formatter,
+            "#{:02x}{:02x}{:02x}",
+            self.red, self.green, self.blue
+        )
     }
 }
 
@@ -349,7 +352,11 @@ pub struct OdfLibreOfficeGradientStop {
 impl OdfLibreOfficeGradientStop {
     fn validate(&self) -> Result<()> {
         self.offset.validate()?;
-        validate_text(self.color_type.as_str(), "LibreOffice gradient color type", false)?;
+        validate_text(
+            self.color_type.as_str(),
+            "LibreOffice gradient color type",
+            false,
+        )?;
         validate_text(&self.color_value, "LibreOffice gradient color value", false)
     }
 }
@@ -487,7 +494,9 @@ pub struct OdfDrawingGradients {
 
 impl OdfDrawingGradients {
     pub fn get(&self, name: &str) -> Option<&OdfDrawingGradient> {
-        self.gradients.iter().find(|value| value.name() == Some(name))
+        self.gradients
+            .iter()
+            .find(|value| value.name() == Some(name))
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -577,7 +586,10 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<OdfDrawingGradients> {
                 let local = decode_name(element.local_name().as_ref(), "element")?;
                 reject_spoofed_name(namespace, &local)?;
                 if active.is_some() {
-                    if matches!((namespace, local.as_str()), (NamespaceKind::Svg, "stop") | (NamespaceKind::Loext, "gradient-stop")) {
+                    if matches!(
+                        (namespace, local.as_str()),
+                        (NamespaceKind::Svg, "stop") | (NamespaceKind::Loext, "gradient-stop")
+                    ) {
                         return invalid("gradient stop elements must be empty");
                     }
                     return invalid("gradient resource contains an unsupported child element");
@@ -607,7 +619,9 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<OdfDrawingGradients> {
                         return invalid("gradient stop must be a direct gradient child");
                     }
                     add_stop(&reader, namespace, &local, element, &mut active.value)?;
-                } else if let Some(value) = parse_gradient_start(&reader, namespace, &local, element)? {
+                } else if let Some(value) =
+                    parse_gradient_start(&reader, namespace, &local, element)?
+                {
                     ensure_location(&stack)?;
                     result.gradients.push(value);
                 } else if is_stop(namespace, &local) {
@@ -812,19 +826,17 @@ fn add_stop(
             if value.extension_stops.len() >= MAX_STOPS {
                 return invalid(format!("gradient exceeds {MAX_STOPS} extension stops"));
             }
-            value.extension_stops.push(parse_loext_stop(reader, element)?);
+            value
+                .extension_stops
+                .push(parse_loext_stop(reader, element)?);
         },
-        OdfDrawingGradient::Linear(value)
-            if namespace == NamespaceKind::Svg && local == "stop" =>
-        {
+        OdfDrawingGradient::Linear(value) if namespace == NamespaceKind::Svg && local == "stop" => {
             if value.common.stops.len() >= MAX_STOPS {
                 return invalid(format!("SVG gradient exceeds {MAX_STOPS} stops"));
             }
             value.common.stops.push(parse_svg_stop(reader, element)?);
         },
-        OdfDrawingGradient::Radial(value)
-            if namespace == NamespaceKind::Svg && local == "stop" =>
-        {
+        OdfDrawingGradient::Radial(value) if namespace == NamespaceKind::Svg && local == "stop" => {
             if value.common.stops.len() >= MAX_STOPS {
                 return invalid(format!("SVG gradient exceeds {MAX_STOPS} stops"));
             }
@@ -835,7 +847,10 @@ fn add_stop(
     Ok(())
 }
 
-fn parse_svg_stop(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<OdfSvgGradientStop> {
+fn parse_svg_stop(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<OdfSvgGradientStop> {
     let mut values = attributes(reader, element)?;
     let offset = OdfGradientStopOffset::parse(&required(
         &mut values,
@@ -936,13 +951,16 @@ fn required(
 
 fn reject_attributes(values: &Attributes, context: &str) -> Result<()> {
     if let Some(((namespace, local), _)) = values.iter().next() {
-        return invalid(format!("unsupported {context} attribute {namespace:?}:{local}"));
+        return invalid(format!(
+            "unsupported {context} attribute {namespace:?}:{local}"
+        ));
     }
     Ok(())
 }
 
 fn ensure_location(stack: &[Frame]) -> Result<()> {
-    if !matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles") {
+    if !matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
+    {
         return invalid("gradient resources must be direct office:styles children");
     }
     Ok(())
@@ -1198,9 +1216,8 @@ fn validate_decimal(value: &str, complete: &str) -> Result<()> {
     let fraction = parts.next();
     if parts.next().is_some()
         || !integer.bytes().all(|byte| byte.is_ascii_digit())
-        || fraction.is_some_and(|part| {
-            part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit())
-        })
+        || fraction
+            .is_some_and(|part| part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()))
         || integer.is_empty() && fraction.is_none()
     {
         return invalid(format!("invalid decimal '{complete}'"));
@@ -1215,9 +1232,9 @@ fn validate_text(value: &str, context: &str, empty_allowed: bool) -> Result<()> 
     if value.len() > MAX_VALUE_BYTES {
         return invalid(format!("{context} exceeds 64 KiB"));
     }
-    if value.chars().any(|character| {
-        matches!(character, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}')
-    }) {
+    if value.chars().any(
+        |character| matches!(character, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}'),
+    ) {
         return invalid(format!("{context} contains an XML-prohibited character"));
     }
     Ok(())
@@ -1295,9 +1312,11 @@ mod tests {
             panic!("LibreOffice fixture should begin with a legacy gradient");
         };
         assert_eq!(first.extension_stops.len(), 2);
-        assert!(!parse_drawing_gradients(&gradients.to_xml().unwrap())
-            .unwrap()
-            .gradients
-            .is_empty());
+        assert!(
+            !parse_drawing_gradients(&gradients.to_xml().unwrap())
+                .unwrap()
+                .gradients
+                .is_empty()
+        );
     }
 }

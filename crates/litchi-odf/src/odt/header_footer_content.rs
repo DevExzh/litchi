@@ -133,17 +133,12 @@ pub(super) fn parse_header_footer_blocks(
                             "nested style:master-page element".to_string(),
                         ));
                     }
-                    let name = namespaced_attr(
-                        &reader,
-                        &element,
-                        STYLE_NAMESPACE,
-                        b"name",
-                    )?
-                    .ok_or_else(|| {
-                        Error::InvalidFormat(
-                            "style:master-page is missing style:name".to_string(),
-                        )
-                    })?;
+                    let name = namespaced_attr(&reader, &element, STYLE_NAMESPACE, b"name")?
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "style:master-page is missing style:name".to_string(),
+                            )
+                        })?;
                     master = Some(Master {
                         name,
                         depth: element_depth,
@@ -153,19 +148,9 @@ pub(super) fn parse_header_footer_blocks(
                     && namespace == Some(STYLE_NAMESPACE)
                     && let Some(kind) = HeaderFooterKind::parse(element.local_name().as_ref())
                 {
-                    region = Some(Region::new(
-                        master_page.name.clone(),
-                        kind,
-                        element_depth,
-                    ));
+                    region = Some(Region::new(master_page.name.clone(), kind, element_depth));
                 } else if let Some(active) = region.as_mut() {
-                    active.start_element(
-                        &reader,
-                        namespace,
-                        &element,
-                        element_depth,
-                        false,
-                    )?;
+                    active.start_element(&reader, namespace, &element, element_depth, false)?;
                 }
                 depth = element_depth;
             },
@@ -179,27 +164,18 @@ pub(super) fn parse_header_footer_blocks(
                     && namespace == Some(STYLE_NAMESPACE)
                     && let Some(kind) = HeaderFooterKind::parse(element.local_name().as_ref())
                 {
-                    insert_region(
-                        &mut regions,
-                        master_page.name.clone(),
-                        kind,
-                        Vec::new(),
-                    )?;
+                    insert_region(&mut regions, master_page.name.clone(), kind, Vec::new())?;
                 } else if let Some(active) = region.as_mut() {
-                    active.start_element(
-                        &reader,
-                        namespace,
-                        &element,
-                        element_depth,
-                        true,
-                    )?;
+                    active.start_element(&reader, namespace, &element, element_depth, true)?;
                 }
             },
             Event::Text(value) => {
                 if let Some(active) = region.as_mut() {
-                    let decoded = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                        Error::InvalidFormat(format!("invalid header text: {error}"))
-                    })?;
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid header text: {error}"))
+                        })?;
                     active.push_text(&decoded)?;
                 }
             },
@@ -210,9 +186,11 @@ pub(super) fn parse_header_footer_blocks(
             },
             Event::CData(value) => {
                 if let Some(active) = region.as_mut() {
-                    let decoded = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                        Error::InvalidFormat(format!("invalid header CDATA: {error}"))
-                    })?;
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid header CDATA: {error}"))
+                        })?;
                     active.push_text(&decoded)?;
                 }
             },
@@ -230,12 +208,7 @@ pub(super) fn parse_header_footer_blocks(
                             "malformed header/footer region nesting".to_string(),
                         ));
                     }
-                    insert_region(
-                        &mut regions,
-                        active.master_name,
-                        active.kind,
-                        active.blocks,
-                    )?;
+                    insert_region(&mut regions, active.master_name, active.kind, active.blocks)?;
                 }
                 if master.as_ref().is_some_and(|active| active.depth == depth) {
                     master = None;
@@ -296,12 +269,7 @@ impl Region {
             self.block = Some(ActiveBlock {
                 depth,
                 block: HeaderFooterBlock {
-                    style_name: namespaced_attr(
-                        reader,
-                        element,
-                        TEXT_NAMESPACE,
-                        b"style-name",
-                    )?,
+                    style_name: namespaced_attr(reader, element, TEXT_NAMESPACE, b"style-name")?,
                     content: Vec::new(),
                 },
             });
@@ -329,9 +297,10 @@ impl Region {
                 b"tab" => self.push_token(HeaderFooterInline::Tab)?,
                 b"line-break" => self.push_token(HeaderFooterInline::LineBreak)?,
                 local if field_kind(local).is_some() || is_unknown_field(local) => {
-                    self.field_count = self.field_count.checked_add(1).ok_or_else(|| {
-                        limit_error("field")
-                    })?;
+                    self.field_count = self
+                        .field_count
+                        .checked_add(1)
+                        .ok_or_else(|| limit_error("field"))?;
                     if self.field_count > MAX_FIELDS {
                         return Err(limit_error("field"));
                     }
@@ -348,17 +317,20 @@ impl Region {
         Ok(())
     }
 
-    fn end_element(
-        &mut self,
-        namespace: Option<&[u8]>,
-        local: &[u8],
-        depth: usize,
-    ) -> Result<()> {
-        if self.field.as_ref().is_some_and(|field| field.depth == depth) {
+    fn end_element(&mut self, namespace: Option<&[u8]>, local: &[u8], depth: usize) -> Result<()> {
+        if self
+            .field
+            .as_ref()
+            .is_some_and(|field| field.depth == depth)
+        {
             let field = self.field.take().expect("checked header/footer field");
             self.push_token(HeaderFooterInline::Field(field.field))?;
         }
-        if self.block.as_ref().is_some_and(|block| block.depth == depth) {
+        if self
+            .block
+            .as_ref()
+            .is_some_and(|block| block.depth == depth)
+        {
             if namespace != Some(TEXT_NAMESPACE) || !matches!(local, b"p" | b"h") {
                 return Err(Error::InvalidFormat(
                     "malformed header/footer block nesting".to_string(),
@@ -375,9 +347,10 @@ impl Region {
     }
 
     fn finish_block(&mut self) -> Result<()> {
-        let block = self.block.take().ok_or_else(|| {
-            Error::InvalidFormat("missing header/footer block".to_string())
-        })?;
+        let block = self
+            .block
+            .take()
+            .ok_or_else(|| Error::InvalidFormat("missing header/footer block".to_string()))?;
         self.blocks.push(block.block);
         Ok(())
     }
@@ -526,8 +499,7 @@ fn field_kind(local: &[u8]) -> Option<HeaderFooterFieldKind> {
 fn is_unknown_field(local: &[u8]) -> bool {
     !matches!(
         local,
-        b"p"
-            | b"h"
+        b"p" | b"h"
             | b"span"
             | b"a"
             | b"s"
@@ -565,7 +537,10 @@ fn insert_region(
     kind: HeaderFooterKind,
     blocks: Vec<HeaderFooterBlock>,
 ) -> Result<()> {
-    if regions.insert((master_name.clone(), kind), blocks).is_some() {
+    if regions
+        .insert((master_name.clone(), kind), blocks)
+        .is_some()
+    {
         return Err(Error::InvalidFormat(format!(
             "duplicate {kind:?} in master page '{master_name}'"
         )));
@@ -598,10 +573,7 @@ fn namespaced_attr(
     Ok(None)
 }
 
-fn text_space_count(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<Option<usize>> {
+fn text_space_count(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<usize>> {
     let value = namespaced_attr(reader, element, TEXT_NAMESPACE, b"c")?;
     value
         .map(|value| {
@@ -684,7 +656,10 @@ mod tests {
         let blocks = &regions[&(String::from("A"), HeaderFooterKind::Header)];
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[0].style_name.as_deref(), Some("Header"));
-        assert_eq!(blocks[0].content[0], HeaderFooterInline::Text("Page ".into()));
+        assert_eq!(
+            blocks[0].content[0],
+            HeaderFooterInline::Text("Page ".into())
+        );
         let HeaderFooterInline::Field(page) = &blocks[0].content[1] else {
             panic!("expected page field");
         };
@@ -692,16 +667,25 @@ mod tests {
         assert_eq!(page.displayed_text, "7");
         assert_eq!(page.fixed, Some(false));
         assert_eq!(page.data_style_name.as_deref(), Some("N1"));
-        assert!(page.attributes.contains(&("text:page-adjust".into(), "2".into())));
+        assert!(
+            page.attributes
+                .contains(&("text:page-adjust".into(), "2".into()))
+        );
         assert_eq!(blocks[0].content[2], HeaderFooterInline::Space { count: 2 });
         assert_eq!(blocks[0].content[3], HeaderFooterInline::Tab);
         assert_eq!(blocks[0].content[4], HeaderFooterInline::LineBreak);
         let HeaderFooterInline::Field(unknown) = &blocks[0].content[5] else {
             panic!("expected unknown field");
         };
-        assert!(matches!(unknown.kind, HeaderFooterFieldKind::Unknown { .. }));
+        assert!(matches!(
+            unknown.kind,
+            HeaderFooterFieldKind::Unknown { .. }
+        ));
         assert_eq!(unknown.displayed_text, "Example");
-        assert_eq!(blocks[1].content, vec![HeaderFooterInline::Text("Heading".into())]);
+        assert_eq!(
+            blocks[1].content,
+            vec![HeaderFooterInline::Text("Heading".into())]
+        );
     }
 
     #[test]
@@ -716,7 +700,9 @@ mod tests {
             .content
             .iter()
             .filter_map(|inline| match inline {
-                HeaderFooterInline::Field(field) => Some((&field.kind, field.displayed_text.as_str())),
+                HeaderFooterInline::Field(field) => {
+                    Some((&field.kind, field.displayed_text.as_str()))
+                },
                 _ => None,
             })
             .collect();
@@ -733,15 +719,17 @@ mod tests {
 
     #[test]
     fn rejects_invalid_boolean_dtd_depth_and_cumulative_spaces() {
-        let wrap = |body: &str| format!(
-            r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:header><t:p>{body}</t:p></s:header></s:master-page></o:master-styles></o:document-styles>"#
-        );
+        let wrap = |body: &str| {
+            format!(
+                r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:header><t:p>{body}</t:p></s:header></s:master-page></o:master-styles></o:document-styles>"#
+            )
+        };
         assert!(parse_header_footer_blocks(&wrap("<t:date t:fixed=\"yes\"/>")).is_err());
         assert!(parse_header_footer_blocks(&format!("<!DOCTYPE x>{}", wrap("x"))).is_err());
-        assert!(parse_header_footer_blocks(&wrap(
-            "<t:s t:c=\"600000\"/><t:s t:c=\"600000\"/>"
-        ))
-        .is_err());
+        assert!(
+            parse_header_footer_blocks(&wrap("<t:s t:c=\"600000\"/><t:s t:c=\"600000\"/>"))
+                .is_err()
+        );
         let nested = format!("{}x{}", "<t:span>".repeat(129), "</t:span>".repeat(129));
         assert!(parse_header_footer_blocks(&wrap(&nested)).is_err());
     }

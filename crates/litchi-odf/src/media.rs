@@ -1,8 +1,8 @@
 //! Semantic image discovery shared by packaged and flat OpenDocument families.
 
+use crate::elements::xml::namespaced_attribute;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use crate::elements::xml::namespaced_attribute;
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -52,10 +52,7 @@ pub enum OdfImageSource {
         manifest_media_type: Option<String>,
     },
     /// A safe package path which is referenced but absent from the archive.
-    MissingPackagePart {
-        href: String,
-        resolved_path: String,
-    },
+    MissingPackagePart { href: String, resolved_path: String },
     /// An inert external, filesystem, fragment, query-bearing, or flat-document link.
     Linked { href: String },
     /// A malformed producer omitted both href and inline data.
@@ -274,9 +271,7 @@ fn scan_xml(
                         "svg:title and svg:desc must not contain elements".to_string(),
                     ));
                 }
-                if frames
-                    .last()
-                    .is_some_and(|frame| depth == frame.depth + 1)
+                if frames.last().is_some_and(|frame| depth == frame.depth + 1)
                     && let Some(kind) =
                         accessibility_kind(&namespace, element.local_name().as_ref())
                 {
@@ -319,7 +314,9 @@ fn scan_xml(
                     }
                     sheet_shapes.push(depth);
                 } else if element.local_name().as_ref() == b"frame"
-                    && sheet_shapes.last().is_some_and(|shape_depth| depth == *shape_depth + 1)
+                    && sheet_shapes
+                        .last()
+                        .is_some_and(|shape_depth| depth == *shape_depth + 1)
                     && !bound_to(&namespace, DRAW_NAMESPACE)
                 {
                     return Err(Error::InvalidFormat(
@@ -335,15 +332,17 @@ fn scan_xml(
                             &element,
                             &pages,
                             &sheets,
-                            sheet_shapes.last().is_some_and(|shape_depth| depth == *shape_depth + 1),
+                            sheet_shapes
+                                .last()
+                                .is_some_and(|shape_depth| depth == *shape_depth + 1),
                         )?,
                         image_count: 0,
                         image_indices: Vec::new(),
                     });
                 } else if element.local_name().as_ref() == b"image"
-                    && frames.last().is_some_and(|frame| {
-                        frame.frame.sheet_shape && depth == frame.depth + 1
-                    })
+                    && frames
+                        .last()
+                        .is_some_and(|frame| frame.frame.sheet_shape && depth == frame.depth + 1)
                     && !bound_to(&namespace, DRAW_NAMESPACE)
                 {
                     return Err(Error::InvalidFormat(
@@ -414,10 +413,7 @@ fn scan_xml(
                     && let Some(kind) =
                         accessibility_kind(&namespace, element.local_name().as_ref())
                 {
-                    set_empty_accessibility(
-                        frames.last_mut().expect("direct frame child"),
-                        kind,
-                    )?;
+                    set_empty_accessibility(frames.last_mut().expect("direct frame child"), kind)?;
                 } else if bound_to(&namespace, DRAW_NAMESPACE)
                     && element.local_name().as_ref() == b"image"
                 {
@@ -447,22 +443,38 @@ fn scan_xml(
                     image.inline_present = true;
                 }
             },
-            Event::Text(value) if active.as_ref().and_then(|image| image.inline_depth).is_some() => {
-                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid inline image text: {error}"))
-                })?;
+            Event::Text(value)
+                if active
+                    .as_ref()
+                    .and_then(|image| image.inline_depth)
+                    .is_some() =>
+            {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid inline image text: {error}"))
+                    })?;
                 append_inline(active.as_mut().expect("active inline image"), &value)?;
             },
-            Event::CData(value) if active.as_ref().and_then(|image| image.inline_depth).is_some() => {
-                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid inline image CDATA: {error}"))
-                })?;
+            Event::CData(value)
+                if active
+                    .as_ref()
+                    .and_then(|image| image.inline_depth)
+                    .is_some() =>
+            {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid inline image CDATA: {error}"))
+                    })?;
                 append_inline(active.as_mut().expect("active inline image"), &value)?;
             },
             Event::Text(value) if accessibility.is_some() => {
-                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid image accessibility text: {error}"))
-                })?;
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid image accessibility text: {error}"))
+                    })?;
                 append_accessibility(
                     accessibility.as_mut().expect("active accessibility text"),
                     &value,
@@ -470,16 +482,23 @@ fn scan_xml(
                 )?;
             },
             Event::CData(value) if accessibility.is_some() => {
-                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid image accessibility CDATA: {error}"))
-                })?;
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid image accessibility CDATA: {error}"))
+                    })?;
                 append_accessibility(
                     accessibility.as_mut().expect("active accessibility text"),
                     &value,
                     total_accessibility_bytes,
                 )?;
             },
-            Event::GeneralRef(_) if active.as_ref().and_then(|image| image.inline_depth).is_some() => {
+            Event::GeneralRef(_)
+                if active
+                    .as_ref()
+                    .and_then(|image| image.inline_depth)
+                    .is_some() =>
+            {
                 return Err(Error::InvalidFormat(
                     "XML references are not allowed in office:binary-data".to_string(),
                 ));
@@ -565,8 +584,7 @@ fn scan_xml(
             },
             Event::PI(_) => {
                 return Err(Error::InvalidFormat(
-                    "processing instructions are not allowed while scanning ODF images"
-                        .to_string(),
+                    "processing instructions are not allowed while scanning ODF images".to_string(),
                 ));
             },
             Event::Eof => break,
@@ -726,11 +744,9 @@ fn append_accessibility(
     value: &str,
     total_accessibility_bytes: &mut usize,
 ) -> Result<()> {
-    let field_len = active
-        .value
-        .len()
-        .checked_add(value.len())
-        .ok_or_else(|| Error::InvalidFormat("image accessibility text size overflow".to_string()))?;
+    let field_len = active.value.len().checked_add(value.len()).ok_or_else(|| {
+        Error::InvalidFormat("image accessibility text size overflow".to_string())
+    })?;
     if field_len > MAX_ACCESSIBILITY_TEXT_BYTES {
         return Err(Error::InvalidFormat(format!(
             "image accessibility text exceeds {MAX_ACCESSIBILITY_TEXT_BYTES} bytes"
@@ -752,7 +768,9 @@ fn append_accessibility(
 
 fn resolve_accessibility_reference(value: &quick_xml::events::BytesRef<'_>) -> Result<String> {
     if let Some(character) = value.resolve_char_ref().map_err(|error| {
-        Error::InvalidFormat(format!("invalid image accessibility character reference: {error}"))
+        Error::InvalidFormat(format!(
+            "invalid image accessibility character reference: {error}"
+        ))
     })? {
         return Ok(character.to_string());
     }
@@ -814,9 +832,9 @@ fn finish_image(
                 "inline image exceeds {MAX_INLINE_IMAGE_BYTES} decoded bytes"
             )));
         }
-        *total_inline_bytes = total_inline_bytes.checked_add(bytes.len()).ok_or_else(|| {
-            Error::InvalidFormat("total inline image size overflow".to_string())
-        })?;
+        *total_inline_bytes = total_inline_bytes
+            .checked_add(bytes.len())
+            .ok_or_else(|| Error::InvalidFormat("total inline image size overflow".to_string()))?;
         if *total_inline_bytes > MAX_TOTAL_INLINE_IMAGE_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "total inline image data exceeds {MAX_TOTAL_INLINE_IMAGE_BYTES} bytes"

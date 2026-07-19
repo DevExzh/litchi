@@ -17,8 +17,14 @@ use quick_xml::{
 
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const TABLE_EXT_NAMESPACE: &[u8] =
+    b"urn:org:documentfoundation:names:experimental:office:xmlns:table:1.0";
+const CALC_EXT_NAMESPACE: &[u8] =
+    b"urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0";
 const MAX_DATA_PILOT_TABLES: usize = 65_536;
 const MAX_DATA_PILOT_FIELDS: usize = 65_536;
+const MAX_DATA_PILOT_ITEMS: usize = 1_000_000;
+const MAX_DATA_PILOT_STRING: usize = 1024 * 1024;
 
 trait HasLocalName {
     fn local(&self) -> &[u8];
@@ -39,7 +45,7 @@ impl HasLocalName for BytesEnd<'_> {
 macro_rules! string_enum {
     ($(#[$meta:meta])* $vis:vis enum $name:ident { $($(#[$variant_meta:meta])* $variant:ident => $value:literal),+ $(,)? }) => {
         $(#[$meta])*
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
         $vis enum $name { $($(#[$variant_meta])* $variant),+ }
 
         impl $name {
@@ -50,7 +56,7 @@ macro_rules! string_enum {
                 }
             }
 
-            const fn as_str(self) -> &'static str {
+            pub(crate) const fn as_str(self) -> &'static str {
                 match self { $(Self::$variant => $value,)+ }
             }
         }
@@ -62,6 +68,21 @@ string_enum! {
     pub enum DataPilotGrandTotal {
         None => "none", Row => "row", Column => "column", Both => "both"
     }
+}
+
+string_enum! {
+    /// Orientation of a LibreOffice named grand-total extension element.
+    pub enum DataPilotGrandTotalOrientation {
+        Row => "row", Column => "column", Both => "both"
+    }
+}
+
+/// LibreOffice's inert named grand-total extension metadata.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DataPilotGrandTotalElement {
+    pub orientation: DataPilotGrandTotalOrientation,
+    pub display: bool,
+    pub display_name: Option<String>,
 }
 
 string_enum! {
@@ -159,6 +180,8 @@ pub enum DataPilotSource {
     },
     /// A spreadsheet range and optional filter.
     CellRange {
+        /// Optional ODF 1.3 named-range source identifier.
+        name: Option<String>,
         cell_range_address: String,
         filter: Option<DatabaseFilter>,
     },
@@ -218,6 +241,8 @@ pub struct DataPilotLayoutInfo {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DataPilotLevel {
     pub show_empty: Option<bool>,
+    /// LibreOffice `calcext:repeat-item-labels`; retained but never evaluated.
+    pub repeat_item_labels: Option<bool>,
     /// Standard or implementation-defined aggregation names.
     pub subtotals: Vec<String>,
     pub members: Vec<DataPilotMember>,
@@ -295,9 +320,9 @@ impl DataPilotField {
             ));
         }
         if let Some(groups) = &self.groups {
-            if !groups.step.is_finite() {
+            if !groups.step.is_finite() || groups.step <= 0.0 {
                 return Err(Error::InvalidFormat(
-                    "data-pilot grouping step must be finite".to_string(),
+                    "data-pilot grouping step must be finite and greater than zero".to_string(),
                 ));
             }
             for boundary in [&groups.start, &groups.end] {
@@ -331,6 +356,8 @@ pub struct DataPilotTable {
     pub buttons: Option<String>,
     pub show_filter_button: Option<bool>,
     pub drill_down_on_double_click: Option<bool>,
+    /// LibreOffice named grand-total extension elements in schema position.
+    pub grand_totals: Vec<DataPilotGrandTotalElement>,
     pub source: Option<DataPilotSource>,
     pub fields: Vec<DataPilotField>,
 }
@@ -348,16 +375,34 @@ impl DataPilotTable {
             buttons: None,
             show_filter_button: None,
             drill_down_on_double_click: None,
+            grand_totals: Vec::new(),
             source: None,
             fields: Vec::new(),
         }
     }
 
     pub fn validate(&self) -> Result<()> {
+        validate_string("data-pilot table name", &self.name, false)?;
         if self.target_range_address.is_empty() {
             return Err(Error::InvalidFormat(
                 "data-pilot target range address cannot be empty".to_string(),
             ));
+        }
+        parse_data_pilot_range(&self.target_range_address)?;
+        for value in [self.application_data.as_deref(), self.buttons.as_deref()]
+            .into_iter()
+            .flatten()
+        {
+            validate_string("data-pilot attribute", value, true)?;
+        }
+        let mut grand_orientations = std::collections::HashSet::new();
+        for total in &self.grand_totals {
+            if !grand_orientations.insert(total.orientation) {
+                return Err(invalid_message("duplicate data-pilot grand-total orientation"));
+            }
+            if let Some(name) = &total.display_name {
+                validate_string("data-pilot grand-total display name", name, true)?;
+            }
         }
         if self.fields.is_empty() {
             return Err(Error::InvalidFormat(
@@ -369,30 +414,223 @@ impl DataPilotTable {
                 "data-pilot field count exceeds the {MAX_DATA_PILOT_FIELDS} field safety limit"
             )));
         }
-        if let Some(DataPilotSource::CellRange {
-            cell_range_address,
-            filter: Some(filter),
-        }) = &self.source
-        {
-            if cell_range_address.is_empty() {
-                return Err(Error::InvalidFormat(
-                    "data-pilot source cell range address cannot be empty".to_string(),
-                ));
+        if let Some(DataPilotSource::CellRange { name, cell_range_address, filter }) = &self.source {
+            if let Some(name) = name {
+                validate_string("data-pilot named source", name, false)?;
             }
-            validate_filter(filter)?;
+            validate_string("data-pilot source cell range address", cell_range_address, false)?;
+            parse_data_pilot_range(cell_range_address)?;
+            if let Some(filter) = filter {
+                validate_filter(filter)?;
+            }
         }
-        if let Some(DataPilotSource::CellRange {
-            cell_range_address,
-            filter: None,
-        }) = &self.source
-            && cell_range_address.is_empty()
-        {
-            return Err(Error::InvalidFormat(
-                "data-pilot source cell range address cannot be empty".to_string(),
-            ));
+        if let Some(DataPilotSource::Service { name, source_name, object_name, user_name, password }) = &self.source {
+            for value in [name.as_str(), source_name.as_str(), object_name.as_str()] {
+                validate_string("data-pilot service source", value, false)?;
+            }
+            for value in [user_name.as_deref(), password.as_deref()].into_iter().flatten() {
+                validate_string("data-pilot service source", value, true)?;
+            }
         }
-        self.fields.iter().try_for_each(DataPilotField::validate)
+        if let Some(DataPilotSource::Database(source)) = &self.source {
+            match source {
+                DatabaseSource::Sql { database_name, statement, .. } => {
+                    validate_string("data-pilot database name", database_name, false)?;
+                    validate_string("data-pilot SQL statement", statement, false)?;
+                },
+                DatabaseSource::Table { database_name, table_name } => {
+                    validate_string("data-pilot database name", database_name, false)?;
+                    validate_string("data-pilot database table", table_name, false)?;
+                },
+                DatabaseSource::Query { database_name, query_name } => {
+                    validate_string("data-pilot database name", database_name, false)?;
+                    validate_string("data-pilot database query", query_name, false)?;
+                },
+            }
+        }
+        self.fields.iter().try_for_each(DataPilotField::validate)?;
+        let field_names: std::collections::HashSet<&str> =
+            self.fields.iter().map(|field| field.source_field_name.as_str()).collect();
+        let mut item_count = self.fields.len();
+        for field in &self.fields {
+            validate_string("data-pilot source field name", &field.source_field_name, true)?;
+            if let Some(reference) = &field.reference
+                && !field_names.contains(reference.field_name.as_str())
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "data-pilot field reference '{}' does not name a field",
+                    reference.field_name
+                )));
+            }
+            if let Some(groups) = &field.groups {
+                if !field_names.contains(groups.source_field_name.as_str()) {
+                    return Err(Error::InvalidFormat(format!(
+                        "data-pilot grouping source '{}' does not name a field",
+                        groups.source_field_name
+                    )));
+                }
+                let mut names = std::collections::HashSet::new();
+                for group in &groups.groups {
+                    validate_string("data-pilot group name", &group.name, false)?;
+                    if !names.insert(group.name.as_str()) {
+                        return Err(Error::InvalidFormat(format!("duplicate data-pilot group '{}'", group.name)));
+                    }
+                    let mut members = std::collections::HashSet::new();
+                    for member in &group.members {
+                        validate_string("data-pilot group member", member, false)?;
+                        if !members.insert(member.as_str()) {
+                            return Err(Error::InvalidFormat(format!("duplicate member '{member}' in data-pilot group '{}'", group.name)));
+                        }
+                    }
+                    item_count = item_count.checked_add(group.members.len() + 1)
+                        .ok_or_else(|| invalid_message("data-pilot item count overflow"))?;
+                }
+            }
+            if let Some(level) = &field.level {
+                let mut members = std::collections::HashSet::new();
+                for member in &level.members {
+                    validate_string("data-pilot member", &member.name, false)?;
+                    if !members.insert(member.name.as_str()) {
+                        return Err(Error::InvalidFormat(format!("duplicate data-pilot member '{}'", member.name)));
+                    }
+                }
+                item_count = item_count.checked_add(level.members.len() + level.subtotals.len())
+                    .ok_or_else(|| invalid_message("data-pilot item count overflow"))?;
+            }
+        }
+        if item_count > MAX_DATA_PILOT_ITEMS {
+            return Err(invalid_message("data-pilot declaration exceeds item limit"));
+        }
+        Ok(())
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ParsedDataPilotRange {
+    pub sheet: String,
+    pub start_column: usize,
+    pub start_row: usize,
+    pub end_column: usize,
+    pub end_row: usize,
+}
+
+pub(crate) fn parse_data_pilot_range(value: &str) -> Result<ParsedDataPilotRange> {
+    validate_string("data-pilot cell range", value, false)?;
+    let mut quoted = false;
+    let mut separator = None;
+    let mut characters = value.char_indices().peekable();
+    while let Some((index, character)) = characters.next() {
+        if character == '\'' {
+            if quoted && characters.peek().is_some_and(|(_, next)| *next == '\'') {
+                characters.next();
+                continue;
+            }
+            quoted = !quoted;
+        } else if character == ':' && !quoted {
+            if separator.replace(index).is_some() { return Err(invalid_message("invalid data-pilot cell range")); }
+        }
+    }
+    if quoted { return Err(invalid_message("unterminated quoted sheet name in data-pilot range")); }
+    let (first, second) = separator.map_or((value, None), |at| (&value[..at], Some(&value[at + 1..])));
+    let (sheet, start_column, start_row) = parse_range_endpoint(first, None)?;
+    let (end_sheet, end_column, end_row) = if let Some(second) = second {
+        parse_range_endpoint(second, Some(&sheet))?
+    } else {
+        (sheet.clone(), start_column, start_row)
+    };
+    if end_sheet != sheet || end_column < start_column || end_row < start_row {
+        return Err(invalid_message("data-pilot cell range is reversed or crosses sheets"));
+    }
+    Ok(ParsedDataPilotRange { sheet, start_column, start_row, end_column, end_row })
+}
+
+fn parse_range_endpoint(value: &str, inherited_sheet: Option<&str>) -> Result<(String, usize, usize)> {
+    let value = value.trim();
+    let mut quoted = false;
+    let mut dot = None;
+    let mut characters = value.char_indices().peekable();
+    while let Some((index, character)) = characters.next() {
+        if character == '\'' {
+            if quoted && characters.peek().is_some_and(|(_, next)| *next == '\'') {
+                characters.next();
+                continue;
+            }
+            quoted = !quoted;
+        } else if character == '.' && !quoted { dot = Some(index); }
+    }
+    let (sheet, coordinate) = dot.map_or((None, value), |at| (Some(&value[..at]), &value[at + 1..]));
+    let sheet = match sheet {
+        Some("") => inherited_sheet.unwrap_or_default().to_string(),
+        Some(value) => normalize_sheet_name(value)?,
+        None => inherited_sheet.unwrap_or_default().to_string(),
+    };
+    let coordinate = coordinate.replace('$', "");
+    let split = coordinate.find(|character: char| character.is_ascii_digit())
+        .ok_or_else(|| invalid_message("data-pilot cell address lacks a row"))?;
+    let (column, row) = coordinate.split_at(split);
+    if column.is_empty() || !column.chars().all(|ch| ch.is_ascii_uppercase())
+        || row.is_empty() || !row.chars().all(|ch| ch.is_ascii_digit())
+    {
+        return Err(invalid_message("invalid data-pilot cell address"));
+    }
+    let mut column_index = 0usize;
+    for ch in column.bytes() {
+        column_index = column_index.checked_mul(26)
+            .and_then(|value| value.checked_add(usize::from(ch - b'A') + 1))
+            .ok_or_else(|| invalid_message("data-pilot column index overflow"))?;
+    }
+    let row_number = row.parse::<usize>().map_err(|_| invalid_message("invalid data-pilot row"))?;
+    if row_number == 0 { return Err(invalid_message("data-pilot rows are one-based")); }
+    Ok((sheet, column_index - 1, row_number - 1))
+}
+
+fn normalize_sheet_name(value: &str) -> Result<String> {
+    let value = value.trim().trim_start_matches('$');
+    if value.starts_with('\'') {
+        if !value.ends_with('\'') || value.len() < 2 { return Err(invalid_message("invalid quoted sheet name")); }
+        Ok(value[1..value.len() - 1].replace("''", "'"))
+    } else {
+        if value.contains('\'') { return Err(invalid_message("invalid sheet name")); }
+        Ok(value.to_string())
+    }
+}
+
+pub(crate) fn validate_data_pilot_tables(tables: &[DataPilotTable]) -> Result<()> {
+    if tables.len() > MAX_DATA_PILOT_TABLES { return Err(invalid_message("data-pilot table count exceeds safety limit")); }
+    let mut names = std::collections::HashSet::new();
+    let mut targets = Vec::with_capacity(tables.len());
+    for table in tables {
+        table.validate()?;
+        if !names.insert(table.name.as_str()) {
+            return Err(Error::InvalidFormat(format!("duplicate data-pilot table name '{}'", table.name)));
+        }
+        let range = parse_data_pilot_range(&table.target_range_address)?;
+        for (other_name, other) in &targets {
+            if ranges_overlap(&range, other) {
+                return Err(Error::InvalidFormat(format!(
+                    "data-pilot target ranges for '{other_name}' and '{}' overlap",
+                    table.name
+                )));
+            }
+        }
+        targets.push((table.name.as_str(), range));
+    }
+    Ok(())
+}
+
+fn ranges_overlap(left: &ParsedDataPilotRange, right: &ParsedDataPilotRange) -> bool {
+    left.sheet == right.sheet
+        && left.start_column <= right.end_column && right.start_column <= left.end_column
+        && left.start_row <= right.end_row && right.start_row <= left.end_row
+}
+
+fn validate_string(label: &str, value: &str, allow_empty: bool) -> Result<()> {
+    if !allow_empty && value.is_empty() { return Err(Error::InvalidFormat(format!("{label} cannot be empty"))); }
+    if value.len() > MAX_DATA_PILOT_STRING { return Err(Error::InvalidFormat(format!("{label} exceeds size limit"))); }
+    if value.chars().any(|ch| matches!(ch as u32, 0..=8 | 11 | 12 | 14..=31 | 0xFFFE | 0xFFFF)) {
+        return Err(Error::InvalidFormat(format!("{label} contains an XML-prohibited character")));
+    }
+    Ok(())
 }
 
 pub(crate) fn parse_data_pilot_tables(xml: &str) -> Result<Vec<DataPilotTable>> {
@@ -470,6 +708,7 @@ pub(crate) fn parse_data_pilot_tables(xml: &str) -> Result<Vec<DataPilotTable>> 
         }
         buf.clear();
     }
+    validate_data_pilot_tables(&tables)?;
     Ok(tables)
 }
 
@@ -486,6 +725,7 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
         buttons: optional_attr(reader, start, b"buttons")?,
         show_filter_button: optional_bool(reader, start, b"show-filter-button")?,
         drill_down_on_double_click: optional_bool(reader, start, b"drill-down-on-double-click")?,
+        grand_totals: Vec::new(),
         source: None,
         fields: Vec::new(),
     };
@@ -496,6 +736,15 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
             .read_resolved_event_into(&mut buf)
             .map_err(xml_error)?;
         match event {
+            Event::Start(ref element) if is_table_ext(&namespace, element, b"data-pilot-grand-total") => {
+                if fields_started || table.source.is_some() { return Err(invalid_message("data-pilot grand totals must precede the source and fields")); }
+                table.grand_totals.push(parse_grand_total(reader, element)?);
+                consume_empty_extension(reader, b"data-pilot-grand-total")?;
+            },
+            Event::Empty(ref element) if is_table_ext(&namespace, element, b"data-pilot-grand-total") => {
+                if fields_started || table.source.is_some() { return Err(invalid_message("data-pilot grand totals must precede the source and fields")); }
+                table.grand_totals.push(parse_grand_total(reader, element)?);
+            },
             Event::Start(ref element) | Event::Empty(ref element)
                 if is_table(&namespace, element, b"database-source-sql") =>
             {
@@ -559,6 +808,7 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
                     return Err(invalid_message("data-pilot source must precede all fields"));
                 }
                 let source = DataPilotSource::CellRange {
+                    name: optional_attr(reader, element, b"name")?,
                     cell_range_address: required_attr(reader, element, b"cell-range-address")?,
                     filter: None,
                 };
@@ -585,6 +835,10 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
             },
             Event::Eof => return Err(invalid_message("unterminated table:data-pilot-table")),
             Event::Comment(_) => {},
+            Event::Start(ref element) if !is_table_namespace(&namespace) => {
+                skip_foreign_element(reader, element)?;
+            },
+            Event::Empty(ref element) if !is_table_namespace(&namespace) => {},
             other => {
                 return Err(invalid_message(&format!(
                     "invalid child in table:data-pilot-table: {other:?}"
@@ -601,6 +855,7 @@ fn parse_cell_range_source(
     start: &BytesStart<'_>,
 ) -> Result<DataPilotSource> {
     let address = required_attr(reader, start, b"cell-range-address")?;
+    let name = optional_attr(reader, start, b"name")?;
     let mut filter = None;
     let mut buf = Vec::new();
     loop {
@@ -623,6 +878,7 @@ fn parse_cell_range_source(
         buf.clear();
     }
     Ok(DataPilotSource::CellRange {
+        name,
         cell_range_address: address,
         filter,
     })
@@ -698,6 +954,7 @@ fn parse_field(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
 fn level_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DataPilotLevel> {
     Ok(DataPilotLevel {
         show_empty: optional_bool(reader, start, b"show-empty")?,
+        repeat_item_labels: optional_ns_bool(reader, start, CALC_EXT_NAMESPACE, b"repeat-item-labels")?,
         ..Default::default()
     })
 }
@@ -764,6 +1021,8 @@ fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
                     || is_table(&namespace, element, b"data-pilot-layout-info") => {},
             Event::Text(ref text) if text_is_whitespace(text)? => {},
             Event::Comment(_) => {},
+            Event::Start(ref element) if !is_table_namespace(&namespace) => skip_foreign_element(reader, element)?,
+            Event::Empty(ref element) if !is_table_namespace(&namespace) => {},
             Event::Eof => return Err(invalid_message("unterminated table:data-pilot-level")),
             _ => return Err(invalid_message("invalid child in table:data-pilot-level")),
         }
@@ -975,9 +1234,15 @@ pub(crate) fn write_data_pilot_tables(
     Ok(())
 }
 
+pub(crate) fn write_data_pilot_table_fragment(table: &DataPilotTable) -> Result<String> {
+    let mut output = String::new();
+    write_table(&mut output, table)?;
+    Ok(output)
+}
+
 fn write_table(out: &mut String, table: &DataPilotTable) -> Result<()> {
     table.validate()?;
-    out.push_str("<table:data-pilot-table");
+    out.push_str("<table:data-pilot-table xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"");
     attr(out, "table:name", Some(&table.name));
     attr(
         out,
@@ -1004,6 +1269,13 @@ fn write_table(out: &mut String, table: &DataPilotTable) -> Result<()> {
         table.drill_down_on_double_click,
     );
     out.push('>');
+    for total in &table.grand_totals {
+        out.push_str("<table-ext:data-pilot-grand-total xmlns:table-ext=\"urn:org:documentfoundation:names:experimental:office:xmlns:table:1.0\"");
+        bool_attr(out, "table:display", Some(total.display));
+        attr(out, "table:orientation", Some(total.orientation.as_str()));
+        attr(out, "table-ext:display-name", total.display_name.as_deref());
+        out.push_str("/>");
+    }
     if let Some(source) = &table.source {
         write_source(out, source);
     }
@@ -1033,10 +1305,12 @@ fn write_source(out: &mut String, source: &DataPilotSource) {
             out.push_str("/>");
         },
         DataPilotSource::CellRange {
+            name,
             cell_range_address,
             filter,
         } => {
             out.push_str("<table:source-cell-range");
+            attr(out, "table:name", name.as_deref());
             attr(out, "table:cell-range-address", Some(cell_range_address));
             if let Some(filter) = filter {
                 out.push('>');
@@ -1096,6 +1370,10 @@ fn write_field(out: &mut String, field: &DataPilotField) -> Result<()> {
 fn write_level(out: &mut String, level: &DataPilotLevel) {
     out.push_str("<table:data-pilot-level");
     bool_attr(out, "table:show-empty", level.show_empty);
+    if level.repeat_item_labels.is_some() {
+        out.push_str(" xmlns:calcext=\"urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0\"");
+        bool_attr(out, "calcext:repeat-item-labels", level.repeat_item_labels);
+    }
     if level.subtotals.is_empty()
         && level.members.is_empty()
         && level.display.is_none()
@@ -1201,6 +1479,55 @@ fn is_office(namespace: &ResolveResult<'_>, element: &impl HasLocalName, local: 
     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE)
         && element.local() == local
 }
+fn is_table_ext(namespace: &ResolveResult<'_>, element: &impl HasLocalName, local: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == TABLE_EXT_NAMESPACE)
+        && element.local() == local
+}
+fn is_table_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == TABLE_NAMESPACE)
+}
+
+fn parse_grand_total(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<DataPilotGrandTotalElement> {
+    Ok(DataPilotGrandTotalElement {
+        orientation: DataPilotGrandTotalOrientation::parse(&required_attr(reader, element, b"orientation")?)?,
+        display: required_bool(reader, element, b"display")?,
+        display_name: optional_ns_attr(reader, element, TABLE_EXT_NAMESPACE, b"display-name")?,
+    })
+}
+
+fn consume_empty_extension(reader: &mut NsReader<&[u8]>, local: &[u8]) -> Result<()> {
+    let mut buffer = Vec::new();
+    loop {
+        let (namespace, event) = reader.read_resolved_event_into(&mut buffer).map_err(xml_error)?;
+        match event {
+            Event::End(ref element) if is_table_ext(&namespace, element, local) => return Ok(()),
+            Event::Text(ref text) if text_is_whitespace(text)? => {},
+            Event::Comment(_) => {},
+            Event::Eof => return Err(invalid_message("unterminated data-pilot extension element")),
+            _ => return Err(invalid_message("data-pilot grand-total extension must be empty")),
+        }
+        buffer.clear();
+    }
+}
+
+fn skip_foreign_element(reader: &mut NsReader<&[u8]>, _start: &BytesStart<'_>) -> Result<()> {
+    let mut depth = 1usize;
+    let mut buffer = Vec::new();
+    while depth > 0 {
+        match reader.read_event_into(&mut buffer).map_err(xml_error)? {
+            Event::Start(_) => {
+                depth = depth.checked_add(1).ok_or_else(|| invalid_message("data-pilot extension depth overflow"))?;
+                if depth > 128 { return Err(invalid_message("data-pilot extension nesting exceeds limit")); }
+            },
+            Event::End(_) => depth -= 1,
+            Event::DocType(_) => return Err(invalid_message("DOCTYPE is not allowed in data-pilot extensions")),
+            Event::Eof => return Err(invalid_message("unterminated data-pilot extension")),
+            _ => {},
+        }
+        buffer.clear();
+    }
+    Ok(())
+}
 
 fn optional_attr(
     reader: &NsReader<&[u8]>,
@@ -1225,6 +1552,31 @@ fn optional_attr(
         }
     }
     Ok(found)
+}
+fn optional_ns_attr(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    wanted_namespace: &[u8],
+    local: &[u8],
+) -> Result<Option<String>> {
+    let mut found = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| invalid_message(&format!("invalid XML attribute: {error}")))?;
+        let (namespace, name) = reader.resolver().resolve_attribute(attribute.key);
+        if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == wanted_namespace)
+            && name.as_ref() == local
+        {
+            let value = attribute.decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                .map_err(|error| invalid_message(&format!("invalid XML attribute value: {error}")))?.into_owned();
+            if found.replace(value).is_some() { return Err(invalid_message("duplicate extension attribute")); }
+        }
+    }
+    Ok(found)
+}
+fn optional_ns_bool(
+    reader: &NsReader<&[u8]>, element: &BytesStart<'_>, namespace: &[u8], local: &[u8],
+) -> Result<Option<bool>> {
+    optional_ns_attr(reader, element, namespace, local)?.map(|value| parse_bool(&value)).transpose()
 }
 fn required_attr(
     reader: &NsReader<&[u8]>,

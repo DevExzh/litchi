@@ -8,7 +8,14 @@
 use litchi_core::{Error, Result, xml::escape_xml};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::collections::HashSet;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use zeroize::Zeroizing;
 
+use super::encryption::{OdfEncryptionProfile, encrypt_entry};
+use super::manifest::{
+    ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm,
+    ManifestKeyDerivation, ManifestStartKeyGeneration,
+};
 use super::package::OwnedPackage;
 
 /// Builder for creating ODF packages (ZIP archives)
@@ -39,6 +46,14 @@ pub struct PackageWriter {
     manifest_entries: Vec<ManifestEntry>,
     wrote_any_entry: bool,
     wrote_mimetype: bool,
+    wrote_payload_entry: bool,
+    encryption: Option<WriterEncryption>,
+    document_signer: Option<crate::OdfDocumentSigner>,
+}
+
+struct WriterEncryption {
+    profile: OdfEncryptionProfile,
+    password: Zeroizing<String>,
 }
 
 /// Entry in the ODF manifest
@@ -46,6 +61,8 @@ pub struct PackageWriter {
 struct ManifestEntry {
     full_path: String,
     media_type: String,
+    size: Option<u64>,
+    encryption: Option<ManifestEncryption>,
 }
 
 impl PackageWriter {
@@ -57,7 +74,63 @@ impl PackageWriter {
             manifest_entries: Vec::new(),
             wrote_any_entry: false,
             wrote_mimetype: false,
+            wrote_payload_entry: false,
+            encryption: None,
+            document_signer: None,
         }
+    }
+
+    /// Configure a document signature generated after every other package entry is final.
+    pub fn set_document_signer(&mut self, signer: crate::OdfDocumentSigner) -> Result<()> {
+        if self.wrote_payload_entry {
+            return Err(Error::InvalidFormat(
+                "ODF signing must be configured before payload entries".to_string(),
+            ));
+        }
+        self.document_signer = Some(signer);
+        Ok(())
+    }
+
+    /// Clear document signing before any payload entry is written.
+    pub fn clear_document_signer(&mut self) -> Result<()> {
+        if self.wrote_payload_entry {
+            return Err(Error::InvalidFormat(
+                "ODF signing cannot be changed after payload entries".to_string(),
+            ));
+        }
+        self.document_signer = None;
+        Ok(())
+    }
+
+    /// Configure encryption for subsequently written payload entries.
+    ///
+    /// This may be called after `mimetype`, but not after any payload entry was emitted.
+    pub fn set_encryption(
+        &mut self,
+        password: impl Into<String>,
+        profile: OdfEncryptionProfile,
+    ) -> Result<()> {
+        if self.wrote_payload_entry {
+            return Err(Error::InvalidFormat(
+                "ODF encryption must be configured before payload entries".to_string(),
+            ));
+        }
+        // Profiles can only be constructed after validation; evaluate the password before
+        // mutating state so a late call remains atomic.
+        let password = Zeroizing::new(password.into());
+        self.encryption = Some(WriterEncryption { profile, password });
+        Ok(())
+    }
+
+    /// Clear encryption before any payload entry is written.
+    pub fn clear_encryption(&mut self) -> Result<()> {
+        if self.wrote_payload_entry {
+            return Err(Error::InvalidFormat(
+                "ODF encryption cannot be changed after payload entries".to_string(),
+            ));
+        }
+        self.encryption = None;
+        Ok(())
     }
 
     /// Set the MIME type for the document
@@ -88,6 +161,8 @@ impl PackageWriter {
         self.manifest_entries.push(ManifestEntry {
             full_path: "/".to_string(),
             media_type: mimetype.to_string(),
+            size: None,
+            encryption: None,
         });
 
         Ok(())
@@ -116,19 +191,7 @@ impl PackageWriter {
         // Determine media type based on file extension
         let media_type = Self::guess_media_type(path);
 
-        // Add to manifest
-        self.manifest_entries.push(ManifestEntry {
-            full_path: path.to_string(),
-            media_type: media_type.to_string(),
-        });
-
-        self.zip_writer
-            .write_deflated(path, content)
-            .map_err(|e| Error::ZipError(e.to_string()))?;
-
-        self.wrote_any_entry = true;
-
-        Ok(())
+        self.write_file(path, content, media_type)
     }
 
     /// Add a file to the package with a specific media type
@@ -154,18 +217,37 @@ impl PackageWriter {
             return Err(Error::InvalidFormat("MIME type not set".to_string()));
         }
 
-        // Add to manifest
+        self.write_file(path, content, media_type)
+    }
+
+    fn write_file(&mut self, path: &str, content: &[u8], media_type: &str) -> Result<()> {
+        let encrypt = self
+            .encryption
+            .as_ref()
+            .filter(|_| !path.starts_with("META-INF/"));
+        let (size, encryption) = if let Some(settings) = encrypt {
+            let (ciphertext, descriptor) =
+                encrypt_entry(content, settings.password.as_str(), settings.profile)?;
+            self.zip_writer
+                .write_stored(path, &ciphertext)
+                .map_err(|e| Error::ZipError(e.to_string()))?;
+            (Some(content.len() as u64), Some(descriptor))
+        } else {
+            self.zip_writer
+                .write_deflated(path, content)
+                .map_err(|e| Error::ZipError(e.to_string()))?;
+            (None, None)
+        };
         self.manifest_entries.push(ManifestEntry {
             full_path: path.to_string(),
             media_type: media_type.to_string(),
+            size,
+            encryption,
         });
-
-        self.zip_writer
-            .write_deflated(path, content)
-            .map_err(|e| Error::ZipError(e.to_string()))?;
-
         self.wrote_any_entry = true;
-
+        if !path.starts_with("META-INF/") {
+            self.wrote_payload_entry = true;
+        }
         Ok(())
     }
 
@@ -185,6 +267,8 @@ impl PackageWriter {
         self.manifest_entries.push(ManifestEntry {
             full_path: path.to_string(),
             media_type: media_type.to_string(),
+            size: None,
+            encryption: None,
         });
         Ok(())
     }
@@ -197,10 +281,20 @@ impl PackageWriter {
     /// faithfully with the current manifest writer and are rejected.
     pub(crate) fn copy_auxiliary_files_from(&mut self, source: &OwnedPackage) -> Result<()> {
         let package = source.package()?;
-        if package.manifest().has_encrypted_entries() {
+        if package.manifest().has_encrypted_entries() && self.encryption.is_none() {
             return Err(Error::InvalidFormat(
-                "Cannot safely rewrite an ODF package containing encrypted entries".to_string(),
+                "Rewriting encrypted ODF entries requires writer encryption".to_string(),
             ));
+        }
+
+        let mut files = Vec::new();
+        for path in package.files()? {
+            if path.ends_with('/') || is_regenerated_package_part(&path) {
+                continue;
+            }
+            let bytes = package.get_file(&path)?;
+            let media_type = package.manifest().get_media_type(&path).map(str::to_string);
+            files.push((path, bytes, media_type));
         }
 
         for entry in package.manifest().entries.values() {
@@ -209,19 +303,76 @@ impl PackageWriter {
             }
         }
 
-        for path in package.files()? {
-            if path.ends_with('/') || is_regenerated_package_part(&path) {
-                continue;
-            }
-
-            let bytes = package.get_file(&path)?;
-            if let Some(media_type) = package.manifest().get_media_type(&path) {
-                self.add_file_with_media_type(&path, &bytes, media_type)?;
+        for (path, bytes, media_type) in files {
+            if let Some(media_type) = media_type {
+                self.add_file_with_media_type(&path, &bytes, &media_type)?;
             } else {
                 self.add_file(&path, &bytes)?;
             }
         }
 
+        Ok(())
+    }
+
+    /// Add a directory entry to the generated manifest without a ZIP payload.
+    pub(crate) fn add_manifest_directory(
+        &mut self,
+        path: &str,
+        media_type: &str,
+    ) -> Result<()> {
+        if !path.ends_with('/') || path.starts_with('/') || path.contains("..") {
+            return Err(Error::InvalidFormat(
+                "invalid embedded-object manifest directory".to_string(),
+            ));
+        }
+        self.add_manifest_entry(path, media_type)
+    }
+
+    /// Copy auxiliary entries except selected exact paths and directory trees.
+    pub(crate) fn copy_auxiliary_files_from_except(
+        &mut self,
+        source: &OwnedPackage,
+        excluded_paths: &[String],
+        excluded_prefixes: &[String],
+    ) -> Result<()> {
+        let package = source.package()?;
+        if package.manifest().has_encrypted_entries() && self.encryption.is_none() {
+            return Err(Error::InvalidFormat(
+                "Rewriting encrypted ODF entries requires writer encryption".to_string(),
+            ));
+        }
+        let excluded = |path: &str| {
+            excluded_paths.iter().any(|candidate| candidate == path)
+                || excluded_prefixes
+                    .iter()
+                    .any(|candidate| path.starts_with(candidate))
+        };
+
+        let mut files = Vec::new();
+        for path in package.files()? {
+            if path.ends_with('/') || is_regenerated_package_part(&path) || excluded(&path) {
+                continue;
+            }
+            let bytes = package.get_file(&path)?;
+            let media_type = package.manifest().get_media_type(&path).map(str::to_string);
+            files.push((path, bytes, media_type));
+        }
+
+        for entry in package.manifest().entries.values() {
+            if entry.full_path.ends_with('/')
+                && !is_regenerated_package_part(&entry.full_path)
+                && !excluded(&entry.full_path)
+            {
+                self.add_manifest_entry(&entry.full_path, &entry.media_type)?;
+            }
+        }
+        for (path, bytes, media_type) in files {
+            if let Some(media_type) = media_type {
+                self.add_file_with_media_type(&path, &bytes, &media_type)?;
+            } else {
+                self.add_file(&path, &bytes)?;
+            }
+        }
         Ok(())
     }
 
@@ -237,11 +388,7 @@ impl PackageWriter {
             if !seen_paths.insert(entry.full_path.as_str()) {
                 continue;
             }
-            manifest.push_str(&format!(
-                r#"<manifest:file-entry manifest:full-path="{}" manifest:media-type="{}"/>"#,
-                escape_xml(&entry.full_path),
-                escape_xml(&entry.media_type)
-            ));
+            write_manifest_entry(&mut manifest, entry);
         }
 
         manifest.push_str("</manifest:manifest>");
@@ -285,11 +432,15 @@ impl PackageWriter {
         self.manifest_entries.push(ManifestEntry {
             full_path: "META-INF/".to_string(),
             media_type: String::new(),
+            size: None,
+            encryption: None,
         });
 
         self.manifest_entries.push(ManifestEntry {
             full_path: "META-INF/manifest.xml".to_string(),
             media_type: "text/xml".to_string(),
+            size: None,
+            encryption: None,
         });
 
         // Generate and write manifest
@@ -299,15 +450,122 @@ impl PackageWriter {
             .map_err(|e| Error::ZipError(e.to_string()))?;
 
         // Finish ZIP archive and return bytes
-        self.zip_writer
+        let bytes = self.zip_writer
             .finish_to_bytes()
-            .map_err(|e| Error::ZipError(e.to_string()))
+            .map_err(|e| Error::ZipError(e.to_string()))?;
+        if let Some(signer) = &self.document_signer {
+            crate::signature_crypto::sign_package(&bytes, signer)
+        } else {
+            Ok(bytes)
+        }
     }
 
     /// Alias for `finish()` for API compatibility.
     pub fn finish_to_bytes(self) -> Result<Vec<u8>> {
         self.finish()
     }
+}
+
+fn write_manifest_entry(xml: &mut String, entry: &ManifestEntry) {
+    xml.push_str("<manifest:file-entry manifest:full-path=\"");
+    xml.push_str(&escape_xml(&entry.full_path));
+    xml.push_str("\" manifest:media-type=\"");
+    xml.push_str(&escape_xml(&entry.media_type));
+    xml.push('"');
+    if let Some(size) = entry.size {
+        xml.push_str(&format!(" manifest:size=\"{size}\""));
+    }
+    let Some(encryption) = &entry.encryption else {
+        xml.push_str("/>");
+        return;
+    };
+    xml.push('>');
+    xml.push_str("<manifest:encryption-data");
+    if let Some(checksum) = &encryption.checksum {
+        let algorithm = match checksum.algorithm {
+            ManifestChecksumAlgorithm::Sha1First1024 => "SHA1/1K",
+            ManifestChecksumAlgorithm::Sha256First1024 => {
+                "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0#sha256-1k"
+            },
+        };
+        xml.push_str(" manifest:checksum-type=\"");
+        xml.push_str(algorithm);
+        xml.push_str("\" manifest:checksum=\"");
+        xml.push_str(&BASE64_STANDARD.encode(&checksum.value));
+        xml.push('"');
+    }
+    xml.push('>');
+
+    let (algorithm_name, iv): (&str, &[u8]) = match &encryption.algorithm {
+        ManifestEncryptionAlgorithm::Aes128Cbc { iv } => {
+            ("http://www.w3.org/2001/04/xmlenc#aes128-cbc", iv)
+        },
+        ManifestEncryptionAlgorithm::Aes192Cbc { iv } => {
+            ("http://www.w3.org/2001/04/xmlenc#aes192-cbc", iv)
+        },
+        ManifestEncryptionAlgorithm::Aes256Cbc { iv } => {
+            ("http://www.w3.org/2001/04/xmlenc#aes256-cbc", iv)
+        },
+        ManifestEncryptionAlgorithm::Aes128Gcm { iv } => {
+            ("http://www.w3.org/2009/xmlenc11#aes128-gcm", iv)
+        },
+        ManifestEncryptionAlgorithm::Aes192Gcm { iv } => {
+            ("http://www.w3.org/2009/xmlenc11#aes192-gcm", iv)
+        },
+        ManifestEncryptionAlgorithm::Aes256Gcm { iv } => {
+            ("http://www.w3.org/2009/xmlenc11#aes256-gcm", iv)
+        },
+        ManifestEncryptionAlgorithm::BlowfishCfb8 { iv } => ("Blowfish CFB", iv),
+    };
+    xml.push_str("<manifest:algorithm manifest:algorithm-name=\"");
+    xml.push_str(algorithm_name);
+    xml.push_str("\" manifest:initialisation-vector=\"");
+    xml.push_str(&BASE64_STANDARD.encode(iv));
+    xml.push_str("\"/>");
+
+    let (start_name, start_size) = match encryption.start_key {
+        ManifestStartKeyGeneration::Sha1 => ("SHA1", 20),
+        ManifestStartKeyGeneration::Sha256 => {
+            ("http://www.w3.org/2001/04/xmlenc#sha256", 32)
+        },
+    };
+    xml.push_str("<manifest:start-key-generation manifest:start-key-generation-name=\"");
+    xml.push_str(start_name);
+    xml.push_str(&format!("\" manifest:key-size=\"{start_size}\"/>"));
+
+    match &encryption.key_derivation {
+        ManifestKeyDerivation::Pbkdf2 {
+            salt,
+            iterations,
+            key_size,
+        } => {
+            xml.push_str("<manifest:key-derivation manifest:key-derivation-name=\"PBKDF2\" manifest:salt=\"");
+            xml.push_str(&BASE64_STANDARD.encode(salt));
+            xml.push_str(&format!(
+                "\" manifest:iteration-count=\"{}\" manifest:key-size=\"{key_size}\"/>",
+                iterations.get()
+            ));
+        },
+        ManifestKeyDerivation::Argon2id {
+            salt,
+            iterations,
+            memory_kib,
+            lanes,
+            key_size,
+        } => {
+            xml.push_str("<manifest:key-derivation manifest:key-derivation-name=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.5#argon2id\" manifest:salt=\"");
+            xml.push_str(&BASE64_STANDARD.encode(salt));
+            xml.push_str(&format!(
+                "\" manifest:argon2-iterations=\"{}\" manifest:argon2-memory=\"{}\" manifest:argon2-lanes=\"{}\"",
+                iterations.get(), memory_kib.get(), lanes.get()
+            ));
+            if let Some(key_size) = key_size {
+                xml.push_str(&format!(" manifest:key-size=\"{key_size}\""));
+            }
+            xml.push_str("/>");
+        },
+    }
+    xml.push_str("</manifest:encryption-data></manifest:file-entry>");
 }
 
 fn is_regenerated_package_part(path: &str) -> bool {
@@ -549,6 +807,8 @@ mod tests {
         let entry = ManifestEntry {
             full_path: "content.xml".to_string(),
             media_type: "text/xml".to_string(),
+            size: None,
+            encryption: None,
         };
         let debug_str = format!("{:?}", entry);
         assert!(debug_str.contains("content.xml"));
@@ -581,5 +841,57 @@ mod tests {
 
         // Verify it's a valid ZIP (starts with PK)
         assert_eq!(&bytes[0..2], b"PK");
+    }
+}
+
+#[cfg(test)]
+mod encrypted_copy_tests {
+    use super::*;
+
+    #[test]
+    fn encrypted_auxiliary_entries_require_plaintext_and_are_reencrypted() {
+        let mut source_writer = PackageWriter::new();
+        source_writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        source_writer
+            .set_encryption("source-password", OdfEncryptionProfile::compatible())
+            .unwrap();
+        source_writer
+            .add_file("Pictures/asset.bin", b"encrypted auxiliary bytes")
+            .unwrap();
+        source_writer
+            .add_file("META-INF/documentsignatures.xml", b"<signatures/>")
+            .unwrap();
+        let source = OwnedPackage::from_bytes_with_password(
+            source_writer.finish().unwrap(),
+            "source-password",
+        )
+        .unwrap();
+
+        let mut unencrypted = PackageWriter::new();
+        unencrypted
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        assert!(unencrypted.copy_auxiliary_files_from(&source).is_err());
+
+        let mut destination = PackageWriter::new();
+        destination
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        destination
+            .set_encryption("new-password", OdfEncryptionProfile::compatible())
+            .unwrap();
+        destination.copy_auxiliary_files_from(&source).unwrap();
+        let rewritten = OwnedPackage::from_bytes_with_password(
+            destination.finish().unwrap(),
+            "new-password",
+        )
+        .unwrap();
+        assert_eq!(
+            rewritten.get_file("Pictures/asset.bin").unwrap(),
+            b"encrypted auxiliary bytes"
+        );
+        assert!(!rewritten.has_file("META-INF/documentsignatures.xml").unwrap());
     }
 }

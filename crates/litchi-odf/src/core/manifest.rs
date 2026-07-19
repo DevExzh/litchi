@@ -14,12 +14,12 @@ use std::num::NonZeroU32;
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 const LOEXT_NAMESPACE: &[u8] =
     b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
-const MAX_PBKDF2_ITERATIONS: u32 = 10_000_000;
+pub(crate) const MAX_PBKDF2_ITERATIONS: u32 = 10_000_000;
 const MAX_SALT_BYTES: usize = 1_024;
-const MAX_ARGON2_ITERATIONS: u32 = 10;
-const MAX_ARGON2_MEMORY_KIB: u32 = 262_144;
-const MAX_ARGON2_LANES: u32 = 16;
-const MAX_ARGON2_WORK_KIB_PASSES: u64 = 1_048_576;
+pub(crate) const MAX_ARGON2_ITERATIONS: u32 = 10;
+pub(crate) const MAX_ARGON2_MEMORY_KIB: u32 = 262_144;
+pub(crate) const MAX_ARGON2_LANES: u32 = 16;
+pub(crate) const MAX_ARGON2_WORK_KIB_PASSES: u64 = 1_048_576;
 
 /// ODF manifest (`META-INF/manifest.xml`).
 #[derive(Debug, Clone)]
@@ -473,8 +473,7 @@ fn parse_encryption_checksum(
     let has_value = attributes.contains_key(b"checksum".as_slice());
     if has_type != has_value {
         return Err(Error::InvalidFormat(
-            "ODF encryption metadata must contain both checksum attributes or neither"
-                .to_string(),
+            "ODF encryption metadata must contain both checksum attributes or neither".to_string(),
         ));
     }
     if !has_type {
@@ -498,42 +497,41 @@ fn parse_algorithm(
         "initialisation-vector",
     )?;
     match name {
-        "http://www.w3.org/2001/04/xmlenc#aes128-cbc" => Ok(
-            ManifestEncryptionAlgorithm::Aes128Cbc {
+        "http://www.w3.org/2001/04/xmlenc#aes128-cbc" => {
+            Ok(ManifestEncryptionAlgorithm::Aes128Cbc {
                 iv: fixed_iv(iv, 16, "AES-CBC")?,
-            },
-        ),
-        "http://www.w3.org/2001/04/xmlenc#aes192-cbc" => Ok(
-            ManifestEncryptionAlgorithm::Aes192Cbc {
+            })
+        },
+        "http://www.w3.org/2001/04/xmlenc#aes192-cbc" => {
+            Ok(ManifestEncryptionAlgorithm::Aes192Cbc {
                 iv: fixed_iv(iv, 16, "AES-CBC")?,
-            },
-        ),
-        "http://www.w3.org/2001/04/xmlenc#aes256-cbc" => Ok(
-            ManifestEncryptionAlgorithm::Aes256Cbc {
+            })
+        },
+        "http://www.w3.org/2001/04/xmlenc#aes256-cbc" => {
+            Ok(ManifestEncryptionAlgorithm::Aes256Cbc {
                 iv: fixed_iv(iv, 16, "AES-CBC")?,
-            },
-        ),
-        "http://www.w3.org/2009/xmlenc11#aes128-gcm" => Ok(
-            ManifestEncryptionAlgorithm::Aes128Gcm {
+            })
+        },
+        "http://www.w3.org/2009/xmlenc11#aes128-gcm" => {
+            Ok(ManifestEncryptionAlgorithm::Aes128Gcm {
                 iv: fixed_iv(iv, 12, "AES-GCM")?,
-            },
-        ),
-        "http://www.w3.org/2009/xmlenc11#aes192-gcm" => Ok(
-            ManifestEncryptionAlgorithm::Aes192Gcm {
+            })
+        },
+        "http://www.w3.org/2009/xmlenc11#aes192-gcm" => {
+            Ok(ManifestEncryptionAlgorithm::Aes192Gcm {
                 iv: fixed_iv(iv, 12, "AES-GCM")?,
-            },
-        ),
-        "http://www.w3.org/2009/xmlenc11#aes256-gcm" => Ok(
-            ManifestEncryptionAlgorithm::Aes256Gcm {
+            })
+        },
+        "http://www.w3.org/2009/xmlenc11#aes256-gcm" => {
+            Ok(ManifestEncryptionAlgorithm::Aes256Gcm {
                 iv: fixed_iv(iv, 12, "AES-GCM")?,
-            },
-        ),
-        "Blowfish CFB"
-        | "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0#blowfish" => Ok(
-            ManifestEncryptionAlgorithm::BlowfishCfb8 {
+            })
+        },
+        "Blowfish CFB" | "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0#blowfish" => {
+            Ok(ManifestEncryptionAlgorithm::BlowfishCfb8 {
                 iv: fixed_iv(iv, 8, "Blowfish CFB")?,
-            },
-        ),
+            })
+        },
         _ => Err(Error::InvalidFormat(format!(
             "Unsupported ODF encryption algorithm '{name}'"
         ))),
@@ -616,8 +614,7 @@ fn parse_key_derivation(
         "urn:oasis:names:tc:opendocument:xmlns:manifest:1.5#argon2id" => {
             if has_argon2_parameters(&loext_attributes) {
                 return Err(Error::InvalidFormat(
-                    "Standard Argon2id metadata mixes LibreOffice extension attributes"
-                        .to_string(),
+                    "Standard Argon2id metadata mixes LibreOffice extension attributes".to_string(),
                 ));
             }
             parse_argon2id(&attributes, salt)
@@ -625,8 +622,7 @@ fn parse_key_derivation(
         "urn:org:documentfoundation:names:experimental:office:manifest:argon2id" => {
             if has_argon2_parameters(&attributes) {
                 return Err(Error::InvalidFormat(
-                    "Experimental Argon2id metadata mixes standard manifest attributes"
-                        .to_string(),
+                    "Experimental Argon2id metadata mixes standard manifest attributes".to_string(),
                 ));
             }
             let mut parameters = loext_attributes;
@@ -696,8 +692,7 @@ fn parse_argon2id(
         || memory_kib.get() > MAX_ARGON2_MEMORY_KIB
         || lanes.get() > MAX_ARGON2_LANES
         || memory_kib.get() < 8 * lanes.get()
-        || u64::from(memory_kib.get()) * u64::from(iterations.get())
-            > MAX_ARGON2_WORK_KIB_PASSES
+        || u64::from(memory_kib.get()) * u64::from(iterations.get()) > MAX_ARGON2_WORK_KIB_PASSES
     {
         return Err(Error::InvalidFormat(
             "ODF Argon2id parameters exceed supported resource limits".to_string(),
@@ -742,13 +737,13 @@ fn finish_encryption(partial: PartialEncryption) -> Result<ManifestEncryption> {
         .ok_or_else(|| Error::InvalidFormat("Missing key derivation".to_string()))?;
     let derived_key_size = match &key_derivation {
         ManifestKeyDerivation::Pbkdf2 { key_size, .. } => *key_size,
-        ManifestKeyDerivation::Argon2id { key_size, .. } => (*key_size)
-            .or(algorithm.fixed_key_size())
-            .ok_or_else(|| {
+        ManifestKeyDerivation::Argon2id { key_size, .. } => {
+            (*key_size).or(algorithm.fixed_key_size()).ok_or_else(|| {
                 Error::InvalidFormat(
                     "Argon2id key size cannot be inferred for this cipher".to_string(),
                 )
-            })?,
+            })?
+        },
     };
     if !algorithm.accepts_key_size(derived_key_size) {
         return Err(Error::InvalidFormat(format!(
@@ -817,12 +812,21 @@ mod tests {
     fn accepts_checksumless_gcm_but_not_checksumless_cbc() {
         let gcm = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
         let parsed = Manifest::parse(gcm).unwrap();
-        assert!(parsed.entries["content.xml"].encryption.as_ref().unwrap().checksum.is_none());
+        assert!(
+            parsed.entries["content.xml"]
+                .encryption
+                .as_ref()
+                .unwrap()
+                .checksum
+                .is_none()
+        );
 
-        let cbc = gcm.replace(
-            "http://www.w3.org/2009/xmlenc11#aes256-gcm",
-            "http://www.w3.org/2001/04/xmlenc#aes256-cbc",
-        ).replace("AAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAAAAAAAA==");
+        let cbc = gcm
+            .replace(
+                "http://www.w3.org/2009/xmlenc11#aes256-gcm",
+                "http://www.w3.org/2001/04/xmlenc#aes256-cbc",
+            )
+            .replace("AAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAAAAAAAA==");
         assert!(Manifest::parse(&cbc).is_err());
     }
 

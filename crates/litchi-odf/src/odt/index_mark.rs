@@ -1,5 +1,12 @@
 //! Semantic parsing for OpenDocument index source marks.
 
+mod writing;
+
+pub use writing::{
+    TextAlphabeticalMarkMetadata, TextIndexMarkFragments, insert_text_index_mark_xml,
+    remove_text_index_mark_xml, replace_text_index_mark_xml,
+};
+
 use super::index::{TextIndexAttribute, expanded_attributes};
 use crate::elements::xml::{
     TEXT_NAMESPACE, append_checked, append_text_control, decode_reference, is_bound,

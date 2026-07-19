@@ -113,21 +113,9 @@ impl TableTemplate {
             "first-row-start-column",
             self.first_row_start_column,
         );
-        write_axis_attribute(
-            output,
-            "first-row-end-column",
-            self.first_row_end_column,
-        );
-        write_axis_attribute(
-            output,
-            "last-row-start-column",
-            self.last_row_start_column,
-        );
-        write_axis_attribute(
-            output,
-            "last-row-end-column",
-            self.last_row_end_column,
-        );
+        write_axis_attribute(output, "first-row-end-column", self.first_row_end_column);
+        write_axis_attribute(output, "last-row-start-column", self.last_row_start_column);
+        write_axis_attribute(output, "last-row-end-column", self.last_row_end_column);
         write_bool_attribute(output, "use-first-row-styles", self.use_first_row_styles);
         write_bool_attribute(output, "use-last-row-styles", self.use_last_row_styles);
         write_bool_attribute(
@@ -272,7 +260,10 @@ fn parse_part(
 
         if let Event::Start(element) = &event
             && namespace == Namespace::Office
-            && matches!(element.local_name().as_ref(), b"styles" | b"automatic-styles")
+            && matches!(
+                element.local_name().as_ref(),
+                b"styles" | b"automatic-styles"
+            )
         {
             styles_depth = Some(depth);
         }
@@ -297,7 +288,10 @@ fn parse_part(
             },
             Event::End(element)
                 if namespace == Namespace::Office
-                    && matches!(element.local_name().as_ref(), b"styles" | b"automatic-styles") =>
+                    && matches!(
+                        element.local_name().as_ref(),
+                        b"styles" | b"automatic-styles"
+                    ) =>
             {
                 styles_depth = None;
             },
@@ -426,11 +420,9 @@ fn parse_template(
                 }
             },
             Event::Text(text) => {
-                let value = text
-                    .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid table-template text: {error}"))
-                    })?;
+                let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid table-template text: {error}"))
+                })?;
                 if !value.trim().is_empty() {
                     return Err(Error::InvalidFormat(
                         "table:table-template cannot contain character data".to_string(),
@@ -532,10 +524,7 @@ fn build_template(attributes: &[Attribute], regions: TemplateRegions) -> Result<
         use_first_column_styles: parse_bool_attribute(attributes, "use-first-column-styles")?,
         use_last_column_styles: parse_bool_attribute(attributes, "use-last-column-styles")?,
         use_banding_rows_styles: parse_bool_attribute(attributes, "use-banding-rows-styles")?,
-        use_banding_columns_styles: parse_bool_attribute(
-            attributes,
-            "use-banding-columns-styles",
-        )?,
+        use_banding_columns_styles: parse_bool_attribute(attributes, "use-banding-columns-styles")?,
         first_row: regions.first_row,
         last_row: regions.last_row,
         first_column: regions.first_column,
@@ -612,9 +601,10 @@ fn parse_attributes(
             ));
         }
         append_size(aggregate, local.len().saturating_add(value.len()))?;
-        if attributes.iter().any(|existing: &Attribute| {
-            existing.namespace == namespace && existing.local == local
-        }) {
+        if attributes
+            .iter()
+            .any(|existing: &Attribute| existing.namespace == namespace && existing.local == local)
+        {
             return Err(Error::InvalidFormat(format!(
                 "duplicate expanded table-template attribute '{local}'"
             )));
@@ -735,7 +725,9 @@ fn consume_empty_region(reader: &mut NsReader<&[u8]>, local: &str) -> Result<()>
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_error)?;
         match event {
-            Event::End(element) if element.local_name().as_ref() == local.as_bytes() => return Ok(()),
+            Event::End(element) if element.local_name().as_ref() == local.as_bytes() => {
+                return Ok(());
+            },
             Event::Text(text) => {
                 let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                     Error::InvalidFormat(format!("invalid table-template region text: {error}"))
@@ -845,7 +837,10 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> Result<Namespace> {
 }
 
 fn is_known(namespace: Namespace) -> bool {
-    matches!(namespace, Namespace::Office | Namespace::Table | Namespace::Text)
+    matches!(
+        namespace,
+        Namespace::Office | Namespace::Table | Namespace::Text
+    )
 }
 
 fn decode_name(value: &[u8]) -> Result<String> {
@@ -877,11 +872,28 @@ mod tests {
         .unwrap();
         let template = &templates[0];
         assert_eq!(template.name, "Bands & Body");
-        assert_eq!(template.first_row_start_column, Some(TableTemplateAxis::Row));
-        assert_eq!(template.first_row_end_column, Some(TableTemplateAxis::Column));
+        assert_eq!(
+            template.first_row_start_column,
+            Some(TableTemplateAxis::Row)
+        );
+        assert_eq!(
+            template.first_row_end_column,
+            Some(TableTemplateAxis::Column)
+        );
         assert_eq!(template.use_first_row_styles, Some(true));
-        assert_eq!(template.first_row.as_ref().unwrap().paragraph_style_name.as_deref(), Some("HeaderP"));
-        assert_eq!(template.background.as_ref().unwrap().style_name, "Background");
+        assert_eq!(
+            template
+                .first_row
+                .as_ref()
+                .unwrap()
+                .paragraph_style_name
+                .as_deref(),
+            Some("HeaderP")
+        );
+        assert_eq!(
+            template.background.as_ref().unwrap().style_name,
+            "Background"
+        );
     }
 
     #[test]
@@ -905,9 +917,8 @@ mod tests {
 
     #[test]
     fn parses_libreoffice_table_style_catalog() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/libreoffice-core/sc/res/xml/tablestyles.xml",
-        );
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../3rdparty/libreoffice-core/sc/res/xml/tablestyles.xml");
         let xml = std::fs::read_to_string(path).unwrap();
         let templates = parse_table_templates(&[&xml]).unwrap();
         assert!(templates.len() > 10);
@@ -915,7 +926,10 @@ mod tests {
             .iter()
             .find(|template| template.name == "Default Style")
             .unwrap();
-        assert_eq!(default.body.as_ref().unwrap().style_name, "Default-Style.body");
+        assert_eq!(
+            default.body.as_ref().unwrap().style_name,
+            "Default-Style.body"
+        );
         assert!(default.background.is_some());
     }
 

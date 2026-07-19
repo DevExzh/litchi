@@ -62,7 +62,11 @@ impl PresentationPlaceholderClass {
             "footer" => Self::Footer,
             "date-time" => Self::DateTime,
             "page-number" => Self::PageNumber,
-            _ => return invalid(format!("unsupported presentation placeholder class '{value}'")),
+            _ => {
+                return invalid(format!(
+                    "unsupported presentation placeholder class '{value}'"
+                ));
+            },
         })
     }
 
@@ -340,7 +344,9 @@ pub fn parse_presentation_page_layouts(xml: &str) -> Result<PresentationPageLayo
     loop {
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid presentation page-layout XML: {error}")))?;
+            .map_err(|error| {
+                make_error(format!("invalid presentation page-layout XML: {error}"))
+            })?;
         let namespace = namespace_kind(&resolved)?;
         match event {
             Event::Start(ref element) => {
@@ -464,13 +470,17 @@ impl FlatOpenDocument {
 }
 
 fn ensure_location(stack: &[Frame]) -> Result<()> {
-    if !matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles") {
+    if !matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
+    {
         return invalid("style:presentation-page-layout must be a direct office:styles child");
     }
     Ok(())
 }
 
-fn parse_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<PresentationPageLayout> {
+fn parse_layout(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<PresentationPageLayout> {
     let mut attributes = attributes(reader, element)?;
     let name = take_required(&mut attributes, NamespaceKind::Style, "name", "style:name")?;
     let display_name = attributes.remove(&(NamespaceKind::Style, "display-name".to_string()));
@@ -503,7 +513,11 @@ fn parse_placeholder(
     Ok(PresentationPlaceholder::new(class, x, y, width, height))
 }
 
-fn take_measure(attributes: &mut Attributes, local: &str, context: &str) -> Result<PresentationMeasure> {
+fn take_measure(
+    attributes: &mut Attributes,
+    local: &str,
+    context: &str,
+) -> Result<PresentationMeasure> {
     take_required(attributes, NamespaceKind::Svg, local, context)?.parse()
 }
 
@@ -609,7 +623,9 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
     loop {
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid presentation page-layout XML: {error}")))?;
+            .map_err(|error| {
+                make_error(format!("invalid presentation page-layout XML: {error}"))
+            })?;
         let namespace = namespace_kind(&resolved)?;
         match event {
             Event::Start(ref element) => {
@@ -660,7 +676,13 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
                     .ok_or_else(|| make_error("presentation page-layout XML depth underflow"))?;
                 if open_target.is_some_and(|(target_depth, _)| target_depth == depth) {
                     let (_, target_start) = open_target.take().expect("target depth checked");
-                    if target.replace(XmlSpan { start: target_start, end }).is_some() {
+                    if target
+                        .replace(XmlSpan {
+                            start: target_start,
+                            end,
+                        })
+                        .is_some()
+                    {
                         return invalid("duplicate target presentation page layout");
                     }
                 }
@@ -697,7 +719,12 @@ pub fn set_presentation_page_layout_xml(
     let (target, styles_site) = mutation_sites(xml, &layout.name)?;
     let fragment = layout.to_xml_fragment()?;
     if let Some(span) = target {
-        return Ok(format!("{}{}{}", &xml[..span.start], fragment, &xml[span.end..]));
+        return Ok(format!(
+            "{}{}{}",
+            &xml[..span.start],
+            fragment,
+            &xml[span.end..]
+        ));
     }
     Ok(match styles_site {
         StylesSite::Content { insertion } => {
@@ -824,9 +851,9 @@ fn validate_text(value: &str, context: &str, empty_allowed: bool) -> Result<()> 
     if value.len() > MAX_VALUE_BYTES {
         return invalid(format!("{context} exceeds 64 KiB"));
     }
-    if value.chars().any(|character| {
-        matches!(character, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}')
-    }) {
+    if value.chars().any(
+        |character| matches!(character, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}'),
+    ) {
         return invalid(format!("{context} contains an XML-prohibited character"));
     }
     Ok(())
@@ -860,12 +887,21 @@ mod tests {
         );
         let layouts = parse_presentation_page_layouts(&xml).unwrap();
         assert_eq!(layouts.layouts.len(), 1);
-        assert_eq!(layouts.layouts[0].display_name.as_deref(), Some("Title & body"));
-        assert_eq!(layouts.layouts[0].placeholders[0].x.unit(), PresentationMeasureUnit::Percent);
+        assert_eq!(
+            layouts.layouts[0].display_name.as_deref(),
+            Some("Title & body")
+        );
+        assert_eq!(
+            layouts.layouts[0].placeholders[0].x.unit(),
+            PresentationMeasureUnit::Percent
+        );
         assert_eq!(layouts.layouts[0].placeholders[1].y.value(), -0.5);
 
         let serialized = layouts.to_xml().unwrap();
-        assert_eq!(parse_presentation_page_layouts(&serialized).unwrap(), layouts);
+        assert_eq!(
+            parse_presentation_page_layouts(&serialized).unwrap(),
+            layouts
+        );
     }
 
     #[test]
@@ -878,7 +914,10 @@ mod tests {
             r#"<style:presentation-page-layout style:name="x"/><style:presentation-page-layout style:name="x"/>"#,
         ] {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
-            assert!(parse_presentation_page_layouts(&xml).is_err(), "accepted {body}");
+            assert!(
+                parse_presentation_page_layouts(&xml).is_err(),
+                "accepted {body}"
+            );
         }
         let misplaced = format!(
             r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:automatic-styles><style:presentation-page-layout style:name="x"/></office:automatic-styles></office:document-styles>"#
@@ -936,21 +975,37 @@ mod tests {
                 "-2px".parse().unwrap(),
             ));
         }
-        let parsed = parse_presentation_page_layouts(&format!("{PREFIX}{}{SUFFIX}", layout.to_xml_fragment().unwrap())).unwrap();
+        let parsed = parse_presentation_page_layouts(&format!(
+            "{PREFIX}{}{SUFFIX}",
+            layout.to_xml_fragment().unwrap()
+        ))
+        .unwrap();
         assert_eq!(parsed.layouts[0].placeholders.len(), 16);
-        assert_eq!(parsed.layouts[0].placeholders[15].class, PresentationPlaceholderClass::PageNumber);
+        assert_eq!(
+            parsed.layouts[0].placeholders[15].class,
+            PresentationPlaceholderClass::PageNumber
+        );
         for value in [".5cm", "1.cm", "-.5%", "-0px", "01.00pt"] {
-            assert!(value.parse::<PresentationMeasure>().is_ok(), "rejected {value}");
+            assert!(
+                value.parse::<PresentationMeasure>().is_ok(),
+                "rejected {value}"
+            );
         }
         for value in [".", ".cm", "+1cm", "1e2cm", "1 cm", "NaNcm"] {
-            assert!(value.parse::<PresentationMeasure>().is_err(), "accepted {value}");
+            assert!(
+                value.parse::<PresentationMeasure>().is_err(),
+                "accepted {value}"
+            );
         }
     }
 
     #[test]
     fn rejects_identity_duplicates_and_caps() {
         for name in ["", "1layout", "bad:name", "two words"] {
-            assert!(PresentationPageLayout::new(name).is_err(), "accepted {name}");
+            assert!(
+                PresentationPageLayout::new(name).is_err(),
+                "accepted {name}"
+            );
         }
         let aliased_duplicate = format!(
             r#"{PREFIX}<style:presentation-page-layout xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="a" s:name="b"/>{SUFFIX}"#
@@ -975,13 +1030,21 @@ mod tests {
         let mut layout = PresentationPageLayout::new("layout1").unwrap();
         layout.display_name = Some("First".to_string());
         let inserted = set_presentation_page_layout_xml(&original, &layout).unwrap();
-        assert!(inserted.contains("<!--keep--><style:style style:name=\"other\"/><style:presentation-page-layout"));
+        assert!(inserted.contains(
+            "<!--keep--><style:style style:name=\"other\"/><style:presentation-page-layout"
+        ));
         layout.display_name = Some("Replacement".to_string());
         let replaced = set_presentation_page_layout_xml(&inserted, &layout).unwrap();
         assert!(replaced.contains("style:display-name=\"Replacement\""));
         assert!(!replaced.contains("style:display-name=\"First\""));
-        assert_eq!(remove_presentation_page_layout_xml(&replaced, "layout1").unwrap(), original);
-        assert_eq!(remove_presentation_page_layout_xml(&original, "missing").unwrap(), original);
+        assert_eq!(
+            remove_presentation_page_layout_xml(&replaced, "layout1").unwrap(),
+            original
+        );
+        assert_eq!(
+            remove_presentation_page_layout_xml(&original, "missing").unwrap(),
+            original
+        );
     }
 
     #[test]
@@ -997,6 +1060,9 @@ mod tests {
         ));
         builder.add_page_layout(layout).unwrap();
         let presentation = crate::Presentation::from_bytes(builder.build().unwrap()).unwrap();
-        assert_eq!(presentation.page_layouts().unwrap().layouts[0].name, "builder_layout");
+        assert_eq!(
+            presentation.page_layouts().unwrap().layouts[0].name,
+            "builder_layout"
+        );
     }
 }

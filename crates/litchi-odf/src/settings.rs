@@ -127,7 +127,7 @@ impl Frame {
         Ok(match self {
             Self::Set { name, children } => {
                 Finished::Node(OdfConfigNode::Set(OdfConfigSet { name, children }))
-            }
+            },
             Self::Item {
                 name,
                 value_type,
@@ -138,13 +138,11 @@ impl Frame {
             })),
             Self::IndexedMap { name, entries } => {
                 Finished::Node(OdfConfigNode::IndexedMap(OdfConfigMap { name, entries }))
-            }
+            },
             Self::NamedMap { name, entries } => {
                 Finished::Node(OdfConfigNode::NamedMap(OdfConfigMap { name, entries }))
-            }
-            Self::Entry { name, children } => {
-                Finished::Entry(OdfConfigMapEntry { name, children })
-            }
+            },
+            Self::Entry { name, children } => Finished::Entry(OdfConfigMapEntry { name, children }),
         })
     }
 }
@@ -199,7 +197,7 @@ pub(crate) fn parse_settings(xml: &str, kind: SettingsDocumentKind) -> Result<Od
                     &mut result,
                 )?;
                 xml_depth += 1;
-            }
+            },
             Event::Empty(start) => {
                 if root_closed {
                     return invalid("settings XML has more than one document element");
@@ -228,7 +226,7 @@ pub(crate) fn parse_settings(xml: &str, kind: SettingsDocumentKind) -> Result<Od
                 if xml_depth == 0 {
                     root_closed = true;
                 }
-            }
+            },
             Event::End(end) => {
                 xml_depth = xml_depth
                     .checked_sub(1)
@@ -260,7 +258,7 @@ pub(crate) fn parse_settings(xml: &str, kind: SettingsDocumentKind) -> Result<Od
                 namespace_scopes.pop().ok_or_else(|| {
                     Error::InvalidFormat("unbalanced namespace scope".to_string())
                 })?;
-            }
+            },
             Event::Text(text) => {
                 let decoded = text.decode().map_err(|error| {
                     Error::InvalidFormat(format!("invalid settings text encoding: {error}"))
@@ -269,36 +267,42 @@ pub(crate) fn parse_settings(xml: &str, kind: SettingsDocumentKind) -> Result<Od
                     Error::InvalidFormat(format!("invalid settings text escape: {error}"))
                 })?;
                 append_text(&value, root_seen, root_closed, in_settings, &mut stack)?;
-            }
+            },
             Event::CData(text) => {
                 let value = text.decode().map_err(|error| {
                     Error::InvalidFormat(format!("invalid settings CDATA encoding: {error}"))
                 })?;
                 append_text(&value, root_seen, root_closed, in_settings, &mut stack)?;
-            }
+            },
             Event::GeneralRef(reference) => {
                 let name = std::str::from_utf8(reference.as_ref()).map_err(|_| {
                     Error::InvalidFormat("invalid XML character reference".to_string())
                 })?;
                 let value = resolve_reference(name)?;
                 append_text(&value, root_seen, root_closed, in_settings, &mut stack)?;
-            }
+            },
             Event::Decl(decl) => {
                 if root_seen {
                     return invalid("XML declaration must precede the document element");
                 }
-                if decl.version().map_err(|error| {
-                    Error::InvalidFormat(format!("invalid XML declaration: {error}"))
-                })?.as_ref() != b"1.0"
+                if decl
+                    .version()
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid XML declaration: {error}"))
+                    })?
+                    .as_ref()
+                    != b"1.0"
                 {
                     return invalid("only XML 1.0 settings documents are supported");
                 }
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
-                return invalid("DOCTYPE and processing instructions are prohibited in settings XML");
-            }
+                return invalid(
+                    "DOCTYPE and processing instructions are prohibited in settings XML",
+                );
+            },
             Event::Eof => break,
-            Event::Comment(_) => {}
+            Event::Comment(_) => {},
         }
         buffer.clear();
     }
@@ -351,7 +355,9 @@ fn process_start(
 
     if is_namespace(namespace, OFFICE) && local.as_ref() == b"settings" {
         if depth != 1 || *settings_seen || *in_settings {
-            return invalid("office:settings must be a unique direct child of the document element");
+            return invalid(
+                "office:settings must be a unique direct child of the document element",
+            );
         }
         validate_no_semantic_attributes(decoder, start)?;
         *settings_seen = true;
@@ -422,12 +428,12 @@ fn validate_placement(frame: &Frame, stack: &[Frame]) -> Result<()> {
         (None, _) => invalid("office:settings may contain only top-level config-item-set elements"),
         (Some(Frame::Set { .. } | Frame::Entry { .. }), Frame::Entry { .. }) => {
             invalid("config-item-map-entry must be a direct child of a config map")
-        }
+        },
         (Some(Frame::Set { .. } | Frame::Entry { .. }), _) => Ok(()),
         (Some(Frame::IndexedMap { .. } | Frame::NamedMap { .. }), Frame::Entry { .. }) => Ok(()),
         (Some(Frame::IndexedMap { .. } | Frame::NamedMap { .. }), _) => {
             invalid("configuration maps may contain only map entries")
-        }
+        },
         (Some(Frame::Item { .. }), _) => invalid("config-item elements cannot contain elements"),
     }
 }
@@ -437,26 +443,29 @@ fn attach(finished: Finished, stack: &mut [Frame], result: &mut OdfSettings) -> 
         (None, Finished::Node(OdfConfigNode::Set(set))) => {
             result.sets.push(set);
             Ok(())
-        }
+        },
         (None, _) => invalid("invalid top-level configuration node"),
-        (Some(Frame::Set { children, .. } | Frame::Entry { children, .. }), Finished::Node(node)) => {
+        (
+            Some(Frame::Set { children, .. } | Frame::Entry { children, .. }),
+            Finished::Node(node),
+        ) => {
             children.push(node);
             Ok(())
-        }
+        },
         (Some(Frame::IndexedMap { entries, .. }), Finished::Entry(entry)) => {
             if entry.name.is_some() {
                 return invalid("indexed map entries must not have config:name");
             }
             entries.push(entry);
             Ok(())
-        }
+        },
         (Some(Frame::NamedMap { entries, .. }), Finished::Entry(entry)) => {
             if entry.name.as_deref().is_none_or(str::is_empty) {
                 return invalid("named map entries require a non-empty config:name");
             }
             entries.push(entry);
             Ok(())
-        }
+        },
         _ => invalid("invalid configuration child placement"),
     }
 }
@@ -490,7 +499,7 @@ fn append_text(
             }
             text.push_str(value);
             Ok(())
-        }
+        },
         _ if value.trim().is_empty() => Ok(()),
         _ => invalid("unexpected text in a configuration container"),
     }
@@ -505,8 +514,9 @@ fn semantic_attributes(
     let mut seen = HashSet::<Vec<u8>>::new();
     let mut count = 0usize;
     for attribute in start.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|error| Error::InvalidFormat(format!("invalid settings attribute: {error}")))?;
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid settings attribute: {error}"))
+        })?;
         let raw = attribute.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
             continue;
@@ -540,8 +550,9 @@ fn semantic_attributes(
 fn validate_no_semantic_attributes(decoder: Decoder, start: &BytesStart<'_>) -> Result<()> {
     let mut count = 0usize;
     for attribute in start.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|error| Error::InvalidFormat(format!("invalid settings attribute: {error}")))?;
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid settings attribute: {error}"))
+        })?;
         let raw = attribute.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
             continue;
@@ -552,7 +563,9 @@ fn validate_no_semantic_attributes(decoder: Decoder, start: &BytesStart<'_>) -> 
         }
         let _ = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-            .map_err(|error| Error::InvalidFormat(format!("invalid settings attribute: {error}")))?;
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid settings attribute: {error}"))
+            })?;
     }
     Ok(())
 }
@@ -594,7 +607,7 @@ fn parse_value(value_type: &str, text: &str) -> Result<OdfConfigValue> {
                     return invalid("invalid double configuration value");
                 }
                 value
-            }
+            },
         }),
         "string" => OdfConfigValue::String(text.to_string()),
         "datetime" => {
@@ -602,7 +615,7 @@ fn parse_value(value_type: &str, text: &str) -> Result<OdfConfigValue> {
                 return invalid("invalid datetime configuration value");
             }
             OdfConfigValue::DateTime(trimmed.to_string())
-        }
+        },
         "base64Binary" => OdfConfigValue::Base64Binary(decode_base64(trimmed)?),
         _ => return invalid("unknown configuration value type"),
     })
@@ -647,7 +660,10 @@ fn is_datetime(value: &str) -> bool {
     ) else {
         return false;
     };
-    if year.len() < 4 || !year.bytes().all(|byte| byte.is_ascii_digit()) || year.bytes().all(|b| b == b'0') {
+    if year.len() < 4
+        || !year.bytes().all(|byte| byte.is_ascii_digit())
+        || year.bytes().all(|b| b == b'0')
+    {
         return false;
     }
     let Ok(month) = month.parse::<u8>() else {
@@ -687,7 +703,9 @@ fn is_datetime(value: &str) -> bool {
     };
     let (second, fraction) = second
         .split_once('.')
-        .map_or((second, None), |(second, fraction)| (second, Some(fraction)));
+        .map_or((second, None), |(second, fraction)| {
+            (second, Some(fraction))
+        });
     if fraction.is_some_and(|fraction| {
         fraction.is_empty() || !fraction.bytes().all(|byte| byte.is_ascii_digit())
     }) {
@@ -716,10 +734,7 @@ fn valid_timezone(value: &str) -> bool {
     if value == "Z" {
         return true;
     }
-    let Some(value) = value
-        .strip_prefix('+')
-        .or_else(|| value.strip_prefix('-'))
-    else {
+    let Some(value) = value.strip_prefix('+').or_else(|| value.strip_prefix('-')) else {
         return false;
     };
     let Some((hour, minute)) = value.split_once(':') else {
@@ -756,14 +771,15 @@ fn resolve_reference(name: &str) -> Result<String> {
     if let Some(value) = quick_xml::escape::resolve_xml_entity(name) {
         return Ok(value.to_string());
     }
-    let codepoint = if let Some(hex) = name.strip_prefix("#x").or_else(|| name.strip_prefix("#X")) {
-        u32::from_str_radix(hex, 16)
-    } else if let Some(decimal) = name.strip_prefix('#') {
-        decimal.parse::<u32>()
-    } else {
-        return invalid("undeclared entity reference in settings XML");
-    }
-    .map_err(|_| Error::InvalidFormat("invalid XML character reference".to_string()))?;
+    let codepoint =
+        if let Some(hex) = name.strip_prefix("#x").or_else(|| name.strip_prefix("#X")) {
+            u32::from_str_radix(hex, 16)
+        } else if let Some(decimal) = name.strip_prefix('#') {
+            decimal.parse::<u32>()
+        } else {
+            return invalid("undeclared entity reference in settings XML");
+        }
+        .map_err(|_| Error::InvalidFormat("invalid XML character reference".to_string()))?;
     let character = char::from_u32(codepoint)
         .filter(|character| is_xml_character(*character))
         .ok_or_else(|| Error::InvalidFormat("invalid XML character reference".to_string()))?;
@@ -786,8 +802,9 @@ fn namespace_declarations(
     let mut declarations = Vec::new();
     let mut seen = HashSet::<Vec<u8>>::new();
     for attribute in start.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|error| Error::InvalidFormat(format!("invalid namespace declaration: {error}")))?;
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid namespace declaration: {error}"))
+        })?;
         let raw = attribute.key.as_ref();
         let prefix = if raw == b"xmlns" {
             Vec::new()
@@ -824,7 +841,9 @@ fn resolve_attribute<'a>(
         .rev()
         .flat_map(|scope| scope.iter().rev())
         .find_map(|(candidate, uri)| (candidate.as_slice() == prefix).then_some(uri.as_slice()))
-        .ok_or_else(|| Error::InvalidFormat("unbound configuration attribute prefix".to_string()))?;
+        .ok_or_else(|| {
+            Error::InvalidFormat("unbound configuration attribute prefix".to_string())
+        })?;
     Ok((namespace, local))
 }
 
@@ -875,9 +894,19 @@ mod tests {
     #[test]
     fn accepts_empty_flat_settings_and_missing_flat_settings() {
         let empty = r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:settings/></o:document>"#;
-        assert!(parse_settings(empty, SettingsDocumentKind::Flat).unwrap().sets.is_empty());
+        assert!(
+            parse_settings(empty, SettingsDocumentKind::Flat)
+                .unwrap()
+                .sets
+                .is_empty()
+        );
         let missing = r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body>ordinary flat document text</o:body></o:document>"#;
-        assert!(parse_settings(missing, SettingsDocumentKind::Flat).unwrap().sets.is_empty());
+        assert!(
+            parse_settings(missing, SettingsDocumentKind::Flat)
+                .unwrap()
+                .sets
+                .is_empty()
+        );
     }
 
     #[test]

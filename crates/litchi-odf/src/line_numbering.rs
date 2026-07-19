@@ -150,9 +150,7 @@ impl OdfLineNumberingConfiguration {
                 .as_ref()
                 .is_some_and(OdfLineNumberFormat::permits_letter_sync)
         {
-            return invalid(
-                "style:num-letter-sync requires style:num-format 'a' or 'A'",
-            );
+            return invalid("style:num-letter-sync requires style:num-format 'a' or 'A'");
         }
         if let Some(format) = &self.number_format {
             validate_value(format.as_str(), "style:num-format", true)?;
@@ -185,11 +183,7 @@ impl OdfLineNumberingConfiguration {
             self.number_format.as_ref().map(OdfLineNumberFormat::as_str),
         );
         write_bool_attr(&mut output, "style:num-letter-sync", self.letter_sync);
-        write_attr(
-            &mut output,
-            "text:style-name",
-            self.style_name.as_deref(),
-        );
+        write_attr(&mut output, "text:style-name", self.style_name.as_deref());
         write_u64_attr(&mut output, "text:increment", self.increment);
         write_attr(
             &mut output,
@@ -211,11 +205,7 @@ impl OdfLineNumberingConfiguration {
             "text:count-in-text-boxes",
             self.count_in_text_boxes,
         );
-        write_bool_attr(
-            &mut output,
-            "text:restart-on-page",
-            self.restart_on_page,
-        );
+        write_bool_attr(&mut output, "text:restart-on-page", self.restart_on_page);
         let Some(separator) = &self.separator else {
             output.push_str("/>");
             return Ok(output);
@@ -271,7 +261,7 @@ pub fn parse_line_numbering_configuration(
                 configuration.separator = parse_configuration_body(&mut reader)?;
                 configuration.validate()?;
                 result = Some(configuration);
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Text
                     && element.local_name().as_ref() == b"linenumbering-configuration" =>
@@ -287,7 +277,7 @@ pub fn parse_line_numbering_configuration(
                 let configuration = parse_attributes(&reader, &element)?;
                 configuration.validate()?;
                 result = Some(configuration);
-            }
+            },
             Event::Start(element) => {
                 depth = depth
                     .checked_add(1)
@@ -295,14 +285,13 @@ pub fn parse_line_numbering_configuration(
                 if depth > MAX_XML_DEPTH {
                     return invalid(format!("ODF XML exceeds the {MAX_XML_DEPTH} depth limit"));
                 }
-                if namespace == NamespaceKind::Office
-                    && element.local_name().as_ref() == b"styles"
+                if namespace == NamespaceKind::Office && element.local_name().as_ref() == b"styles"
                 {
                     if styles_content_depth.replace(depth).is_some() {
                         return invalid("ODF XML contains nested office:styles elements");
                     }
                 }
-            }
+            },
             Event::End(element) => {
                 if namespace == NamespaceKind::Office
                     && element.local_name().as_ref() == b"styles"
@@ -313,10 +302,10 @@ pub fn parse_line_numbering_configuration(
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("invalid ODF XML depth".to_string()))?;
-            }
+            },
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in ODF line metadata"),
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -347,38 +336,37 @@ fn parse_attributes(
         match (namespace, local.as_ref()) {
             (NamespaceKind::Text, b"number-lines") => {
                 configuration.number_lines = Some(parse_bool(&value, "text:number-lines")?)
-            }
+            },
             (NamespaceKind::Style, b"num-format") => {
                 configuration.number_format = Some(OdfLineNumberFormat::parse(value)?)
-            }
+            },
             (NamespaceKind::Style, b"num-letter-sync") => {
                 configuration.letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?)
-            }
+            },
             (NamespaceKind::Text, b"style-name") => {
                 validate_value(&value, "text:style-name", false)?;
                 configuration.style_name = Some(value);
-            }
+            },
             (NamespaceKind::Text, b"increment") => {
                 configuration.increment = Some(parse_nonnegative_integer(&value, "text:increment")?)
-            }
+            },
             (NamespaceKind::Text, b"number-position") => {
                 configuration.number_position = Some(OdfLineNumberPosition::parse(&value)?)
-            }
+            },
             (NamespaceKind::Text, b"offset") => {
                 configuration.offset = Some(OdfNonNegativeLength::new(value)?)
-            }
+            },
             (NamespaceKind::Text, b"count-empty-lines") => {
                 configuration.count_empty_lines =
                     Some(parse_bool(&value, "text:count-empty-lines")?)
-            }
+            },
             (NamespaceKind::Text, b"count-in-text-boxes") => {
                 configuration.count_in_text_boxes =
                     Some(parse_bool(&value, "text:count-in-text-boxes")?)
-            }
+            },
             (NamespaceKind::Text, b"restart-on-page") => {
-                configuration.restart_on_page =
-                    Some(parse_bool(&value, "text:restart-on-page")?)
-            }
+                configuration.restart_on_page = Some(parse_bool(&value, "text:restart-on-page")?)
+            },
             _ => return invalid("unsupported line-numbering configuration attribute"),
         }
     }
@@ -404,7 +392,7 @@ fn parse_configuration_body(
                     return invalid("duplicate text:linenumbering-separator");
                 }
                 separator = Some(parse_separator(reader, &element)?);
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Text
                     && element.local_name().as_ref() == b"linenumbering-separator" =>
@@ -416,18 +404,18 @@ fn parse_configuration_body(
                     increment: parse_separator_increment(reader, &element)?,
                     text: String::new(),
                 });
-            }
+            },
             Event::End(element)
                 if namespace == NamespaceKind::Text
                     && element.local_name().as_ref() == b"linenumbering-configuration" =>
             {
                 break;
-            }
+            },
             Event::Text(text) => require_whitespace(
                 &text.decode().map_err(xml_error)?,
                 "linenumbering-configuration",
             )?,
-            Event::Comment(_) | Event::PI(_) => {}
+            Event::Comment(_) | Event::PI(_) => {},
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in line numbering"),
             Event::Eof => return invalid("unterminated text:linenumbering-configuration"),
             _ => return invalid("unsupported child in linenumbering-configuration"),
@@ -453,11 +441,11 @@ fn parse_separator(
             Event::Text(value) => {
                 let value = value.decode().map_err(xml_error)?;
                 append_separator_text(&mut text, &value)?;
-            }
+            },
             Event::CData(value) => {
                 let value = value.decode().map_err(xml_error)?;
                 append_separator_text(&mut text, &value)?;
-            }
+            },
             Event::GeneralRef(reference) => {
                 if let Some(character) = reference.resolve_char_ref().map_err(xml_error)? {
                     let mut encoded = [0u8; 4];
@@ -474,14 +462,14 @@ fn parse_separator(
                     };
                     append_separator_text(&mut text, value)?;
                 }
-            }
+            },
             Event::End(element)
                 if namespace == NamespaceKind::Text
                     && element.local_name().as_ref() == b"linenumbering-separator" =>
             {
                 break;
-            }
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated text:linenumbering-separator"),
             _ => return invalid("text:linenumbering-separator may contain text only"),
         }
@@ -608,7 +596,11 @@ fn write_attr(output: &mut String, name: &str, value: Option<&str>) {
 }
 
 fn write_bool_attr(output: &mut String, name: &str, value: Option<bool>) {
-    write_attr(output, name, value.map(|value| if value { "true" } else { "false" }));
+    write_attr(
+        output,
+        name,
+        value.map(|value| if value { "true" } else { "false" }),
+    );
 }
 
 fn write_u64_attr(output: &mut String, name: &str, value: Option<u64>) {
@@ -680,12 +672,12 @@ mod tests {
             configuration.number_format,
             Some(OdfLineNumberFormat::UpperAlpha)
         );
-        assert_eq!(configuration.number_position, Some(OdfLineNumberPosition::Outer));
-        assert_eq!(configuration.offset.as_ref().unwrap().as_str(), "0.25in");
         assert_eq!(
-            configuration.separator.as_ref().unwrap().text,
-            " / & "
+            configuration.number_position,
+            Some(OdfLineNumberPosition::Outer)
         );
+        assert_eq!(configuration.offset.as_ref().unwrap().as_str(), "0.25in");
+        assert_eq!(configuration.separator.as_ref().unwrap().text, " / & ");
 
         let serialized = configuration.to_xml().unwrap();
         let reparsed = parse_line_numbering_configuration(&styles(&serialized))
@@ -704,11 +696,10 @@ mod tests {
                 number_format: Some(format.clone()),
                 ..OdfLineNumberingConfiguration::default()
             };
-            let parsed = parse_line_numbering_configuration(&styles(
-                &configuration.to_xml().unwrap(),
-            ))
-            .unwrap()
-            .unwrap();
+            let parsed =
+                parse_line_numbering_configuration(&styles(&configuration.to_xml().unwrap()))
+                    .unwrap()
+                    .unwrap();
             assert_eq!(parsed.number_format, Some(format));
         }
     }
@@ -724,7 +715,10 @@ mod tests {
             r#"<t:linenumbering-configuration><t:linenumbering-separator/><t:linenumbering-separator/></t:linenumbering-configuration>"#,
             r#"<t:linenumbering-configuration><t:linenumbering-separator><t:span/></t:linenumbering-separator></t:linenumbering-configuration>"#,
         ] {
-            assert!(parse_line_numbering_configuration(&styles(body)).is_err(), "{body}");
+            assert!(
+                parse_line_numbering_configuration(&styles(body)).is_err(),
+                "{body}"
+            );
         }
         let misplaced = format!(
             r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}"><o:body><t:linenumbering-configuration/></o:body></o:document-content>"#

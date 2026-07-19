@@ -9,21 +9,17 @@ use zip::write::SimpleFileOptions;
 const ODT_REMOTE: &str = include_str!(
     "../../../3rdparty/libreoffice-core/sw/qa/extras/odfimport/data/draw-object-link.fodt"
 );
-const ODS_REMOTE: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sc/qa/unit/data/draw-object-link.fods"
-);
-const ODP_REMOTE: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sd/qa/unit/data/draw-object-link.fodp"
-);
+const ODS_REMOTE: &str =
+    include_str!("../../../3rdparty/libreoffice-core/sc/qa/unit/data/draw-object-link.fods");
+const ODP_REMOTE: &str =
+    include_str!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/draw-object-link.fodp");
 const ODT_MATH: &str = include_str!(
     "../../../3rdparty/libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt"
 );
-const ODP_MATH: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sd/qa/unit/data/odp/Math.fodp"
-);
-const ODT_CHART: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt"
-);
+const ODP_MATH: &str =
+    include_str!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/odp/Math.fodp");
+const ODT_CHART: &str =
+    include_str!("../../../3rdparty/libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt");
 
 #[test]
 fn libreoffice_remote_objects_remain_typed_and_inert_across_families() {
@@ -101,17 +97,17 @@ fn package_subdocuments_are_exactly_classified_for_specialized_families() {
                 b"<office:document-content/>" as &[u8],
                 "application/vnd.oasis.opendocument.chart",
             )],
-            Some((
-                "Object_1/",
-                "application/vnd.oasis.opendocument.chart",
-            )),
+            Some(("Object_1/", "application/vnd.oasis.opendocument.chart")),
         );
         let generic = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
         assert_eq!(generic.family(), family);
         assert_subdocument(&generic.embedded_objects().unwrap()[0]);
 
         let specialized = if family == OpenDocumentFamily::Text {
-            Document::from_bytes(bytes).unwrap().embedded_objects().unwrap()
+            Document::from_bytes(bytes)
+                .unwrap()
+                .embedded_objects()
+                .unwrap()
         } else if family == OpenDocumentFamily::Spreadsheet {
             Spreadsheet::from_bytes(bytes)
                 .unwrap()
@@ -195,7 +191,11 @@ fn malformed_active_content_and_unsafe_package_paths_are_rejected() {
     )
     .replacen("<office:body>", "<!DOCTYPE x><office:body>", 1);
     let parsed = FlatOpenDocument::from_bytes(xml.into_bytes());
-    assert!(parsed.and_then(|document| document.embedded_objects()).is_err());
+    assert!(
+        parsed
+            .and_then(|document| document.embedded_objects())
+            .is_err()
+    );
 
     let bytes = package(
         "application/vnd.oasis.opendocument.text",
@@ -274,9 +274,13 @@ fn package(
     let body = if mimetype.ends_with(".text") {
         format!("<office:text><text:p><draw:frame>{object}</draw:frame></text:p></office:text>")
     } else if mimetype.ends_with(".spreadsheet") {
-        format!("<office:spreadsheet><table:table table:name=\"Sheet1\"><table:shapes><draw:frame>{object}</draw:frame></table:shapes></table:table></office:spreadsheet>")
+        format!(
+            "<office:spreadsheet><table:table table:name=\"Sheet1\"><table:shapes><draw:frame>{object}</draw:frame></table:shapes></table:table></office:spreadsheet>"
+        )
     } else {
-        format!("<office:presentation><draw:page draw:name=\"Slide1\"><draw:frame>{object}</draw:frame></draw:page></office:presentation>")
+        format!(
+            "<office:presentation><draw:page draw:name=\"Slide1\"><draw:frame>{object}</draw:frame></draw:page></office:presentation>"
+        )
     };
     let content = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\" xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><office:body>{body}</office:body></office:document-content>"

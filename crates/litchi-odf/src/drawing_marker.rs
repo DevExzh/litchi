@@ -119,19 +119,9 @@ impl OdfDrawingMarker {
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "draw:name", false, MAX_VALUE_BYTES)?;
         if let Some(display_name) = &self.display_name {
-            validate_text(
-                display_name,
-                "draw:display-name",
-                true,
-                MAX_VALUE_BYTES,
-            )?;
+            validate_text(display_name, "draw:display-name", true, MAX_VALUE_BYTES)?;
         }
-        validate_text(
-            self.path_data.as_str(),
-            "svg:d",
-            true,
-            MAX_PATH_BYTES,
-        )
+        validate_text(self.path_data.as_str(), "svg:d", true, MAX_PATH_BYTES)
     }
 
     pub fn to_xml_fragment(&self) -> Result<String> {
@@ -274,7 +264,7 @@ pub fn parse_drawing_markers(xml: &str) -> Result<OdfDrawingMarkers> {
                 if stack.len() > MAX_DEPTH {
                     return invalid(format!("drawing marker XML exceeds {MAX_DEPTH} levels"));
                 }
-            }
+            },
             Event::Empty(ref element) => {
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace, &local)?;
@@ -288,7 +278,7 @@ pub fn parse_drawing_markers(xml: &str) -> Result<OdfDrawingMarkers> {
                         .markers
                         .push(parse_marker(&reader, element, &mut aggregate)?);
                 }
-            }
+            },
             Event::End(_) => {
                 let frame = stack
                     .pop()
@@ -304,7 +294,7 @@ pub fn parse_drawing_markers(xml: &str) -> Result<OdfDrawingMarkers> {
                         .markers
                         .push(active.take().expect("active marker checked").value);
                 }
-            }
+            },
             Event::Text(ref text) if active.is_some() => {
                 let value = text
                     .xml_content(XmlVersion::Explicit1_0)
@@ -312,15 +302,15 @@ pub fn parse_drawing_markers(xml: &str) -> Result<OdfDrawingMarkers> {
                 if !value.chars().all(char::is_whitespace) {
                     return invalid("draw:marker must be empty");
                 }
-            }
+            },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
                 return invalid("draw:marker cannot contain character data");
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid("DTDs and processing instructions are prohibited in marker XML");
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -347,19 +337,9 @@ fn parse_marker(
     let mut values = attributes(reader, element, aggregate)?;
     let name = required(&mut values, NamespaceKind::Draw, "name", "draw:name")?;
     let display_name = take(&mut values, NamespaceKind::Draw, "display-name");
-    let view_box = required(
-        &mut values,
-        NamespaceKind::Svg,
-        "viewBox",
-        "svg:viewBox",
-    )?
-    .parse()?;
-    let path_data = OdfMarkerPathData::new(required(
-        &mut values,
-        NamespaceKind::Svg,
-        "d",
-        "svg:d",
-    )?)?;
+    let view_box = required(&mut values, NamespaceKind::Svg, "viewBox", "svg:viewBox")?.parse()?;
+    let path_data =
+        OdfMarkerPathData::new(required(&mut values, NamespaceKind::Svg, "d", "svg:d")?)?;
     reject_attributes(&values)?;
     let marker = OdfDrawingMarker {
         name,
@@ -378,8 +358,8 @@ fn attributes(
 ) -> Result<Attributes> {
     let mut values = HashMap::new();
     for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|error| make_error(format!("invalid marker attribute: {error}")))?;
+        let attribute =
+            attribute.map_err(|error| make_error(format!("invalid marker attribute: {error}")))?;
         let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_kind(&resolved)?;
         let local = decode(local.as_ref(), "attribute name")?;
@@ -409,9 +389,10 @@ fn attributes(
 }
 
 fn ensure_location(stack: &[Frame]) -> Result<()> {
-    if stack.last().is_some_and(|frame| {
-        frame.namespace == NamespaceKind::Office && frame.local == "styles"
-    }) {
+    if stack
+        .last()
+        .is_some_and(|frame| frame.namespace == NamespaceKind::Office && frame.local == "styles")
+    {
         Ok(())
     } else {
         invalid("draw:marker must be a direct child of office:styles")
@@ -432,7 +413,7 @@ fn namespace_kind(resolved: &ResolveResult<'_>) -> Result<NamespaceKind> {
             } else {
                 NamespaceKind::Other
             })
-        }
+        },
         ResolveResult::Unknown(prefix) => invalid(format!(
             "unbound XML namespace prefix '{}'",
             String::from_utf8_lossy(prefix.as_ref())
@@ -463,7 +444,9 @@ fn required(
 
 fn reject_attributes(values: &Attributes) -> Result<()> {
     if let Some(((namespace, local), _)) = values.iter().next() {
-        return invalid(format!("unsupported marker attribute {namespace:?}:{local}"));
+        return invalid(format!(
+            "unsupported marker attribute {namespace:?}:{local}"
+        ));
     }
     Ok(())
 }
@@ -565,11 +548,21 @@ mod tests {
             wrap(r#"<draw:marker svg:viewBox="0 0 20 30" svg:d="M0 0"/>"#),
             wrap(r#"<draw:marker draw:name="x" svg:viewBox="0 0 20" svg:d="M0 0"/>"#),
             wrap(r#"<draw:marker draw:name="x" svg:viewBox="0 0 20.5 30" svg:d="M0 0"/>"#),
-            wrap(r#"<draw:marker draw:name="x" svg:viewBox="0 0 20 30" svg:d="M0 0"><draw:g/></draw:marker>"#),
-            wrap(r#"<draw:marker draw:name="x" svg:viewBox="0 0 20 30" svg:d="M0 0"/><draw:marker draw:name="x" svg:viewBox="0 0 1 1" svg:d="z"/>"#),
-            format!(r#"<office:document xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:svg="{SVG}"><draw:marker draw:name="x" svg:viewBox="0 0 1 1" svg:d="z"/></office:document>"#),
-            format!(r#"<office:styles xmlns:office="{OFFICE}" xmlns:evil="urn:evil" xmlns:svg="{SVG}"><evil:marker evil:name="x" svg:viewBox="0 0 1 1" svg:d="z"/></office:styles>"#),
-            format!(r#"<!DOCTYPE x><office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:svg="{SVG}"><draw:marker draw:name="x" svg:viewBox="0 0 1 1" svg:d="z"/></office:styles>"#),
+            wrap(
+                r#"<draw:marker draw:name="x" svg:viewBox="0 0 20 30" svg:d="M0 0"><draw:g/></draw:marker>"#,
+            ),
+            wrap(
+                r#"<draw:marker draw:name="x" svg:viewBox="0 0 20 30" svg:d="M0 0"/><draw:marker draw:name="x" svg:viewBox="0 0 1 1" svg:d="z"/>"#,
+            ),
+            format!(
+                r#"<office:document xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:svg="{SVG}"><draw:marker draw:name="x" svg:viewBox="0 0 1 1" svg:d="z"/></office:document>"#
+            ),
+            format!(
+                r#"<office:styles xmlns:office="{OFFICE}" xmlns:evil="urn:evil" xmlns:svg="{SVG}"><evil:marker evil:name="x" svg:viewBox="0 0 1 1" svg:d="z"/></office:styles>"#
+            ),
+            format!(
+                r#"<!DOCTYPE x><office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:svg="{SVG}"><draw:marker draw:name="x" svg:viewBox="0 0 1 1" svg:d="z"/></office:styles>"#
+            ),
         ] {
             assert!(parse_drawing_markers(&xml).is_err(), "accepted {xml}");
         }

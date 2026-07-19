@@ -68,11 +68,10 @@ fn builder_and_mutable_round_trip_inert_sheet_images() {
 }
 
 #[test]
-fn parses_libreoffice_table_shapes_reference_and_rejects_invalid_forms() {
+fn parses_libreoffice_table_shapes_references_alternatives_and_invalid_forms() {
     let source = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/libreoffice-core/sc/qa/unit/data/draw-image-link.fods",
-        ),
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../3rdparty/libreoffice-core/sc/qa/unit/data/draw-image-link.fods"),
     )
     .unwrap();
     let package = package_with_content(&source);
@@ -85,13 +84,34 @@ fn parses_libreoffice_table_shapes_reference_and_rejects_invalid_forms() {
     for body in [
         r#"<table:shapes/><table:shapes/>"#,
         r#"<evil:shapes xmlns:evil="urn:evil"><draw:frame/></evil:shapes>"#,
-        r#"<table:shapes><draw:frame svg:width="5cm" svg:height="5cm"><draw:image xlink:href="a"/><draw:image xlink:href="b"/></draw:frame></table:shapes>"#,
     ] {
         let content = content_with_shapes(body);
         let result = Spreadsheet::from_bytes(package_with_content(&content))
             .and_then(|mut spreadsheet| spreadsheet.sheets().map(|_| ()));
         assert!(result.is_err(), "accepted {body}");
     }
+
+    let alternatives = content_with_shapes(
+        r#"<table:shapes><draw:frame draw:name="preview" svg:width="5cm" svg:height="5cm"><draw:image xlink:href="Pictures/vector.svg"/><draw:image xlink:href="Pictures/fallback.png"/></draw:frame></table:shapes>"#,
+    );
+    let mut spreadsheet = Spreadsheet::from_bytes(package_with_content(&alternatives)).unwrap();
+    let sheets = spreadsheet.sheets().unwrap();
+    let images = sheets[0].images();
+    assert_eq!(images.len(), 2);
+    assert_eq!(
+        (images[0].alternative_index, images[1].alternative_index),
+        (0, 1)
+    );
+    assert_eq!(images[0].frame, images[1].frame);
+    assert!(
+        matches!(&images[1].source, OdfImageSource::Linked { href } if href == "Pictures/fallback.png")
+    );
+    let mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+    let mut reparsed = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reparsed_sheets = reparsed.sheets().unwrap();
+    let reparsed_images = reparsed_sheets[0].images();
+    assert_eq!(reparsed_images.len(), 2);
+    assert_eq!(reparsed_images[1].alternative_index, 1);
 
     let mut builder = SpreadsheetBuilder::new();
     let mut invalid = linked_image("relative.png");
@@ -109,8 +129,8 @@ fn package_with_content(content: &str) -> Vec<u8> {
     let mimetype = "application/vnd.oasis.opendocument.spreadsheet";
     let mut output = Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut output);
-    let stored = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let stored =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     let deflated = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
     zip.start_file("mimetype", stored).unwrap();

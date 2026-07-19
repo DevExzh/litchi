@@ -71,6 +71,9 @@ pub use manifest::{
     Manifest, ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption,
     ManifestEncryptionAlgorithm, ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration,
 };
+pub use encryption::{
+    OdfEncryptionCipher, OdfEncryptionKdf, OdfEncryptionProfile, OdfEncryptionStartKey,
+};
 pub use metadata::{
     AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, OdfMetadata,
     TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,

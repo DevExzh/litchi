@@ -1,5 +1,6 @@
 //! Semantic access to point and range cross-reference targets.
 
+use super::index::expanded_attributes;
 use crate::elements::xml::{
     TEXT_NAMESPACE, append_checked, append_text_control, decode_reference, is_bound,
     namespaced_attribute,
@@ -8,7 +9,13 @@ use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+mod writing;
+pub use writing::{
+    ReferenceMarkFragments, insert_reference_mark_xml, remove_reference_mark_xml,
+    replace_reference_mark_xml,
+};
 
 const MAX_DEPTH: usize = 4_096;
 const MAX_MARKS: usize = 1_000_000;
@@ -24,6 +31,28 @@ pub struct ReferenceMark {
 }
 
 impl ReferenceMark {
+    /// Create a point reference target.
+    pub fn point(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            start: None,
+            end: None,
+            text: String::new(),
+            range: false,
+        }
+    }
+
+    /// Create a range reference target.
+    pub fn range(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            start: None,
+            end: None,
+            text: String::new(),
+            range: true,
+        }
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -61,6 +90,7 @@ pub(crate) fn parse_reference_marks(xml: &str) -> Result<Vec<ReferenceMark>> {
     let mut paragraph: Option<(usize, usize, usize)> = None;
     let mut marker_depth = None;
     let mut pending = HashMap::<String, PendingReference>::new();
+    let mut identities = HashSet::<String>::new();
     let mut marks = Vec::new();
     let mut next_order = 0usize;
 
@@ -87,6 +117,7 @@ pub(crate) fn parse_reference_marks(xml: &str) -> Result<Vec<ReferenceMark>> {
                         text_element,
                         location,
                         &mut pending,
+                        &mut identities,
                         &mut marks,
                         &mut next_order,
                     )?;
@@ -112,6 +143,7 @@ pub(crate) fn parse_reference_marks(xml: &str) -> Result<Vec<ReferenceMark>> {
                         text_element,
                         None,
                         &mut pending,
+                        &mut identities,
                         &mut marks,
                         &mut next_order,
                     )?;
@@ -128,6 +160,7 @@ pub(crate) fn parse_reference_marks(xml: &str) -> Result<Vec<ReferenceMark>> {
                     text_element,
                     location,
                     &mut pending,
+                    &mut identities,
                     &mut marks,
                     &mut next_order,
                 )?;
@@ -212,17 +245,25 @@ fn process_marker(
     text_element: bool,
     location: Option<(usize, usize)>,
     pending: &mut HashMap<String, PendingReference>,
+    identities: &mut HashSet<String>,
     marks: &mut Vec<(usize, ReferenceMark)>,
     next_order: &mut usize,
 ) -> Result<()> {
     if !text_element || !is_marker(element) {
         return Ok(());
     }
+    validate_marker_attributes(reader, element)?;
     let name = namespaced_attribute(reader, element, TEXT_NAMESPACE, b"name", "reference mark")?
         .ok_or_else(|| Error::InvalidFormat("reference mark requires text:name".to_string()))?;
+    validate_reference_name(&name)?;
     match element.local_name().as_ref() {
         b"reference-mark" => {
             ensure_capacity(*next_order)?;
+            if !identities.insert(name.clone()) {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate reference-mark identity '{name}'"
+                )));
+            }
             marks.push((
                 *next_order,
                 ReferenceMark {
@@ -237,6 +278,11 @@ fn process_marker(
         },
         b"reference-mark-start" => {
             ensure_capacity(*next_order)?;
+            if !identities.insert(name.clone()) {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate reference-mark identity '{name}'"
+                )));
+            }
             if pending
                 .insert(
                     name.clone(),
@@ -268,6 +314,41 @@ fn process_marker(
             marks.push((reference.order, reference.mark));
         },
         _ => unreachable!(),
+    }
+    Ok(())
+}
+
+fn validate_marker_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<()> {
+    let attributes = expanded_attributes(reader, element, "reference mark")?;
+    if attributes.len() != 1
+        || attributes[0].namespace_uri.as_deref()
+            != Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ODF text namespace is UTF-8"))
+        || attributes[0].local_name != "name"
+    {
+        return Err(Error::InvalidFormat(
+            "reference marks allow only text:name".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn validate_reference_name(name: &str) -> Result<()> {
+    const MAX_NAME_BYTES: usize = 65_536;
+    if name.len() > MAX_NAME_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "reference-mark name exceeds {MAX_NAME_BYTES} bytes"
+        )));
+    }
+    if name.chars().any(|character| {
+        !matches!(
+            character,
+            '\u{9}' | '\u{A}' | '\u{D}' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}'
+                | '\u{10000}'..='\u{10FFFF}'
+        )
+    }) {
+        return Err(Error::InvalidFormat(
+            "reference-mark name contains a forbidden XML character".to_string(),
+        ));
     }
     Ok(())
 }

@@ -1,4 +1,4 @@
-//! Read-only semantic access to OpenDocument drawings.
+//! Semantic access to OpenDocument drawings.
 
 use crate::odp::OdpParser;
 use crate::{MediaReference, OdfMetadata, OpenDocumentFamily, OpenDocumentPackage, Shape, Slide};
@@ -31,6 +31,11 @@ pub struct DrawingPageProperties {
 }
 
 impl DrawingPageProperties {
+    /// Create an empty drawing-page property set.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Return `draw:name`.
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
@@ -83,6 +88,71 @@ impl DrawingPageProperties {
     pub fn date_time_name(&self) -> Option<&str> {
         self.date_time_name.as_deref()
     }
+
+    /// Set `draw:name`.
+    pub fn set_name(&mut self, value: Option<impl Into<String>>) {
+        self.name = value.map(Into::into);
+    }
+
+    /// Set the legacy `draw:id` identifier.
+    pub fn set_draw_id(&mut self, value: Option<impl Into<String>>) {
+        self.draw_id = value.map(Into::into);
+    }
+
+    /// Set the namespace-defined `xml:id` identifier.
+    pub fn set_xml_id(&mut self, value: Option<impl Into<String>>) {
+        self.xml_id = value.map(Into::into);
+    }
+
+    /// Set the drawing-page style reference.
+    pub fn set_style_name(&mut self, value: Option<impl Into<String>>) {
+        self.style_name = value.map(Into::into);
+    }
+
+    /// Set the master-page reference.
+    pub fn set_master_page_name(&mut self, value: Option<impl Into<String>>) {
+        self.master_page_name = value.map(Into::into);
+    }
+
+    /// Set the exact whitespace-separated `draw:nav-order` value.
+    pub fn set_navigation_order(&mut self, value: Option<impl Into<String>>) {
+        self.navigation_order = value.map(Into::into);
+    }
+
+    /// Set the presentation page-layout reference.
+    pub fn set_presentation_layout_name(&mut self, value: Option<impl Into<String>>) {
+        self.presentation_layout_name = value.map(Into::into);
+    }
+
+    /// Set the presentation header declaration reference.
+    pub fn set_header_name(&mut self, value: Option<impl Into<String>>) {
+        self.header_name = value.map(Into::into);
+    }
+
+    /// Set the presentation footer declaration reference.
+    pub fn set_footer_name(&mut self, value: Option<impl Into<String>>) {
+        self.footer_name = value.map(Into::into);
+    }
+
+    /// Set the presentation date/time declaration reference.
+    pub fn set_date_time_name(&mut self, value: Option<impl Into<String>>) {
+        self.date_time_name = value.map(Into::into);
+    }
+
+    pub(crate) fn values(&self) -> [Option<&str>; 10] {
+        [
+            self.name(),
+            self.draw_id(),
+            self.xml_id(),
+            self.style_name(),
+            self.master_page_name(),
+            self.navigation_order(),
+            self.presentation_layout_name(),
+            self.header_name(),
+            self.footer_name(),
+            self.date_time_name(),
+        ]
+    }
 }
 
 /// Visibility target of a declared drawing layer.
@@ -107,6 +177,15 @@ pub struct DrawingLayer {
 }
 
 impl DrawingLayer {
+    /// Create a named drawing layer.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            protected: None,
+            display: None,
+        }
+    }
+
     /// Return the required `draw:name` referenced by shape `draw:layer` values.
     pub fn name(&self) -> &str {
         &self.name
@@ -121,6 +200,22 @@ impl DrawingLayer {
     pub fn display(&self) -> Option<DrawingLayerDisplay> {
         self.display
     }
+
+    /// Change the layer name. Commit through [`MutableDrawing`](super::MutableDrawing)
+    /// so references can be checked atomically.
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = name.into();
+    }
+
+    /// Set the optional protection flag.
+    pub fn set_protected(&mut self, value: Option<bool>) {
+        self.protected = value;
+    }
+
+    /// Set the optional output visibility target.
+    pub fn set_display(&mut self, value: Option<DrawingLayerDisplay>) {
+        self.display = value;
+    }
 }
 
 struct DrawingPageData {
@@ -132,12 +227,30 @@ struct DrawingPageData {
 /// A page in an OpenDocument drawing.
 #[derive(Debug, Clone)]
 pub struct DrawingPage {
-    properties: DrawingPageProperties,
-    layers: Vec<DrawingLayer>,
-    page: Slide,
+    pub(crate) properties: DrawingPageProperties,
+    pub(crate) layers: Vec<DrawingLayer>,
+    pub(crate) page: Slide,
 }
 
 impl DrawingPage {
+    /// Create an empty drawing page with the supplied standard properties.
+    pub fn new(properties: DrawingPageProperties) -> Self {
+        Self {
+            properties,
+            layers: Vec::new(),
+            page: Slide {
+                title: None,
+                text: String::new(),
+                index: 0,
+                notes: None,
+                transition: None,
+                animations: Vec::new(),
+                legacy_animation: None,
+                shapes: Vec::new(),
+            },
+        }
+    }
+
     /// Return the zero-based page index.
     pub fn index(&self) -> usize {
         self.page.index()
@@ -186,6 +299,25 @@ pub struct DrawingDocument {
 }
 
 impl DrawingDocument {
+    /// Convert this validated package into an atomic mutable drawing.
+    pub fn into_mutable(self) -> Result<super::MutableDrawing> {
+        let content = self.package.content_xml()?;
+        let metadata = self.package.metadata()?;
+        let mimetype = self.package.mimetype().to_string();
+        let source_bytes = self.package.into_bytes();
+        super::MutableDrawing::from_document_parts(
+            source_bytes,
+            mimetype,
+            content,
+            metadata,
+            self.pages,
+        )
+    }
+
+    /// Clone this drawing into an atomic mutable drawing.
+    pub fn to_mutable(&self) -> Result<super::MutableDrawing> {
+        super::MutableDrawing::from_bytes(self.to_bytes())
+    }
     /// Open and validate an OpenDocument drawing from a path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = std::fs::File::open(path)?;

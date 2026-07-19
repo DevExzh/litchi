@@ -10,8 +10,7 @@ use quick_xml::{
 use std::collections::HashSet;
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-const PRESENTATION_NAMESPACE: &[u8] =
-    b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const MAX_XML_BYTES: usize = 8 * 1024 * 1024;
@@ -148,10 +147,14 @@ impl PresentationDeclarations {
             || self.footers.len() > MAX_DECLARATIONS
             || self.date_times.len() > MAX_DECLARATIONS
         {
-            return Err(invalid("presentation declaration collection exceeds 65536 entries"));
+            return Err(invalid(
+                "presentation declaration collection exceeds 65536 entries",
+            ));
         }
         if self.bindings.len() > MAX_BINDINGS {
-            return Err(invalid("presentation declaration bindings exceed 131072 entries"));
+            return Err(invalid(
+                "presentation declaration bindings exceed 131072 entries",
+            ));
         }
         let headers = validate_text_declarations(&self.headers, "header")?;
         let footers = validate_text_declarations(&self.footers, "footer")?;
@@ -186,11 +189,7 @@ impl PresentationDeclarations {
             }
             validate_reference(binding.header_name.as_deref(), "header", &headers)?;
             validate_reference(binding.footer_name.as_deref(), "footer", &footers)?;
-            validate_reference(
-                binding.date_time_name.as_deref(),
-                "date-time",
-                &date_times,
-            )?;
+            validate_reference(binding.date_time_name.as_deref(), "date-time", &date_times)?;
         }
         Ok(())
     }
@@ -251,7 +250,9 @@ pub fn parse_presentation_declarations(xml: &str) -> Result<PresentationDeclarat
     loop {
         match reader.read_event_into(&mut buffer).map_err(xml_error)? {
             Event::Start(element) => {
-                depth = depth.checked_add(1).ok_or_else(|| invalid("XML nesting overflow"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XML nesting overflow"))?;
                 if element_is(&reader, &element, OFFICE_NAMESPACE, b"presentation") {
                     if found_presentation {
                         return Err(invalid("duplicate office:presentation element"));
@@ -264,9 +265,8 @@ pub fn parse_presentation_declarations(xml: &str) -> Result<PresentationDeclarat
                             "presentation declarations must be direct office:presentation children",
                         ));
                     }
-                    open_declaration = Some(parse_declaration_start(
-                        &reader, &element, kind, depth,
-                    )?);
+                    open_declaration =
+                        Some(parse_declaration_start(&reader, &element, kind, depth)?);
                 } else if open_declaration.is_some() {
                     return Err(invalid("presentation declarations may contain text only"));
                 } else if element_is(&reader, &element, DRAW_NAMESPACE, b"page")
@@ -551,10 +551,15 @@ fn parse_declaration_start(
                 validate_name(&value, "style:data-style-name")?;
                 data_style_name = Some(value);
             },
-            _ => return Err(invalid("unsupported or duplicate presentation declaration attribute")),
+            _ => {
+                return Err(invalid(
+                    "unsupported or duplicate presentation declaration attribute",
+                ));
+            },
         }
     }
-    let name = name.ok_or_else(|| invalid("presentation declaration requires presentation:name"))?;
+    let name =
+        name.ok_or_else(|| invalid("presentation declaration requires presentation:name"))?;
     validate_name(&name, "presentation declaration name")?;
     Ok(OpenDeclaration {
         depth,
@@ -591,7 +596,9 @@ fn parse_binding(
                 value.date_time_name = Some(decoded)
             },
             b"use-header-name" | b"use-footer-name" | b"use-date-time-name" => {
-                return Err(invalid("duplicate presentation declaration binding attribute"));
+                return Err(invalid(
+                    "duplicate presentation declaration binding attribute",
+                ));
             },
             _ => continue,
         }
@@ -613,14 +620,12 @@ fn parse_binding(
 
 fn finish_declaration(value: OpenDeclaration, result: &mut PresentationDeclarations) -> Result<()> {
     match value.kind {
-        DeclarationKind::Header => result.headers.push(PresentationTextDeclaration::new(
-            value.name,
-            value.text,
-        )?),
-        DeclarationKind::Footer => result.footers.push(PresentationTextDeclaration::new(
-            value.name,
-            value.text,
-        )?),
+        DeclarationKind::Header => result
+            .headers
+            .push(PresentationTextDeclaration::new(value.name, value.text)?),
+        DeclarationKind::Footer => result
+            .footers
+            .push(PresentationTextDeclaration::new(value.name, value.text)?),
         DeclarationKind::DateTime => {
             let value = PresentationDateTimeDeclaration {
                 name: value.name,
@@ -691,19 +696,16 @@ fn validate_text(value: &str, description: &str, allow_empty: bool) -> Result<()
         return Err(invalid(format!("{description} cannot be empty")));
     }
     if value.chars().any(|character| {
-        character == '\0'
-            || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
+        character == '\0' || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
     }) {
-        return Err(invalid(format!("{description} contains invalid XML characters")));
+        return Err(invalid(format!(
+            "{description} contains invalid XML characters"
+        )));
     }
     Ok(())
 }
 
-fn write_text_declaration(
-    output: &mut String,
-    element: &str,
-    value: &PresentationTextDeclaration,
-) {
+fn write_text_declaration(output: &mut String, element: &str, value: &PresentationTextDeclaration) {
     output.push_str("<presentation:");
     output.push_str(element);
     output.push_str(" presentation:name=\"");
@@ -727,13 +729,23 @@ fn write_attribute(output: &mut String, name: &str, value: &str) {
     output.push('"');
 }
 
-fn element_is(reader: &NsReader<&[u8]>, element: &BytesStart<'_>, namespace: &[u8], local: &[u8]) -> bool {
+fn element_is(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &[u8],
+    local: &[u8],
+) -> bool {
     let (resolved, local_name) = reader.resolver().resolve_element(element.name());
     matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
         && local_name.as_ref() == local
 }
 
-fn end_is(reader: &NsReader<&[u8]>, element: &quick_xml::events::BytesEnd<'_>, namespace: &[u8], local: &[u8]) -> bool {
+fn end_is(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesEnd<'_>,
+    namespace: &[u8],
+    local: &[u8],
+) -> bool {
     let (resolved, local_name) = reader.resolver().resolve_element(element.name());
     matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
         && local_name.as_ref() == local
@@ -748,7 +760,9 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {
-    invalid(format!("presentation declaration XML parsing error: {error}"))
+    invalid(format!(
+        "presentation declaration XML parsing error: {error}"
+    ))
 }
 
 #[cfg(test)]
@@ -793,7 +807,10 @@ mod tests {
         let xml = format!(
             r#"{PREFIX}<p:header-decl p:name="h1">Quarterly &amp; Review</p:header-decl><p:footer-decl p:name="f1">Confidential</p:footer-decl><p:date-time-decl p:name="d1" p:source="current-date" s:data-style-name="N2"/><d:page p:use-header-name="h1" p:use-footer-name="f1" p:use-date-time-name="d1"><p:notes p:use-footer-name="f1"/></d:page>{SUFFIX}"#
         );
-        assert_eq!(parse_presentation_declarations(&xml).unwrap(), declarations());
+        assert_eq!(
+            parse_presentation_declarations(&xml).unwrap(),
+            declarations()
+        );
     }
 
     #[test]
@@ -801,7 +818,9 @@ mod tests {
         let declarations = declarations();
         let mut builder = PresentationBuilder::new();
         builder.add_slide_with_title("Title", "Body").unwrap();
-        builder.set_declarations(Some(declarations.clone())).unwrap();
+        builder
+            .set_declarations(Some(declarations.clone()))
+            .unwrap();
         let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
         assert_eq!(presentation.declarations().unwrap(), declarations);
         let mutable = MutablePresentation::from_presentation(presentation).unwrap();
@@ -820,7 +839,10 @@ mod tests {
             r#"<p:header-decl p:name="bad name"/>"#,
         ] {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
-            assert!(parse_presentation_declarations(&xml).is_err(), "accepted {xml}");
+            assert!(
+                parse_presentation_declarations(&xml).is_err(),
+                "accepted {xml}"
+            );
         }
         let active = format!("{PREFIX}<!DOCTYPE x><p:header-decl p:name=\"h\"/>{SUFFIX}");
         assert!(parse_presentation_declarations(&active).is_err());

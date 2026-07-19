@@ -38,6 +38,15 @@ impl Paragraph {
         }
     }
 
+    /// Append a validated, inert dynamic text field to this paragraph.
+    pub fn add_dynamic_text_field(
+        &mut self,
+        field: &crate::elements::field::OdfDynamicTextField,
+    ) -> Result<()> {
+        self.element.add_child(field.to_element()?);
+        Ok(())
+    }
+
     /// Create paragraph from element
     pub fn from_element(element: Element) -> Result<Self> {
         if element.tag_name() != "text:p" {

@@ -56,9 +56,11 @@
 
 mod builder;
 mod document;
-mod header_footer;
+mod dynamic_text;
+pub(crate) mod header_footer;
 mod header_footer_content;
 mod index;
+pub(crate) use index::expanded_attributes;
 mod index_mark;
 mod mutable;
 mod note;
@@ -66,22 +68,53 @@ pub(crate) mod page_layout;
 mod parser;
 mod reference_mark;
 mod ruby;
+mod section;
 mod tracked_changes;
 
 pub use builder::DocumentBuilder;
 pub use document::Document;
-pub use header_footer::{HeaderFooter, HeaderFooterKind, MasterPage};
+#[allow(unused_imports)]
+pub use dynamic_text::{
+    insert_database_field_xml, insert_dynamic_text_field_xml, remove_database_field_xml,
+    remove_dynamic_text_field_xml, replace_database_field_xml, replace_dynamic_text_field_xml,
+};
+pub use header_footer::{
+    HeaderFooter, HeaderFooterKind, MasterPage, MasterPageChild, MasterPageChildKind,
+};
 #[allow(unused_imports)] // Library public API
 pub use header_footer_content::{
     HeaderFooterBlock, HeaderFooterField, HeaderFooterFieldKind, HeaderFooterInline,
 };
-pub use index::{TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind};
-pub use index_mark::{TextIndexMark, TextIndexMarkKind};
+pub use index::{
+    AlphabeticalIndexSource, BibliographyIndexSource, IllustrationIndexSource, ObjectIndexSource,
+    TableIndexSource, TableOfContentsSource, TextAlphabeticalIndexEntryTemplate,
+    TextAlphabeticalIndexLevel, TextBibliographyEntryTemplate, TextBibliographyEntryToken,
+    TextBibliographyType, TextIndex, TextIndexAttribute, TextIndexBody, TextIndexBodyParagraph,
+    TextIndexBodyTitle, TextIndexCaptionSequenceFormat, TextIndexChapterDisplay, TextIndexContent,
+    TextIndexElement, TextIndexEntryTemplate, TextIndexEntryToken, TextIndexKind, TextIndexScope,
+    TextIndexSimpleEntryTemplate, TextIndexSourceStyles, TextIndexTabStop, TextIndexTitleTemplate,
+    UserIndexSource, insert_text_index_xml, remove_text_index_xml, replace_text_index_xml,
+};
+pub use index_mark::{
+    TextAlphabeticalMarkMetadata, TextIndexMark, TextIndexMarkFragments, TextIndexMarkKind,
+    insert_text_index_mark_xml, remove_text_index_mark_xml, replace_text_index_mark_xml,
+};
 pub use mutable::MutableDocument;
 pub use note::{Note, NoteClass};
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
-pub use reference_mark::ReferenceMark;
+pub use reference_mark::{
+    ReferenceMark, ReferenceMarkFragments, insert_reference_mark_xml, remove_reference_mark_xml,
+    replace_reference_mark_xml,
+};
 pub use ruby::Ruby;
+pub use section::{
+    OdtSectionBlock, add_section_xml, clear_sections_xml, remove_section_xml,
+    unwrap_section_xml, update_section_xml, wrap_section_xml,
+};
+pub use tracked_changes::{
+    OdtTrackedPosition, OdtTrackedStory, mark_tracked_change_range_xml,
+    mark_tracked_deletion_xml, set_tracked_changes_xml, unmark_tracked_change_xml,
+};
 
 // Re-export ODT-specific types for external use
 #[allow(unused_imports)] // Library public API

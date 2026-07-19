@@ -12,12 +12,10 @@ const ODT_LINK: &str = include_str!(
 const ODT_INLINE: &str = include_str!(
     "../../../3rdparty/libreoffice-core/sw/qa/extras/odfimport/data/draw-image-embedded.fodt"
 );
-const ODS_LINK: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sc/qa/unit/data/draw-image-link.fods"
-);
-const ODP_LINK: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sd/qa/unit/data/draw-image-link.fodp"
-);
+const ODS_LINK: &str =
+    include_str!("../../../3rdparty/libreoffice-core/sc/qa/unit/data/draw-image-link.fods");
+const ODP_LINK: &str =
+    include_str!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/draw-image-link.fodp");
 const ODT_HYPERLINK_ALT: &str = include_str!(
     "../../../3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/image-hyperlink-alttext.fodt"
 );
@@ -66,7 +64,10 @@ fn libreoffice_inline_image_is_strictly_decoded_without_following_links() {
     assert_eq!(images.len(), 1);
     let bytes = images[0].inline_bytes().unwrap();
     assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
-    assert_eq!(images[0].frame.as_ref().unwrap().name.as_deref(), Some("img1"));
+    assert_eq!(
+        images[0].frame.as_ref().unwrap().name.as_deref(),
+        Some("img1")
+    );
 }
 
 #[test]
@@ -78,20 +79,36 @@ fn packaged_images_join_references_manifest_and_bytes_for_all_specialized_famili
         ),
         (
             "application/vnd.oasis.opendocument.spreadsheet",
-            content_xml("<office:spreadsheet><table:table table:name=\"Sheet1\"><table:shapes>{image}</table:shapes></table:table></office:spreadsheet>"),
+            content_xml(
+                "<office:spreadsheet><table:table table:name=\"Sheet1\"><table:shapes>{image}</table:shapes></table:table></office:spreadsheet>",
+            ),
         ),
         (
             "application/vnd.oasis.opendocument.presentation",
-            content_xml("<office:presentation><draw:page draw:name=\"Slide1\">{image}</draw:page></office:presentation>"),
+            content_xml(
+                "<office:presentation><draw:page draw:name=\"Slide1\">{image}</draw:page></office:presentation>",
+            ),
         ),
     ] {
         let bytes = package(mimetype, &content, "Pictures/no-extension");
         let generic = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
         let images = generic.images().unwrap();
         assert_packaged_image(&images[0]);
-        assert_eq!(generic.image_bytes(&images[0]).unwrap(), Some(b"image-data".to_vec()));
-        assert!(generic.media_files().unwrap().contains(&"Pictures/unused.png".to_string()));
-        assert_eq!(images.len(), 1, "unreferenced package media is not an occurrence");
+        assert_eq!(
+            generic.image_bytes(&images[0]).unwrap(),
+            Some(b"image-data".to_vec())
+        );
+        assert!(
+            generic
+                .media_files()
+                .unwrap()
+                .contains(&"Pictures/unused.png".to_string())
+        );
+        assert_eq!(
+            images.len(),
+            1,
+            "unreferenced package media is not an occurrence"
+        );
 
         let specialized = if mimetype.ends_with(".text") {
             Document::from_bytes(bytes).unwrap().images().unwrap()
@@ -152,7 +169,13 @@ fn libreoffice_image_accessibility_metadata_is_typed_after_image_content() {
         let images = document.images().unwrap();
         let image = images
             .iter()
-            .find(|image| image.frame.as_ref().and_then(|frame| frame.title.as_deref()) == Some(title))
+            .find(|image| {
+                image
+                    .frame
+                    .as_ref()
+                    .and_then(|frame| frame.title.as_deref())
+                    == Some(title)
+            })
             .expect("fixture image with alternative title");
         let frame = image.frame.as_ref().unwrap();
         assert_eq!(frame.description.as_deref(), Some(description));
@@ -265,7 +288,10 @@ fn accessibility_text_limits_are_enforced_per_field_and_in_aggregate() {
 
 fn assert_packaged_image(image: &litchi_odf::OdfImage) {
     assert_eq!(image.part, OdfImagePart::Content);
-    assert_eq!(image.frame.as_ref().unwrap().name.as_deref(), Some("Image1"));
+    assert_eq!(
+        image.frame.as_ref().unwrap().name.as_deref(),
+        Some("Image1")
+    );
     assert!(matches!(
         &image.source,
         OdfImageSource::PackagePart {

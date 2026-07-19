@@ -1,8 +1,8 @@
 //! Inert semantic discovery of embedded ODF and OLE objects.
 
+use crate::OdfImageFrame;
 use crate::elements::xml::namespaced_attribute;
 use crate::media::{is_linked_href, resolve_package_path};
-use crate::OdfImageFrame;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
@@ -95,7 +95,9 @@ pub enum OdfEmbeddedObjectSource {
         href: String,
         resolved_path: String,
     },
-    Linked { href: String },
+    Linked {
+        href: String,
+    },
     Missing,
 }
 
@@ -260,7 +262,9 @@ fn scan_xml(
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid embedded-object XML: {error}")))?;
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid embedded-object XML: {error}"))
+            })?;
 
         if matches!(&event, Event::DocType(_)) {
             return Err(Error::InvalidFormat(
@@ -305,10 +309,9 @@ fn scan_xml(
                         "unterminated inline embedded-object XML".to_string(),
                     ));
                 },
-                event => write_inline_event(
-                    inline_capture.as_mut().expect("active inline XML"),
-                    event,
-                )?,
+                event => {
+                    write_inline_event(inline_capture.as_mut().expect("active inline XML"), event)?
+                },
             }
             buffer.clear();
             continue;
@@ -317,7 +320,11 @@ fn scan_xml(
         match event {
             Event::Start(element) => {
                 depth = checked_depth(depth)?;
-                if active.as_ref().and_then(|object| object.binary_depth).is_some() {
+                if active
+                    .as_ref()
+                    .and_then(|object| object.binary_depth)
+                    .is_some()
+                {
                     return Err(Error::InvalidFormat(
                         "office:binary-data must not contain elements".to_string(),
                     ));
@@ -377,9 +384,7 @@ fn scan_xml(
                         object.binary_present = true;
                         object.binary_depth = Some(depth);
                     }
-                } else if frames
-                    .last()
-                    .is_some_and(|frame| depth == frame.depth + 1)
+                } else if frames.last().is_some_and(|frame| depth == frame.depth + 1)
                     && let Some(kind) =
                         accessibility_kind(&namespace, element.local_name().as_ref())
                 {
@@ -424,7 +429,11 @@ fn scan_xml(
                 }
             },
             Event::Empty(element) => {
-                if active.as_ref().and_then(|object| object.binary_depth).is_some() {
+                if active
+                    .as_ref()
+                    .and_then(|object| object.binary_depth)
+                    .is_some()
+                {
                     return Err(Error::InvalidFormat(
                         "office:binary-data must not contain elements".to_string(),
                     ));
@@ -461,8 +470,7 @@ fn scan_xml(
                         && bound_to(&namespace, OFFICE_NAMESPACE)
                         && element.local_name().as_ref() == b"binary-data"
                     {
-                        if object.kind != OdfEmbeddedObjectKind::ObjectOle
-                            || object.binary_present
+                        if object.kind != OdfEmbeddedObjectKind::ObjectOle || object.binary_present
                         {
                             return Err(Error::InvalidFormat(
                                 "invalid duplicate inline OLE payload".to_string(),
@@ -478,10 +486,7 @@ fn scan_xml(
                     && let Some(kind) =
                         accessibility_kind(&namespace, element.local_name().as_ref())
                 {
-                    set_empty_accessibility(
-                        frames.last_mut().expect("direct frame child"),
-                        kind,
-                    )?;
+                    set_empty_accessibility(frames.last_mut().expect("direct frame child"), kind)?;
                 } else if let Some(kind) = object_kind(&namespace, &element) {
                     ensure_object_capacity(objects.len())?;
                     let object = start_object(
@@ -495,27 +500,48 @@ fn scan_xml(
                     objects.push(finish_object(object, part, package, total_binary_bytes)?);
                 }
             },
-            Event::Text(value) if active.as_ref().and_then(|object| object.binary_depth).is_some() => {
-                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid inline OLE text: {error}"))
-                })?;
+            Event::Text(value)
+                if active
+                    .as_ref()
+                    .and_then(|object| object.binary_depth)
+                    .is_some() =>
+            {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid inline OLE text: {error}"))
+                    })?;
                 append_binary(active.as_mut().expect("active OLE object"), &value)?;
             },
-            Event::CData(value) if active.as_ref().and_then(|object| object.binary_depth).is_some() => {
-                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid inline OLE CDATA: {error}"))
-                })?;
+            Event::CData(value)
+                if active
+                    .as_ref()
+                    .and_then(|object| object.binary_depth)
+                    .is_some() =>
+            {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid inline OLE CDATA: {error}"))
+                    })?;
                 append_binary(active.as_mut().expect("active OLE object"), &value)?;
             },
-            Event::GeneralRef(_) if active.as_ref().and_then(|object| object.binary_depth).is_some() => {
+            Event::GeneralRef(_)
+                if active
+                    .as_ref()
+                    .and_then(|object| object.binary_depth)
+                    .is_some() =>
+            {
                 return Err(Error::InvalidFormat(
                     "XML references are not allowed in office:binary-data".to_string(),
                 ));
             },
             Event::Text(value) if accessibility.is_some() => {
-                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid object accessibility text: {error}"))
-                })?;
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid object accessibility text: {error}"))
+                    })?;
                 append_accessibility(
                     accessibility.as_mut().expect("active accessibility text"),
                     &value,
@@ -523,9 +549,11 @@ fn scan_xml(
                 )?;
             },
             Event::CData(value) if accessibility.is_some() => {
-                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid object accessibility CDATA: {error}"))
-                })?;
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid object accessibility CDATA: {error}"))
+                    })?;
                 append_accessibility(
                     accessibility.as_mut().expect("active accessibility text"),
                     &value,
@@ -784,9 +812,9 @@ fn finish_object(
                 "inline OLE exceeds {MAX_INLINE_BINARY_BYTES} decoded bytes"
             )));
         }
-        *total_binary_bytes = total_binary_bytes.checked_add(bytes.len()).ok_or_else(|| {
-            Error::InvalidFormat("total inline OLE size overflow".to_string())
-        })?;
+        *total_binary_bytes = total_binary_bytes
+            .checked_add(bytes.len())
+            .ok_or_else(|| Error::InvalidFormat("total inline OLE size overflow".to_string()))?;
         if *total_binary_bytes > MAX_TOTAL_INLINE_BINARY_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "total inline OLE data exceeds {MAX_TOTAL_INLINE_BINARY_BYTES} bytes"
@@ -805,37 +833,37 @@ fn finish_object(
         ) {
             OdfEmbeddedObjectSource::Linked { href }
         } else {
-        match package {
-            None => OdfEmbeddedObjectSource::Linked { href },
-            Some(_) if is_linked_href(&href) => OdfEmbeddedObjectSource::Linked { href },
-            Some(package) => {
-                let path = resolve_package_path(&href)?;
-                if (package.has_file)(&path) {
-                    OdfEmbeddedObjectSource::PackageFile {
-                        href,
-                        manifest_media_type: (package.media_type)(&path),
-                        path,
-                    }
-                } else {
-                    let content_path = format!("{path}/content.xml");
-                    if (package.has_file)(&content_path) {
-                        let root_path = format!("{path}/");
-                        OdfEmbeddedObjectSource::PackageSubdocument {
+            match package {
+                None => OdfEmbeddedObjectSource::Linked { href },
+                Some(_) if is_linked_href(&href) => OdfEmbeddedObjectSource::Linked { href },
+                Some(package) => {
+                    let path = resolve_package_path(&href)?;
+                    if (package.has_file)(&path) {
+                        OdfEmbeddedObjectSource::PackageFile {
                             href,
-                            manifest_media_type: (package.media_type)(&root_path)
-                                .or_else(|| (package.media_type)(&path)),
-                            root_path,
-                            content_path,
+                            manifest_media_type: (package.media_type)(&path),
+                            path,
                         }
                     } else {
-                        OdfEmbeddedObjectSource::MissingPackagePart {
-                            href,
-                            resolved_path: path,
+                        let content_path = format!("{path}/content.xml");
+                        if (package.has_file)(&content_path) {
+                            let root_path = format!("{path}/");
+                            OdfEmbeddedObjectSource::PackageSubdocument {
+                                href,
+                                manifest_media_type: (package.media_type)(&root_path)
+                                    .or_else(|| (package.media_type)(&path)),
+                                root_path,
+                                content_path,
+                            }
+                        } else {
+                            OdfEmbeddedObjectSource::MissingPackagePart {
+                                href,
+                                resolved_path: path,
+                            }
                         }
                     }
-                }
-            },
-        }
+                },
+            }
         }
     } else {
         OdfEmbeddedObjectSource::Missing
@@ -1013,11 +1041,10 @@ fn append_accessibility(
     value: &str,
     total_accessibility_bytes: &mut usize,
 ) -> Result<()> {
-    let field_len = active
-        .value
-        .len()
-        .checked_add(value.len())
-        .ok_or_else(|| Error::InvalidFormat("object accessibility size overflow".to_string()))?;
+    let field_len =
+        active.value.len().checked_add(value.len()).ok_or_else(|| {
+            Error::InvalidFormat("object accessibility size overflow".to_string())
+        })?;
     if field_len > MAX_ACCESSIBILITY_TEXT_BYTES {
         return Err(Error::InvalidFormat(format!(
             "object accessibility text exceeds {MAX_ACCESSIBILITY_TEXT_BYTES} bytes"
@@ -1066,7 +1093,10 @@ fn limited_attribute(
     local_name: &[u8],
 ) -> Result<Option<String>> {
     let value = attribute(reader, element, namespace, local_name)?;
-    if value.as_ref().is_some_and(|value| value.len() > MAX_ATTRIBUTE_BYTES) {
+    if value
+        .as_ref()
+        .is_some_and(|value| value.len() > MAX_ATTRIBUTE_BYTES)
+    {
         return Err(Error::InvalidFormat(format!(
             "embedded-object attribute exceeds {MAX_ATTRIBUTE_BYTES} bytes"
         )));
@@ -1105,9 +1135,15 @@ mod active_object_tests {
         assert_eq!(objects[0].code.as_deref(), Some("Main"));
         assert_eq!(objects[0].may_script, Some(true));
         assert_eq!(objects[0].parameters[0].name, "theme");
-        assert!(matches!(objects[0].source, OdfEmbeddedObjectSource::Linked { .. }));
+        assert!(matches!(
+            objects[0].source,
+            OdfEmbeddedObjectSource::Linked { .. }
+        ));
         assert_eq!(objects[1].kind, OdfEmbeddedObjectKind::Plugin);
-        assert_eq!(objects[1].mime_type.as_deref(), Some("application/x-example"));
+        assert_eq!(
+            objects[1].mime_type.as_deref(),
+            Some("application/x-example")
+        );
         assert_eq!(objects[2].kind, OdfEmbeddedObjectKind::FloatingFrame);
         assert_eq!(objects[2].frame_name.as_deref(), Some("preview"));
     }

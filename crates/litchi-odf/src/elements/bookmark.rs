@@ -13,6 +13,12 @@ use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
+mod writing;
+pub use writing::{
+    BookmarkFragments, BookmarkTarget, insert_bookmark_xml, parse_bookmark_targets,
+    remove_bookmark_xml, replace_bookmark_xml,
+};
+
 const MAX_BOOKMARK_DEPTH: usize = 4_096;
 const MAX_BOOKMARKS: usize = 1_000_000;
 
@@ -158,6 +164,7 @@ pub struct BookmarkParser;
 impl BookmarkParser {
     /// Parse all bookmarks from XML content
     pub fn parse_bookmarks(xml_content: &str) -> Result<Vec<Bookmark>> {
+        writing::validate_bookmark_xml(xml_content)?;
         let mut reader = NsReader::from_str(xml_content);
         reader.config_mut().expand_empty_elements = true;
         let mut buffer = Vec::new();
@@ -227,6 +234,7 @@ impl BookmarkParser {
     ///
     /// Positions are reported as zero-based paragraph/heading and character offsets.
     pub fn parse_bookmark_ranges(xml_content: &str) -> Result<Vec<BookmarkRange>> {
+        writing::validate_bookmark_xml(xml_content)?;
         let mut reader = NsReader::from_str(xml_content);
         let mut buffer = Vec::new();
         let mut document_depth = 0usize;

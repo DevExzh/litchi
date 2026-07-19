@@ -71,14 +71,14 @@
 //! - calamine: Spreadsheet parsing patterns
 //! - ODF Toolkit: Simple API - Spreadsheet class
 
-mod annotation;
+pub(crate) mod annotation;
 mod builder;
-mod calculation;
+pub(crate) mod calculation;
 mod cell;
 mod consolidation;
-mod data_pilot;
+pub(crate) mod data_pilot;
 mod data_validation;
-mod database_range;
+pub(crate) mod database_range;
 mod dde;
 mod detective;
 /// OpenFormula parsing and support
@@ -86,8 +86,8 @@ pub mod formula;
 mod hyperlink;
 mod label_range;
 mod mutable;
-mod named_expression;
-mod parser;
+pub(crate) mod named_expression;
+pub(crate) mod parser;
 mod protection;
 mod row;
 mod scenario;
@@ -109,7 +109,8 @@ pub use cell::{Cell, CellMatrixSpan, CellMerge, CellValue};
 pub use consolidation::{Consolidation, ConsolidationUseLabels};
 pub use data_pilot::{
     DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,
-    DataPilotGrandTotal, DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups,
+    DataPilotGrandTotal, DataPilotGrandTotalElement, DataPilotGrandTotalOrientation,
+    DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups,
     DataPilotLayoutInfo, DataPilotLayoutMode, DataPilotLevel, DataPilotMember,
     DataPilotOrientation, DataPilotReferenceMemberType, DataPilotReferenceType, DataPilotSortInfo,
     DataPilotSortMode, DataPilotSortOrder, DataPilotSource, DataPilotTable,
@@ -149,7 +150,9 @@ pub use structure::{
     Column, SheetPrintSettings, SheetStyle, SheetStyleUsage, TableGroup, TableRange,
     TableStructure, TableVisibility,
 };
-pub use style_protection::{CellStyleProtection, ConditionalCellStyle, ConditionalCellStyleRule};
+pub use style_protection::{
+    CellStyleProtection, ConditionalCellStyle, ConditionalCellStyleRule, TableCellProtectionStyle,
+};
 pub use table_template::{TableTemplate, TableTemplateAxis, TableTemplateStyle};
 pub use tracked_changes::{
     SpreadsheetCellContentChange, SpreadsheetChangeAcceptance, SpreadsheetChangeCutOff,

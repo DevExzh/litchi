@@ -69,6 +69,9 @@ pub struct Document {
 }
 
 impl Document {
+    crate::script_package::script_facade_methods!();
+    crate::annotation_package::annotation_facade_methods!(Text);
+
     pub(crate) fn into_package(self) -> OwnedPackage {
         self.package
     }
@@ -671,6 +674,15 @@ impl Document {
         FieldParser::parse_fields(self.content.xml_content())
     }
 
+    /// Get conditional, hidden, and placeholder text fields in document order.
+    ///
+    /// Conditions and formulas are returned as inert strings. This method never
+    /// evaluates them and returns only the cached display text stored in the file.
+    pub fn dynamic_text_fields(&self) -> Result<Vec<crate::elements::field::OdfDynamicTextField>> {
+        use crate::elements::field::FieldParser;
+        FieldParser::parse_dynamic_text_fields(self.content.xml_content())
+    }
+
     /// Get all tables with repeated cells and rows expanded.
     ///
     /// ODF files can store repeated cells/rows compactly. This method expands
@@ -843,6 +855,76 @@ impl Document {
         crate::form::parse_form_parts(&parts)
     }
 
+    pub fn rdf_graphs(&self) -> Result<Vec<crate::OdfRdfGraph>> {
+        crate::rdf_package::graphs(&self.package)
+    }
+    pub fn add_rdf_graph(&mut self, preferred_path: Option<&str>, triples: &[crate::OdfRdfTriple]) -> Result<String> {
+        let (bytes, path) = crate::rdf_package::add_graph(&self.package, preferred_path, triples)?;
+        *self = Self::from_bytes(bytes)?; Ok(path)
+    }
+    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::OdfRdfTriple]) -> Result<()> {
+        let bytes = crate::rdf_package::replace_graph(&self.package, path, triples)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
+        let bytes = crate::rdf_package::remove_graph(&self.package, path)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::OdfRdfTriple) -> Result<usize> {
+        let index = self.rdf_graphs()?.into_iter().find(|graph| graph.path == path).ok_or_else(|| Error::InvalidFormat(format!("RDF graph '{path}' was not found")))?.triples.len();
+        let (bytes, _) = crate::rdf_package::add_triple(&self.package, path, triple)?;
+        *self = Self::from_bytes(bytes)?; Ok(index)
+    }
+    pub fn replace_rdf_triple(&mut self, path: &str, index: usize, triple: &crate::OdfRdfTriple) -> Result<()> {
+        let bytes = crate::rdf_package::replace_triple(&self.package, path, index, triple)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
+        let bytes = crate::rdf_package::remove_triple(&self.package, path, index)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::rdf_package::move_triple(&self.package, path, from, to)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+
+    pub fn add_form(&mut self, group_index: usize, form: &crate::OdfAuthoredForm) -> Result<usize> {
+        let (bytes, index) = crate::form_package::add_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), crate::form_package::FormHost::Text, group_index, None, form)?;
+        *self = Self::from_bytes(bytes)?; Ok(index)
+    }
+    pub fn add_nested_form(&mut self, parent_form: usize, form: &crate::OdfAuthoredForm) -> Result<usize> {
+        let (bytes, index) = crate::form_package::add_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), crate::form_package::FormHost::Text, 0, Some(parent_form), form)?;
+        *self = Self::from_bytes(bytes)?; Ok(index)
+    }
+    pub fn replace_form(&mut self, index: usize, form: &crate::OdfAuthoredForm) -> Result<()> {
+        let bytes = crate::form_package::replace_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, form)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn remove_form(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::form_package::remove_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn move_form(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::form_package::move_form(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), from, to)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn add_form_control(&mut self, form_index: usize, control: &crate::OdfAuthoredFormControl) -> Result<usize> {
+        let (bytes, index) = crate::form_package::add_control(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), form_index, control)?;
+        *self = Self::from_bytes(bytes)?; Ok(index)
+    }
+    pub fn replace_form_control(&mut self, index: usize, control: &crate::OdfAuthoredFormControl) -> Result<()> {
+        let bytes = crate::form_package::replace_control(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, control)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn remove_form_control(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::form_package::remove_control(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+    pub fn move_form_control(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::form_package::move_control(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), from, to)?;
+        *self = Self::from_bytes(bytes)?; Ok(())
+    }
+
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
     pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
         let mut parts = vec![(self.content.xml_content(), crate::OdfVariablePart::Content)];
@@ -861,6 +943,78 @@ impl Document {
             |path| package.has_file(path),
             |path| package.manifest().get_media_type(path).map(str::to_string),
         )
+    }
+
+    /// Open one inert embedded chart as a standalone chart document.
+    pub fn embedded_chart(&self, index: usize) -> Result<crate::ChartDocument> {
+        crate::embedded_chart::open_embedded_chart(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index)
+    }
+
+    /// Append a packaged chart object to the text body.
+    pub fn add_embedded_chart(&mut self, definition: &crate::ChartDefinition) -> Result<usize> {
+        self.add_embedded_chart_with_storage(definition, crate::OdfEmbeddedChartStorage::PackageSubdocument)
+    }
+
+    /// Append a chart object using an explicit storage form.
+    pub fn add_embedded_chart_with_storage(&mut self, definition: &crate::ChartDefinition, storage: crate::OdfEmbeddedChartStorage) -> Result<usize> {
+        let (bytes, index) = crate::embedded_chart::add_embedded_chart(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), crate::embedded_chart::EmbeddedChartHost::Text, storage, definition)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(index)
+    }
+
+    pub fn replace_embedded_chart(&mut self, index: usize, definition: &crate::ChartDefinition) -> Result<()> {
+        let bytes = crate::embedded_chart::replace_embedded_chart(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, definition)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    pub fn remove_embedded_chart(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::embedded_chart::remove_embedded_chart(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    /// Append an inert embedded object or image to the text body.
+    pub fn add_embedded_resource(&mut self, resource: &crate::OdfEmbeddedResource) -> Result<usize> {
+        let (bytes, index) = crate::embedded_package::add(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), crate::embedded_chart::EmbeddedChartHost::Text, resource)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(index)
+    }
+
+    pub fn replace_embedded_object(&mut self, index: usize, resource: &crate::OdfEmbeddedResource) -> Result<()> {
+        let bytes = crate::embedded_package::replace(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, crate::embedded_package::ResourceTarget::Object, resource)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    pub fn replace_embedded_image(&mut self, index: usize, resource: &crate::OdfEmbeddedResource) -> Result<()> {
+        let bytes = crate::embedded_package::replace(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, crate::embedded_package::ResourceTarget::Image, resource)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    pub fn remove_embedded_object(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::embedded_package::remove(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, crate::embedded_package::ResourceTarget::Object)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    pub fn remove_embedded_image(&mut self, index: usize) -> Result<()> {
+        let bytes = crate::embedded_package::remove(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), index, crate::embedded_package::ResourceTarget::Image)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    pub fn move_embedded_object(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::embedded_package::reorder(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), from, to, crate::embedded_package::ResourceTarget::Object)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    pub fn move_embedded_image(&mut self, from: usize, to: usize) -> Result<()> {
+        let bytes = crate::embedded_package::reorder(&self.package, self.content.xml_content(), self.styles.as_ref().map(Styles::xml_content), from, to, crate::embedded_package::ResourceTarget::Image)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
     }
 
     /// Return bytes only for inline or verified package-contained images.

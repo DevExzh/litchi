@@ -149,6 +149,10 @@ impl<'a> ChartSeries<'a> {
         self.element
     }
 
+    pub fn xml_id(self) -> Option<&'a str> {
+        self.element.attribute(Some("http://www.w3.org/XML/1998/namespace"), "id")
+    }
+
     /// Return the chart class QName lexically; namespace resolution remains inert.
     pub fn class_name(self) -> Option<&'a str> {
         chart_attribute(self.element, "class")
@@ -169,9 +173,7 @@ impl<'a> ChartSeries<'a> {
     pub fn domains(self) -> impl Iterator<Item = &'a str> + 'a {
         self.element
             .children_of_kind(ChartElementKind::Domain)
-            .filter_map(|domain| {
-                domain.attribute(Some(TABLE_NAMESPACE), "cell-range-address")
-            })
+            .filter_map(|domain| domain.attribute(Some(TABLE_NAMESPACE), "cell-range-address"))
     }
 
     pub fn data_points(self) -> impl Iterator<Item = ChartDataPoint<'a>> + 'a {
@@ -274,15 +276,26 @@ mod tests {
 
     #[test]
     fn exposes_typed_zero_copy_chart_semantics() {
-        let document = document(r#"<c:axis c:dimension="x" c:name="x"><c:categories t:cell-range-address="Data.A2:A4"/><c:grid c:class="major"/></c:axis><c:series c:values-cell-range-address="Data.B2:B4" c:label-cell-address="Data.B1"><c:domain t:cell-range-address="Data.A2:A4"/><c:data-point c:repeated="3"/></c:series>"#);
-        assert_eq!(document.legend().unwrap().position().unwrap(), ChartLegendPosition::BottomEnd);
+        let document = document(
+            r#"<c:axis c:dimension="x" c:name="x"><c:categories t:cell-range-address="Data.A2:A4"/><c:grid c:class="major"/></c:axis><c:series c:values-cell-range-address="Data.B2:B4" c:label-cell-address="Data.B1"><c:domain t:cell-range-address="Data.A2:A4"/><c:data-point c:repeated="3"/></c:series>"#,
+        );
+        assert_eq!(
+            document.legend().unwrap().position().unwrap(),
+            ChartLegendPosition::BottomEnd
+        );
         let plot = document.plot_area().unwrap();
         assert_eq!(plot.cell_range_address(), Some("Data.A1:C4"));
-        assert_eq!(plot.data_source_labels().unwrap(), ChartDataSourceLabels::Both);
+        assert_eq!(
+            plot.data_source_labels().unwrap(),
+            ChartDataSourceLabels::Both
+        );
         let axis = plot.axes().next().unwrap();
         assert_eq!(axis.dimension().unwrap(), ChartAxisDimension::X);
         assert_eq!(axis.categories_range(), Some("Data.A2:A4"));
-        assert_eq!(axis.grids().next().unwrap().class().unwrap(), ChartGridClass::Major);
+        assert_eq!(
+            axis.grids().next().unwrap().class().unwrap(),
+            ChartGridClass::Major
+        );
         let series = plot.series().next().unwrap();
         assert_eq!(series.values_range(), Some("Data.B2:B4"));
         assert_eq!(series.domains().next(), Some("Data.A2:A4"));
@@ -291,11 +304,22 @@ mod tests {
 
     #[test]
     fn validates_typed_enumerations_and_counts_lazily() {
-        let document = document(r#"<c:axis c:dimension="time"><c:grid c:class="micro"/></c:axis><c:series><c:data-point c:repeated="0"/></c:series>"#);
+        let document = document(
+            r#"<c:axis c:dimension="time"><c:grid c:class="micro"/></c:axis><c:series><c:data-point c:repeated="0"/></c:series>"#,
+        );
         let plot = document.plot_area().unwrap();
         let axis = plot.axes().next().unwrap();
         assert!(axis.dimension().is_err());
         assert!(axis.grids().next().unwrap().class().is_err());
-        assert!(plot.series().next().unwrap().data_points().next().unwrap().repeated().is_err());
+        assert!(
+            plot.series()
+                .next()
+                .unwrap()
+                .data_points()
+                .next()
+                .unwrap()
+                .repeated()
+                .is_err()
+        );
     }
 }

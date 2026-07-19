@@ -160,8 +160,8 @@ impl ChartElement {
 
 /// A validated standalone OpenDocument chart or chart template.
 pub struct ChartDocument {
-    package: OpenDocumentPackage,
-    chart: ChartElement,
+    pub(crate) package: OpenDocumentPackage,
+    pub(crate) chart: ChartElement,
 }
 
 impl ChartDocument {
@@ -200,6 +200,11 @@ impl ChartDocument {
         &self.chart
     }
 
+    /// Return inert calculation settings stored beside the chart.
+    pub fn calculation_settings(&self) -> Result<Option<crate::CalculationSettings>> {
+        crate::ods::calculation::parse_calculation_settings(&self.package.content_xml()?)
+    }
+
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
     pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
         self.package.variable_declarations()
@@ -234,7 +239,7 @@ impl ChartDocument {
     }
 }
 
-fn parse_chart_content(xml: &str) -> Result<ChartElement> {
+pub(crate) fn parse_chart_content(xml: &str) -> Result<ChartElement> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;

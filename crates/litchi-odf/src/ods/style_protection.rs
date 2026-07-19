@@ -9,6 +9,7 @@ use quick_xml::{
     reader::NsReader,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::ops::Range;
 
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const MAX_CONDITIONAL_STYLES: usize = 65_536;
@@ -42,6 +43,47 @@ pub struct ConditionalCellStyleRule {
     pub base_cell_address: Option<String>,
 }
 
+impl ConditionalCellStyle {
+    /// Create an inert conditional table-cell style.
+    pub fn new(style_name: impl Into<String>, rules: Vec<ConditionalCellStyleRule>) -> Self {
+        Self {
+            style_name: style_name.into(),
+            parent_style_name: None,
+            rules,
+        }
+    }
+
+    /// Set the optional parent table-cell style name.
+    pub fn with_parent_style_name(mut self, parent_style_name: impl Into<String>) -> Self {
+        self.parent_style_name = Some(parent_style_name.into());
+        self
+    }
+}
+
+impl ConditionalCellStyleRule {
+    /// Create an inert conditional rule without a formula namespace or base address.
+    pub fn new(condition: impl Into<String>, apply_style_name: impl Into<String>) -> Self {
+        Self {
+            condition: condition.into(),
+            formula_namespace: None,
+            apply_style_name: apply_style_name.into(),
+            base_cell_address: None,
+        }
+    }
+
+    /// Bind the lexical condition prefix to a namespace URI.
+    pub fn with_formula_namespace(mut self, namespace: FormulaNamespace) -> Self {
+        self.formula_namespace = Some(namespace);
+        self
+    }
+
+    /// Set the optional lexical base cell address.
+    pub fn with_base_cell_address(mut self, address: impl Into<String>) -> Self {
+        self.base_cell_address = Some(address.into());
+        self
+    }
+}
+
 /// The effective value of the ODF `style:cell-protect` property.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CellStyleProtection {
@@ -50,6 +92,29 @@ pub enum CellStyleProtection {
     FormulaHidden,
     ProtectedFormulaHidden,
     HiddenAndProtected,
+}
+
+/// One automatic table-cell style with an explicit `style:cell-protect` value.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TableCellProtectionStyle {
+    pub style_name: String,
+    pub parent_style_name: Option<String>,
+    pub protection: CellStyleProtection,
+}
+
+impl TableCellProtectionStyle {
+    pub fn new(style_name: impl Into<String>, protection: CellStyleProtection) -> Self {
+        Self {
+            style_name: style_name.into(),
+            parent_style_name: None,
+            protection,
+        }
+    }
+
+    pub fn with_parent_style_name(mut self, parent_style_name: impl Into<String>) -> Self {
+        self.parent_style_name = Some(parent_style_name.into());
+        self
+    }
 }
 
 impl CellStyleProtection {
@@ -85,6 +150,16 @@ impl CellStyleProtection {
     pub fn hides_content(self) -> bool {
         self == Self::HiddenAndProtected
     }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Protected => "protected",
+            Self::FormulaHidden => "formula-hidden",
+            Self::ProtectedFormulaHidden => "protected formula-hidden",
+            Self::HiddenAndProtected => "hidden-and-protected",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -95,6 +170,7 @@ pub(crate) struct CellStyleRegistry {
     style_order: Vec<String>,
     conditional_styles: Vec<ConditionalCellStyle>,
     conditional_style_index: HashMap<String, usize>,
+    automatic_protection_styles: Vec<TableCellProtectionStyle>,
     parsed_conditional_styles: usize,
     parsed_conditional_rules: usize,
     conditional_text_bytes: usize,
@@ -128,6 +204,738 @@ impl PreservedXmlFragment {
             out.push('"');
         }
     }
+}
+
+pub(crate) fn common_table_cell_style_names(styles_xml: Option<&str>) -> Result<HashSet<String>> {
+    let registry = CellStyleRegistry::parse(styles_xml, "")?;
+    Ok(registry.common_table_cell_styles)
+}
+
+pub(crate) fn validate_protection_style_document(
+    styles_xml: Option<&str>,
+    automatic_styles_xml: &str,
+    authored: &[TableCellProtectionStyle],
+) -> Result<()> {
+    let registry = CellStyleRegistry::parse(styles_xml, automatic_styles_xml)?;
+    for style in authored {
+        let mut current = style.style_name.as_str();
+        let mut visited = HashSet::new();
+        loop {
+            if !visited.insert(current.to_string()) {
+                return Err(Error::InvalidFormat(format!(
+                    "cyclic table-cell style inheritance at '{current}'"
+                )));
+            }
+            let definition = registry.styles.get(current).ok_or_else(|| {
+                Error::InvalidFormat(format!("missing table-cell style '{current}'"))
+            })?;
+            let Some(parent) = definition.parent.as_deref() else {
+                break;
+            };
+            current = parent;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_style_name(name: &str, label: &str) -> Result<()> {
+    if name.is_empty() {
+        return Err(Error::InvalidFormat(format!("{label} must not be empty")));
+    }
+    check_conditional_attribute_size(label, name)
+}
+
+pub(crate) fn validate_conditional_style_collection(
+    styles: &[ConditionalCellStyle],
+    common_styles: &HashSet<String>,
+) -> Result<()> {
+    if styles.len() > MAX_CONDITIONAL_STYLES {
+        return Err(Error::InvalidFormat(format!(
+            "document exceeds the {MAX_CONDITIONAL_STYLES} conditional style limit"
+        )));
+    }
+    let mut names = HashSet::with_capacity(styles.len());
+    let mut total_rules = 0usize;
+    let mut total_text = 0usize;
+    for style in styles {
+        validate_style_name(&style.style_name, "conditional style name")?;
+        if !names.insert(style.style_name.as_str()) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate conditional style name '{}'",
+                style.style_name
+            )));
+        }
+        if style.rules.is_empty() {
+            return Err(Error::InvalidFormat(format!(
+                "conditional style '{}' must contain at least one rule",
+                style.style_name
+            )));
+        }
+        if style.rules.len() > MAX_RULES_PER_STYLE {
+            return Err(Error::InvalidFormat(format!(
+                "conditional style '{}' exceeds the {MAX_RULES_PER_STYLE} rule limit",
+                style.style_name
+            )));
+        }
+        if let Some(parent) = &style.parent_style_name {
+            validate_style_name(parent, "parent style name")?;
+        }
+        total_rules = total_rules.checked_add(style.rules.len()).ok_or_else(|| {
+            Error::InvalidFormat("conditional rule count overflow".to_string())
+        })?;
+        if total_rules > MAX_CONDITIONAL_RULES {
+            return Err(Error::InvalidFormat(format!(
+                "document exceeds the {MAX_CONDITIONAL_RULES} conditional rule limit"
+            )));
+        }
+        for rule in &style.rules {
+            check_conditional_attribute_size("style:condition", &rule.condition)?;
+            if rule.condition.is_empty() {
+                return Err(Error::InvalidFormat(
+                    "style:condition must not be empty".to_string(),
+                ));
+            }
+            validate_style_name(&rule.apply_style_name, "style:apply-style-name")?;
+            if !common_styles.contains(&rule.apply_style_name) {
+                return Err(Error::InvalidFormat(format!(
+                    "conditional style '{}' references missing, automatic, or non-table-cell common style '{}'",
+                    style.style_name, rule.apply_style_name
+                )));
+            }
+            if let Some(base) = &rule.base_cell_address {
+                check_conditional_attribute_size("style:base-cell-address", base)?;
+                if base.is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "style:base-cell-address must not be empty".to_string(),
+                    ));
+                }
+            }
+            validate_formula_namespace(rule)?;
+            total_text = total_text
+                .checked_add(rule.condition.len())
+                .and_then(|value| value.checked_add(rule.apply_style_name.len()))
+                .and_then(|value| {
+                    value.checked_add(rule.base_cell_address.as_deref().map_or(0, str::len))
+                })
+                .ok_or_else(|| {
+                    Error::InvalidFormat("conditional style text size overflow".to_string())
+                })?;
+            if total_text > MAX_CONDITIONAL_TEXT_BYTES {
+                return Err(Error::InvalidFormat(format!(
+                    "conditional style text exceeds the {MAX_CONDITIONAL_TEXT_BYTES} byte limit"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_formula_namespace(rule: &ConditionalCellStyleRule) -> Result<()> {
+    let lexical_prefix = formula_prefix(&rule.condition);
+    match (lexical_prefix, &rule.formula_namespace) {
+        (None, None) => Ok(()),
+        (Some(prefix), Some(namespace)) if prefix == namespace.prefix => {
+            validate_xml_prefix(&namespace.prefix)?;
+            if namespace.uri.is_empty() {
+                return Err(Error::InvalidFormat(
+                    "conditional formula namespace URI must not be empty".to_string(),
+                ));
+            }
+            check_conditional_attribute_size("formula namespace URI", &namespace.uri)
+        },
+        (Some(prefix), Some(namespace)) => Err(Error::InvalidFormat(format!(
+            "condition prefix '{prefix}' does not match formula namespace prefix '{}'",
+            namespace.prefix
+        ))),
+        (Some(prefix), None) => Err(Error::InvalidFormat(format!(
+            "conditional style condition uses unbound namespace prefix '{prefix}'"
+        ))),
+        (None, Some(namespace)) => Err(Error::InvalidFormat(format!(
+            "formula namespace prefix '{}' is not used by the condition",
+            namespace.prefix
+        ))),
+    }
+}
+
+fn formula_prefix(condition: &str) -> Option<&str> {
+    let (prefix, _) = condition.split_once(':')?;
+    let mut characters = prefix.chars();
+    if characters
+        .next()
+        .is_some_and(|character| character == '_' || character.is_alphabetic())
+        && characters.all(|character| {
+            character == '_' || character == '-' || character == '.' || character.is_alphanumeric()
+        })
+    {
+        Some(prefix)
+    } else {
+        None
+    }
+}
+
+fn validate_xml_prefix(prefix: &str) -> Result<()> {
+    if formula_prefix(&format!("{prefix}:x")) != Some(prefix)
+        || matches!(prefix, "xml" | "xmlns")
+    {
+        return Err(Error::InvalidFormat(format!(
+            "invalid conditional formula namespace prefix '{prefix}'"
+        )));
+    }
+    Ok(())
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn rewrite_conditional_styles(
+    fragment: Option<&PreservedXmlFragment>,
+    styles: &[ConditionalCellStyle],
+) -> Result<PreservedXmlFragment> {
+    let canonical = write_conditional_styles(styles);
+    let Some(fragment) = fragment else {
+        return Ok(PreservedXmlFragment {
+            xml: format!(
+                "<office:automatic-styles xmlns:office=\"{}\">{canonical}</office:automatic-styles>",
+                String::from_utf8_lossy(OFFICE_NAMESPACE)
+            ),
+            namespaces: BTreeMap::new(),
+        });
+    };
+    let (ranges, insertion) = conditional_style_ranges(&fragment.xml)?;
+    let xml = match insertion {
+        AutomaticStylesInsertion::BeforeEnd(position) => {
+            let mut out = String::with_capacity(fragment.xml.len() + canonical.len());
+            let mut cursor = 0usize;
+            for range in ranges {
+                if range.end > position {
+                    return Err(Error::InvalidFormat(
+                        "conditional style range exceeds automatic styles container".to_string(),
+                    ));
+                }
+                out.push_str(&fragment.xml[cursor..range.start]);
+                cursor = range.end;
+            }
+            out.push_str(&fragment.xml[cursor..position]);
+            out.push_str(&canonical);
+            out.push_str(&fragment.xml[position..]);
+            out
+        },
+        AutomaticStylesInsertion::ExpandEmpty { slash, name } => {
+            let mut out = String::with_capacity(fragment.xml.len() + canonical.len() + name.len());
+            out.push_str(&fragment.xml[..slash]);
+            out.push('>');
+            out.push_str(&canonical);
+            out.push_str("</");
+            out.push_str(&name);
+            out.push('>');
+            out
+        },
+    };
+    Ok(PreservedXmlFragment {
+        xml,
+        namespaces: fragment.namespaces.clone(),
+    })
+}
+
+pub(crate) fn validate_protection_style_collection(
+    styles: &[TableCellProtectionStyle],
+) -> Result<()> {
+    if styles.len() > MAX_CONDITIONAL_STYLES {
+        return Err(Error::InvalidFormat(format!(
+            "document exceeds the {MAX_CONDITIONAL_STYLES} automatic protection style limit"
+        )));
+    }
+    let mut names = HashSet::with_capacity(styles.len());
+    for style in styles {
+        validate_style_name(&style.style_name, "protection style name")?;
+        if !names.insert(style.style_name.as_str()) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate protection style name '{}'",
+                style.style_name
+            )));
+        }
+        if let Some(parent) = &style.parent_style_name {
+            validate_style_name(parent, "parent style name")?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn rewrite_managed_cell_styles(
+    fragment: Option<&PreservedXmlFragment>,
+    conditional_styles: &[ConditionalCellStyle],
+    protection_styles: &[TableCellProtectionStyle],
+) -> Result<PreservedXmlFragment> {
+    validate_protection_style_collection(protection_styles)?;
+    for conditional in conditional_styles {
+        if let Some(protection) = protection_styles
+            .iter()
+            .find(|style| style.style_name == conditional.style_name)
+            && conditional.parent_style_name != protection.parent_style_name
+        {
+            return Err(Error::InvalidFormat(format!(
+                "conditional and protection definitions for '{}' have different parent styles",
+                conditional.style_name
+            )));
+        }
+    }
+    let canonical = write_managed_styles(conditional_styles, protection_styles);
+    let Some(fragment) = fragment else {
+        return Ok(PreservedXmlFragment {
+            xml: format!(
+                "<office:automatic-styles xmlns:office=\"{}\">{canonical}</office:automatic-styles>",
+                String::from_utf8_lossy(OFFICE_NAMESPACE)
+            ),
+            namespaces: BTreeMap::new(),
+        });
+    };
+    let (ranges, insertion) = managed_style_ranges(&fragment.xml)?;
+    let xml = rewrite_ranges(&fragment.xml, ranges, insertion, &canonical)?;
+    Ok(PreservedXmlFragment {
+        xml,
+        namespaces: fragment.namespaces.clone(),
+    })
+}
+
+fn rewrite_ranges(
+    xml: &str,
+    ranges: Vec<Range<usize>>,
+    insertion: AutomaticStylesInsertion,
+    canonical: &str,
+) -> Result<String> {
+    match insertion {
+        AutomaticStylesInsertion::BeforeEnd(position) => {
+            let mut out = String::with_capacity(xml.len() + canonical.len());
+            let mut cursor = 0usize;
+            for range in ranges {
+                if range.end > position {
+                    return Err(Error::InvalidFormat(
+                        "managed style range exceeds automatic styles container".to_string(),
+                    ));
+                }
+                out.push_str(&xml[cursor..range.start]);
+                cursor = range.end;
+            }
+            out.push_str(&xml[cursor..position]);
+            out.push_str(canonical);
+            out.push_str(&xml[position..]);
+            Ok(out)
+        },
+        AutomaticStylesInsertion::ExpandEmpty { slash, name } => Ok(format!(
+            "{}>{canonical}</{name}>",
+            &xml[..slash]
+        )),
+    }
+}
+
+fn managed_style_ranges(
+    xml: &str,
+) -> Result<(Vec<Range<usize>>, AutomaticStylesInsertion)> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut candidate: Option<(usize, bool, bool)> = None;
+    let mut ranges = Vec::new();
+    let mut insertion = None;
+    loop {
+        let event_start = reader.buffer_position() as usize;
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+        let is_style_namespace = is_namespace(&namespace, STYLE_NAMESPACE);
+        let is_office_namespace = is_namespace(&namespace, OFFICE_NAMESPACE);
+        let event = event.into_owned();
+        let event_end = reader.buffer_position() as usize;
+        match event {
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "DOCTYPE is not allowed in automatic styles XML".to_string(),
+                ));
+            },
+            Event::Start(element) => {
+                if depth == 1 && is_style_namespace && element.local_name().as_ref() == b"style" {
+                    let is_cell = optional_attribute(
+                        reader.resolver(),
+                        reader.decoder(),
+                        &element,
+                        b"family",
+                    )?
+                    .as_deref()
+                        == Some("table-cell");
+                    candidate = Some((event_start, is_cell, false));
+                } else if depth == 2 && candidate.is_some() && is_style_namespace {
+                    if element.local_name().as_ref() == b"map" {
+                        candidate.as_mut().expect("checked candidate").2 = true;
+                    } else if element.local_name().as_ref() == b"table-cell-properties"
+                        && optional_attribute(
+                            reader.resolver(),
+                            reader.decoder(),
+                            &element,
+                            b"cell-protect",
+                        )?
+                        .is_some()
+                    {
+                        candidate.as_mut().expect("checked candidate").2 = true;
+                    }
+                }
+                depth += 1;
+            },
+            Event::Empty(element) => {
+                if depth == 0
+                    && is_office_namespace
+                    && element.local_name().as_ref() == b"automatic-styles"
+                {
+                    let slash = xml[..event_end].rfind("/>").ok_or_else(|| {
+                        Error::InvalidFormat("malformed empty automatic styles".to_string())
+                    })?;
+                    let name = String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
+                        Error::InvalidFormat("automatic styles name is not UTF-8".to_string())
+                    })?;
+                    insertion = Some(AutomaticStylesInsertion::ExpandEmpty { slash, name });
+                } else if depth == 2 && candidate.is_some() && is_style_namespace {
+                    if element.local_name().as_ref() == b"map" {
+                        candidate.as_mut().expect("checked candidate").2 = true;
+                    } else if element.local_name().as_ref() == b"table-cell-properties"
+                        && optional_attribute(
+                            reader.resolver(),
+                            reader.decoder(),
+                            &element,
+                            b"cell-protect",
+                        )?
+                        .is_some()
+                    {
+                        candidate.as_mut().expect("checked candidate").2 = true;
+                    }
+                }
+            },
+            Event::End(element) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("invalid automatic styles depth".to_string())
+                })?;
+                if depth == 1
+                    && is_style_namespace
+                    && element.local_name().as_ref() == b"style"
+                    && let Some((start, is_cell, managed)) = candidate.take()
+                    && is_cell
+                    && managed
+                {
+                    ranges.push(start..event_end);
+                }
+                if depth == 0
+                    && is_office_namespace
+                    && element.local_name().as_ref() == b"automatic-styles"
+                {
+                    insertion = Some(AutomaticStylesInsertion::BeforeEnd(event_start));
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    Ok((
+        ranges,
+        insertion.ok_or_else(|| {
+            Error::InvalidFormat("missing office:automatic-styles container".to_string())
+        })?,
+    ))
+}
+
+fn write_managed_styles(
+    conditionals: &[ConditionalCellStyle],
+    protections: &[TableCellProtectionStyle],
+) -> String {
+    let formula_prefixes = conditionals
+        .iter()
+        .flat_map(|style| &style.rules)
+        .filter_map(|rule| rule.formula_namespace.as_ref())
+        .map(|namespace| namespace.prefix.as_str())
+        .collect::<HashSet<_>>();
+    let mut style_prefix = "style".to_string();
+    let mut suffix = 0usize;
+    while formula_prefixes.contains(style_prefix.as_str()) {
+        suffix += 1;
+        style_prefix = format!("style{suffix}");
+    }
+    let mut out = String::new();
+    for conditional in conditionals {
+        let protection = protections
+            .iter()
+            .find(|style| style.style_name == conditional.style_name)
+            .map(|style| style.protection);
+        write_managed_style(
+            &mut out,
+            &style_prefix,
+            &conditional.style_name,
+            conditional.parent_style_name.as_deref(),
+            protection,
+            &conditional.rules,
+        );
+    }
+    for protection in protections {
+        if conditionals
+            .iter()
+            .any(|style| style.style_name == protection.style_name)
+        {
+            continue;
+        }
+        write_managed_style(
+            &mut out,
+            &style_prefix,
+            &protection.style_name,
+            protection.parent_style_name.as_deref(),
+            Some(protection.protection),
+            &[],
+        );
+    }
+    out
+}
+
+fn write_managed_style(
+    out: &mut String,
+    prefix: &str,
+    name: &str,
+    parent: Option<&str>,
+    protection: Option<CellStyleProtection>,
+    rules: &[ConditionalCellStyleRule],
+) {
+    out.push('<');
+    out.push_str(prefix);
+    out.push_str(":style xmlns:");
+    out.push_str(prefix);
+    out.push_str("=\"");
+    out.push_str(&escape_xml(&String::from_utf8_lossy(STYLE_NAMESPACE)));
+    out.push_str("\" ");
+    out.push_str(prefix);
+    out.push_str(":name=\"");
+    out.push_str(&escape_xml(name));
+    out.push_str("\" ");
+    out.push_str(prefix);
+    out.push_str(":family=\"table-cell\"");
+    if let Some(parent) = parent {
+        out.push(' ');
+        out.push_str(prefix);
+        out.push_str(":parent-style-name=\"");
+        out.push_str(&escape_xml(parent));
+        out.push('"');
+    }
+    out.push('>');
+    if let Some(protection) = protection {
+        out.push('<');
+        out.push_str(prefix);
+        out.push_str(":table-cell-properties ");
+        out.push_str(prefix);
+        out.push_str(":cell-protect=\"");
+        out.push_str(protection.as_str());
+        out.push_str("\"/>");
+    }
+    for rule in rules {
+        out.push('<');
+        out.push_str(prefix);
+        out.push_str(":map");
+        if let Some(namespace) = &rule.formula_namespace {
+            out.push_str(" xmlns:");
+            out.push_str(&namespace.prefix);
+            out.push_str("=\"");
+            out.push_str(&escape_xml(&namespace.uri));
+            out.push('"');
+        }
+        out.push(' ');
+        out.push_str(prefix);
+        out.push_str(":condition=\"");
+        out.push_str(&escape_xml(&rule.condition));
+        out.push_str("\" ");
+        out.push_str(prefix);
+        out.push_str(":apply-style-name=\"");
+        out.push_str(&escape_xml(&rule.apply_style_name));
+        out.push('"');
+        if let Some(base) = &rule.base_cell_address {
+            out.push(' ');
+            out.push_str(prefix);
+            out.push_str(":base-cell-address=\"");
+            out.push_str(&escape_xml(base));
+            out.push('"');
+        }
+        out.push_str("/>");
+    }
+    out.push_str("</");
+    out.push_str(prefix);
+    out.push_str(":style>");
+}
+
+enum AutomaticStylesInsertion {
+    BeforeEnd(usize),
+    ExpandEmpty { slash: usize, name: String },
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+fn conditional_style_ranges(
+    xml: &str,
+) -> Result<(Vec<Range<usize>>, AutomaticStylesInsertion)> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut candidate: Option<(usize, bool, bool)> = None;
+    let mut ranges = Vec::new();
+    let mut insertion = None;
+    loop {
+        let event_start = reader.buffer_position() as usize;
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+        let is_style_namespace = is_namespace(&namespace, STYLE_NAMESPACE);
+        let is_office_namespace = is_namespace(&namespace, OFFICE_NAMESPACE);
+        let event = event.into_owned();
+        let event_end = reader.buffer_position() as usize;
+        match event {
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "DOCTYPE is not allowed in automatic styles XML".to_string(),
+                ));
+            },
+            Event::Start(element) => {
+                if depth == 1
+                    && is_style_namespace
+                    && element.local_name().as_ref() == b"style"
+                {
+                    let is_cell = optional_attribute(
+                        reader.resolver(),
+                        reader.decoder(),
+                        &element,
+                        b"family",
+                    )?
+                    .as_deref()
+                        == Some("table-cell");
+                    candidate = Some((event_start, is_cell, false));
+                } else if depth == 2
+                    && candidate.is_some()
+                    && is_style_namespace
+                    && element.local_name().as_ref() == b"map"
+                {
+                    candidate.as_mut().expect("checked candidate").2 = true;
+                }
+                depth += 1;
+            },
+            Event::Empty(element) => {
+                if depth == 0
+                    && is_office_namespace
+                    && element.local_name().as_ref() == b"automatic-styles"
+                {
+                    let slash = xml[..event_end].rfind("/>").ok_or_else(|| {
+                        Error::InvalidFormat("malformed empty automatic styles".to_string())
+                    })?;
+                    let name = String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
+                        Error::InvalidFormat("automatic styles name is not UTF-8".to_string())
+                    })?;
+                    insertion = Some(AutomaticStylesInsertion::ExpandEmpty { slash, name });
+                } else if depth == 2
+                    && candidate.is_some()
+                    && is_style_namespace
+                    && element.local_name().as_ref() == b"map"
+                {
+                    candidate.as_mut().expect("checked candidate").2 = true;
+                }
+            },
+            Event::End(element) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("invalid automatic styles depth".to_string())
+                })?;
+                if depth == 1
+                    && is_style_namespace
+                    && element.local_name().as_ref() == b"style"
+                    && let Some((start, is_cell, has_map)) = candidate.take()
+                    && is_cell
+                    && has_map
+                {
+                    ranges.push(start..event_end);
+                }
+                if depth == 0
+                    && is_office_namespace
+                    && element.local_name().as_ref() == b"automatic-styles"
+                {
+                    insertion = Some(AutomaticStylesInsertion::BeforeEnd(event_start));
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    let insertion = insertion.ok_or_else(|| {
+        Error::InvalidFormat("missing office:automatic-styles container".to_string())
+    })?;
+    Ok((ranges, insertion))
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+fn write_conditional_styles(styles: &[ConditionalCellStyle]) -> String {
+    let formula_prefixes = styles
+        .iter()
+        .flat_map(|style| &style.rules)
+        .filter_map(|rule| rule.formula_namespace.as_ref())
+        .map(|namespace| namespace.prefix.as_str())
+        .collect::<HashSet<_>>();
+    let mut style_prefix = "style".to_string();
+    let mut suffix = 0usize;
+    while formula_prefixes.contains(style_prefix.as_str()) {
+        suffix += 1;
+        style_prefix = format!("style{suffix}");
+    }
+    let mut out = String::new();
+    for style in styles {
+        out.push('<');
+        out.push_str(&style_prefix);
+        out.push_str(":style xmlns:");
+        out.push_str(&style_prefix);
+        out.push_str("=\"");
+        out.push_str(&escape_xml(&String::from_utf8_lossy(STYLE_NAMESPACE)));
+        out.push_str("\" ");
+        out.push_str(&style_prefix);
+        out.push_str(":name=\"");
+        out.push_str(&escape_xml(&style.style_name));
+        out.push_str("\" ");
+        out.push_str(&style_prefix);
+        out.push_str(":family=\"table-cell\"");
+        if let Some(parent) = &style.parent_style_name {
+            out.push(' ');
+            out.push_str(&style_prefix);
+            out.push_str(":parent-style-name=\"");
+            out.push_str(&escape_xml(parent));
+            out.push('"');
+        }
+        out.push('>');
+        for rule in &style.rules {
+            out.push('<');
+            out.push_str(&style_prefix);
+            out.push_str(":map");
+            if let Some(namespace) = &rule.formula_namespace {
+                out.push_str(" xmlns:");
+                out.push_str(&namespace.prefix);
+                out.push_str("=\"");
+                out.push_str(&escape_xml(&namespace.uri));
+                out.push('"');
+            }
+            out.push(' ');
+            out.push_str(&style_prefix);
+            out.push_str(":condition=\"");
+            out.push_str(&escape_xml(&rule.condition));
+            out.push_str("\" ");
+            out.push_str(&style_prefix);
+            out.push_str(":apply-style-name=\"");
+            out.push_str(&escape_xml(&rule.apply_style_name));
+            out.push('"');
+            if let Some(base) = &rule.base_cell_address {
+                out.push(' ');
+                out.push_str(&style_prefix);
+                out.push_str(":base-cell-address=\"");
+                out.push_str(&escape_xml(base));
+                out.push('"');
+            }
+            out.push_str("/>");
+        }
+        out.push_str("</");
+        out.push_str(&style_prefix);
+        out.push_str(":style>");
+    }
+    out
 }
 
 pub(crate) fn extract_automatic_styles(xml: &str) -> Result<Option<PreservedXmlFragment>> {
@@ -249,6 +1057,7 @@ struct CellStyleDefinition {
     parent: Option<String>,
     protection: Option<CellStyleProtection>,
     conditional_rules: Vec<ConditionalCellStyleRule>,
+    is_common: bool,
 }
 
 impl CellStyleRegistry {
@@ -272,6 +1081,10 @@ impl CellStyleRegistry {
         self.conditional_style_index
             .get(name)
             .and_then(|index| self.conditional_styles.get(*index))
+    }
+
+    pub(crate) fn automatic_protection_styles(&self) -> &[TableCellProtectionStyle] {
+        &self.automatic_protection_styles
     }
 
     pub(crate) fn resolve(&self, style_name: Option<&str>) -> Result<Option<CellStyleProtection>> {
@@ -426,23 +1239,19 @@ impl CellStyleRegistry {
                     ));
                 },
                 Event::Text(text) if open_map => {
-                    let value = text
-                        .decode()
-                        .map_err(|error| Error::InvalidFormat(format!("invalid style:map text: {error}")))?;
+                    let value = text.decode().map_err(|error| {
+                        Error::InvalidFormat(format!("invalid style:map text: {error}"))
+                    })?;
                     if !value.trim().is_empty() {
-                        return Err(Error::InvalidFormat(
-                            "style:map must be empty".to_string(),
-                        ));
+                        return Err(Error::InvalidFormat("style:map must be empty".to_string()));
                     }
                 },
                 Event::CData(text) if open_map => {
-                    let value = text
-                        .decode()
-                        .map_err(|error| Error::InvalidFormat(format!("invalid style:map CDATA: {error}")))?;
+                    let value = text.decode().map_err(|error| {
+                        Error::InvalidFormat(format!("invalid style:map CDATA: {error}"))
+                    })?;
                     if !value.trim().is_empty() {
-                        return Err(Error::InvalidFormat(
-                            "style:map must be empty".to_string(),
-                        ));
+                        return Err(Error::InvalidFormat("style:map must be empty".to_string()));
                     }
                 },
                 Event::End(element)
@@ -498,18 +1307,17 @@ impl CellStyleRegistry {
             .len()
             .checked_add(rule.apply_style_name.len())
             .and_then(|size| {
-                size.checked_add(
-                    rule
-                        .base_cell_address
-                        .as_deref()
-                        .map_or(0, str::len),
-                )
+                size.checked_add(rule.base_cell_address.as_deref().map_or(0, str::len))
             })
-            .ok_or_else(|| Error::InvalidFormat("conditional style text size overflow".to_string()))?;
-        self.conditional_text_bytes = self
-            .conditional_text_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| Error::InvalidFormat("conditional style text size overflow".to_string()))?;
+            .ok_or_else(|| {
+                Error::InvalidFormat("conditional style text size overflow".to_string())
+            })?;
+        self.conditional_text_bytes =
+            self.conditional_text_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| {
+                    Error::InvalidFormat("conditional style text size overflow".to_string())
+                })?;
         if self.conditional_text_bytes > MAX_CONDITIONAL_TEXT_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "conditional style text exceeds the {MAX_CONDITIONAL_TEXT_BYTES} byte limit"
@@ -527,12 +1335,28 @@ impl CellStyleRegistry {
             if last_position.get(name.as_str()) != Some(&index) {
                 continue;
             }
-            let definition = self.styles.get(name).expect("style order references registry");
+            let definition = self
+                .styles
+                .get(name)
+                .expect("style order references registry");
+            if !definition.is_common
+                && let Some(protection) = definition.protection
+            {
+                self.automatic_protection_styles
+                    .push(TableCellProtectionStyle {
+                        style_name: name.clone(),
+                        parent_style_name: definition.parent.clone(),
+                        protection,
+                    });
+            }
             if definition.conditional_rules.is_empty() {
                 continue;
             }
             for rule in &definition.conditional_rules {
-                if !self.common_table_cell_styles.contains(&rule.apply_style_name) {
+                if !self
+                    .common_table_cell_styles
+                    .contains(&rule.apply_style_name)
+                {
                     return Err(Error::InvalidFormat(format!(
                         "conditional style '{}' references missing, automatic, or non-table-cell common style '{}'",
                         name, rule.apply_style_name
@@ -584,6 +1408,7 @@ impl CellStyleRegistry {
                 parent: builder.parent,
                 protection: builder.protection,
                 conditional_rules: builder.conditional_rules,
+                is_common: builder.is_common,
             },
         );
         Ok(())
@@ -643,8 +1468,7 @@ fn parse_conditional_rule(
     element: &BytesStart<'_>,
 ) -> Result<ConditionalCellStyleRule> {
     let condition = required_conditional_attribute(reader, element, b"condition")?;
-    let apply_style_name =
-        required_conditional_attribute(reader, element, b"apply-style-name")?;
+    let apply_style_name = required_conditional_attribute(reader, element, b"apply-style-name")?;
     let base_cell_address = optional_attribute(
         reader.resolver(),
         reader.decoder(),
@@ -674,13 +1498,8 @@ fn required_conditional_attribute(
     local_name: &[u8],
 ) -> Result<String> {
     let qualified_name = format!("style:{}", String::from_utf8_lossy(local_name));
-    let value = optional_attribute(
-        reader.resolver(),
-        reader.decoder(),
-        element,
-        local_name,
-    )?
-    .ok_or_else(|| Error::InvalidFormat(format!("style:map is missing {qualified_name}")))?;
+    let value = optional_attribute(reader.resolver(), reader.decoder(), element, local_name)?
+        .ok_or_else(|| Error::InvalidFormat(format!("style:map is missing {qualified_name}")))?;
     check_conditional_attribute_size(&qualified_name, &value)?;
     if value.is_empty() {
         return Err(Error::InvalidFormat(format!(
@@ -711,10 +1530,7 @@ fn condition_formula_namespace(
         .next()
         .is_some_and(|character| character == '_' || character.is_alphabetic())
         || !characters.all(|character| {
-            character == '_'
-                || character == '-'
-                || character == '.'
-                || character.is_alphanumeric()
+            character == '_' || character == '-' || character == '.' || character.is_alphanumeric()
         })
     {
         return Ok(None);
@@ -754,9 +1570,11 @@ fn optional_attribute(
             }
             found = Some(
                 attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                .map(|value| value.into_owned())
-                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?,
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                    .map(|value| value.into_owned())
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid XML attribute: {error}"))
+                    })?,
             );
         }
     }
@@ -770,6 +1588,66 @@ fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conditional_editor_preserves_unrelated_automatic_styles_with_arbitrary_prefixes() {
+        let xml = r#"<o:automatic-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:x="urn:example:formula"><draw:gradient xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" draw:name="keep&amp;exact"/><s:style s:name="old" s:family="table-cell"><s:map s:condition="x:old()" s:apply-style-name="Red"/></s:style><s:style s:name="plain" s:family="table-cell"><s:table-cell-properties/></s:style></o:automatic-styles>"#;
+        let fragment = PreservedXmlFragment {
+            xml: xml.to_string(),
+            namespaces: BTreeMap::new(),
+        };
+        let style = ConditionalCellStyle::new(
+            "new&style",
+            vec![ConditionalCellStyleRule::new("x:test()<2", "Red")
+                .with_formula_namespace(FormulaNamespace {
+                    prefix: "x".to_string(),
+                    uri: "urn:example:formula".to_string(),
+                })],
+        );
+        let common = HashSet::from(["Red".to_string()]);
+        validate_conditional_style_collection(std::slice::from_ref(&style), &common).unwrap();
+        let rewritten = rewrite_conditional_styles(Some(&fragment), &[style]).unwrap();
+        assert!(rewritten.xml.contains(
+            r#"<draw:gradient xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" draw:name="keep&amp;exact"/>"#
+        ));
+        assert!(rewritten.xml.contains(
+            r#"<s:style s:name="plain" s:family="table-cell"><s:table-cell-properties/></s:style>"#
+        ));
+        assert!(!rewritten.xml.contains("s:name=\"old\""));
+        assert!(rewritten.xml.contains("style:name=\"new&amp;style\""));
+    }
+
+    #[test]
+    fn managed_protection_editor_preserves_unrelated_xml_and_merges_maps() {
+        let xml = r#"<o:automatic-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><draw:gradient xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" draw:name="keep"/><s:style s:name="combo" s:family="table-cell"><s:table-cell-properties s:cell-protect="protected"/><s:map s:condition="cell-content()>0" s:apply-style-name="Red"/></s:style><s:style s:name="plain" s:family="table-cell"><s:table-cell-properties/></s:style></o:automatic-styles>"#;
+        let fragment = PreservedXmlFragment {
+            xml: xml.to_string(),
+            namespaces: BTreeMap::new(),
+        };
+        let conditional = ConditionalCellStyle::new(
+            "combo",
+            vec![ConditionalCellStyleRule::new("cell-content()>0", "Red")],
+        );
+        let protection = TableCellProtectionStyle::new(
+            "combo",
+            CellStyleProtection::HiddenAndProtected,
+        );
+        let rewritten = rewrite_managed_cell_styles(
+            Some(&fragment),
+            &[conditional],
+            &[protection],
+        )
+        .unwrap();
+        assert!(rewritten.xml.contains(
+            r#"<draw:gradient xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" draw:name="keep"/>"#
+        ));
+        assert!(rewritten.xml.contains(
+            r#"<s:style s:name="plain" s:family="table-cell"><s:table-cell-properties/></s:style>"#
+        ));
+        assert_eq!(rewritten.xml.matches("name=\"combo\"").count(), 1);
+        assert!(rewritten.xml.contains("cell-protect=\"hidden-and-protected\""));
+        assert!(rewritten.xml.contains("condition=\"cell-content()&gt;0\""));
+    }
 
     #[test]
     fn resolves_defaults_named_parents_and_automatic_overrides() {
@@ -826,7 +1704,10 @@ mod tests {
         assert_eq!(style.rules.len(), 2);
         assert_eq!(style.rules[0].condition, "cell-content()<1");
         assert_eq!(style.rules[0].apply_style_name, "Red");
-        assert_eq!(style.rules[0].base_cell_address.as_deref(), Some("Sheet1.A1"));
+        assert_eq!(
+            style.rules[0].base_cell_address.as_deref(),
+            Some("Sheet1.A1")
+        );
         assert_eq!(
             style.rules[1].formula_namespace,
             Some(FormulaNamespace {

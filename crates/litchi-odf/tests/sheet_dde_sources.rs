@@ -81,8 +81,8 @@ fn package_with_content(content: &str) -> Vec<u8> {
     let mimetype = "application/vnd.oasis.opendocument.spreadsheet";
     let mut output = Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut output);
-    let stored = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let stored =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     let deflated = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
     zip.start_file("mimetype", stored).unwrap();

@@ -5,10 +5,10 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
-    Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink, LabelRange,
+    ConditionalCellStyle, Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink, LabelRange,
     NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
     SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection,
-    TableStructure, TableVisibility,
+    TableCellProtectionStyle, TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     consolidation::write_consolidation,
@@ -23,8 +23,15 @@ use crate::ods::{
         write_spreadsheet_attributes,
     },
     scenario::{validate_scenario, write_sheet_preamble},
-    sheet_image::{MAX_IMAGES_PER_SHEET, normalize_sheet_image, write_sheet_images},
+    sheet_image::{
+        MAX_IMAGES_PER_SHEET, append_sheet_image_alternative, insert_sheet_image_alternative,
+        normalize_sheet_image, remove_sheet_image_alternative, write_sheet_images,
+    },
     source::validate_table_source,
+    style_protection::{
+        rewrite_managed_cell_styles, validate_conditional_style_collection,
+        validate_protection_style_collection, validate_style_name,
+    },
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
         validate_sheet_print_settings, validate_table_structure, write_columns,
@@ -32,7 +39,7 @@ use crate::ods::{
     },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 /// Builder for creating new ODS spreadsheets.
 ///
@@ -65,6 +72,9 @@ pub struct SpreadsheetBuilder {
     consolidation: Option<Consolidation>,
     dde_links: Vec<DdeLink>,
     protection: SpreadsheetProtection,
+    common_table_cell_styles: Vec<String>,
+    conditional_cell_styles: Vec<ConditionalCellStyle>,
+    table_cell_protection_styles: Vec<TableCellProtectionStyle>,
 }
 
 impl Default for SpreadsheetBuilder {
@@ -96,7 +106,207 @@ impl SpreadsheetBuilder {
             consolidation: None,
             dde_links: Vec::new(),
             protection: SpreadsheetProtection::default(),
+            common_table_cell_styles: Vec::new(),
+            conditional_cell_styles: Vec::new(),
+            table_cell_protection_styles: Vec::new(),
         }
+    }
+
+    /// Return common table-cell styles declared by this builder.
+    pub fn common_table_cell_styles(&self) -> &[String] {
+        &self.common_table_cell_styles
+    }
+
+    /// Declare an empty common table-cell style usable as a conditional rule target.
+    pub fn add_common_table_cell_style(
+        &mut self,
+        style_name: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let style_name = style_name.into();
+        validate_style_name(&style_name, "common table-cell style name")?;
+        if self.common_table_cell_styles.iter().any(|name| name == &style_name) {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate common table-cell style name '{style_name}'"
+            )));
+        }
+        if self.common_table_cell_styles.len() >= 65_536 {
+            return Err(litchi_core::Error::InvalidFormat(
+                "common table-cell style limit exceeded".to_string(),
+            ));
+        }
+        self.common_table_cell_styles.push(style_name);
+        Ok(self)
+    }
+
+    /// Return authored conditional table-cell styles in deterministic write order.
+    pub fn conditional_cell_styles(&self) -> &[ConditionalCellStyle] {
+        &self.conditional_cell_styles
+    }
+
+    /// Create a uniquely named conditional table-cell style atomically.
+    pub fn create_conditional_cell_style(
+        &mut self,
+        style: ConditionalCellStyle,
+    ) -> Result<&mut Self> {
+        if self
+            .conditional_cell_styles
+            .iter()
+            .any(|existing| existing.style_name == style.style_name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate conditional style name '{}'",
+                style.style_name
+            )));
+        }
+        let mut candidate = self.conditional_cell_styles.clone();
+        candidate.push(style);
+        self.validate_conditional_styles(&candidate)?;
+        self.conditional_cell_styles = candidate;
+        Ok(self)
+    }
+
+    /// Replace an existing conditional style atomically and return its old value.
+    pub fn replace_conditional_cell_style(
+        &mut self,
+        style: ConditionalCellStyle,
+    ) -> Result<ConditionalCellStyle> {
+        let index = self
+            .conditional_cell_styles
+            .iter()
+            .position(|existing| existing.style_name == style.style_name)
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "missing conditional style '{}'",
+                    style.style_name
+                ))
+            })?;
+        let mut candidate = self.conditional_cell_styles.clone();
+        let previous = std::mem::replace(&mut candidate[index], style);
+        self.validate_conditional_styles(&candidate)?;
+        self.conditional_cell_styles = candidate;
+        Ok(previous)
+    }
+
+    /// Remove and return a conditional style by name.
+    pub fn remove_conditional_cell_style(
+        &mut self,
+        style_name: &str,
+    ) -> Option<ConditionalCellStyle> {
+        self.conditional_cell_styles
+            .iter()
+            .position(|style| style.style_name == style_name)
+            .map(|index| self.conditional_cell_styles.remove(index))
+    }
+
+    fn validate_conditional_styles(&self, styles: &[ConditionalCellStyle]) -> Result<()> {
+        let common = self
+            .common_table_cell_styles
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
+        validate_conditional_style_collection(styles, &common)?;
+        rewrite_managed_cell_styles(None, styles, &self.table_cell_protection_styles)?;
+        Ok(())
+    }
+
+    /// Return automatic table-cell protection styles in write order.
+    pub fn table_cell_protection_styles(&self) -> &[TableCellProtectionStyle] {
+        &self.table_cell_protection_styles
+    }
+
+    /// Create a uniquely named automatic protection style atomically.
+    pub fn create_table_cell_protection_style(
+        &mut self,
+        style: TableCellProtectionStyle,
+    ) -> Result<&mut Self> {
+        if self.table_cell_protection_styles.iter().any(|existing| {
+            existing.style_name == style.style_name
+        }) || self
+            .conditional_cell_styles
+            .iter()
+            .any(|existing| existing.style_name == style.style_name
+                && existing.parent_style_name != style.parent_style_name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate or incompatible protection style name '{}'",
+                style.style_name
+            )));
+        }
+        let mut candidate = self.table_cell_protection_styles.clone();
+        candidate.push(style);
+        self.validate_protection_styles(&candidate)?;
+        self.table_cell_protection_styles = candidate;
+        Ok(self)
+    }
+
+    /// Replace an automatic protection style atomically.
+    pub fn replace_table_cell_protection_style(
+        &mut self,
+        style: TableCellProtectionStyle,
+    ) -> Result<TableCellProtectionStyle> {
+        let index = self
+            .table_cell_protection_styles
+            .iter()
+            .position(|existing| existing.style_name == style.style_name)
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "missing protection style '{}'",
+                    style.style_name
+                ))
+            })?;
+        let mut candidate = self.table_cell_protection_styles.clone();
+        let previous = std::mem::replace(&mut candidate[index], style);
+        self.validate_protection_styles(&candidate)?;
+        self.table_cell_protection_styles = candidate;
+        Ok(previous)
+    }
+
+    /// Remove and return an automatic protection style.
+    pub fn remove_table_cell_protection_style(
+        &mut self,
+        style_name: &str,
+    ) -> Option<TableCellProtectionStyle> {
+        self.table_cell_protection_styles
+            .iter()
+            .position(|style| style.style_name == style_name)
+            .map(|index| self.table_cell_protection_styles.remove(index))
+    }
+
+    fn validate_protection_styles(&self, styles: &[TableCellProtectionStyle]) -> Result<()> {
+        validate_protection_style_collection(styles)?;
+        let known = self
+            .common_table_cell_styles
+            .iter()
+            .cloned()
+            .chain(self.conditional_cell_styles.iter().map(|style| style.style_name.clone()))
+            .chain(styles.iter().map(|style| style.style_name.clone()))
+            .collect::<HashSet<_>>();
+        for style in styles {
+            if let Some(parent) = &style.parent_style_name
+                && !known.contains(parent)
+            {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "protection style '{}' references missing parent style '{parent}'",
+                    style.style_name
+                )));
+            }
+            let mut visited = HashSet::new();
+            let mut current = style;
+            while let Some(parent) = &current.parent_style_name {
+                if !visited.insert(current.style_name.as_str()) {
+                    return Err(litchi_core::Error::InvalidFormat(format!(
+                        "cyclic protection style inheritance at '{}'",
+                        style.style_name
+                    )));
+                }
+                let Some(next) = styles.iter().find(|candidate| &candidate.style_name == parent)
+                else {
+                    break;
+                };
+                current = next;
+            }
+        }
+        Ok(())
     }
 
     /// Set document metadata
@@ -205,9 +415,7 @@ impl SpreadsheetBuilder {
     }
 
     fn validate_database_ranges(&self) -> Result<()> {
-        self.database_ranges
-            .iter()
-            .try_for_each(DatabaseRange::validate)
+        crate::ods::database_range::validate_database_range_collection(&self.database_ranges)
     }
 
     /// Return data-pilot (pivot-table) declarations.
@@ -217,7 +425,9 @@ impl SpreadsheetBuilder {
 
     /// Add a validated data-pilot table.
     pub fn add_data_pilot_table(&mut self, table: DataPilotTable) -> Result<&mut Self> {
-        table.validate()?;
+        let mut tables = self.data_pilot_tables.clone();
+        tables.push(table.clone());
+        crate::ods::data_pilot::validate_data_pilot_tables(&tables)?;
         self.data_pilot_tables.push(table);
         Ok(self)
     }
@@ -312,6 +522,7 @@ impl SpreadsheetBuilder {
     }
 
     fn validate_named_definitions(&self) -> Result<()> {
+        crate::ods::named_expression::validate_named_definition_collection(&self.named_definitions)?;
         for (index, definition) in self.named_definitions.iter().enumerate() {
             definition.validate()?;
             self.validate_scope(definition.scope())?;
@@ -1380,6 +1591,65 @@ impl SpreadsheetBuilder {
         (index < sheet.images.len()).then(|| sheet.images.remove(index))
     }
 
+    /// Append an image alternative to a frame group on the current sheet.
+    ///
+    /// `primary_image_index` is the flat sheet-image index whose
+    /// `alternative_index` is zero. The alternative must describe the same
+    /// frame after its sheet ownership is normalized.
+    pub fn append_sheet_image_alternative(
+        &mut self,
+        primary_image_index: usize,
+        image: crate::OdfImage,
+    ) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        append_sheet_image_alternative(&mut sheet.images, &sheet.name, primary_image_index, image)?;
+        Ok(self)
+    }
+
+    /// Insert an image alternative at a group-local alternative index.
+    ///
+    /// Valid alternative indices start at one and include the position after
+    /// the group's current final alternative.
+    pub fn insert_sheet_image_alternative(
+        &mut self,
+        primary_image_index: usize,
+        alternative_index: usize,
+        image: crate::OdfImage,
+    ) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        insert_sheet_image_alternative(
+            &mut sheet.images,
+            &sheet.name,
+            primary_image_index,
+            alternative_index,
+            image,
+        )?;
+        Ok(self)
+    }
+
+    /// Remove a non-primary image alternative from a current-sheet frame group.
+    pub fn remove_sheet_image_alternative(
+        &mut self,
+        primary_image_index: usize,
+        alternative_index: usize,
+    ) -> Result<crate::OdfImage> {
+        let sheet = self.sheets.last_mut().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("spreadsheet has no current sheet".to_string())
+        })?;
+        remove_sheet_image_alternative(
+            &mut sheet.images,
+            &sheet.name,
+            primary_image_index,
+            alternative_index,
+        )
+    }
+
     /// Merge a rectangular range in the current sheet.
     pub fn merge_cells(
         &mut self,
@@ -1709,9 +1979,16 @@ impl SpreadsheetBuilder {
         if has_protection_extensions && !has_annotations {
             out.push_str(r#" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
         }
+        out.push_str(r#" office:version="1.3"><office:font-face-decls/>"#);
         out.push_str(
-            r#" office:version="1.3"><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet"#,
+            &rewrite_managed_cell_styles(
+                None,
+                &self.conditional_cell_styles,
+                &self.table_cell_protection_styles,
+            )?
+            .xml,
         );
+        out.push_str("<office:body><office:spreadsheet");
         write_spreadsheet_attributes(&mut out, &self.protection);
         out.push('>');
         out.push_str(&body);
@@ -1761,9 +2038,7 @@ impl SpreadsheetBuilder {
         self.validate_annotations()?;
         self.validate_content_validations()?;
         self.validate_database_ranges()?;
-        self.data_pilot_tables
-            .iter()
-            .try_for_each(DataPilotTable::validate)?;
+        crate::ods::data_pilot::validate_data_pilot_tables(&self.data_pilot_tables)?;
         self.validate_label_ranges()?;
         if let Some(consolidation) = &self.consolidation {
             consolidation.validate()?;
@@ -1779,7 +2054,17 @@ impl SpreadsheetBuilder {
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml
-        let styles_xml = OdfStructure::default_styles_xml();
+        let mut styles_xml = OdfStructure::default_styles_xml();
+        if !self.common_table_cell_styles.is_empty() {
+            let mut common = String::from("<office:styles>");
+            for name in &self.common_table_cell_styles {
+                common.push_str("<style:style style:name=\"");
+                common.push_str(&escape_xml(name));
+                common.push_str("\" style:family=\"table-cell\"/>");
+            }
+            common.push_str("</office:styles>");
+            styles_xml = styles_xml.replace("<office:styles/>", &common);
+        }
         writer.add_file("styles.xml", styles_xml.as_bytes())?;
 
         // Add meta.xml
@@ -1823,6 +2108,26 @@ mod tests {
         Spreadsheet, TableGroup, TableRange,
     };
     use tempfile::tempdir;
+
+    fn alternative_test_image(source: crate::OdfImageSource) -> crate::OdfImage {
+        crate::OdfImage {
+            part: crate::OdfImagePart::Content,
+            source,
+            frame: Some(crate::OdfImageFrame {
+                name: Some("hero".to_string()),
+                width: Some("3cm".to_string()),
+                height: Some("2cm".to_string()),
+                ..Default::default()
+            }),
+            xml_id: None,
+            filter_name: None,
+            declared_media_type: None,
+            link_type: Some("simple".to_string()),
+            show: Some("embed".to_string()),
+            actuate: Some("onLoad".to_string()),
+            alternative_index: 0,
+        }
+    }
 
     #[test]
     fn test_spreadsheet_builder_new() {
@@ -2787,5 +3092,109 @@ mod tests {
             .unwrap();
         let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
         assert_eq!(spreadsheet.calculation_settings(), Some(&settings));
+    }
+
+    #[test]
+    fn builder_sheet_image_alternatives_round_trip_and_reindex() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Pictures").unwrap();
+        builder
+            .add_sheet_image(alternative_test_image(crate::OdfImageSource::Linked {
+                href: "https://example.test/primary.svg".to_string(),
+            }))
+            .unwrap();
+        builder
+            .append_sheet_image_alternative(
+                0,
+                alternative_test_image(crate::OdfImageSource::Inline {
+                    bytes: vec![1, 2, 3, 4],
+                    ignored_href: Some("ignored.png".to_string()),
+                }),
+            )
+            .unwrap();
+        builder
+            .insert_sheet_image_alternative(
+                0,
+                1,
+                alternative_test_image(crate::OdfImageSource::Linked {
+                    href: "https://example.test/fallback.webp".to_string(),
+                }),
+            )
+            .unwrap();
+        let removed = builder.remove_sheet_image_alternative(0, 1).unwrap();
+        assert!(matches!(
+            removed.source,
+            crate::OdfImageSource::Linked { .. }
+        ));
+
+        let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let sheets = spreadsheet.sheets().unwrap();
+        let images = sheets[0].images();
+        assert_eq!(images.len(), 2);
+        assert_eq!(images[0].alternative_index, 0);
+        assert_eq!(images[1].alternative_index, 1);
+        assert_eq!(images[0].frame, images[1].frame);
+        assert!(matches!(
+            images[0].source,
+            crate::OdfImageSource::Linked { .. }
+        ));
+        assert_eq!(images[1].inline_bytes(), Some(&[1, 2, 3, 4][..]));
+    }
+
+    #[test]
+    fn builder_sheet_image_alternative_validation_is_atomic() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Pictures").unwrap();
+        builder
+            .add_sheet_image(alternative_test_image(crate::OdfImageSource::Linked {
+                href: "primary.svg".to_string(),
+            }))
+            .unwrap();
+        builder
+            .append_sheet_image_alternative(
+                0,
+                alternative_test_image(crate::OdfImageSource::Linked {
+                    href: "fallback.png".to_string(),
+                }),
+            )
+            .unwrap();
+        let before = builder.sheets[0].images.clone();
+
+        assert!(
+            builder
+                .append_sheet_image_alternative(
+                    1,
+                    alternative_test_image(crate::OdfImageSource::Linked {
+                        href: "wrong-group.png".to_string(),
+                    }),
+                )
+                .is_err()
+        );
+        assert!(
+            builder
+                .insert_sheet_image_alternative(
+                    0,
+                    0,
+                    alternative_test_image(crate::OdfImageSource::Linked {
+                        href: "wrong-index.png".to_string(),
+                    }),
+                )
+                .is_err()
+        );
+        let mut wrong_frame = alternative_test_image(crate::OdfImageSource::Linked {
+            href: "wrong-frame.png".to_string(),
+        });
+        wrong_frame.frame.as_mut().unwrap().width = Some("4cm".to_string());
+        assert!(
+            builder
+                .append_sheet_image_alternative(0, wrong_frame)
+                .is_err()
+        );
+        let mut no_frame = alternative_test_image(crate::OdfImageSource::Linked {
+            href: "no-frame.png".to_string(),
+        });
+        no_frame.frame = None;
+        assert!(builder.append_sheet_image_alternative(0, no_frame).is_err());
+        assert_eq!(builder.sheets[0].images, before);
     }
 }

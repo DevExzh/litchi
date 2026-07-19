@@ -33,10 +33,27 @@ enum DocumentElement {
     Heading(Heading),
     Table(Table),
     List(List),
+    Section(String),
 }
 
 pub struct DocumentBuilder {
     elements: Vec<DocumentElement>,
+    text_indexes: Vec<String>,
+    text_index_marks: Vec<(usize, crate::TextIndexMark)>,
+    reference_marks: Vec<(usize, crate::ReferenceMark)>,
+    bookmark_targets: Vec<(usize, crate::BookmarkTarget)>,
+    property_forms: Vec<crate::OdfPropertyForm>,
+    control_forms: Vec<crate::OdfControlForm>,
+    interactive_forms: Vec<crate::OdfInteractiveForm>,
+    selection_forms: Vec<crate::OdfSelectionForm>,
+    visual_forms: Vec<crate::OdfVisualForm>,
+    generic_forms: Vec<crate::OdfGenericForm>,
+    password_file_forms: Vec<crate::OdfPasswordFileForm>,
+    image_frame_forms: Vec<crate::OdfImageFrameForm>,
+    value_range_forms: Vec<crate::OdfValueRangeForm>,
+    typed_value_forms: Vec<crate::OdfTypedValueForm>,
+    grid_forms: Vec<crate::OdfGridForm>,
+    connection_resource_forms: Vec<crate::OdfConnectionResourceForm>,
     metadata: Metadata,
     paragraph_tab_styles: Vec<crate::ParagraphStyleTabStops>,
     paragraph_drop_cap_styles: Vec<crate::ParagraphStyleDropCap>,
@@ -45,9 +62,15 @@ pub struct DocumentBuilder {
     table_row_property_styles: Vec<crate::TableRowStyleProperties>,
     table_property_styles: Vec<crate::TableStyleProperties>,
     section_property_styles: Vec<crate::SectionStyleProperties>,
+    section_names: std::collections::HashSet<String>,
+    section_xml_ids: std::collections::HashSet<String>,
     page_layout_columns: Vec<(String, crate::StyleColumns)>,
     page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
-    page_layout_header_footer_properties: Vec<(String, crate::PageHeaderFooterRegion, crate::HeaderFooterStyleProperties)>,
+    page_layout_header_footer_properties: Vec<(
+        String,
+        crate::PageHeaderFooterRegion,
+        crate::HeaderFooterStyleProperties,
+    )>,
     notes_configurations: crate::OdfNotesConfigurations,
 }
 
@@ -70,6 +93,22 @@ impl DocumentBuilder {
     pub fn new() -> Self {
         Self {
             elements: Vec::new(),
+            text_indexes: Vec::new(),
+            text_index_marks: Vec::new(),
+            reference_marks: Vec::new(),
+            bookmark_targets: Vec::new(),
+            property_forms: Vec::new(),
+            control_forms: Vec::new(),
+            interactive_forms: Vec::new(),
+            selection_forms: Vec::new(),
+            visual_forms: Vec::new(),
+            generic_forms: Vec::new(),
+            password_file_forms: Vec::new(),
+            image_frame_forms: Vec::new(),
+            value_range_forms: Vec::new(),
+            typed_value_forms: Vec::new(),
+            grid_forms: Vec::new(),
+            connection_resource_forms: Vec::new(),
             metadata: Metadata::default(),
             paragraph_tab_styles: Vec::new(),
             paragraph_drop_cap_styles: Vec::new(),
@@ -78,11 +117,24 @@ impl DocumentBuilder {
             table_row_property_styles: Vec::new(),
             table_property_styles: Vec::new(),
             section_property_styles: Vec::new(),
+            section_names: std::collections::HashSet::new(),
+            section_xml_ids: std::collections::HashSet::new(),
             page_layout_columns: Vec::new(),
             page_layout_footnote_separators: Vec::new(),
             page_layout_header_footer_properties: Vec::new(),
             notes_configurations: crate::OdfNotesConfigurations::default(),
         }
+    }
+
+    /// Add a paragraph containing one validated, inert dynamic text field.
+    pub fn add_dynamic_text_field(
+        &mut self,
+        field: &crate::elements::field::OdfDynamicTextField,
+    ) -> Result<&mut Self> {
+        let mut paragraph = Paragraph::new();
+        paragraph.add_dynamic_text_field(field)?;
+        self.elements.push(DocumentElement::Paragraph(paragraph));
+        Ok(self)
     }
 
     /// Return footnote and endnote configurations emitted to `styles.xml`.
@@ -107,7 +159,9 @@ impl DocumentBuilder {
     ) -> Result<&mut Self> {
         configuration.validate()?;
         match configuration.note_class {
-            crate::OdfNoteClass::Footnote => self.notes_configurations.footnote = Some(configuration),
+            crate::OdfNoteClass::Footnote => {
+                self.notes_configurations.footnote = Some(configuration)
+            },
             crate::OdfNoteClass::Endnote => self.notes_configurations.endnote = Some(configuration),
         }
         Ok(self)
@@ -142,38 +196,143 @@ impl DocumentBuilder {
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.paragraph_drop_cap_styles.len() >= 4_096 {
-            return Err(litchi_core::Error::InvalidFormat("too many paragraph drop-cap styles".to_string()));
+            return Err(litchi_core::Error::InvalidFormat(
+                "too many paragraph drop-cap styles".to_string(),
+            ));
         }
-        if self.paragraph_drop_cap_styles.iter().any(|old| old.name == style.name && old.is_default_style == style.is_default_style) {
-            return Err(litchi_core::Error::InvalidFormat("duplicate paragraph drop-cap style identity".to_string()));
+        if self
+            .paragraph_drop_cap_styles
+            .iter()
+            .any(|old| old.name == style.name && old.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate paragraph drop-cap style identity".to_string(),
+            ));
         }
-        if let Some(tabs) = self.paragraph_tab_styles.iter().find(|tabs| crate::paragraph_drop_cap::same_style_identity(&style, tabs))
-            && tabs.parent_style_name != style.parent_style_name {
-            return Err(litchi_core::Error::InvalidFormat("paragraph style parent definitions conflict".to_string()));
+        if let Some(tabs) = self
+            .paragraph_tab_styles
+            .iter()
+            .find(|tabs| crate::paragraph_drop_cap::same_style_identity(&style, tabs))
+            && tabs.parent_style_name != style.parent_style_name
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "paragraph style parent definitions conflict".to_string(),
+            ));
         }
         self.paragraph_drop_cap_styles.push(style);
         Ok(self)
     }
 
     /// Customize one of the three generated `L1` numbered-list levels.
-    pub fn set_numbered_list_level_label_alignment(&mut self, level:u16, alignment:crate::ListLevelLabelAlignment)->Result<&mut Self>{
-        if !(1..=3).contains(&level){return Err(litchi_core::Error::InvalidFormat("generated numbered-list level must be 1..=3".to_string()));}
-        let item=crate::ListStyleLevelLabelAlignment::new("L1",level,alignment)?;
-        if let Some(old)=self.list_level_label_alignments.iter_mut().find(|x|x.level==level){*old=item}else{self.list_level_label_alignments.push(item)}Ok(self)
+    pub fn set_numbered_list_level_label_alignment(
+        &mut self,
+        level: u16,
+        alignment: crate::ListLevelLabelAlignment,
+    ) -> Result<&mut Self> {
+        if !(1..=3).contains(&level) {
+            return Err(litchi_core::Error::InvalidFormat(
+                "generated numbered-list level must be 1..=3".to_string(),
+            ));
+        }
+        let item = crate::ListStyleLevelLabelAlignment::new("L1", level, alignment)?;
+        if let Some(old) = self
+            .list_level_label_alignments
+            .iter_mut()
+            .find(|x| x.level == level)
+        {
+            *old = item
+        } else {
+            self.list_level_label_alignments.push(item)
+        }
+        Ok(self)
     }
-    pub fn add_paragraph_flow_style(&mut self,style:crate::ParagraphStyleFlow)->Result<&mut Self>{style.validate()?;if self.paragraph_flow_styles.len()>=4096||self.paragraph_flow_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style){return Err(litchi_core::Error::InvalidFormat("duplicate or excessive paragraph flow style".to_string()))}if self.paragraph_tab_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style)||self.paragraph_drop_cap_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style){return Err(litchi_core::Error::InvalidFormat("paragraph flow style conflicts with another typed paragraph style".to_string()))}self.paragraph_flow_styles.push(style);Ok(self)}
+    pub fn add_paragraph_flow_style(
+        &mut self,
+        style: crate::ParagraphStyleFlow,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.paragraph_flow_styles.len() >= 4096
+            || self
+                .paragraph_flow_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive paragraph flow style".to_string(),
+            ));
+        }
+        if self
+            .paragraph_tab_styles
+            .iter()
+            .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+            || self
+                .paragraph_drop_cap_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "paragraph flow style conflicts with another typed paragraph style".to_string(),
+            ));
+        }
+        self.paragraph_flow_styles.push(style);
+        Ok(self)
+    }
 
     /// Add a named or default table-row style carrying typed row properties.
-    pub fn add_table_row_property_style(&mut self, style: crate::TableRowStyleProperties) -> Result<&mut Self> { style.validate()?; if self.table_row_property_styles.len()>=4096 || self.table_row_property_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style){return Err(litchi_core::Error::InvalidFormat("duplicate or excessive table-row property style".to_string()));} self.table_row_property_styles.push(style); Ok(self) }
+    pub fn add_table_row_property_style(
+        &mut self,
+        style: crate::TableRowStyleProperties,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.table_row_property_styles.len() >= 4096
+            || self
+                .table_row_property_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive table-row property style".to_string(),
+            ));
+        }
+        self.table_row_property_styles.push(style);
+        Ok(self)
+    }
 
     /// Add a named or default table style carrying typed table properties.
-    pub fn add_table_property_style(&mut self, style: crate::TableStyleProperties) -> Result<&mut Self> { style.validate()?; if self.table_property_styles.len()>=4096 || self.table_property_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style){return Err(litchi_core::Error::InvalidFormat("duplicate or excessive table property style".to_string()));} self.table_property_styles.push(style); Ok(self) }
+    pub fn add_table_property_style(
+        &mut self,
+        style: crate::TableStyleProperties,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.table_property_styles.len() >= 4096
+            || self
+                .table_property_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive table property style".to_string(),
+            ));
+        }
+        self.table_property_styles.push(style);
+        Ok(self)
+    }
 
     /// Add a named section style carrying typed residual section properties.
-    pub fn add_section_property_style(&mut self, style: crate::SectionStyleProperties) -> Result<&mut Self> {
+    pub fn add_section_property_style(
+        &mut self,
+        style: crate::SectionStyleProperties,
+    ) -> Result<&mut Self> {
         style.validate()?;
-        if self.section_property_styles.len() >= 4096 || self.section_property_styles.iter().any(|item| item.name == style.name) {
-            return Err(litchi_core::Error::InvalidFormat("duplicate or excessive section property style".to_string()));
+        if self.section_property_styles.len() >= 4096
+            || self
+                .section_property_styles
+                .iter()
+                .any(|item| item.name == style.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive section property style".to_string(),
+            ));
         }
         self.section_property_styles.push(style);
         Ok(self)
@@ -192,7 +351,11 @@ impl DocumentBuilder {
                 "document builder exceeds 4096 column page layouts".to_owned(),
             ));
         }
-        if self.page_layout_columns.iter().any(|(existing, _)| existing == &name) {
+        if self
+            .page_layout_columns
+            .iter()
+            .any(|(existing, _)| existing == &name)
+        {
             return Err(litchi_core::Error::InvalidFormat(format!(
                 "duplicate page layout '{name}'"
             )));
@@ -233,8 +396,27 @@ impl DocumentBuilder {
         Ok(self)
     }
 
-    pub fn add_page_layout_header_footer_properties(&mut self, page_layout_name: impl Into<String>, region: crate::PageHeaderFooterRegion, properties: crate::HeaderFooterStyleProperties) -> Result<&mut Self> {
-        let name=page_layout_name.into();properties.validate()?;if self.page_layout_header_footer_properties.len()>=8192||self.page_layout_header_footer_properties.iter().any(|(n,r,_)|n==&name&&*r==region){return Err(litchi_core::Error::InvalidFormat("duplicate or excessive page-layout header/footer properties".to_string()))}self.page_layout_header_footer_properties.push((name,region,properties));Ok(self)
+    pub fn add_page_layout_header_footer_properties(
+        &mut self,
+        page_layout_name: impl Into<String>,
+        region: crate::PageHeaderFooterRegion,
+        properties: crate::HeaderFooterStyleProperties,
+    ) -> Result<&mut Self> {
+        let name = page_layout_name.into();
+        properties.validate()?;
+        if self.page_layout_header_footer_properties.len() >= 8192
+            || self
+                .page_layout_header_footer_properties
+                .iter()
+                .any(|(n, r, _)| n == &name && *r == region)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive page-layout header/footer properties".to_string(),
+            ));
+        }
+        self.page_layout_header_footer_properties
+            .push((name, region, properties));
+        Ok(self)
     }
 
     /// Set document metadata
@@ -520,6 +702,387 @@ impl DocumentBuilder {
         Ok(self)
     }
 
+    /// Add a validated typed section in mixed document order.
+    pub fn add_section(&mut self, section: crate::Section) -> Result<&mut Self> {
+        section.validate()?;
+        if self.section_names.contains(&section.name) {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate section name '{}'",
+                section.name
+            )));
+        }
+        if let Some(id) = &section.xml_id
+            && self.section_xml_ids.contains(id)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate section xml:id '{id}'"
+            )));
+        }
+        let fragment = section.to_xml_fragment()?;
+        self.section_names.insert(section.name.clone());
+        if let Some(id) = &section.xml_id {
+            self.section_xml_ids.insert(id.clone());
+        }
+        self.elements.push(DocumentElement::Section(fragment));
+        Ok(self)
+    }
+
+    /// Add caller-authored, schema-validated generated-index markup.
+    pub fn add_text_index(&mut self, index: &crate::TextIndex) -> Result<&mut Self> {
+        self.text_indexes.push(index.to_xml_fragment()?);
+        Ok(self)
+    }
+
+    /// Insert a validated point mark at a current paragraph end, or wrap it with a range mark.
+    pub fn add_text_index_mark(
+        &mut self,
+        paragraph_index: usize,
+        mark: &crate::TextIndexMark,
+    ) -> Result<&mut Self> {
+        mark.to_xml_fragments()?;
+        let paragraph_count = self
+            .elements
+            .iter()
+            .filter(|element| {
+                matches!(
+                    element,
+                    DocumentElement::Paragraph(_) | DocumentElement::Heading(_)
+                )
+            })
+            .count();
+        if paragraph_index >= paragraph_count {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "paragraph index {paragraph_index} is out of bounds"
+            )));
+        }
+        self.text_index_marks.push((paragraph_index, mark.clone()));
+        Ok(self)
+    }
+
+    /// Insert a point reference at a current paragraph end, or wrap it with a range reference.
+    pub fn add_reference_mark(
+        &mut self,
+        paragraph_index: usize,
+        mark: &crate::ReferenceMark,
+    ) -> Result<&mut Self> {
+        mark.to_xml_fragments()?;
+        let paragraph_count = self
+            .elements
+            .iter()
+            .filter(|element| {
+                matches!(
+                    element,
+                    DocumentElement::Paragraph(_) | DocumentElement::Heading(_)
+                )
+            })
+            .count();
+        if paragraph_index >= paragraph_count {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "paragraph index {paragraph_index} is out of bounds"
+            )));
+        }
+        if self
+            .reference_marks
+            .iter()
+            .any(|(_, existing)| existing.name() == mark.name())
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate reference-mark identity '{}'",
+                mark.name()
+            )));
+        }
+        self.reference_marks.push((paragraph_index, mark.clone()));
+        Ok(self)
+    }
+
+    /// Insert a point bookmark at a current paragraph end, or wrap it with a range bookmark.
+    pub fn add_bookmark_target(
+        &mut self,
+        paragraph_index: usize,
+        target: &crate::BookmarkTarget,
+    ) -> Result<&mut Self> {
+        target.to_xml_fragments()?;
+        let paragraph_count = self
+            .elements
+            .iter()
+            .filter(|element| {
+                matches!(
+                    element,
+                    DocumentElement::Paragraph(_) | DocumentElement::Heading(_)
+                )
+            })
+            .count();
+        if paragraph_index >= paragraph_count {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "paragraph index {paragraph_index} is out of bounds"
+            )));
+        }
+        if self
+            .bookmark_targets
+            .iter()
+            .any(|(_, existing)| existing.name() == target.name())
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate bookmark identity '{}'",
+                target.name()
+            )));
+        }
+        self.bookmark_targets
+            .push((paragraph_index, target.clone()));
+        Ok(self)
+    }
+
+    /// Add a minimal inert form containing typed custom properties.
+    pub fn add_property_form(&mut self, form: &crate::OdfPropertyForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .property_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate property form '{}'",
+                form.name
+            )));
+        }
+        self.property_forms.push(form.clone());
+        Ok(self)
+    }
+
+    /// Add a canonical form containing typed text and textarea controls.
+    pub fn add_control_form(&mut self, form: &crate::OdfControlForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .control_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.control_forms.push(form.clone());
+        Ok(self)
+    }
+
+    /// Add a canonical form containing typed button and checkbox controls.
+    pub fn add_interactive_form(&mut self, form: &crate::OdfInteractiveForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .interactive_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.interactive_forms.push(form.clone());
+        Ok(self)
+    }
+
+    /// Add a canonical form containing typed listbox and combobox controls.
+    pub fn add_selection_form(&mut self, form: &crate::OdfSelectionForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .selection_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.selection_forms.push(form.clone());
+        Ok(self)
+    }
+
+    /// Add a canonical form containing radio, frame, and image-button controls.
+    pub fn add_visual_form(&mut self, form: &crate::OdfVisualForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .visual_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.visual_forms.push(form.clone());
+        Ok(self)
+    }
+
+    /// Add a canonical form containing fixed-text, hidden, and generic controls.
+    pub fn add_generic_form(&mut self, form: &crate::OdfGenericForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .generic_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.generic_forms.push(form.clone());
+        Ok(self)
+    }
+
+    /// Add a canonical form containing password and file controls.
+    pub fn add_password_file_form(
+        &mut self,
+        form: &crate::OdfPasswordFileForm,
+    ) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .password_file_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.password_file_forms.push(form.clone());
+        Ok(self)
+    }
+
+    /// Add a canonical form containing image-frame controls.
+    pub fn add_image_frame_form(&mut self, form: &crate::OdfImageFrameForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .image_frame_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .password_file_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.image_frame_forms.push(form.clone());
+        Ok(self)
+    }
+
     /// Generate the content.xml body
     fn generate_content_body(&self) -> String {
         let mut estimated = 256usize;
@@ -532,10 +1095,108 @@ impl DocumentBuilder {
                 DocumentElement::Heading(h) => h.text().map(|t| t.len()).unwrap_or(0),
                 DocumentElement::Table(_) => 256,
                 DocumentElement::List(_) => 256,
+                DocumentElement::Section(xml) => xml.len(),
             })
             .sum::<usize>();
 
         let mut body = String::with_capacity(estimated);
+
+        if !self.property_forms.is_empty()
+            || !self.control_forms.is_empty()
+            || !self.interactive_forms.is_empty()
+            || !self.selection_forms.is_empty()
+            || !self.visual_forms.is_empty()
+            || !self.generic_forms.is_empty()
+            || !self.password_file_forms.is_empty()
+            || !self.image_frame_forms.is_empty()
+            || !self.value_range_forms.is_empty()
+            || !self.typed_value_forms.is_empty()
+            || !self.grid_forms.is_empty()
+            || !self.connection_resource_forms.is_empty()
+        {
+            body.push_str("<office:forms>");
+            for form in &self.property_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder property form"),
+                );
+            }
+            for form in &self.control_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder control form"),
+                );
+            }
+            for form in &self.interactive_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder interactive form"),
+                );
+            }
+            for form in &self.selection_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder selection form"),
+                );
+            }
+            for form in &self.visual_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder visual form"),
+                );
+            }
+            for form in &self.generic_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder generic form"),
+                );
+            }
+            for form in &self.password_file_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder password/file form"),
+                );
+            }
+            for form in &self.image_frame_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder image-frame form"),
+                );
+            }
+            for form in &self.value_range_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder value-range form"),
+                );
+            }
+            for form in &self.typed_value_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder typed-value form"),
+                );
+            }
+            for form in &self.grid_forms {
+                body.push_str(&form.to_xml_fragment().expect("validated builder grid form"));
+            }
+            for form in &self.connection_resource_forms {
+                body.push_str(
+                    &form
+                        .to_xml_fragment()
+                        .expect("validated builder connection-resource form"),
+                );
+            }
+            body.push_str("</office:forms>");
+        }
 
         // Add all elements in order they were added
         for element in &self.elements {
@@ -556,7 +1217,45 @@ impl DocumentBuilder {
                     let elem: crate::elements::element::Element = list.clone().into();
                     body.push_str(&elem.to_xml_string());
                 },
+                DocumentElement::Section(section) => body.push_str(section),
             }
+        }
+
+        for index in &self.text_indexes {
+            body.push_str(index);
+        }
+
+        if !self.text_index_marks.is_empty() {
+            let prefix = r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#;
+            let suffix = "</office:text>";
+            let mut wrapped = format!("{prefix}{body}{suffix}");
+            for (paragraph_index, mark) in &self.text_index_marks {
+                wrapped = crate::odt::insert_text_index_mark_xml(&wrapped, *paragraph_index, mark)
+                    .expect("validated builder index mark");
+            }
+            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
+        }
+
+        if !self.reference_marks.is_empty() {
+            let prefix = r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#;
+            let suffix = "</office:text>";
+            let mut wrapped = format!("{prefix}{body}{suffix}");
+            for (paragraph_index, mark) in &self.reference_marks {
+                wrapped = crate::odt::insert_reference_mark_xml(&wrapped, *paragraph_index, mark)
+                    .expect("validated builder reference mark");
+            }
+            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
+        }
+
+        if !self.bookmark_targets.is_empty() {
+            let prefix = r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#;
+            let suffix = "</office:text>";
+            let mut wrapped = format!("{prefix}{body}{suffix}");
+            for (paragraph_index, target) in &self.bookmark_targets {
+                wrapped = crate::insert_bookmark_xml(&wrapped, *paragraph_index, target)
+                    .expect("validated builder bookmark target");
+            }
+            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
         }
 
         body
@@ -619,30 +1318,103 @@ impl DocumentBuilder {
         let mut xml = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" office:version="1.3"><office:font-face-decls/><office:styles><!-- Numbered list style --><text:list-style style:name="L1"><text:list-level-style-number text:level="1" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.27cm" fo:text-indent="-0.635cm" fo:margin-left="1.27cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="2" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.905cm" fo:text-indent="-0.635cm" fo:margin-left="1.905cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="3" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="2.54cm" fo:text-indent="-0.635cm" fo:margin-left="2.54cm"/></style:list-level-properties></text:list-level-style-number></text:list-style></office:styles><office:automatic-styles/><office:master-styles/></office:document-styles>"#.to_string();
         if !self.paragraph_tab_styles.is_empty() {
             let insertion = xml.find("</office:styles>").expect("static styles root");
-            let fragments = self.paragraph_tab_styles.iter()
-                .map(|style| self.paragraph_drop_cap_styles.iter()
-                    .find(|cap| crate::paragraph_drop_cap::same_style_identity(cap, style))
-                    .map_or_else(
-                        || style.to_xml_fragment().expect("validated paragraph tab style"),
-                        |cap| crate::paragraph_drop_cap::merge_with_tab_style(style, cap).expect("validated merged paragraph style"),
-                    ))
+            let fragments = self
+                .paragraph_tab_styles
+                .iter()
+                .map(|style| {
+                    self.paragraph_drop_cap_styles
+                        .iter()
+                        .find(|cap| crate::paragraph_drop_cap::same_style_identity(cap, style))
+                        .map_or_else(
+                            || {
+                                style
+                                    .to_xml_fragment()
+                                    .expect("validated paragraph tab style")
+                            },
+                            |cap| {
+                                crate::paragraph_drop_cap::merge_with_tab_style(style, cap)
+                                    .expect("validated merged paragraph style")
+                            },
+                        )
+                })
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
         }
         if !self.paragraph_drop_cap_styles.is_empty() {
             let insertion = xml.find("</office:styles>").expect("static styles root");
-            let fragments = self.paragraph_drop_cap_styles.iter()
-                .filter(|cap| !self.paragraph_tab_styles.iter().any(|tabs| crate::paragraph_drop_cap::same_style_identity(cap, tabs)))
-                .map(|style| style.to_xml_fragment().expect("validated paragraph drop-cap style"))
+            let fragments = self
+                .paragraph_drop_cap_styles
+                .iter()
+                .filter(|cap| {
+                    !self
+                        .paragraph_tab_styles
+                        .iter()
+                        .any(|tabs| crate::paragraph_drop_cap::same_style_identity(cap, tabs))
+                })
+                .map(|style| {
+                    style
+                        .to_xml_fragment()
+                        .expect("validated paragraph drop-cap style")
+                })
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
         }
-        if !self.paragraph_flow_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.paragraph_flow_styles.iter().map(|x|x.to_xml_fragment().expect("validated paragraph flow style")).collect::<String>();xml.insert_str(insertion,&fragments);}
-        if !self.table_row_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.table_row_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated table-row property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
-        if !self.table_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.table_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated table property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
-        if !self.section_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.section_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated section property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
-        if self.notes_configurations.footnote.is_some() || self.notes_configurations.endnote.is_some() { let insertion=xml.find("</office:styles>").expect("static styles root"); let fragments=self.notes_configurations.to_xml_fragment().expect("validated notes configurations"); xml.insert_str(insertion,&fragments); }
-        if !self.page_layout_columns.is_empty() || !self.page_layout_footnote_separators.is_empty() || !self.page_layout_header_footer_properties.is_empty() {
+        if !self.paragraph_flow_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .paragraph_flow_styles
+                .iter()
+                .map(|x| x.to_xml_fragment().expect("validated paragraph flow style"))
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.table_row_property_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .table_row_property_styles
+                .iter()
+                .map(|x| {
+                    x.to_xml_fragment()
+                        .expect("validated table-row property style")
+                })
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.table_property_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .table_property_styles
+                .iter()
+                .map(|x| x.to_xml_fragment().expect("validated table property style"))
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.section_property_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .section_property_styles
+                .iter()
+                .map(|x| {
+                    x.to_xml_fragment()
+                        .expect("validated section property style")
+                })
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if self.notes_configurations.footnote.is_some()
+            || self.notes_configurations.endnote.is_some()
+        {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .notes_configurations
+                .to_xml_fragment()
+                .expect("validated notes configurations");
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.page_layout_columns.is_empty()
+            || !self.page_layout_footnote_separators.is_empty()
+            || !self.page_layout_header_footer_properties.is_empty()
+        {
             let mut fragments = self
                 .page_layout_columns
                 .iter()
@@ -660,33 +1432,99 @@ impl DocumentBuilder {
                             .expect("static column page layout fragment");
                         fragment.insert_str(
                             insertion,
-                            &separator.to_xml_fragment().expect("validated footnote separator"),
+                            &separator
+                                .to_xml_fragment()
+                                .expect("validated footnote separator"),
                         );
                     }
-                    for (_,region,properties) in self.page_layout_header_footer_properties.iter().filter(|(property_name,_,_)|property_name==name){let insertion=fragment.rfind("</style:page-layout>").expect("page layout fragment");fragment.insert_str(insertion,&properties.to_region_fragment(*region).expect("validated header/footer properties"));}
+                    for (_, region, properties) in self
+                        .page_layout_header_footer_properties
+                        .iter()
+                        .filter(|(property_name, _, _)| property_name == name)
+                    {
+                        let insertion = fragment
+                            .rfind("</style:page-layout>")
+                            .expect("page layout fragment");
+                        fragment.insert_str(
+                            insertion,
+                            &properties
+                                .to_region_fragment(*region)
+                                .expect("validated header/footer properties"),
+                        );
+                    }
                     fragment
                 })
                 .collect::<String>();
             for (name, separator) in &self.page_layout_footnote_separators {
-                if !self.page_layout_columns.iter().any(|(column_name, _)| column_name == name) {
+                if !self
+                    .page_layout_columns
+                    .iter()
+                    .any(|(column_name, _)| column_name == name)
+                {
                     let mut fragment = separator
-                            .to_page_layout_fragment(name)
-                            .expect("validated footnote separator page layout");
-                    for (_,region,properties) in self.page_layout_header_footer_properties.iter().filter(|(property_name,_,_)|property_name==name){let insertion=fragment.rfind("</style:page-layout>").expect("page layout fragment");fragment.insert_str(insertion,&properties.to_region_fragment(*region).expect("validated header/footer properties"));}
+                        .to_page_layout_fragment(name)
+                        .expect("validated footnote separator page layout");
+                    for (_, region, properties) in self
+                        .page_layout_header_footer_properties
+                        .iter()
+                        .filter(|(property_name, _, _)| property_name == name)
+                    {
+                        let insertion = fragment
+                            .rfind("</style:page-layout>")
+                            .expect("page layout fragment");
+                        fragment.insert_str(
+                            insertion,
+                            &properties
+                                .to_region_fragment(*region)
+                                .expect("validated header/footer properties"),
+                        );
+                    }
                     fragments.push_str(&fragment);
                 }
             }
-            for (index,(name,_,_)) in self.page_layout_header_footer_properties.iter().enumerate() { if self.page_layout_columns.iter().any(|(n,_)|n==name)||self.page_layout_footnote_separators.iter().any(|(n,_)|n==name)||self.page_layout_header_footer_properties[..index].iter().any(|(n,_,_)|n==name){continue}let mut fragment=format!("<style:page-layout style:name=\"{}\">",litchi_core::xml::escape_xml(name));for (_,region,properties) in self.page_layout_header_footer_properties.iter().filter(|(n,_,_)|n==name){fragment.push_str(&properties.to_region_fragment(*region).expect("validated header/footer properties"));}fragment.push_str("</style:page-layout>");fragments.push_str(&fragment); }
+            for (index, (name, _, _)) in
+                self.page_layout_header_footer_properties.iter().enumerate()
+            {
+                if self.page_layout_columns.iter().any(|(n, _)| n == name)
+                    || self
+                        .page_layout_footnote_separators
+                        .iter()
+                        .any(|(n, _)| n == name)
+                    || self.page_layout_header_footer_properties[..index]
+                        .iter()
+                        .any(|(n, _, _)| n == name)
+                {
+                    continue;
+                }
+                let mut fragment = format!(
+                    "<style:page-layout style:name=\"{}\">",
+                    litchi_core::xml::escape_xml(name)
+                );
+                for (_, region, properties) in self
+                    .page_layout_header_footer_properties
+                    .iter()
+                    .filter(|(n, _, _)| n == name)
+                {
+                    fragment.push_str(
+                        &properties
+                            .to_region_fragment(*region)
+                            .expect("validated header/footer properties"),
+                    );
+                }
+                fragment.push_str("</style:page-layout>");
+                fragments.push_str(&fragment);
+            }
             xml = xml.replacen(
                 "<office:automatic-styles/>",
-                &format!(
-                    "<office:automatic-styles>{fragments}</office:automatic-styles>"
-                ),
+                &format!("<office:automatic-styles>{fragments}</office:automatic-styles>"),
                 1,
             );
         }
         for alignment in &self.list_level_label_alignments {
-            xml=crate::list_label_alignment::replace_list_level_label_alignment_xml(&xml,alignment).expect("validated generated list alignment");
+            xml = crate::list_label_alignment::replace_list_level_label_alignment_xml(
+                &xml, alignment,
+            )
+            .expect("validated generated list alignment");
         }
         xml
     }
@@ -1054,5 +1892,233 @@ mod tests {
         let mut builder = DocumentBuilder::new();
         builder.add_bulleted_list(vec![]).unwrap();
         assert_eq!(builder.elements.len(), 1);
+    }
+}
+
+impl DocumentBuilder {
+    /// Add a validated value-range form to the document.
+    pub fn add_value_range_form(&mut self, form: &crate::OdfValueRangeForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .value_range_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .image_frame_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .password_file_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.value_range_forms.push(form.clone());
+        Ok(self)
+    }
+}
+
+impl DocumentBuilder {
+    /// Add a validated form containing formatted-text, number, date, or time controls.
+    pub fn add_typed_value_form(&mut self, form: &crate::OdfTypedValueForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .typed_value_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .value_range_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .image_frame_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .password_file_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.typed_value_forms.push(form.clone());
+        Ok(self)
+    }
+}
+
+impl DocumentBuilder {
+    /// Adds a form whose final child is an inert `form:connection-resource`.
+    pub fn add_connection_resource_form(
+        &mut self,
+        form: &crate::OdfConnectionResourceForm,
+    ) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .connection_resource_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .grid_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .typed_value_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .value_range_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .image_frame_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .password_file_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.connection_resource_forms.push(form.clone());
+        Ok(self)
+    }
+
+    pub fn add_grid_form(&mut self, form: &crate::OdfGridForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .grid_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .typed_value_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .value_range_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .image_frame_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .password_file_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.grid_forms.push(form.clone());
+        Ok(self)
     }
 }

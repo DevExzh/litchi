@@ -11,8 +11,7 @@ use std::fmt;
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const SVG_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
-const LOEXT_NS: &[u8] =
-    b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
+const LOEXT_NS: &[u8] = b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 const MAX_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_DEPTH: usize = 256;
 const MAX_OPACITIES: usize = 65_536;
@@ -251,7 +250,12 @@ impl OdfDrawingOpacities {
             aggregate = aggregate
                 .checked_add(opacity.display_name.as_ref().map_or(0, String::len))
                 .and_then(|size| {
-                    size.checked_add(opacity.angle.as_ref().map_or(0, |angle| angle.as_str().len()))
+                    size.checked_add(
+                        opacity
+                            .angle
+                            .as_ref()
+                            .map_or(0, |angle| angle.as_str().len()),
+                    )
                 })
                 .ok_or_else(|| make_error("opacity aggregate size overflow"))?;
             if aggregate > MAX_AGGREGATE_BYTES {
@@ -354,7 +358,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<OdfDrawingOpacities> {
                 if stack.len() > MAX_DEPTH {
                     return invalid(format!("opacity XML exceeds {MAX_DEPTH} levels"));
                 }
-            }
+            },
             Event::Empty(ref element) => {
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace, &local)?;
@@ -381,7 +385,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<OdfDrawingOpacities> {
                 } else if namespace == NamespaceKind::Loext && local == "opacity-stop" {
                     return invalid("loext:opacity-stop must be inside draw:opacity");
                 }
-            }
+            },
             Event::End(_) => {
                 let frame = stack
                     .pop()
@@ -397,7 +401,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<OdfDrawingOpacities> {
                         .opacities
                         .push(active.take().expect("active opacity checked").value);
                 }
-            }
+            },
             Event::Text(ref text) if active.is_some() => {
                 let value = text
                     .xml_content(XmlVersion::Explicit1_0)
@@ -405,15 +409,15 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<OdfDrawingOpacities> {
                 if !value.chars().all(char::is_whitespace) {
                     return invalid("draw:opacity cannot contain text");
                 }
-            }
+            },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
                 return invalid("draw:opacity cannot contain character data");
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid("DTDs and processing instructions are prohibited in opacities");
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -504,11 +508,7 @@ fn take_geometry_percent(
             let number = value
                 .strip_suffix('%')
                 .ok_or_else(|| make_error(format!("draw:{local} must be a percentage")))?;
-            OdfOpacityGeometryPercent::new(parse_decimal(
-                number,
-                true,
-                &format!("draw:{local}"),
-            )?)
+            OdfOpacityGeometryPercent::new(parse_decimal(number, true, &format!("draw:{local}"))?)
         })
         .transpose()
 }
@@ -547,8 +547,8 @@ fn attributes(
 ) -> Result<Attributes> {
     let mut values = HashMap::new();
     for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|error| make_error(format!("invalid opacity attribute: {error}")))?;
+        let attribute =
+            attribute.map_err(|error| make_error(format!("invalid opacity attribute: {error}")))?;
         let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_kind(&resolved)?;
         let local = decode(local.as_ref(), "attribute name")?;
@@ -588,7 +588,7 @@ fn namespace_kind(resolved: &ResolveResult<'_>) -> Result<NamespaceKind> {
             } else {
                 NamespaceKind::Other
             })
-        }
+        },
         ResolveResult::Unknown(prefix) => invalid(format!(
             "unbound XML namespace prefix '{}'",
             String::from_utf8_lossy(prefix.as_ref())
@@ -597,9 +597,10 @@ fn namespace_kind(resolved: &ResolveResult<'_>) -> Result<NamespaceKind> {
 }
 
 fn ensure_location(stack: &[Frame]) -> Result<()> {
-    if stack.last().is_some_and(|frame| {
-        frame.namespace == NamespaceKind::Office && frame.local == "styles"
-    }) {
+    if stack
+        .last()
+        .is_some_and(|frame| frame.namespace == NamespaceKind::Office && frame.local == "styles")
+    {
         Ok(())
     } else {
         invalid("draw:opacity must be a direct child of office:styles")
@@ -640,16 +641,16 @@ fn required(
 
 fn reject_attributes(values: &Attributes, element: &str) -> Result<()> {
     if let Some(((namespace, local), _)) = values.iter().next() {
-        return invalid(format!("unsupported {element} attribute {namespace:?}:{local}"));
+        return invalid(format!(
+            "unsupported {element} attribute {namespace:?}:{local}"
+        ));
     }
     Ok(())
 }
 
 fn validate_stop_value(value: OdfOpacityStopValue) -> Result<()> {
     match value {
-        OdfOpacityStopValue::Fraction(value) => {
-            OdfOpacityStopValue::fraction(value).map(|_| ())
-        }
+        OdfOpacityStopValue::Fraction(value) => OdfOpacityStopValue::fraction(value).map(|_| ()),
         OdfOpacityStopValue::Percent(value) => OdfOpacityPercent::new(value.0).map(|_| ()),
     }
 }
@@ -735,7 +736,11 @@ fn escape_xml(output: &mut String, value: &str) {
 }
 
 fn canonical_number(value: f64) -> String {
-    if value == 0.0 { "0".to_owned() } else { value.to_string() }
+    if value == 0.0 {
+        "0".to_owned()
+    } else {
+        value.to_string()
+    }
 }
 
 fn decode(value: &[u8], what: &str) -> Result<String> {
@@ -759,16 +764,24 @@ mod tests {
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
     const SVG: &str = "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
-    const LOEXT: &str =
-        "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
+    const LOEXT: &str = "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 
     fn wrap(body: &str) -> String {
-        format!(r#"<office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:svg="{SVG}" xmlns:loext="{LOEXT}">{body}</office:styles>"#)
+        format!(
+            r#"<office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:svg="{SVG}" xmlns:loext="{LOEXT}">{body}</office:styles>"#
+        )
     }
 
     #[test]
     fn parses_and_round_trips_all_geometries_and_stops() {
-        let styles = ["linear", "axial", "radial", "ellipsoid", "square", "rectangular"];
+        let styles = [
+            "linear",
+            "axial",
+            "radial",
+            "ellipsoid",
+            "square",
+            "rectangular",
+        ];
         let body = styles.iter().enumerate().map(|(index, style)| format!(r#"<draw:opacity draw:name="o{index}" draw:style="{style}" draw:cx="-5.5%" draw:cy=".5%" draw:start="0%" draw:end="100.0%" draw:angle="1rad" draw:border="25.%"><loext:opacity-stop svg:offset="0" svg:stop-opacity="20%"/><loext:opacity-stop svg:offset="1" svg:stop-opacity=".5"/></draw:opacity>"#)).collect::<String>();
         let parsed = parse_drawing_opacities(&wrap(&body)).unwrap();
         assert_eq!(parsed.opacities.len(), 6);
@@ -784,13 +797,23 @@ mod tests {
             wrap(r#"<draw:opacity draw:name="x"/>"#),
             wrap(r#"<draw:opacity draw:name="x" draw:style="cone"/>"#),
             wrap(r#"<draw:opacity draw:name="x" draw:style="linear" draw:start="101%"/>"#),
-            wrap(r#"<draw:opacity draw:name="x" draw:style="linear"><loext:opacity-stop svg:offset="2" svg:stop-opacity="1"/></draw:opacity>"#),
-            wrap(r#"<draw:opacity draw:name="x" draw:style="linear"><loext:opacity-stop svg:offset="0"/></draw:opacity>"#),
+            wrap(
+                r#"<draw:opacity draw:name="x" draw:style="linear"><loext:opacity-stop svg:offset="2" svg:stop-opacity="1"/></draw:opacity>"#,
+            ),
+            wrap(
+                r#"<draw:opacity draw:name="x" draw:style="linear"><loext:opacity-stop svg:offset="0"/></draw:opacity>"#,
+            ),
             wrap(r#"<draw:opacity draw:name="x" draw:style="linear"><draw:g/></draw:opacity>"#),
             wrap(r#"<loext:opacity-stop svg:offset="0" svg:stop-opacity="1"/>"#),
-            wrap(r#"<draw:opacity draw:name="x" draw:style="linear"/><draw:opacity draw:name="x" draw:style="axial"/>"#),
-            format!(r#"<office:document xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><draw:opacity draw:style="linear"/></office:document>"#),
-            format!(r#"<!DOCTYPE x><office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><draw:opacity draw:style="linear"/></office:styles>"#),
+            wrap(
+                r#"<draw:opacity draw:name="x" draw:style="linear"/><draw:opacity draw:name="x" draw:style="axial"/>"#,
+            ),
+            format!(
+                r#"<office:document xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><draw:opacity draw:style="linear"/></office:document>"#
+            ),
+            format!(
+                r#"<!DOCTYPE x><office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><draw:opacity draw:style="linear"/></office:styles>"#
+            ),
         ] {
             assert!(parse_drawing_opacities(&xml).is_err(), "accepted {xml}");
         }
@@ -798,15 +821,30 @@ mod tests {
 
     #[test]
     fn parses_real_libreoffice_angles_and_extension_stops() {
-        let angles_xml = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/sd/qa/unit/data/odg/gradient-angle.fodg"));
+        let angles_xml = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/sd/qa/unit/data/odg/gradient-angle.fodg"
+        ));
         let angles = crate::FlatOpenDocument::from_bytes(angles_xml.as_bytes().to_vec()).unwrap();
         let values = angles.drawing_opacities().unwrap();
         assert_eq!(values.opacities.len(), 6);
-        assert_eq!(values.opacities[0].angle.as_ref().unwrap().as_str(), "90deg");
-        assert_eq!(values.opacities[2].angle.as_ref().unwrap().as_str(), "1.0rad");
-        assert_eq!(values.opacities[3].angle.as_ref().unwrap().as_str(), "1000grad");
+        assert_eq!(
+            values.opacities[0].angle.as_ref().unwrap().as_str(),
+            "90deg"
+        );
+        assert_eq!(
+            values.opacities[2].angle.as_ref().unwrap().as_str(),
+            "1.0rad"
+        );
+        assert_eq!(
+            values.opacities[3].angle.as_ref().unwrap().as_str(),
+            "1000grad"
+        );
 
-        let stops_xml = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/oox/qa/unit/data/tdf51195_Fontwork_ellipticalGradient.fodt"));
+        let stops_xml = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/oox/qa/unit/data/tdf51195_Fontwork_ellipticalGradient.fodt"
+        ));
         let stops = crate::FlatOpenDocument::from_bytes(stops_xml.as_bytes().to_vec()).unwrap();
         let values = stops.drawing_opacities().unwrap();
         let value = values.get("Transparency_20_1").unwrap();

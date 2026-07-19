@@ -53,6 +53,8 @@ pub struct TrackChange {
     pub author: Option<String>,
     /// Date/time of the change
     pub date: Option<String>,
+    /// Optional review comment stored in `office:change-info`.
+    pub comment: Option<String>,
     /// Type of change (insertion, deletion, format-change)
     pub change_type: ChangeType,
     /// Style referenced by a format change. The style is not resolved automatically.
@@ -212,6 +214,7 @@ struct ActiveTrackedChange {
     xml_id: Option<String>,
     author: Option<String>,
     date: Option<String>,
+    comment: String,
     change_type: Option<ChangeType>,
     style_name: Option<String>,
     merge_last_paragraph: Option<bool>,
@@ -222,6 +225,8 @@ struct ActiveTrackedChange {
     change_info_seen: bool,
     creator_depth: Option<usize>,
     date_depth: Option<usize>,
+    comment_depth: Option<usize>,
+    comment_seen: bool,
     paragraph_depth: Option<usize>,
     seen_paragraph: bool,
 }
@@ -296,6 +301,7 @@ fn parse_change_declarations(content: &str) -> Result<TrackedChanges> {
                             xml_id,
                             author: None,
                             date: None,
+                            comment: String::new(),
                             change_type: None,
                             style_name: None,
                             merge_last_paragraph: None,
@@ -306,6 +312,8 @@ fn parse_change_declarations(content: &str) -> Result<TrackedChanges> {
                             change_info_seen: false,
                             creator_depth: None,
                             date_depth: None,
+                            comment_depth: None,
+                            comment_seen: false,
                             paragraph_depth: None,
                             seen_paragraph: false,
                         });
@@ -372,6 +380,9 @@ fn parse_change_declarations(content: &str) -> Result<TrackedChanges> {
                         if change.date_depth == Some(change.depth) {
                             change.date_depth = None;
                         }
+                        if change.comment_depth == Some(change.depth) {
+                            change.comment_depth = None;
+                        }
                         if change.paragraph_depth == Some(change.depth) {
                             change.paragraph_depth = None;
                         }
@@ -403,6 +414,7 @@ fn parse_change_declarations(content: &str) -> Result<TrackedChanges> {
                                 xml_id: change.xml_id,
                                 author: change.author,
                                 date: change.date,
+                                comment: change.comment_seen.then_some(change.comment),
                                 change_type,
                                 style_name: change.style_name,
                                 merge_last_paragraph: change.merge_last_paragraph,
@@ -487,11 +499,7 @@ fn parse_tracked_changes_attributes(
         b"protection-key-digest-algorithm",
         "tracked-changes",
     )? {
-        validate_tracked_change_text(
-            &value,
-            "text:protection-key-digest-algorithm",
-            false,
-        )?;
+        validate_tracked_change_text(&value, "text:protection-key-digest-algorithm", false)?;
         tracked.protection_key_digest_algorithm = Some(value);
     }
     if tracked.protection_key_digest_algorithm.is_some() && tracked.protection_key.is_none() {
@@ -594,6 +602,20 @@ fn process_change_declaration_start(
         change.date = Some(String::new());
         change.date_depth = Some(change.depth);
     } else if text_element
+        && element.local_name().as_ref() == b"p"
+        && change.change_info_depth.is_some()
+    {
+        if change.change_info_depth != change.depth.checked_sub(1) {
+            return Err(Error::InvalidFormat(
+                "change-info comment must be a direct text:p child".to_string(),
+            ));
+        }
+        if change.comment_seen {
+            append_checked(&mut change.comment, "\n")?;
+        }
+        change.comment_seen = true;
+        change.comment_depth = Some(change.depth);
+    } else if text_element
         && matches!(element.local_name().as_ref(), b"p" | b"h")
         && change.change_type == Some(ChangeType::Deletion)
         && change.change_info_depth.is_none()
@@ -605,7 +627,9 @@ fn process_change_declaration_start(
         change.seen_paragraph = true;
         change.paragraph_depth = Some(change.depth);
     }
-    if text_element && change.paragraph_depth.is_some() {
+    if text_element && change.comment_depth.is_some() {
+        append_text_control(reader, element, &mut change.comment)?;
+    } else if text_element && change.paragraph_depth.is_some() {
         append_text_control(reader, element, &mut change.content)?;
     }
     Ok(())
@@ -629,11 +653,12 @@ fn validate_tracked_change_text(value: &str, description: &str, allow_empty: boo
         )));
     }
     if !allow_empty && value.is_empty() {
-        return Err(Error::InvalidFormat(format!("{description} cannot be empty")));
+        return Err(Error::InvalidFormat(format!(
+            "{description} cannot be empty"
+        )));
     }
     if value.chars().any(|character| {
-        character == '\0'
-            || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
+        character == '\0' || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
     }) {
         return Err(Error::InvalidFormat(format!(
             "{description} contains invalid XML characters"
@@ -724,6 +749,19 @@ fn process_change_declaration_empty(
         }
         change.date = Some(String::new());
     } else if text_element
+        && element.local_name().as_ref() == b"p"
+        && change.change_info_depth.is_some()
+    {
+        if change.change_info_depth != change.depth.checked_sub(1) {
+            return Err(Error::InvalidFormat(
+                "change-info comment must be a direct text:p child".to_string(),
+            ));
+        }
+        if change.comment_seen {
+            append_checked(&mut change.comment, "\n")?;
+        }
+        change.comment_seen = true;
+    } else if text_element
         && matches!(element.local_name().as_ref(), b"p" | b"h")
         && change.change_type == Some(ChangeType::Deletion)
         && change.change_info_depth.is_none()
@@ -732,6 +770,8 @@ fn process_change_declaration_empty(
             append_checked(&mut change.content, "\n")?;
         }
         change.seen_paragraph = true;
+    } else if text_element && change.comment_depth.is_some() {
+        append_text_control(reader, element, &mut change.comment)?;
     } else if text_element && change.paragraph_depth.is_some() {
         append_text_control(reader, element, &mut change.content)?;
     }
@@ -743,6 +783,8 @@ fn append_change_declaration_text(change: &mut ActiveTrackedChange, value: &str)
         append_checked(change.author.as_mut().expect("creator initialized"), value)
     } else if change.date_depth.is_some() {
         append_checked(change.date.as_mut().expect("date initialized"), value)
+    } else if change.comment_depth.is_some() {
+        append_checked(&mut change.comment, value)
     } else if change.paragraph_depth.is_some() {
         append_checked(&mut change.content, value)
     } else {
@@ -1970,7 +2012,10 @@ mod tests {
             r#"<t:tracked-changes><t:changed-region t:id="a"><t:deletion t:merge-last-paragraph="maybe"><o:change-info/></t:deletion></t:changed-region></t:tracked-changes>"#,
         ] {
             let xml = format!("{prefix}{body}{suffix}");
-            assert!(OdtParser::parse_tracked_changes(&xml).is_err(), "accepted {body}");
+            assert!(
+                OdtParser::parse_tracked_changes(&xml).is_err(),
+                "accepted {body}"
+            );
         }
     }
 
@@ -2179,6 +2224,7 @@ mod tests {
             xml_id: None,
             author: Some("Author".to_string()),
             date: Some("2024-03-15".to_string()),
+            comment: None,
             change_type: ChangeType::Insertion,
             style_name: None,
             merge_last_paragraph: None,
@@ -2267,6 +2313,7 @@ mod tests {
             xml_id: None,
             author: Some("Author".to_string()),
             date: Some("2024-03-15".to_string()),
+            comment: None,
             change_type: ChangeType::Deletion,
             style_name: None,
             merge_last_paragraph: None,

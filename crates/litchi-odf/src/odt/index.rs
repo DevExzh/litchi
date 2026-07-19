@@ -1,5 +1,18 @@
 //! Inert semantic access to generated OpenDocument text indexes.
 
+mod writing;
+
+pub use writing::{
+    AlphabeticalIndexSource, BibliographyIndexSource, IllustrationIndexSource, ObjectIndexSource,
+    TableIndexSource, TableOfContentsSource, TextAlphabeticalIndexEntryTemplate,
+    TextAlphabeticalIndexLevel, TextBibliographyEntryTemplate, TextBibliographyEntryToken,
+    TextBibliographyType, TextIndexBody, TextIndexBodyParagraph, TextIndexBodyTitle,
+    TextIndexCaptionSequenceFormat, TextIndexChapterDisplay, TextIndexEntryTemplate,
+    TextIndexEntryToken, TextIndexScope, TextIndexSimpleEntryTemplate, TextIndexSourceStyles,
+    TextIndexTabStop, TextIndexTitleTemplate, UserIndexSource, insert_text_index_xml,
+    remove_text_index_xml, replace_text_index_xml,
+};
+
 use crate::elements::xml::{
     TEXT_NAMESPACE, append_checked, decode_reference, is_bound, namespaced_attribute,
 };

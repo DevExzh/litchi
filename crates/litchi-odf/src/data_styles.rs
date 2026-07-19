@@ -369,7 +369,10 @@ impl OdfDataStyle {
             return invalid("data style exceeds component limits");
         }
         if self.automatic_order.is_some()
-            && !matches!(self.kind, OdfDataStyleKind::Currency | OdfDataStyleKind::Date)
+            && !matches!(
+                self.kind,
+                OdfDataStyleKind::Currency | OdfDataStyleKind::Date
+            )
         {
             return invalid("number:automatic-order is invalid for this data style");
         }
@@ -398,7 +401,11 @@ impl OdfDataStyle {
     /// Serialize a normative ODF fragment for the requested core version.
     pub fn to_xml_fragment(&self, version: OdfDataStyleVersion) -> Result<String> {
         self.validate(version)?;
-        let mut out = format!("<number:{} style:name=\"{}\"", self.kind.local(), esc(&self.name));
+        let mut out = format!(
+            "<number:{} style:name=\"{}\"",
+            self.kind.local(),
+            esc(&self.name)
+        );
         attr(&mut out, "style:display-name", self.display_name.as_deref());
         locale_attrs(&mut out, &self.locale);
         attr(&mut out, "number:title", self.title.as_deref());
@@ -480,11 +487,10 @@ impl OdfDataStyles {
         })
     }
 
-    pub fn in_section(
-        &self,
-        section: OdfDataStyleSection,
-    ) -> impl Iterator<Item = &OdfDataStyle> {
-        self.styles.iter().filter(move |style| style.section == section)
+    pub fn in_section(&self, section: OdfDataStyleSection) -> impl Iterator<Item = &OdfDataStyle> {
+        self.styles
+            .iter()
+            .filter(move |style| style.section == section)
     }
 
     pub fn named<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a OdfDataStyle> {
@@ -493,7 +499,10 @@ impl OdfDataStyles {
 
     fn append(&mut self, mut other: Self) -> Result<()> {
         for style in other.styles.drain(..) {
-            if self.get(style.source_part, style.section, &style.name).is_some() {
+            if self
+                .get(style.source_part, style.section, &style.name)
+                .is_some()
+            {
                 return invalid("duplicate data style identity");
             }
             if self.styles.len() >= MAX_STYLES {
@@ -569,7 +578,7 @@ pub fn parse_data_styles_xml(xml: &str, part: OdfDataStylePart) -> Result<OdfDat
                 xml_version = declaration
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
-            }
+            },
             Event::Start(ref element) => {
                 if frames.len() >= MAX_DEPTH {
                     return invalid("data-style XML is too deep");
@@ -588,12 +597,8 @@ pub fn parse_data_styles_xml(xml: &str, part: OdfDataStylePart) -> Result<OdfDat
                         && namespace.as_deref() == Some(NUMBER)
                         && OdfDataStyleKind::parse(&local).is_some()
                 {
-                    let attributes = collect_attributes(
-                        &reader,
-                        element,
-                        xml_version,
-                        &mut aggregate,
-                    )?;
+                    let attributes =
+                        collect_attributes(&reader, element, xml_version, &mut aggregate)?;
                     nodes.push(NodeBuilder {
                         namespace: namespace.clone(),
                         local: local.clone(),
@@ -604,7 +609,7 @@ pub fn parse_data_styles_xml(xml: &str, part: OdfDataStylePart) -> Result<OdfDat
                     });
                 }
                 frames.push(Frame { namespace, local });
-            }
+            },
             Event::Empty(ref element) => {
                 let namespace = namespace_uri(&resolved)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
@@ -626,7 +631,11 @@ pub fn parse_data_styles_xml(xml: &str, part: OdfDataStylePart) -> Result<OdfDat
                         children: Vec::new(),
                         raw: xml[start..end].to_string(),
                     };
-                    nodes.last_mut().expect("active data style").children.push(node);
+                    nodes
+                        .last_mut()
+                        .expect("active data style")
+                        .children
+                        .push(node);
                 } else if let Some(section) = direct
                     && namespace.as_deref() == Some(NUMBER)
                     && OdfDataStyleKind::parse(&local).is_some()
@@ -644,33 +653,40 @@ pub fn parse_data_styles_xml(xml: &str, part: OdfDataStylePart) -> Result<OdfDat
                         children: Vec::new(),
                         raw: xml[start..end].to_string(),
                     };
-                    push_style(
-                        &mut output,
-                        parse_style_node(node, part, section, version)?,
-                    )?;
+                    push_style(&mut output, parse_style_node(node, part, section, version)?)?;
                 }
-            }
+            },
             Event::Text(ref text) if !nodes.is_empty() => {
                 let decoded = text
                     .decode()
                     .map_err(|error| bad(format!("invalid data-style text: {error}")))?;
                 let unescaped = quick_xml::escape::unescape(&decoded)
                     .map_err(|error| bad(format!("invalid data-style entity: {error}")))?;
-                add_text(&mut nodes.last_mut().expect("active node").text, &unescaped, &mut aggregate)?;
-            }
+                add_text(
+                    &mut nodes.last_mut().expect("active node").text,
+                    &unescaped,
+                    &mut aggregate,
+                )?;
+            },
             Event::CData(ref text) if !nodes.is_empty() => {
                 let decoded = reader
                     .decoder()
                     .decode(text.as_ref())
                     .map_err(|error| bad(format!("invalid data-style CDATA: {error}")))?;
-                add_text(&mut nodes.last_mut().expect("active node").text, &decoded, &mut aggregate)?;
-            }
+                add_text(
+                    &mut nodes.last_mut().expect("active node").text,
+                    &decoded,
+                    &mut aggregate,
+                )?;
+            },
             Event::GeneralRef(_) if !nodes.is_empty() => {
                 return invalid("entity references are prohibited in data styles");
-            }
+            },
             Event::End(_) => {
                 let end = reader.buffer_position() as usize;
-                if !nodes.is_empty() && nodes.len() == frames.len() - active_base_depth(&frames, &nodes) {
+                if !nodes.is_empty()
+                    && nodes.len() == frames.len() - active_base_depth(&frames, &nodes)
+                {
                     let builder = nodes.pop().expect("active data-style node");
                     let node = Node {
                         namespace: builder.namespace,
@@ -685,21 +701,18 @@ pub fn parse_data_styles_xml(xml: &str, part: OdfDataStylePart) -> Result<OdfDat
                     } else {
                         let section = direct_parent_section(&frames)
                             .ok_or_else(|| bad("misplaced data style"))?;
-                        push_style(
-                            &mut output,
-                            parse_style_node(node, part, section, version)?,
-                        )?;
+                        push_style(&mut output, parse_style_node(node, part, section, version)?)?;
                     }
                 }
                 frames
                     .pop()
                     .ok_or_else(|| bad("data-style element stack underflow"))?;
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid("DTDs and processing instructions are prohibited");
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -716,7 +729,9 @@ fn active_base_depth(frames: &[Frame], nodes: &[NodeBuilder]) -> usize {
 }
 
 fn direct_parent_section(frames: &[Frame]) -> Option<OdfDataStyleSection> {
-    frames.get(frames.len().checked_sub(2)?).and_then(frame_section)
+    frames
+        .get(frames.len().checked_sub(2)?)
+        .and_then(frame_section)
 }
 
 fn direct_style_section(frames: &[Frame]) -> Option<OdfDataStyleSection> {
@@ -743,45 +758,25 @@ fn parse_style_node(
     if node.namespace.as_deref() != Some(NUMBER) {
         return invalid("data style uses the wrong namespace");
     }
-    let kind = OdfDataStyleKind::parse(&node.local)
-        .ok_or_else(|| bad("unknown data-style container"))?;
+    let kind =
+        OdfDataStyleKind::parse(&node.local).ok_or_else(|| bad("unknown data-style container"))?;
     ensure_whitespace(&node.text, "data-style container")?;
     let name = required(&mut node.attributes, STYLE, "name")?;
     let display_name = take(&mut node.attributes, STYLE, "display-name");
     let locale = parse_locale(&mut node.attributes)?;
     let title = take(&mut node.attributes, NUMBER, "title");
     let volatile = take_bool(&mut node.attributes, STYLE, "volatile")?;
-    let transliteration_format = take(
-        &mut node.attributes,
-        NUMBER,
-        "transliteration-format",
-    );
-    let transliteration_language = take(
-        &mut node.attributes,
-        NUMBER,
-        "transliteration-language",
-    );
-    let transliteration_country = take(
-        &mut node.attributes,
-        NUMBER,
-        "transliteration-country",
-    );
-    let transliteration_style = take(
-        &mut node.attributes,
-        NUMBER,
-        "transliteration-style",
-    )
-    .map(|value| OdfTransliterationStyle::parse(&value))
-    .transpose()?;
+    let transliteration_format = take(&mut node.attributes, NUMBER, "transliteration-format");
+    let transliteration_language = take(&mut node.attributes, NUMBER, "transliteration-language");
+    let transliteration_country = take(&mut node.attributes, NUMBER, "transliteration-country");
+    let transliteration_style = take(&mut node.attributes, NUMBER, "transliteration-style")
+        .map(|value| OdfTransliterationStyle::parse(&value))
+        .transpose()?;
     let automatic_order = take_bool(&mut node.attributes, NUMBER, "automatic-order")?;
     let format_source = take(&mut node.attributes, NUMBER, "format-source")
         .map(|value| OdfFormatSource::parse(&value))
         .transpose()?;
-    let truncate_on_overflow = take_bool(
-        &mut node.attributes,
-        NUMBER,
-        "truncate-on-overflow",
-    )?;
+    let truncate_on_overflow = take_bool(&mut node.attributes, NUMBER, "truncate-on-overflow")?;
     reject_remaining(&node.attributes, "data-style container")?;
 
     let mut text_properties = None;
@@ -870,7 +865,7 @@ fn parse_part_node(
             reject_remaining(&node.attributes, "number:text")?;
             ensure_no_children(&node, "number:text")?;
             OdfDataStylePartToken::Text(node.text)
-        }
+        },
         "fill-character" => {
             if version == OdfDataStyleVersion::V1_2 {
                 return invalid("number:fill-character requires ODF 1.3");
@@ -878,7 +873,7 @@ fn parse_part_node(
             reject_remaining(&node.attributes, "number:fill-character")?;
             ensure_no_children(&node, "number:fill-character")?;
             OdfDataStylePartToken::FillCharacter(node.text)
-        }
+        },
         "number" => {
             ensure_whitespace(&node.text, "number:number")?;
             let mut embedded_text = Vec::new();
@@ -901,25 +896,17 @@ fn parse_part_node(
                 &mut alias,
             )?;
             let value = OdfNumberToken {
-                decimal_replacement: take(
-                    &mut node.attributes,
-                    NUMBER,
-                    "decimal-replacement",
-                ),
+                decimal_replacement: take(&mut node.attributes, NUMBER, "decimal-replacement"),
                 display_factor: take_f64(&mut node.attributes, NUMBER, "display-factor")?,
                 decimal_places: take_i64(&mut node.attributes, NUMBER, "decimal-places")?,
                 min_decimal_places,
-                min_integer_digits: take_i64(
-                    &mut node.attributes,
-                    NUMBER,
-                    "min-integer-digits",
-                )?,
+                min_integer_digits: take_i64(&mut node.attributes, NUMBER, "min-integer-digits")?,
                 grouping: take_bool(&mut node.attributes, NUMBER, "grouping")?,
                 embedded_text,
             };
             reject_remaining(&node.attributes, "number:number")?;
             OdfDataStylePartToken::Number(value)
-        }
+        },
         "scientific-number" => {
             ensure_empty_node(&node, "number:scientific-number")?;
             let exponent_interval = take_versioned_u64(
@@ -941,25 +928,17 @@ fn parse_part_node(
                 &mut alias,
             )?;
             let value = OdfScientificNumberToken {
-                min_exponent_digits: take_i64(
-                    &mut node.attributes,
-                    NUMBER,
-                    "min-exponent-digits",
-                )?,
+                min_exponent_digits: take_i64(&mut node.attributes, NUMBER, "min-exponent-digits")?,
                 exponent_interval,
                 forced_exponent_sign,
                 decimal_places: take_i64(&mut node.attributes, NUMBER, "decimal-places")?,
                 min_decimal_places,
-                min_integer_digits: take_i64(
-                    &mut node.attributes,
-                    NUMBER,
-                    "min-integer-digits",
-                )?,
+                min_integer_digits: take_i64(&mut node.attributes, NUMBER, "min-integer-digits")?,
                 grouping: take_bool(&mut node.attributes, NUMBER, "grouping")?,
             };
             reject_remaining(&node.attributes, "number:scientific-number")?;
             OdfDataStylePartToken::ScientificNumber(value)
-        }
+        },
         "fraction" => {
             ensure_empty_node(&node, "number:fraction")?;
             let max_denominator_value = take_versioned_u64(
@@ -979,22 +958,14 @@ fn parse_part_node(
                     NUMBER,
                     "min-denominator-digits",
                 )?,
-                denominator_value: take_i64(
-                    &mut node.attributes,
-                    NUMBER,
-                    "denominator-value",
-                )?,
+                denominator_value: take_i64(&mut node.attributes, NUMBER, "denominator-value")?,
                 max_denominator_value,
-                min_integer_digits: take_i64(
-                    &mut node.attributes,
-                    NUMBER,
-                    "min-integer-digits",
-                )?,
+                min_integer_digits: take_i64(&mut node.attributes, NUMBER, "min-integer-digits")?,
                 grouping: take_bool(&mut node.attributes, NUMBER, "grouping")?,
             };
             reject_remaining(&node.attributes, "number:fraction")?;
             OdfDataStylePartToken::Fraction(value)
-        }
+        },
         "currency-symbol" => {
             ensure_no_children(&node, "number:currency-symbol")?;
             let locale = parse_locale(&mut node.attributes)?;
@@ -1003,23 +974,19 @@ fn parse_part_node(
                 locale,
                 text: node.text,
             })
-        }
+        },
         "day" => OdfDataStylePartToken::Day(parse_calendar(&mut node)?),
         "month" => {
             ensure_empty_node(&node, "number:month")?;
             let value = OdfMonthToken {
                 style: take_style(&mut node.attributes)?,
                 textual: take_bool(&mut node.attributes, NUMBER, "textual")?,
-                possessive_form: take_bool(
-                    &mut node.attributes,
-                    NUMBER,
-                    "possessive-form",
-                )?,
+                possessive_form: take_bool(&mut node.attributes, NUMBER, "possessive-form")?,
                 calendar: take(&mut node.attributes, NUMBER, "calendar"),
             };
             reject_remaining(&node.attributes, "number:month")?;
             OdfDataStylePartToken::Month(value)
-        }
+        },
         "year" => OdfDataStylePartToken::Year(parse_calendar(&mut node)?),
         "era" => OdfDataStylePartToken::Era(parse_calendar(&mut node)?),
         "day-of-week" => OdfDataStylePartToken::DayOfWeek(parse_calendar(&mut node)?),
@@ -1030,7 +997,7 @@ fn parse_part_node(
             };
             reject_remaining(&node.attributes, "number:week-of-year")?;
             OdfDataStylePartToken::WeekOfYear(value)
-        }
+        },
         "quarter" => OdfDataStylePartToken::Quarter(parse_calendar(&mut node)?),
         "hours" => OdfDataStylePartToken::Hours(parse_clock(&mut node)?),
         "minutes" => OdfDataStylePartToken::Minutes(parse_clock(&mut node)?),
@@ -1042,22 +1009,22 @@ fn parse_part_node(
             };
             reject_remaining(&node.attributes, "number:seconds")?;
             OdfDataStylePartToken::Seconds(value)
-        }
+        },
         "am-pm" => {
             ensure_empty_node(&node, "number:am-pm")?;
             reject_remaining(&node.attributes, "number:am-pm")?;
             OdfDataStylePartToken::AmPm
-        }
+        },
         "boolean" => {
             ensure_empty_node(&node, "number:boolean")?;
             reject_remaining(&node.attributes, "number:boolean")?;
             OdfDataStylePartToken::Boolean
-        }
+        },
         "text-content" => {
             ensure_empty_node(&node, "number:text-content")?;
             reject_remaining(&node.attributes, "number:text-content")?;
             OdfDataStylePartToken::TextContent
-        }
+        },
         _ => return invalid(format!("unexpected number:{} token", node.local)),
     };
     Ok((token, alias))
@@ -1067,11 +1034,7 @@ fn parse_map(mut node: Node) -> Result<OdfDataStyleMap> {
     ensure_empty_node(&node, "style:map")?;
     let value = OdfDataStyleMap {
         condition: required(&mut node.attributes, STYLE, "condition")?,
-        apply_style_name: required(
-            &mut node.attributes,
-            STYLE,
-            "apply-style-name",
-        )?,
+        apply_style_name: required(&mut node.attributes, STYLE, "apply-style-name")?,
         base_cell_address: take(&mut node.attributes, STYLE, "base-cell-address"),
     };
     reject_remaining(&node.attributes, "style:map")?;
@@ -1118,7 +1081,7 @@ fn validate_sequence(
                 index += 1;
                 consume_plain_text(parts, &mut index);
             }
-        }
+        },
         OdfDataStyleKind::Number => {
             consume_separator(parts, &mut index, allow_fill);
             if matches!(
@@ -1132,14 +1095,14 @@ fn validate_sequence(
                 index += 1;
                 consume_separator(parts, &mut index, allow_fill);
             }
-        }
+        },
         OdfDataStyleKind::Percentage => {
             consume_separator(parts, &mut index, allow_fill);
             if matches!(parts.get(index), Some(OdfDataStylePartToken::Number(_))) {
                 index += 1;
                 consume_separator(parts, &mut index, allow_fill);
             }
-        }
+        },
         OdfDataStyleKind::Currency => {
             consume_separator(parts, &mut index, allow_fill);
             if matches!(parts.get(index), Some(OdfDataStylePartToken::Number(_))) {
@@ -1163,7 +1126,7 @@ fn validate_sequence(
                     consume_separator(parts, &mut index, allow_fill);
                 }
             }
-        }
+        },
         OdfDataStyleKind::Date => {
             consume_separator(parts, &mut index, allow_fill);
             let mut count = 0usize;
@@ -1175,7 +1138,7 @@ fn validate_sequence(
             if count == 0 {
                 return invalid("number:date-style requires at least one date token");
             }
-        }
+        },
         OdfDataStyleKind::Time => {
             consume_separator(parts, &mut index, allow_fill);
             let mut count = 0usize;
@@ -1187,14 +1150,14 @@ fn validate_sequence(
             if count == 0 {
                 return invalid("number:time-style requires at least one time token");
             }
-        }
+        },
         OdfDataStyleKind::Text => {
             consume_separator(parts, &mut index, allow_fill);
             while matches!(parts.get(index), Some(OdfDataStylePartToken::TextContent)) {
                 index += 1;
                 consume_separator(parts, &mut index, allow_fill);
             }
-        }
+        },
     }
     if index != parts.len() {
         return invalid(format!(
@@ -1261,7 +1224,7 @@ fn validate_part(
         OdfDataStylePartToken::FillCharacter(value) => {
             validate_text(value, "number:fill-character")?;
             require_1_3(true, version, allow_lo)?;
-        }
+        },
         OdfDataStylePartToken::Number(value) => {
             validate_optional_string(
                 value.decimal_replacement.as_deref(),
@@ -1274,7 +1237,7 @@ fn validate_part(
                 validate_text(&embedded.text, "number:embedded-text")?;
             }
             require_1_3(value.min_decimal_places.is_some(), version, allow_lo)?;
-        }
+        },
         OdfDataStylePartToken::ScientificNumber(value) => {
             require_1_3(
                 value.min_decimal_places.is_some()
@@ -1286,40 +1249,36 @@ fn validate_part(
             if value.exponent_interval == Some(0) {
                 return invalid("number:exponent-interval must be positive");
             }
-        }
+        },
         OdfDataStylePartToken::Fraction(value) => {
             require_1_3(value.max_denominator_value.is_some(), version, allow_lo)?;
             if value.max_denominator_value == Some(0) {
                 return invalid("number:max-denominator-value must be positive");
             }
-        }
+        },
         OdfDataStylePartToken::CurrencySymbol(value) => {
             validate_locale(&value.locale)?;
             validate_text(&value.text, "number:currency-symbol")?;
-        }
+        },
         OdfDataStylePartToken::Day(value)
         | OdfDataStylePartToken::Year(value)
         | OdfDataStylePartToken::Era(value)
         | OdfDataStylePartToken::DayOfWeek(value)
         | OdfDataStylePartToken::Quarter(value) => {
             validate_optional_string(value.calendar.as_deref(), "number:calendar")?;
-        }
+        },
         OdfDataStylePartToken::Month(value) => {
             validate_optional_string(value.calendar.as_deref(), "number:calendar")?;
-        }
+        },
         OdfDataStylePartToken::WeekOfYear(value) => {
             validate_optional_string(value.calendar.as_deref(), "number:calendar")?;
-        }
-        _ => {}
+        },
+        _ => {},
     }
     Ok(())
 }
 
-fn require_1_3(
-    present: bool,
-    version: OdfDataStyleVersion,
-    allow_lo: bool,
-) -> Result<()> {
+fn require_1_3(present: bool, version: OdfDataStyleVersion, allow_lo: bool) -> Result<()> {
     if present && version == OdfDataStyleVersion::V1_2 && !allow_lo {
         return invalid("ODF 1.3 number-format feature used in ODF 1.2");
     }
@@ -1338,7 +1297,7 @@ fn write_part(
                 return invalid("number:fill-character requires ODF 1.3 output");
             }
             element_text(out, "number:fill-character", value);
-        }
+        },
         OdfDataStylePartToken::Number(value) => {
             out.push_str("<number:number");
             attr(
@@ -1348,16 +1307,8 @@ fn write_part(
             );
             f64_attr(out, "number:display-factor", value.display_factor);
             i64_attr(out, "number:decimal-places", value.decimal_places);
-            i64_attr(
-                out,
-                "number:min-decimal-places",
-                value.min_decimal_places,
-            );
-            i64_attr(
-                out,
-                "number:min-integer-digits",
-                value.min_integer_digits,
-            );
+            i64_attr(out, "number:min-decimal-places", value.min_decimal_places);
+            i64_attr(out, "number:min-integer-digits", value.min_integer_digits);
             bool_attr(out, "number:grouping", value.grouping);
             if value.embedded_text.is_empty() {
                 out.push_str("/>");
@@ -1372,14 +1323,10 @@ fn write_part(
                 }
                 out.push_str("</number:number>");
             }
-        }
+        },
         OdfDataStylePartToken::ScientificNumber(value) => {
             out.push_str("<number:scientific-number");
-            i64_attr(
-                out,
-                "number:min-exponent-digits",
-                value.min_exponent_digits,
-            );
+            i64_attr(out, "number:min-exponent-digits", value.min_exponent_digits);
             u64_attr(out, "number:exponent-interval", value.exponent_interval);
             bool_attr(
                 out,
@@ -1387,19 +1334,11 @@ fn write_part(
                 value.forced_exponent_sign,
             );
             i64_attr(out, "number:decimal-places", value.decimal_places);
-            i64_attr(
-                out,
-                "number:min-decimal-places",
-                value.min_decimal_places,
-            );
-            i64_attr(
-                out,
-                "number:min-integer-digits",
-                value.min_integer_digits,
-            );
+            i64_attr(out, "number:min-decimal-places", value.min_decimal_places);
+            i64_attr(out, "number:min-integer-digits", value.min_integer_digits);
             bool_attr(out, "number:grouping", value.grouping);
             out.push_str("/>");
-        }
+        },
         OdfDataStylePartToken::Fraction(value) => {
             out.push_str("<number:fraction");
             i64_attr(
@@ -1412,37 +1351,27 @@ fn write_part(
                 "number:min-denominator-digits",
                 value.min_denominator_digits,
             );
-            i64_attr(
-                out,
-                "number:denominator-value",
-                value.denominator_value,
-            );
+            i64_attr(out, "number:denominator-value", value.denominator_value);
             u64_attr(
                 out,
                 "number:max-denominator-value",
                 value.max_denominator_value,
             );
-            i64_attr(
-                out,
-                "number:min-integer-digits",
-                value.min_integer_digits,
-            );
+            i64_attr(out, "number:min-integer-digits", value.min_integer_digits);
             bool_attr(out, "number:grouping", value.grouping);
             out.push_str("/>");
-        }
+        },
         OdfDataStylePartToken::CurrencySymbol(value) => {
             out.push_str("<number:currency-symbol");
             locale_attrs(out, &value.locale);
             out.push('>');
             out.push_str(&esc(&value.text));
             out.push_str("</number:currency-symbol>");
-        }
+        },
         OdfDataStylePartToken::Day(value) => write_calendar(out, "day", value),
         OdfDataStylePartToken::Year(value) => write_calendar(out, "year", value),
         OdfDataStylePartToken::Era(value) => write_calendar(out, "era", value),
-        OdfDataStylePartToken::DayOfWeek(value) => {
-            write_calendar(out, "day-of-week", value)
-        }
+        OdfDataStylePartToken::DayOfWeek(value) => write_calendar(out, "day-of-week", value),
         OdfDataStylePartToken::Quarter(value) => write_calendar(out, "quarter", value),
         OdfDataStylePartToken::Month(value) => {
             out.push_str("<number:month");
@@ -1451,12 +1380,12 @@ fn write_part(
             bool_attr(out, "number:possessive-form", value.possessive_form);
             attr(out, "number:calendar", value.calendar.as_deref());
             out.push_str("/>");
-        }
+        },
         OdfDataStylePartToken::WeekOfYear(value) => {
             out.push_str("<number:week-of-year");
             attr(out, "number:calendar", value.calendar.as_deref());
             out.push_str("/>");
-        }
+        },
         OdfDataStylePartToken::Hours(value) => write_clock(out, "hours", value),
         OdfDataStylePartToken::Minutes(value) => write_clock(out, "minutes", value),
         OdfDataStylePartToken::Seconds(value) => {
@@ -1464,7 +1393,7 @@ fn write_part(
             short_long_attr(out, value.style);
             i64_attr(out, "number:decimal-places", value.decimal_places);
             out.push_str("/>");
-        }
+        },
         OdfDataStylePartToken::AmPm => out.push_str("<number:am-pm/>"),
         OdfDataStylePartToken::Boolean => out.push_str("<number:boolean/>"),
         OdfDataStylePartToken::TextContent => out.push_str("<number:text-content/>"),
@@ -1583,7 +1512,12 @@ pub fn set_data_style_xml(xml: &str, style: &OdfDataStyle) -> Result<String> {
     let fragment = style.to_xml_fragment(version)?;
     let (target, container) = find_style_span(xml, style.section, &style.name)?;
     if let Some(span) = target {
-        return Ok(format!("{}{}{}", &xml[..span.start], fragment, &xml[span.end..]));
+        return Ok(format!(
+            "{}{}{}",
+            &xml[..span.start],
+            fragment,
+            &xml[span.end..]
+        ));
     }
     let container = container.ok_or_else(|| bad("target ODF style container does not exist"))?;
     if container.empty {
@@ -1591,10 +1525,7 @@ pub fn set_data_style_xml(xml: &str, style: &OdfDataStyle) -> Result<String> {
         let slash = raw
             .rfind("/>")
             .ok_or_else(|| bad("invalid empty ODF style container"))?;
-        let expanded = format!(
-            "{}>{}</{}>",
-            &raw[..slash], fragment, container.qname
-        );
+        let expanded = format!("{}>{}</{}>", &raw[..slash], fragment, container.qname);
         return Ok(format!(
             "{}{}{}",
             &xml[..container.start],
@@ -1638,15 +1569,15 @@ fn document_version(xml: &str) -> Result<OdfDataStyleVersion> {
                 xml_version = declaration
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
-            }
+            },
             Event::Start(ref element) | Event::Empty(ref element) => {
                 return read_document_version(&reader, element, xml_version);
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid("DTDs and processing instructions are prohibited");
-            }
+            },
             Event::Eof => return invalid("missing ODF document root"),
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -1722,7 +1653,7 @@ fn find_style_span(
                         active = Some((depth, start));
                     }
                 }
-            }
+            },
             Event::Empty(ref element) => {
                 let namespace = namespace_uri(&resolved)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
@@ -1768,7 +1699,7 @@ fn find_style_span(
                         target = Some(XmlSpan { start, end });
                     }
                 }
-            }
+            },
             Event::End(_) => {
                 let end = reader.buffer_position() as usize;
                 let end_start = event_start(xml, end)?;
@@ -1788,19 +1719,22 @@ fn find_style_span(
                 frames
                     .pop()
                     .ok_or_else(|| bad("data-style element stack underflow"))?;
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid("DTDs and processing instructions are prohibited");
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
     if !frames.is_empty() || active.is_some() || container_depth.is_some() {
         return invalid("truncated data-style XML");
     }
-    if container.as_ref().is_some_and(|value| value.section != wanted_section) {
+    if container
+        .as_ref()
+        .is_some_and(|value| value.section != wanted_section)
+    {
         return invalid("internal data-style section mismatch");
     }
     Ok((target, container))
@@ -1811,16 +1745,10 @@ impl OpenDocumentPackage {
     pub fn data_styles(&self) -> Result<OdfDataStyles> {
         let mut output = OdfDataStyles::default();
         if let Some(styles) = self.styles_xml()? {
-            output.append(parse_data_styles_xml(
-                &styles,
-                OdfDataStylePart::Styles,
-            )?)?;
+            output.append(parse_data_styles_xml(&styles, OdfDataStylePart::Styles)?)?;
         }
         let content = self.content_xml()?;
-        output.append(parse_data_styles_xml(
-            &content,
-            OdfDataStylePart::Content,
-        )?)?;
+        output.append(parse_data_styles_xml(&content, OdfDataStylePart::Content)?)?;
         Ok(output)
     }
 }
@@ -1836,7 +1764,10 @@ fn push_style(output: &mut OdfDataStyles, style: OdfDataStyle) -> Result<()> {
     if output.styles.len() >= MAX_STYLES {
         return invalid("too many data styles");
     }
-    if output.get(style.source_part, style.section, &style.name).is_some() {
+    if output
+        .get(style.source_part, style.section, &style.name)
+        .is_some()
+    {
         return invalid("duplicate data style identity");
     }
     output.styles.push(style);
@@ -1852,8 +1783,8 @@ fn collect_attributes(
     let mut output = Vec::new();
     let mut seen = HashSet::new();
     for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|error| bad(format!("invalid data-style attribute: {error}")))?;
+        let attribute =
+            attribute.map_err(|error| bad(format!("invalid data-style attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
@@ -1933,46 +1864,32 @@ fn take_bool(
         .transpose()
 }
 
-fn take_i64(
-    attributes: &mut Vec<Attribute>,
-    namespace: &str,
-    local: &str,
-) -> Result<Option<i64>> {
+fn take_i64(attributes: &mut Vec<Attribute>, namespace: &str, local: &str) -> Result<Option<i64>> {
     take(attributes, namespace, local)
         .map(|value| parse_i64(&value, local))
         .transpose()
 }
 
-fn required_i64(
-    attributes: &mut Vec<Attribute>,
-    namespace: &str,
-    local: &str,
-) -> Result<i64> {
+fn required_i64(attributes: &mut Vec<Attribute>, namespace: &str, local: &str) -> Result<i64> {
     let value = required(attributes, namespace, local)?;
     parse_i64(&value, local)
 }
 
-fn take_f64(
-    attributes: &mut Vec<Attribute>,
-    namespace: &str,
-    local: &str,
-) -> Result<Option<f64>> {
+fn take_f64(attributes: &mut Vec<Attribute>, namespace: &str, local: &str) -> Result<Option<f64>> {
     take(attributes, namespace, local)
-        .map(|value| {
-            match value.as_str() {
-                "INF" => Ok(f64::INFINITY),
-                "-INF" => Ok(f64::NEG_INFINITY),
-                "NaN" => Ok(f64::NAN),
-                _ => {
-                    let parsed: f64 = value
-                        .parse()
-                        .map_err(|_| bad(format!("invalid {local} double '{value}'")))?;
-                    if !parsed.is_finite() {
-                        return invalid(format!("invalid {local} double '{value}'"));
-                    }
-                    Ok(parsed)
+        .map(|value| match value.as_str() {
+            "INF" => Ok(f64::INFINITY),
+            "-INF" => Ok(f64::NEG_INFINITY),
+            "NaN" => Ok(f64::NAN),
+            _ => {
+                let parsed: f64 = value
+                    .parse()
+                    .map_err(|_| bad(format!("invalid {local} double '{value}'")))?;
+                if !parsed.is_finite() {
+                    return invalid(format!("invalid {local} double '{value}'"));
                 }
-            }
+                Ok(parsed)
+            },
         })
         .transpose()
 }
@@ -2151,19 +2068,15 @@ fn validate_text(value: &str, name: &str) -> Result<()> {
     if value.len() > MAX_VALUE_BYTES {
         return invalid(format!("{name} exceeds 64 KiB"));
     }
-    if value.chars().any(|character| {
-        matches!(character, '\u{0}'..='\u{8}' | '\u{B}' | '\u{C}' | '\u{E}'..='\u{1F}')
-    }) {
+    if value.chars().any(
+        |character| matches!(character, '\u{0}'..='\u{8}' | '\u{B}' | '\u{C}' | '\u{E}'..='\u{1F}'),
+    ) {
         return invalid(format!("{name} contains an invalid XML character"));
     }
     Ok(())
 }
 
-fn reject_spoofed_container(
-    namespace: Option<&str>,
-    local: &str,
-    direct: bool,
-) -> Result<()> {
+fn reject_spoofed_container(namespace: Option<&str>, local: &str, direct: bool) -> Result<()> {
     if direct && OdfDataStyleKind::parse(local).is_some() && namespace != Some(NUMBER) {
         return invalid("data-style container uses the wrong namespace");
     }
@@ -2241,7 +2154,8 @@ mod tests {
 
     #[test]
     fn parses_all_seven_containers_and_all_standard_tokens() {
-        let xml = doc13(r##"
+        let xml = doc13(
+            r##"
             <number:number-style style:name="n" style:display-name="N" number:language="en" number:country="US" number:script="Latn" number:rfc-language-tag="en-US" number:title="title" style:volatile="true" number:transliteration-format="一" number:transliteration-language="zh" number:transliteration-country="CN" number:transliteration-style="medium">
               <style:text-properties fo:color="#ff0000"/><number:text>[</number:text><number:fill-character> </number:fill-character><number:number number:decimal-replacement="--" number:display-factor="1000" number:decimal-places="2" number:min-decimal-places="1" number:min-integer-digits="1" number:grouping="true"><number:embedded-text number:position="1">x</number:embedded-text></number:number><number:text>]</number:text><style:map style:condition="value()&gt;=0" style:apply-style-name="positive" style:base-cell-address="Sheet1.A1"/>
             </number:number-style>
@@ -2253,16 +2167,14 @@ mod tests {
             <number:time-style style:name="t" number:format-source="fixed" number:truncate-on-overflow="false"><number:hours number:style="long"/><number:text>:</number:text><number:minutes/><number:seconds/><number:am-pm/></number:time-style>
             <number:boolean-style style:name="b"><number:text>?</number:text><number:boolean/><number:text>!</number:text></number:boolean-style>
             <number:text-style style:name="x"><number:text-content/><number:text> </number:text><number:text-content/></number:text-style>
-        "##);
+        "##,
+        );
         let styles = parse_data_styles_xml(&xml, OdfDataStylePart::Flat).unwrap();
         assert_eq!(styles.styles.len(), 9);
         for style in &styles.styles {
             let fragment = style.to_xml_fragment(OdfDataStyleVersion::V1_3).unwrap();
-            let reparsed = parse_data_styles_xml(
-                &doc13(&fragment),
-                OdfDataStylePart::Flat,
-            )
-            .unwrap();
+            let reparsed =
+                parse_data_styles_xml(&doc13(&fragment), OdfDataStylePart::Flat).unwrap();
             assert_eq!(reparsed.styles[0].kind, style.kind);
             assert_eq!(reparsed.styles[0].parts, style.parts);
         }
@@ -2270,7 +2182,9 @@ mod tests {
 
     #[test]
     fn reads_libreoffice_12_aliases_but_writes_them_only_as_standard_13() {
-        let xml = doc12(r#"<number:number-style style:name="n"><loext:fill-character> </loext:fill-character><number:number loext:min-decimal-places="2"/></number:number-style>"#);
+        let xml = doc12(
+            r#"<number:number-style style:name="n"><loext:fill-character> </loext:fill-character><number:number loext:min-decimal-places="2"/></number:number-style>"#,
+        );
         let style = parse_data_styles_xml(&xml, OdfDataStylePart::Flat)
             .unwrap()
             .styles
@@ -2284,7 +2198,9 @@ mod tests {
 
     #[test]
     fn parses_yielddisc_n122_n126_n170() {
-        let fixture = include_str!("../../../3rdparty/libreoffice-core/sc/qa/unit/data/functions/financial/fods/yielddisc.fods");
+        let fixture = include_str!(
+            "../../../3rdparty/libreoffice-core/sc/qa/unit/data/functions/financial/fods/yielddisc.fods"
+        );
         fn style<'a>(fixture: &'a str, marker: &str, close: &str) -> &'a str {
             let begin = fixture.find(marker).unwrap();
             let end = begin + fixture[begin..].find(close).unwrap() + close.len();
@@ -2292,15 +2208,30 @@ mod tests {
         }
         let body = format!(
             "{}{}{}",
-            style(fixture, r#"<number:currency-style style:name="N122">"#, "</number:currency-style>"),
-            style(fixture, r#"<number:text-style style:name="N126">"#, "</number:text-style>"),
-            style(fixture, r#"<number:date-style style:name="N170">"#, "</number:date-style>")
+            style(
+                fixture,
+                r#"<number:currency-style style:name="N122">"#,
+                "</number:currency-style>"
+            ),
+            style(
+                fixture,
+                r#"<number:text-style style:name="N126">"#,
+                "</number:text-style>"
+            ),
+            style(
+                fixture,
+                r#"<number:date-style style:name="N170">"#,
+                "</number:date-style>"
+            )
         );
         let parsed = parse_data_styles_xml(&doc12(&body), OdfDataStylePart::Flat).unwrap();
         assert_eq!(parsed.styles.len(), 3);
         assert_eq!(parsed.styles[0].maps.len(), 1);
         assert_eq!(parsed.styles[1].maps.len(), 3);
-        assert!(matches!(parsed.styles[2].parts[0], OdfDataStylePartToken::DayOfWeek(_)));
+        assert!(matches!(
+            parsed.styles[2].parts[0],
+            OdfDataStylePartToken::DayOfWeek(_)
+        ));
     }
 
     #[test]
@@ -2351,11 +2282,28 @@ mod tests {
         assert_eq!(factor(1), f64::INFINITY);
         assert_eq!(factor(2), f64::NEG_INFINITY);
         assert!(factor(3).is_nan());
-        assert!(parsed.styles[1].to_xml_fragment(OdfDataStyleVersion::V1_3).unwrap().contains("display-factor=\"INF\""));
-        assert!(parsed.styles[2].to_xml_fragment(OdfDataStyleVersion::V1_3).unwrap().contains("display-factor=\"-INF\""));
-        assert!(parsed.styles[3].to_xml_fragment(OdfDataStyleVersion::V1_3).unwrap().contains("display-factor=\"NaN\""));
+        assert!(
+            parsed.styles[1]
+                .to_xml_fragment(OdfDataStyleVersion::V1_3)
+                .unwrap()
+                .contains("display-factor=\"INF\"")
+        );
+        assert!(
+            parsed.styles[2]
+                .to_xml_fragment(OdfDataStyleVersion::V1_3)
+                .unwrap()
+                .contains("display-factor=\"-INF\"")
+        );
+        assert!(
+            parsed.styles[3]
+                .to_xml_fragment(OdfDataStyleVersion::V1_3)
+                .unwrap()
+                .contains("display-factor=\"NaN\"")
+        );
         for lexical in ["inf", "-inf", "+INF", "1e", "++1"] {
-            let body = format!(r#"<number:number-style style:name="bad"><number:number number:display-factor="{lexical}"/></number:number-style>"#);
+            let body = format!(
+                r#"<number:number-style style:name="bad"><number:number number:display-factor="{lexical}"/></number:number-style>"#
+            );
             assert!(parse_data_styles_xml(&doc13(&body), OdfDataStylePart::Flat).is_err());
         }
         assert!(parse_data_styles_xml(&doc13(r#"<number:number-style style:name="bad"><number:number number:decimal-places="++1"/></number:number-style>"#), OdfDataStylePart::Flat).is_err());
@@ -2363,14 +2311,15 @@ mod tests {
 
     #[test]
     fn lossless_insert_replace_remove_preserves_unrelated_markup() {
-        let original = doc13("<!--keep--><number:number-style style:name=\"other\"><number:number/></number:number-style><x:keep xmlns:x=\"urn:x\"/>");
-        let mut style = OdfDataStyle::new(
-            "new",
-            OdfDataStyleKind::Number,
-            OdfDataStyleSection::Styles,
-        )
-        .unwrap();
-        style.parts.push(OdfDataStylePartToken::Number(OdfNumberToken::default()));
+        let original = doc13(
+            "<!--keep--><number:number-style style:name=\"other\"><number:number/></number:number-style><x:keep xmlns:x=\"urn:x\"/>",
+        );
+        let mut style =
+            OdfDataStyle::new("new", OdfDataStyleKind::Number, OdfDataStyleSection::Styles)
+                .unwrap();
+        style
+            .parts
+            .push(OdfDataStylePartToken::Number(OdfNumberToken::default()));
         let inserted = set_data_style_xml(&original, &style).unwrap();
         assert!(inserted.contains("<!--keep--><number:number-style style:name=\"other\""));
         assert!(inserted.contains("<x:keep xmlns:x=\"urn:x\"/>"));

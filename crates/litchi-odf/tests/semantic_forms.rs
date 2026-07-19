@@ -1,6 +1,6 @@
 use litchi_odf::{
-    FlatOpenDocument, OdfFormControlKind, OdfFormNode, OdfFormPropertyValue,
-    OdfFormScalarValue, OpenDocumentPackage,
+    FlatOpenDocument, OdfFormControlKind, OdfFormNode, OdfFormPropertyValue, OdfFormScalarValue,
+    OpenDocumentPackage,
 };
 use std::path::{Path, PathBuf};
 
@@ -20,7 +20,9 @@ fn flat(body: &str) -> Vec<u8> {
 }
 
 fn fixture(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(relative)
 }
 
 fn collect<'a>(nodes: &'a [OdfFormNode], out: &mut Vec<&'a litchi_odf::OdfFormControl>) {
@@ -38,10 +40,30 @@ fn collect<'a>(nodes: &'a [OdfFormNode], out: &mut Vec<&'a litchi_odf::OdfFormCo
 #[test]
 fn parses_all_controls_nesting_typed_properties_and_links() {
     let names = [
-        "text", "textarea", "password", "file", "formatted-text", "number", "date",
-        "time", "fixed-text", "combobox", "item", "listbox", "option", "button",
-        "image", "checkbox", "radio", "frame", "image-frame", "hidden", "grid",
-        "column", "value-range", "generic-control",
+        "text",
+        "textarea",
+        "password",
+        "file",
+        "formatted-text",
+        "number",
+        "date",
+        "time",
+        "fixed-text",
+        "combobox",
+        "item",
+        "listbox",
+        "option",
+        "button",
+        "image",
+        "checkbox",
+        "radio",
+        "frame",
+        "image-frame",
+        "hidden",
+        "grid",
+        "column",
+        "value-range",
+        "generic-control",
     ];
     let controls = names
         .iter()
@@ -59,7 +81,10 @@ fn parses_all_controls_nesting_typed_properties_and_links() {
     collect(&forms.groups[0].forms[0].children, &mut parsed);
     assert_eq!(parsed.len(), names.len());
     assert!(matches!(parsed[0].kind, OdfFormControlKind::Text));
-    assert!(matches!(parsed[23].kind, OdfFormControlKind::GenericControl));
+    assert!(matches!(
+        parsed[23].kind,
+        OdfFormControlKind::GenericControl
+    ));
     assert!(matches!(
         forms.groups[0].forms[0].properties[0].value,
         OdfFormPropertyValue::Scalar(OdfFormScalarValue::Boolean(true))
@@ -73,39 +98,57 @@ fn parses_all_controls_nesting_typed_properties_and_links() {
 
 #[test]
 fn flags_behavior_but_preserves_external_values_inertly() {
-    let xml = flat(r#"<o:forms><xf:model><xf:instance src="file:///never"/></xf:model><f:form f:datasource="https://never.test/db" f:command="DROP TABLE x"><f:image f:id="c" f:image-data="https://never.test/image"><o:event-listeners><s:event-listener s:macro-name="macro://never"/></o:event-listeners></f:image></f:form></o:forms><d:control d:control="c"/>"#);
+    let xml = flat(
+        r#"<o:forms><xf:model><xf:instance src="file:///never"/></xf:model><f:form f:datasource="https://never.test/db" f:command="DROP TABLE x"><f:image f:id="c" f:image-data="https://never.test/image"><o:event-listeners><s:event-listener s:macro-name="macro://never"/></o:event-listeners></f:image></f:form></o:forms><d:control d:control="c"/>"#,
+    );
     let forms = FlatOpenDocument::from_bytes(xml).unwrap().forms().unwrap();
     assert!(forms.has_xforms && forms.has_event_listeners);
-    assert!(forms.groups[0].forms[0]
-        .attributes
-        .iter()
-        .any(|attribute| attribute.value == "DROP TABLE x"));
+    assert!(
+        forms.groups[0].forms[0]
+            .attributes
+            .iter()
+            .any(|attribute| attribute.value == "DROP TABLE x")
+    );
     let OdfFormNode::Control(control) = &forms.groups[0].forms[0].children[0] else {
         panic!()
     };
-    assert_eq!(control.image_data.as_deref(), Some("https://never.test/image"));
+    assert_eq!(
+        control.image_data.as_deref(),
+        Some("https://never.test/image")
+    );
 }
 
 #[test]
 fn rejects_malformed_spoofed_unresolved_and_limited_inputs() {
     for xml in [
         flat(r#"<o:forms><f:form/></o:forms><d:control d:control="missing"/>"#),
-        flat(r#"<o:forms><f:form><f:text f:id="x"/><f:button f:id="x"/></f:form></o:forms><d:control d:control="x"/>"#),
+        flat(
+            r#"<o:forms><f:form><f:text f:id="x"/><f:button f:id="x"/></f:form></o:forms><d:control d:control="x"/>"#,
+        ),
         flat(r#"<o:forms f:automatic-focus="yes"><f:form/></o:forms>"#),
     ] {
         assert!(FlatOpenDocument::from_bytes(xml).unwrap().forms().is_err());
     }
     let spoofed = format!(r#"<o:document xmlns:o="{OFFICE}" xmlns:f="urn:not-form" o:mimetype="application/vnd.oasis.opendocument.text"><o:body><o:text><o:forms><f:form/></o:forms></o:text></o:body></o:document>"#).into_bytes();
-    assert!(FlatOpenDocument::from_bytes(spoofed)
-        .unwrap()
-        .forms()
-        .unwrap()
-        .groups[0]
-        .forms
-        .is_empty());
+    assert!(
+        FlatOpenDocument::from_bytes(spoofed)
+            .unwrap()
+            .forms()
+            .unwrap()
+            .groups[0]
+            .forms
+            .is_empty()
+    );
     let oversized = "x".repeat(65_537);
-    let limited = flat(&format!(r#"<o:forms><f:form f:name="{oversized}"/></o:forms>"#));
-    assert!(FlatOpenDocument::from_bytes(limited).unwrap().forms().is_err());
+    let limited = flat(&format!(
+        r#"<o:forms><f:form f:name="{oversized}"/></o:forms>"#
+    ));
+    assert!(
+        FlatOpenDocument::from_bytes(limited)
+            .unwrap()
+            .forms()
+            .is_err()
+    );
     let mut nested = String::from("<o:forms>");
     for _ in 0..129 {
         nested.push_str("<f:form>");
@@ -114,10 +157,12 @@ fn rejects_malformed_spoofed_unresolved_and_limited_inputs() {
         nested.push_str("</f:form>");
     }
     nested.push_str("</o:forms>");
-    assert!(FlatOpenDocument::from_bytes(flat(&nested))
-        .unwrap()
-        .forms()
-        .is_err());
+    assert!(
+        FlatOpenDocument::from_bytes(flat(&nested))
+            .unwrap()
+            .forms()
+            .is_err()
+    );
 }
 
 #[test]
@@ -139,7 +184,10 @@ fn parses_all_bundled_fixtures_without_rewriting_packages() {
         "3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt",
     ))
     .unwrap();
-    let forms = FlatOpenDocument::from_bytes(bytes).unwrap().forms().unwrap();
+    let forms = FlatOpenDocument::from_bytes(bytes)
+        .unwrap()
+        .forms()
+        .unwrap();
     assert_eq!(forms.groups.len(), 1);
     assert_eq!(forms.control_shapes.len(), 1);
     assert!(forms.control_shapes[0].resolved_control.is_some());

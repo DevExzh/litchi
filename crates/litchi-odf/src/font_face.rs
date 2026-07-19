@@ -495,13 +495,13 @@ impl OdfFontFaceDeclarations {
                             validate_value(format, "svg:string", true)?;
                             text_bytes = add_text_bytes(text_bytes, format.len())?;
                         }
-                    }
+                    },
                     OdfFontFaceSource::LocalName(name) => {
                         if let Some(name) = name {
                             validate_value(name, "svg:name", true)?;
                             text_bytes = add_text_bytes(text_bytes, name.len())?;
                         }
-                    }
+                    },
                 }
             }
             if let Some(link) = &face.definition_source {
@@ -542,11 +542,7 @@ impl OdfFontFaceDeclarations {
                 "style:font-pitch",
                 face.pitch.map(OdfFontPitch::as_str),
             );
-            write_attr(
-                &mut output,
-                "style:font-charset",
-                face.charset.as_deref(),
-            );
+            write_attr(&mut output, "style:font-charset", face.charset.as_deref());
             write_attr(&mut output, "svg:font-family", face.family.as_deref());
             write_attr(
                 &mut output,
@@ -614,12 +610,12 @@ impl OdfFontFaceDeclarations {
                                 }
                                 output.push_str("</svg:font-face-uri>");
                             }
-                        }
+                        },
                         OdfFontFaceSource::LocalName(name) => {
                             output.push_str("<svg:font-face-name");
                             write_attr(&mut output, "svg:name", name.as_deref());
                             output.push_str("/>");
-                        }
+                        },
                     }
                 }
                 output.push_str("</svg:font-face-src>");
@@ -665,7 +661,7 @@ pub fn parse_font_face_declarations(xml: &str) -> Result<Option<OdfFontFaceDecla
                     return invalid("ODF XML contains duplicate office:font-face-decls");
                 }
                 result = Some(parse_declarations(&mut reader)?);
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Office
                     && element.local_name().as_ref() == b"font-face-decls" =>
@@ -676,7 +672,7 @@ pub fn parse_font_face_declarations(xml: &str) -> Result<Option<OdfFontFaceDecla
                 if result.replace(OdfFontFaceDeclarations::default()).is_some() {
                     return invalid("ODF XML contains duplicate office:font-face-decls");
                 }
-            }
+            },
             Event::Start(_) => {
                 depth = depth
                     .checked_add(1)
@@ -684,15 +680,15 @@ pub fn parse_font_face_declarations(xml: &str) -> Result<Option<OdfFontFaceDecla
                 if depth > MAX_XML_DEPTH {
                     return invalid(format!("ODF XML exceeds the {MAX_XML_DEPTH} depth limit"));
                 }
-            }
+            },
             Event::End(_) => {
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("invalid ODF XML depth".to_string()))?;
-            }
+            },
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in ODF font metadata"),
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -721,7 +717,7 @@ fn parse_declarations(reader: &mut NsReader<&[u8]>) -> Result<OdfFontFaceDeclara
                     return invalid(format!("duplicate style:font-face name '{}'", face.name));
                 }
                 faces.push(face);
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Style
                     && element.local_name().as_ref() == b"font-face" =>
@@ -732,16 +728,20 @@ fn parse_declarations(reader: &mut NsReader<&[u8]>) -> Result<OdfFontFaceDeclara
                     return invalid(format!("duplicate style:font-face name '{}'", face.name));
                 }
                 faces.push(face);
-            }
+            },
             Event::End(element)
                 if namespace == NamespaceKind::Office
                     && element.local_name().as_ref() == b"font-face-decls" =>
             {
                 break;
-            }
-            Event::Text(text) => require_whitespace(&text.decode().map_err(xml_error)?, "font-face-decls")?,
-            Event::Comment(_) | Event::PI(_) => {}
-            Event::DocType(_) => return invalid("DOCTYPE is not allowed in font-face declarations"),
+            },
+            Event::Text(text) => {
+                require_whitespace(&text.decode().map_err(xml_error)?, "font-face-decls")?
+            },
+            Event::Comment(_) | Event::PI(_) => {},
+            Event::DocType(_) => {
+                return invalid("DOCTYPE is not allowed in font-face declarations");
+            },
             Event::Eof => return invalid("unterminated office:font-face-decls"),
             _ => return invalid("unsupported child in office:font-face-decls"),
         }
@@ -769,34 +769,30 @@ fn parse_face_attributes(
                 validate_value(&value, "style:name", false)?;
                 face.name = value;
                 name_seen = true;
-            }
+            },
             (NamespaceKind::Style, b"font-adornments") => face.font_adornments = Some(value),
             (NamespaceKind::Style, b"font-family-generic") => {
                 face.generic_family = Some(OdfGenericFontFamily::parse(&value)?)
-            }
+            },
             (NamespaceKind::Style, b"font-pitch") => {
                 face.pitch = Some(OdfFontPitch::parse(&value)?)
-            }
+            },
             (NamespaceKind::Style, b"font-charset") => {
                 validate_text_encoding(&value)?;
                 face.charset = Some(value);
-            }
+            },
             (NamespaceKind::Svg, b"font-family") => face.family = Some(value),
-            (NamespaceKind::Svg, b"font-style") => {
-                face.style = Some(OdfFontStyle::parse(&value)?)
-            }
+            (NamespaceKind::Svg, b"font-style") => face.style = Some(OdfFontStyle::parse(&value)?),
             (NamespaceKind::Svg, b"font-variant") => {
                 face.variant = Some(OdfFontVariant::parse(&value)?)
-            }
+            },
             (NamespaceKind::Svg, b"font-weight") => {
                 face.weight = Some(OdfFontWeight::parse(&value)?)
-            }
+            },
             (NamespaceKind::Svg, b"font-stretch") => {
                 face.stretch = Some(OdfFontStretch::parse(&value)?)
-            }
-            (NamespaceKind::Svg, b"font-size") => {
-                face.size = Some(OdfPositiveLength::new(value)?)
-            }
+            },
+            (NamespaceKind::Svg, b"font-size") => face.size = Some(OdfPositiveLength::new(value)?),
             (NamespaceKind::Svg, b"unicode-range") => face.unicode_range = Some(value),
             (NamespaceKind::Svg, b"panose-1") => face.panose_1 = Some(value),
             (NamespaceKind::Svg, b"widths") => face.widths = Some(value),
@@ -812,7 +808,7 @@ fn parse_face_attributes(
                     Error::InvalidFormat(format!("invalid svg:{} integer", kind.as_str()))
                 })?;
                 face.metrics.push(OdfFontMetric { kind, value });
-            }
+            },
             _ => return invalid("style:font-face attribute has an unsupported namespace"),
         }
     }
@@ -845,13 +841,13 @@ fn parse_face_children(
                 }
                 source_seen = true;
                 face.sources = parse_sources(reader, text_bytes)?;
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Svg
                     && element.local_name().as_ref() == b"font-face-src" =>
             {
                 return invalid("svg:font-face-src requires at least one source");
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Svg
                     && element.local_name().as_ref() == b"definition-src" =>
@@ -863,7 +859,7 @@ fn parse_face_children(
                 let link = parse_link(reader, &element)?;
                 *text_bytes = add_text_bytes(*text_bytes, link.href.len())?;
                 face.definition_source = Some(link);
-            }
+            },
             Event::Start(element)
                 if namespace == NamespaceKind::Svg
                     && element.local_name().as_ref() == b"definition-src" =>
@@ -876,15 +872,17 @@ fn parse_face_children(
                 require_empty(reader, NamespaceKind::Svg, b"definition-src")?;
                 *text_bytes = add_text_bytes(*text_bytes, link.href.len())?;
                 face.definition_source = Some(link);
-            }
+            },
             Event::End(element)
                 if namespace == NamespaceKind::Style
                     && element.local_name().as_ref() == b"font-face" =>
             {
                 break;
-            }
-            Event::Text(text) => require_whitespace(&text.decode().map_err(xml_error)?, "font-face")?,
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Text(text) => {
+                require_whitespace(&text.decode().map_err(xml_error)?, "font-face")?
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated style:font-face"),
             _ => return invalid("unsupported child in style:font-face"),
         }
@@ -914,7 +912,7 @@ fn parse_sources(
                 *text_bytes = add_text_bytes(*text_bytes, link.href.len())?;
                 let formats = parse_formats(reader, text_bytes)?;
                 sources.push(OdfFontFaceSource::Uri { link, formats });
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Svg
                     && element.local_name().as_ref() == b"font-face-uri" =>
@@ -926,7 +924,7 @@ fn parse_sources(
                     link,
                     formats: Vec::new(),
                 });
-            }
+            },
             Event::Empty(element)
                 if namespace == NamespaceKind::Svg
                     && element.local_name().as_ref() == b"font-face-name" =>
@@ -937,7 +935,7 @@ fn parse_sources(
                     *text_bytes = add_text_bytes(*text_bytes, name.len())?;
                 }
                 sources.push(OdfFontFaceSource::LocalName(name));
-            }
+            },
             Event::Start(element)
                 if namespace == NamespaceKind::Svg
                     && element.local_name().as_ref() == b"font-face-name" =>
@@ -949,15 +947,17 @@ fn parse_sources(
                     *text_bytes = add_text_bytes(*text_bytes, name.len())?;
                 }
                 sources.push(OdfFontFaceSource::LocalName(name));
-            }
+            },
             Event::End(element)
                 if namespace == NamespaceKind::Svg
                     && element.local_name().as_ref() == b"font-face-src" =>
             {
                 break;
-            }
-            Event::Text(text) => require_whitespace(&text.decode().map_err(xml_error)?, "font-face-src")?,
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Text(text) => {
+                require_whitespace(&text.decode().map_err(xml_error)?, "font-face-src")?
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated svg:font-face-src"),
             _ => return invalid("unsupported child in svg:font-face-src"),
         }
@@ -995,7 +995,7 @@ fn parse_formats(
                     *text_bytes = add_text_bytes(*text_bytes, value.len())?;
                 }
                 formats.push(value);
-            }
+            },
             Event::Start(element)
                 if namespace == NamespaceKind::Svg
                     && element.local_name().as_ref() == b"font-face-format" =>
@@ -1011,15 +1011,17 @@ fn parse_formats(
                     *text_bytes = add_text_bytes(*text_bytes, value.len())?;
                 }
                 formats.push(value);
-            }
+            },
             Event::End(element)
                 if namespace == NamespaceKind::Svg
                     && element.local_name().as_ref() == b"font-face-uri" =>
             {
                 break;
-            }
-            Event::Text(text) => require_whitespace(&text.decode().map_err(xml_error)?, "font-face-uri")?,
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Text(text) => {
+                require_whitespace(&text.decode().map_err(xml_error)?, "font-face-uri")?
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated svg:font-face-uri"),
             _ => return invalid("unsupported child in svg:font-face-uri"),
         }
@@ -1052,7 +1054,8 @@ fn parse_link(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<OdfF
     if actuate.as_deref().is_some_and(|value| value != "onRequest") {
         return invalid("font source xlink:actuate must be 'onRequest'");
     }
-    let href = href.ok_or_else(|| Error::InvalidFormat("font source requires xlink:href".to_string()))?;
+    let href =
+        href.ok_or_else(|| Error::InvalidFormat("font source requires xlink:href".to_string()))?;
     validate_value(&href, "xlink:href", false)?;
     Ok(OdfFontFaceLink {
         href,
@@ -1076,7 +1079,9 @@ fn optional_single_svg_attribute(
         return invalid("font source element contains an unsupported attribute");
     }
     validate_value(&attributes[0].2, "SVG font source attribute", true)?;
-    Ok(Some(attributes.into_iter().next().expect("one attribute").2))
+    Ok(Some(
+        attributes.into_iter().next().expect("one attribute").2,
+    ))
 }
 
 fn require_empty(
@@ -1096,9 +1101,11 @@ fn require_empty(
                     && element.local_name().as_ref() == expected_local =>
             {
                 return Ok(());
-            }
-            Event::Text(text) => require_whitespace(&text.decode().map_err(xml_error)?, "empty font source")?,
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Text(text) => {
+                require_whitespace(&text.decode().map_err(xml_error)?, "empty font source")?
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated empty font source element"),
             _ => return invalid("font source element must be empty"),
         }
@@ -1156,7 +1163,7 @@ fn validate_positive_length(value: &str) -> Result<()> {
             b'0'..=b'9' => {
                 digits += 1;
                 nonzero |= byte != b'0';
-            }
+            },
             _ => return invalid(format!("invalid positive ODF length '{value}'")),
         }
     }
@@ -1326,23 +1333,22 @@ mod tests {
             r#"<o:font-face-decls><s:font-face s:name="A"><v:font-face-src><v:font-face-uri x:type="extended" x:href="x"/></v:font-face-src></s:font-face></o:font-face-decls>"#,
             r#"<o:font-face-decls><s:font-face s:name="A">active text</s:font-face></o:font-face-decls>"#,
         ] {
-            assert!(parse_font_face_declarations(&document(body)).is_err(), "{body}");
+            assert!(
+                parse_font_face_declarations(&document(body)).is_err(),
+                "{body}"
+            );
         }
     }
 
     #[test]
     fn rejects_misplaced_or_duplicate_containers() {
         assert!(
-            parse_font_face_declarations(&document(
-                r#"<o:body><o:font-face-decls/></o:body>"#
-            ))
-            .is_err()
+            parse_font_face_declarations(&document(r#"<o:body><o:font-face-decls/></o:body>"#))
+                .is_err()
         );
         assert!(
-            parse_font_face_declarations(&document(
-                r#"<o:font-face-decls/><o:font-face-decls/>"#
-            ))
-            .is_err()
+            parse_font_face_declarations(&document(r#"<o:font-face-decls/><o:font-face-decls/>"#))
+                .is_err()
         );
     }
 }

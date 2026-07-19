@@ -90,13 +90,34 @@ pub enum OdfVariableDateValue {
 /// Typed user-field value retaining its exact lexical representation.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OdfVariableValue {
-    Float { value: f64, lexical: String },
-    Percentage { value: f64, lexical: String },
-    Currency { value: f64, lexical: String, currency: String },
-    Date { value: OdfVariableDateValue, lexical: String },
-    Time { value: OdfDurationValue, lexical: String },
-    Boolean { value: bool, lexical: String },
-    String { value: String },
+    Float {
+        value: f64,
+        lexical: String,
+    },
+    Percentage {
+        value: f64,
+        lexical: String,
+    },
+    Currency {
+        value: f64,
+        lexical: String,
+        currency: String,
+    },
+    Date {
+        value: OdfVariableDateValue,
+        lexical: String,
+    },
+    Time {
+        value: OdfDurationValue,
+        lexical: String,
+    },
+    Boolean {
+        value: bool,
+        lexical: String,
+    },
+    String {
+        value: String,
+    },
     Void,
 }
 
@@ -158,9 +179,9 @@ impl OdfVariableDeclaration {
 
     pub fn name(&self) -> &str {
         match self {
-            Self::Simple { name, .. }
-            | Self::User { name, .. }
-            | Self::Sequence { name, .. } => name,
+            Self::Simple { name, .. } | Self::User { name, .. } | Self::Sequence { name, .. } => {
+                name
+            },
         }
     }
 
@@ -186,6 +207,464 @@ pub struct OdfVariableDeclarationGroup {
     pub declarations: Vec<OdfVariableDeclaration>,
 }
 
+impl OdfVariableDeclarationGroup {
+    /// Serialize this declaration container as a self-contained XML fragment.
+    ///
+    /// Namespace declarations are emitted on the container so the fragment can
+    /// be inserted into documents that use arbitrary prefixes for ODF names.
+    pub fn to_xml(&self) -> Result<String> {
+        let xml = serialize_group_unchecked(self);
+        validate_serialized_group(self, &xml)?;
+        Ok(xml)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct GroupSpan {
+    kind: OdfVariableKind,
+    start: usize,
+    end: usize,
+}
+
+struct ScopeScan {
+    opening_end: usize,
+    groups: Vec<GroupSpan>,
+    first_other_child: Option<usize>,
+    empty_parent: Option<EmptyParentSpan>,
+}
+
+struct EmptyParentSpan {
+    start: usize,
+    end: usize,
+    qname: String,
+}
+
+/// Insert or replace one declaration container in its declared structural scope.
+///
+/// The source XML is otherwise retained byte-for-byte. The returned XML should
+/// be validated together with the document's other XML parts before commit so
+/// cross-part field references remain valid.
+pub fn set_variable_declaration_group_xml(
+    xml: &str,
+    group: &OdfVariableDeclarationGroup,
+) -> Result<String> {
+    let replacement = group.to_xml()?;
+    let scan = scan_scope(xml, &group.scope)?;
+    if let Some(parent) = scan.empty_parent.as_ref() {
+        return expand_empty_parent(xml, parent, &replacement);
+    }
+    let desired_order = kind_order(group.kind);
+    if let Some(existing) = scan
+        .groups
+        .iter()
+        .find(|candidate| candidate.kind == group.kind)
+    {
+        return replace_range(xml, existing.start, existing.end, &replacement);
+    }
+
+    let insertion = scan
+        .groups
+        .iter()
+        .find(|candidate| kind_order(candidate.kind) > desired_order)
+        .map(|candidate| candidate.start)
+        .or(scan.first_other_child)
+        .or_else(|| scan.groups.last().map(|candidate| candidate.end))
+        .unwrap_or(scan.opening_end);
+    replace_range(xml, insertion, insertion, &replacement)
+}
+
+/// Remove one declaration container from a structural scope.
+pub fn remove_variable_declaration_group_xml(
+    xml: &str,
+    scope: &OdfVariableScope,
+    kind: OdfVariableKind,
+) -> Result<String> {
+    let scan = scan_scope(xml, scope)?;
+    let existing = scan
+        .groups
+        .iter()
+        .find(|candidate| candidate.kind == kind)
+        .ok_or_else(|| invalid("variable declaration container was not found"))?;
+    replace_range(xml, existing.start, existing.end, "")
+}
+
+fn serialize_group_unchecked(group: &OdfVariableDeclarationGroup) -> String {
+    let container = match group.kind {
+        OdfVariableKind::Simple => "variable-decls",
+        OdfVariableKind::User => "user-field-decls",
+        OdfVariableKind::Sequence => "sequence-decls",
+    };
+    let mut xml = String::with_capacity(
+        group
+            .declarations
+            .iter()
+            .map(|declaration| declaration.name().len())
+            .sum::<usize>()
+            + group.declarations.len() * 96
+            + 192,
+    );
+    xml.push_str("<text:");
+    xml.push_str(container);
+    push_attribute(&mut xml, "xmlns:text", TEXT);
+    push_attribute(&mut xml, "xmlns:office", OFFICE);
+    xml.push('>');
+    for declaration in &group.declarations {
+        serialize_declaration(&mut xml, declaration);
+    }
+    xml.push_str("</text:");
+    xml.push_str(container);
+    xml.push('>');
+    xml
+}
+
+fn serialize_declaration(xml: &mut String, declaration: &OdfVariableDeclaration) {
+    xml.push_str("<text:");
+    xml.push_str(declaration_local(declaration.kind()));
+    push_attribute(xml, "text:name", declaration.name());
+    match declaration {
+        OdfVariableDeclaration::Simple { value_type, .. } => {
+            push_attribute(xml, "office:value-type", value_type_name(*value_type));
+        },
+        OdfVariableDeclaration::User { value, formula, .. } => {
+            if let Some(formula) = formula {
+                push_attribute(xml, "text:formula", formula);
+            }
+            if let Some(value) = value {
+                push_attribute(
+                    xml,
+                    "office:value-type",
+                    value_type_name(value.value_type()),
+                );
+                match value {
+                    OdfVariableValue::Float { lexical, .. }
+                    | OdfVariableValue::Percentage { lexical, .. } => {
+                        push_attribute(xml, "office:value", lexical);
+                    },
+                    OdfVariableValue::Currency {
+                        lexical, currency, ..
+                    } => {
+                        push_attribute(xml, "office:value", lexical);
+                        push_attribute(xml, "office:currency", currency);
+                    },
+                    OdfVariableValue::Date { lexical, .. } => {
+                        push_attribute(xml, "office:date-value", lexical);
+                    },
+                    OdfVariableValue::Time { lexical, .. } => {
+                        push_attribute(xml, "office:time-value", lexical);
+                    },
+                    OdfVariableValue::Boolean { lexical, .. } => {
+                        push_attribute(xml, "office:boolean-value", lexical);
+                    },
+                    OdfVariableValue::String { value } => {
+                        push_attribute(xml, "office:string-value", value);
+                    },
+                    OdfVariableValue::Void => {},
+                }
+            }
+        },
+        OdfVariableDeclaration::Sequence {
+            display_outline_level,
+            separation_character,
+            ..
+        } => {
+            push_attribute(
+                xml,
+                "text:display-outline-level",
+                &display_outline_level.to_string(),
+            );
+            if let Some(character) = separation_character {
+                push_attribute(xml, "text:separation-character", &character.to_string());
+            }
+        },
+    }
+    xml.push_str("/>");
+}
+
+fn value_type_name(value_type: OdfVariableValueType) -> &'static str {
+    match value_type {
+        OdfVariableValueType::Float => "float",
+        OdfVariableValueType::Percentage => "percentage",
+        OdfVariableValueType::Currency => "currency",
+        OdfVariableValueType::Date => "date",
+        OdfVariableValueType::Time => "time",
+        OdfVariableValueType::Boolean => "boolean",
+        OdfVariableValueType::String => "string",
+        OdfVariableValueType::Void => "void",
+    }
+}
+
+fn push_attribute(xml: &mut String, name: &str, value: &str) {
+    xml.push(' ');
+    xml.push_str(name);
+    xml.push_str("=\"");
+    for character in value.chars() {
+        match character {
+            '&' => xml.push_str("&amp;"),
+            '<' => xml.push_str("&lt;"),
+            '>' => xml.push_str("&gt;"),
+            '\"' => xml.push_str("&quot;"),
+            '\'' => xml.push_str("&apos;"),
+            _ => xml.push(character),
+        }
+    }
+    xml.push('\"');
+}
+
+fn validate_serialized_group(group: &OdfVariableDeclarationGroup, xml: &str) -> Result<()> {
+    let document = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}"><office:body><office:text>{xml}</office:text></office:body></office:document-content>"#
+    );
+    let parsed = parse_variable_declaration_parts(&[(document.as_str(), group.part)])?;
+    if parsed.groups.len() != 1
+        || parsed.groups[0].kind != group.kind
+        || parsed.groups[0].declarations.len() != group.declarations.len()
+    {
+        return Err(invalid(
+            "serialized variable declaration group is inconsistent",
+        ));
+    }
+    Ok(())
+}
+
+fn kind_order(kind: OdfVariableKind) -> u8 {
+    match kind {
+        OdfVariableKind::Simple => 0,
+        OdfVariableKind::Sequence => 1,
+        OdfVariableKind::User => 2,
+    }
+}
+
+fn replace_range(xml: &str, start: usize, end: usize, replacement: &str) -> Result<String> {
+    if start > end || end > xml.len() || !xml.is_char_boundary(start) || !xml.is_char_boundary(end)
+    {
+        return Err(invalid("variable declaration XML range is invalid"));
+    }
+    let new_len = xml
+        .len()
+        .checked_sub(end - start)
+        .and_then(|size| size.checked_add(replacement.len()))
+        .ok_or_else(|| invalid("variable declaration XML size overflow"))?;
+    if new_len > MAX_XML_BYTES {
+        return Err(invalid("variable declaration XML exceeds 64 MiB"));
+    }
+    let mut updated = String::with_capacity(new_len);
+    updated.push_str(&xml[..start]);
+    updated.push_str(replacement);
+    updated.push_str(&xml[end..]);
+    Ok(updated)
+}
+
+fn expand_empty_parent(xml: &str, parent: &EmptyParentSpan, child: &str) -> Result<String> {
+    let raw = xml
+        .get(parent.start..parent.end)
+        .ok_or_else(|| invalid("empty declaration scope range is invalid"))?;
+    let prefix = raw
+        .strip_suffix("/>")
+        .ok_or_else(|| invalid("empty declaration scope lacks a self-closing terminator"))?;
+    let replacement_len = prefix
+        .len()
+        .checked_add(child.len())
+        .and_then(|size| size.checked_add(parent.qname.len() + 4))
+        .ok_or_else(|| invalid("variable declaration XML size overflow"))?;
+    let mut replacement = String::with_capacity(replacement_len);
+    replacement.push_str(prefix);
+    replacement.push('>');
+    replacement.push_str(child);
+    replacement.push_str("</");
+    replacement.push_str(&parent.qname);
+    replacement.push('>');
+    replace_range(xml, parent.start, parent.end, &replacement)
+}
+
+fn scan_scope(xml: &str, scope: &OdfVariableScope) -> Result<ScopeScan> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("variable declaration XML exceeds 64 MiB"));
+    }
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut stack = Vec::<Frame>::new();
+    let mut depth = 0usize;
+    let mut parent_depth = None;
+    let mut opening_end = None;
+    let mut active_group: Option<(OdfVariableKind, usize, usize)> = None;
+    let mut groups = Vec::new();
+    let mut first_other_child = None;
+    let mut empty_parent = None;
+    loop {
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid(format!("invalid variable declaration XML: {error}")))?;
+        match event {
+            Event::Start(ref element) => {
+                let namespace = namespace_uri(&resolved)?;
+                let local = decode(element.local_name().as_ref(), "element name")?;
+                reject_spoofed_declaration_name(namespace.as_deref(), &local)?;
+                let event_end = reader.buffer_position() as usize;
+                let event_start = event_end
+                    .checked_sub(element.len() + 2)
+                    .ok_or_else(|| invalid("invalid XML event position"))?;
+                if scope_matches_parent(scope, namespace.as_deref(), &local, &stack) {
+                    if opening_end.is_some() {
+                        return Err(invalid("variable declaration scope is ambiguous"));
+                    }
+                    opening_end = Some(event_end);
+                    parent_depth = Some(depth + 1);
+                } else if parent_depth == Some(depth) {
+                    if let Some(kind) = container_kind(namespace.as_deref(), &local) {
+                        active_group = Some((kind, event_start, depth + 1));
+                    } else {
+                        first_other_child.get_or_insert(event_start);
+                    }
+                }
+                let master_page_name =
+                    if namespace.as_deref() == Some(STYLE) && local == "master-page" {
+                        optional_attribute(&reader, element, STYLE, "name")?
+                    } else {
+                        None
+                    };
+                stack.push(Frame {
+                    namespace,
+                    local,
+                    master_page_name,
+                });
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XML depth overflow"))?;
+                if depth > MAX_DEPTH {
+                    return Err(invalid(format!(
+                        "variable declaration XML nesting exceeds {MAX_DEPTH} levels"
+                    )));
+                }
+            },
+            Event::Empty(ref element) => {
+                let namespace = namespace_uri(&resolved)?;
+                let local = decode(element.local_name().as_ref(), "element name")?;
+                reject_spoofed_declaration_name(namespace.as_deref(), &local)?;
+                let event_end = reader.buffer_position() as usize;
+                let event_start = event_end
+                    .checked_sub(element.len() + 3)
+                    .ok_or_else(|| invalid("invalid XML event position"))?;
+                if scope_matches_parent(scope, namespace.as_deref(), &local, &stack) {
+                    if opening_end.is_some() {
+                        return Err(invalid("variable declaration scope is ambiguous"));
+                    }
+                    opening_end = Some(event_end);
+                    empty_parent = Some(EmptyParentSpan {
+                        start: event_start,
+                        end: event_end,
+                        qname: decode(element.name().as_ref(), "element name")?,
+                    });
+                }
+                if parent_depth == Some(depth) {
+                    if let Some(kind) = container_kind(namespace.as_deref(), &local) {
+                        groups.push(GroupSpan {
+                            kind,
+                            start: event_start,
+                            end: event_end,
+                        });
+                    } else {
+                        first_other_child.get_or_insert(event_start);
+                    }
+                }
+            },
+            Event::End(_) => {
+                let event_end = reader.buffer_position() as usize;
+                if let Some((kind, start, group_depth)) = active_group {
+                    if group_depth == depth {
+                        groups.push(GroupSpan {
+                            kind,
+                            start,
+                            end: event_end,
+                        });
+                        active_group = None;
+                    }
+                }
+                if parent_depth == Some(depth) {
+                    parent_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("XML stack underflow"))?;
+                stack
+                    .pop()
+                    .ok_or_else(|| invalid("XML frame stack underflow"))?;
+            },
+            Event::DocType(_) => return Err(invalid("DTDs are not allowed in declaration XML")),
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if depth != 0 || !stack.is_empty() || active_group.is_some() {
+        return Err(invalid("incomplete variable declaration XML structure"));
+    }
+    let opening_end =
+        opening_end.ok_or_else(|| invalid("variable declaration scope was not found"))?;
+    let mut previous_order = None;
+    for group in &groups {
+        let order = kind_order(group.kind);
+        if previous_order.is_some_and(|previous| order <= previous) {
+            return Err(invalid(
+                "variable declaration containers are duplicated or out of order",
+            ));
+        }
+        if first_other_child.is_some_and(|offset| offset < group.start) {
+            return Err(invalid(
+                "variable declaration container occurs after document content",
+            ));
+        }
+        previous_order = Some(order);
+    }
+    Ok(ScopeScan {
+        opening_end,
+        groups,
+        first_other_child,
+        empty_parent,
+    })
+}
+
+fn scope_matches_parent(
+    scope: &OdfVariableScope,
+    namespace: Option<&str>,
+    local: &str,
+    stack: &[Frame],
+) -> bool {
+    match scope {
+        OdfVariableScope::Body(body) => {
+            namespace == Some(OFFICE)
+                && local
+                    == match body {
+                        OdfVariableBody::Text => "text",
+                        OdfVariableBody::Spreadsheet => "spreadsheet",
+                        OdfVariableBody::Presentation => "presentation",
+                        OdfVariableBody::Drawing => "drawing",
+                        OdfVariableBody::Chart => "chart",
+                    }
+        },
+        OdfVariableScope::HeaderFooter {
+            kind,
+            master_page_name,
+        } => {
+            let expected_local = match kind {
+                OdfVariableHeaderFooter::Header => "header",
+                OdfVariableHeaderFooter::HeaderFirst => "header-first",
+                OdfVariableHeaderFooter::HeaderLeft => "header-left",
+                OdfVariableHeaderFooter::Footer => "footer",
+                OdfVariableHeaderFooter::FooterFirst => "footer-first",
+                OdfVariableHeaderFooter::FooterLeft => "footer-left",
+            };
+            let actual_master_page = stack.iter().rev().find_map(|frame| {
+                (frame.namespace.as_deref() == Some(STYLE) && frame.local == "master-page")
+                    .then_some(frame.master_page_name.as_ref())
+                    .flatten()
+            });
+            namespace == Some(STYLE)
+                && local == expected_local
+                && actual_master_page.map(String::as_str) == master_page_name.as_deref()
+        },
+    }
+}
+
 /// Ordered declaration groups from all scanned XML parts.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct OdfVariableDeclarations {
@@ -200,14 +679,12 @@ pub struct OdfVariableDeclarations {
 
 impl OdfVariableDeclarations {
     pub fn declarations(&self) -> impl Iterator<Item = &OdfVariableDeclaration> {
-        self.groups.iter().flat_map(|group| group.declarations.iter())
+        self.groups
+            .iter()
+            .flat_map(|group| group.declarations.iter())
     }
 
-    pub fn find(
-        &self,
-        kind: OdfVariableKind,
-        name: &str,
-    ) -> Option<&OdfVariableDeclaration> {
+    pub fn find(&self, kind: OdfVariableKind, name: &str) -> Option<&OdfVariableDeclaration> {
         self.declarations()
             .find(|declaration| declaration.kind() == kind && declaration.name() == name)
     }
@@ -326,9 +803,12 @@ fn parse_part(
                         || local != expected
                         || depth != group.depth
                     {
-                        return Err(invalid("declaration containers may contain only their declaration elements"));
+                        return Err(invalid(
+                            "declaration containers may contain only their declaration elements",
+                        ));
                     }
-                    let declaration = parse_declaration(&reader, element, group.group.kind, aggregate)?;
+                    let declaration =
+                        parse_declaration(&reader, element, group.group.kind, aggregate)?;
                     pending = Some(PendingDeclaration {
                         depth: depth + 1,
                         declaration,
@@ -350,19 +830,20 @@ fn parse_part(
                         &reader, element, part, kind, &stack, uses, all_uses, aggregate,
                     )?;
                 }
-                let master_page_name = if namespace.as_deref() == Some(STYLE)
-                    && local == "master-page"
-                {
-                    optional_attribute(&reader, element, STYLE, "name")?
-                } else {
-                    None
-                };
+                let master_page_name =
+                    if namespace.as_deref() == Some(STYLE) && local == "master-page" {
+                        optional_attribute(&reader, element, STYLE, "name")?
+                    } else {
+                        None
+                    };
                 stack.push(Frame {
                     namespace,
                     local,
                     master_page_name,
                 });
-                depth = depth.checked_add(1).ok_or_else(|| invalid("XML depth overflow"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XML depth overflow"))?;
                 if depth > MAX_DEPTH {
                     return Err(invalid(format!(
                         "variable declaration XML nesting exceeds {MAX_DEPTH} levels"
@@ -381,9 +862,12 @@ fn parse_part(
                         || local != declaration_local(group.group.kind)
                         || depth != group.depth
                     {
-                        return Err(invalid("declaration containers may contain only their declaration elements"));
+                        return Err(invalid(
+                            "declaration containers may contain only their declaration elements",
+                        ));
                     }
-                    let declaration = parse_declaration(&reader, element, group.group.kind, aggregate)?;
+                    let declaration =
+                        parse_declaration(&reader, element, group.group.kind, aggregate)?;
                     add_declaration(
                         declaration,
                         &mut group.group,
@@ -417,7 +901,9 @@ fn parse_part(
                     if pending_declaration.depth != depth {
                         pending = Some(pending_declaration);
                     } else {
-                        let group = active.as_mut().ok_or_else(|| invalid("orphan declaration"))?;
+                        let group = active
+                            .as_mut()
+                            .ok_or_else(|| invalid("orphan declaration"))?;
                         add_declaration(
                             pending_declaration.declaration,
                             &mut group.group,
@@ -429,10 +915,16 @@ fn parse_part(
                     }
                 }
                 if active.as_ref().is_some_and(|group| group.depth == depth) {
-                    result.groups.push(active.take().expect("checked group").group);
+                    result
+                        .groups
+                        .push(active.take().expect("checked group").group);
                 }
-                depth = depth.checked_sub(1).ok_or_else(|| invalid("XML stack underflow"))?;
-                stack.pop().ok_or_else(|| invalid("XML frame stack underflow"))?;
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("XML stack underflow"))?;
+                stack
+                    .pop()
+                    .ok_or_else(|| invalid("XML frame stack underflow"))?;
             },
             Event::Text(ref text) => {
                 let value = text
@@ -442,7 +934,9 @@ fn parse_part(
                     return Err(invalid("declaration elements must have no content"));
                 }
                 if active.is_some() && pending.is_none() && !value.trim().is_empty() {
-                    return Err(invalid("declaration containers may contain only declarations"));
+                    return Err(invalid(
+                        "declaration containers may contain only declarations",
+                    ));
                 }
             },
             Event::CData(ref value) if pending.is_some() || active.is_some() => {
@@ -451,7 +945,9 @@ fn parse_part(
                 }
             },
             Event::GeneralRef(_) if pending.is_some() || active.is_some() => {
-                return Err(invalid("declaration elements cannot contain entity references"));
+                return Err(invalid(
+                    "declaration elements cannot contain entity references",
+                ));
             },
             Event::DocType(_) => return Err(invalid("DTDs are not allowed in declaration XML")),
             Event::Eof => break,
@@ -477,16 +973,29 @@ fn start_group(
     containers: &mut HashSet<(OdfVariablePart, OdfVariableScope, OdfVariableKind)>,
     active: &mut Option<ActiveGroup>,
 ) -> Result<()> {
-    if element.attributes().next().is_some() {
-        return Err(invalid("variable declaration containers cannot have attributes"));
+    for attribute in element.attributes() {
+        let attribute = attribute
+            .map_err(|error| invalid(format!("invalid declaration attribute: {error}")))?;
+        let name = attribute.key.as_ref();
+        if name != b"xmlns" && !name.starts_with(b"xmlns:") {
+            return Err(invalid(
+                "variable declaration containers cannot have attributes",
+            ));
+        }
     }
     if result.groups.len() >= MAX_GROUPS {
-        return Err(invalid(format!("document exceeds {MAX_GROUPS} declaration groups")));
+        return Err(invalid(format!(
+            "document exceeds {MAX_GROUPS} declaration groups"
+        )));
     }
-    let parent = stack.last().ok_or_else(|| invalid("misplaced declaration container"))?;
+    let parent = stack
+        .last()
+        .ok_or_else(|| invalid("misplaced declaration container"))?;
     let scope = scope_for_parent(parent, stack)?;
     if !containers.insert((part, scope.clone(), kind)) {
-        return Err(invalid("duplicate variable declaration container in one scope"));
+        return Err(invalid(
+            "duplicate variable declaration container in one scope",
+        ));
     }
     *active = Some(ActiveGroup {
         depth: depth + 1,
@@ -510,7 +1019,9 @@ fn add_declaration(
     declaration_count: &mut usize,
 ) -> Result<()> {
     if *declaration_count >= MAX_DECLARATIONS {
-        return Err(invalid(format!("document exceeds {MAX_DECLARATIONS} variable declarations")));
+        return Err(invalid(format!(
+            "document exceeds {MAX_DECLARATIONS} variable declarations"
+        )));
     }
     let kind = declaration.kind();
     let name = declaration.name().to_string();
@@ -526,7 +1037,10 @@ fn add_declaration(
         )));
     }
     if !names.insert((kind, name.clone())) {
-        return Err(invalid(format!("duplicate ODF {:?} variable declaration '{name}'", kind)));
+        return Err(invalid(format!(
+            "duplicate ODF {:?} variable declaration '{name}'",
+            kind
+        )));
     }
     *declaration_count += 1;
     group.declarations.push(declaration);
@@ -566,7 +1080,10 @@ fn parse_declaration(
                 ],
             )?;
             let formula = get(&attributes, TEXT, "formula").map(str::to_string);
-            if formula.as_ref().is_some_and(|value| value.len() > MAX_VALUE_BYTES) {
+            if formula
+                .as_ref()
+                .is_some_and(|value| value.len() > MAX_VALUE_BYTES)
+            {
                 return Err(invalid("user-field formula exceeds 1 MiB"));
             }
             let value = get(&attributes, OFFICE, "value-type")
@@ -575,7 +1092,11 @@ fn parse_declaration(
             if value.is_none() {
                 reject_typed_value_attributes(&attributes, &[])?;
             }
-            Ok(OdfVariableDeclaration::User { name, value, formula })
+            Ok(OdfVariableDeclaration::User {
+                name,
+                value,
+                formula,
+            })
         },
         OdfVariableKind::Sequence => {
             reject_unexpected(
@@ -595,7 +1116,9 @@ fn parse_declaration(
             let separation_character = get(&attributes, TEXT, "separation-character")
                 .map(|value| {
                     let mut chars = value.chars();
-                    let character = chars.next().ok_or_else(|| invalid("empty sequence separator"))?;
+                    let character = chars
+                        .next()
+                        .ok_or_else(|| invalid("empty sequence separator"))?;
                     if chars.next().is_some() {
                         return Err(invalid("sequence separator must be one Unicode scalar"));
                     }
@@ -603,7 +1126,9 @@ fn parse_declaration(
                 })
                 .transpose()?;
             if level == 0 && separation_character.is_some() {
-                return Err(invalid("level-zero sequence declaration cannot have a separator"));
+                return Err(invalid(
+                    "level-zero sequence declaration cannot have a separator",
+                ));
             }
             Ok(OdfVariableDeclaration::Sequence {
                 name,
@@ -623,7 +1148,8 @@ fn collect_attributes(
 ) -> Result<Attributes> {
     let mut result = HashMap::new();
     for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| invalid(format!("invalid declaration attribute: {error}")))?;
+        let attribute = attribute
+            .map_err(|error| invalid(format!("invalid declaration attribute: {error}")))?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_uri(&namespace)?.unwrap_or_default();
         let local = decode(local.as_ref(), "attribute name")?;
@@ -645,7 +1171,10 @@ fn collect_attributes(
     Ok(result)
 }
 
-fn parse_user_value(kind: OdfVariableValueType, attributes: &Attributes) -> Result<OdfVariableValue> {
+fn parse_user_value(
+    kind: OdfVariableValueType,
+    attributes: &Attributes,
+) -> Result<OdfVariableValue> {
     let allowed = match kind {
         OdfVariableValueType::Float | OdfVariableValueType::Percentage => &["value"][..],
         OdfVariableValueType::Currency => &["value", "currency"][..],
@@ -659,11 +1188,17 @@ fn parse_user_value(kind: OdfVariableValueType, attributes: &Attributes) -> Resu
     let value = match kind {
         OdfVariableValueType::Float => {
             let lexical = required(attributes, OFFICE, "value")?.to_string();
-            OdfVariableValue::Float { value: parse_double(&lexical)?, lexical }
+            OdfVariableValue::Float {
+                value: parse_double(&lexical)?,
+                lexical,
+            }
         },
         OdfVariableValueType::Percentage => {
             let lexical = required(attributes, OFFICE, "value")?.to_string();
-            OdfVariableValue::Percentage { value: parse_double(&lexical)?, lexical }
+            OdfVariableValue::Percentage {
+                value: parse_double(&lexical)?,
+                lexical,
+            }
         },
         OdfVariableValueType::Currency => {
             let lexical = required(attributes, OFFICE, "value")?.to_string();
@@ -671,13 +1206,18 @@ fn parse_user_value(kind: OdfVariableValueType, attributes: &Attributes) -> Resu
             if currency.is_empty() {
                 return Err(invalid("currency value requires a currency code"));
             }
-            OdfVariableValue::Currency { value: parse_double(&lexical)?, lexical, currency }
+            OdfVariableValue::Currency {
+                value: parse_double(&lexical)?,
+                lexical,
+                currency,
+            }
         },
         OdfVariableValueType::Date => {
             let lexical = required(attributes, OFFICE, "date-value")?.to_string();
             let value = if lexical.contains('T') {
                 OdfVariableDateValue::DateTime(
-                    DateTimeOdf::decode(&lexical).map_err(|_| invalid("invalid user-field date-time"))?,
+                    DateTimeOdf::decode(&lexical)
+                        .map_err(|_| invalid("invalid user-field date-time"))?,
                 )
             } else {
                 OdfVariableDateValue::Date(
@@ -694,7 +1234,8 @@ fn parse_user_value(kind: OdfVariableValueType, attributes: &Attributes) -> Resu
         },
         OdfVariableValueType::Boolean => {
             let lexical = required(attributes, OFFICE, "boolean-value")?.to_string();
-            let value = Boolean::decode(&lexical).map_err(|_| invalid("invalid user-field boolean"))?;
+            let value =
+                Boolean::decode(&lexical).map_err(|_| invalid("invalid user-field boolean"))?;
             OdfVariableValue::Boolean { value, lexical }
         },
         OdfVariableValueType::String => OdfVariableValue::String {
@@ -733,7 +1274,9 @@ fn parse_value_type(value: &str) -> Result<OdfVariableValueType> {
         "boolean" => Ok(OdfVariableValueType::Boolean),
         "string" => Ok(OdfVariableValueType::String),
         "void" => Ok(OdfVariableValueType::Void),
-        _ => Err(invalid(format!("unsupported ODF variable value type '{value}'"))),
+        _ => Err(invalid(format!(
+            "unsupported ODF variable value type '{value}'"
+        ))),
     }
 }
 
@@ -742,7 +1285,9 @@ fn parse_double(value: &str) -> Result<f64> {
         "INF" => Ok(f64::INFINITY),
         "-INF" => Ok(f64::NEG_INFINITY),
         "NaN" => Ok(f64::NAN),
-        _ => value.parse().map_err(|_| invalid("invalid XML Schema double")),
+        _ => value
+            .parse()
+            .map_err(|_| invalid("invalid XML Schema double")),
     }
 }
 
@@ -805,7 +1350,10 @@ fn scope_for_parent(parent: &Frame, stack: &[Frame]) -> Result<OdfVariableScope>
                 .iter()
                 .rev()
                 .find_map(|frame| frame.master_page_name.clone());
-            return Ok(OdfVariableScope::HeaderFooter { kind, master_page_name });
+            return Ok(OdfVariableScope::HeaderFooter {
+                kind,
+                master_page_name,
+            });
         }
     }
     Err(invalid("misplaced variable declaration container"))
@@ -814,12 +1362,23 @@ fn scope_for_parent(parent: &Frame, stack: &[Frame]) -> Result<OdfVariableScope>
 fn nearest_scope(stack: &[Frame]) -> Result<Option<OdfVariableScope>> {
     for (index, frame) in stack.iter().enumerate().rev() {
         if frame.namespace.as_deref() == Some(OFFICE)
-            && matches!(frame.local.as_str(), "text" | "spreadsheet" | "presentation" | "drawing" | "chart")
+            && matches!(
+                frame.local.as_str(),
+                "text" | "spreadsheet" | "presentation" | "drawing" | "chart"
+            )
         {
             return scope_for_parent(frame, &stack[..=index]).map(Some);
         }
         if frame.namespace.as_deref() == Some(STYLE)
-            && matches!(frame.local.as_str(), "header" | "header-first" | "header-left" | "footer" | "footer-first" | "footer-left")
+            && matches!(
+                frame.local.as_str(),
+                "header"
+                    | "header-first"
+                    | "header-left"
+                    | "footer"
+                    | "footer-first"
+                    | "footer-left"
+            )
         {
             return scope_for_parent(frame, &stack[..=index]).map(Some);
         }
@@ -859,10 +1418,17 @@ fn usage_kind(namespace: Option<&str>, local: &str) -> Option<OdfVariableKind> {
 fn reject_spoofed_declaration_name(namespace: Option<&str>, local: &str) -> Result<()> {
     if matches!(
         local,
-        "variable-decls" | "variable-decl" | "user-field-decls" | "user-field-decl" | "sequence-decls" | "sequence-decl"
+        "variable-decls"
+            | "variable-decl"
+            | "user-field-decls"
+            | "user-field-decl"
+            | "sequence-decls"
+            | "sequence-decl"
     ) && namespace != Some(TEXT)
     {
-        return Err(invalid("variable declaration vocabulary uses the wrong namespace"));
+        return Err(invalid(
+            "variable declaration vocabulary uses the wrong namespace",
+        ));
     }
     Ok(())
 }
@@ -873,7 +1439,9 @@ fn reject_unexpected(attributes: &Attributes, allowed: &[(&str, &str)]) -> Resul
             namespace == allowed_namespace && local == allowed_local
         }) && matches!(namespace.as_str(), OFFICE | TEXT)
         {
-            return Err(invalid(format!("unexpected declaration attribute {namespace}:{local}")));
+            return Err(invalid(format!(
+                "unexpected declaration attribute {namespace}:{local}"
+            )));
         }
     }
     Ok(())
@@ -908,7 +1476,8 @@ fn optional_attribute(
 ) -> Result<Option<String>> {
     let mut value = None;
     for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| invalid(format!("invalid XML attribute: {error}")))?;
+        let attribute =
+            attribute.map_err(|error| invalid(format!("invalid XML attribute: {error}")))?;
         let (resolved, resolved_local) = reader.resolver().resolve_attribute(attribute.key);
         if namespace_uri(&resolved)?.as_deref() == Some(namespace)
             && resolved_local.as_ref() == local.as_bytes()
@@ -929,9 +1498,7 @@ fn optional_attribute(
 
 fn namespace_uri(namespace: &ResolveResult<'_>) -> Result<Option<String>> {
     match namespace {
-        ResolveResult::Bound(Namespace(value)) => {
-            Ok(Some(decode(value, "namespace URI")?))
-        },
+        ResolveResult::Bound(Namespace(value)) => Ok(Some(decode(value, "namespace URI")?)),
         ResolveResult::Unbound => Ok(None),
         ResolveResult::Unknown(prefix) => Err(invalid(format!(
             "unbound XML namespace prefix '{}'",

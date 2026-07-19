@@ -1,4 +1,4 @@
-//! Read-only access to OpenDocument text master documents.
+//! Typed access to OpenDocument text master documents.
 
 use crate::OdfMetadata;
 use crate::constants;
@@ -42,6 +42,114 @@ pub struct MasterSubdocument {
 }
 
 impl MasterSubdocument {
+    /// Create a linked subdocument. The URI remains inert and is never fetched.
+    pub fn new(section_name: impl Into<String>, href: impl Into<String>) -> Result<Self> {
+        let value = Self {
+            section_name: section_name.into(),
+            style_name: None,
+            protected: None,
+            protection_key: None,
+            protection_key_digest_algorithm: None,
+            display: None,
+            condition: None,
+            xml_id: None,
+            href: Some(href.into()),
+            source_section_name: None,
+            filter_name: None,
+            xlink_type: Some("simple".to_string()),
+            xlink_show: Some("embed".to_string()),
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
+    pub fn set_style_name(&mut self, value: Option<String>) -> Result<&mut Self> {
+        let mut candidate = self.clone();
+        candidate.style_name = value;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(self)
+    }
+
+    pub fn set_xml_id(&mut self, value: Option<String>) -> Result<&mut Self> {
+        let mut candidate = self.clone();
+        candidate.xml_id = value;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(self)
+    }
+
+    pub fn set_source_section_name(&mut self, value: Option<String>) -> Result<&mut Self> {
+        let mut candidate = self.clone();
+        candidate.source_section_name = value;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(self)
+    }
+
+    pub fn set_filter_name(&mut self, value: Option<String>) -> Result<&mut Self> {
+        let mut candidate = self.clone();
+        candidate.filter_name = value;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(self)
+    }
+
+    pub fn set_protection(
+        &mut self,
+        protected: bool,
+        key: Option<String>,
+        digest_algorithm: Option<String>,
+    ) -> Result<&mut Self> {
+        let mut candidate = self.clone();
+        candidate.protected = Some(protected);
+        candidate.protection_key = key;
+        candidate.protection_key_digest_algorithm = digest_algorithm;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(self)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.href.as_deref().is_none_or(str::is_empty) {
+            return Err(Error::InvalidFormat(
+                "master subdocument requires a non-empty inert href".to_string(),
+            ));
+        }
+        if self.xlink_type.as_deref().is_some_and(|value| value != "simple")
+            || self.xlink_show.as_deref().is_some_and(|value| value != "embed")
+        {
+            return Err(Error::InvalidFormat(
+                "master subdocument requires simple/embed XLink behavior".to_string(),
+            ));
+        }
+        self.to_section().validate()
+    }
+
+    pub(crate) fn to_section(&self) -> crate::Section {
+        crate::Section {
+            name: self.section_name.clone(),
+            style: self.style_name.clone(),
+            protected: self.protected.unwrap_or(false),
+            xml_id: self.xml_id.clone(),
+            protection_key: self.protection_key.clone(),
+            protection_key_digest_algorithm: self.protection_key_digest_algorithm.clone(),
+            display: match self.display.as_deref() {
+                Some("none") => crate::SectionDisplay::Hidden,
+                Some("condition") => crate::SectionDisplay::Condition,
+                _ => crate::SectionDisplay::Visible,
+            },
+            condition: self.condition.clone(),
+            source: Some(crate::SectionSource {
+                href: self.href.clone(),
+                section_name: self.source_section_name.clone(),
+                filter_name: self.filter_name.clone(),
+            }),
+            dde_source: None,
+            content: String::new(),
+        }
+    }
+
     /// Return the required containing `text:section` name.
     pub fn section_name(&self) -> &str {
         &self.section_name
@@ -142,7 +250,23 @@ impl MasterDocument {
 
     /// Validate a master document from owned package bytes.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = OwnedPackage::from_bytes(bytes)?;
+        Self::from_owned_package(OwnedPackage::from_bytes(bytes)?)
+    }
+
+    /// Validate an encrypted master package with the supplied password.
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        Self::from_owned_package(OwnedPackage::from_bytes_with_password(bytes, password)?)
+    }
+
+    /// Open and validate an encrypted master package.
+    pub fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_bytes_with_password(std::fs::read(path)?, password)
+    }
+
+    fn from_owned_package(package: OwnedPackage) -> Result<Self> {
         let mimetype = package.mimetype()?;
         let template = match mimetype.as_str() {
             constants::ODF_MASTER => false,
@@ -153,10 +277,15 @@ impl MasterDocument {
                 )));
             },
         };
+        if package.package()?.manifest().get_media_type("/") != Some(mimetype.as_str()) {
+            return Err(Error::InvalidFormat(
+                "master package mimetype and root manifest media type differ".to_string(),
+            ));
+        }
         let content = package.get_file(constants::ODF_CONTENT)?;
         let content = std::str::from_utf8(&content)
             .map_err(|_| Error::InvalidFormat("invalid UTF-8 in content.xml".to_string()))?;
-        let (global, subdocuments) = parse_master_content(content)?;
+        let (global, subdocuments) = validate_master_content_xml(content)?;
         let document = Document::from_owned_package(package)?;
         Ok(Self {
             document,
@@ -230,6 +359,93 @@ impl MasterDocument {
         std::fs::write(path, self.as_bytes())?;
         Ok(())
     }
+
+    pub(crate) fn into_owned_package(self) -> OwnedPackage {
+        self.document.into_package()
+    }
+}
+
+pub(crate) fn validate_master_content_xml(
+    xml: &str,
+) -> Result<(Option<bool>, Vec<MasterSubdocument>)> {
+    if xml.len() > 64 * 1024 * 1024 {
+        return Err(Error::InvalidFormat(
+            "master content.xml exceeds 64 MiB".to_string(),
+        ));
+    }
+    let parsed = parse_master_content(xml)?;
+    let mut names = std::collections::HashSet::new();
+    for subdocument in &parsed.1 {
+        subdocument.validate()?;
+    }
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut ids = std::collections::HashSet::new();
+    loop {
+        match reader.read_event_into(&mut buffer).map_err(|error| {
+            Error::InvalidFormat(format!("invalid master XML: {error}"))
+        })? {
+            Event::Start(element) | Event::Empty(element) => {
+                if element_matches(&reader, &element, TEXT_NAMESPACE, "section") {
+                    let parsed_section = parse_section(&reader, &element)?;
+                    let mut section = parsed_section.to_section();
+                    section.source = None;
+                    section.validate()?;
+                    if !names.insert(section.name.clone()) {
+                        return Err(Error::InvalidFormat(format!(
+                            "duplicate master section name '{}'",
+                            section.name
+                        )));
+                    }
+                }
+                if let Some(id) = optional_attribute(&reader, &element, XML_NAMESPACE, "id")? {
+                    validate_xml_id(&id)?;
+                    if !ids.insert(id.clone()) {
+                        return Err(Error::InvalidFormat(format!(
+                            "duplicate master xml:id '{id}'"
+                        )));
+                    }
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(Error::InvalidFormat(
+                    "active XML declarations are prohibited in master content".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    Ok(parsed)
+}
+
+fn element_matches(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &str,
+    local: &str,
+) -> bool {
+    let (resolved, found_local) = reader.resolver().resolve_element(element.name());
+    matches!(resolved, ResolveResult::Bound(Namespace(uri)) if uri == namespace.as_bytes())
+        && found_local.as_ref() == local.as_bytes()
+}
+
+fn validate_xml_id(value: &str) -> Result<()> {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return Err(Error::InvalidFormat("master xml:id cannot be empty".to_string()));
+    };
+    if !(first == '_' || first.is_alphabetic())
+        || chars.any(|character| {
+            !(character == '_' || character == '-' || character == '.' || character.is_alphanumeric())
+        })
+    {
+        return Err(Error::InvalidFormat(format!(
+            "master xml:id '{value}' is not an XML NCName"
+        )));
+    }
+    Ok(())
 }
 
 fn parse_master_content(xml: &str) -> Result<(Option<bool>, Vec<MasterSubdocument>)> {
@@ -414,6 +630,11 @@ fn parse_master_content(xml: &str) -> Result<(Option<bool>, Vec<MasterSubdocumen
             Event::CData(_) | Event::GeneralRef(_) if depth == 0 || source_depth.is_some() => {
                 return Err(Error::InvalidFormat(
                     "content is not allowed in this master XML position".to_string(),
+                ));
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(Error::InvalidFormat(
+                    "active XML declarations are prohibited in master content".to_string(),
                 ));
             },
             Event::Eof => break,

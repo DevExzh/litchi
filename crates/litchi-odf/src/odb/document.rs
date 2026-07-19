@@ -35,6 +35,8 @@ pub enum DatabaseElementKind {
     Delimiter,
     FontCharset,
     CharacterSet,
+    TableSettings,
+    TableSetting,
     TableFilter,
     TableIncludeFilter,
     TableExcludeFilter,
@@ -145,6 +147,8 @@ impl DatabaseElement {
             "delimiter" => DatabaseElementKind::Delimiter,
             "font-charset" => DatabaseElementKind::FontCharset,
             "character-set" => DatabaseElementKind::CharacterSet,
+            "table-settings" => DatabaseElementKind::TableSettings,
+            "table-setting" => DatabaseElementKind::TableSetting,
             "table-filter" => DatabaseElementKind::TableFilter,
             "table-include-filter" => DatabaseElementKind::TableIncludeFilter,
             "table-exclude-filter" => DatabaseElementKind::TableExcludeFilter,
@@ -250,6 +254,144 @@ pub struct DatabaseDocument {
 }
 
 impl DatabaseDocument {
+    /// Atomically replace or remove the packaged saved-query collection.
+    ///
+    /// Query commands, filters, URLs, embedded engines, and scripts remain
+    /// inert. This method never connects, fetches, or executes package data.
+    pub fn set_queries(
+        &mut self,
+        value: Option<&super::query::OdfDatabaseQueries>,
+    ) -> Result<Option<super::query::OdfDatabaseQueries>> {
+        let previous = self.queries()?;
+        let content = self.package.content_xml()?;
+        let content = super::query::set_database_queries_xml(&content, value)?;
+        let package = self.package.with_replaced_content_xml(content)?;
+        let staged = Self::from_bytes(package.into_bytes())?;
+        staged.queries()?;
+        *self = staged;
+        Ok(previous)
+    }
+
+    /// Atomically replace or remove `db:schema-definition` in `content.xml`.
+    pub fn set_schema_definition(
+        &mut self,
+        value: Option<&super::schema::OdfDatabaseSchemaDefinition>,
+    ) -> Result<Option<super::schema::OdfDatabaseSchemaDefinition>> {
+        if let Some(value) = value { value.validate()?; }
+        let previous = self.schema_definition()?;
+        let content = self.package.content_xml()?;
+        let content = super::schema::set_database_schema_definition_xml(&content, value)?;
+        let package = self.package.with_replaced_content_xml(content)?;
+        let staged = Self::from_package(package)?;
+        staged.schema_definition()?;
+        *self = staged;
+        Ok(previous)
+    }
+
+    pub fn clear_schema_definition(&mut self) -> Result<Option<super::schema::OdfDatabaseSchemaDefinition>> {
+        self.set_schema_definition(None)
+    }
+
+    pub fn add_schema_table(&mut self, table: super::schema::OdfDatabaseTableDefinition) -> Result<usize> {
+        self.mutate_schema(|schema| { let index = schema.tables.len(); schema.tables.push(table); Ok(index) })
+    }
+    pub fn add_schema_view(&mut self, mut view: super::schema::OdfDatabaseTableDefinition) -> Result<usize> {
+        view.table_type = Some("VIEW".to_string());
+        self.add_schema_table(view)
+    }
+    pub fn update_schema_table(&mut self, index: usize, table: super::schema::OdfDatabaseTableDefinition) -> Result<super::schema::OdfDatabaseTableDefinition> {
+        self.mutate_schema(|schema| replace_at(&mut schema.tables, index, table, "schema table"))
+    }
+    pub fn remove_schema_table(&mut self, index: usize) -> Result<super::schema::OdfDatabaseTableDefinition> {
+        self.mutate_schema(|schema| remove_at(&mut schema.tables, index, "schema table"))
+    }
+    pub fn move_schema_table(&mut self, from: usize, to: usize) -> Result<()> {
+        self.mutate_schema(|schema| move_at(&mut schema.tables, from, to, "schema table"))
+    }
+
+    pub fn add_schema_column(&mut self, table: usize, column: super::schema::OdfDatabaseColumnDefinition) -> Result<usize> {
+        self.mutate_schema(|schema| { let values = &mut table_at(schema, table)?.columns; let index = values.len(); values.push(column); Ok(index) })
+    }
+    pub fn update_schema_column(&mut self, table: usize, column: usize, value: super::schema::OdfDatabaseColumnDefinition) -> Result<super::schema::OdfDatabaseColumnDefinition> {
+        self.mutate_schema(|schema| replace_at(&mut table_at(schema, table)?.columns, column, value, "schema column"))
+    }
+    pub fn remove_schema_column(&mut self, table: usize, column: usize) -> Result<super::schema::OdfDatabaseColumnDefinition> {
+        self.mutate_schema(|schema| remove_at(&mut table_at(schema, table)?.columns, column, "schema column"))
+    }
+    pub fn move_schema_column(&mut self, table: usize, from: usize, to: usize) -> Result<()> {
+        self.mutate_schema(|schema| move_at(&mut table_at(schema, table)?.columns, from, to, "schema column"))
+    }
+
+    pub fn add_schema_key(&mut self, table: usize, key: super::schema::OdfDatabaseKey) -> Result<usize> {
+        self.mutate_schema(|schema| { let values = table_at(schema, table)?.keys.get_or_insert_with(Vec::new); let index = values.len(); values.push(key); Ok(index) })
+    }
+    pub fn add_schema_relation(&mut self, table: usize, key: super::schema::OdfDatabaseKey) -> Result<usize> {
+        if key.key_type != super::schema::OdfDatabaseKeyType::Foreign { return Err(Error::InvalidFormat("schema relation must be a foreign key".into())); }
+        self.add_schema_key(table, key)
+    }
+    pub fn update_schema_key(&mut self, table: usize, key: usize, value: super::schema::OdfDatabaseKey) -> Result<super::schema::OdfDatabaseKey> {
+        self.mutate_schema(|schema| replace_at(keys_at(schema, table)?, key, value, "schema key"))
+    }
+    pub fn remove_schema_key(&mut self, table: usize, key: usize) -> Result<super::schema::OdfDatabaseKey> {
+        self.mutate_schema(|schema| {
+            let (removed, empty) = { let values = keys_at(schema, table)?; let removed = remove_at(values, key, "schema key")?; (removed, values.is_empty()) };
+            if empty { table_at(schema, table)?.keys = None; }
+            Ok(removed)
+        })
+    }
+    pub fn move_schema_key(&mut self, table: usize, from: usize, to: usize) -> Result<()> {
+        self.mutate_schema(|schema| move_at(keys_at(schema, table)?, from, to, "schema key"))
+    }
+    pub fn add_schema_key_column(&mut self, table: usize, key: usize, group: usize, column: super::schema::OdfDatabaseKeyColumn) -> Result<usize> {
+        self.mutate_schema(|schema| { let values = key_group_at(schema, table, key, group)?; let index = values.len(); values.push(column); Ok(index) })
+    }
+    pub fn update_schema_key_column(&mut self, table: usize, key: usize, group: usize, column: usize, value: super::schema::OdfDatabaseKeyColumn) -> Result<super::schema::OdfDatabaseKeyColumn> {
+        self.mutate_schema(|schema| replace_at(key_group_at(schema, table, key, group)?, column, value, "schema key column"))
+    }
+    pub fn remove_schema_key_column(&mut self, table: usize, key: usize, group: usize, column: usize) -> Result<super::schema::OdfDatabaseKeyColumn> {
+        self.mutate_schema(|schema| remove_at(key_group_at(schema, table, key, group)?, column, "schema key column"))
+    }
+    pub fn move_schema_key_column(&mut self, table: usize, key: usize, group: usize, from: usize, to: usize) -> Result<()> {
+        self.mutate_schema(|schema| move_at(key_group_at(schema, table, key, group)?, from, to, "schema key column"))
+    }
+
+    pub fn add_schema_index(&mut self, table: usize, index: super::schema::OdfDatabaseIndex) -> Result<usize> {
+        self.mutate_schema(|schema| { let values = table_at(schema, table)?.indices.get_or_insert_with(Vec::new); let position = values.len(); values.push(index); Ok(position) })
+    }
+    pub fn update_schema_index(&mut self, table: usize, index: usize, value: super::schema::OdfDatabaseIndex) -> Result<super::schema::OdfDatabaseIndex> {
+        self.mutate_schema(|schema| replace_at(indices_at(schema, table)?, index, value, "schema index"))
+    }
+    pub fn remove_schema_index(&mut self, table: usize, index: usize) -> Result<super::schema::OdfDatabaseIndex> {
+        self.mutate_schema(|schema| {
+            let (removed, empty) = { let values = indices_at(schema, table)?; let removed = remove_at(values, index, "schema index")?; (removed, values.is_empty()) };
+            if empty { table_at(schema, table)?.indices = None; }
+            Ok(removed)
+        })
+    }
+    pub fn move_schema_index(&mut self, table: usize, from: usize, to: usize) -> Result<()> {
+        self.mutate_schema(|schema| move_at(indices_at(schema, table)?, from, to, "schema index"))
+    }
+    pub fn add_schema_index_column(&mut self, table: usize, index: usize, group: usize, column: super::schema::OdfDatabaseIndexColumn) -> Result<usize> {
+        self.mutate_schema(|schema| { let values = index_group_at(schema, table, index, group)?; let position = values.len(); values.push(column); Ok(position) })
+    }
+    pub fn update_schema_index_column(&mut self, table: usize, index: usize, group: usize, column: usize, value: super::schema::OdfDatabaseIndexColumn) -> Result<super::schema::OdfDatabaseIndexColumn> {
+        self.mutate_schema(|schema| replace_at(index_group_at(schema, table, index, group)?, column, value, "schema index column"))
+    }
+    pub fn remove_schema_index_column(&mut self, table: usize, index: usize, group: usize, column: usize) -> Result<super::schema::OdfDatabaseIndexColumn> {
+        self.mutate_schema(|schema| remove_at(index_group_at(schema, table, index, group)?, column, "schema index column"))
+    }
+    pub fn move_schema_index_column(&mut self, table: usize, index: usize, group: usize, from: usize, to: usize) -> Result<()> {
+        self.mutate_schema(|schema| move_at(index_group_at(schema, table, index, group)?, from, to, "schema index column"))
+    }
+
+    fn mutate_schema<T>(&mut self, operation: impl FnOnce(&mut super::schema::OdfDatabaseSchemaDefinition) -> Result<T>) -> Result<T> {
+        let mut schema = self.schema_definition()?.unwrap_or_default();
+        let output = operation(&mut schema)?;
+        schema.validate()?;
+        self.set_schema_definition(Some(&schema))?;
+        Ok(output)
+    }
+
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         Self::from_reader(file)
@@ -262,7 +404,18 @@ impl DatabaseDocument {
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = OpenDocumentPackage::from_bytes(bytes)?;
+        Self::from_package(OpenDocumentPackage::from_bytes(bytes)?)
+    }
+
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        Self::from_package(OpenDocumentPackage::from_bytes_with_password(bytes, password)?)
+    }
+
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        Self::from_bytes_with_password(std::fs::read(path)?, password)
+    }
+
+    fn from_package(package: OpenDocumentPackage) -> Result<Self> {
         if package.family() != OpenDocumentFamily::Database {
             return Err(Error::InvalidFormat(format!(
                 "not an OpenDocument database: MIME type is '{}'",
@@ -330,7 +483,38 @@ impl DatabaseDocument {
     }
 }
 
-fn parse_database_content(xml: &str) -> Result<DatabaseElement> {
+fn table_at(schema: &mut super::schema::OdfDatabaseSchemaDefinition, index: usize) -> Result<&mut super::schema::OdfDatabaseTableDefinition> {
+    schema.tables.get_mut(index).ok_or_else(|| Error::InvalidFormat("schema table index is out of bounds".into()))
+}
+fn keys_at(schema: &mut super::schema::OdfDatabaseSchemaDefinition, table: usize) -> Result<&mut Vec<super::schema::OdfDatabaseKey>> {
+    table_at(schema, table)?.keys.as_mut().ok_or_else(|| Error::InvalidFormat("schema table has no keys".into()))
+}
+fn indices_at(schema: &mut super::schema::OdfDatabaseSchemaDefinition, table: usize) -> Result<&mut Vec<super::schema::OdfDatabaseIndex>> {
+    table_at(schema, table)?.indices.as_mut().ok_or_else(|| Error::InvalidFormat("schema table has no indices".into()))
+}
+fn key_group_at(schema: &mut super::schema::OdfDatabaseSchemaDefinition, table: usize, key: usize, group: usize) -> Result<&mut Vec<super::schema::OdfDatabaseKeyColumn>> {
+    keys_at(schema, table)?.get_mut(key).ok_or_else(|| Error::InvalidFormat("schema key index is out of bounds".into()))?
+        .column_groups.get_mut(group).ok_or_else(|| Error::InvalidFormat("schema key-column group index is out of bounds".into()))
+}
+fn index_group_at(schema: &mut super::schema::OdfDatabaseSchemaDefinition, table: usize, index: usize, group: usize) -> Result<&mut Vec<super::schema::OdfDatabaseIndexColumn>> {
+    indices_at(schema, table)?.get_mut(index).ok_or_else(|| Error::InvalidFormat("schema index is out of bounds".into()))?
+        .column_groups.get_mut(group).ok_or_else(|| Error::InvalidFormat("schema index-column group index is out of bounds".into()))
+}
+fn replace_at<T>(values: &mut [T], index: usize, value: T, label: &str) -> Result<T> {
+    let slot = values.get_mut(index).ok_or_else(|| Error::InvalidFormat(format!("{label} index is out of bounds")))?;
+    Ok(std::mem::replace(slot, value))
+}
+fn remove_at<T>(values: &mut Vec<T>, index: usize, label: &str) -> Result<T> {
+    if index >= values.len() { return Err(Error::InvalidFormat(format!("{label} index is out of bounds"))); }
+    Ok(values.remove(index))
+}
+fn move_at<T>(values: &mut Vec<T>, from: usize, to: usize, label: &str) -> Result<()> {
+    if from >= values.len() || to >= values.len() { return Err(Error::InvalidFormat(format!("{label} reorder index is out of bounds"))); }
+    if from != to { let value = values.remove(from); values.insert(to, value); }
+    Ok(())
+}
+
+pub(super) fn parse_database_content(xml: &str) -> Result<DatabaseElement> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -584,7 +768,7 @@ fn make_element(
     })
 }
 
-fn validate_database_root(database: &DatabaseElement) -> Result<()> {
+pub(super) fn validate_database_root(database: &DatabaseElement) -> Result<()> {
     if database.kind() != DatabaseElementKind::Database {
         return Err(Error::InvalidFormat(
             "database subtree has the wrong root".to_string(),

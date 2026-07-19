@@ -58,6 +58,7 @@ mod legacy_animation;
 mod media;
 mod mutable;
 mod page_layout_definition;
+mod layout_master_mutation;
 mod page_metadata;
 mod parser;
 mod presentation;
@@ -77,22 +78,21 @@ pub use animation::{
 };
 pub use builder::PresentationBuilder;
 pub use declaration::{
-    PresentationDateTimeDeclaration, PresentationDateTimeSource,
-    PresentationDeclarationBinding, PresentationDeclarationTarget, PresentationDeclarations,
-    PresentationTextDeclaration, parse_presentation_declarations,
+    PresentationDateTimeDeclaration, PresentationDateTimeSource, PresentationDeclarationBinding,
+    PresentationDeclarationTarget, PresentationDeclarations, PresentationTextDeclaration,
+    parse_presentation_declarations,
 };
 pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
 pub use mutable::MutablePresentation;
 pub use page_layout_definition::{
-    PresentationMeasure, PresentationMeasureUnit, PresentationPageLayout,
-    PresentationPageLayouts, PresentationPlaceholder, PresentationPlaceholderClass,
-    parse_presentation_page_layouts, remove_presentation_page_layout_xml,
-    set_presentation_page_layout_xml,
+    PresentationMeasure, PresentationMeasureUnit, PresentationPageLayout, PresentationPageLayouts,
+    PresentationPlaceholder, PresentationPlaceholderClass, parse_presentation_page_layouts,
+    remove_presentation_page_layout_xml, set_presentation_page_layout_xml,
 };
+pub use layout_master_mutation::PresentationMasterPage;
 pub use page_metadata::{
-    PresentationPageMetadata, PresentationPageMetadataCollection,
-    parse_presentation_page_metadata,
+    PresentationPageMetadata, PresentationPageMetadataCollection, parse_presentation_page_metadata,
 };
 pub use presentation::Presentation;
 pub use settings::{

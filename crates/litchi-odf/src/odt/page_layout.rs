@@ -503,8 +503,16 @@ fn store_child(
                 xml,
             });
         },
-        ChildKind::HeaderStyle => { layout.header_properties = crate::header_footer_properties::parse_region_properties(&xml)?; layout.header_style_xml = Some(xml); },
-        ChildKind::FooterStyle => { layout.footer_properties = crate::header_footer_properties::parse_region_properties(&xml)?; layout.footer_style_xml = Some(xml); },
+        ChildKind::HeaderStyle => {
+            layout.header_properties =
+                crate::header_footer_properties::parse_region_properties(&xml)?;
+            layout.header_style_xml = Some(xml);
+        },
+        ChildKind::FooterStyle => {
+            layout.footer_properties =
+                crate::header_footer_properties::parse_region_properties(&xml)?;
+            layout.footer_style_xml = Some(xml);
+        },
     }
     Ok(())
 }

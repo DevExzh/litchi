@@ -14,6 +14,7 @@ aes           = { workspace = true }
 aes-gcm       = { workspace = true }
 argon2        = { workspace = true }
 base64        = { workspace = true }
+bergshamra-c14n = { workspace = true }
 blowfish      = { workspace = true }
 cbc           = { workspace = true }
 chrono        = { workspace = true }
@@ -23,15 +24,20 @@ hmac          = { workspace = true }
 litchi-core   = { workspace = true, features = ["odf"] }
 memchr        = { workspace = true }
 pbkdf2        = { workspace = true }
+p256          = { workspace = true }
 phf           = { workspace = true }
 quick-xml     = { workspace = true }
+rand          = { workspace = true }
 sha1          = { workspace = true }
 sha2          = { workspace = true }
+signature     = { workspace = true }
 smallvec      = { workspace = true }
 soapberry-zip = { workspace = true }
 subtle        = { workspace = true }
 xml-minifier  = { workspace = true }
 zeroize       = { workspace = true }
+x509-cert     = { workspace = true }
+rsa           = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

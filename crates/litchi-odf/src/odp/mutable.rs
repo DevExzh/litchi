@@ -291,6 +291,19 @@ impl MutablePresentation {
     /// ```
     pub fn insert_slide(&mut self, index: usize, title: &str, text: &str) -> Result<()> {
         if index <= self.slides.len() {
+            let candidate_metadata = super::page_metadata::metadata_after_page_insert(
+                self.page_metadata.as_ref(),
+                self.slides.len(),
+                index,
+            )?;
+            let candidate_names = super::page_metadata::effective_page_names(
+                Some(&candidate_metadata),
+                self.slides.len() + 1,
+            )?;
+            super::settings::validate_presentation_page_references(
+                self.settings.as_ref(),
+                &candidate_names,
+            )?;
             let slide = Slide {
                 title: Some(title.to_string()),
                 text: text.to_string(),
@@ -302,6 +315,7 @@ impl MutablePresentation {
                 shapes: Vec::new(),
             };
             self.slides.insert(index, slide);
+            self.page_metadata = Some(candidate_metadata);
 
             // Update indices of subsequent slides
             for i in (index + 1)..self.slides.len() {
@@ -339,7 +353,31 @@ impl MutablePresentation {
     /// ```
     pub fn remove_slide(&mut self, index: usize) -> Result<Slide> {
         if index < self.slides.len() {
+            let current_names = super::page_metadata::effective_page_names(
+                self.page_metadata.as_ref(),
+                self.slides.len(),
+            )?;
+            let removed_name = &current_names[index];
+            if super::settings::settings_reference_page(self.settings.as_ref(), removed_name) {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "cannot remove presentation page '{removed_name}' because slide-show settings reference it"
+                )));
+            }
+            let candidate_metadata = super::page_metadata::metadata_after_page_remove(
+                self.page_metadata.as_ref(),
+                self.slides.len(),
+                index,
+            )?;
+            let candidate_names = super::page_metadata::effective_page_names(
+                candidate_metadata.as_ref(),
+                self.slides.len() - 1,
+            )?;
+            super::settings::validate_presentation_page_references(
+                self.settings.as_ref(),
+                &candidate_names,
+            )?;
             let slide = self.slides.remove(index);
+            self.page_metadata = candidate_metadata;
 
             // Update indices of subsequent slides
             for i in index..self.slides.len() {
@@ -563,6 +601,15 @@ impl MutablePresentation {
             self.declarations.as_ref(),
             self.slides.len(),
         )?);
+
+        let page_names = super::page_metadata::effective_page_names(
+            self.page_metadata.as_ref(),
+            self.slides.len(),
+        )?;
+        super::settings::validate_presentation_page_references(
+            self.settings.as_ref(),
+            &page_names,
+        )?;
 
         for (i, slide) in self.slides.iter().enumerate() {
             let page_num = i + 1;

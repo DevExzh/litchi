@@ -85,7 +85,45 @@ pub struct MasterPage {
     pub drawing_style_name: Option<String>,
     pub next_style_name: Option<String>,
     pub regions: Vec<HeaderFooter>,
+    /// Direct children classified in normative ODF 1.3 RNG order.
+    pub children: Vec<MasterPageChild>,
     /// The exact master-page element bytes, including shapes and extension content.
+    pub xml: String,
+}
+
+/// Typed classification of one direct `style:master-page` child.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MasterPageChildKind {
+    HeaderFooter(HeaderFooterKind),
+    LayerSet,
+    Forms,
+    Shape,
+    Animation,
+    Notes,
+}
+
+impl MasterPageChildKind {
+    pub(crate) const fn order(self) -> u8 {
+        match self {
+            Self::HeaderFooter(HeaderFooterKind::Header) => 0,
+            Self::HeaderFooter(HeaderFooterKind::HeaderLeft) => 1,
+            Self::HeaderFooter(HeaderFooterKind::HeaderFirst) => 2,
+            Self::HeaderFooter(HeaderFooterKind::Footer) => 3,
+            Self::HeaderFooter(HeaderFooterKind::FooterLeft) => 4,
+            Self::HeaderFooter(HeaderFooterKind::FooterFirst) => 5,
+            Self::LayerSet => 6,
+            Self::Forms => 7,
+            Self::Shape => 8,
+            Self::Animation => 9,
+            Self::Notes => 10,
+        }
+    }
+}
+
+/// Exact inert XML for one classified direct master-page child.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MasterPageChild {
+    pub kind: MasterPageChildKind,
     pub xml: String,
 }
 
@@ -275,6 +313,7 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
             "unterminated master-page header/footer".to_string(),
         ));
     }
+    crate::master_page::validate_master_page_schema(xml, &mut pages)?;
     let mut structured = parse_header_footer_blocks(xml)?;
     for page in &mut pages {
         for region in &mut page.regions {
@@ -316,7 +355,7 @@ pub(crate) fn set_region_xml(
 
 fn validate_region_xml(region_xml: &str, kind: HeaderFooterKind) -> Result<()> {
     let wrapper = format!(
-        "<office:document-styles xmlns:office=\"{}\" xmlns:style=\"{}\"><office:master-styles><style:master-page style:name=\"validation\">{region_xml}</style:master-page></office:master-styles></office:document-styles>",
+        "<office:document-styles xmlns:office=\"{}\" xmlns:style=\"{}\"><office:master-styles><style:master-page style:name=\"validation\" style:page-layout-name=\"validation\">{region_xml}</style:master-page></office:master-styles></office:document-styles>",
         String::from_utf8_lossy(OFFICE_NAMESPACE),
         String::from_utf8_lossy(STYLE_NAMESPACE),
     );
@@ -467,7 +506,7 @@ struct ElementLocation {
     empty: bool,
 }
 
-fn insert_container_child(
+pub(crate) fn insert_container_child(
     xml: &str,
     namespace: &[u8],
     local_name: &[u8],
@@ -562,16 +601,19 @@ fn find_element(xml: &str, namespace: &[u8], local_name: &[u8]) -> Result<Option
     }
 }
 
-struct MasterPageLocation {
-    start: usize,
-    end: usize,
+pub(crate) struct MasterPageLocation {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
     content_start: usize,
     content_end: usize,
     qualified_name: String,
     empty: bool,
 }
 
-fn find_master_page(xml: &str, expected_name: &str) -> Result<Option<MasterPageLocation>> {
+pub(crate) fn find_master_page(
+    xml: &str,
+    expected_name: &str,
+) -> Result<Option<MasterPageLocation>> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut active: Option<(usize, usize, usize, String)> = None;
@@ -638,7 +680,7 @@ fn find_master_page(xml: &str, expected_name: &str) -> Result<Option<MasterPageL
     }
 }
 
-fn replace_range(xml: &str, start: usize, end: usize, replacement: &str) -> String {
+pub(crate) fn replace_range(xml: &str, start: usize, end: usize, replacement: &str) -> String {
     let mut output = String::with_capacity(xml.len() - (end - start) + replacement.len());
     output.push_str(&xml[..start]);
     output.push_str(replacement);
@@ -657,6 +699,7 @@ fn parse_master_page(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
         drawing_style_name: namespaced_attr(reader, element, DRAW_NAMESPACE, b"style-name")?,
         next_style_name: style_attr(reader, element, b"next-style-name")?,
         regions: Vec::new(),
+        children: Vec::new(),
         xml: String::new(),
     })
 }
@@ -772,7 +815,7 @@ mod tests {
 
     #[test]
     fn parses_all_master_page_regions_losslessly_with_arbitrary_prefixes() {
-        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:master-styles><s:master-page s:name="Standard" s:display-name="Default &amp; Main" s:page-layout-name="pm1" d:style-name="drawing1" s:next-style-name="Next"><s:header><t:p>Page <t:page-number/></t:p><t:p>A<t:s t:c="2"/>B<t:tab/>C<t:line-break/>D</t:p></s:header><s:header-first><t:p>First</t:p></s:header-first><s:header-left><t:p>Left</t:p></s:header-left><s:footer><t:p>Footer</t:p></s:footer><s:footer-first><t:p>First footer</t:p></s:footer-first><s:footer-left><t:p>Left footer</t:p></s:footer-left></s:master-page><s:master-page s:name="Empty"/></o:master-styles></o:document-styles>"#;
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:master-styles><s:master-page s:name="Standard" s:display-name="Default &amp; Main" s:page-layout-name="pm1" d:style-name="drawing1" s:next-style-name="Next"><s:header><t:p>Page <t:page-number/></t:p><t:p>A<t:s t:c="2"/>B<t:tab/>C<t:line-break/>D</t:p></s:header><s:header-left><t:p>Left</t:p></s:header-left><s:header-first><t:p>First</t:p></s:header-first><s:footer><t:p>Footer</t:p></s:footer><s:footer-left><t:p>Left footer</t:p></s:footer-left><s:footer-first><t:p>First footer</t:p></s:footer-first></s:master-page><s:master-page s:name="Empty" s:page-layout-name="empty"/></o:master-styles></o:document-styles>"#;
         let pages = parse_master_pages(xml).unwrap();
         assert_eq!(pages.len(), 2);
         assert_eq!(pages[0].name, "Standard");
@@ -789,24 +832,26 @@ mod tests {
         assert!(pages[0].xml.ends_with("</s:master-page>"));
         assert_eq!(pages[1].name, "Empty");
         assert!(pages[1].regions.is_empty());
-        assert_eq!(pages[1].xml, "<s:master-page s:name=\"Empty\"/>");
+        assert_eq!(
+            pages[1].xml,
+            "<s:master-page s:name=\"Empty\" s:page-layout-name=\"empty\"/>"
+        );
     }
 
     #[test]
     fn rejects_duplicate_regions_and_missing_master_names() {
-        let duplicate = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:master-styles><s:master-page s:name="A"><s:header/><s:header/></s:master-page></o:master-styles></o:document-styles>"#;
+        let duplicate = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:master-styles><s:master-page s:name="A" s:page-layout-name="pm1"><s:header/><s:header/></s:master-page></o:master-styles></o:document-styles>"#;
         assert!(parse_master_pages(duplicate).is_err());
-        let missing = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:master-styles><s:master-page/></o:master-styles></o:document-styles>"#;
+        let missing = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:master-styles><s:master-page s:page-layout-name="pm1"/></o:master-styles></o:document-styles>"#;
         assert!(parse_master_pages(missing).is_err());
     }
 
     #[test]
     fn inserts_replaces_and_clears_regions_without_rewriting_other_styles() {
-        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:styles><s:style s:name="keep"/></o:styles><o:master-styles><s:master-page s:name="A"><s:header><t:p>Old</t:p></s:header><s:region-left/></s:master-page><s:master-page s:name="B" /></o:master-styles></o:document-styles>"#;
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:styles><s:style s:name="keep"/></o:styles><o:master-styles><s:master-page s:name="A" s:page-layout-name="pm1"><s:header><t:p>Old</t:p></s:header></s:master-page><s:master-page s:name="B" s:page-layout-name="pm2" /></o:master-styles></o:document-styles>"#;
         let replaced =
             set_region_text(xml, "A", HeaderFooterKind::Header, Some("A & <B>")).unwrap();
         assert!(replaced.contains("<s:style s:name=\"keep\"/>"));
-        assert!(replaced.contains("<s:region-left/>"));
         let pages = parse_master_pages(&replaced).unwrap();
         assert_eq!(
             pages[0].region(HeaderFooterKind::Header).unwrap().text,
@@ -833,7 +878,6 @@ mod tests {
         let cleared = set_region_text(&expanded, "A", HeaderFooterKind::Header, None).unwrap();
         let pages = parse_master_pages(&cleared).unwrap();
         assert!(pages[0].region(HeaderFooterKind::Header).is_none());
-        assert!(cleared.contains("<s:region-left/>"));
     }
 
     #[test]
@@ -879,29 +923,12 @@ mod tests {
     }
 
     #[test]
-    fn opens_libreoffice_first_left_right_header_footer_fixture() {
+    fn rejects_libreoffice_legacy_first_before_left_region_order() {
         let document = crate::Document::open(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../3rdparty/libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt"
         ))
         .unwrap();
-        let pages = document.master_pages().unwrap();
-        assert_eq!(pages.len(), 2);
-        for kind in [
-            HeaderFooterKind::Header,
-            HeaderFooterKind::HeaderFirst,
-            HeaderFooterKind::HeaderLeft,
-            HeaderFooterKind::Footer,
-            HeaderFooterKind::FooterFirst,
-            HeaderFooterKind::FooterLeft,
-        ] {
-            let matching: Vec<_> = pages
-                .iter()
-                .filter_map(|page| page.region(kind))
-                .collect();
-            assert_eq!(matching.len(), 2, "missing {kind:?} regions");
-            assert!(matching.iter().all(|region| !region.text.is_empty()));
-            assert!(matching.iter().all(|region| region.blocks.len() == 1));
-        }
+        assert!(document.master_pages().is_err());
     }
 }

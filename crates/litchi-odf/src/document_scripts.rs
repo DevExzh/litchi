@@ -5,16 +5,15 @@
 
 use litchi_core::{Error, Result};
 use quick_xml::{
+    XmlVersion,
     events::{BytesStart, Event},
     name::ResolveResult,
     reader::NsReader,
-    XmlVersion,
 };
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const SCRIPT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
-const PRESENTATION_NAMESPACE: &[u8] =
-    b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 const MAX_DOCUMENT_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_SCRIPT_COUNT: usize = 1_024;
@@ -123,11 +122,11 @@ impl OdfDocumentScripts {
                     };
                     validate_required_value(value, "script event target")?;
                     text_bytes = checked_text_bytes(text_bytes, value.len())?;
-                }
+                },
                 OdfDocumentEventListener::PresentationXml(xml) => {
                     text_bytes = checked_text_bytes(text_bytes, xml.len())?;
                     validate_fragment(xml, &self.namespace_declarations)?;
-                }
+                },
             }
         }
         Ok(())
@@ -165,11 +164,7 @@ impl OdfDocumentScripts {
             ) {
                 continue;
             }
-            namespace_attribute(
-                &mut output,
-                declaration.prefix.as_deref(),
-                &declaration.uri,
-            );
+            namespace_attribute(&mut output, declaration.prefix.as_deref(), &declaration.uri);
         }
         output.push('>');
 
@@ -199,14 +194,14 @@ impl OdfDocumentScripts {
                                 output.push_str("\" script:macro-name=\"");
                                 escape_attribute(&mut output, value);
                                 output.push_str("\"/>");
-                            }
+                            },
                             OdfScriptBinding::Linked { href } => {
                                 output.push_str("\" xlink:type=\"simple\" xlink:href=\"");
                                 escape_attribute(&mut output, href);
                                 output.push_str("\" xlink:actuate=\"onRequest\"/>");
-                            }
+                            },
                         }
-                    }
+                    },
                     OdfDocumentEventListener::PresentationXml(xml) => output.push_str(xml),
                 }
             }
@@ -228,7 +223,7 @@ impl OdfDocumentScripts {
                             OdfScriptBinding::MacroName(value) => value.len(),
                             OdfScriptBinding::Linked { href } => href.len(),
                         }
-                }
+                },
                 OdfDocumentEventListener::PresentationXml(xml) => xml.len(),
             }))
             .sum()
@@ -265,7 +260,9 @@ pub fn parse_document_scripts(xml: &str) -> Result<Option<OdfDocumentScripts>> {
                     && element.local_name().as_ref() == b"scripts"
                 {
                     if depth != 1 {
-                        return invalid("office:scripts must be a direct child of the document root");
+                        return invalid(
+                            "office:scripts must be a direct child of the document root",
+                        );
                     }
                     if result.is_some() {
                         return invalid("ODF document contains multiple office:scripts elements");
@@ -282,14 +279,14 @@ pub fn parse_document_scripts(xml: &str) -> Result<Option<OdfDocumentScripts>> {
                         event_end,
                     )?);
                 } else {
-                    depth = depth
-                        .checked_add(1)
-                        .ok_or_else(|| Error::InvalidFormat("ODF XML depth overflow".to_string()))?;
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODF XML depth overflow".to_string())
+                    })?;
                     if depth > MAX_XML_DEPTH {
                         return invalid(format!("ODF XML exceeds the {MAX_XML_DEPTH} depth limit"));
                     }
                 }
-            }
+            },
             Event::Empty(element) => {
                 if depth == 0 {
                     root_namespaces = namespace_declarations(&reader, &element)?;
@@ -298,7 +295,9 @@ pub fn parse_document_scripts(xml: &str) -> Result<Option<OdfDocumentScripts>> {
                     && element.local_name().as_ref() == b"scripts"
                 {
                     if depth != 1 {
-                        return invalid("office:scripts must be a direct child of the document root");
+                        return invalid(
+                            "office:scripts must be a direct child of the document root",
+                        );
                     }
                     if result.is_some() {
                         return invalid("ODF document contains multiple office:scripts elements");
@@ -313,15 +312,15 @@ pub fn parse_document_scripts(xml: &str) -> Result<Option<OdfDocumentScripts>> {
                         ..OdfDocumentScripts::default()
                     });
                 }
-            }
+            },
             Event::End(_) => {
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("invalid ODF XML depth".to_string()))?;
-            }
+            },
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in ODF script metadata"),
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         if event_start > event_end || event_end > xml.len() {
             return invalid("invalid ODF XML reader position");
@@ -347,7 +346,9 @@ fn parse_scripts_element(
         let event_start = reader.buffer_position() as usize;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid office:scripts XML: {error}")))?;
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid office:scripts XML: {error}"))
+            })?;
         let namespace = namespace_kind(&namespace);
         let event_end = reader.buffer_position() as usize;
         match event {
@@ -371,7 +372,7 @@ fn parse_scripts_element(
                     language,
                     content_xml,
                 });
-            }
+            },
             Event::Empty(element)
                 if bound_to(&namespace, OFFICE_NAMESPACE)
                     && element.local_name().as_ref() == b"script" =>
@@ -390,7 +391,7 @@ fn parse_scripts_element(
                     language,
                     content_xml: String::new(),
                 });
-            }
+            },
             Event::Start(element)
                 if bound_to(&namespace, OFFICE_NAMESPACE)
                     && element.local_name().as_ref() == b"event-listeners" =>
@@ -400,7 +401,7 @@ fn parse_scripts_element(
                 }
                 listener_container_seen = true;
                 event_listeners = parse_event_listeners(reader, xml, &mut text_bytes)?;
-            }
+            },
             Event::Empty(element)
                 if bound_to(&namespace, OFFICE_NAMESPACE)
                     && element.local_name().as_ref() == b"event-listeners" =>
@@ -409,22 +410,22 @@ fn parse_scripts_element(
                     return invalid("office:scripts contains duplicate office:event-listeners");
                 }
                 listener_container_seen = true;
-            }
+            },
             Event::End(element)
                 if bound_to(&namespace, OFFICE_NAMESPACE)
                     && element.local_name().as_ref() == b"scripts" =>
             {
                 break;
-            }
+            },
             Event::Text(text) => {
-                let value = text
-                    .decode()
-                    .map_err(|error| Error::InvalidFormat(format!("invalid script text: {error}")))?;
+                let value = text.decode().map_err(|error| {
+                    Error::InvalidFormat(format!("invalid script text: {error}"))
+                })?;
                 if !value.trim().is_empty() {
                     return invalid("office:scripts cannot contain text");
                 }
-            }
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in office:scripts"),
             Event::Eof => return invalid("unterminated office:scripts element"),
             _ => return invalid("unsupported child in office:scripts"),
@@ -453,7 +454,9 @@ fn parse_event_listeners(
         let event_start = reader.buffer_position() as usize;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid event-listener XML: {error}")))?;
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid event-listener XML: {error}"))
+            })?;
         let namespace = namespace_kind(&namespace);
         let event_end = reader.buffer_position() as usize;
         match event {
@@ -465,7 +468,7 @@ fn parse_event_listeners(
                 let listener = parse_script_listener(reader, &element)?;
                 *text_bytes = checked_text_bytes(*text_bytes, script_listener_bytes(&listener))?;
                 listeners.push(OdfDocumentEventListener::Script(listener));
-            }
+            },
             Event::Start(element)
                 if bound_to(&namespace, SCRIPT_NAMESPACE)
                     && element.local_name().as_ref() == b"event-listener" =>
@@ -475,7 +478,7 @@ fn parse_event_listeners(
                 require_empty_element(reader, b"event-listener", SCRIPT_NAMESPACE)?;
                 *text_bytes = checked_text_bytes(*text_bytes, script_listener_bytes(&listener))?;
                 listeners.push(OdfDocumentEventListener::Script(listener));
-            }
+            },
             Event::Empty(element)
                 if bound_to(&namespace, PRESENTATION_NAMESPACE)
                     && element.local_name().as_ref() == b"event-listener" =>
@@ -483,11 +486,13 @@ fn parse_event_listeners(
                 ensure_listener_capacity(listeners.len())?;
                 let raw = xml
                     .get(event_start..event_end)
-                    .ok_or_else(|| Error::InvalidFormat("invalid presentation listener range".to_string()))?
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("invalid presentation listener range".to_string())
+                    })?
                     .to_string();
                 *text_bytes = checked_text_bytes(*text_bytes, raw.len())?;
                 listeners.push(OdfDocumentEventListener::PresentationXml(raw));
-            }
+            },
             Event::Start(element)
                 if bound_to(&namespace, PRESENTATION_NAMESPACE)
                     && element.local_name().as_ref() == b"event-listener" =>
@@ -496,22 +501,22 @@ fn parse_event_listeners(
                 let raw = capture_full_xml(reader, xml, event_start, b"event-listener")?;
                 *text_bytes = checked_text_bytes(*text_bytes, raw.len())?;
                 listeners.push(OdfDocumentEventListener::PresentationXml(raw));
-            }
+            },
             Event::End(element)
                 if bound_to(&namespace, OFFICE_NAMESPACE)
                     && element.local_name().as_ref() == b"event-listeners" =>
             {
                 break;
-            }
+            },
             Event::Text(text) => {
-                let value = text
-                    .decode()
-                    .map_err(|error| Error::InvalidFormat(format!("invalid listener text: {error}")))?;
+                let value = text.decode().map_err(|error| {
+                    Error::InvalidFormat(format!("invalid listener text: {error}"))
+                })?;
                 if !value.trim().is_empty() {
                     return invalid("office:event-listeners cannot contain text");
                 }
-            }
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in event listeners"),
             Event::Eof => return invalid("unterminated office:event-listeners element"),
             _ => return invalid("unsupported child in office:event-listeners"),
@@ -533,8 +538,9 @@ fn parse_script_listener(
     let mut actuate = None;
 
     for attribute in element.attributes() {
-        let attribute = attribute
-            .map_err(|error| Error::InvalidFormat(format!("invalid listener attribute: {error}")))?;
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid listener attribute: {error}"))
+        })?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
         }
@@ -574,19 +580,19 @@ fn parse_script_listener(
         (Some(value), None, None, None) => {
             validate_required_value(&value, "script:macro-name")?;
             OdfScriptBinding::MacroName(value)
-        }
+        },
         (None, Some(kind), Some(href), actuate) if kind == "simple" => {
             if actuate.as_deref().is_some_and(|value| value != "onRequest") {
                 return invalid("script event xlink:actuate must be 'onRequest'");
             }
             validate_required_value(&href, "xlink:href")?;
             OdfScriptBinding::Linked { href }
-        }
+        },
         _ => {
             return invalid(
                 "script:event-listener requires exactly script:macro-name or simple xlink:href",
             );
-        }
+        },
     };
     Ok(OdfScriptEventListener {
         event_name,
@@ -595,14 +601,12 @@ fn parse_script_listener(
     })
 }
 
-fn required_script_language(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<String> {
+fn required_script_language(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<String> {
     let mut language = None;
     for attribute in element.attributes() {
-        let attribute = attribute
-            .map_err(|error| Error::InvalidFormat(format!("invalid office:script attribute: {error}")))?;
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid office:script attribute: {error}"))
+        })?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
         }
@@ -636,7 +640,9 @@ fn capture_inner_xml(
         let event_start = reader.buffer_position() as usize;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid embedded script XML: {error}")))?;
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid embedded script XML: {error}"))
+            })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(_) => {
@@ -646,7 +652,7 @@ fn capture_inner_xml(
                         "embedded script XML exceeds the {MAX_XML_DEPTH} depth limit"
                     ));
                 }
-            }
+            },
             Event::End(element) if depth == 0 => {
                 if !bound_to(&namespace, OFFICE_NAMESPACE)
                     || element.local_name().as_ref() != expected_local
@@ -656,12 +662,14 @@ fn capture_inner_xml(
                 return xml
                     .get(content_start..event_start)
                     .map(ToOwned::to_owned)
-                    .ok_or_else(|| Error::InvalidFormat("invalid embedded script range".to_string()));
-            }
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("invalid embedded script range".to_string())
+                    });
+            },
             Event::End(_) => depth -= 1,
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in embedded scripts"),
             Event::Eof => return invalid("unterminated office:script element"),
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -678,7 +686,9 @@ fn capture_full_xml(
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid preserved listener XML: {error}")))?;
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid preserved listener XML: {error}"))
+            })?;
         let namespace = namespace_kind(&namespace);
         let event_end = reader.buffer_position() as usize;
         match event {
@@ -689,7 +699,7 @@ fn capture_full_xml(
                         "presentation listener exceeds the {MAX_XML_DEPTH} depth limit"
                     ));
                 }
-            }
+            },
             Event::End(element) if depth == 0 => {
                 if !bound_to(&namespace, PRESENTATION_NAMESPACE)
                     || element.local_name().as_ref() != expected_local
@@ -700,11 +710,11 @@ fn capture_full_xml(
                     .get(element_start..event_end)
                     .map(ToOwned::to_owned)
                     .ok_or_else(|| Error::InvalidFormat("invalid listener XML range".to_string()));
-            }
+            },
             Event::End(_) => depth -= 1,
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in event listeners"),
             Event::Eof => return invalid("unterminated presentation:event-listener"),
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -719,7 +729,9 @@ fn require_empty_element(
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid event-listener body: {error}")))?;
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid event-listener body: {error}"))
+            })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::End(element)
@@ -727,16 +739,16 @@ fn require_empty_element(
                     && element.local_name().as_ref() == expected_local =>
             {
                 return Ok(());
-            }
+            },
             Event::Text(text) => {
-                let value = text
-                    .decode()
-                    .map_err(|error| Error::InvalidFormat(format!("invalid listener text: {error}")))?;
+                let value = text.decode().map_err(|error| {
+                    Error::InvalidFormat(format!("invalid listener text: {error}"))
+                })?;
                 if !value.trim().is_empty() {
                     return invalid("script:event-listener must be empty");
                 }
-            }
-            Event::Comment(_) | Event::PI(_) => {}
+            },
+            Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated script:event-listener"),
             _ => return invalid("script:event-listener must not contain child elements"),
         }
@@ -750,15 +762,15 @@ fn namespace_declarations(
 ) -> Result<Vec<NamespaceDeclaration>> {
     let mut declarations: Vec<NamespaceDeclaration> = Vec::new();
     for attribute in element.attributes() {
-        let attribute = attribute
-            .map_err(|error| Error::InvalidFormat(format!("invalid namespace declaration: {error}")))?;
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid namespace declaration: {error}"))
+        })?;
         let key = attribute.key.as_ref();
         let prefix = if key == b"xmlns" {
             Some(None)
         } else {
-            key.strip_prefix(b"xmlns:").map(|value| {
-                Some(String::from_utf8_lossy(value).into_owned())
-            })
+            key.strip_prefix(b"xmlns:")
+                .map(|value| Some(String::from_utf8_lossy(value).into_owned()))
         };
         let Some(prefix) = prefix else { continue };
         let uri = attribute
@@ -766,7 +778,9 @@ fn namespace_declarations(
             .map_err(|error| Error::InvalidFormat(format!("invalid namespace URI: {error}")))?
             .into_owned();
         if uri.len() > MAX_VALUE_BYTES
-            || prefix.as_ref().is_some_and(|value| value.len() > MAX_VALUE_BYTES)
+            || prefix
+                .as_ref()
+                .is_some_and(|value| value.len() > MAX_VALUE_BYTES)
         {
             return invalid("namespace declaration exceeds the value-size limit");
         }
@@ -818,10 +832,9 @@ fn validate_fragment(fragment: &str, declarations: &[NamespaceDeclaration]) -> R
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     loop {
-        match reader
-            .read_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid preserved script XML: {error}")))?
-        {
+        match reader.read_event_into(&mut buffer).map_err(|error| {
+            Error::InvalidFormat(format!("invalid preserved script XML: {error}"))
+        })? {
             Event::Start(_) => {
                 depth += 1;
                 if depth > MAX_XML_DEPTH + 1 {
@@ -829,11 +842,11 @@ fn validate_fragment(fragment: &str, declarations: &[NamespaceDeclaration]) -> R
                         "preserved script XML exceeds the {MAX_XML_DEPTH} depth limit"
                     ));
                 }
-            }
+            },
             Event::End(_) => depth = depth.saturating_sub(1),
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in script metadata"),
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -846,7 +859,7 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
         ResolveResult::Bound(value) if value.as_ref() == SCRIPT_NAMESPACE => NamespaceKind::Script,
         ResolveResult::Bound(value) if value.as_ref() == PRESENTATION_NAMESPACE => {
             NamespaceKind::Presentation
-        }
+        },
         ResolveResult::Bound(value) if value.as_ref() == XLINK_NAMESPACE => NamespaceKind::Xlink,
         _ => NamespaceKind::Other,
     }
@@ -946,8 +959,7 @@ mod tests {
 
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const SCRIPT: &str = "urn:oasis:names:tc:opendocument:xmlns:script:1.0";
-    const PRESENTATION: &str =
-        "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    const PRESENTATION: &str = "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 
     #[test]
     fn parses_and_round_trips_inert_document_scripts() {

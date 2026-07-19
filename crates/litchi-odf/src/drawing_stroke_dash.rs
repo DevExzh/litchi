@@ -184,7 +184,10 @@ impl OdfDrawingStrokeDashes {
         for dash in &self.dashes {
             dash.validate()?;
             if !names.insert(dash.name.as_str()) {
-                return invalid(format!("duplicate drawing stroke-dash name '{}'", dash.name));
+                return invalid(format!(
+                    "duplicate drawing stroke-dash name '{}'",
+                    dash.name
+                ));
             }
             aggregate = aggregate
                 .checked_add(dash.name.len())
@@ -267,7 +270,9 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<OdfDrawingStrokeDashes> 
                 if namespace == NamespaceKind::Draw && local == "stroke-dash" {
                     ensure_location(&stack)?;
                     if result.dashes.len() >= MAX_DASHES {
-                        return invalid(format!("drawing styles exceed {MAX_DASHES} stroke dashes"));
+                        return invalid(format!(
+                            "drawing styles exceed {MAX_DASHES} stroke dashes"
+                        ));
                     }
                     active = Some(ActiveDash {
                         parent_depth: stack.len(),
@@ -280,7 +285,7 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<OdfDrawingStrokeDashes> 
                         "drawing stroke-dash XML exceeds {MAX_DEPTH} levels"
                     ));
                 }
-            }
+            },
             Event::Empty(ref element) => {
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace, &local)?;
@@ -290,13 +295,15 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<OdfDrawingStrokeDashes> 
                 if namespace == NamespaceKind::Draw && local == "stroke-dash" {
                     ensure_location(&stack)?;
                     if result.dashes.len() >= MAX_DASHES {
-                        return invalid(format!("drawing styles exceed {MAX_DASHES} stroke dashes"));
+                        return invalid(format!(
+                            "drawing styles exceed {MAX_DASHES} stroke dashes"
+                        ));
                     }
                     result
                         .dashes
                         .push(parse_dash(&reader, element, &mut aggregate)?);
                 }
-            }
+            },
             Event::End(_) => {
                 let frame = stack
                     .pop()
@@ -312,7 +319,7 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<OdfDrawingStrokeDashes> 
                         .dashes
                         .push(active.take().expect("active stroke dash checked").value);
                 }
-            }
+            },
             Event::Text(ref text) if active.is_some() => {
                 let value = text
                     .xml_content(XmlVersion::Explicit1_0)
@@ -320,17 +327,17 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<OdfDrawingStrokeDashes> 
                 if !value.chars().all(char::is_whitespace) {
                     return invalid("draw:stroke-dash must be empty");
                 }
-            }
+            },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
                 return invalid("draw:stroke-dash cannot contain character data");
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid(
                     "DTDs and processing instructions are prohibited in stroke-dash XML",
                 );
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -428,9 +435,10 @@ fn attributes(
 }
 
 fn ensure_location(stack: &[Frame]) -> Result<()> {
-    if stack.last().is_some_and(|frame| {
-        frame.namespace == NamespaceKind::Office && frame.local == "styles"
-    }) {
+    if stack
+        .last()
+        .is_some_and(|frame| frame.namespace == NamespaceKind::Office && frame.local == "styles")
+    {
         Ok(())
     } else {
         invalid("draw:stroke-dash must be a direct child of office:styles")
@@ -442,10 +450,8 @@ fn namespace_kind(resolved: &ResolveResult<'_>) -> Result<NamespaceKind> {
         ResolveResult::Unbound => Ok(NamespaceKind::None),
         ResolveResult::Bound(namespace) if namespace.as_ref() == OFFICE_NS => {
             Ok(NamespaceKind::Office)
-        }
-        ResolveResult::Bound(namespace) if namespace.as_ref() == DRAW_NS => {
-            Ok(NamespaceKind::Draw)
-        }
+        },
+        ResolveResult::Bound(namespace) if namespace.as_ref() == DRAW_NS => Ok(NamespaceKind::Draw),
         ResolveResult::Bound(_) => Ok(NamespaceKind::Other),
         ResolveResult::Unknown(prefix) => invalid(format!(
             "unbound XML namespace prefix '{}'",
@@ -499,7 +505,9 @@ fn split_measure(value: &str) -> Result<(&str, OdfStrokeDashMeasureUnit)> {
             return Ok((number, unit));
         }
     }
-    invalid(format!("stroke-dash measure lacks a supported unit: '{value}'"))
+    invalid(format!(
+        "stroke-dash measure lacks a supported unit: '{value}'"
+    ))
 }
 
 fn validate_decimal(number: &str, original: &str) -> Result<()> {
@@ -518,9 +526,8 @@ fn validate_decimal(number: &str, original: &str) -> Result<()> {
     if parts.next().is_some()
         || integer.is_empty()
         || !integer.bytes().all(|byte| byte.is_ascii_digit())
-        || fraction.is_some_and(|part| {
-            part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit())
-        })
+        || fraction
+            .is_some_and(|part| part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()))
     {
         return invalid(format!("invalid stroke-dash measure '{original}'"));
     }
@@ -543,9 +550,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool) -> Result<()> {
 fn write_dash(output: &mut String, value: &OdfDrawingStrokeDash, standalone: bool) {
     output.push_str("<draw:stroke-dash");
     if standalone {
-        output.push_str(
-            r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0""#,
-        );
+        output.push_str(r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0""#);
     }
     write_attribute(output, "draw:name", &value.name);
     if let Some(display_name) = &value.display_name {
@@ -656,11 +661,19 @@ mod tests {
             wrap(r#"<draw:stroke-dash draw:name="x" draw:distance="-1cm"/>"#),
             wrap(r#"<draw:stroke-dash draw:name="x" draw:dots1="1000001"/>"#),
             wrap(r#"<draw:stroke-dash draw:name="x" draw:style="square"/>"#),
-            wrap(r#"<draw:stroke-dash draw:name="x"><draw:stroke-dash draw:name="y"/></draw:stroke-dash>"#),
+            wrap(
+                r#"<draw:stroke-dash draw:name="x"><draw:stroke-dash draw:name="y"/></draw:stroke-dash>"#,
+            ),
             wrap(r#"<draw:stroke-dash draw:name="x"/><draw:stroke-dash draw:name="x"/>"#),
-            format!(r#"<office:document xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><draw:stroke-dash draw:name="x"/></office:document>"#),
-            format!(r#"<office:styles xmlns:office="{OFFICE}" xmlns:evil="urn:evil"><evil:stroke-dash evil:name="x"/></office:styles>"#),
-            format!(r#"<!DOCTYPE x><office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><draw:stroke-dash draw:name="x"/></office:styles>"#),
+            format!(
+                r#"<office:document xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><draw:stroke-dash draw:name="x"/></office:document>"#
+            ),
+            format!(
+                r#"<office:styles xmlns:office="{OFFICE}" xmlns:evil="urn:evil"><evil:stroke-dash evil:name="x"/></office:styles>"#
+            ),
+            format!(
+                r#"<!DOCTYPE x><office:styles xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><draw:stroke-dash draw:name="x"/></office:styles>"#
+            ),
         ] {
             assert!(parse_drawing_stroke_dashes(&xml).is_err(), "accepted {xml}");
         }

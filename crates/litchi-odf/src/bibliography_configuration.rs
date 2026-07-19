@@ -53,9 +53,47 @@ pub enum OdfBibliographyField {
     Custom4,
     Custom5,
     Isbn,
+    Issn,
 }
 
 impl OdfBibliographyField {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Identifier => "identifier",
+            Self::BibliographyType => "bibliography-type",
+            Self::Address => "address",
+            Self::Annote => "annote",
+            Self::Author => "author",
+            Self::BookTitle => "booktitle",
+            Self::Chapter => "chapter",
+            Self::Edition => "edition",
+            Self::Editor => "editor",
+            Self::HowPublished => "howpublished",
+            Self::Institution => "institution",
+            Self::Journal => "journal",
+            Self::Month => "month",
+            Self::Note => "note",
+            Self::Number => "number",
+            Self::Organizations => "organizations",
+            Self::Pages => "pages",
+            Self::Publisher => "publisher",
+            Self::School => "school",
+            Self::Series => "series",
+            Self::Title => "title",
+            Self::ReportType => "report-type",
+            Self::Volume => "volume",
+            Self::Year => "year",
+            Self::Url => "url",
+            Self::Custom1 => "custom1",
+            Self::Custom2 => "custom2",
+            Self::Custom3 => "custom3",
+            Self::Custom4 => "custom4",
+            Self::Custom5 => "custom5",
+            Self::Isbn => "isbn",
+            Self::Issn => "issn",
+        }
+    }
+
     fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "identifier" => Self::Identifier,
@@ -89,6 +127,7 @@ impl OdfBibliographyField {
             "custom4" => Self::Custom4,
             "custom5" => Self::Custom5,
             "isbn" => Self::Isbn,
+            "issn" => Self::Issn,
             _ => return invalid(format!("invalid bibliography sort key '{value}'")),
         })
     }
@@ -132,6 +171,142 @@ impl OdfBibliographyConfiguration {
 
     pub fn effective_sort_by_position(&self) -> bool {
         self.sort_by_position.unwrap_or(true)
+    }
+
+    /// Serialize the document-level bibliography policy and ordered sort keys.
+    ///
+    /// This fragment belongs in an ODF styles declaration context; it is not a
+    /// child of `text:bibliography-source`.
+    pub fn to_xml_fragment(&self) -> Result<String> {
+        if self.sort_keys.len() > MAX_SORT_KEYS {
+            return invalid("bibliography configuration has too many sort keys");
+        }
+        let mut attributes = Vec::<(&str, &str, String)>::new();
+        if let Some(value) = &self.prefix {
+            checked_value(value, "bibliography prefix")?;
+            attributes.push((TEXT, "prefix", value.clone()));
+        }
+        if let Some(value) = &self.suffix {
+            checked_value(value, "bibliography suffix")?;
+            attributes.push((TEXT, "suffix", value.clone()));
+        }
+        if let Some(value) = self.numbered_entries {
+            attributes.push((TEXT, "numbered-entries", value.to_string()));
+        }
+        if let Some(value) = self.sort_by_position {
+            attributes.push((TEXT, "sort-by-position", value.to_string()));
+        }
+        if let Some(value) = &self.language {
+            validate_language_code(value, "fo:language")?;
+            attributes.push((FO, "language", value.clone()));
+        }
+        if let Some(value) = &self.country {
+            validate_alphanumeric_code(value, "fo:country")?;
+            attributes.push((FO, "country", value.clone()));
+        }
+        if let Some(value) = &self.script {
+            validate_alphanumeric_code(value, "fo:script")?;
+            attributes.push((FO, "script", value.clone()));
+        }
+        if let Some(value) = &self.rfc_language_tag {
+            validate_language_tag(value)?;
+            attributes.push((STYLE, "rfc-language-tag", value.clone()));
+        }
+        if let Some(value) = &self.sort_algorithm {
+            checked_value(value, "bibliography sort algorithm")?;
+            attributes.push((TEXT, "sort-algorithm", value.clone()));
+        }
+        attributes.sort_by(|left, right| (left.0, left.1).cmp(&(right.0, right.1)));
+        let mut output = String::from("<text:bibliography-configuration xmlns:fo=\"");
+        escape_attribute(FO, &mut output);
+        output.push_str("\" xmlns:style=\"");
+        escape_attribute(STYLE, &mut output);
+        output.push_str("\" xmlns:text=\"");
+        escape_attribute(TEXT, &mut output);
+        output.push('"');
+        for (namespace, local, value) in attributes {
+            output.push(' ');
+            output.push_str(match namespace {
+                TEXT => "text",
+                FO => "fo",
+                STYLE => "style",
+                _ => unreachable!(),
+            });
+            output.push(':');
+            output.push_str(local);
+            output.push_str("=\"");
+            escape_attribute(&value, &mut output);
+            output.push('"');
+        }
+        if self.sort_keys.is_empty() {
+            output.push_str("/>");
+        } else {
+            output.push('>');
+            for key in &self.sort_keys {
+                output.push_str("<text:sort-key text:key=\"");
+                output.push_str(key.field.as_str());
+                output.push('"');
+                if let Some(ascending) = key.ascending {
+                    output.push_str(" text:sort-ascending=\"");
+                    output.push_str(if ascending { "true" } else { "false" });
+                    output.push('"');
+                }
+                output.push_str("/>");
+            }
+            output.push_str("</text:bibliography-configuration>");
+        }
+        if output.len() > MAX_AGGREGATE_BYTES {
+            return invalid("serialized bibliography configuration exceeds 4 MiB");
+        }
+        Ok(output)
+    }
+}
+
+fn checked_value(value: &str, context: &str) -> Result<()> {
+    if value.len() > MAX_VALUE_BYTES {
+        invalid(format!("{context} exceeds 64 KiB"))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_language_code(value: &str, context: &str) -> Result<()> {
+    if (1..=8).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_alphabetic()) {
+        Ok(())
+    } else {
+        invalid(format!("invalid {context} lexical '{value}'"))
+    }
+}
+
+fn validate_alphanumeric_code(value: &str, context: &str) -> Result<()> {
+    if (1..=8).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+        Ok(())
+    } else {
+        invalid(format!("invalid {context} lexical '{value}'"))
+    }
+}
+
+fn validate_language_tag(value: &str) -> Result<()> {
+    if value.split('-').all(|part| {
+        (1..=8).contains(&part.len()) && part.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    }) {
+        Ok(())
+    } else {
+        invalid(format!("invalid style:rfc-language-tag lexical '{value}'"))
+    }
+}
+
+fn escape_attribute(value: &str, output: &mut String) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '"' => output.push_str("&quot;"),
+            '\r' => output.push_str("&#13;"),
+            '\n' => output.push_str("&#10;"),
+            '\t' => output.push_str("&#9;"),
+            _ => output.push(character),
+        }
     }
 }
 
@@ -189,11 +364,12 @@ fn parse_part(
     let mut pending_sort_key: Option<usize> = None;
 
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|source| {
-                make_error(format!("invalid bibliography configuration XML: {source}"))
-            })?;
+        let (namespace, event) =
+            reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|source| {
+                    make_error(format!("invalid bibliography configuration XML: {source}"))
+                })?;
         match event {
             Event::Start(ref element) => {
                 if pending_sort_key.is_some() {
@@ -236,7 +412,7 @@ fn parse_part(
                         "bibliography configuration exceeds {MAX_DEPTH} XML levels"
                     ));
                 }
-            }
+            },
             Event::Empty(ref element) => {
                 if pending_sort_key.is_some() {
                     return invalid("text:sort-key cannot contain elements");
@@ -270,7 +446,7 @@ fn parse_part(
                     )?;
                     *result = Some(temporary.expect("configuration created").value);
                 }
-            }
+            },
             Event::End(_) => {
                 if pending_sort_key.is_some_and(|pending_depth| pending_depth == depth) {
                     pending_sort_key = None;
@@ -287,7 +463,7 @@ fn parse_part(
                 stack
                     .pop()
                     .ok_or_else(|| make_error("bibliography frame stack underflow"))?;
-            }
+            },
             Event::Text(ref text) => {
                 let value = text.decode().map_err(|source| {
                     make_error(format!("invalid bibliography configuration text: {source}"))
@@ -298,22 +474,22 @@ fn parse_part(
                 if active.is_some() && pending_sort_key.is_none() && !value.trim().is_empty() {
                     return invalid("bibliography configuration cannot contain text");
                 }
-            }
+            },
             Event::CData(ref value) if active.is_some() || pending_sort_key.is_some() => {
                 if !value.is_empty() {
                     return invalid("bibliography configuration cannot contain CDATA");
                 }
-            }
+            },
             Event::GeneralRef(_) if active.is_some() || pending_sort_key.is_some() => {
                 return invalid("bibliography configuration cannot contain entity references");
-            }
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid(
                     "DTDs and processing instructions are prohibited in bibliography XML",
                 );
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -395,10 +571,7 @@ fn add_sort_key(
         ));
     }
     let attributes = collect_attributes(reader, element, aggregate)?;
-    reject_unexpected(
-        &attributes,
-        &[(TEXT, "key"), (TEXT, "sort-ascending")],
-    )?;
+    reject_unexpected(&attributes, &[(TEXT, "key"), (TEXT, "sort-ascending")])?;
     let field = OdfBibliographyField::parse(
         get(&attributes, TEXT, "key")
             .ok_or_else(|| make_error("text:sort-key requires text:key"))?,
@@ -421,7 +594,9 @@ fn collect_attributes(
     let mut attributes = HashMap::new();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|source| {
-            make_error(format!("invalid bibliography configuration attribute: {source}"))
+            make_error(format!(
+                "invalid bibliography configuration attribute: {source}"
+            ))
         })?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_uri(&namespace)?.unwrap_or_default();
@@ -483,9 +658,7 @@ fn parse_bool(value: &str) -> Result<bool> {
 }
 
 fn reject_spoofed_name(namespace: Option<&str>, local: &str) -> Result<()> {
-    if matches!(local, "bibliography-configuration" | "sort-key")
-        && namespace != Some(TEXT)
-    {
+    if matches!(local, "bibliography-configuration" | "sort-key") && namespace != Some(TEXT) {
         return invalid("bibliography configuration vocabulary uses the wrong namespace");
     }
     Ok(())
@@ -540,17 +713,17 @@ mod tests {
                 <t:sort-key t:key="isbn"/>
             </t:bibliography-configuration>{SUFFIX}"#
         );
-        let inventory = parse_variable_declaration_parts(&[(
-            xml.as_str(),
-            OdfVariablePart::Content,
-        )])
-        .unwrap();
+        let inventory =
+            parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content)]).unwrap();
         let configuration = inventory.bibliography_configuration.unwrap();
         assert_eq!(configuration.prefix.as_deref(), Some("["));
         assert!(configuration.effective_numbered_entries());
         assert!(!configuration.effective_sort_by_position());
         assert_eq!(configuration.sort_keys.len(), 3);
-        assert_eq!(configuration.sort_keys[0].field, OdfBibliographyField::Author);
+        assert_eq!(
+            configuration.sort_keys[0].field,
+            OdfBibliographyField::Author
+        );
         assert!(!configuration.sort_keys[1].effective_ascending());
         assert_eq!(configuration.sort_keys[2].field, OdfBibliographyField::Isbn);
     }
@@ -558,11 +731,8 @@ mod tests {
     #[test]
     fn applies_effective_defaults_and_accepts_empty_configuration() {
         let xml = format!(r#"{PREFIX}<t:bibliography-configuration/>{SUFFIX}"#);
-        let parsed = parse_variable_declaration_parts(&[(
-            xml.as_str(),
-            OdfVariablePart::Content,
-        )])
-        .unwrap();
+        let parsed =
+            parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content)]).unwrap();
         let configuration = parsed.bibliography_configuration.unwrap();
         assert!(!configuration.effective_numbered_entries());
         assert!(configuration.effective_sort_by_position());
@@ -582,11 +752,8 @@ mod tests {
         for body in bodies {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
             assert!(
-                parse_variable_declaration_parts(&[(
-                    xml.as_str(),
-                    OdfVariablePart::Content,
-                )])
-                .is_err(),
+                parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content,)])
+                    .is_err(),
                 "accepted {body}"
             );
         }

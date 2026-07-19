@@ -983,12 +983,6 @@ impl OdsParser {
             let Some(frame) = image.frame.as_ref().filter(|frame| frame.sheet_shape) else {
                 continue;
             };
-            if image.alternative_index != 0 {
-                return Err(Error::InvalidFormat(
-                    "sheet image frames with alternative draw:image children are unsupported"
-                        .to_string(),
-                ));
-            }
             let sheet_name = frame.sheet_name.as_deref().ok_or_else(|| {
                 Error::InvalidFormat("sheet image has no containing table name".to_string())
             })?;
@@ -999,6 +993,9 @@ impl OdsParser {
             })?;
             super::sheet_image::validate_sheet_image(&image)?;
             sheets[index].images.push(image);
+        }
+        for sheet in &sheets {
+            super::sheet_image::validate_sheet_images(&sheet.images)?;
         }
         Ok(sheets)
     }

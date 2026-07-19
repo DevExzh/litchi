@@ -104,29 +104,31 @@ impl DdeSource {
         for (name, value, required) in values {
             if (required && value.is_empty())
                 || value.len() > MAX_DDE_SOURCE_VALUE_BYTES
-                || value
-                    .chars()
-                    .any(|character| character == '\0' || (character.is_control() && !matches!(character, '\t' | '\n' | '\r')))
+                || value.chars().any(|character| {
+                    character == '\0'
+                        || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
+                })
             {
                 return Err(Error::InvalidFormat(format!("invalid or oversized {name}")));
             }
-            total = total.checked_add(value.len()).ok_or_else(|| {
-                Error::InvalidFormat("DDE source text size overflow".to_string())
-            })?;
+            total = total
+                .checked_add(value.len())
+                .ok_or_else(|| Error::InvalidFormat("DDE source text size overflow".to_string()))?;
         }
         if let Some(name) = &self.name {
             if name.len() > MAX_DDE_SOURCE_VALUE_BYTES
-                || name
-                    .chars()
-                    .any(|character| character == '\0' || (character.is_control() && !matches!(character, '\t' | '\n' | '\r')))
+                || name.chars().any(|character| {
+                    character == '\0'
+                        || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
+                })
             {
                 return Err(Error::InvalidFormat(
                     "invalid or oversized office:name".to_string(),
                 ));
             }
-            total = total.checked_add(name.len()).ok_or_else(|| {
-                Error::InvalidFormat("DDE source text size overflow".to_string())
-            })?;
+            total = total
+                .checked_add(name.len())
+                .ok_or_else(|| Error::InvalidFormat("DDE source text size overflow".to_string()))?;
         }
         if total > MAX_DDE_SOURCE_TOTAL_BYTES {
             return Err(Error::InvalidFormat(format!(
@@ -489,9 +491,8 @@ pub(crate) fn parse_source(
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid DDE attribute: {error}")))?;
-        let attribute_name = std::str::from_utf8(attribute.key.as_ref()).map_err(|_| {
-            Error::InvalidFormat("invalid UTF-8 in DDE attribute name".to_string())
-        })?;
+        let attribute_name = std::str::from_utf8(attribute.key.as_ref())
+            .map_err(|_| Error::InvalidFormat("invalid UTF-8 in DDE attribute name".to_string()))?;
         if attribute_name == "xmlns" || attribute_name.starts_with("xmlns:") {
             continue;
         }

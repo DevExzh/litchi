@@ -342,12 +342,73 @@ impl CellAnnotation {
 
     /// Set or clear `meta:date-string`.
     pub fn set_date_string(&mut self, date: Option<&str>) {
-        self.set_metadata("meta:date-string", date, 2);
+        self.set_metadata("meta:date-string", date, 3);
+    }
+
+    /// Return ODF 1.3 `meta:creator-initials`, including LibreOffice's legacy
+    /// `text:sender-initials` and `loext:sender-initials` spellings.
+    pub fn initials(&self) -> Option<String> {
+        self.children
+            .iter()
+            .find(|child| {
+                matches!(
+                    local_name(child.name()),
+                    "creator-initials" | "sender-initials"
+                )
+            })
+            .map(AnnotationElement::plain_text)
+    }
+
+    /// Set or clear canonical ODF 1.3 `meta:creator-initials` metadata.
+    pub fn set_initials(&mut self, initials: Option<&str>) {
+        self.children.retain(|child| {
+            !matches!(
+                local_name(child.name()),
+                "creator-initials" | "sender-initials"
+            )
+        });
+        let Some(initials) = initials else { return };
+        let mut element = AnnotationElement::new("meta:creator-initials")
+            .expect("the built-in creator-initials name is valid");
+        element.push_text(initials);
+        let insertion = self
+            .children
+            .iter()
+            .position(|child| metadata_order(child).is_none_or(|other| other > 2))
+            .unwrap_or(self.children.len());
+        self.children.insert(insertion, element);
     }
 
     /// Return all ordered child elements, including metadata and rich content.
     pub fn children(&self) -> &[AnnotationElement] {
         &self.children
+    }
+
+    /// Return the rich body elements without creator/date/initials metadata.
+    pub fn body_elements(&self) -> Vec<&AnnotationElement> {
+        self.children
+            .iter()
+            .filter(|child| !is_metadata_element(child))
+            .collect()
+    }
+
+    /// Replace the rich body while retaining typed metadata and its schema order.
+    pub fn replace_body(&mut self, body: Vec<AnnotationElement>) -> Result<&mut Self> {
+        if body.len() > 65_536 {
+            return Err(Error::InvalidFormat(
+                "annotation body exceeds element limit".to_string(),
+            ));
+        }
+        self.children.retain(is_metadata_element);
+        self.children.extend(body);
+        self.validate()?;
+        Ok(self)
+    }
+
+    /// Remove all rich body elements while retaining typed metadata.
+    pub fn clear_body(&mut self) -> &mut Self {
+        self.children.retain(is_metadata_element);
+        self
     }
 
     /// Append a plain-text paragraph.
@@ -658,7 +719,8 @@ fn metadata_order(element: &AnnotationElement) -> Option<usize> {
     match local_name(element.name()) {
         "creator" => Some(0),
         "date" => Some(1),
-        "date-string" => Some(2),
+        "creator-initials" | "sender-initials" => Some(2),
+        "date-string" => Some(3),
         _ => None,
     }
 }

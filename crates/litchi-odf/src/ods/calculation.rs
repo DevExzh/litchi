@@ -159,7 +159,7 @@ pub(crate) fn parse_calculation_settings(xml: &str) -> Result<Option<Calculation
     let mut result = None;
     let mut child_open = false;
     let mut depth = 0usize;
-    let mut spreadsheet_depth = None;
+    let mut document_body_depth = None;
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buf)
@@ -169,18 +169,22 @@ pub(crate) fn parse_calculation_settings(xml: &str) -> Result<Option<Calculation
         let is_end = matches!(&event, Event::End(_));
         if let Event::Start(element) = &event
             && is_namespace_uri(&namespace, OFFICE_NAMESPACE)
-            && element.local_name().as_ref() == b"spreadsheet"
+            && matches!(
+                element.local_name().as_ref(),
+                b"chart" | b"drawing" | b"presentation" | b"spreadsheet" | b"text"
+            )
         {
-            spreadsheet_depth = Some(depth);
+            document_body_depth = Some(depth);
         }
-        let is_spreadsheet_child = spreadsheet_depth.is_some_and(|value| depth == value + 1);
+        let is_document_body_child =
+            document_body_depth.is_some_and(|value| depth == value + 1);
         match event {
             Event::Start(element)
                 if is_table && element.local_name().as_ref() == b"calculation-settings" =>
             {
-                if !is_spreadsheet_child {
+                if !is_document_body_child {
                     return Err(Error::InvalidFormat(
-                        "table:calculation-settings must be a direct office:spreadsheet child"
+                        "table:calculation-settings must be a direct office document-body child"
                             .to_string(),
                     ));
                 }
@@ -198,9 +202,9 @@ pub(crate) fn parse_calculation_settings(xml: &str) -> Result<Option<Calculation
             Event::Empty(element)
                 if is_table && element.local_name().as_ref() == b"calculation-settings" =>
             {
-                if !is_spreadsheet_child {
+                if !is_document_body_child {
                     return Err(Error::InvalidFormat(
-                        "table:calculation-settings must be a direct office:spreadsheet child"
+                        "table:calculation-settings must be a direct office document-body child"
                             .to_string(),
                     ));
                 }
@@ -656,5 +660,38 @@ mod tests {
             <t:calculation-settings/></t:table-cell></t:table-row></t:table>
           </o:spreadsheet></o:body></o:document-content>"#;
         assert!(parse_calculation_settings(nested).is_err());
+    }
+}
+
+#[cfg(test)]
+mod chart_document_tests {
+    use super::*;
+
+    #[test]
+    fn parses_calculation_settings_from_chart_document_body() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content
+ xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+ xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+ <office:body><office:chart>
+  <table:calculation-settings table:case-sensitive="true" table:precision-as-shown="false"/>
+ </office:chart></office:body>
+</office:document-content>"#;
+        let settings = parse_calculation_settings(xml).unwrap().unwrap();
+        assert_eq!(settings.case_sensitive, Some(true));
+        assert_eq!(settings.precision_as_shown, Some(false));
+    }
+
+    #[test]
+    fn rejects_calculation_settings_below_chart_chart() {
+        let xml = r#"<office:document-content
+ xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+ xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"
+ xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+ <office:body><office:chart><chart:chart>
+  <table:calculation-settings/>
+ </chart:chart></office:chart></office:body>
+</office:document-content>"#;
+        assert!(parse_calculation_settings(xml).is_err());
     }
 }

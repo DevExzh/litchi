@@ -7,6 +7,81 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::HashMap;
 
+mod connection_resource_writing;
+mod control_writing;
+mod generic_writing;
+mod grid_writing;
+mod image_frame_writing;
+mod input_writing;
+mod interactive_writing;
+mod selection_writing;
+mod typed_value_writing;
+mod value_range_writing;
+mod visual_writing;
+mod writing;
+pub use connection_resource_writing::{
+    OdfConnectionResourceForm, OdfFormConnectionResource, OdfOwnedFormConnectionResource,
+    form_connection_resources, insert_form_connection_resource_xml,
+    remove_form_connection_resource_xml, replace_form_connection_resource_xml,
+};
+pub use control_writing::{
+    OdfControlForm, OdfTextControl, OdfTextControlKind, insert_text_control_xml,
+    remove_text_control_xml, replace_text_control_xml, text_controls,
+};
+pub use generic_writing::{
+    OdfFixedTextControl, OdfGenericControl, OdfGenericControlMetadata, OdfGenericForm,
+    OdfGenericFormControl, OdfHiddenControl, generic_form_controls,
+    insert_generic_form_control_xml, remove_generic_form_control_xml,
+    replace_generic_form_control_xml,
+};
+pub use grid_writing::{
+    OdfGridColumn, OdfGridColumnControl, OdfGridColumnControlKind, OdfGridControl, OdfGridForm,
+    OdfGridNonNegativeInteger, grid_controls, insert_grid_control_xml, remove_grid_control_xml,
+    replace_grid_control_xml,
+};
+pub use image_frame_writing::{
+    OdfImageFrameControl, OdfImageFrameForm, image_frame_controls, insert_image_frame_control_xml,
+    remove_image_frame_control_xml, replace_image_frame_control_xml,
+};
+pub use input_writing::{
+    OdfFileControl, OdfPasswordControl, OdfPasswordFileControl, OdfPasswordFileForm,
+    insert_password_file_control_xml, password_file_controls, remove_password_file_control_xml,
+    replace_password_file_control_xml,
+};
+pub use interactive_writing::{
+    OdfButtonControl, OdfButtonType, OdfCheckboxControl, OdfCheckboxState, OdfInteractiveControl,
+    OdfInteractiveForm, insert_interactive_control_xml, interactive_controls,
+    remove_interactive_control_xml, replace_interactive_control_xml,
+};
+pub use selection_writing::{
+    OdfComboItem, OdfComboboxControl, OdfListLinkageType, OdfListOption, OdfListSourceType,
+    OdfListboxControl, OdfSelectionControl, OdfSelectionForm, insert_selection_control_xml,
+    remove_selection_control_xml, replace_selection_control_xml, selection_controls,
+};
+pub use typed_value_writing::{
+    OdfFormDate, OdfFormDouble, OdfTypedValueBound, OdfTypedValueControl, OdfTypedValueControlKind,
+    OdfTypedValueDuration, OdfTypedValueForm, OdfTypedValueNonNegativeInteger,
+    insert_typed_value_control_xml, remove_typed_value_control_xml,
+    replace_typed_value_control_xml, typed_value_controls,
+};
+pub use value_range_writing::{
+    OdfValueRangeControl, OdfValueRangeDuration, OdfValueRangeForm, OdfValueRangeInteger,
+    OdfValueRangeNonNegativeInteger, OdfValueRangeOrientation, OdfValueRangePositiveInteger,
+    insert_value_range_control_xml, remove_value_range_control_xml,
+    replace_value_range_control_xml, value_range_controls,
+};
+pub use visual_writing::{
+    OdfFrameControl, OdfImageButtonType, OdfImageControl, OdfRadioControl, OdfRadioVisualEffect,
+    OdfRelativeImageAlign, OdfRelativeImagePosition, OdfVisualControl, OdfVisualForm,
+    insert_visual_control_xml, remove_visual_control_xml, replace_visual_control_xml,
+    visual_controls,
+};
+pub use writing::{
+    OdfPropertyForm, form_properties, insert_form_property_xml, remove_form_property_xml,
+    replace_form_property_xml,
+};
+pub(crate) use writing::property_xml;
+
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const FORM: &str = "urn:oasis:names:tc:opendocument:xmlns:form:1.0";
 const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -196,7 +271,11 @@ impl OdfFormControlKind {
             "column" => Self::Column,
             "value-range" => Self::ValueRange,
             "generic-control" => Self::GenericControl,
-            "form" | "properties" | "property" | "list-property" | "list-value"
+            "form"
+            | "properties"
+            | "property"
+            | "list-property"
+            | "list-value"
             | "connection-resource" => return None,
             other => Self::Other(other.to_string()),
         })
@@ -232,6 +311,77 @@ pub struct OdfFormControl {
 pub struct OdfFormProperty {
     pub name: String,
     pub value: OdfFormPropertyValue,
+}
+
+impl OdfFormProperty {
+    pub fn boolean(name: impl Into<String>, value: bool) -> Self {
+        Self {
+            name: name.into(),
+            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Boolean(value)),
+        }
+    }
+
+    pub fn number(
+        name: impl Into<String>,
+        value_type: impl Into<String>,
+        lexical: impl Into<String>,
+        currency: Option<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Number {
+                value_type: value_type.into(),
+                lexical: lexical.into(),
+                currency,
+            }),
+        }
+    }
+
+    pub fn text(name: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Text(value.into())),
+        }
+    }
+
+    pub fn date(name: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Date(value.into())),
+        }
+    }
+
+    pub fn time(name: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Time(value.into())),
+        }
+    }
+
+    pub fn void(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            value: OdfFormPropertyValue::Scalar(OdfFormScalarValue::Void),
+        }
+    }
+
+    pub fn list(
+        name: impl Into<String>,
+        value_type: impl Into<String>,
+        values: Vec<OdfFormScalarValue>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            value: OdfFormPropertyValue::List {
+                value_type: Some(value_type.into()),
+                values,
+            },
+        }
+    }
+
+    pub fn to_xml_fragment(&self) -> Result<String> {
+        writing::property_xml(self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -318,7 +468,8 @@ struct Limits {
 
 pub(crate) fn parse_form_parts(parts: &[(&str, OdfFormPart)]) -> Result<OdfForms> {
     let raw = parts.iter().try_fold(0usize, |sum, (xml, _)| {
-        sum.checked_add(xml.len()).ok_or_else(|| err("form XML size overflow"))
+        sum.checked_add(xml.len())
+            .ok_or_else(|| err("form XML size overflow"))
     })?;
     if raw > MAX_RAW {
         return Err(err("form XML exceeds 64 MiB"));
@@ -466,7 +617,9 @@ fn parse_part(
                     mark_events(result, group.as_mut());
                 } else if namespace.as_deref() == Some(OFFICE) && local == "forms" {
                     let attrs = attrs(&reader, element, limits)?;
-                    result.groups.push(new_group(part, current_scope(&scopes), attrs)?);
+                    result
+                        .groups
+                        .push(new_group(part, current_scope(&scopes), attrs)?);
                 } else if group.is_some() {
                     form_empty(
                         &reader,
@@ -496,7 +649,9 @@ fn parse_part(
                             return Err(err("invalid script:event-listener end element"));
                         }
                         events.listener_depth = None;
-                        depth = depth.checked_sub(1).ok_or_else(|| err("XML depth underflow"))?;
+                        depth = depth
+                            .checked_sub(1)
+                            .ok_or_else(|| err("XML depth underflow"))?;
                         buffer.clear();
                         continue;
                     }
@@ -506,7 +661,9 @@ fn parse_part(
                         }
                         let completed = event_listeners.take().expect("active event listeners");
                         result.event_listeners.extend(completed.listeners);
-                        depth = depth.checked_sub(1).ok_or_else(|| err("XML depth underflow"))?;
+                        depth = depth
+                            .checked_sub(1)
+                            .ok_or_else(|| err("XML depth underflow"))?;
                         buffer.clear();
                         continue;
                     }
@@ -514,11 +671,16 @@ fn parse_part(
                 }
                 if skip != 0 {
                     skip -= 1;
-                    depth = depth.checked_sub(1).ok_or_else(|| err("XML depth underflow"))?;
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| err("XML depth underflow"))?;
                     buffer.clear();
                     continue;
                 }
-                while builders.last().is_some_and(|builder| builder.depth() == depth) {
+                while builders
+                    .last()
+                    .is_some_and(|builder| builder.depth() == depth)
+                {
                     finish_builder(&mut group, &mut builders)?;
                 }
                 if group.as_ref().is_some_and(|(at, _)| *at == depth) {
@@ -530,7 +692,9 @@ fn parse_part(
                 if scopes.last().is_some_and(|scope| scope.0 == depth) {
                     scopes.pop();
                 }
-                depth = depth.checked_sub(1).ok_or_else(|| err("XML depth underflow"))?;
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| err("XML depth underflow"))?;
             },
             Event::Text(ref text) if skip == 0 && group.is_some() => {
                 if event_listeners.is_some() {
@@ -562,12 +726,16 @@ fn parse_part(
             },
             Event::GeneralRef(ref value) if skip == 0 && group.is_some() => {
                 if event_listeners.is_some() {
-                    return Err(err("office:event-listeners cannot contain entity references"));
+                    return Err(err(
+                        "office:event-listeners cannot contain entity references",
+                    ));
                 }
                 append_text(&mut builders, &reference(value)?, limits)?;
             },
             Event::PI(_) if event_listeners.is_some() => {
-                return Err(err("processing instructions are not allowed in event listeners"));
+                return Err(err(
+                    "processing instructions are not allowed in event listeners",
+                ));
             },
             Event::DocType(_) => return Err(err("DOCTYPE is not allowed in form XML")),
             Event::Eof => break,
@@ -605,7 +773,9 @@ fn event_target(
             name: control.name.clone(),
         },
         Some(Builder::List(..)) => {
-            return Err(err("office:event-listeners cannot be nested in a form property"));
+            return Err(err(
+                "office:event-listeners cannot be nested in a form property",
+            ));
         },
         None => OdfEventTarget::Forms { part, scope },
     })
@@ -856,7 +1026,12 @@ fn attach_property(builders: &mut [Builder], property: OdfFormProperty) -> Resul
 fn append_text(builders: &mut [Builder], text: &str, limits: &mut Limits) -> Result<()> {
     for builder in builders.iter_mut().rev() {
         if let Builder::Control(_, control) = builder {
-            if control.text.len().checked_add(text.len()).is_none_or(|size| size > MAX_TEXT) {
+            if control
+                .text
+                .len()
+                .checked_add(text.len())
+                .is_none_or(|size| size > MAX_TEXT)
+            {
                 return Err(err("form control text exceeds 4 MiB"));
             }
             decoded(limits, text.len())?;
@@ -978,12 +1153,8 @@ fn scalar(attributes: &[OdfFormAttribute], inherited: Option<&str>) -> Result<Od
                 .unwrap_or_default()
                 .to_string(),
         ),
-        "date" => OdfFormScalarValue::Date(
-            required(attributes, OFFICE, "date-value")?.to_string(),
-        ),
-        "time" => OdfFormScalarValue::Time(
-            required(attributes, OFFICE, "time-value")?.to_string(),
-        ),
+        "date" => OdfFormScalarValue::Date(required(attributes, OFFICE, "date-value")?.to_string()),
+        "time" => OdfFormScalarValue::Time(required(attributes, OFFICE, "time-value")?.to_string()),
         "void" => OdfFormScalarValue::Void,
         other => OdfFormScalarValue::Other {
             value_type: other.to_string(),
@@ -1012,7 +1183,11 @@ fn new_shape(
         style_name: owned(&attributes, DRAW, "style-name"),
         text_style_name: owned(&attributes, DRAW, "text-style-name"),
         z_index: attr(&attributes, DRAW, "z-index")
-            .map(|value| value.parse::<u32>().map_err(|_| err("invalid draw:z-index")))
+            .map(|value| {
+                value
+                    .parse::<u32>()
+                    .map_err(|_| err("invalid draw:z-index"))
+            })
             .transpose()?,
         x: owned(&attributes, SVG, "x"),
         y: owned(&attributes, SVG, "y"),
@@ -1023,7 +1198,10 @@ fn new_shape(
 }
 
 fn push_shape(result: &mut OdfForms, shape: OdfControlShape, limits: &mut Limits) -> Result<()> {
-    limits.shapes = limits.shapes.checked_add(1).ok_or_else(|| err("shape overflow"))?;
+    limits.shapes = limits
+        .shapes
+        .checked_add(1)
+        .ok_or_else(|| err("shape overflow"))?;
     if limits.shapes > MAX_SHAPES {
         return Err(err("document exceeds 65536 form control shapes"));
     }
@@ -1211,12 +1389,16 @@ fn mark_events(result: &mut OdfForms, group: Option<&mut (usize, OdfFormGroup)>)
 
 fn next_index(value: &mut usize) -> Result<usize> {
     let current = *value;
-    *value = value.checked_add(1).ok_or_else(|| err("form scope count overflow"))?;
+    *value = value
+        .checked_add(1)
+        .ok_or_else(|| err("form scope count overflow"))?;
     Ok(current)
 }
 
 fn inc_depth(value: usize) -> Result<usize> {
-    let value = value.checked_add(1).ok_or_else(|| err("form XML depth overflow"))?;
+    let value = value
+        .checked_add(1)
+        .ok_or_else(|| err("form XML depth overflow"))?;
     if value > MAX_DEPTH {
         return Err(err("form XML nesting exceeds 128 levels"));
     }
@@ -1224,7 +1406,10 @@ fn inc_depth(value: usize) -> Result<usize> {
 }
 
 fn node(limits: &mut Limits) -> Result<()> {
-    limits.nodes = limits.nodes.checked_add(1).ok_or_else(|| err("form node overflow"))?;
+    limits.nodes = limits
+        .nodes
+        .checked_add(1)
+        .ok_or_else(|| err("form node overflow"))?;
     if limits.nodes > MAX_NODES {
         return Err(err("document exceeds 65536 form nodes"));
     }

@@ -282,55 +282,69 @@
 
 /// ODF constants, MIME types, and XML tags
 pub mod constants;
+pub mod content_validation;
 /// Cell coordinate conversion utilities (A1 notation)
 pub mod coordinates;
 /// Core ODF parsing functionality
 mod core;
 /// ODF data type conversions (Boolean, Date, DateTime, Duration)
 pub mod datatype;
+pub mod drawing_fill_image;
 pub mod drawing_gradient;
 pub mod drawing_hatch;
-pub mod drawing_fill_image;
-pub mod drawing_marker;
 pub mod drawing_layer;
+pub mod drawing_marker;
 pub mod drawing_opacity;
 pub mod drawing_stroke_dash;
-pub mod named_expression;
-pub mod content_validation;
-mod paragraph_tab_stop;
-mod paragraph_drop_cap;
-mod list_label_alignment;
-mod paragraph_flow;
-mod table_row_properties;
-mod table_properties;
-mod style_columns;
-mod footnote_separator;
 /// ODF XML element classes
 pub mod elements;
+mod footnote_separator;
+mod list_label_alignment;
+pub mod named_expression;
+mod outline_style;
+mod paragraph_drop_cap;
+mod paragraph_flow;
+mod paragraph_tab_stop;
+mod style_columns;
+mod table_properties;
+mod table_row_properties;
+pub use elements::bookmark::{
+    Bookmark, BookmarkEnd, BookmarkFragments, BookmarkParser, BookmarkRange, BookmarkStart,
+    BookmarkTarget, insert_bookmark_xml, parse_bookmark_targets, remove_bookmark_xml,
+    replace_bookmark_xml,
+};
 pub use elements::field::{
     OdfDatabaseConnectionResource, OdfDatabaseField, OdfDatabaseFieldKind, OdfDatabaseSource,
     OdfDatabaseTableType,
 };
-/// OpenDocument formula (.odf/.otf) support.
-mod formula;
-/// Inert semantic discovery of classic ODF forms and control shapes.
-mod form;
-mod settings;
-/// Format-neutral package access for every OpenDocument family.
-mod generic;
-/// Shared semantic discovery of images in OpenDocument XML and packages.
-mod media;
-mod variable_declaration;
-mod document_scripts;
 mod chart_properties;
-mod graphic_properties;
-mod text_properties;
-mod ruby_family;
+mod annotation_package;
+mod data_pilot_package;
+mod ods_definition_package;
+mod dde_connection;
+mod digital_signature;
+mod signature_crypto;
+mod document_scripts;
 mod drawing_page_properties;
 mod font_face;
+/// Inert semantic discovery of classic ODF forms and control shapes.
+mod form;
+mod form_package;
+/// OpenDocument formula (.odf/.otf) support.
+mod formula;
+/// Format-neutral package access for every OpenDocument family.
+mod generic;
+mod graphic_properties;
 mod line_numbering;
+mod master_page;
+/// Shared semantic discovery of images in OpenDocument XML and packages.
+mod media;
 mod notes_configuration;
-mod dde_connection;
+mod ruby_family;
+mod rdf_package;
+mod settings;
+mod text_properties;
+mod variable_declaration;
 pub use dde_connection::{OdfDdeConnectionDeclaration, OdfDdeConnectionUse};
 mod bibliography_configuration;
 pub use bibliography_configuration::{
@@ -340,6 +354,8 @@ mod data_styles;
 pub use data_styles::*;
 /// Inert semantic discovery of embedded OpenDocument and OLE objects.
 mod embedded_object;
+mod embedded_chart;
+mod embedded_package;
 /// OpenDocument database front-end (.odb) support.
 mod odb;
 /// OpenDocument standalone chart (.odc/.otc) support.
@@ -361,59 +377,6 @@ mod oth;
 
 // Re-export common utilities for convenience
 // These are used across all Office formats, not ODF-specific
-pub use core::{
-    AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, Manifest, ManifestChecksum,
-    ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm, ManifestEntry,
-    ManifestKeyDerivation, ManifestStartKeyGeneration, OdfMetadata, TemplateMetadata,
-    UserDefinedMetadata, UserDefinedValueType,
-};
-pub use paragraph_tab_stop::{
-    MAX_PARAGRAPH_TAB_STOPS, OdfTabStopPosition, ParagraphStyleTabStopSet,
-    ParagraphStyleTabStops, ParagraphTabLeaderColor, ParagraphTabLeaderStyle,
-    ParagraphTabLeaderType, ParagraphTabLeaderWidth, ParagraphTabStop,
-    ParagraphTabStopType, ParagraphTabStops, parse_paragraph_style_tab_stops,
-};
-pub use paragraph_drop_cap::{
-    DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
-    ParagraphStyleDropCapSet, parse_paragraph_style_drop_caps,
-};
-pub use list_label_alignment::{LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment,
-    ListLevelLabelAlignmentSet, ListStyleKind, ListStyleLevelLabelAlignment,
-    parse_list_level_label_alignments};
-pub use paragraph_flow::{HyphenationKeep,HyphenationLadder,Keep,LineBreak,ParagraphFlowProperties,ParagraphStyleFlow,ParagraphStyleFlowSet,PunctuationWrap,parse_paragraph_style_flows};
-pub use table_row_properties::{HorizontalBackgroundPosition,TableRowBackgroundColor,TableRowBackgroundImage,TableRowBackgroundPosition,TableRowBackgroundRepeat,TableRowBackgroundSource,TableRowBreak,TableRowKeepTogether,TableRowLength,TableRowOpacity,TableRowProperties,TableRowStyleProperties,TableRowStylePropertiesSet,VerticalBackgroundPosition,parse_table_row_style_properties,set_table_row_style_properties_xml};
-pub use table_properties::{TableAlignment,TableBorderModel,TablePageNumber,TableProperties,TableShadow,TableStyleMeasure,TableStylePercent,TableStyleProperties,TableStylePropertiesSet,TableStyleWidth,TableWritingMode,parse_table_style_properties,set_table_style_properties_xml};
-pub use style_columns::{
-    MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
-    StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns,
-    parse_style_columns,
-};
-pub use footnote_separator::{
-    FootnoteSeparatorAdjustment, FootnoteSeparatorLength, FootnoteSeparatorLineStyle,
-    FootnoteSeparatorPercent, StyleFootnoteSeparator, parse_style_footnote_separators,
-};
-pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
-pub use form::{
-    OdfControlRef, OdfControlShape, OdfForm, OdfFormAttribute, OdfFormControl,
-    OdfFormControlKind, OdfFormGroup, OdfFormNode, OdfFormPart, OdfFormProperty,
-    OdfFormPropertyValue, OdfFormScalarValue, OdfFormScope, OdfForms,
-};
-pub use settings::{
-    OdfConfigItem, OdfConfigMap, OdfConfigMapEntry, OdfConfigNode, OdfConfigSet,
-    OdfConfigValue, OdfSettings,
-};
-pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
-pub use media::{OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource};
-pub use variable_declaration::{
-    OdfVariableBody, OdfVariableDateValue, OdfVariableDeclaration,
-    OdfVariableDeclarationGroup, OdfVariableDeclarations, OdfVariableHeaderFooter,
-    OdfVariableKind, OdfVariablePart, OdfVariableScope, OdfVariableValue,
-    OdfVariableValueType,
-};
-pub use document_scripts::{
-    OdfDocumentEventListener, OdfDocumentScripts, OdfEmbeddedScript, OdfScriptBinding,
-    OdfScriptEventListener, parse_document_scripts,
-};
 pub use chart_properties::{
     ChartAngle, ChartAxisLabelPosition, ChartAxisPosition, ChartDataLabelNumber, ChartDirection,
     ChartDouble, ChartEmptyCellTreatment, ChartErrorCategory, ChartInteger, ChartInterpolation,
@@ -423,23 +386,30 @@ pub use chart_properties::{
     ChartStyleRecord, ChartSymbolImage, ChartSymbolName, ChartSymbolType, ChartTickMarkPosition,
     parse_chart_style_properties, set_chart_style_properties_xml,
 };
-pub use graphic_properties::{
-    GraphicProperty, GraphicPropertyChild, GraphicPropertyChildKind, GraphicPropertyKind,
-    GraphicPropertyNamespace, GraphicPropertyValue, GraphicStyleProperties,
-    GraphicStylePropertiesSet, GraphicStyleRecord, parse_graphic_style_properties,
-    set_graphic_style_properties_xml,
+pub use core::{
+    AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, Manifest, ManifestChecksum,
+    ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm, ManifestEntry,
+    ManifestKeyDerivation, ManifestStartKeyGeneration, OdfEncryptionCipher, OdfEncryptionKdf,
+    OdfEncryptionProfile, OdfEncryptionStartKey, OdfMetadata, OdfStructure, OwnedPackage,
+    PackageWriter, TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
 };
-pub use text_properties::{
-    TextProperty, TextPropertyKind, TextPropertyNamespace, TextPropertyValue,
-    TextStyleProperties, TextStylePropertiesSet, TextStyleRecord,
-    parse_text_style_properties, set_text_style_properties_xml,
+pub use digital_signature::{OdfDigitalSignature, OdfDigitalSignatures, OdfSignatureReference};
+pub use signature_crypto::{
+    OdfCanonicalizationAlgorithm, OdfDocumentSigner, OdfSignatureAlgorithm,
+    OdfSignatureValidity, OdfSignatureVerification,
 };
-pub use ruby_family::{
-    RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
-    RubyStyle, RubyStyles, insert_ruby_annotation_xml, parse_ruby_annotations,
-    parse_ruby_styles, remove_ruby_annotation_xml, remove_ruby_style_xml,
-    replace_ruby_annotation_xml, set_ruby_style_xml,
+pub use document_scripts::{
+    OdfDocumentEventListener, OdfDocumentScripts, OdfEmbeddedScript, OdfScriptBinding,
+    OdfScriptEventListener, parse_document_scripts,
 };
+mod script_package;
+pub use script_package::{OdfScriptResource, OdfScriptResourceKind, OdfScriptResourceSpec};
+pub use annotation_package::{
+    OdfAnnotation, OdfAnnotationAnchor, OdfAnnotationInfo, OdfAnnotationPosition,
+    OdfAnnotationUpdate,
+};
+pub use data_pilot_package::DataPilotTableUpdate;
+pub use ods_definition_package::{DatabaseRangeUpdate, NamedDefinitionUpdate};
 pub use drawing_page_properties::{
     DrawingPageBackgroundSize, DrawingPageColor, DrawingPageDuration, DrawingPageFill,
     DrawingPageFillRule, DrawingPageImageRefPoint, DrawingPageLengthOrPercent,
@@ -450,96 +420,269 @@ pub use drawing_page_properties::{
     DrawingPageTransitionType, DrawingPageVisibility, parse_drawing_page_style_properties,
     set_drawing_page_style_properties_xml,
 };
+pub use embedded_object::{
+    OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart, OdfEmbeddedObjectSource,
+    OdfInlineObjectRoot,
+};
+pub use embedded_chart::OdfEmbeddedChartStorage;
+pub use embedded_package::{
+    OdfEmbeddedResource, OdfEmbeddedResourceFile, OdfEmbeddedResourceKind,
+    OdfEmbeddedResourceSource,
+};
 pub use font_face::{
     OdfFontFace, OdfFontFaceDeclarations, OdfFontFaceLink, OdfFontFaceSource, OdfFontMetric,
-    OdfFontMetricKind, OdfFontPitch, OdfFontStretch, OdfFontStyle, OdfFontVariant,
-    OdfFontWeight, OdfGenericFontFamily, OdfPositiveLength, parse_font_face_declarations,
+    OdfFontMetricKind, OdfFontPitch, OdfFontStretch, OdfFontStyle, OdfFontVariant, OdfFontWeight,
+    OdfGenericFontFamily, OdfPositiveLength, parse_font_face_declarations,
+};
+pub use footnote_separator::{
+    FootnoteSeparatorAdjustment, FootnoteSeparatorLength, FootnoteSeparatorLineStyle,
+    FootnoteSeparatorPercent, StyleFootnoteSeparator, parse_style_footnote_separators,
+};
+pub use form::{
+    OdfButtonControl, OdfButtonType, OdfCheckboxControl, OdfCheckboxState, OdfComboItem,
+    OdfComboboxControl, OdfControlForm, OdfControlRef, OdfControlShape, OdfFileControl,
+    OdfFixedTextControl, OdfForm, OdfFormAttribute, OdfFormControl, OdfFormControlKind,
+    OdfFormGroup, OdfFormNode, OdfFormPart, OdfFormProperty, OdfFormPropertyValue,
+    OdfFormScalarValue, OdfFormScope, OdfForms, OdfFrameControl, OdfGenericControl,
+    OdfGenericControlMetadata, OdfGenericForm, OdfGenericFormControl, OdfHiddenControl,
+    OdfImageButtonType, OdfImageControl, OdfImageFrameControl, OdfImageFrameForm,
+    OdfInteractiveControl, OdfInteractiveForm, OdfListLinkageType, OdfListOption,
+    OdfListSourceType, OdfListboxControl, OdfPasswordControl, OdfPasswordFileControl,
+    OdfPasswordFileForm, OdfPropertyForm, OdfRadioControl, OdfRadioVisualEffect,
+    OdfRelativeImageAlign, OdfRelativeImagePosition, OdfSelectionControl, OdfSelectionForm,
+    OdfTextControl, OdfTextControlKind, OdfVisualControl, OdfVisualForm, form_properties,
+    generic_form_controls, image_frame_controls, insert_form_property_xml,
+    insert_generic_form_control_xml, insert_image_frame_control_xml,
+    insert_interactive_control_xml, insert_password_file_control_xml, insert_selection_control_xml,
+    insert_text_control_xml, insert_visual_control_xml, interactive_controls,
+    password_file_controls, remove_form_property_xml, remove_generic_form_control_xml,
+    remove_image_frame_control_xml, remove_interactive_control_xml,
+    remove_password_file_control_xml, remove_selection_control_xml, remove_text_control_xml,
+    remove_visual_control_xml, replace_form_property_xml, replace_generic_form_control_xml,
+    replace_image_frame_control_xml, replace_interactive_control_xml,
+    replace_password_file_control_xml, replace_selection_control_xml, replace_text_control_xml,
+    replace_visual_control_xml, selection_controls, text_controls, visual_controls,
+};
+pub use form_package::{OdfAuthoredForm, OdfAuthoredFormControl, OdfAuthoredFormNode};
+pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
+pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
+pub use graphic_properties::{
+    GraphicProperty, GraphicPropertyChild, GraphicPropertyChildKind, GraphicPropertyKind,
+    GraphicPropertyNamespace, GraphicPropertyValue, GraphicStyleProperties,
+    GraphicStylePropertiesSet, GraphicStyleRecord, parse_graphic_style_properties,
+    set_graphic_style_properties_xml,
 };
 pub use line_numbering::{
     OdfLineNumberFormat, OdfLineNumberPosition, OdfLineNumberingConfiguration,
     OdfLineNumberingSeparator, OdfNonNegativeLength, parse_line_numbering_configuration,
 };
+pub use list_label_alignment::{
+    LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment, ListLevelLabelAlignmentSet,
+    ListStyleKind, ListStyleLevelLabelAlignment, parse_list_level_label_alignments,
+};
+pub use litchi_core::RGBColor as Color;
+pub use litchi_core::unit::{Length, LengthUnit};
+pub use media::{OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource};
 pub use notes_configuration::{
     OdfFootnotePosition, OdfNoteClass, OdfNoteNumberingScope, OdfNotesConfiguration,
     OdfNotesConfigurations, parse_notes_configurations, remove_notes_configuration_xml,
     set_notes_configuration_xml,
 };
-pub use embedded_object::{
-    OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart,
-    OdfEmbeddedObjectSource, OdfInlineObjectRoot,
-};
-pub use litchi_core::RGBColor as Color;
-pub use litchi_core::unit::{Length, LengthUnit};
 pub use odb::{
     DatabaseAttribute, DatabaseContent, DatabaseDocument, DatabaseElement, DatabaseElementKind,
 };
+pub use odb::{
+    OdfDatabaseApplicationConnectionSettings, OdfDatabaseAutoIncrement,
+    OdfDatabaseBooleanComparisonMode, OdfDatabaseCharacterSet, OdfDatabaseDataSourceSetting,
+    OdfDatabaseDelimiter, OdfDatabaseDriverSettings, OdfDatabaseInteger, OdfDatabaseSettingType,
+    OdfDatabaseTableFilter, OdfDatabaseTableSetting, OdfDatabaseTrailingSettings,
+    parse_database_trailing_settings_xml, set_database_application_connection_settings_xml,
+    set_database_driver_settings_xml,
+};
+pub use odb::{
+    OdfDatabaseColumn, OdfDatabaseColumnValue, OdfDatabaseQueries, OdfDatabaseQuery,
+    OdfDatabaseQueryCollection, OdfDatabaseQueryItem, OdfDatabaseQueryModel, OdfDatabaseStatement,
+    OdfDatabaseTableRepresentation, OdfDatabaseTableRepresentations, OdfDatabaseUpdateTable,
+    parse_database_queries_xml, parse_database_query_model_xml,
+    parse_database_table_representations_xml, set_database_queries_xml,
+    set_database_table_representations_xml,
+};
+pub use odb::{
+    OdfDatabaseColumnDefinition, OdfDatabaseDataType, OdfDatabaseIndex, OdfDatabaseIndexColumn,
+    OdfDatabaseKey, OdfDatabaseKeyColumn, OdfDatabaseKeyType, OdfDatabaseNullable,
+    OdfDatabaseReferentialRule, OdfDatabaseSchemaDefinition, OdfDatabaseSchemaPositiveInteger,
+    OdfDatabaseTableDefinition, parse_database_schema_definition_xml,
+    set_database_schema_definition_xml,
+};
+pub use odb::{
+    OdfDatabaseComponent, OdfDatabaseComponentCollection, OdfDatabaseComponentItem,
+    OdfDatabaseComponentLink, OdfDatabaseComponentModel, OdfDatabaseComponentPayload,
+    OdfDatabaseForms, OdfDatabaseInertAttribute, OdfDatabaseInertContent, OdfDatabaseInertElement,
+    OdfDatabaseReports, parse_database_components_xml, parse_database_forms_xml,
+    parse_database_reports_xml, set_database_forms_xml, set_database_reports_xml,
+};
+pub use odb::{
+    OdfDatabaseConnectionData, OdfDatabaseConnectionSource, OdfDatabaseFileSource,
+    OdfDatabaseLogin, OdfDatabaseLoginIdentity, OdfDatabasePositiveInteger,
+    OdfDatabaseServerLocation, OdfDatabaseServerSource, OdfOdbConnectionResource,
+    parse_database_connection_data_xml, replace_database_connection_data_xml,
+};
 pub use odc::{
-    ChartAttribute, ChartAxis, ChartAxisDimension, ChartDataPoint, ChartDataSourceLabels,
-    ChartDocument, ChartElement, ChartElementKind, ChartGrid, ChartGridClass, ChartLegend,
-    ChartLegendPosition, ChartPlotArea, ChartSeries,
+    ChartAttribute, ChartAxis, ChartAxisDimension, ChartAxisSpec, ChartAxisUpdate, ChartCachedCell, ChartCachedRow,
+    ChartCachedTable, ChartCachedValue, ChartDataLabelSpec, ChartDataPoint, ChartDataPointSpec,
+    ChartDataSourceLabels, ChartDefinition, ChartDocument, ChartDomainSpec, ChartElement,
+    ChartElementKind, ChartEquationSpec, ChartExtensionAttribute, ChartExtensionElement,
+    ChartExtensions, ChartGrid, ChartGridClass, ChartGridSpec, ChartLegend, ChartLegendPosition,
+    ChartLegendSpec, ChartPlotArea, ChartPlotAreaSpec, ChartRegressionSpec, ChartSeries,
+    ChartSeriesSpec, ChartSeriesUpdate, ChartStyleElement, ChartText, serialize_chart_content,
 };
 pub use odg::{
-    DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage, DrawingPageProperties,
+    DrawingBuilder, DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage,
+    DrawingPageProperties, MutableDrawing,
 };
 pub use odi::{ImageAttribute, ImageContent, ImageDocument, ImageElement, ImageElementKind};
-pub use odm::{MasterDocument, MasterSubdocument};
+pub use odm::{
+    MasterDocument, MasterDocumentBuilder, MasterDocumentElement, MasterSection,
+    MasterSubdocument, MutableMasterDocument,
+};
 pub use oth::WebDocument;
+pub use outline_style::{
+    MAX_OUTLINE_LEVELS, OdfListLevelPositionMode, OdfOutlineAttribute, OdfOutlineLevelStyle,
+    OdfOutlineListLevelProperties, OdfOutlineNumberFormat, OdfOutlinePositiveInteger,
+    OdfOutlineStyle, OdfOutlineStyles, OdfOutlineTextAlign, OdfOutlineTextProperties,
+    parse_outline_styles, remove_outline_style_xml, set_outline_style_xml,
+};
+pub use paragraph_drop_cap::{
+    DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
+    ParagraphStyleDropCapSet, parse_paragraph_style_drop_caps,
+};
+pub use paragraph_flow::{
+    HyphenationKeep, HyphenationLadder, Keep, LineBreak, ParagraphFlowProperties,
+    ParagraphStyleFlow, ParagraphStyleFlowSet, PunctuationWrap, parse_paragraph_style_flows,
+};
+pub use paragraph_tab_stop::{
+    MAX_PARAGRAPH_TAB_STOPS, OdfTabStopPosition, ParagraphStyleTabStopSet, ParagraphStyleTabStops,
+    ParagraphTabLeaderColor, ParagraphTabLeaderStyle, ParagraphTabLeaderType,
+    ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType, ParagraphTabStops,
+    parse_paragraph_style_tab_stops,
+};
+pub use ruby_family::{
+    RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
+    RubyStyle, RubyStyles, insert_ruby_annotation_xml, parse_ruby_annotations, parse_ruby_styles,
+    remove_ruby_annotation_xml, remove_ruby_style_xml, replace_ruby_annotation_xml,
+    set_ruby_style_xml,
+};
+pub use rdf_package::{OdfRdfGraph, OdfRdfObject, OdfRdfSubject, OdfRdfTriple};
+pub use settings::{
+    OdfConfigItem, OdfConfigMap, OdfConfigMapEntry, OdfConfigNode, OdfConfigSet, OdfConfigValue,
+    OdfSettings,
+};
+pub use style_columns::{
+    MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
+    StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
+};
+pub use table_properties::{
+    TableAlignment, TableBorderModel, TablePageNumber, TableProperties, TableShadow,
+    TableStyleMeasure, TableStylePercent, TableStyleProperties, TableStylePropertiesSet,
+    TableStyleWidth, TableWritingMode, parse_table_style_properties,
+    set_table_style_properties_xml,
+};
+pub use table_row_properties::{
+    HorizontalBackgroundPosition, TableRowBackgroundColor, TableRowBackgroundImage,
+    TableRowBackgroundPosition, TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowBreak,
+    TableRowKeepTogether, TableRowLength, TableRowOpacity, TableRowProperties,
+    TableRowStyleProperties, TableRowStylePropertiesSet, VerticalBackgroundPosition,
+    parse_table_row_style_properties, set_table_row_style_properties_xml,
+};
+pub use text_properties::{
+    TextProperty, TextPropertyKind, TextPropertyNamespace, TextPropertyValue, TextStyleProperties,
+    TextStylePropertiesSet, TextStyleRecord, parse_text_style_properties,
+    set_text_style_properties_xml,
+};
+pub use variable_declaration::{
+    OdfVariableBody, OdfVariableDateValue, OdfVariableDeclaration, OdfVariableDeclarationGroup,
+    OdfVariableDeclarations, OdfVariableHeaderFooter, OdfVariableKind, OdfVariablePart,
+    OdfVariableScope, OdfVariableValue, OdfVariableValueType,
+    remove_variable_declaration_group_xml, set_variable_declaration_group_xml,
+};
 
 // Re-export main types for convenience
+pub use master_page::{insert_master_page_xml, remove_master_page_xml, replace_master_page_xml};
 pub use odp::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-    DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind,
-    EnhancedGeometry, EnhancedGeometryChild, EnhancedGeometryChildKind, HyperlinkShow,
-    LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
-    MediaShow, MutablePresentation, Presentation, PresentationAction, PresentationBuilder,
+    CustomPresentationShow, DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink,
+    DrawingShapeKind, EnhancedGeometry, EnhancedGeometryChild, EnhancedGeometryChildKind,
+    HyperlinkShow, LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter,
+    MediaReference, MediaShow, MutablePresentation, Presentation, PresentationAction,
+    PresentationBuilder, PresentationDateTimeDeclaration, PresentationDateTimeSource,
+    PresentationDeclarationBinding, PresentationDeclarationTarget, PresentationDeclarations,
     PresentationEffect, PresentationEffectDirection, PresentationEventListener,
-    PresentationDateTimeDeclaration, PresentationDateTimeSource, PresentationDeclarationBinding,
-    PresentationDeclarationTarget, PresentationDeclarations, PresentationFeatureState,
-    PresentationMeasure, PresentationMeasureUnit, PresentationPageLayout,
-    PresentationPageLayouts, PresentationPageMetadata, PresentationPageMetadataCollection,
+    PresentationFeatureState, PresentationMasterPage, PresentationMeasure,
+    PresentationMeasureUnit, PresentationPageLayout, PresentationPageLayouts,
+    PresentationPageMetadata, PresentationPageMetadataCollection,
     PresentationPlaceholder, PresentationPlaceholderClass, PresentationSettings,
-    PresentationTextDeclaration, CustomPresentationShow, parse_presentation_page_layouts,
+    PresentationTextDeclaration, ScriptEventListener, ShapeEventListener, SlideTransition,
+    TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle,
+    TransitionType, parse_presentation_page_layouts, parse_presentation_settings,
     remove_presentation_page_layout_xml, set_presentation_page_layout_xml,
-    ScriptEventListener, ShapeEventListener, SlideTransition, TransitionDirection, TransitionSound,
-    TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };
 pub use ods::{
     AnnotationElement, AnnotationNode, CalculationIteration, CalculationNullDate,
     CalculationSettings, Cell as SCell, CellAnnotation, CellDetective, CellMatrixSpan, CellMerge,
     CellRangeSource, CellStyleProtection, CellValue, Column as SColumn, ConditionalCellStyle,
-    ConditionalCellStyleRule, Consolidation,
-    ConsolidationUseLabels, ContentValidation, DataPilotDisplayInfo, DataPilotDisplayMemberMode,
-    DataPilotField, DataPilotFieldReference, DataPilotGrandTotal, DataPilotGroup,
-    DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups, DataPilotLayoutInfo,
-    DataPilotLayoutMode, DataPilotLevel, DataPilotMember, DataPilotOrientation,
-    DataPilotReferenceMemberType, DataPilotReferenceType, DataPilotSortInfo, DataPilotSortMode,
-    DataPilotSortOrder, DataPilotSource, DataPilotTable, DatabaseFilter, DatabaseOrientation,
-    DatabaseRange, DatabaseSort, DatabaseSortKey, DatabaseSource, DdeConversionMode, DdeLink,
-    DdeSource, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
-    DetectiveOperationKind, EmbeddedNumberBehavior, FilterCondition, FilterConditionSource,
-    FilterDataType, FilterExpression, FormulaNamespace, IterationStatus, LabelRange,
-    LabelRangeOrientation, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
+    ConditionalCellStyleRule, Consolidation, ConsolidationUseLabels, ContentValidation,
+    DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,
+    DataPilotGrandTotal, DataPilotGrandTotalElement, DataPilotGrandTotalOrientation,
+    DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups,
+    DataPilotLayoutInfo, DataPilotLayoutMode, DataPilotLevel, DataPilotMember,
+    DataPilotOrientation, DataPilotReferenceMemberType, DataPilotReferenceType, DataPilotSortInfo,
+    DataPilotSortMode, DataPilotSortOrder, DataPilotSource, DataPilotTable, DatabaseFilter,
+    DatabaseOrientation, DatabaseRange, DatabaseSort, DatabaseSortKey, DatabaseSource,
+    DdeConversionMode, DdeLink, DdeSource, DetectiveDirection, DetectiveHighlightedRange,
+    DetectiveOperation, DetectiveOperationKind, EmbeddedNumberBehavior, FilterCondition,
+    FilterConditionSource, FilterDataType, FilterExpression, FormulaNamespace, IterationStatus,
+    LabelRange, LabelRangeOrientation, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
     NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet,
     SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetStyle,
     SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet, SpreadsheetBuilder,
+    TableCellProtectionStyle,
     SpreadsheetCellContentChange, SpreadsheetChangeAcceptance, SpreadsheetChangeCutOff,
     SpreadsheetChangeDimension, SpreadsheetChangeInfo, SpreadsheetChangeMetadata,
     SpreadsheetDeletion, SpreadsheetInsertion, SpreadsheetMovement, SpreadsheetNestedDeletion,
     SpreadsheetProtection, SpreadsheetTrackedCell, SpreadsheetTrackedCellAddress,
     SpreadsheetTrackedCellValue, SpreadsheetTrackedChange, SpreadsheetTrackedChanges,
-    SpreadsheetTrackedRangeAddress, SubtotalField, SubtotalRule, SubtotalRules,
-    SubtotalSortGroups,
+    SpreadsheetTrackedRangeAddress, SubtotalField, SubtotalRule, SubtotalRules, SubtotalSortGroups,
     TableGroup, TableRange, TableSourceMode, TableStructure, TableTemplate, TableTemplateAxis,
-    TableTemplateStyle, TableVisibility,
-    ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage, ValidationEventListener,
-    ValidationMessage, ValidationMessageType, ValidationPresentationEventListener,
-    ValidationPresentationSound, ValidationScriptEventListener,
+    TableTemplateStyle, TableVisibility, ValidationDisplayList, ValidationErrorMacro,
+    ValidationErrorMessage, ValidationEventListener, ValidationMessage, ValidationMessageType,
+    ValidationPresentationEventListener, ValidationPresentationSound,
+    ValidationScriptEventListener,
 };
 pub use odt::{
-    Document, DocumentBuilder, HeaderFooter, HeaderFooterKind, MasterPage, MutableDocument, Note,
-    NoteClass, PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage, ReferenceMark,
-    Ruby, SectionDdeSource, SectionDisplay, SectionSource, TextIndex, TextIndexAttribute,
-    TextIndexContent, TextIndexElement, TextIndexKind, TextIndexMark, TextIndexMarkKind,
+    AlphabeticalIndexSource, BibliographyIndexSource, ChangeType, Document, DocumentBuilder,
+    HeaderFooter,
+    HeaderFooterKind, IllustrationIndexSource, MasterPage, MasterPageChild, MasterPageChildKind,
+    MutableDocument, Note, NoteClass, ObjectIndexSource, OdtSectionBlock,
+    OdtTrackedPosition, OdtTrackedStory,
+    PageLayout, PageLayoutAttribute,
+    PageLayoutProperties, PageUsage, ReferenceMark, ReferenceMarkFragments, Ruby, SectionDdeSource,
+    Section, SectionDisplay, SectionSource, TableIndexSource, TableOfContentsSource,
+    TextAlphabeticalIndexEntryTemplate, TextAlphabeticalIndexLevel, TextAlphabeticalMarkMetadata,
+    TextBibliographyEntryTemplate, TextBibliographyEntryToken, TextBibliographyType, TextIndex,
+    TextIndexAttribute, TextIndexBody, TextIndexBodyParagraph, TextIndexBodyTitle,
+    TextIndexCaptionSequenceFormat, TextIndexChapterDisplay, TextIndexContent, TextIndexElement,
+    TextIndexEntryTemplate, TextIndexEntryToken, TextIndexKind, TextIndexMark,
+    TextIndexMarkFragments, TextIndexMarkKind, TextIndexScope, TextIndexSimpleEntryTemplate,
+    TrackChange, TrackedChanges,
+    TextIndexSourceStyles, TextIndexTabStop, TextIndexTitleTemplate, UserIndexSource,
+    insert_database_field_xml, insert_reference_mark_xml, insert_text_index_mark_xml,
+    insert_text_index_xml, remove_database_field_xml, remove_reference_mark_xml,
+    remove_text_index_mark_xml, remove_text_index_xml, replace_database_field_xml,
+    replace_reference_mark_xml, replace_text_index_mark_xml, replace_text_index_xml,
+    mark_tracked_change_range_xml, mark_tracked_deletion_xml, set_tracked_changes_xml,
+    unmark_tracked_change_xml,
+    add_section_xml, clear_sections_xml, remove_section_xml, unwrap_section_xml,
+    update_section_xml, wrap_section_xml,
 };
 
 // Re-export shapes for presentations
@@ -557,3 +700,28 @@ pub mod section_properties;
 pub use section_properties::*;
 mod header_footer_properties;
 pub use header_footer_properties::*;
+
+pub use form::{
+    OdfValueRangeControl, OdfValueRangeDuration, OdfValueRangeForm, OdfValueRangeInteger,
+    OdfValueRangeNonNegativeInteger, OdfValueRangeOrientation, OdfValueRangePositiveInteger,
+    insert_value_range_control_xml, remove_value_range_control_xml,
+    replace_value_range_control_xml, value_range_controls,
+};
+
+pub use form::{
+    OdfFormDate, OdfFormDouble, OdfTypedValueBound, OdfTypedValueControl, OdfTypedValueControlKind,
+    OdfTypedValueDuration, OdfTypedValueForm, OdfTypedValueNonNegativeInteger,
+    insert_typed_value_control_xml, remove_typed_value_control_xml,
+    replace_typed_value_control_xml, typed_value_controls,
+};
+
+pub use form::{
+    OdfConnectionResourceForm, OdfFormConnectionResource, OdfOwnedFormConnectionResource,
+    form_connection_resources, insert_form_connection_resource_xml,
+    remove_form_connection_resource_xml, replace_form_connection_resource_xml,
+};
+pub use form::{
+    OdfGridColumn, OdfGridColumnControl, OdfGridColumnControlKind, OdfGridControl, OdfGridForm,
+    OdfGridNonNegativeInteger, grid_controls, insert_grid_control_xml, remove_grid_control_xml,
+    replace_grid_control_xml,
+};

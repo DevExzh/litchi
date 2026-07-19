@@ -6,9 +6,13 @@
 //! OpenFormula expression.
 
 use litchi_core::{Error, Result, xml::escape_xml};
+use std::collections::{HashMap, HashSet};
 
 const OPENFORMULA_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:of:1.2";
 const OPENOFFICE_CALC_NAMESPACE: &str = "http://openoffice.org/2004/calc";
+const MAX_NAMED_DEFINITIONS: usize = 262_144;
+const MAX_NAMED_VALUE_BYTES: usize = 65_536;
+const MAX_NAMED_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 /// Scope in which a named range or expression is visible.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -122,8 +126,12 @@ impl NamedRange {
     pub(crate) fn validate(&self) -> Result<()> {
         validate_common(&self.name, &self.scope)?;
         validate_nonempty("named range cell address", &self.cell_range_address)?;
+        if self.cell_range_address != "#REF!" {
+            crate::ods::data_pilot::parse_data_pilot_range(&self.cell_range_address)?;
+        }
         if let Some(base) = &self.base_cell_address {
             validate_nonempty("named range base cell address", base)?;
+            if base != "#REF!" { crate::ods::data_pilot::parse_data_pilot_range(base)?; }
         }
         Ok(())
     }
@@ -249,6 +257,7 @@ impl NamedExpression {
         validate_nonempty("named expression", &self.expression)?;
         if let Some(base) = &self.base_cell_address {
             validate_nonempty("named expression base cell address", base)?;
+            if base != "#REF!" { crate::ods::data_pilot::parse_data_pilot_range(base)?; }
         }
         let expression_prefix = formula_prefix(&self.expression);
         match (&self.formula_namespace, expression_prefix) {
@@ -366,6 +375,157 @@ pub(crate) fn write_named_definitions<'a>(
     out.push_str("</table:named-expressions>");
 }
 
+pub(crate) fn write_named_definition_fragment(definition: &NamedDefinition) -> Result<String> {
+    definition.validate()?;
+    let mut output = String::with_capacity(256);
+    match definition {
+        NamedDefinition::Range(value) => {
+            output.push_str("<table:named-range xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\" table:name=\"");
+            output.push_str(&escape_xml(&value.name));
+            output.push_str("\" table:cell-range-address=\"");
+            output.push_str(&escape_xml(&value.cell_range_address));
+            output.push('"');
+            if let Some(base) = &value.base_cell_address {
+                output.push_str(" table:base-cell-address=\"");
+                output.push_str(&escape_xml(base));
+                output.push('"');
+            }
+            if !value.usable_as.is_empty() {
+                output.push_str(" table:range-usable-as=\"");
+                for (index, usage) in value.usable_as.iter().enumerate() {
+                    if index != 0 { output.push(' '); }
+                    output.push_str(usage.as_str());
+                }
+                output.push('"');
+            }
+            output.push_str("/>");
+        },
+        NamedDefinition::Expression(value) => {
+            output.push_str("<table:named-expression xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\" table:name=\"");
+            output.push_str(&escape_xml(&value.name));
+            if let Some(namespace) = &value.formula_namespace {
+                output.push_str("\" xmlns:");
+                output.push_str(&namespace.prefix);
+                output.push_str("=\"");
+                output.push_str(&escape_xml(&namespace.uri));
+            }
+            output.push_str("\" table:expression=\"");
+            output.push_str(&escape_xml(&value.expression));
+            output.push('"');
+            if let Some(base) = &value.base_cell_address {
+                output.push_str(" table:base-cell-address=\"");
+                output.push_str(&escape_xml(base));
+                output.push('"');
+            }
+            output.push_str("/>");
+        },
+    }
+    Ok(output)
+}
+
+pub(crate) fn validate_named_definition_collection(definitions: &[NamedDefinition]) -> Result<()> {
+    if definitions.len() > MAX_NAMED_DEFINITIONS {
+        return Err(Error::InvalidFormat(format!(
+            "named definition count exceeds {MAX_NAMED_DEFINITIONS}"
+        )));
+    }
+    let mut names = HashSet::with_capacity(definitions.len());
+    let mut aggregate = 0usize;
+    for definition in definitions {
+        definition.validate()?;
+        if !names.insert((definition.scope().clone(), definition.name().to_string())) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate named definition '{}' in {:?}", definition.name(), definition.scope()
+            )));
+        }
+        let values: Vec<&str> = match definition {
+            NamedDefinition::Range(value) => vec![
+                value.name.as_str(), value.cell_range_address.as_str(),
+                value.base_cell_address.as_deref().unwrap_or(""),
+            ],
+            NamedDefinition::Expression(value) => vec![
+                value.name.as_str(), value.expression.as_str(),
+                value.base_cell_address.as_deref().unwrap_or(""),
+                value.formula_namespace.as_ref().map_or("", |namespace| namespace.uri.as_str()),
+            ],
+        };
+        for value in values {
+            if value.len() > MAX_NAMED_VALUE_BYTES {
+                return Err(Error::InvalidFormat(format!(
+                    "named definition value exceeds {MAX_NAMED_VALUE_BYTES} bytes"
+                )));
+            }
+            aggregate = aggregate.checked_add(value.len())
+                .ok_or_else(|| Error::InvalidFormat("named definition text size overflow".to_string()))?;
+        }
+    }
+    if aggregate > MAX_NAMED_AGGREGATE_BYTES {
+        return Err(Error::InvalidFormat("named definition text exceeds 16 MiB".to_string()));
+    }
+    validate_named_dependencies(definitions)
+}
+
+pub(crate) fn expression_references_name(expression: &str, name: &str) -> bool {
+    formula_identifiers(expression).into_iter().any(|identifier| identifier == name)
+}
+
+fn validate_named_dependencies(definitions: &[NamedDefinition]) -> Result<()> {
+    let mut indexes = HashMap::with_capacity(definitions.len());
+    for (index, definition) in definitions.iter().enumerate() {
+        indexes.insert((definition.scope().clone(), definition.name()), index);
+    }
+    let mut edges = vec![Vec::new(); definitions.len()];
+    for (index, definition) in definitions.iter().enumerate() {
+        let NamedDefinition::Expression(expression) = definition else { continue; };
+        for identifier in formula_identifiers(&expression.expression) {
+            let local = (expression.scope.clone(), identifier);
+            let global = (NamedDefinitionScope::Global, identifier);
+            if let Some(target) = indexes.get(&local).or_else(|| indexes.get(&global)) {
+                if !edges[index].contains(target) { edges[index].push(*target); }
+            }
+        }
+    }
+    let mut state = vec![0u8; definitions.len()];
+    fn visit(index: usize, edges: &[Vec<usize>], state: &mut [u8]) -> Result<()> {
+        if state[index] == 1 {
+            return Err(Error::InvalidFormat("named expression dependency cycle".to_string()));
+        }
+        if state[index] == 2 { return Ok(()); }
+        state[index] = 1;
+        for &target in &edges[index] { visit(target, edges, state)?; }
+        state[index] = 2;
+        Ok(())
+    }
+    for index in 0..definitions.len() { visit(index, &edges, &mut state)?; }
+    Ok(())
+}
+
+fn formula_identifiers(expression: &str) -> Vec<&str> {
+    let bytes = expression.as_bytes();
+    let mut identifiers = Vec::new();
+    let mut index = 0usize;
+    let mut quoted = false;
+    while index < bytes.len() {
+        if bytes[index] == b'"' {
+            if quoted && bytes.get(index + 1) == Some(&b'"') { index += 2; continue; }
+            quoted = !quoted; index += 1; continue;
+        }
+        if quoted || !(bytes[index].is_ascii_alphabetic() || bytes[index] == b'_') {
+            index += 1; continue;
+        }
+        let start = index; index += 1;
+        while index < bytes.len() && (bytes[index].is_ascii_alphanumeric() || matches!(bytes[index], b'_' | b'.')) { index += 1; }
+        let mut following = index;
+        while following < bytes.len() && bytes[following].is_ascii_whitespace() { following += 1; }
+        let is_function = bytes.get(following) == Some(&b'(');
+        let is_namespace = bytes.get(following) == Some(&b':') && bytes.get(following + 1) == Some(&b'=');
+        if !is_function && !is_namespace {
+            identifiers.push(&expression[start..index]);
+        }
+    }
+    identifiers
+}
+
 pub(crate) fn ensure_unique(
     definitions: &[NamedDefinition],
     candidate: &NamedDefinition,
@@ -393,6 +553,8 @@ fn validate_common(name: &str, scope: &NamedDefinitionScope) -> Result<()> {
 fn validate_nonempty(label: &str, value: &str) -> Result<()> {
     if value.trim().is_empty() {
         Err(Error::InvalidFormat(format!("{label} must not be empty")))
+    } else if value.len() > MAX_NAMED_VALUE_BYTES {
+        Err(Error::InvalidFormat(format!("{label} exceeds {MAX_NAMED_VALUE_BYTES} bytes")))
     } else {
         Ok(())
     }
