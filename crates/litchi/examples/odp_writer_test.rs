@@ -133,6 +133,9 @@ fn main() -> Result<()> {
         text: String::new(),
         index: 0,
         notes: Some("This slide demonstrates custom shape creation".to_string()),
+        transition: None,
+        animations: Vec::new(),
+        legacy_animation: None,
         shapes: vec![
             Shape {
                 shape_type: ShapeType::TextBox,
@@ -273,6 +276,9 @@ fn main() -> Result<()> {
         text: String::new(),
         index: 0,
         notes: Some("Final slide with acknowledgments".to_string()),
+        transition: None,
+        animations: Vec::new(),
+        legacy_animation: None,
         shapes: vec![Shape {
             shape_type: ShapeType::TextBox,
             text: "Litchi Library - ODF Support\n\nThank you for using litchi!".to_string(),

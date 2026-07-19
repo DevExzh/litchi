@@ -159,6 +159,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let field_type_name = match field.field_type {
                 FieldType::Hyperlink => "Hyperlink",
                 FieldType::Reference => "Reference",
+                FieldType::PageReference => "Page Reference",
+                FieldType::NoteReference => "Note Reference",
                 FieldType::Page => "Page",
                 FieldType::Date => "Date",
                 FieldType::Toc => "Table of Contents",

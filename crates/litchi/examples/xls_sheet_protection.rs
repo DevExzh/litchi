@@ -112,10 +112,13 @@ fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
         let xls_sheet = wb.xls_worksheet(idx)?;
 
         let prot = xls_sheet.protection();
-        println!("  sheet_protected:    {}", prot.sheet_protected);
-        println!("  objects_protected:  {}", prot.objects_protected);
-        println!("  scenarios_protected:{}", prot.scenarios_protected);
-        println!("  password_hash:      0x{:04X}", prot.password_hash);
+        println!("  sheet_protected:    {}", prot.is_protected());
+        println!("  objects_protected:  {}", prot.objects_protected());
+        println!("  scenarios_protected:{}", prot.scenarios_protected());
+        println!(
+            "  password_hash:      0x{:04X}",
+            prot.password().map_or(0, |verifier| verifier.raw())
+        );
         println!("  has_password:       {}", prot.has_password());
     }
 

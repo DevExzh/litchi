@@ -46,7 +46,7 @@ This document tracks the implementation status of features across all supported 
 | Custom XML | ✅ | ✅ | ❌ | Read only |
 | Drawing objects | ✅ | ✅ | ❌ | Shape extraction |
 | Content controls | ✅ | ✅ | ✅ | Full content control support |
-| Document variables | ✅ | ✅ | ❌ | Read only |
+| Document variables | ✅ | ✅ | ✅ | Full read/write support |
 | Themes | ✅ | ✅ | ✅ | Color schemes and themes |
 | Watermarks | 🟡 | ❌ | ✅ | Write only |
 | Equations (OMML) | ❌ | ❌ | ❌ | Office Math (`m:oMath`) equations |
@@ -751,4 +751,3 @@ See individual TODO comments in the source files for specific implementation det
 - `src/iwa/` - Apple iWork formats (Pages, Keynote, Numbers)
 
 Pull requests are welcome for any of these features!
-

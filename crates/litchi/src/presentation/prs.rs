@@ -41,16 +41,6 @@ use std::path::Path;
 pub struct Presentation {
     /// The underlying format-specific implementation
     pub(super) inner: PresentationImpl,
-    /// PPTX package storage that must outlive the Presentation reference.
-    ///
-    /// This field is prefixed with `_` because it's not directly accessed,
-    /// but it MUST be kept to maintain memory safety. The `inner` PresentationImpl::Pptx
-    /// variant holds a reference with extended lifetime to data owned by this Box.
-    /// Dropping this would invalidate those references (use-after-free).
-    ///
-    /// Only used for PPTX files; None for PPT and Keynote files.
-    #[cfg(feature = "ooxml")]
-    pub(super) _pptx_package: Option<Box<ooxml::pptx::Package>>,
     /// Cached metadata extracted during presentation creation.
     ///
     /// Metadata is extracted once during `open()` or `from_bytes()` and cached here
@@ -153,8 +143,6 @@ impl Presentation {
 
                 Ok(Self {
                     inner: PresentationImpl::Ppt(pres),
-                    #[cfg(feature = "ooxml")]
-                    _pptx_package: None,
                     cached_metadata,
                 })
             },
@@ -177,19 +165,8 @@ impl Presentation {
                             }
                         });
 
-                // SAFETY: Same lifetime extension as in `open()`
-                let pres_ref = unsafe {
-                    let pkg_ptr = &*package as *const ooxml::pptx::Package;
-                    let pres = (*pkg_ptr).presentation().map_err(Error::from)?;
-                    std::mem::transmute::<
-                        ooxml::pptx::Presentation<'_>,
-                        ooxml::pptx::Presentation<'static>,
-                    >(pres)
-                };
-
                 Ok(Self {
-                    inner: PresentationImpl::Pptx(Box::new(pres_ref)),
-                    _pptx_package: Some(package),
+                    inner: PresentationImpl::Pptx(package),
                     cached_metadata,
                 })
             },
@@ -210,8 +187,6 @@ impl Presentation {
 
                 Ok(Self {
                     inner: PresentationImpl::Keynote(doc),
-                    #[cfg(feature = "ooxml")]
-                    _pptx_package: None,
                     cached_metadata,
                 })
             },
@@ -227,8 +202,6 @@ impl Presentation {
                 Ok(Self {
                     inner: PresentationImpl::Odp(doc),
                     cached_metadata: Some(litchi_core::Metadata::default()),
-                    #[cfg(feature = "ooxml")]
-                    _pptx_package: None,
                 })
             },
             // Handle mismatched formats
@@ -258,8 +231,9 @@ impl Presentation {
             #[cfg(feature = "ole")]
             PresentationImpl::Ppt(pres) => pres.text().map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            PresentationImpl::Pptx(pres) => {
+            PresentationImpl::Pptx(package) => {
                 // PPTX presentations need to extract text from all slides
+                let pres = package.presentation().map_err(Error::from)?;
                 let slides = pres.slides().map_err(Error::from)?;
                 let mut texts = Vec::new();
                 for slide in slides {
@@ -299,7 +273,11 @@ impl Presentation {
             #[cfg(feature = "ole")]
             PresentationImpl::Ppt(pres) => Ok(pres.slide_count()),
             #[cfg(feature = "ooxml")]
-            PresentationImpl::Pptx(pres) => pres.slide_count().map_err(Error::from),
+            PresentationImpl::Pptx(package) => package
+                .presentation()
+                .map_err(Error::from)?
+                .slide_count()
+                .map_err(Error::from),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(doc) => {
                 let slides = doc
@@ -349,8 +327,9 @@ impl Presentation {
                     .collect()
             },
             #[cfg(feature = "ooxml")]
-            PresentationImpl::Pptx(pres) => {
+            PresentationImpl::Pptx(package) => {
                 use super::types::PptxSlideData;
+                let pres = package.presentation().map_err(Error::from)?;
                 let slides = pres.slides().map_err(Error::from)?;
                 // Extract slide data immediately to avoid lifetime issues
                 slides
@@ -399,7 +378,11 @@ impl Presentation {
             #[cfg(feature = "ole")]
             PresentationImpl::Ppt(_) => Ok(None),
             #[cfg(feature = "ooxml")]
-            PresentationImpl::Pptx(pres) => pres.slide_width().map_err(Error::from),
+            PresentationImpl::Pptx(package) => package
+                .presentation()
+                .map_err(Error::from)?
+                .slide_width()
+                .map_err(Error::from),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odf")]
@@ -427,7 +410,11 @@ impl Presentation {
             #[cfg(feature = "ole")]
             PresentationImpl::Ppt(_) => Ok(None),
             #[cfg(feature = "ooxml")]
-            PresentationImpl::Pptx(pres) => pres.slide_height().map_err(Error::from),
+            PresentationImpl::Pptx(package) => package
+                .presentation()
+                .map_err(Error::from)?
+                .slide_height()
+                .map_err(Error::from),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odf")]

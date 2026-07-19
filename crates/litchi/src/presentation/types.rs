@@ -38,7 +38,7 @@ pub(super) enum PresentationImpl {
     Ppt(ole::ppt::Presentation),
     /// Modern .pptx format
     #[cfg(feature = "ooxml")]
-    Pptx(Box<ooxml::pptx::Presentation<'static>>),
+    Pptx(Box<ooxml::pptx::Package>),
     /// Apple Keynote format
     #[cfg(feature = "iwa")]
     Keynote(crate::iwa::keynote::KeynoteDocument),

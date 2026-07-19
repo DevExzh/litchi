@@ -21,14 +21,14 @@ fn main() {
 
     println!("Created animations:");
     println!(
-        "  Shape 1: {:?}, duration={}ms",
+        "  Shape 1: {:?}, duration={:?}",
         fade_in.effect, fade_in.duration
     );
     println!(
-        "  Shape 2: {:?}, duration={}ms, delay={}ms",
+        "  Shape 2: {:?}, duration={:?}, delay={}ms",
         fly_in.effect, fly_in.duration, fly_in.delay
     );
-    println!("  Shape 3: {:?}, duration={}ms", zoom.effect, zoom.duration);
+    println!("  Shape 3: {:?}, duration={:?}", zoom.effect, zoom.duration);
 
     // Build an animation sequence
     let mut sequence = AnimationSequence::new();

@@ -1468,13 +1468,10 @@ impl MarkdownWriter {
             let crate::document::Run::Doc(ole_run) = _run;
 
             if ole_run.has_mtef_formula() {
-                // Get the MTEF formula AST
-                if let Some(mtef_ast) = ole_run.mtef_formula_ast() {
-                    // Convert MTEF AST to LaTeX
-                    let latex = self.convert_mtef_to_latex(mtef_ast);
-                    return Ok(Some(self.format_formula(&latex, true))); // true = inline
+                if let Some(latex) = ole_run.mtef_formula_latex() {
+                    return Ok(Some(self.format_formula(latex, true))); // true = inline
                 } else {
-                    // Fallback placeholder if AST is not available
+                    // Fallback placeholder if rendered formula text is unavailable.
                     return Ok(Some(self.format_formula("[Formula]", true)));
                 }
             }
@@ -1490,13 +1487,10 @@ impl MarkdownWriter {
             };
 
             if ole_run.has_mtef_formula() {
-                // Get the MTEF formula AST
-                if let Some(mtef_ast) = ole_run.mtef_formula_ast() {
-                    // Convert MTEF AST to LaTeX
-                    let latex = self.convert_mtef_to_latex(mtef_ast);
-                    return Ok(Some(self.format_formula(&latex, true))); // true = inline
+                if let Some(latex) = ole_run.mtef_formula_latex() {
+                    return Ok(Some(self.format_formula(latex, true))); // true = inline
                 } else {
-                    // Fallback placeholder if AST is not available
+                    // Fallback placeholder if rendered formula text is unavailable.
                     return Ok(Some(self.format_formula("[Formula]", true)));
                 }
             }
