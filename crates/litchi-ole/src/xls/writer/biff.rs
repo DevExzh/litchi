@@ -22,6 +22,8 @@ use std::io::Write;
 mod cells;
 mod comment;
 mod conditional_format;
+mod drawing;
+mod list_object;
 mod modern_globals;
 mod named_range;
 mod pivot;
@@ -34,20 +36,22 @@ mod workbook;
 mod worksheet;
 
 pub(crate) use cells::write_formula;
-pub(crate) use comment::{CommentConfig, write_comments};
+pub(crate) use comment::CommentConfig;
+pub(crate) use drawing::{PrimitiveShapeConfig, write_worksheet_drawing};
 pub(crate) use conditional_format::Cf12Config;
+pub(crate) use list_object::write_list_objects;
 
 pub(crate) use modern_globals::{
     sxdbex_creation_timestamp_bytes, write_compat12, write_compress_pictures,
-    write_pivot_cache_sxaddl_block, write_table_styles,
+    write_custom_table_styles, write_differential_formats, write_pivot_cache_sxaddl_block,
+    write_table_styles,
 };
 pub(crate) use pivot::{
     PivotCacheFieldInfo, PivotCacheSourceRow, PivotCacheStreamInfo, SxDiConfig, SxExConfig,
     SxVdConfig, SxViConfig, SxViewConfig, generate_pivot_cache_stream, write_dconref,
-    write_mso_drawing_group, write_mso_drawing_sheet1, write_pivot_modern_extensions,
-    write_pivot_page_mso_drawing, write_pivot_page_obj, write_sx_stream_id, write_sxdi, write_sxex,
-    write_sxivd, write_sxli, write_sxpi, write_sxvd, write_sxvdex, write_sxvi, write_sxview,
-    write_sxvs,
+    write_mso_drawing_group, write_pivot_modern_extensions, write_sx_stream_id, write_sxdi,
+    write_sxex, write_sxivd, write_sxli, write_sxpi, write_sxvd, write_sxvdex, write_sxvi,
+    write_sxview, write_sxvs,
 };
 pub(crate) use pivot_xfext::write_pivot_xfext_block;
 pub(crate) use validation::{DvConfig, DvalConfig};
@@ -73,6 +77,13 @@ pub(crate) fn write_record_header<W: Write>(
 
 pub fn write_force_full_calculation<W: Write>(writer: &mut W, force: bool) -> XlsResult<()> {
     workbook::write_force_full_calculation(writer, force)
+}
+
+pub fn write_mtr_settings<W: Write>(
+    writer: &mut W,
+    settings: crate::xls::XlsMultithreadedCalculation,
+) -> XlsResult<()> {
+    workbook::write_mtr_settings(writer, settings)
 }
 
 pub fn write_uncalced<W: Write>(writer: &mut W) -> XlsResult<()> {
@@ -415,8 +426,8 @@ pub fn write_default_selection<W: Write>(
     worksheet::write_default_selection(writer, freeze_rows, freeze_cols)
 }
 
-pub fn write_pivot_window2<W: Write>(writer: &mut W) -> XlsResult<()> {
-    worksheet::write_pivot_window2(writer)
+pub fn write_pivot_window2<W: Write>(writer: &mut W, selected: bool) -> XlsResult<()> {
+    worksheet::write_pivot_window2(writer, selected)
 }
 
 pub fn write_plv<W: Write>(writer: &mut W) -> XlsResult<()> {

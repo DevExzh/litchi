@@ -1,6 +1,9 @@
 use super::super::hyperlink::PowerPointInteraction;
 use super::super::package::{PptError, Result};
 use super::super::records::PptRecord;
+use super::super::shape_programmable_tags::{
+    PowerPointShapeProgrammableTagLimits, PowerPointShapeProgrammableTags,
+};
 use super::super::text_extensions::{
     TextStyleExtension9, TextStyleExtension10, TextStyleExtension11,
 };
@@ -704,6 +707,48 @@ impl<'a> EscherRecord<'a> {
         Ok(None)
     }
 
+    /// Parse the context-validated `PlaceholderAtom` owned by this shape.
+    pub fn extract_placeholder_atom(
+        &self,
+        context: crate::ppt::PowerPointPlaceholderContext,
+    ) -> Result<Option<crate::ppt::PowerPointPlaceholderAtom>> {
+        self.extract_placeholder_atom_with_limits(
+            context,
+            crate::ppt::PowerPointPlaceholderLimits::default(),
+        )
+    }
+
+    /// Parse a placeholder atom with caller-supplied client-data limits.
+    pub fn extract_placeholder_atom_with_limits(
+        &self,
+        context: crate::ppt::PowerPointPlaceholderContext,
+        limits: crate::ppt::PowerPointPlaceholderLimits,
+    ) -> Result<Option<crate::ppt::PowerPointPlaceholderAtom>> {
+        let Some(client_data) = (self.record_type == EscherRecordType::ClientData)
+            .then_some(self)
+            .or_else(|| self.find_child(EscherRecordType::ClientData))
+        else {
+            return Ok(None);
+        };
+        if client_data.version != 0x0f
+            || client_data.instance != 0
+            || client_data.record_type != EscherRecordType::ClientData
+            || usize::try_from(client_data.data_length).ok() != Some(client_data.data.len())
+        {
+            return Err(PptError::Corrupted(
+                "Invalid OfficeArt ClientData record header".to_string(),
+            ));
+        }
+        Ok(
+            crate::ppt::PowerPointPlaceholderProjection::parse_client_data_payload(
+                &client_data.data,
+                context,
+                limits,
+            )?
+            .placeholder,
+        )
+    }
+
     /// Extract click and mouse-over actions from this shape's ClientData.
     pub fn extract_interactions(&self) -> Result<Vec<PowerPointInteraction>> {
         let Some(client_data) = (self.record_type == EscherRecordType::ClientData)
@@ -741,44 +786,15 @@ impl<'a> EscherRecord<'a> {
         }
     }
 
-    /// Extract the PowerPoint 9 text-style extension stored beside a textbox.
+    /// Extract the external media or OLE object reference stored beside a shape.
     ///
-    /// MS-PPT stores `StyleTextProp9Atom` in the shape's `ClientData`, under
-    /// the `___PPT9` programmable binary tag, rather than in `ClientTextbox`.
-    pub fn extract_text_style_extension9(&self) -> Result<Option<TextStyleExtension9>> {
-        self.extract_versioned_text_style_record(
-            9,
-            crate::consts::PptRecordType::StyleTextProp9Atom,
-        )?
-        .map(|record| TextStyleExtension9::parse(&record.data))
-        .transpose()
-    }
-
-    /// Extract PowerPoint 10 alternate-script font formatting for this text.
-    pub fn extract_text_style_extension10(&self) -> Result<Option<TextStyleExtension10>> {
-        self.extract_versioned_text_style_record(
-            10,
-            crate::consts::PptRecordType::StyleTextProp10Atom,
-        )?
-        .map(|record| TextStyleExtension10::parse(&record.data))
-        .transpose()
-    }
-
-    /// Extract PowerPoint 11 smart-tag formatting for this text.
-    pub fn extract_text_style_extension11(&self) -> Result<Option<TextStyleExtension11>> {
-        self.extract_versioned_text_style_record(
-            11,
-            crate::consts::PptRecordType::StyleTextProp11Atom,
-        )?
-        .map(|record| TextStyleExtension11::parse(&record.data))
-        .transpose()
-    }
-
-    fn extract_versioned_text_style_record(
+    /// MS-PPT permits at most one `ExObjRefAtom` in an OfficeArt
+    /// `ClientData` record. The returned identifier remains inert; callers can
+    /// resolve it through the presentation's validated external-object
+    /// collections without activating embedded content.
+    pub fn extract_external_object_reference(
         &self,
-        version: u8,
-        record_type: crate::consts::PptRecordType,
-    ) -> Result<Option<PptRecord>> {
+    ) -> Result<Option<crate::ppt::PowerPointExternalObjectReference>> {
         let Some(client_data) = (self.record_type == EscherRecordType::ClientData)
             .then_some(self)
             .or_else(|| self.find_child(EscherRecordType::ClientData))
@@ -786,56 +802,107 @@ impl<'a> EscherRecord<'a> {
             return Ok(None);
         };
 
+        let mut reference = None;
+        for record in parse_ppt_record_sequence(&client_data.data, "shape ClientData")? {
+            if record.record_type != crate::consts::PptRecordType::ExternalObjectRefAtom {
+                continue;
+            }
+            let parsed = crate::ppt::PowerPointExternalObjectReference::parse(&record)?;
+            if reference.replace(parsed).is_some() {
+                return Err(PptError::Corrupted(
+                    "Shape ClientData contains multiple ExObjRefAtom records".to_string(),
+                ));
+            }
+        }
+        Ok(reference)
+    }
+
+    /// Parse the shape-flag prefix owned by this shape's OfficeArt `ClientData`.
+    pub fn extract_shape_flags(&self) -> Result<Option<crate::ppt::PowerPointShapeFlagProjection>> {
+        self.extract_shape_flags_with_limits(crate::ppt::PowerPointShapeFlagLimits::default())
+    }
+
+    /// Parse shape flags with caller-supplied client-data resource limits.
+    pub fn extract_shape_flags_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointShapeFlagLimits,
+    ) -> Result<Option<crate::ppt::PowerPointShapeFlagProjection>> {
+        let Some(client_data) = (self.record_type == EscherRecordType::ClientData)
+            .then_some(self)
+            .or_else(|| self.find_child(EscherRecordType::ClientData))
+        else {
+            return Ok(None);
+        };
+        if client_data.version != 0x0f
+            || client_data.instance != 0
+            || client_data.record_type != EscherRecordType::ClientData
+            || usize::try_from(client_data.data_length).ok() != Some(client_data.data.len())
+        {
+            return Err(PptError::Corrupted(
+                "Invalid OfficeArt ClientData record header".to_string(),
+            ));
+        }
+        let projection = crate::ppt::PowerPointShapeFlagProjection::parse_client_data_payload(
+            &client_data.data,
+            limits,
+        )?;
+        Ok(projection.has_flags().then_some(projection))
+    }
+
+    /// Parse shape programmable tags from this shape's OfficeArt `ClientData`.
+    pub fn extract_shape_programmable_tags(
+        &self,
+    ) -> Result<Option<PowerPointShapeProgrammableTags>> {
+        self.extract_shape_programmable_tags_with_limits(
+            PowerPointShapeProgrammableTagLimits::default(),
+        )
+    }
+
+    /// Parse shape programmable tags with caller-supplied resource limits.
+    pub fn extract_shape_programmable_tags_with_limits(
+        &self,
+        limits: PowerPointShapeProgrammableTagLimits,
+    ) -> Result<Option<PowerPointShapeProgrammableTags>> {
+        let Some(client_data) = (self.record_type == EscherRecordType::ClientData)
+            .then_some(self)
+            .or_else(|| self.find_child(EscherRecordType::ClientData))
+        else {
+            return Ok(None);
+        };
         let mut result = None;
         for record in parse_ppt_record_sequence(&client_data.data, "shape ClientData")? {
             if record.record_type != crate::consts::PptRecordType::ProgTags {
                 continue;
             }
-            for tag in parse_ppt_record_sequence(&record.data, &format!("PPT{version} ProgTags"))? {
-                if tag.record_type != crate::consts::PptRecordType::ProgBinaryTag {
-                    continue;
-                }
-                let tag_children =
-                    parse_ppt_record_sequence(&tag.data, &format!("PPT{version} ProgBinaryTag"))?;
-                let Some(name) = tag_children
-                    .iter()
-                    .find(|child| child.record_type == crate::consts::PptRecordType::CString)
-                else {
-                    continue;
-                };
-                if !is_versioned_ppt_tag_name(name, version) {
-                    continue;
-                }
-                let blob = tag_children
-                    .iter()
-                    .find(|child| child.record_type == crate::consts::PptRecordType::BinaryTagData)
-                    .ok_or_else(|| {
-                        PptError::Corrupted(format!(
-                            "___PPT{version} programmable tag is missing BinaryTagData"
-                        ))
-                    })?;
-                for extension_record in parse_ppt_record_sequence(
-                    &blob.data,
-                    &format!("___PPT{version} BinaryTagData"),
-                )? {
-                    if extension_record.record_type != record_type {
-                        continue;
-                    }
-                    if extension_record.version != 0 || extension_record.instance != 0 {
-                        return Err(PptError::Corrupted(format!(
-                            "Versioned text style atom {record_type:?} has an invalid header"
-                        )));
-                    }
-                    if result.is_some() {
-                        return Err(PptError::Corrupted(format!(
-                            "Shape contains multiple {record_type:?} records"
-                        )));
-                    }
-                    result = Some(extension_record);
-                }
+            let parsed = PowerPointShapeProgrammableTags::parse(&record, limits)?;
+            if result.replace(parsed).is_some() {
+                return Err(PptError::Corrupted(
+                    "Shape ClientData contains multiple ShapeProgTagsContainer records".to_string(),
+                ));
             }
         }
         Ok(result)
+    }
+
+    /// Extract the PowerPoint 9 text-style extension stored beside a textbox.
+    pub fn extract_text_style_extension9(&self) -> Result<Option<TextStyleExtension9>> {
+        Ok(self
+            .extract_shape_programmable_tags()?
+            .and_then(|tags| tags.powerpoint9().cloned()))
+    }
+
+    /// Extract PowerPoint 10 alternate-script font formatting for this text.
+    pub fn extract_text_style_extension10(&self) -> Result<Option<TextStyleExtension10>> {
+        Ok(self
+            .extract_shape_programmable_tags()?
+            .and_then(|tags| tags.powerpoint10().cloned()))
+    }
+
+    /// Extract PowerPoint 11 smart-tag formatting for this text.
+    pub fn extract_text_style_extension11(&self) -> Result<Option<TextStyleExtension11>> {
+        Ok(self
+            .extract_shape_programmable_tags()?
+            .and_then(|tags| tags.powerpoint11().cloned()))
     }
 
     /// Parse text record data according to MS-ODRAW text record format.
@@ -903,23 +970,6 @@ fn parse_ppt_record_sequence(data: &[u8], context: &str) -> Result<Vec<PptRecord
         offset = record_end;
     }
     Ok(records)
-}
-
-fn is_versioned_ppt_tag_name(record: &PptRecord, version: u8) -> bool {
-    let expected: &[u16] = match version {
-        9 => &[0x5f, 0x5f, 0x5f, 0x50, 0x50, 0x54, 0x39],
-        10 => &[0x5f, 0x5f, 0x5f, 0x50, 0x50, 0x54, 0x31, 0x30],
-        11 => &[0x5f, 0x5f, 0x5f, 0x50, 0x50, 0x54, 0x31, 0x31],
-        _ => return false,
-    };
-    record.version == 0
-        && record.instance == 0
-        && record.data.len() == expected.len() * 2
-        && record
-            .data
-            .chunks_exact(2)
-            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
-            .eq(expected.iter().copied())
 }
 
 /// Parser for Escher-based shape data with zero-copy optimization.
@@ -1110,6 +1160,50 @@ mod tests {
         let shape = shape_with_versioned_extension("___PPT11", 4022, 0, &smart_tag_payload);
         let extension = shape.extract_text_style_extension11().unwrap().unwrap();
         assert_eq!(extension.runs[0].smart_tag_indices, vec![99]);
+    }
+
+    #[test]
+    fn extracts_external_object_reference_from_shape_client_data() {
+        let atom = ppt_record(0, 0, 3009, &37u32.to_le_bytes());
+        let client_data = EscherRecord {
+            record_type: EscherRecordType::ClientData,
+            version: 0x0f,
+            instance: 0,
+            data_length: atom.len() as u32,
+            data: Cow::Owned(atom.clone()),
+            children: Vec::new(),
+            properties: Vec::new(),
+        };
+        let shape = EscherRecord {
+            record_type: EscherRecordType::SpContainer,
+            version: 0x0f,
+            instance: 0,
+            data_length: 0,
+            data: Cow::Borrowed(&[]),
+            children: vec![client_data],
+            properties: Vec::new(),
+        };
+        assert_eq!(
+            shape
+                .extract_external_object_reference()
+                .unwrap()
+                .unwrap()
+                .id,
+            37
+        );
+
+        let mut duplicate = atom.clone();
+        duplicate.extend_from_slice(&atom);
+        let client_data = EscherRecord {
+            record_type: EscherRecordType::ClientData,
+            version: 0x0f,
+            instance: 0,
+            data_length: duplicate.len() as u32,
+            data: Cow::Owned(duplicate),
+            children: Vec::new(),
+            properties: Vec::new(),
+        };
+        assert!(client_data.extract_external_object_reference().is_err());
     }
 
     #[test]

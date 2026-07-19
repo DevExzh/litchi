@@ -8,13 +8,241 @@ use encoding_rs::{
     WINDOWS_1253, WINDOWS_1254, WINDOWS_1255, WINDOWS_1256, WINDOWS_1257, WINDOWS_1258,
 };
 use md5::{Digest, Md5};
+use rand::{TryRng, rngs::SysRng};
 use rc4::{KeyInit, Rc4, StreamCipher};
+use sha1::Sha1;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
 
 const FIB_BASE_LEN: usize = 68;
 const BINARY_RC4_HEADER_LEN: usize = 52;
 const BINARY_RC4_BLOCK_SIZE: usize = 512;
+const CRYPTO_API_FLAG: u32 = 0x0000_0004;
+const CALG_RC4: u32 = 0x0000_6801;
+const CALG_SHA1: u32 = 0x0000_8004;
+const CRYPTO_API_VERIFIER_LEN: usize = 60;
+const CRYPTO_API_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
+
+/// Password-to-open encryption profile used by [`crate::doc::DocWriter`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocEncryptionProfile {
+    /// Legacy Word XOR obfuscation with an ANSI password of at most 15 characters.
+    WordXorObfuscation,
+    /// Office 97 binary RC4 with a 40-bit password-derived secret.
+    OfficeBinaryRc4,
+    /// Office CryptoAPI RC4/SHA-1 using a supported byte-aligned key size.
+    CryptoApiRc4 {
+        /// RC4 key size in bits. Supported values are 40 through 128 in steps of eight.
+        key_bits: u16,
+    },
+}
+
+impl DocEncryptionProfile {
+    pub(crate) fn validate(self) -> std::result::Result<(), String> {
+        if let Self::CryptoApiRc4 { key_bits } = self
+            && (!(40..=128).contains(&key_bits) || key_bits % 8 != 0)
+        {
+            return Err(format!(
+                "DOC CryptoAPI RC4 key size {key_bits} is not a byte-aligned value in 40..=128"
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn table_header_len(self) -> std::result::Result<usize, String> {
+        self.validate()?;
+        match self {
+            Self::WordXorObfuscation => Ok(0),
+            Self::OfficeBinaryRc4 => Ok(BINARY_RC4_HEADER_LEN),
+            Self::CryptoApiRc4 { .. } => {
+                let provider_len = CRYPTO_API_PROVIDER.encode_utf16().count() + 1;
+                12usize
+                    .checked_add(32)
+                    .and_then(|len| len.checked_add(provider_len * 2))
+                    .and_then(|len| len.checked_add(CRYPTO_API_VERIFIER_LEN))
+                    .ok_or_else(|| "DOC CryptoAPI encryption header length overflow".to_string())
+            },
+        }
+    }
+}
+
+pub(crate) fn validate_writer_password(
+    profile: DocEncryptionProfile,
+    password: &str,
+) -> std::result::Result<(), String> {
+    profile.validate()?;
+    let units = password.encode_utf16().count();
+    if units == 0 {
+        return Err("DOC password-to-open password must not be empty".to_string());
+    }
+    let maximum = match profile {
+        DocEncryptionProfile::WordXorObfuscation => 15,
+        DocEncryptionProfile::OfficeBinaryRc4 | DocEncryptionProfile::CryptoApiRc4 { .. } => 255,
+    };
+    if units > maximum {
+        return Err(format!(
+            "DOC password contains {units} UTF-16 code units and exceeds the {maximum}-unit limit"
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn encrypt_document_streams_for_write(
+    profile: DocEncryptionProfile,
+    password: &str,
+    word_document: &mut [u8],
+    table_stream: &mut [u8],
+    data_stream: &mut [u8],
+) -> std::result::Result<(), String> {
+    validate_writer_password(profile, password)?;
+    let header_len = profile.table_header_len()?;
+    if word_document.len() < FIB_BASE_LEN {
+        return Err(format!(
+            "DOC WordDocument stream is shorter than the {FIB_BASE_LEN}-byte clear FIB prefix"
+        ));
+    }
+    if table_stream.len() < header_len {
+        return Err("DOC table stream is shorter than its encryption header".to_string());
+    }
+    if table_stream[..header_len].iter().any(|byte| *byte != 0) {
+        return Err("DOC reserved table encryption header is not clear".to_string());
+    }
+    let flags = u16::from_le_bytes([word_document[10], word_document[11]]);
+    if flags & 0x0200 == 0 {
+        return Err("DOC encrypted writer output must identify the 1Table stream".to_string());
+    }
+
+    match profile {
+        DocEncryptionProfile::WordXorObfuscation => {
+            let password_bytes = ansi_password_bytes(password, 0x0409);
+            let verifier = xor_password_verifier(&password_bytes);
+            patch_fib_encryption(word_document, true, verifier);
+            let context = XorContext {
+                array: Zeroizing::new(create_word_xor_array(&password_bytes)),
+            };
+            apply_xor_stream(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &context)
+                .map_err(|error| error.to_string())?;
+            apply_xor_stream(table_stream, 0, &context).map_err(|error| error.to_string())?;
+            apply_xor_stream(data_stream, 0, &context).map_err(|error| error.to_string())?;
+        },
+        DocEncryptionProfile::OfficeBinaryRc4 => {
+            let mut salt = Zeroizing::new([0u8; 16]);
+            let mut verifier = Zeroizing::new([0u8; 16]);
+            fill_random(salt.as_mut(), "binary RC4 salt")?;
+            fill_random(verifier.as_mut(), "binary RC4 verifier")?;
+            let (header, secret) = build_binary_rc4_header(password, &salt, &verifier)?;
+            table_stream[..header_len].copy_from_slice(&header);
+            patch_fib_encryption(word_document, false, header_len as u32);
+            apply_stream_cipher(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &secret)
+                .map_err(|error| error.to_string())?;
+            apply_stream_cipher(&mut table_stream[header_len..], header_len, &secret)
+                .map_err(|error| error.to_string())?;
+            apply_stream_cipher(data_stream, 0, &secret).map_err(|error| error.to_string())?;
+        },
+        DocEncryptionProfile::CryptoApiRc4 { key_bits } => {
+            let mut salt = Zeroizing::new([0u8; 16]);
+            let mut verifier = Zeroizing::new([0u8; 16]);
+            fill_random(salt.as_mut(), "CryptoAPI salt")?;
+            fill_random(verifier.as_mut(), "CryptoAPI verifier")?;
+            let (header, context) =
+                build_cryptoapi_header(password, key_bits, &salt, &verifier)?;
+            if header.len() != header_len {
+                return Err("DOC CryptoAPI header length is inconsistent".to_string());
+            }
+            table_stream[..header_len].copy_from_slice(&header);
+            patch_fib_encryption(word_document, false, header_len as u32);
+            apply_cryptoapi_stream(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &context)
+                .map_err(|error| error.to_string())?;
+            apply_cryptoapi_stream(&mut table_stream[header_len..], header_len, &context)
+                .map_err(|error| error.to_string())?;
+            apply_cryptoapi_stream(data_stream, 0, &context)
+                .map_err(|error| error.to_string())?;
+        },
+    }
+    Ok(())
+}
+
+fn patch_fib_encryption(word_document: &mut [u8], obfuscated: bool, l_key: u32) {
+    let mut flags = u16::from_le_bytes([word_document[10], word_document[11]]) | 0x0100;
+    if obfuscated {
+        flags |= 0x8000;
+    } else {
+        flags &= !0x8000;
+    }
+    word_document[10..12].copy_from_slice(&flags.to_le_bytes());
+    word_document[14..18].copy_from_slice(&l_key.to_le_bytes());
+}
+
+fn fill_random(bytes: &mut [u8], field: &str) -> std::result::Result<(), String> {
+    SysRng
+        .try_fill_bytes(bytes)
+        .map_err(|_| format!("operating-system randomness unavailable for DOC {field}"))
+}
+
+fn build_binary_rc4_header(
+    password: &str,
+    salt: &[u8; 16],
+    verifier: &[u8; 16],
+) -> std::result::Result<(Vec<u8>, Zeroizing<[u8; 5]>), String> {
+    let secret = derive_secret(password, salt);
+    let key = derive_block_key(&secret, 0);
+    let mut encrypted = Zeroizing::new([0u8; 32]);
+    encrypted[..16].copy_from_slice(verifier);
+    encrypted[16..].copy_from_slice(&Md5::digest(verifier));
+    let mut cipher = Rc4::new_from_slice(key.as_ref())
+        .map_err(|_| "invalid DOC binary RC4 key length".to_string())?;
+    cipher.apply_keystream(encrypted.as_mut());
+    let mut header = Vec::with_capacity(BINARY_RC4_HEADER_LEN);
+    header.extend_from_slice(&1u16.to_le_bytes());
+    header.extend_from_slice(&1u16.to_le_bytes());
+    header.extend_from_slice(salt);
+    header.extend_from_slice(encrypted.as_ref());
+    Ok((header, secret))
+}
+
+fn build_cryptoapi_header(
+    password: &str,
+    key_bits: u16,
+    salt: &[u8; 16],
+    verifier: &[u8; 16],
+) -> std::result::Result<(Vec<u8>, CryptoApiContext), String> {
+    let context = cryptoapi::context_for_password(password, salt, usize::from(key_bits))
+        .map_err(|error| map_crypto_error(error).to_string())?;
+    let mut encrypted = Zeroizing::new([0u8; 36]);
+    encrypted[..16].copy_from_slice(verifier);
+    encrypted[16..].copy_from_slice(&Sha1::digest(verifier));
+    cryptoapi::apply_block_cipher(&context, 0, encrypted.as_mut())
+        .map_err(|error| map_crypto_error(error).to_string())?;
+
+    let provider = CRYPTO_API_PROVIDER
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    let header_size = 32u32
+        .checked_add(provider.len() as u32)
+        .ok_or_else(|| "DOC CryptoAPI header size overflow".to_string())?;
+    let mut header = Vec::with_capacity(12 + header_size as usize + CRYPTO_API_VERIFIER_LEN);
+    header.extend_from_slice(&2u16.to_le_bytes());
+    header.extend_from_slice(&2u16.to_le_bytes());
+    header.extend_from_slice(&CRYPTO_API_FLAG.to_le_bytes());
+    header.extend_from_slice(&header_size.to_le_bytes());
+    header.extend_from_slice(&CRYPTO_API_FLAG.to_le_bytes());
+    header.extend_from_slice(&0u32.to_le_bytes());
+    header.extend_from_slice(&CALG_RC4.to_le_bytes());
+    header.extend_from_slice(&CALG_SHA1.to_le_bytes());
+    header.extend_from_slice(&u32::from(key_bits).to_le_bytes());
+    header.extend_from_slice(&1u32.to_le_bytes());
+    header.extend_from_slice(&0u32.to_le_bytes());
+    header.extend_from_slice(&0u32.to_le_bytes());
+    header.extend_from_slice(&provider);
+    header.extend_from_slice(&16u32.to_le_bytes());
+    header.extend_from_slice(salt);
+    header.extend_from_slice(&encrypted[..16]);
+    header.extend_from_slice(&20u32.to_le_bytes());
+    header.extend_from_slice(&encrypted[16..]);
+    Ok((header, context))
+}
 
 const XOR_INITIAL_CODE: [u16; 15] = [
     0xe1f0, 0x1d0f, 0xcc9c, 0x84c0, 0x110c, 0x0e10, 0xf1ce, 0x313e, 0x1872, 0xe139, 0xd40f, 0x84f9,

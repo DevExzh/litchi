@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::comment::WritableComment;
+use super::shape::XlsShapeWrite;
 use super::{
     XlsCellValue, XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormatGroup,
     XlsConditionalFormatRange, XlsConditionalFormatRule, XlsDataValidation,
@@ -112,16 +113,20 @@ pub(super) struct WritableWorksheet {
     /// Cell or range hyperlinks stored for this worksheet.
     pub hyperlinks: Vec<XlsHyperlink>,
     pub comments: Vec<WritableComment>,
+    pub shapes: Vec<XlsShapeWrite>,
     /// Per-column AutoFilter conditions.
     pub auto_filter_columns: Vec<AutoFilterColumnDef>,
     /// Sort configuration.
     pub sort_config: Option<SortConfig>,
+    /// Extended sort metadata and conditions.
+    pub sort_data: Option<crate::xls::XlsSortData>,
     /// Pivot tables to write.
     pub pivot_tables: Vec<WritablePivotTable>,
     pub formulas_pending_recalculation: bool,
     pub scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
     pub vba_code_name: Option<String>,
     pub consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
+    pub list_objects: Vec<crate::xls::XlsListObject>,
 }
 
 /// A column-level AutoFilter condition for the writer.
@@ -174,13 +179,16 @@ impl WritableWorksheet {
             auto_filter: None,
             hyperlinks: Vec::new(),
             comments: Vec::new(),
+            shapes: Vec::new(),
             auto_filter_columns: Vec::new(),
             sort_config: None,
+            sort_data: None,
             pivot_tables: Vec::new(),
             formulas_pending_recalculation: false,
             scenario_manager: None,
             vba_code_name: None,
             consolidation: None,
+            list_objects: Vec::new(),
         }
     }
 
@@ -199,6 +207,20 @@ impl WritableWorksheet {
         }
 
         self.cells.insert((cell.row, cell.col), cell);
+    }
+
+    pub(super) fn include_list_object_range(&mut self, range: crate::xls::XlsListObjectRange) {
+        if self.cells.is_empty() && self.list_objects.is_empty() {
+            self.first_row = u32::from(range.first_row());
+            self.last_row = u32::from(range.last_row()) + 1;
+            self.first_col = range.first_column();
+            self.last_col = range.last_column() + 1;
+        } else {
+            self.first_row = self.first_row.min(u32::from(range.first_row()));
+            self.last_row = self.last_row.max(u32::from(range.last_row()) + 1);
+            self.first_col = self.first_col.min(range.first_column());
+            self.last_col = self.last_col.max(range.last_column() + 1);
+        }
     }
 
     pub(super) fn add_merged_range(&mut self, range: MergedRange) {
@@ -297,6 +319,10 @@ impl WritableWorksheet {
         self.sort_config = Some(config);
     }
 
+    pub(super) fn set_sort_data(&mut self, sort_data: crate::xls::XlsSortData) {
+        self.sort_data = Some(sort_data);
+    }
+
     pub(super) fn add_pivot_table(&mut self, pt: WritablePivotTable) {
         // Expand worksheet dimensions to encompass the pivot table output
         // range.  Excel validates that the DIMENSIONS record covers the
@@ -381,9 +407,10 @@ pub(super) struct WritablePivotField {
     /// Source column name for the pivot cache SXFDB record.
     pub cache_name: String,
     /// Unique source data values for this field's cache items (SXSTRING records).
-    pub cache_items: Vec<String>,
+    pub cache_items: Vec<crate::xls::PivotCacheItem>,
     /// Whether this field is numeric (data-axis).
     pub is_numeric: bool,
+    pub grouping: Option<crate::xls::PivotCacheGrouping>,
 }
 
 /// A pivot item for the writer.

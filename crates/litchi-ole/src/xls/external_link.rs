@@ -16,8 +16,89 @@ const MAX_EXTERNAL_REFERENCES: usize = 1370;
 const MAX_CACHED_CELLS: usize = 65_536;
 const MAX_EXTERNAL_NAMES: usize = 4096;
 const MAX_EXTERNAL_NAME_BYTES: usize = 1_048_576;
+const MAX_DDE_OLE_VALUES: usize = 65_536;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Clipboard format cached by a DDE or OLE external-name item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i16)]
+pub enum XlsExternalClipboardFormat {
+    None = -1,
+    Text = 0,
+    EnhancedMetafile = 2,
+    Csv = 5,
+    Sylk = 6,
+    RichText = 7,
+    Biff8 = 8,
+    Bitmap = 9,
+    ApplicationTable = 16,
+    Biff3 = 20,
+    Biff4 = 30,
+    MetafilePicture = 36,
+    UnicodeText = 44,
+    Biff12 = 63,
+}
+
+impl XlsExternalClipboardFormat {
+    pub(crate) fn parse(value: i16) -> XlsResult<Self> {
+        match value {
+            -1 => Ok(Self::None),
+            0 => Ok(Self::Text),
+            2 => Ok(Self::EnhancedMetafile),
+            5 => Ok(Self::Csv),
+            6 => Ok(Self::Sylk),
+            7 => Ok(Self::RichText),
+            8 => Ok(Self::Biff8),
+            9 => Ok(Self::Bitmap),
+            16 => Ok(Self::ApplicationTable),
+            20 => Ok(Self::Biff3),
+            30 => Ok(Self::Biff4),
+            36 => Ok(Self::MetafilePicture),
+            44 => Ok(Self::UnicodeText),
+            63 => Ok(Self::Biff12),
+            _ => invalid(
+                EXTERN_NAME_RECORD_TYPE,
+                "ExternName clipboard format is invalid",
+            ),
+        }
+    }
+
+    pub fn code(self) -> i16 {
+        self as i16
+    }
+}
+
+/// Current values cached for a DDE or OLE item, in row-major order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct XlsDdeOleValueMatrix {
+    pub last_column: u8,
+    pub last_row: u16,
+    pub values: Vec<XlsExternalCachedValue>,
+}
+
+impl XlsDdeOleValueMatrix {
+    pub fn validate(&self) -> XlsResult<()> {
+        let count = (usize::from(self.last_column) + 1)
+            .checked_mul(usize::from(self.last_row) + 1)
+            .ok_or_else(|| XlsError::InvalidData("DDE/OLE matrix size overflows".to_string()))?;
+        if count > MAX_DDE_OLE_VALUES || self.values.len() != count {
+            return Err(XlsError::InvalidData(
+                "DDE/OLE matrix dimensions do not match its bounded value array".to_string(),
+            ));
+        }
+        for value in &self.values {
+            if let XlsExternalCachedValue::Text(text) = value {
+                if text.encode_utf16().count() > 255 {
+                    return Err(XlsError::InvalidData(
+                        "DDE/OLE matrix text exceeds 255 UTF-16 code units".to_string(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum XlsExternalNameBody {
     ExternalDefinedName {
         sheet_index: Option<u16>,
@@ -31,15 +112,14 @@ pub enum XlsExternalNameBody {
     DdeOrOle {
         storage_id: u32,
         name: String,
-        opaque_data: Vec<u8>,
-        continuation_chunks: Vec<Vec<u8>>,
+        matrix: Option<XlsDdeOleValueMatrix>,
     },
     DdeStandardDocumentName {
         name: String,
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct XlsExternalName {
     supporting_book_index: u16,
     built_in: bool,
@@ -47,7 +127,7 @@ pub struct XlsExternalName {
     picture: bool,
     standard_document_name: bool,
     ole_link: bool,
-    clipboard_format: i16,
+    clipboard_format: XlsExternalClipboardFormat,
     displayed_as_icon: bool,
     body: XlsExternalNameBody,
 }
@@ -71,7 +151,7 @@ impl XlsExternalName {
     pub fn ole_link(&self) -> bool {
         self.ole_link
     }
-    pub fn clipboard_format(&self) -> i16 {
+    pub fn clipboard_format(&self) -> XlsExternalClipboardFormat {
         self.clipboard_format
     }
     pub fn displayed_as_icon(&self) -> bool {
@@ -250,13 +330,18 @@ struct PendingCache {
     remaining: usize,
 }
 
+struct PendingDdeMatrix {
+    name_index: usize,
+    remaining: usize,
+}
+
 #[derive(Default)]
 pub(crate) struct ExternalLinkCollector {
     books: Vec<XlsSupportingBook>,
     references: Vec<XlsExternalSheetReference>,
     external_names: Vec<XlsExternalName>,
     pending: Option<PendingCache>,
-    continuable_name: Option<usize>,
+    pending_dde_matrix: Option<PendingDdeMatrix>,
     names_allowed: bool,
     extern_sheet_seen: bool,
     closed: bool,
@@ -281,9 +366,15 @@ impl ExternalLinkCollector {
                 "XCT must be followed immediately by its declared CRN records",
             );
         }
+        if self.pending_dde_matrix.is_some() && record_type != CONTINUE_RECORD_TYPE {
+            return invalid(
+                EXTERN_NAME_RECORD_TYPE,
+                "DDE/OLE MOper matrix ended before all declared values were read",
+            );
+        }
 
         if record_type == CONTINUE_RECORD_TYPE {
-            if let Some(index) = self.continuable_name {
+            if let Some(pending) = &mut self.pending_dde_matrix {
                 if data.is_empty() || data.len() > 8224 {
                     return invalid(
                         CONTINUE_RECORD_TYPE,
@@ -300,17 +391,29 @@ impl ExternalLinkCollector {
                 if self.external_name_bytes > MAX_EXTERNAL_NAME_BYTES {
                     return invalid(
                         CONTINUE_RECORD_TYPE,
-                        "ExternName opaque data exceeds resource bound",
+                        "ExternName matrix data exceeds resource bound",
                     );
                 }
                 let XlsExternalNameBody::DdeOrOle {
-                    continuation_chunks,
+                    matrix: Some(matrix),
                     ..
-                } = &mut self.external_names[index].body
+                } = &mut self.external_names[pending.name_index].body
                 else {
                     unreachable!()
                 };
-                continuation_chunks.push(data.to_vec());
+                let mut values =
+                    parse_ser_ar_values(data, pending.remaining, CONTINUE_RECORD_TYPE)?;
+                if values.is_empty() || values.len() > pending.remaining {
+                    return invalid(
+                        CONTINUE_RECORD_TYPE,
+                        "DDE/OLE Continue contains an invalid number of complete values",
+                    );
+                }
+                pending.remaining -= values.len();
+                matrix.values.append(&mut values);
+                if pending.remaining == 0 {
+                    self.pending_dde_matrix = None;
+                }
                 return Ok(());
             }
             if !self.books.is_empty() && !self.closed {
@@ -321,7 +424,6 @@ impl ExternalLinkCollector {
             }
             return Ok(());
         }
-        self.continuable_name = None;
 
         let target = matches!(
             record_type,
@@ -384,10 +486,20 @@ impl ExternalLinkCollector {
                 if self.external_name_bytes > MAX_EXTERNAL_NAME_BYTES {
                     return invalid(record_type, "external name data exceeds resource bound");
                 }
-                let continuable = matches!(name.body, XlsExternalNameBody::DdeOrOle { .. });
                 self.external_names.push(name);
-                if continuable {
-                    self.continuable_name = Some(self.external_names.len() - 1);
+                if let XlsExternalNameBody::DdeOrOle {
+                    matrix: Some(matrix),
+                    ..
+                } = &self.external_names.last().unwrap().body
+                {
+                    let expected =
+                        (usize::from(matrix.last_column) + 1) * (usize::from(matrix.last_row) + 1);
+                    if matrix.values.len() < expected {
+                        self.pending_dde_matrix = Some(PendingDdeMatrix {
+                            name_index: self.external_names.len() - 1,
+                            remaining: expected - matrix.values.len(),
+                        });
+                    }
                 }
             },
             XCT_RECORD_TYPE => {
@@ -503,6 +615,12 @@ impl ExternalLinkCollector {
                 "workbook ended before all CRN records declared by XCT",
             );
         }
+        if self.pending_dde_matrix.is_some() {
+            return invalid(
+                EXTERN_NAME_RECORD_TYPE,
+                "workbook ended before all DDE/OLE matrix values were read",
+            );
+        }
         for reference in &self.references {
             validate_reference(reference, &self.books, internal_sheet_count)?;
         }
@@ -561,15 +679,7 @@ fn parse_external_name(
     } else {
         clipboard_bits as i16
     };
-    if !matches!(
-        clipboard_format,
-        -1 | 0 | 2 | 5 | 6 | 7 | 8 | 9 | 16 | 20 | 30 | 36 | 44 | 63
-    ) {
-        return invalid(
-            EXTERN_NAME_RECORD_TYPE,
-            "ExternName clipboard format is invalid",
-        );
-    }
+    let clipboard_format = XlsExternalClipboardFormat::parse(clipboard_format)?;
     let displayed_as_icon = flags & 0x8000 != 0;
     let (name, offset) = parse_short_unicode_string(data, 6, EXTERN_NAME_RECORD_TYPE)?;
 
@@ -668,11 +778,54 @@ fn parse_external_name(
                 }
                 XlsExternalNameBody::DdeStandardDocumentName { name }
             } else {
+                if !ole_link && storage_id != 0 {
+                    return invalid(
+                        EXTERN_NAME_RECORD_TYPE,
+                        "DDE item has a nonzero OLE link-storage identifier",
+                    );
+                }
+                if displayed_as_icon && !ole_link {
+                    return invalid(
+                        EXTERN_NAME_RECORD_TYPE,
+                        "only an OLE item can be displayed as an icon",
+                    );
+                }
+                let remaining = &data[offset..];
+                let matrix = if remaining.is_empty() {
+                    None
+                } else {
+                    if remaining.len() < 3 {
+                        return invalid(
+                            EXTERN_NAME_RECORD_TYPE,
+                            "DDE/OLE MOper header is truncated",
+                        );
+                    }
+                    let last_column = remaining[0];
+                    let last_row = read_u16(remaining, 1);
+                    let expected = (usize::from(last_column) + 1)
+                        .checked_mul(usize::from(last_row) + 1)
+                        .ok_or_else(|| XlsError::InvalidRecord {
+                            record_type: EXTERN_NAME_RECORD_TYPE,
+                            message: "DDE/OLE matrix size overflows".to_string(),
+                        })?;
+                    if expected > MAX_DDE_OLE_VALUES {
+                        return invalid(
+                            EXTERN_NAME_RECORD_TYPE,
+                            "DDE/OLE matrix exceeds the resource bound",
+                        );
+                    }
+                    let values =
+                        parse_ser_ar_values(&remaining[3..], expected, EXTERN_NAME_RECORD_TYPE)?;
+                    Some(XlsDdeOleValueMatrix {
+                        last_column,
+                        last_row,
+                        values,
+                    })
+                };
                 XlsExternalNameBody::DdeOrOle {
                     storage_id,
                     name,
-                    opaque_data: data[offset..].to_vec(),
-                    continuation_chunks: Vec::new(),
+                    matrix,
                 }
             }
         },
@@ -697,6 +850,83 @@ fn parse_external_name(
         displayed_as_icon,
         body,
     })
+}
+
+fn parse_ser_ar_values(
+    data: &[u8],
+    maximum: usize,
+    record_type: u16,
+) -> XlsResult<Vec<XlsExternalCachedValue>> {
+    let mut offset = 0usize;
+    let mut values = Vec::new();
+    while offset < data.len() {
+        if values.len() == maximum {
+            return invalid(record_type, "SerAr value count exceeds matrix dimensions");
+        }
+        let tag = data[offset];
+        match tag {
+            0x00 => {
+                require_available_for(data, offset, 9, record_type)?;
+                values.push(XlsExternalCachedValue::Blank);
+                offset += 9;
+            },
+            0x01 => {
+                require_available_for(data, offset, 9, record_type)?;
+                values.push(XlsExternalCachedValue::Number(f64::from_le_bytes(
+                    data[offset + 1..offset + 9].try_into().unwrap(),
+                )));
+                offset += 9;
+            },
+            0x02 => {
+                let (value, next) = parse_unicode_string(data, offset + 1, 255, record_type)?;
+                values.push(XlsExternalCachedValue::Text(value));
+                offset = next;
+            },
+            0x04 => {
+                require_available_for(data, offset, 9, record_type)?;
+                if data[offset + 2] != 0 {
+                    return invalid(record_type, "SerBool reserved byte must be zero");
+                }
+                values.push(XlsExternalCachedValue::Boolean(match data[offset + 1] {
+                    0 => false,
+                    1 => true,
+                    _ => return invalid(record_type, "SerBool value must be zero or one"),
+                }));
+                offset += 9;
+            },
+            0x10 => {
+                require_available_for(data, offset, 9, record_type)?;
+                if data[offset + 2] != 0 {
+                    return invalid(record_type, "SerErr reserved byte must be zero");
+                }
+                values.push(XlsExternalCachedValue::Error(
+                    XlsExternalCachedError::parse(data[offset + 1])?,
+                ));
+                offset += 9;
+            },
+            _ => return invalid(record_type, format!("unknown SerAr tag 0x{tag:02X}")),
+        }
+    }
+    Ok(values)
+}
+
+fn require_available_for(
+    data: &[u8],
+    offset: usize,
+    length: usize,
+    record_type: u16,
+) -> XlsResult<()> {
+    if offset
+        .checked_add(length)
+        .is_some_and(|end| end <= data.len())
+    {
+        Ok(())
+    } else {
+        invalid(
+            record_type,
+            "SerAr value is truncated or split across records",
+        )
+    }
 }
 
 fn parse_short_unicode_string(
@@ -1121,7 +1351,7 @@ mod tests {
     }
 
     #[test]
-    fn extern_names_are_contextual_bounded_and_continuable_only_for_links() {
+    fn extern_names_are_contextual_bounded_and_continue_complete_moper_values() {
         let addin = [1, 0, 1, 0x3a];
         let addin_name = [0, 0, 0, 0, 0, 0, 1, 0, b'F', 2, 0, 0x1c, 0x17];
         let mut collector = ExternalLinkCollector::new();
@@ -1148,12 +1378,14 @@ mod tests {
             .unwrap();
         let links = collector.finish(1).unwrap();
         let XlsExternalNameBody::DdeOrOle {
-            continuation_chunks,
+            matrix: Some(matrix),
             ..
         } = links.external_names()[0].body()
         else {
             panic!("expected DDE/OLE body")
         };
-        assert_eq!(continuation_chunks, &[vec![0; 9]]);
+        assert_eq!(matrix.last_column, 0);
+        assert_eq!(matrix.last_row, 0);
+        assert_eq!(matrix.values, [XlsExternalCachedValue::Blank]);
     }
 }

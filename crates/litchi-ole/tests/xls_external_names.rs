@@ -6,7 +6,10 @@ use litchi_ole::xls::writer::{
     XlsAddInFunctionOptions, XlsDdeOrOleItemOptions, XlsDdeOrOleLinkOptions,
     XlsExternalDefinedNameOptions, XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsWriter,
 };
-use litchi_ole::xls::{XlsExternalNameBody, XlsSupportingBook, XlsWorkbook};
+use litchi_ole::xls::{
+    XlsDdeOleValueMatrix, XlsExternalCachedError, XlsExternalCachedValue,
+    XlsExternalClipboardFormat, XlsExternalNameBody, XlsSupportingBook, XlsWorkbook,
+};
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -54,23 +57,28 @@ fn generated_external_names_round_trip_as_inert_metadata() {
                     picture: false,
                     standard_document_name: false,
                     ole_link: false,
-                    clipboard_format: 0,
+                    clipboard_format: XlsExternalClipboardFormat::Text,
                     displayed_as_icon: false,
                     storage_id: 0,
-                    opaque_data: vec![0, 0, 0],
-                    continuation_chunks: vec![vec![0; 9]],
+                    matrix: Some(XlsDdeOleValueMatrix {
+                        last_column: 1,
+                        last_row: 0,
+                        values: vec![
+                            XlsExternalCachedValue::Text("linked".to_string()),
+                            XlsExternalCachedValue::Error(XlsExternalCachedError::NotAvailable),
+                        ],
+                    }),
                 },
                 XlsDdeOrOleItemOptions {
                     name: "Object".to_string(),
                     automatic: false,
                     picture: true,
                     standard_document_name: false,
-                    ole_link: false,
-                    clipboard_format: 2,
+                    ole_link: true,
+                    clipboard_format: XlsExternalClipboardFormat::EnhancedMetafile,
                     displayed_as_icon: true,
                     storage_id: 1,
-                    opaque_data: vec![],
-                    continuation_chunks: vec![],
+                    matrix: None,
                 },
                 XlsDdeOrOleItemOptions {
                     name: "StdDocumentName".to_string(),
@@ -78,11 +86,10 @@ fn generated_external_names_round_trip_as_inert_metadata() {
                     picture: false,
                     standard_document_name: true,
                     ole_link: false,
-                    clipboard_format: 0,
+                    clipboard_format: XlsExternalClipboardFormat::Text,
                     displayed_as_icon: false,
                     storage_id: 0,
-                    opaque_data: vec![],
-                    continuation_chunks: vec![],
+                    matrix: None,
                 },
             ],
         })
@@ -117,14 +124,10 @@ fn generated_external_names_round_trip_as_inert_metadata() {
     assert_eq!(name, "RemoteName");
     assert_eq!(*sheet_index, Some(0));
     assert_eq!(formula_bytes, &[0x1c, 0x17]);
-    let XlsExternalNameBody::DdeOrOle {
-        continuation_chunks,
-        ..
-    } = links.external_names()[2].body()
-    else {
+    let XlsExternalNameBody::DdeOrOle { matrix, .. } = links.external_names()[2].body() else {
         panic!("expected DDE item")
     };
-    assert_eq!(continuation_chunks, &[vec![0; 9]]);
+    assert_eq!(matrix.as_ref().unwrap().values.len(), 2);
     assert_eq!(links.sheet_references().len(), 3);
 }
 

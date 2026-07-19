@@ -109,6 +109,111 @@ impl<'doc> Slide<'doc> {
         Ok(self.shapes()?.len())
     }
 
+    /// Return every shape-scoped programmable-tag container on this slide.
+    pub fn shape_programmable_tags(
+        &self,
+    ) -> Result<Vec<crate::ppt::PowerPointShapeProgrammableTagsEntry>> {
+        self.shape_programmable_tags_with_limits(
+            crate::ppt::PowerPointShapeProgrammableTagLimits::default(),
+        )
+    }
+
+    /// Return shape programmable tags with caller-supplied resource limits.
+    pub fn shape_programmable_tags_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointShapeProgrammableTagLimits,
+    ) -> Result<Vec<crate::ppt::PowerPointShapeProgrammableTagsEntry>> {
+        let Some(ppdrawing) = self
+            .record
+            .find_child(crate::consts::PptRecordType::PPDrawing)
+        else {
+            return Ok(Vec::new());
+        };
+        let escher_shapes =
+            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let mut result = Vec::new();
+        for shape in &escher_shapes {
+            if let Some(programmable_tags) =
+                shape.extract_shape_programmable_tags_with_limits(limits)?
+            {
+                result.push(crate::ppt::PowerPointShapeProgrammableTagsEntry {
+                    shape_id: shape.shape_id().unwrap_or(0),
+                    programmable_tags,
+                });
+            }
+        }
+        Ok(result)
+    }
+
+    /// Return every typed shape-flag projection on this slide.
+    pub fn shape_flags(&self) -> Result<Vec<crate::ppt::PowerPointShapeFlagEntry>> {
+        self.shape_flags_with_limits(crate::ppt::PowerPointShapeFlagLimits::default())
+    }
+
+    /// Return shape flags with caller-supplied client-data resource limits.
+    pub fn shape_flags_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointShapeFlagLimits,
+    ) -> Result<Vec<crate::ppt::PowerPointShapeFlagEntry>> {
+        let Some(ppdrawing) = self
+            .record
+            .find_child(crate::consts::PptRecordType::PPDrawing)
+        else {
+            return Ok(Vec::new());
+        };
+        let escher_shapes =
+            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let mut result = Vec::new();
+        for shape in &escher_shapes {
+            if let Some(projection) = shape.shape_flags_with_limits(limits)? {
+                result.push(crate::ppt::PowerPointShapeFlagEntry {
+                    shape_id: shape.shape_id().unwrap_or(0),
+                    projection,
+                });
+            }
+        }
+        Ok(result)
+    }
+
+    /// Return context-validated placeholders on this presentation slide.
+    pub fn placeholder_atoms(&self) -> Result<Vec<crate::ppt::PowerPointPlaceholderEntry>> {
+        self.placeholder_atoms_with_limits(crate::ppt::PowerPointPlaceholderLimits::default())
+    }
+
+    /// Return placeholders with caller-supplied client-data limits.
+    pub fn placeholder_atoms_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointPlaceholderLimits,
+    ) -> Result<Vec<crate::ppt::PowerPointPlaceholderEntry>> {
+        let Some(ppdrawing) = self
+            .record
+            .find_child(crate::consts::PptRecordType::PPDrawing)
+        else {
+            return Ok(Vec::new());
+        };
+        let escher_shapes =
+            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let mut positions = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        for shape in &escher_shapes {
+            if let Some(placeholder) = shape.placeholder_atom_with_limits(
+                crate::ppt::PowerPointPlaceholderContext::PresentationSlide,
+                limits,
+            )? {
+                if placeholder.position != -1 && !positions.insert(placeholder.position) {
+                    return Err(PptError::Corrupted(
+                        "Presentation slide contains duplicate placeholder positions".to_string(),
+                    ));
+                }
+                result.push(crate::ppt::PowerPointPlaceholderEntry {
+                    shape_id: shape.shape_id().unwrap_or(0),
+                    placeholder,
+                });
+            }
+        }
+        Ok(result)
+    }
+
     /// Return this slide's speaker-notes page, if one exists.
     pub fn speaker_notes(&self) -> Result<Option<&SpeakerNotes>> {
         self.speaker_notes

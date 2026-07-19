@@ -316,6 +316,23 @@ pub fn write_recalc_id<W: Write>(writer: &mut W, engine_id: u32) -> XlsResult<()
     Ok(())
 }
 
+/// Write MTRSETTINGS record.
+///
+/// Record type: 0x089A
+pub fn write_mtr_settings<W: Write>(
+    writer: &mut W,
+    settings: crate::xls::XlsMultithreadedCalculation,
+) -> XlsResult<()> {
+    write_record_header(writer, 0x089A, 24)?;
+    writer.write_all(&0x089Au16.to_le_bytes())?;
+    writer.write_all(&0u16.to_le_bytes())?;
+    writer.write_all(&0u64.to_le_bytes())?;
+    writer.write_all(&u32::from(settings.enabled()).to_le_bytes())?;
+    writer.write_all(&u32::from(settings.user_thread_count().is_some()).to_le_bytes())?;
+    writer.write_all(&u32::from(settings.serialized_thread_count()).to_le_bytes())?;
+    Ok(())
+}
+
 pub fn write_force_full_calculation<W: Write>(writer: &mut W, force: bool) -> XlsResult<()> {
     write_record_header(writer, 0x08A3, 16)?;
     writer.write_all(&0x08A3u16.to_le_bytes())?;
@@ -662,8 +679,30 @@ fn write_add_in_supbook<W: Write>(
     Ok(())
 }
 
-fn encode_clipboard_format(value: i16) -> u16 {
-    (value as u16) & 0x03ff
+fn encode_clipboard_format(value: crate::xls::XlsExternalClipboardFormat) -> u16 {
+    (value.code() as u16) & 0x03ff
+}
+
+fn encode_ser_ar(value: &crate::xls::XlsExternalCachedValue) -> XlsResult<Vec<u8>> {
+    let mut data = Vec::new();
+    match value {
+        crate::xls::XlsExternalCachedValue::Blank => data.extend_from_slice(&[0; 9]),
+        crate::xls::XlsExternalCachedValue::Number(value) => {
+            data.push(0x01);
+            data.extend_from_slice(&value.to_le_bytes());
+        },
+        crate::xls::XlsExternalCachedValue::Text(value) => {
+            data.push(0x02);
+            write_unicode_string(&mut data, value, true)?;
+        },
+        crate::xls::XlsExternalCachedValue::Boolean(value) => {
+            data.extend_from_slice(&[0x04, u8::from(*value), 0, 0, 0, 0, 0, 0, 0]);
+        },
+        crate::xls::XlsExternalCachedValue::Error(error) => {
+            data.extend_from_slice(&[0x10, error.code(), 0, 0, 0, 0, 0, 0, 0]);
+        },
+    }
+    Ok(data)
 }
 
 fn write_dde_or_ole_supbook<W: Write>(
@@ -690,17 +729,33 @@ fn write_dde_or_ole_supbook<W: Write>(
         data.extend_from_slice(&flags.to_le_bytes());
         data.extend_from_slice(&item.storage_id.to_le_bytes());
         write_short_unicode_string(&mut data, &item.name)?;
-        data.extend_from_slice(&item.opaque_data);
-        if data.len() > 8224 {
-            return Err(XlsError::InvalidData(
-                "DDE/OLE ExternName exceeds BIFF8 record size".to_string(),
-            ));
+        let mut remaining_values = Vec::new();
+        if let Some(matrix) = &item.matrix {
+            data.push(matrix.last_column);
+            data.extend_from_slice(&matrix.last_row.to_le_bytes());
+            for value in &matrix.values {
+                let encoded = encode_ser_ar(value)?;
+                if data.len() + encoded.len() <= 8224 && remaining_values.is_empty() {
+                    data.extend_from_slice(&encoded);
+                } else {
+                    remaining_values.push(encoded);
+                }
+            }
         }
         write_record_header(writer, 0x0023, data.len() as u16)?;
         writer.write_all(&data)?;
-        for chunk in &item.continuation_chunks {
+        let mut chunk = Vec::new();
+        for value in remaining_values {
+            if !chunk.is_empty() && chunk.len() + value.len() > 8224 {
+                write_record_header(writer, 0x003c, chunk.len() as u16)?;
+                writer.write_all(&chunk)?;
+                chunk.clear();
+            }
+            chunk.extend_from_slice(&value);
+        }
+        if !chunk.is_empty() {
             write_record_header(writer, 0x003c, chunk.len() as u16)?;
-            writer.write_all(chunk)?;
+            writer.write_all(&chunk)?;
         }
     }
     Ok(())
@@ -715,23 +770,7 @@ fn write_crn<W: Write>(
     data.push(row.first_column);
     data.extend_from_slice(&row.row.to_le_bytes());
     for value in &row.values {
-        match value {
-            crate::xls::XlsExternalCachedValue::Blank => data.extend_from_slice(&[0; 9]),
-            crate::xls::XlsExternalCachedValue::Number(value) => {
-                data.push(0x01);
-                data.extend_from_slice(&value.to_le_bytes());
-            },
-            crate::xls::XlsExternalCachedValue::Text(value) => {
-                data.push(0x02);
-                write_unicode_string(&mut data, value, true)?;
-            },
-            crate::xls::XlsExternalCachedValue::Boolean(value) => {
-                data.extend_from_slice(&[0x04, u8::from(*value), 0, 0, 0, 0, 0, 0, 0]);
-            },
-            crate::xls::XlsExternalCachedValue::Error(error) => {
-                data.extend_from_slice(&[0x10, error.code(), 0, 0, 0, 0, 0, 0, 0]);
-            },
-        }
+        data.extend_from_slice(&encode_ser_ar(value)?);
     }
     write_record_header(writer, 0x005a, data.len() as u16)?;
     writer.write_all(&data)?;

@@ -37,6 +37,9 @@ pub const AUTOFILTER_TYPE: u16 = 0x009E;
 /// SORT record type identifier.
 pub const SORT_TYPE: u16 = 0x0090;
 
+/// FILTERMODE record type identifier.
+pub const FILTERMODE_TYPE: u16 = 0x009B;
+
 /// Comparison operators for AutoFilter conditions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterOperator {
@@ -171,6 +174,20 @@ pub fn parse_autofilterinfo(data: &[u8]) -> XlsResult<u16> {
         });
     }
     Ok(binary::read_u16_le_at(data, 0)?)
+}
+
+/// Parse a FILTERMODE record (0x009B).
+///
+/// The record body is empty ([MS-XLS] 2.4.119); its presence alone specifies
+/// that the containing sheet data was filtered.
+pub fn parse_filtermode(data: &[u8]) -> XlsResult<()> {
+    if !data.is_empty() {
+        return Err(XlsError::InvalidLength {
+            expected: 0,
+            found: data.len(),
+        });
+    }
+    Ok(())
 }
 
 /// Parse a DOPER structure (10 bytes) at the given offset.
@@ -437,6 +454,57 @@ mod tests {
             matches!(col.condition1.value, FilterValue::Number(v) if (v - 100.0).abs() < f64::EPSILON)
         );
         assert_eq!(col.condition2.operator, FilterOperator::NoFilter);
+    }
+
+    #[test]
+    fn test_parse_autofilter_string_condition() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&0u16.to_le_bytes()); // iEntry
+        data.extend_from_slice(&0u16.to_le_bytes()); // grbit
+
+        // doper1: string, operator = Equal (0x02)
+        data.push(0x06); // vt = string
+        data.push(0x02); // operator = Equal
+        data.push(0x00); // unused
+        data.push(0x03); // cch = 3
+        data.extend_from_slice(&[0u8; 6]); // remainder of doper1
+
+        // doper2: unused
+        data.extend_from_slice(&[0u8; 10]);
+
+        // Trailing XLUnicodeStringNoCch: compressed, "abc"
+        data.push(0x00);
+        data.extend_from_slice(b"abc");
+
+        let col = parse_autofilter(&data).unwrap();
+        assert_eq!(col.condition1.operator, FilterOperator::Equal);
+        assert_eq!(col.condition1.value, FilterValue::String("abc".to_string()));
+    }
+
+    #[test]
+    fn test_parse_filtermode_empty_body() {
+        assert!(parse_filtermode(&[]).is_ok());
+    }
+
+    #[test]
+    fn test_parse_filtermode_rejects_nonempty_body() {
+        assert!(parse_filtermode(&[0]).is_err());
+    }
+
+    #[test]
+    fn test_parse_autofilterinfo_rejects_truncated() {
+        assert!(parse_autofilterinfo(&[5]).is_err());
+    }
+
+    #[test]
+    fn test_parse_autofilter_rejects_truncated() {
+        // 23 bytes is one short of the minimum 24.
+        assert!(parse_autofilter(&[0u8; 23]).is_err());
+    }
+
+    #[test]
+    fn test_parse_sort_rejects_truncated() {
+        assert!(parse_sort(&[0u8; 9]).is_err());
     }
 
     #[test]

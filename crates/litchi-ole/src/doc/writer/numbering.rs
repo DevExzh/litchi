@@ -3,7 +3,13 @@
 //! Generates list structures (LST, LVL) and format overrides (LFO, LFOLVL).
 
 use super::core::DocWriteError;
+#[cfg(test)]
+use crate::doc::parts::numbering::ListLevelOverrideMetadata;
 pub use crate::doc::parts::numbering::NumberFormat;
+use crate::doc::parts::numbering::{
+    ListFormatOverrideMetadata, ListLevelMetadata, ListStructureMetadata,
+};
+use crate::doc::parts::{list_names::ListNamesTable, list_templates::ListTemplateTable};
 use std::io::Write;
 
 /// List level definition
@@ -44,6 +50,13 @@ impl ListLevel {
     /// The number text uses placeholder characters 0x0000–0x0008 for levels 0–8.
     /// For example, `"%1."` becomes `[0x0000, u'.']` (level 0 counter + period).
     pub fn to_bytes(&self) -> Result<Vec<u8>, DocWriteError> {
+        self.to_bytes_with_metadata(None)
+    }
+
+    fn to_bytes_with_metadata(
+        &self,
+        metadata: Option<&ListLevelMetadata>,
+    ) -> Result<Vec<u8>, DocWriteError> {
         if matches!(
             self.number_format,
             NumberFormat::Hex
@@ -95,38 +108,65 @@ impl ListLevel {
             rgbxch_nums = [0u8; 9]; // no level placeholders for bullets
         }
 
-        // No grpprl SPRMs for simplicity (LVL-level indents come from paragraph SPRMs)
-        let cb_grpprl_papx: u8 = 0;
-        let cb_grpprl_chpx: u8 = 0;
+        if let Some(metadata) = metadata {
+            rgbxch_nums = metadata.placeholder_positions;
+        }
 
-        let mut buf = Vec::with_capacity(28 + 2 + xst_chars.len() * 2);
+        let paragraph_properties =
+            metadata.map_or(&[][..], |value| value.paragraph_properties.as_slice());
+        let number_properties =
+            metadata.map_or(&[][..], |value| value.number_properties.as_slice());
+        let cb_grpprl_papx = u8::try_from(paragraph_properties.len()).map_err(|_| {
+            DocWriteError::InvalidData("LVL paragraph properties exceed 255 bytes".to_string())
+        })?;
+        let cb_grpprl_chpx = u8::try_from(number_properties.len()).map_err(|_| {
+            DocWriteError::InvalidData("LVL number properties exceed 255 bytes".to_string())
+        })?;
+
+        let mut buf = Vec::with_capacity(
+            28 + paragraph_properties.len() + number_properties.len() + 2 + xst_chars.len() * 2,
+        );
 
         // === LVLF (exactly 28 bytes) per MS-DOC 2.9.150 ===
         // Offset 0: iStartAt (4 bytes)
         buf.write_all(&self.start_at.to_le_bytes()).unwrap();
         // Offset 4: nfc (1 byte) — number format code
         buf.push(self.number_format as u8);
-        // Offset 5: jc:2 + flags:6 (1 byte) — left-aligned (jc=0), no flags
-        buf.push(0x00);
+        // Offset 5: jc:2 + typed flags:6. Writer-facing levels remain left aligned.
+        let flags = metadata.map_or(0, |value| {
+            (value.ignored_flags & 0x40)
+                | u8::from(value.legal_numbering) << 2
+                | u8::from(value.no_restart) << 3
+                | u8::from(value.saved_indent.is_some()) << 4
+                | u8::from(value.converted) << 5
+                | u8::from(value.tentative) << 7
+        });
+        buf.push(flags);
         // Offset 6: rgbxchNums[9] (9 bytes) — placeholder positions
         buf.write_all(&rgbxch_nums).unwrap();
         // Offset 15: ixchFollow (1 byte) — 0=tab, 1=space, 2=nothing
-        buf.push(0x00); // tab follow
+        buf.push(metadata.map_or(0, |value| value.follow_character as u8));
         // Offset 16: dxaIndentSav (4 bytes, i32 LE)
-        buf.write_all(&0i32.to_le_bytes()).unwrap();
+        let saved_indent = metadata.map_or(0, |value| {
+            value.saved_indent.unwrap_or(value.ignored_saved_indent)
+        });
+        buf.write_all(&saved_indent.to_le_bytes()).unwrap();
         // Offset 20: reserved2 (4 bytes)
-        buf.write_all(&0u32.to_le_bytes()).unwrap();
+        buf.write_all(&metadata.map_or(0, |value| value.unused_value).to_le_bytes())
+            .unwrap();
         // Offset 24: cbGrpprlChpx (1 byte)
         buf.push(cb_grpprl_chpx);
         // Offset 25: cbGrpprlPapx (1 byte)
         buf.push(cb_grpprl_papx);
-        // Offset 26: ixchLim (1 byte, unused, must be 0)
-        buf.push(0);
-        // Offset 27: nfcOrig (1 byte, unused)
-        buf.push(self.number_format as u8);
+        // Offset 26: ilvlRestartLim.
+        buf.push(metadata.map_or(0, |value| {
+            value.restart_limit.unwrap_or(value.ignored_restart_limit)
+        }));
+        // Offset 27: grfhic.
+        buf.push(metadata.map_or(0, |value| value.html_compatibility.raw()));
 
-        // grpprlPapx (cbGrpprlPapx bytes) — empty for now
-        // grpprlChpx (cbGrpprlChpx bytes) — empty for now
+        buf.extend_from_slice(paragraph_properties);
+        buf.extend_from_slice(number_properties);
 
         // xst: cch (u16 LE) + cch UTF-16LE characters
         buf.write_all(&(xst_chars.len() as u16).to_le_bytes())
@@ -148,6 +188,13 @@ pub struct ListStructure {
     pub template_id: u32,
     /// List levels (up to 9)
     pub levels: Vec<ListLevel>,
+}
+
+/// Lossless metadata paired with one writer list definition.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ListDefinitionMetadata {
+    pub definition: ListStructureMetadata,
+    pub levels: Vec<ListLevelMetadata>,
 }
 
 impl ListStructure {
@@ -172,6 +219,10 @@ impl ListStructure {
     /// This does NOT include the variable-length LVL data — use
     /// [`levels_to_bytes`] for that.
     pub fn to_bytes(&self) -> Vec<u8> {
+        self.to_bytes_with_metadata(None)
+    }
+
+    fn to_bytes_with_metadata(&self, metadata: Option<&ListStructureMetadata>) -> Vec<u8> {
         let mut buf = Vec::with_capacity(28);
 
         // List ID (4 bytes)
@@ -180,8 +231,12 @@ impl ListStructure {
         // Template ID (4 bytes)
         buf.write_all(&self.template_id.to_le_bytes()).unwrap();
 
-        // 9 RGISTDs (18 bytes) - style IDs for each level (0xFFFF = no style)
-        buf.write_all(&[0xff; 18]).unwrap();
+        for index in 0..9 {
+            let style = metadata
+                .and_then(|value| value.style_links[index])
+                .map_or(0x0FFF, |value| value.get());
+            buf.write_all(&style.to_le_bytes()).unwrap();
+        }
 
         // Flags (1 byte):
         //   bit 0: fSimpleList (1 = single-level, 0 = multi-level)
@@ -193,10 +248,16 @@ impl ListStructure {
         } else {
             0x00u8
         };
-        buf.push(f_simple);
+        let flags = metadata.map_or(f_simple, |value| {
+            f_simple
+                | (value.ignored_flags & 0xEA)
+                | u8::from(value.automatic_numbering) << 2
+                | u8::from(value.hybrid) << 4
+        });
+        buf.push(flags);
 
         // grfhic (1 byte) — reserved/compatibility, set to 0
-        buf.push(0);
+        buf.push(metadata.map_or(0, |value| value.html_compatibility.raw()));
 
         buf
     }
@@ -206,15 +267,30 @@ impl ListStructure {
     /// Per MS-DOC spec, LVLs are appended after all LSTFs in the PlfLst
     /// and are NOT counted in `lcbPlfLst`.
     pub fn levels_to_bytes(&self) -> Result<Vec<u8>, DocWriteError> {
+        self.levels_to_bytes_with_metadata(None)
+    }
+
+    fn levels_to_bytes_with_metadata(
+        &self,
+        metadata: Option<&[ListLevelMetadata]>,
+    ) -> Result<Vec<u8>, DocWriteError> {
         let mut buf = Vec::new();
         let level_count = if self.levels.len() <= 1 { 1 } else { 9 };
         for level_index in 0..level_count {
             if let Some(level) = self.levels.get(level_index) {
-                buf.extend_from_slice(&level.to_bytes()?);
+                buf.extend_from_slice(
+                    &level.to_bytes_with_metadata(
+                        metadata.and_then(|values| values.get(level_index)),
+                    )?,
+                );
             } else {
                 let mut level = ListLevel::new(1, NumberFormat::Decimal);
                 level.number_text = format!("%{}.", level_index + 1);
-                buf.extend_from_slice(&level.to_bytes()?);
+                buf.extend_from_slice(
+                    &level.to_bytes_with_metadata(
+                        metadata.and_then(|values| values.get(level_index)),
+                    )?,
+                );
             }
         }
         Ok(buf)
@@ -228,6 +304,21 @@ pub struct ListFormatOverride {
     pub list_id: u32,
     /// Override ID
     pub lfo_id: u32,
+}
+
+/// Writer representation of one `LFOLVL` entry.
+#[derive(Debug, Clone)]
+pub struct ListLevelOverride {
+    pub level: u8,
+    pub start_at: Option<u32>,
+    pub format: Option<ListLevel>,
+}
+
+/// Complete typed `LFOData` and `LFOLVL` payload for one override.
+#[derive(Debug, Clone)]
+pub struct ListFormatOverrideData {
+    pub metadata: ListFormatOverrideMetadata,
+    pub levels: Vec<ListLevelOverride>,
 }
 
 impl ListFormatOverride {
@@ -254,13 +345,87 @@ impl ListFormatOverride {
 
         buf
     }
+
+    fn encode_with_data(
+        &self,
+        data: &ListFormatOverrideData,
+    ) -> Result<(Vec<u8>, Vec<u8>), DocWriteError> {
+        if data.levels.len() > 9 || data.metadata.levels.len() != data.levels.len() {
+            return Err(DocWriteError::InvalidData(
+                "LFOData must contain matching metadata for at most nine levels".to_string(),
+            ));
+        }
+        let mut seen = [false; 9];
+        let mut header = Vec::with_capacity(16);
+        header.extend_from_slice(&self.list_id.to_le_bytes());
+        header.extend_from_slice(&data.metadata.unused1.to_le_bytes());
+        header.extend_from_slice(&data.metadata.unused2.to_le_bytes());
+        header.push(data.levels.len() as u8);
+        header.push(data.metadata.field as u8);
+        header.push(data.metadata.html_compatibility.raw());
+        header.push(data.metadata.unused3);
+
+        let mut body = Vec::new();
+        body.extend_from_slice(
+            &data
+                .metadata
+                .first_paragraph_cp
+                .unwrap_or(u32::MAX)
+                .to_le_bytes(),
+        );
+        for (level, metadata) in data.levels.iter().zip(&data.metadata.levels) {
+            let index = usize::from(level.level);
+            if index >= seen.len() || seen[index] {
+                return Err(DocWriteError::InvalidData(format!(
+                    "LFO level {} is out of range or duplicated",
+                    level.level
+                )));
+            }
+            seen[index] = true;
+            if level.start_at.is_some_and(|value| value > 0x7FFF) {
+                return Err(DocWriteError::InvalidData(format!(
+                    "LFO start value for level {} exceeds 32767",
+                    level.level
+                )));
+            }
+            if level.format.is_some() != metadata.formatting.is_some() {
+                return Err(DocWriteError::InvalidData(format!(
+                    "LFO level {} formatting and metadata disagree",
+                    level.level
+                )));
+            }
+            body.extend_from_slice(
+                &level
+                    .start_at
+                    .unwrap_or(metadata.unused_start_at)
+                    .to_le_bytes(),
+            );
+            let flags = u32::from(level.level)
+                | u32::from(level.start_at.is_some()) << 4
+                | u32::from(level.format.is_some()) << 5
+                | u32::from(metadata.html_compatibility.raw()) << 6
+                | (metadata.ignored_flags & 0xFFFF_C000);
+            body.extend_from_slice(&flags.to_le_bytes());
+            if let (Some(format), Some(format_metadata)) =
+                (level.format.as_ref(), metadata.formatting.as_ref())
+            {
+                body.extend_from_slice(&format.to_bytes_with_metadata(Some(format_metadata))?);
+            }
+        }
+        Ok((header, body))
+    }
 }
 
 /// Numbering writer for list tables
 #[derive(Debug)]
 pub struct NumberingWriter {
     list_structures: Vec<ListStructure>,
+    list_metadata: Vec<Option<ListDefinitionMetadata>>,
     list_overrides: Vec<ListFormatOverride>,
+    override_headers: Vec<Option<Vec<u8>>>,
+    override_data: Vec<Option<Vec<u8>>>,
+    list_names: Option<ListNamesTable>,
+    list_templates: Option<ListTemplateTable>,
 }
 
 impl NumberingWriter {
@@ -268,18 +433,75 @@ impl NumberingWriter {
     pub fn new() -> Self {
         Self {
             list_structures: Vec::new(),
+            list_metadata: Vec::new(),
             list_overrides: Vec::new(),
+            override_headers: Vec::new(),
+            override_data: Vec::new(),
+            list_names: None,
+            list_templates: None,
         }
     }
 
     /// Add a list structure
     pub fn add_list(&mut self, list: ListStructure) {
         self.list_structures.push(list);
+        self.list_metadata.push(None);
+    }
+
+    /// Add a list with lossless LSTF/LVLF metadata and property payloads.
+    pub fn add_list_with_metadata(
+        &mut self,
+        list: ListStructure,
+        metadata: ListDefinitionMetadata,
+    ) {
+        self.list_structures.push(list);
+        self.list_metadata.push(Some(metadata));
     }
 
     /// Add a list format override
     pub fn add_override(&mut self, lfo: ListFormatOverride) {
         self.list_overrides.push(lfo);
+        self.override_headers.push(None);
+        self.override_data.push(None);
+    }
+
+    /// Add a complete LFO/LFOData entry, validating and encoding it transactionally.
+    pub fn add_override_with_data(
+        &mut self,
+        lfo: ListFormatOverride,
+        data: ListFormatOverrideData,
+    ) -> Result<(), DocWriteError> {
+        let (header, body) = lfo.encode_with_data(&data)?;
+        self.list_overrides.push(lfo);
+        self.override_headers.push(Some(header));
+        self.override_data.push(Some(body));
+        Ok(())
+    }
+
+    /// Set names parallel to `PlfLst.rgLstf` for `LISTNUM` fields.
+    pub fn set_list_names(&mut self, table: ListNamesTable) {
+        self.list_names = Some(table);
+    }
+
+    /// Set list-level template codes parallel to `PlfLst.rgLstf`.
+    pub fn set_list_templates(&mut self, table: ListTemplateTable) {
+        self.list_templates = Some(table);
+    }
+
+    pub fn build_sttb_list_names(&self) -> Result<Option<Vec<u8>>, DocWriteError> {
+        self.list_names
+            .as_ref()
+            .map(ListNamesTable::to_bytes)
+            .transpose()
+            .map_err(|error| DocWriteError::InvalidData(error.to_string()))
+    }
+
+    pub fn build_sttb_rgtplc(&self) -> Result<Option<Vec<u8>>, DocWriteError> {
+        self.list_templates
+            .as_ref()
+            .map(ListTemplateTable::to_bytes)
+            .transpose()
+            .map_err(|error| DocWriteError::InvalidData(error.to_string()))
     }
 
     /// Get number of list structures
@@ -304,13 +526,27 @@ impl NumberingWriter {
             .unwrap();
 
         // Each LSTF (fixed 28 bytes)
-        for list in &self.list_structures {
-            header_buf.extend_from_slice(&list.to_bytes());
+        for (index, list) in self.list_structures.iter().enumerate() {
+            header_buf.extend_from_slice(
+                &list.to_bytes_with_metadata(
+                    self.list_metadata
+                        .get(index)
+                        .and_then(Option::as_ref)
+                        .map(|value| &value.definition),
+                ),
+            );
         }
 
         // LVL data for all lists
-        for list in &self.list_structures {
-            lvl_buf.extend_from_slice(&list.levels_to_bytes()?);
+        for (index, list) in self.list_structures.iter().enumerate() {
+            lvl_buf.extend_from_slice(
+                &list.levels_to_bytes_with_metadata(
+                    self.list_metadata
+                        .get(index)
+                        .and_then(Option::as_ref)
+                        .map(|value| value.levels.as_slice()),
+                )?,
+            );
         }
 
         Ok((header_buf, lvl_buf))
@@ -325,13 +561,21 @@ impl NumberingWriter {
             .unwrap();
 
         // Each override
-        for lfo in &self.list_overrides {
-            buf.extend_from_slice(&lfo.to_bytes());
+        for (index, lfo) in self.list_overrides.iter().enumerate() {
+            if let Some(header) = self.override_headers.get(index).and_then(Option::as_ref) {
+                buf.extend_from_slice(header);
+            } else {
+                buf.extend_from_slice(&lfo.to_bytes());
+            }
         }
 
         // Parallel LFOData array. With clfolvl=0 each entry contains only its main-story CP.
-        for _ in &self.list_overrides {
-            buf.extend_from_slice(&0u32.to_le_bytes());
+        for index in 0..self.list_overrides.len() {
+            if let Some(data) = self.override_data.get(index).and_then(Option::as_ref) {
+                buf.extend_from_slice(data);
+            } else {
+                buf.extend_from_slice(&u32::MAX.to_le_bytes());
+            }
         }
 
         buf
@@ -340,6 +584,8 @@ impl NumberingWriter {
     /// Check if empty
     pub fn is_empty(&self) -> bool {
         self.list_structures.is_empty()
+            && self.list_names.is_none()
+            && self.list_templates.is_none()
     }
 }
 
@@ -597,6 +843,99 @@ mod tests {
             u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
             2
         );
+    }
+
+    #[test]
+    fn writes_lossless_list_definition_metadata_and_property_payloads() {
+        let mut list = ListStructure::new(0x1122_3344);
+        list.add_level(ListLevel::new(3, NumberFormat::Decimal));
+        let mut definition = ListStructureMetadata::default();
+        definition.style_links[0] =
+            Some(crate::doc::parts::numbering::ListStyleIndex::new(7).unwrap());
+        definition.automatic_numbering = true;
+        definition.hybrid = true;
+        definition.ignored_flags = 0x40;
+        definition.html_compatibility =
+            crate::doc::parts::numbering::HtmlCompatibilityFlags::from_raw(0xA5);
+        let level = ListLevelMetadata {
+            legal_numbering: true,
+            saved_indent: Some(-240),
+            placeholder_positions: [1, 0, 0, 0, 0, 0, 0, 0, 0],
+            follow_character: crate::doc::parts::numbering::ListFollowCharacter::Space,
+            unused_value: 0x5566_7788,
+            html_compatibility: crate::doc::parts::numbering::HtmlCompatibilityFlags::from_raw(
+                0x5A,
+            ),
+            paragraph_properties: vec![1, 2],
+            number_properties: vec![3, 4, 5],
+            ..ListLevelMetadata::default()
+        };
+        let mut writer = NumberingWriter::new();
+        writer.add_list_with_metadata(
+            list,
+            ListDefinitionMetadata {
+                definition,
+                levels: vec![level],
+            },
+        );
+        let (header, levels) = writer.build_plflst().unwrap();
+        assert_eq!(u16::from_le_bytes([header[10], header[11]]), 7);
+        assert_eq!(header[28], 0x55);
+        assert_eq!(header[29], 0xA5);
+        assert_eq!(levels[5], 0x14);
+        assert_eq!(&levels[16..20], &(-240i32).to_le_bytes());
+        assert_eq!(&levels[20..24], &0x5566_7788u32.to_le_bytes());
+        assert_eq!(&levels[28..33], &[1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn writes_complete_lfo_data_and_formatting_override() {
+        let format_metadata = ListLevelMetadata {
+            paragraph_properties: vec![0xAA],
+            number_properties: vec![0xBB],
+            ..ListLevelMetadata::default()
+        };
+        let override_metadata = ListLevelOverrideMetadata {
+            unused_start_at: 99,
+            html_compatibility: crate::doc::parts::numbering::HtmlCompatibilityFlags::from_raw(
+                0x12,
+            ),
+            ignored_flags: 0x8000_0000,
+            formatting: Some(format_metadata),
+        };
+        let data = ListFormatOverrideData {
+            metadata: ListFormatOverrideMetadata {
+                unused1: 1,
+                unused2: 2,
+                field: crate::doc::parts::numbering::AutomaticNumberingField::AutoNumber,
+                html_compatibility: crate::doc::parts::numbering::HtmlCompatibilityFlags::from_raw(
+                    3,
+                ),
+                unused3: 4,
+                first_paragraph_cp: Some(123),
+                levels: vec![override_metadata],
+            },
+            levels: vec![ListLevelOverride {
+                level: 2,
+                start_at: Some(7),
+                format: Some(ListLevel::new(7, NumberFormat::Decimal)),
+            }],
+        };
+        let mut writer = NumberingWriter::new();
+        writer
+            .add_override_with_data(ListFormatOverride::new(42, 1), data)
+            .unwrap();
+        let bytes = writer.build_plflfo();
+        assert_eq!(&bytes[8..12], &1u32.to_le_bytes());
+        assert_eq!(&bytes[12..16], &2u32.to_le_bytes());
+        assert_eq!(&bytes[16..20], &[1, 0xFE, 3, 4]);
+        assert_eq!(&bytes[20..24], &123u32.to_le_bytes());
+        assert_eq!(&bytes[24..28], &7u32.to_le_bytes());
+        assert_eq!(
+            u32::from_le_bytes(bytes[28..32].try_into().unwrap()),
+            0x8000_04B2
+        );
+        assert_eq!(&bytes[60..62], &[0xAA, 0xBB]);
     }
 
     #[test]

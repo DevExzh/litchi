@@ -598,6 +598,13 @@ impl FormattingManager {
         self.formats.get(index as usize)
     }
 
+    pub(crate) fn contains_number_format_id(&self, index: u16) -> bool {
+        BUILTIN_NUMBER_FORMATS
+            .get(index as usize)
+            .is_some_and(|pattern| !pattern.is_empty())
+            || self.number_formats.iter().any(|(id, _)| *id == index)
+    }
+
     /// Write all FONT records
     pub fn write_fonts<W: Write>(&self, writer: &mut W) -> XlsResult<()> {
         for font in &self.fonts {

@@ -27,6 +27,7 @@ litchi-opc      = { workspace = true }
 md-5            = { workspace = true }
 once_cell       = { workspace = true }
 quick-xml       = { workspace = true }
+rand            = { workspace = true }
 rc4             = { workspace = true }
 sha1            = { workspace = true }
 smallvec        = { workspace = true }
@@ -36,3 +37,7 @@ url             = { workspace = true }
 zerocopy        = { workspace = true }
 zerocopy-derive = { workspace = true }
 zeroize         = { workspace = true }
+
+[dev-dependencies]
+p256            = { workspace = true }
+rsa             = { workspace = true }

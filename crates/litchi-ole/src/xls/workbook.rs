@@ -9,7 +9,6 @@ use crate::xls::encryption::prepare_workbook_stream;
 use crate::xls::error::{XlsError, XlsResult};
 use crate::xls::formula::{FormulaContext, ptg_exp_anchor, render_formula, render_shared_formula};
 use crate::xls::number_format::{XlsDateSystem, XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
-use crate::xls::pivot_table::PivotTable;
 use crate::xls::records::{
     BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, FormulaValue,
     RecordIter, SharedStringProperties, SharedStringTable, XlsEncoding,
@@ -159,6 +158,9 @@ pub struct XlsWorkbook<R: Read + Seek> {
     workbook_view: crate::xls::workbook_view::XlsWorkbookView,
     function_groups: Option<crate::xls::function_group::XlsFunctionGroups>,
     external_links: crate::xls::external_link::XlsExternalLinks,
+    pivot_caches: Vec<crate::xls::PivotCache>,
+    /// SXStreamID values in global PivotCache ordinal order.
+    pivot_cache_stream_ids: Vec<u16>,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -192,6 +194,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
             external_links: crate::xls::XlsExternalLinks::default(),
+            pivot_caches: Vec::new(),
+            pivot_cache_stream_ids: Vec::new(),
             defined_names: Vec::new(),
             defined_name_records: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
@@ -241,6 +245,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
             external_links: crate::xls::XlsExternalLinks::default(),
+            pivot_caches: Vec::new(),
+            pivot_cache_stream_ids: Vec::new(),
             defined_names: Vec::new(),
             defined_name_records: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
@@ -308,12 +314,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             .collect();
         self.worksheet_names.clear();
         self.formula_context.set_sheet_names(all_sheet_names);
-        self.formula_context.set_defined_names(
+        self.formula_context.set_scoped_defined_names(
             defined_name_slots
                 .iter()
-                .map(DefinedNameSlot::symbol)
+                .map(DefinedNameSlot::formula_symbol)
                 .collect(),
         );
+        self.formula_context
+            .set_external_links(&self.external_links);
         self.defined_name_records = defined_name_slots
             .into_iter()
             .map(|slot| slot.into_public(bound_sheets.len(), &self.formula_context))
@@ -337,11 +345,53 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.worksheets.push(worksheet);
                     self.sheets[sheet_index].set_parsed_worksheet_index(worksheet_index);
                 },
-                Err(_e) => {
-                    // Failed to parse worksheet, continue with next
-                },
+                Err(error @ XlsError::InvalidRecord { record_type, .. })
+                    if pivot_table::is_worksheet_view_record(record_type) => return Err(error),
+                Err(_) => {},
             }
         }
+
+        let mut cache_paths = self
+            .ole_file
+            .list_streams()
+            .into_iter()
+            .filter(|path| {
+                path.len() == 2
+                    && path[0].eq_ignore_ascii_case("_SX_DB_CUR")
+                    && u16::from_str_radix(&path[1], 16).is_ok()
+            })
+            .collect::<Vec<_>>();
+        cache_paths.sort_by_key(|path| u16::from_str_radix(&path[1], 16).unwrap());
+        let mut pivot_caches = Vec::with_capacity(cache_paths.len());
+        for path in cache_paths {
+            let expected_stream_id = u16::from_str_radix(&path[1], 16).unwrap();
+            if expected_stream_id == 0 {
+                return Err(XlsError::InvalidRecord {
+                    record_type: 0x00C6,
+                    message: "PivotCache storage stream ID must be nonzero".to_string(),
+                });
+            }
+            let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+            let data = self.ole_file.open_stream(&refs)?;
+            let cache = crate::xls::pivot_table::parse_pivot_cache_stream(&data)?;
+            if cache.stream_id() != expected_stream_id {
+                return Err(XlsError::InvalidRecord {
+                    record_type: 0x00C6,
+                    message: format!(
+                        "PivotCache storage stream {:04X} contains stream ID {:04X}",
+                        expected_stream_id,
+                        cache.stream_id()
+                    ),
+                });
+            }
+            pivot_caches.push(cache);
+        }
+        self.pivot_caches = pivot_caches;
+        crate::xls::pivot_table::validate_pivot_cache_links(
+            &self.worksheets,
+            &self.pivot_caches,
+            &self.pivot_cache_stream_ids,
+        )?;
 
         let visible_tabs = bound_sheets
             .iter()
@@ -471,6 +521,19 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     let sheet = BoundSheetRecord::parse(&record.data, encoding)?;
                     bound_sheets.push(sheet);
                 },
+                0x00D5 => {
+                    if record.data.len() != 2 {
+                        return Err(XlsError::InvalidLength { expected: 2, found: record.data.len() });
+                    }
+                    let stream_id = u16::from_le_bytes(record.data[..2].try_into().expect("length checked"));
+                    if stream_id == 0 || self.pivot_cache_stream_ids.contains(&stream_id) {
+                        return Err(XlsError::InvalidRecord {
+                            record_type: 0x00D5,
+                            message: "SXStreamID must be nonzero and unique".to_string(),
+                        });
+                    }
+                    self.pivot_cache_stream_ids.push(stream_id);
+                },
                 0x01AE => {
                     // SUPBOOK: retain its position and whether it references
                     // this workbook so EXTERNSHEET indices remain stable.
@@ -556,7 +619,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.vba_metadata = vba_collector.finish();
                     self.environment = environment_collector.finish()?;
                     self.write_access = write_access_collector.finish();
-                    self.table_styles = table_styles_collector.finish();
+                    self.table_styles = table_styles_collector
+                        .finish(self.formatting.differential_formats().len())?;
                     self.shared_string_index = shared_string_index_collector.finish();
                     self.workbook_view = workbook_view_collector.finish(bound_sheets.len())?;
                     self.function_groups = function_group_collector.finish()?;
@@ -637,9 +701,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         );
         worksheet.set_formatting(formatting.clone());
 
-        // Accumulator for pivot table records: we collect SX* records in order
-        // and assemble complete PivotTable structs when SXVIEW boundaries are hit.
-        let mut current_pivot: Option<PivotTable> = None;
+        let mut pivot_table_collector = pivot_table::PivotTableCollector::new();
 
         let mut comment_collector = comments::CommentCollector::new();
         let mut hyperlink_collector = hyperlinks::HyperlinkCollector::new();
@@ -656,6 +718,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut vba_collector = crate::xls::vba::WorksheetVbaCollector::new();
         let mut consolidation_collector = crate::xls::consolidation::ConsolidationCollector::new();
         let mut formula_error_collector = crate::xls::formula_errors::FormulaErrorCollector::new();
+        let mut list_object_collector = crate::xls::list_object::ListObjectCollector::new();
+        let mut sort_data_collector = crate::xls::sort_data::SortDataCollector::default();
         let mut row_block_index_collector =
             crate::xls::row_block_index::RowBlockIndexCollector::new(
                 record_iter.stream_len(),
@@ -684,6 +748,12 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_collector.feed_record(record.header.record_type, &record.data)?;
             consolidation_collector.feed_record(record.header.record_type, &record.data)?;
             formula_error_collector.feed_record(record.header.record_type, &record.data)?;
+            list_object_collector.feed_record(record.header.record_type, &record.data)?;
+            if let Some(sort_data) =
+                sort_data_collector.feed_record(record.header.record_type, &record.data)?
+            {
+                worksheet.set_sort_data(sort_data);
+            }
             row_block_index_collector.feed_record(
                 record_position,
                 record.header.record_type,
@@ -737,6 +807,15 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 continue;
             }
 
+            if pivot_table_collector.feed_record(record.header.record_type, &record.data).map_err(|error| {
+                XlsError::InvalidRecord {
+                    record_type: record.header.record_type,
+                    message: error.to_string(),
+                }
+            })? {
+                continue;
+            }
+
             match record.header.record_type {
                 0x0809 => { // BOF - Beginning of worksheet
                     // This marks the start of a worksheet
@@ -769,10 +848,6 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     *remaining -= 1;
                 }
                 0x000A => { // EOF - End of worksheet
-                    // Flush any in-progress pivot table
-                    if let Some(pt) = current_pivot.take() {
-                        worksheet.add_pivot_table(pt);
-                    }
                     *worksheet.protection_mut() = protection_collector.finish()?;
                     break;
                 }
@@ -899,49 +974,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     }
                 }
 
-                // --- Pivot table records ---
-                rt if rt == pivot_table::SXVIEW_TYPE => {
-                    // New SXVIEW starts a new pivot table; flush previous if any
-                    if let Some(pt) = current_pivot.take() {
-                        worksheet.add_pivot_table(pt);
-                    }
-                    if let Ok(view) = pivot_table::parse_sxview(&record.data) {
-                        current_pivot = Some(PivotTable::new(view));
-                    }
-                }
-                rt if rt == pivot_table::SXVD_TYPE => {
-                    if let Some(ref mut pt) = current_pivot
-                        && let Ok(field) = pivot_table::parse_sxvd(&record.data)
-                    {
-                        pt.fields.push(field);
-                    }
-                }
-                rt if rt == pivot_table::SXVI_TYPE => {
-                    if let Some(ref mut pt) = current_pivot
-                        && let Ok(item) = pivot_table::parse_sxvi(&record.data)
-                    {
-                        pt.items.push(item);
-                    }
-                }
-                rt if rt == pivot_table::SXDI_TYPE => {
-                    if let Some(ref mut pt) = current_pivot
-                        && let Ok(di) = pivot_table::parse_sxdi(&record.data)
-                    {
-                        pt.data_items.push(di);
-                    }
-                }
-                rt if rt == pivot_table::SXVS_TYPE => {
-                    if let Some(ref mut pt) = current_pivot
-                        && let Ok(src) = pivot_table::parse_sxvs(&record.data)
-                    {
-                        pt.source_type = src;
-                    }
-                }
-                rt if rt == pivot_table::SXPI_TYPE => {
-                    if let Some(ref mut pt) = current_pivot
-                        && let Ok(entries) = pivot_table::parse_sxpi(&record.data)
-                    {
-                        pt.page_entries.extend(entries);
+                // --- Filter mode (FILTERMODE 0x009B) ---
+                rt if rt == autofilter::FILTERMODE_TYPE => {
+                    if autofilter::parse_filtermode(&record.data).is_ok() {
+                        worksheet.set_filter_mode(true);
                     }
                 }
 
@@ -957,6 +993,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 message: "worksheet ended before all DV records declared by DVAL".to_string(),
             });
         }
+        for table in pivot_table_collector.finish()? {
+            worksheet.add_pivot_table(table);
+        }
+        sort_data_collector.finish()?;
 
         worksheet.set_comments(comment_collector.finish()?);
         worksheet.set_hyperlinks(hyperlink_collector.finish());
@@ -974,6 +1014,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_vba_code_name(vba_collector.finish());
         worksheet.set_consolidation(consolidation_collector.finish());
         worksheet.set_formula_error_features(formula_error_collector.finish()?);
+        worksheet.set_list_objects(list_object_collector.finish()?);
         worksheet.set_row_block_index(row_block_index_collector.finish());
 
         Ok(worksheet)
@@ -1007,6 +1048,64 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Inert supporting-book links and cached external cell values.
     pub fn external_links(&self) -> &crate::xls::external_link::XlsExternalLinks {
         &self.external_links
+    }
+
+    /// Parsed workbook PivotCache streams ordered by their one-based stream ID.
+    pub fn pivot_caches(&self) -> &[crate::xls::PivotCache] {
+        &self.pivot_caches
+    }
+
+    pub fn summary_information(&mut self) -> XlsResult<Option<litchi_cfb::PropertySetStream>> {
+        match self.ole_file.property_set_stream(&["\u{0005}SummaryInformation"]) {
+            Ok(value) => Ok(Some(value)), Err(litchi_cfb::OleError::StreamNotFound) => Ok(None), Err(error) => Err(error.into()),
+        }
+    }
+
+    /// Verify workbook XML signatures without evaluating certificate trust or
+    /// executing any macro content.
+    pub fn verify_digital_signatures(
+        &mut self,
+        policy: &crate::signature::SignatureVerificationPolicy,
+    ) -> crate::signature::Result<Vec<crate::signature::BinaryOfficeSignatureVerification>> {
+        crate::signature::verify_binary_office_signatures(
+            &mut self.ole_file,
+            crate::signature::BinaryOfficeFormat::Xls,
+            policy,
+        )
+    }
+
+    pub fn document_summary_information(&mut self) -> XlsResult<Option<litchi_cfb::PropertySetStream>> {
+        match self.ole_file.property_set_stream(&["\u{0005}DocumentSummaryInformation"]) {
+            Ok(value) => Ok(Some(value)), Err(litchi_cfb::OleError::StreamNotFound) => Ok(None), Err(error) => Err(error.into()),
+        }
+    }
+
+    pub fn user_defined_properties(&mut self) -> XlsResult<Option<litchi_cfb::PropertySet>> {
+        Ok(self.document_summary_information()?.and_then(|stream| stream.section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID).cloned()))
+    }
+
+    /// Global PivotCache ordinal-to-storage-stream map from SXStreamID records.
+    pub fn pivot_cache_stream_ids(&self) -> &[u16] { &self.pivot_cache_stream_ids }
+
+    /// Resolves a worksheet PivotTable's global cache link.
+    pub fn pivot_cache_for_table(
+        &self,
+        table: &crate::xls::pivot_table::PivotTable,
+    ) -> XlsResult<&crate::xls::PivotCache> {
+        let stream_id = *self.pivot_cache_stream_ids.get(usize::from(table.cache_index()))
+            .ok_or_else(|| XlsError::InvalidRecord {
+                record_type: crate::xls::pivot_table::SXVIEW_TYPE,
+                message: "PivotTable global cache index is out of range".to_string(),
+            })?;
+        self.pivot_caches.iter().find(|cache| cache.stream_id() == stream_id).ok_or_else(|| XlsError::InvalidRecord {
+            record_type: crate::xls::pivot_table::SXVIEW_TYPE,
+            message: "PivotTable SXStreamID has no matching cache storage".to_string(),
+        })
+    }
+
+    /// Parsed PivotTables on one worksheet.
+    pub fn worksheet_pivot_tables(&self, index: usize) -> XlsResult<&[crate::xls::pivot_table::PivotTable]> {
+        Ok(self.xls_worksheet(index)?.pivot_tables())
     }
 
     /// Access the typed `XlsWorksheet` at the given index.
@@ -1097,6 +1196,20 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.formatting.extended_formats()
     }
 
+    /// Global differential formats referenced by custom table-style elements.
+    pub fn differential_formats(
+        &self,
+    ) -> &[crate::xls::differential_format::XlsDifferentialFormat] {
+        self.formatting.differential_formats()
+    }
+
+    pub fn differential_format(
+        &self,
+        id: crate::xls::table_styles::XlsDifferentialFormatId,
+    ) -> Option<&crate::xls::differential_format::XlsDifferentialFormat> {
+        self.formatting.differential_format(id)
+    }
+
     /// Resolves an XF's effective property families through its parent StyleXF.
     pub fn effective_extended_format(
         &self,
@@ -1161,6 +1274,20 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Every internal `Lbl`, including inert macro and procedure metadata.
     pub fn defined_name_records(&self) -> &[XlsDefinedName] {
         &self.defined_name_records
+    }
+
+    /// The built-in `_FilterDatabase` defined name scoped to a zero-based
+    /// sheet index, if present.
+    ///
+    /// Its rendered formula describes the AutoFilter cell range.
+    pub fn filter_database_name(&self, sheet_index: usize) -> Option<&XlsDefinedName> {
+        self.defined_names.iter().find(|defined_name| {
+            defined_name.kind
+                == crate::xls::defined_names::XlsDefinedNameKind::BuiltIn(
+                    crate::xls::defined_names::XlsBuiltInName::FilterDatabase,
+                )
+                && defined_name.scope == XlsNameScope::Worksheet(sheet_index)
+        })
     }
 
     /// Case-insensitive name lookup with sheet-local-before-workbook precedence.

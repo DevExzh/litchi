@@ -7,6 +7,7 @@ const DATE1904_RECORD: u16 = 0x0022;
 const FORMAT_RECORD: u16 = 0x041e;
 const XF_RECORD: u16 = 0x00e0;
 const XFCRC_RECORD: u16 = 0x087c;
+const MAX_DXF_RECORDS: usize = 65_536;
 const MAX_FORMAT_RECORDS: usize = 218;
 const MIN_XF_RECORDS: usize = 16;
 const MAX_XF_RECORDS: usize = 65_536;
@@ -283,6 +284,7 @@ pub struct XlsFormatting {
     date_system: XlsDateSystem,
     number_formats: Vec<XlsNumberFormat>,
     extended_formats: Vec<XlsExtendedFormat>,
+    differential_formats: Vec<crate::xls::differential_format::XlsDifferentialFormat>,
     format_by_id: HashMap<u16, usize>,
 }
 
@@ -299,6 +301,20 @@ impl XlsFormatting {
     /// BIFF `XF` records in index order, including style-XF slots.
     pub fn extended_formats(&self) -> &[XlsExtendedFormat] {
         &self.extended_formats
+    }
+
+    /// Global `DXF` records in zero-based reference order.
+    pub fn differential_formats(
+        &self,
+    ) -> &[crate::xls::differential_format::XlsDifferentialFormat] {
+        &self.differential_formats
+    }
+
+    pub fn differential_format(
+        &self,
+        id: crate::xls::table_styles::XlsDifferentialFormatId,
+    ) -> Option<&crate::xls::differential_format::XlsDifferentialFormat> {
+        self.differential_formats.get(id.index() as usize)
     }
 
     pub fn number_format(&self, id: u16) -> Option<&XlsNumberFormat> {
@@ -363,6 +379,7 @@ impl XlsFormatting {
         let mut date_system = None;
         let mut number_formats = Vec::new();
         let mut extended_formats = Vec::new();
+        let mut differential_formats = Vec::new();
         let mut format_by_id = HashMap::new();
         let mut xfcrc = None;
 
@@ -402,6 +419,19 @@ impl XlsFormatting {
                         return Err(invalid(XFCRC_RECORD, "duplicate XFCRC record"));
                     }
                     xfcrc = Some(parse_xfcrc(&record.data)?);
+                },
+                crate::xls::differential_format::DXF_RECORD_TYPE => {
+                    if differential_formats.len() == MAX_DXF_RECORDS {
+                        return Err(invalid(
+                            crate::xls::differential_format::DXF_RECORD_TYPE,
+                            "more than 65,536 DXF records",
+                        ));
+                    }
+                    differential_formats.push(
+                        crate::xls::differential_format::XlsDifferentialFormat::parse_payload(
+                            &record.data,
+                        )?,
+                    );
                 },
                 _ => {},
             }
@@ -478,10 +508,37 @@ impl XlsFormatting {
             }
         }
 
+        for (dxf_index, dxf) in differential_formats.iter().enumerate() {
+            for property in dxf.properties().properties() {
+                if let crate::xls::differential_format::XlsXfProperty::NumberFormatId(id) = property
+                {
+                    if *id > 81 {
+                        if !(164..=392).contains(id) {
+                            return Err(invalid(
+                                crate::xls::differential_format::DXF_RECORD_TYPE,
+                                format!(
+                                    "DXF {dxf_index} uses reserved number format identifier {id}"
+                                ),
+                            ));
+                        }
+                        if !format_by_id.contains_key(id) {
+                            return Err(invalid(
+                                crate::xls::differential_format::DXF_RECORD_TYPE,
+                                format!(
+                                    "DXF {dxf_index} references missing custom number format {id}"
+                                ),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(Self {
             date_system,
             number_formats,
             extended_formats,
+            differential_formats,
             format_by_id,
         })
     }

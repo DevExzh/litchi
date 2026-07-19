@@ -2,6 +2,8 @@
 //!
 //! Parses PowerPoint binary animation records into structured types.
 
+use super::linked_slide::{PowerPoint10LinkedShape, PowerPoint10LinkedSlide};
+use super::slide_metadata::PowerPoint10SlideTime;
 use super::triggers::IterationType;
 use super::types::{
     AfterEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry, ChartBuild,
@@ -600,6 +602,7 @@ pub fn parse_time_node_atom(record: &PptRecord) -> Result<TimeNodeAtom> {
 pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExtension> {
     let mut extension = SlideAnimationExtension::default();
     let mut offset = 0usize;
+    let mut linked_shape_array_closed = false;
     while offset < data.len() {
         if data.len() - offset < 8 {
             return Err(PptError::Corrupted(
@@ -613,7 +616,51 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                 record.record_type
             )));
         }
+        if record.record_type != PptRecordType::LinkedShape10Atom
+            && !extension.linked_shapes.is_empty()
+        {
+            linked_shape_array_closed = true;
+        }
         match record.record_type {
+            PptRecordType::LinkedSlide10Atom => {
+                if extension.linked_slide.is_some() {
+                    return Err(PptError::InvalidFormat(
+                        "___PPT10 contains multiple LinkedSlide10Atom records".to_string(),
+                    ));
+                }
+                if !extension.linked_shapes.is_empty() {
+                    return Err(PptError::InvalidFormat(
+                        "LinkedSlide10Atom must precede its LinkedShape10Atom array".to_string(),
+                    ));
+                }
+                extension.linked_slide = Some(PowerPoint10LinkedSlide::parse_record(&record)?);
+            },
+            PptRecordType::LinkedShape10Atom => {
+                let linked_slide = extension.linked_slide.ok_or_else(|| {
+                    PptError::InvalidFormat(
+                        "LinkedShape10Atom requires a preceding LinkedSlide10Atom".to_string(),
+                    )
+                })?;
+                if linked_shape_array_closed {
+                    return Err(PptError::InvalidFormat(
+                        "LinkedShape10Atom array must be contiguous".to_string(),
+                    ));
+                }
+                let declared_count =
+                    usize::try_from(linked_slide.linked_shape_count()).map_err(|_| {
+                        PptError::InvalidFormat(
+                            "LinkedSlide10Atom shape count does not fit this platform".to_string(),
+                        )
+                    })?;
+                if extension.linked_shapes.len() >= declared_count {
+                    return Err(PptError::InvalidFormat(
+                        "LinkedShape10Atom array exceeds its declared count".to_string(),
+                    ));
+                }
+                extension
+                    .linked_shapes
+                    .push(PowerPoint10LinkedShape::parse_record(&record)?);
+            },
             PptRecordType::ExtTimeNode => {
                 if extension.time_node.is_some() {
                     return Err(PptError::InvalidFormat(
@@ -636,7 +683,7 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                         "___PPT10 contains multiple SlideFlags10Atom records".to_string(),
                     ));
                 }
-                extension.slide_flags = Some(parse_slide_flags(&record)?);
+                extension.slide_flags = Some(PowerPoint10SlideFlags::parse_record(&record)?);
             },
             PptRecordType::SlideTime10Atom => {
                 if extension.creation_time_filetime.is_some() {
@@ -644,7 +691,8 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                         "___PPT10 contains multiple SlideTime10Atom records".to_string(),
                     ));
                 }
-                extension.creation_time_filetime = Some(parse_slide_time(&record)?);
+                extension.creation_time_filetime =
+                    Some(PowerPoint10SlideTime::parse_record(&record)?.file_time());
             },
             PptRecordType::HashCode10Atom => {
                 if extension.animation_hash.is_some() {
@@ -652,7 +700,8 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                         "___PPT10 contains multiple HashCode10Atom records".to_string(),
                     ));
                 }
-                extension.animation_hash = Some(parse_animation_hash(&record)?);
+                extension.animation_hash =
+                    Some(super::hash::PowerPointAnimationHash10::parse_record(&record)?.hash());
             },
             _ => {},
         }
@@ -660,52 +709,20 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
             .checked_add(consumed)
             .ok_or_else(|| PptError::Corrupted("slide binary tag offset overflow".to_string()))?;
     }
+    if let Some(linked_slide) = extension.linked_slide {
+        let declared_count = usize::try_from(linked_slide.linked_shape_count()).map_err(|_| {
+            PptError::InvalidFormat(
+                "LinkedSlide10Atom shape count does not fit this platform".to_string(),
+            )
+        })?;
+        if extension.linked_shapes.len() != declared_count {
+            return Err(PptError::InvalidFormat(format!(
+                "LinkedSlide10Atom declares {declared_count} linked shapes but {} were present",
+                extension.linked_shapes.len()
+            )));
+        }
+    }
     Ok(extension)
-}
-
-fn parse_slide_flags(record: &PptRecord) -> Result<PowerPoint10SlideFlags> {
-    require_atom(
-        record,
-        PptRecordType::SlideFlags10Atom,
-        0,
-        4,
-        "SlideFlags10Atom",
-    )?;
-    let raw =
-        u32::from_le_bytes(record.data[..4].try_into().map_err(|_| {
-            PptError::Corrupted("SlideFlags10Atom payload is truncated".to_string())
-        })?);
-    Ok(PowerPoint10SlideFlags {
-        raw,
-        preserve_master: raw & 1 != 0,
-        override_master_animation: raw & 2 != 0,
-    })
-}
-
-fn parse_slide_time(record: &PptRecord) -> Result<u64> {
-    require_atom(
-        record,
-        PptRecordType::SlideTime10Atom,
-        0,
-        8,
-        "SlideTime10Atom",
-    )?;
-    Ok(u64::from_le_bytes(record.data[..8].try_into().map_err(
-        |_| PptError::Corrupted("SlideTime10Atom payload is truncated".to_string()),
-    )?))
-}
-
-fn parse_animation_hash(record: &PptRecord) -> Result<u32> {
-    require_atom(
-        record,
-        PptRecordType::HashCode10Atom,
-        0,
-        4,
-        "HashCode10Atom",
-    )?;
-    Ok(u32::from_le_bytes(record.data[..4].try_into().map_err(
-        |_| PptError::Corrupted("HashCode10Atom payload is truncated".to_string()),
-    )?))
 }
 
 /// Parse a time-node property list in its containing-node context.

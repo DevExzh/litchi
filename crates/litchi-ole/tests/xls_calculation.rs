@@ -3,7 +3,33 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_ole::xls::writer::{XlsCalculationSettings, XlsWriter};
-use litchi_ole::xls::{XlsCalculationMode, XlsReferenceMode, XlsWorkbook};
+use litchi_ole::xls::{
+    XlsCalculationMode, XlsMultithreadedCalculation, XlsReferenceMode, XlsWorkbook,
+};
+
+fn workbook_global_record_types(bytes: &[u8]) -> Vec<u16> {
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let stream = ole.open_stream(&["Workbook"]).unwrap();
+    let mut record_types = Vec::new();
+    let mut offset = 0usize;
+    while offset + 4 <= stream.len() {
+        let record_type = u16::from_le_bytes(stream[offset..offset + 2].try_into().unwrap());
+        let length = usize::from(u16::from_le_bytes(
+            stream[offset + 2..offset + 4].try_into().unwrap(),
+        ));
+        let end = offset.checked_add(4 + length).unwrap();
+        assert!(
+            end <= stream.len(),
+            "truncated BIFF record in writer output"
+        );
+        record_types.push(record_type);
+        offset = end;
+        if record_type == 0x000A {
+            break;
+        }
+    }
+    record_types
+}
 
 #[test]
 fn calculation_settings_round_trip() {
@@ -19,17 +45,39 @@ fn calculation_settings_round_trip() {
             reference_mode: XlsReferenceMode::R1C1,
             recalculate_before_save: false,
             recalculation_engine_id: 0x1234_5678,
+            multithreaded_calculation: Some(
+                XlsMultithreadedCalculation::try_with_thread_count(true, 8).unwrap(),
+            ),
             force_full_calculation: true,
         })
         .unwrap();
     writer.set_recalculation_pending(sheet, true).unwrap();
+    writer.write_string(sheet, 0, 0, "shared string").unwrap();
+    writer.add_comment(sheet, 0, 0, "Author", "note").unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let bytes = bytes.into_inner();
+    let relevant = workbook_global_record_types(&bytes)
+        .into_iter()
+        .filter(|record_type| {
+            matches!(
+                record_type,
+                0x089A | 0x08A3 | 0x008C | 0x01C1 | 0x00EB | 0x00FC
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        relevant,
+        vec![0x089A, 0x08A3, 0x008C, 0x01C1, 0x00EB, 0x00FC]
+    );
+    let workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
     let globals = workbook.calculation();
     assert!(!globals.full_precision());
     assert!(globals.force_full_calculation());
     assert_eq!(globals.recalculation_engine_id(), Some(0x1234_5678));
+    let threading = globals.multithreaded_calculation().unwrap();
+    assert!(threading.enabled());
+    assert_eq!(threading.user_thread_count(), Some(8));
     let calculation = workbook.xls_worksheet(0).unwrap().calculation();
     assert_eq!(calculation.mode(), XlsCalculationMode::Manual);
     assert_eq!(calculation.maximum_iterations(), 321);
@@ -66,4 +114,24 @@ fn writer_rejects_invalid_calculation_bounds() {
         ..XlsCalculationSettings::default()
     };
     assert!(writer.set_calculation_settings(invalid_delta).is_err());
+    assert!(XlsMultithreadedCalculation::try_with_thread_count(true, 0).is_err());
+    assert!(XlsMultithreadedCalculation::try_with_thread_count(true, 1025).is_err());
+}
+
+#[test]
+fn automatic_multithreaded_calculation_round_trip() {
+    let mut writer = XlsWriter::new();
+    writer.add_worksheet("Automatic threading").unwrap();
+    writer
+        .set_calculation_settings(XlsCalculationSettings {
+            multithreaded_calculation: Some(XlsMultithreadedCalculation::automatic(true)),
+            ..XlsCalculationSettings::default()
+        })
+        .unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let threading = workbook.calculation().multithreaded_calculation().unwrap();
+    assert!(threading.enabled());
+    assert_eq!(threading.user_thread_count(), None);
 }

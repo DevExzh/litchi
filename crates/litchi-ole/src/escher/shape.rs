@@ -200,6 +200,53 @@ impl<'data> EscherShape<'data> {
         self.placeholder
     }
 
+    /// Parse the strict, context-validated PowerPoint `PlaceholderAtom`.
+    pub fn placeholder_atom(
+        &self,
+        context: crate::ppt::PowerPointPlaceholderContext,
+    ) -> crate::ppt::package::Result<Option<crate::ppt::PowerPointPlaceholderAtom>> {
+        self.placeholder_atom_with_limits(
+            context,
+            crate::ppt::PowerPointPlaceholderLimits::default(),
+        )
+    }
+
+    /// Parse `PlaceholderAtom` with caller-supplied client-data limits.
+    pub fn placeholder_atom_with_limits(
+        &self,
+        context: crate::ppt::PowerPointPlaceholderContext,
+        limits: crate::ppt::PowerPointPlaceholderLimits,
+    ) -> crate::ppt::package::Result<Option<crate::ppt::PowerPointPlaceholderAtom>> {
+        let group_header = if self.is_group {
+            self.container
+                .find_child(EscherRecordType::SpContainer)
+                .map(EscherContainer::new)
+        } else {
+            None
+        };
+        let metadata_container = group_header.as_ref().unwrap_or(&self.container);
+        let Some(client_data) = metadata_container.find_child(EscherRecordType::ClientData) else {
+            return Ok(None);
+        };
+        if client_data.version != 0x0f
+            || client_data.instance != 0
+            || client_data.record_type_raw != 0xf011
+            || usize::try_from(client_data.length).ok() != Some(client_data.data.len())
+        {
+            return Err(crate::ppt::package::PptError::Corrupted(
+                "Invalid OfficeArt ClientData record header".to_string(),
+            ));
+        }
+        Ok(
+            crate::ppt::PowerPointPlaceholderProjection::parse_client_data_payload(
+                client_data.data,
+                context,
+                limits,
+            )?
+            .placeholder,
+        )
+    }
+
     /// Parse inert PowerPoint 12 placeholder round-trip metadata from OfficeArt client data.
     pub fn powerpoint12_shape_metadata(
         &self,
@@ -329,6 +376,90 @@ impl<'data> EscherShape<'data> {
         }
 
         Ok(found.then_some(metadata))
+    }
+
+    /// Parse inert shape programmable tags from OfficeArt client data.
+    pub fn extract_shape_programmable_tags_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointShapeProgrammableTagLimits,
+    ) -> crate::ppt::package::Result<Option<crate::ppt::PowerPointShapeProgrammableTags>> {
+        let group_header = if self.is_group {
+            self.container
+                .find_child(EscherRecordType::SpContainer)
+                .map(EscherContainer::new)
+        } else {
+            None
+        };
+        let metadata_container = group_header.as_ref().unwrap_or(&self.container);
+        let Some(client_data) = metadata_container.find_child(EscherRecordType::ClientData) else {
+            return Ok(None);
+        };
+
+        let mut result = None;
+        let mut offset = 0usize;
+        while offset < client_data.data.len() {
+            let (record, consumed) =
+                crate::ppt::records::PptRecord::parse_strict(client_data.data, offset)?;
+            if record.record_type == crate::consts::PptRecordType::ProgTags {
+                let parsed = crate::ppt::PowerPointShapeProgrammableTags::parse(&record, limits)?;
+                if result.replace(parsed).is_some() {
+                    return Err(crate::ppt::package::PptError::Corrupted(
+                        "Shape ClientData contains multiple ShapeProgTagsContainer records"
+                            .to_string(),
+                    ));
+                }
+            }
+            if consumed == 0 {
+                return Err(crate::ppt::package::PptError::Corrupted(
+                    "Zero-length PPT record in OfficeArt client data".to_string(),
+                ));
+            }
+            offset = offset.checked_add(consumed).ok_or_else(|| {
+                crate::ppt::package::PptError::Corrupted(
+                    "OfficeArt client-data offset overflow".to_string(),
+                )
+            })?;
+        }
+        Ok(result)
+    }
+
+    /// Parse the shape-flag prefix owned by this shape's OfficeArt client data.
+    pub fn shape_flags(
+        &self,
+    ) -> crate::ppt::package::Result<Option<crate::ppt::PowerPointShapeFlagProjection>> {
+        self.shape_flags_with_limits(crate::ppt::PowerPointShapeFlagLimits::default())
+    }
+
+    /// Parse shape flags with caller-supplied client-data resource limits.
+    pub fn shape_flags_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointShapeFlagLimits,
+    ) -> crate::ppt::package::Result<Option<crate::ppt::PowerPointShapeFlagProjection>> {
+        let group_header = if self.is_group {
+            self.container
+                .find_child(EscherRecordType::SpContainer)
+                .map(EscherContainer::new)
+        } else {
+            None
+        };
+        let metadata_container = group_header.as_ref().unwrap_or(&self.container);
+        let Some(client_data) = metadata_container.find_child(EscherRecordType::ClientData) else {
+            return Ok(None);
+        };
+        if client_data.version != 0x0f
+            || client_data.instance != 0
+            || client_data.record_type_raw != 0xf011
+            || usize::try_from(client_data.length).ok() != Some(client_data.data.len())
+        {
+            return Err(crate::ppt::package::PptError::Corrupted(
+                "Invalid OfficeArt ClientData record header".to_string(),
+            ));
+        }
+        let projection = crate::ppt::PowerPointShapeFlagProjection::parse_client_data_payload(
+            client_data.data,
+            limits,
+        )?;
+        Ok(projection.has_flags().then_some(projection))
     }
 
     /// Compatibility accessor for [`Self::powerpoint12_shape_metadata`].

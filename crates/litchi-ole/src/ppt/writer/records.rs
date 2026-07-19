@@ -26,6 +26,7 @@ use super::tx_style::{
 };
 
 use litchi_core::unit::emu_u32_to_ppt_master_u32;
+use crate::ppt::view_info::PowerPointSlideViewInfo;
 
 /// Error type for PPT operations
 pub type PptError = std::io::Error;
@@ -537,8 +538,11 @@ pub fn create_slide_list_with_text_notes(entries: &[(u32, u32)]) -> Result<Vec<u
     builder.build()
 }
 
-/// Create a DocInfo List container (type 2000) with minimal HeadersFooters for slides.
-pub fn create_docinfo_list_container_minimal() -> Result<Vec<u8>, PptError> {
+/// Create a DocInfo List container with optional typed slide and notes editing views.
+pub fn create_docinfo_list_container(
+    slide_view_info: Option<&PowerPointSlideViewInfo>,
+    notes_view_info: Option<&PowerPointSlideViewInfo>,
+) -> Result<Vec<u8>, PptError> {
     let mut list = RecordBuilder::new(0x0F, 0, record_type::DOC_INFO_LIST);
 
     // SheetProperties (1044) container with timestamp atom
@@ -548,12 +552,25 @@ pub fn create_docinfo_list_container_minimal() -> Result<Vec<u8>, PptError> {
     sheet.write_child(&sheet_child.build()?);
     list.write_child(&sheet.build()?);
 
-    // SlideViewInfo (1018) container with SlideViewInfoAtom
-    let mut svi = RecordBuilder::new(0x0F, 0, record_type::SLIDE_VIEW_INFO);
-    let mut svia = RecordBuilder::new(0x00, 0, record_type::SLIDE_VIEW_INFO_ATOM);
-    svia.write_data(&SlideViewInfoAtom::DEFAULT.to_bytes());
-    svi.write_child(&svia.build()?);
-    list.write_child(&svi.build()?);
+    if let Some(view) = slide_view_info {
+        let bytes = view
+            .to_bytes()
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+        list.write_child(&bytes);
+    } else {
+        // Preserve the historical canonical default slide view when no override is set.
+        let mut svi = RecordBuilder::new(0x0F, 0, record_type::SLIDE_VIEW_INFO);
+        let mut svia = RecordBuilder::new(0x00, 0, record_type::SLIDE_VIEW_INFO_ATOM);
+        svia.write_data(&SlideViewInfoAtom::DEFAULT.to_bytes());
+        svi.write_child(&svia.build()?);
+        list.write_child(&svi.build()?);
+    }
+    if let Some(view) = notes_view_info {
+        let bytes = view
+            .to_bytes()
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+        list.write_child(&bytes);
+    }
 
     // VBAInfo (1023) container with VBAInfoAtom
     let mut vba = RecordBuilder::new(0x0F, 1, record_type::VBA_INFO);
@@ -575,6 +592,11 @@ pub fn create_docinfo_list_container_minimal() -> Result<Vec<u8>, PptError> {
     list.write_child(&prog_tags.build()?);
 
     list.build()
+}
+
+/// Create the historical minimal DocInfo List with a default slide view.
+pub fn create_docinfo_list_container_minimal() -> Result<Vec<u8>, PptError> {
+    create_docinfo_list_container(None, None)
 }
 
 /// Create an EndDocument record.

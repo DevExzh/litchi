@@ -357,6 +357,26 @@ pub struct SlideAnimationExtension {
     pub creation_time_filetime: Option<u64>,
     /// Optional hash of the slide's shape-animation information.
     pub animation_hash: Option<u32>,
+    /// Optional inert reference to a linked slide in an associated document.
+    pub linked_slide: Option<super::linked_slide::PowerPoint10LinkedSlide>,
+    /// Inert linked-shape references in file order.
+    pub linked_shapes: Vec<super::linked_slide::PowerPoint10LinkedShape>,
+}
+
+impl SlideAnimationExtension {
+    /// Return the PowerPoint 2002 animation hash as its normative typed atom.
+    pub fn animation_hash_atom(&self) -> Option<super::hash::PowerPointAnimationHash10> {
+        self.animation_hash
+            .map(super::hash::PowerPointAnimationHash10::new)
+    }
+
+    /// Set or clear the animation hash through the normative typed atom.
+    pub fn set_animation_hash_atom(
+        &mut self,
+        atom: Option<super::hash::PowerPointAnimationHash10>,
+    ) {
+        self.animation_hash = atom.map(super::hash::PowerPointAnimationHash10::hash);
+    }
 }
 
 /// PowerPoint 10 slide-level flags.

@@ -157,6 +157,8 @@ pub struct UserEditAtom {
     pub last_view_type: u16,
     /// unused padding
     pub unused: u16,
+    /// Optional persist reference to a CryptSession10Container.
+    pub encryption_session_persist_id: Option<u32>,
 }
 
 impl UserEditAtom {
@@ -178,12 +180,23 @@ impl UserEditAtom {
             max_persist_written: persist_id_seed,
             last_view_type: DEFAULT_LAST_VIEW_TYPE,
             unused: USER_EDIT_PADWORD,
+            encryption_session_persist_id: None,
         }
+    }
+
+    /// Attach the encryption-session persist reference required by encrypted files.
+    pub fn with_encryption_session(mut self, persist_id: u32) -> Self {
+        self.encryption_session_persist_id = Some(persist_id);
+        self
     }
 
     /// Generate a full PPT UserEditAtom record (type 4085) with proper header (28 bytes data).
     pub fn generate_record(&self) -> Vec<u8> {
-        let mut data = Vec::with_capacity(28);
+        let mut data = Vec::with_capacity(if self.encryption_session_persist_id.is_some() {
+            32
+        } else {
+            28
+        });
         data.extend_from_slice(&self.last_viewed_slide_id.to_le_bytes()); // +0
         data.extend_from_slice(&self.ppt_version.to_le_bytes()); // +4
         data.extend_from_slice(&self.offset_last_edit.to_le_bytes()); // +8
@@ -192,6 +205,9 @@ impl UserEditAtom {
         data.extend_from_slice(&self.max_persist_written.to_le_bytes()); // +20
         data.extend_from_slice(&self.last_view_type.to_le_bytes()); // +24
         data.extend_from_slice(&self.unused.to_le_bytes()); // +26
+        if let Some(persist_id) = self.encryption_session_persist_id {
+            data.extend_from_slice(&persist_id.to_le_bytes()); // +28
+        }
 
         let mut b = RecordBuilder::new(0x00, 0, record_type::USER_EDIT_ATOM);
         b.write_data(&data);

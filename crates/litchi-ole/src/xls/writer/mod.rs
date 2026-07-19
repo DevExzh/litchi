@@ -23,25 +23,38 @@ pub mod row_blocks;
 
 // Re-export public types
 pub use crate::xls::{
+    XlsAutoFilter12Criterion, XlsAutoFilter12Icon, XlsAutoFilter12IconSet, XlsAutoFilter12Operator,
+    XlsAutoFilter12Value, XlsExternalTableField, XlsExternalTableMetadata, XlsExternalTableVersion,
+    XlsListColumnId, XlsListObject, XlsListObjectColumn, XlsListObjectFeatureVersion,
+    XlsListObjectId, XlsListObjectRange, XlsListObjectSourceMetadata, XlsListObjectStyleOptions,
+    XlsListTotalAggregation, XlsTableAutoFilter12, XlsWebColumnType, XlsWebDefaultValue,
+    XlsWebEditMode, XlsWebFieldInfo, XlsWebInvalidCell, XlsWebReadingOrder, XlsWebTableField,
+    XlsWebTableMetadata, XlsXmlColumnMapping, XlsXmlDataType, XlsXmlTableField,
+    XlsXmlTableMetadata,
+};
+pub use crate::xls::{
     XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile, XlsConsolidationFunction,
     XlsConsolidationRange, XlsConsolidationSource,
 };
 pub use crate::xls::{XlsDefinedNameFutureRecords, XlsNameFnGrp12, XlsNamePublish};
+pub use crate::xls::XlsEncryptionProfile;
 pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
     PivotCacheValue, XlsAddInFunctionOptions, XlsCalculationSettings, XlsCellValue,
     XlsCommentAnchor, XlsCommentTextRunWrite, XlsCommentWriteOptions, XlsConditionalFormat,
     XlsConditionalFormat12Group, XlsConditionalFormat12Rule, XlsConditionalFormat12Type,
     XlsConditionalFormatGroup, XlsConditionalFormatOperator, XlsConditionalFormatRange,
-    XlsConditionalFormatRule, XlsConditionalFormatType, XlsConditionalPattern, XlsDataValidation,
-    XlsDataValidationErrorStyle, XlsDataValidationFormulaKind, XlsDataValidationImeMode,
-    XlsDataValidationOperator, XlsDataValidationOptions, XlsDataValidationRange,
-    XlsDataValidationTableOptions, XlsDataValidationType, XlsDdeOrOleItemOptions,
-    XlsDdeOrOleLinkOptions, XlsDefinedName, XlsDefinedNameRecordOptions,
-    XlsExternalCacheRowOptions, XlsExternalDefinedNameOptions, XlsExternalSheetOptions,
-    XlsExternalWorkbookOptions, XlsFunctionGroupOptions, XlsPageSetupOptions,
-    XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig, XlsPivotTableConfig,
-    XlsWorkbookEnvironmentOptions, XlsWorkbookWindowOptions, XlsWorksheetLayoutOptions, XlsWriter,
+    XlsConditionalFormatRule, XlsConditionalFormatType, XlsConditionalPattern,
+    XlsCustomTableStyles, XlsDataValidation, XlsDataValidationErrorStyle,
+    XlsDataValidationFormulaKind, XlsDataValidationImeMode, XlsDataValidationOperator,
+    XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
+    XlsDataValidationType, XlsDdeOrOleItemOptions, XlsDdeOrOleLinkOptions, XlsDefinedName,
+    XlsDefinedNameRecordOptions, XlsExternalCacheRowOptions, XlsExternalDefinedNameOptions,
+    XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsFunctionGroupOptions,
+    XlsPageSetupOptions, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
+    XlsPivotTableConfig, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine,
+    XlsShapeText, XlsShapeTextRun, XlsShapeWrite, XlsWorkbookEnvironmentOptions,
+    XlsWorkbookWindowOptions, XlsWorksheetLayoutOptions, XlsWriter,
 };
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,

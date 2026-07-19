@@ -28,6 +28,7 @@ mod data_validation;
 
 /// BIFF8 calculation and recalculation records.
 mod calculation;
+mod chart;
 
 /// BIFF8 worksheet scenario manager records.
 mod scenario;
@@ -44,6 +45,9 @@ mod access;
 /// BIFF8 default table and PivotTable style catalog metadata.
 mod table_styles;
 
+/// BIFF8 global differential formatting records and typed XF properties.
+mod differential_format;
+
 /// BIFF8 extended shared-string table lookup index.
 mod shared_string_index;
 
@@ -52,6 +56,10 @@ mod row_block_index;
 
 /// BIFF8 formula error-checking shared features.
 mod formula_errors;
+
+mod autofilter12;
+/// BIFF8 worksheet tables and their List12 formatting records.
+mod list_object;
 
 /// BIFF8 workbook windows and stable sheet-tab identifiers.
 mod workbook_view;
@@ -121,8 +129,28 @@ pub mod comments;
 /// AutoFilter and sort parsing (AUTOFILTERINFO 0x009D, AUTOFILTER 0x009E, SORT 0x0090)
 pub mod autofilter;
 
+/// Extended BIFF8 range-sort metadata (`SortData` and `SortCond12`).
+mod sort_data;
+
 /// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
+#[forbid(unsafe_code)]
 pub mod pivot_table;
+#[forbid(unsafe_code)]
+mod pivot_editor;
+pub use pivot_editor::XlsPivotViewEditor;
+mod ole_object;
+pub use ole_object::{
+    XlsFtCmo, XlsFtPictFmla, XlsFtPioGrbit, XlsObjSubrecord, XlsOleObjectEditor,
+    XlsOleObjectRecord,
+};
+pub use pivot_table::{
+    PageFieldEntry, PivotAdditionalExtension, PivotAxis, PivotAxisField, PivotCache,
+    PivotCacheDateGroupUnit, PivotCacheDateGrouping, PivotCacheDateTime,
+    PivotCacheDiscreteGrouping, PivotCacheError, PivotCacheField, PivotCacheGrouping,
+    PivotCacheItem, PivotCacheNumericGrouping, PivotDataItem, PivotFunction, PivotItemType,
+    PivotLayoutLine, PivotPageSelection, PivotQueryTag, PivotSourceType, PivotTable, PivotViewDef, PivotViewEx9,
+    PivotViewExtension, PivotViewField, PivotViewFieldExtension, PivotViewItem,
+};
 
 /// Sheet protection parsing (PROTECT, OBJECTPROTECT, SCENPROTECT, PASSWORD)
 pub mod protection;
@@ -135,10 +163,18 @@ pub use alignment::{
     XlsCellAlignment, XlsHorizontalAlignment, XlsReadingOrder, XlsTextRotation,
     XlsVerticalAlignment,
 };
+pub use autofilter12::{
+    AUTO_FILTER12_RECORD_TYPE, XlsAutoFilter12Criterion, XlsAutoFilter12DateGroup,
+    XlsAutoFilter12DateLevel, XlsAutoFilter12DifferentialFormat, XlsAutoFilter12DynamicType,
+    XlsAutoFilter12FormatKind, XlsAutoFilter12Icon, XlsAutoFilter12IconSet,
+    XlsAutoFilter12Operator, XlsAutoFilter12Value, XlsTableAutoFilter12,
+};
 pub use border_fill::{XlsBorderSide, XlsBorderStyle, XlsCellBorders, XlsCellFill, XlsFillPattern};
 pub use calculation::{
-    XlsCalculationMode, XlsReferenceMode, XlsWorkbookCalculation, XlsWorksheetCalculation,
+    XlsCalculationMode, XlsMultithreadedCalculation, XlsReferenceMode, XlsWorkbookCalculation,
+    XlsWorksheetCalculation,
 };
+pub use chart::*;
 pub use cell::XlsCell;
 pub use comments::CommentVisibility;
 pub use conditional_format::{
@@ -161,12 +197,18 @@ pub use defined_names::{
     XlsBuiltInName, XlsDefinedName, XlsDefinedNameFutureRecords, XlsDefinedNameKind,
     XlsNameFnGrp12, XlsNamePublish, XlsNameScope,
 };
+pub use differential_format::{
+    XlsDifferentialFormat, XlsThemeColor, XlsXfBorder, XlsXfColor, XlsXfColorSource,
+    XlsXfFontScheme, XlsXfFontWeight, XlsXfGradient, XlsXfGradientStop, XlsXfProperties,
+    XlsXfProperty,
+};
 pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
 pub use error::{XlsEncryptionKind, XlsError, XlsResult};
+pub use encryption::XlsEncryptionProfile;
 pub use external_link::{
-    XlsExternalCacheRow, XlsExternalCachedError, XlsExternalCachedValue, XlsExternalLinks,
-    XlsExternalName, XlsExternalNameBody, XlsExternalSheet, XlsExternalSheetReference,
-    XlsExternalWorkbook, XlsSupportingBook,
+    XlsDdeOleValueMatrix, XlsExternalCacheRow, XlsExternalCachedError, XlsExternalCachedValue,
+    XlsExternalClipboardFormat, XlsExternalLinks, XlsExternalName, XlsExternalNameBody,
+    XlsExternalSheet, XlsExternalSheetReference, XlsExternalWorkbook, XlsSupportingBook,
 };
 pub use font::{XlsFont, XlsFontCharset, XlsFontEscapement, XlsFontFamily, XlsFontUnderline};
 pub use formula_errors::{
@@ -174,6 +216,15 @@ pub use formula_errors::{
 };
 pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
 pub use layout::{XlsColumnLayout, XlsRowLayout};
+pub use list_object::{
+    XlsCachedDiskHeader, XlsExternalTableField, XlsExternalTableMetadata, XlsExternalTableVersion,
+    XlsListColumnId, XlsListObject, XlsListObjectColumn, XlsListObjectFeatureVersion,
+    XlsListObjectId, XlsListObjectRange, XlsListObjectSourceMetadata, XlsListObjectStyleOptions,
+    XlsListTotalAggregation, XlsOpaqueListObjectFeature, XlsOpaqueListObjectFutureRecord,
+    XlsWebColumnType, XlsWebDefaultValue, XlsWebEditMode, XlsWebFieldInfo, XlsWebInvalidCell,
+    XlsWebReadingOrder, XlsWebTableField, XlsWebTableMetadata, XlsXmlColumnMapping, XlsXmlDataType,
+    XlsXmlTableField, XlsXmlTableMetadata,
+};
 pub use number_format::{
     XlsDateSystem, XlsEffectiveExtendedFormat, XlsExtendedFormat, XlsExtendedFormatApplications,
     XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
@@ -195,10 +246,21 @@ pub use shapes::XlsShape;
 pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
 pub use sheet_layout::XlsWorksheetLayout;
 pub use sheet_metadata::{XlsSheetKind, XlsSheetMetadata, XlsSheetVisibility};
-pub use table_styles::XlsTableStyles;
+pub use sort_data::{
+    CONTINUE_FRT12_RECORD_TYPE, SORT_DATA_RECORD_TYPE, XlsDifferentialFormatIndex,
+    XlsSortCondition, XlsSortData, XlsSortIcon, XlsSortIconSet, XlsSortMethod, XlsSortOn,
+    XlsSortOrientation, XlsSortParent, XlsSortRange, parse_sort_data,
+};
+pub use table_styles::{
+    XlsDifferentialFormatId, XlsTableStyle, XlsTableStyleElement, XlsTableStyleRegion,
+    XlsTableStyles,
+};
 pub use vba::XlsVbaMetadata;
 pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
 pub use workbook::{XlsOpenOptions, XlsWorkbook};
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use worksheet::XlsWorksheet;
-pub use writer::XlsWriter;
+pub use writer::{
+    XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText,
+    XlsShapeTextRun, XlsShapeWrite, XlsWriter,
+};

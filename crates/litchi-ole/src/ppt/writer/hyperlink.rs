@@ -29,9 +29,9 @@ pub mod record_type {
     /// ExObjListAtom
     pub const EX_OBJ_LIST_ATOM: u16 = 0x040A;
     /// MouseClick in shape
-    pub const MOUSE_CLICK: u16 = 0x0001; // instance value
+    pub const MOUSE_CLICK: u16 = 0x0000; // instance value
     /// MouseOver in shape
-    pub const MOUSE_OVER: u16 = 0x0000; // instance value
+    pub const MOUSE_OVER: u16 = 0x0001; // instance value
 }
 
 // =============================================================================
@@ -561,25 +561,32 @@ impl ShapeHyperlink {
         &self,
         atom: &InteractiveInfoAtom,
     ) -> Result<Vec<u8>, std::io::Error> {
-        let mut container = Vec::new();
-
-        // InteractiveInfoAtom (16 bytes)
-        let mut atom_record = Vec::new();
-        write_ppt_header(
-            &mut atom_record,
-            record_type::INTERACTIVE_INFO_ATOM,
-            InteractiveInfoAtom::SIZE as u32,
-        )?;
-        atom_record.extend_from_slice(atom.as_bytes());
-
-        let content_size = atom_record.len() as u32;
-
-        // Container header - POI uses instance=0, version=0x0F
-        write_ppt_container_header(&mut container, record_type::INTERACTIVE_INFO, content_size)?;
-
-        container.extend_from_slice(&atom_record);
-
-        Ok(container)
+        let trigger = if self.on_click {
+            crate::ppt::InteractionTrigger::Click
+        } else {
+            crate::ppt::InteractionTrigger::MouseOver
+        };
+        let parsed_atom = crate::ppt::PowerPointInteractiveInfoAtom::parse_payload(atom.as_bytes())
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+        let interaction = crate::ppt::PowerPointInteraction {
+            trigger,
+            sound_id: parsed_atom.sound_id,
+            hyperlink_id: parsed_atom.hyperlink_id,
+            action: parsed_atom.action,
+            ole_verb: parsed_atom.ole_verb,
+            jump: parsed_atom.jump,
+            animated: parsed_atom.animated,
+            stop_sound: parsed_atom.stop_sound,
+            custom_show_return: parsed_atom.custom_show_return,
+            visited: parsed_atom.visited,
+            link_target: parsed_atom.link_target,
+            macro_name: None,
+            unused: parsed_atom.unused,
+            macro_name_data: None,
+        };
+        interaction
+            .to_bytes()
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))
     }
 }
 

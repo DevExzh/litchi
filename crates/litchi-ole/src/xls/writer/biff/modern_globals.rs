@@ -5,7 +5,6 @@ use super::write_record_header;
 
 const SXDBEX_CREATION_TIMESTAMP: [u8; 8] = [0xFC, 0xE5, 0x58, 0x44, 0xBC, 0x7D, 0xE6, 0x40];
 
-const TABLE_STYLES_RECORD_ID: u16 = 0x088E;
 const DEFAULT_TABLE_STYLE_NAME: &str = "TableStyleMedium2";
 const DEFAULT_PIVOT_STYLE_NAME: &str = "PivotStyleLight16";
 
@@ -68,14 +67,26 @@ pub fn write_table_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
         DEFAULT_TABLE_STYLE_NAME,
         DEFAULT_PIVOT_STYLE_NAME,
     )?;
-    let payload = styles.to_payload()?;
-    let data_len = u16::try_from(payload.len()).map_err(|_| {
-        crate::xls::XlsError::InvalidData(
-            "TABLESTYLES payload exceeds BIFF record size".to_string(),
-        )
-    })?;
-    write_record_header(writer, TABLE_STYLES_RECORD_ID, data_len)?;
-    writer.write_all(&payload)?;
+    writer.write_all(&styles.to_family_record_bytes(0)?)?;
+    Ok(())
+}
+
+pub fn write_differential_formats<W: Write>(
+    writer: &mut W,
+    differential_formats: &[crate::xls::XlsDifferentialFormat],
+) -> XlsResult<()> {
+    for differential_format in differential_formats {
+        writer.write_all(&differential_format.to_record_bytes()?)?;
+    }
+    Ok(())
+}
+
+pub fn write_custom_table_styles<W: Write>(
+    writer: &mut W,
+    styles: &crate::xls::XlsTableStyles,
+    differential_format_count: usize,
+) -> XlsResult<()> {
+    writer.write_all(&styles.to_family_record_bytes(differential_format_count)?)?;
     Ok(())
 }
 

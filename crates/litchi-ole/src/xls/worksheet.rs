@@ -12,6 +12,7 @@ use crate::xls::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberForma
 use crate::xls::page_setup::XlsPageSetup;
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::protection::SheetProtection;
+use crate::xls::sort_data::XlsSortData;
 use crate::xls::view::XlsWorksheetView;
 use litchi_core::sheet::{
     Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet,
@@ -44,6 +45,10 @@ pub struct XlsWorksheet {
     autofilter: Option<AutoFilterInfo>,
     /// Sort configuration (SORT record)
     sort_info: Option<SortInfo>,
+    /// Extended sort configuration (SORTDATA + CONTINUEFRT12 records)
+    sort_data: Option<XlsSortData>,
+    /// Whether the sheet data was filtered (FILTERMODE record present)
+    filter_mode: bool,
     /// Pivot tables (aggregated SX* records)
     pivot_tables: Vec<PivotTable>,
     /// Sheet protection state (PROTECT/OBJECTPROTECT/SCENPROTECT/PASSWORD)
@@ -64,6 +69,7 @@ pub struct XlsWorksheet {
     conditional_format_extensions: Vec<crate::xls::conditional_format::XlsConditionalExtension>,
     consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
     formula_error_features: Vec<crate::xls::formula_errors::XlsFormulaErrorFeature>,
+    list_objects: Vec<crate::xls::list_object::XlsListObject>,
     row_block_index:
         std::result::Result<Option<crate::xls::row_block_index::XlsRowBlockIndex>, String>,
 }
@@ -83,6 +89,8 @@ impl XlsWorksheet {
             comments: Vec::new(),
             autofilter: None,
             sort_info: None,
+            sort_data: None,
+            filter_mode: false,
             pivot_tables: Vec::new(),
             protection: SheetProtection::default(),
             formatting: Arc::new(XlsFormatting::default()),
@@ -101,6 +109,7 @@ impl XlsWorksheet {
             conditional_format_extensions: Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
+            list_objects: Vec::new(),
             row_block_index: Ok(None),
         }
     }
@@ -119,6 +128,8 @@ impl XlsWorksheet {
             comments: Vec::new(),
             autofilter: None,
             sort_info: None,
+            sort_data: None,
+            filter_mode: false,
             pivot_tables: Vec::new(),
             protection: SheetProtection::default(),
             formatting: Arc::new(XlsFormatting::default()),
@@ -137,6 +148,7 @@ impl XlsWorksheet {
             conditional_format_extensions: Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
+            list_objects: Vec::new(),
             row_block_index: Ok(None),
         }
     }
@@ -275,6 +287,28 @@ impl XlsWorksheet {
         self.sort_info.as_ref()
     }
 
+    /// Extended range sort metadata, including color, icon, and custom-list keys.
+    pub fn sort_data(&self) -> Option<&XlsSortData> {
+        self.sort_data.as_ref()
+    }
+
+    pub(crate) fn set_sort_data(&mut self, sort_data: XlsSortData) {
+        self.sort_data = Some(sort_data);
+    }
+
+    // -- Filter mode --
+
+    /// Whether the sheet data was filtered (FILTERMODE 0x009B present).
+    ///
+    /// When `true`, at least one AutoFilter drop-down has active criteria.
+    pub fn is_filter_mode(&self) -> bool {
+        self.filter_mode
+    }
+
+    pub(crate) fn set_filter_mode(&mut self, filter_mode: bool) {
+        self.filter_mode = filter_mode;
+    }
+
     // -- Pivot tables --
 
     /// Add a fully assembled pivot table.
@@ -287,6 +321,11 @@ impl XlsWorksheet {
         &self.pivot_tables
     }
 
+    /// Finds a PivotTable by its SXVIEW table name.
+    pub fn pivot_table(&self, name: &str) -> Option<&PivotTable> {
+        self.pivot_tables.iter().find(|table| table.view.name == name)
+    }
+
     /// Formula error-checking shared features declared for this worksheet.
     pub fn formula_error_features(&self) -> &[crate::xls::formula_errors::XlsFormulaErrorFeature] {
         &self.formula_error_features
@@ -297,6 +336,15 @@ impl XlsWorksheet {
         features: Vec<crate::xls::formula_errors::XlsFormulaErrorFeature>,
     ) {
         self.formula_error_features = features;
+    }
+
+    /// Legacy BIFF8 worksheet tables in feature-record order.
+    pub fn list_objects(&self) -> &[crate::xls::list_object::XlsListObject] {
+        &self.list_objects
+    }
+
+    pub(crate) fn set_list_objects(&mut self, tables: Vec<crate::xls::list_object::XlsListObject>) {
+        self.list_objects = tables;
     }
 
     /// Optional worksheet `INDEX`/`DBCELL` accelerator.
@@ -408,6 +456,20 @@ impl XlsWorksheet {
     /// All display windows associated with this worksheet in record order.
     pub fn worksheet_views(&self) -> &[XlsWorksheetView] {
         &self.worksheet_views
+    }
+
+    /// Frozen pane split of the first worksheet window as
+    /// `(frozen_columns, frozen_rows)`.
+    ///
+    /// Returns `None` when the window has no panes or when the panes are
+    /// split (unfrozen); use [`XlsWorksheetView::pane`] for split geometry.
+    pub fn frozen_panes(&self) -> Option<(u16, u16)> {
+        let view = self.worksheet_views.first()?;
+        if !view.has_frozen_panes() {
+            return None;
+        }
+        let pane = view.pane()?;
+        Some((pane.horizontal_split(), pane.vertical_split()))
     }
 
     pub(crate) fn set_worksheet_views(&mut self, views: Vec<XlsWorksheetView>) {

@@ -187,6 +187,169 @@ impl TryFrom<u8> for ListAlignment {
     }
 }
 
+/// Character emitted after a list label (`LVLF.ixchFollow`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum ListFollowCharacter {
+    #[default]
+    Tab = 0,
+    Space = 1,
+    Nothing = 2,
+}
+
+impl TryFrom<u8> for ListFollowCharacter {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Tab),
+            1 => Ok(Self::Space),
+            2 => Ok(Self::Nothing),
+            invalid => Err(invalid),
+        }
+    }
+}
+
+/// Opaque HTML-compatibility flags (`grfhic`).
+///
+/// The individual bits are application hints. Keeping the byte typed but
+/// opaque lets readers and writers preserve values they do not interpret.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct HtmlCompatibilityFlags(u8);
+
+impl HtmlCompatibilityFlags {
+    pub const fn from_raw(raw: u8) -> Self {
+        Self(raw)
+    }
+
+    pub const fn raw(self) -> u8 {
+        self.0
+    }
+}
+
+/// Valid paragraph-style index linked to an LSTF level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ListStyleIndex(u16);
+
+impl ListStyleIndex {
+    pub fn new(index: u16) -> std::result::Result<Self, u16> {
+        if index < 0x0FFF {
+            Ok(Self(index))
+        } else {
+            Err(index)
+        }
+    }
+
+    pub const fn get(self) -> u16 {
+        self.0
+    }
+}
+
+/// Field represented by an LFO (`ibstFltAutoNum`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum AutomaticNumberingField {
+    #[default]
+    None = 0x00,
+    AutoNumberLegal = 0xFC,
+    AutoNumberOutline = 0xFD,
+    AutoNumber = 0xFE,
+    NoneLegacy = 0xFF,
+}
+
+impl TryFrom<u8> for AutomaticNumberingField {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0x00 => Ok(Self::None),
+            0xFC => Ok(Self::AutoNumberLegal),
+            0xFD => Ok(Self::AutoNumberOutline),
+            0xFE => Ok(Self::AutoNumber),
+            0xFF => Ok(Self::NoneLegacy),
+            invalid => Err(invalid),
+        }
+    }
+}
+
+/// Lossless LSTF metadata not represented by [`ListStructure`].
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ListStructureMetadata {
+    pub style_links: [Option<ListStyleIndex>; 9],
+    pub automatic_numbering: bool,
+    pub hybrid: bool,
+    /// Ignored/reserved LSTF flag bits, retained for round trips.
+    pub ignored_flags: u8,
+    pub html_compatibility: HtmlCompatibilityFlags,
+}
+
+/// Lossless LVLF/LVL metadata and property payloads.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ListLevelMetadata {
+    pub legal_numbering: bool,
+    pub no_restart: bool,
+    pub saved_indent: Option<i32>,
+    /// Preserved `dxaIndentSav` value when `fIndentSav` is clear.
+    pub ignored_saved_indent: i32,
+    pub converted: bool,
+    pub tentative: bool,
+    pub ignored_flags: u8,
+    pub placeholder_positions: [u8; 9],
+    pub follow_character: ListFollowCharacter,
+    pub unused_value: u32,
+    pub restart_limit: Option<u8>,
+    /// Preserved `ilvlRestartLim` value when `fNoRestart` is clear.
+    pub ignored_restart_limit: u8,
+    pub html_compatibility: HtmlCompatibilityFlags,
+    pub paragraph_properties: Vec<u8>,
+    pub number_properties: Vec<u8>,
+}
+
+/// Lossless LFOLVL flag metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ListLevelOverrideMetadata {
+    /// Preserved `iStartAt` value when `fStartAt` is clear.
+    pub unused_start_at: u32,
+    pub html_compatibility: HtmlCompatibilityFlags,
+    /// Bits declared unused by the specification, retained verbatim.
+    pub ignored_flags: u32,
+    pub formatting: Option<ListLevelMetadata>,
+}
+
+/// Lossless LFO and corresponding LFOData metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ListFormatOverrideMetadata {
+    pub unused1: u32,
+    pub unused2: u32,
+    pub field: AutomaticNumberingField,
+    pub html_compatibility: HtmlCompatibilityFlags,
+    pub unused3: u8,
+    pub first_paragraph_cp: Option<u32>,
+    pub levels: Vec<ListLevelOverrideMetadata>,
+}
+
+/// Metadata arrays aligned with `ListTables::structures()` and `overrides()`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ListTablesMetadata {
+    definitions: Vec<ListStructureMetadata>,
+    levels: Vec<Vec<ListLevelMetadata>>,
+    overrides: Vec<ListFormatOverrideMetadata>,
+}
+
+impl ListTablesMetadata {
+    pub fn definition(&self, index: usize) -> Option<&ListStructureMetadata> {
+        self.definitions.get(index)
+    }
+
+    pub fn level(&self, definition: usize, level: u8) -> Option<&ListLevelMetadata> {
+        self.levels.get(definition)?.get(usize::from(level))
+    }
+
+    pub fn format_override(&self, index: usize) -> Option<&ListFormatOverrideMetadata> {
+        self.overrides.get(index)
+    }
+}
+
 /// List level format (LVLF structure)
 #[derive(Debug, Clone)]
 pub struct ListLevel {
@@ -374,6 +537,18 @@ impl ListStructure {
     }
 }
 
+/// Level override carried by one `LFOLVL` structure ([MS-DOC] 2.9.133).
+#[derive(Debug, Clone, Default)]
+pub struct ListLevelOverride {
+    /// Zero-based list level this override applies to (`iLvl`, 0..=8).
+    pub level: u8,
+    /// Start-at value overriding `lvlf.iStartAt` when `fStartAt` is set
+    /// without `fFormatting`.
+    pub start_at: Option<u32>,
+    /// Complete replacement level formatting when `fFormatting` is set.
+    pub format: Option<ListLevel>,
+}
+
 /// List Format Override (LFO structure)
 #[derive(Debug, Clone)]
 pub struct ListFormatOverride {
@@ -383,6 +558,8 @@ pub struct ListFormatOverride {
     pub override_count: u8,
     /// LFO ID (used to reference this from paragraphs)
     pub lfo_id: u32,
+    /// Parsed `LFOLVL` level overrides for this LFO.
+    pub level_overrides: Vec<ListLevelOverride>,
 }
 
 impl ListFormatOverride {
@@ -409,7 +586,15 @@ impl ListFormatOverride {
             list_id,
             override_count,
             lfo_id,
+            level_overrides: Vec::new(),
         })
+    }
+
+    /// Get the `LFOLVL` override for a zero-based list level, if any.
+    pub fn level_override(&self, level: u8) -> Option<&ListLevelOverride> {
+        self.level_overrides
+            .iter()
+            .find(|lfolvl| lfolvl.level == level)
     }
 }
 
@@ -419,6 +604,63 @@ pub struct ListTables {
     list_structures: Vec<ListStructure>,
     /// All list format overrides
     list_overrides: Vec<ListFormatOverride>,
+    /// Lossless metadata aligned with the convenience structures above.
+    metadata: ListTablesMetadata,
+}
+
+/// Borrowed resolution of a paragraph's `sprmPIlfo`/`sprmPIlvl` list binding.
+///
+/// This keeps the definition and override structures available to callers and
+/// avoids cloning an `LVL` merely to inspect its effective formatting. A
+/// start-at-only `LFOLVL` override is reported separately because all other
+/// formatting continues to come from `base_level` in that case.
+#[derive(Debug, Clone, Copy)]
+pub struct ParagraphListBinding<'a> {
+    /// One-based index into `PlfLfo`.
+    pub lfo_id: u32,
+    /// Zero-based list level from `sprmPIlvl`.
+    pub level: u8,
+    /// Whether a negative `sprmPIlfo` requests preservation of paragraph indents.
+    pub preserve_indents: bool,
+    /// The `LSTF` selected by the LFO's list identifier.
+    pub definition: &'a ListStructure,
+    /// The paragraph's selected `LFO`.
+    pub format_override: &'a ListFormatOverride,
+    /// The definition's level before applying an `LFOLVL`.
+    pub base_level: &'a ListLevel,
+    /// The level-specific `LFOLVL`, when present.
+    pub level_override: Option<&'a ListLevelOverride>,
+}
+
+impl<'a> ParagraphListBinding<'a> {
+    /// Effective formatting-bearing level without allocating.
+    ///
+    /// A formatting override replaces the complete base `LVL`; a start-at-only
+    /// override leaves this reference pointing at the base level.
+    pub fn effective_level(&self) -> &'a ListLevel {
+        self.level_override
+            .and_then(|level| level.format.as_ref())
+            .unwrap_or(self.base_level)
+    }
+
+    /// Effective starting number after applying a start-at-only override.
+    pub fn effective_start_at(&self) -> u32 {
+        self.level_override
+            .and_then(|level| level.start_at)
+            .unwrap_or_else(|| self.effective_level().start_at)
+    }
+
+    /// Whether this binding replaces the complete base `LVL` formatting.
+    pub fn has_formatting_override(&self) -> bool {
+        self.level_override
+            .is_some_and(|level| level.format.is_some())
+    }
+
+    /// Whether this binding overrides only the starting number.
+    pub fn has_start_at_override(&self) -> bool {
+        self.level_override
+            .is_some_and(|level| level.start_at.is_some())
+    }
 }
 
 impl ListTables {
@@ -474,10 +716,237 @@ impl ListTables {
             list_overrides = Self::parse_plflfo(&plf_data[..plf_len])?;
         }
 
+        let metadata = Self::parse_metadata(fib, table_stream, &list_structures, &list_overrides)?;
+
         Ok(Self {
             list_structures,
             list_overrides,
+            metadata,
         })
+    }
+
+    fn parse_metadata(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        structures: &[ListStructure],
+        overrides: &[ListFormatOverride],
+    ) -> Result<ListTablesMetadata> {
+        let mut metadata = ListTablesMetadata::default();
+        if let Some((offset, length)) = fib.get_table_pointer(73).filter(|(_, length)| *length > 0)
+        {
+            let start = usize::try_from(offset)
+                .map_err(|_| DocError::InvalidFormat("PlfLst offset exceeds usize".to_string()))?;
+            let header_end = start.checked_add(length as usize).ok_or_else(|| {
+                DocError::InvalidFormat("PlfLst metadata range overflows".to_string())
+            })?;
+            let level_end = fib
+                .get_table_pointer(74)
+                .map(|(offset, _)| offset as usize)
+                .filter(|&offset| offset >= header_end)
+                .unwrap_or(table_stream.len());
+            let header = table_stream.get(start..header_end).ok_or_else(|| {
+                DocError::InvalidFormat("PlfLst metadata header is truncated".to_string())
+            })?;
+            let levels = table_stream.get(header_end..level_end).ok_or_else(|| {
+                DocError::InvalidFormat("PlfLst metadata levels are truncated".to_string())
+            })?;
+            let mut level_offset = 0usize;
+            for (index, structure) in structures.iter().enumerate() {
+                let lstf = &header[2 + index * 28..2 + (index + 1) * 28];
+                let mut definition = ListStructureMetadata::default();
+                for style in 0..9 {
+                    let raw = u16::from_le_bytes([lstf[8 + style * 2], lstf[9 + style * 2]]);
+                    definition.style_links[style] = match raw {
+                        0x0FFF | 0xFFFF => None,
+                        value => Some(ListStyleIndex::new(value).map_err(|invalid| {
+                            DocError::InvalidFormat(format!(
+                                "LSTF has invalid linked style index {invalid:#06x}"
+                            ))
+                        })?),
+                    };
+                }
+                let flags = lstf[26];
+                definition.automatic_numbering = flags & 0x04 != 0;
+                definition.hybrid = flags & 0x10 != 0;
+                definition.ignored_flags = flags & 0xEA;
+                definition.html_compatibility = HtmlCompatibilityFlags::from_raw(lstf[27]);
+                metadata.definitions.push(definition);
+
+                let mut level_metadata = Vec::with_capacity(structure.levels.len());
+                for level in &structure.levels {
+                    let (parsed, size) = Self::parse_level_metadata(
+                        levels.get(level_offset..).ok_or_else(|| {
+                            DocError::InvalidFormat("LVL metadata offset is invalid".to_string())
+                        })?,
+                        level.level,
+                        level.number_format,
+                    )?;
+                    level_offset = level_offset.checked_add(size).ok_or_else(|| {
+                        DocError::InvalidFormat("LVL metadata size overflows".to_string())
+                    })?;
+                    level_metadata.push(parsed);
+                }
+                metadata.levels.push(level_metadata);
+            }
+        }
+
+        if let Some((offset, length)) = fib.get_table_pointer(74).filter(|(_, length)| *length > 0)
+        {
+            let start = offset as usize;
+            let data = table_stream
+                .get(start..start.saturating_add(length as usize))
+                .ok_or_else(|| {
+                    DocError::InvalidFormat("PlfLfo metadata is truncated".to_string())
+                })?;
+            let mut data_offset = 4usize
+                .checked_add(overrides.len().checked_mul(16).ok_or_else(|| {
+                    DocError::InvalidFormat("PlfLfo metadata count overflows".to_string())
+                })?)
+                .ok_or_else(|| DocError::InvalidFormat("PlfLfo metadata overflows".to_string()))?;
+            for (index, lfo) in overrides.iter().enumerate() {
+                let raw = &data[4 + index * 16..4 + (index + 1) * 16];
+                let first_cp = binary::read_u32_le(data, data_offset).map_err(|e| {
+                    DocError::InvalidFormat(format!("Failed to read LFOData CP: {e}"))
+                })?;
+                data_offset += 4;
+                let mut parsed = ListFormatOverrideMetadata {
+                    unused1: u32::from_le_bytes(raw[4..8].try_into().expect("LFO unused1")),
+                    unused2: u32::from_le_bytes(raw[8..12].try_into().expect("LFO unused2")),
+                    field: AutomaticNumberingField::try_from(raw[13]).map_err(|invalid| {
+                        DocError::InvalidFormat(format!(
+                            "LFO has invalid automatic-number field {invalid:#04x}"
+                        ))
+                    })?,
+                    html_compatibility: HtmlCompatibilityFlags::from_raw(raw[14]),
+                    unused3: raw[15],
+                    first_paragraph_cp: (first_cp != u32::MAX).then_some(first_cp),
+                    levels: Vec::with_capacity(lfo.level_overrides.len()),
+                };
+                for level_override in &lfo.level_overrides {
+                    let flags = binary::read_u32_le(data, data_offset + 4).map_err(|e| {
+                        DocError::InvalidFormat(format!("Failed to read LFOLVL flags: {e}"))
+                    })?;
+                    data_offset += 8;
+                    let formatting = if let Some(level) = level_override.format.as_ref() {
+                        let (metadata, size) = Self::parse_level_metadata(
+                            &data[data_offset..],
+                            level.level,
+                            level.number_format,
+                        )?;
+                        data_offset += size;
+                        Some(metadata)
+                    } else {
+                        None
+                    };
+                    parsed.levels.push(ListLevelOverrideMetadata {
+                        unused_start_at: if flags & 0x10 == 0 {
+                            binary::read_u32_le(data, data_offset - 8).map_err(|e| {
+                                DocError::InvalidFormat(format!(
+                                    "Failed to read LFOLVL ignored start: {e}"
+                                ))
+                            })?
+                        } else {
+                            0
+                        },
+                        html_compatibility: HtmlCompatibilityFlags::from_raw(
+                            ((flags >> 6) & 0xFF) as u8,
+                        ),
+                        ignored_flags: flags & 0xFFFF_C000,
+                        formatting,
+                    });
+                }
+                metadata.overrides.push(parsed);
+            }
+        }
+        Ok(metadata)
+    }
+
+    fn parse_level_metadata(
+        data: &[u8],
+        level: u8,
+        number_format: NumberFormat,
+    ) -> Result<(ListLevelMetadata, usize)> {
+        if data.len() < 30 {
+            return Err(DocError::InvalidFormat(
+                "LVL metadata is truncated".to_string(),
+            ));
+        }
+        let flags = data[5];
+        let cb_chpx = usize::from(data[24]);
+        let cb_papx = usize::from(data[25]);
+        let text_offset = 28usize
+            .checked_add(cb_papx)
+            .and_then(|value| value.checked_add(cb_chpx))
+            .ok_or_else(|| DocError::InvalidFormat("LVL metadata size overflows".to_string()))?;
+        let text_len = usize::from(binary::read_u16_le(data, text_offset).map_err(|e| {
+            DocError::InvalidFormat(format!("Failed to read LVL metadata XST: {e}"))
+        })?);
+        let total = text_offset
+            .checked_add(2)
+            .and_then(|value| value.checked_add(text_len.checked_mul(2)?))
+            .ok_or_else(|| DocError::InvalidFormat("LVL metadata XST overflows".to_string()))?;
+        if total > data.len() {
+            return Err(DocError::InvalidFormat(
+                "LVL metadata XST is truncated".to_string(),
+            ));
+        }
+        let placeholders: [u8; 9] = data[6..15].try_into().expect("LVLF placeholders");
+        for position in placeholders.into_iter().filter(|position| *position != 0) {
+            if usize::from(position) > text_len {
+                return Err(DocError::InvalidFormat(format!(
+                    "LVLF placeholder position {position} exceeds XST length {text_len}"
+                )));
+            }
+            let offset = text_offset + 2 + (usize::from(position) - 1) * 2;
+            let placeholder = u16::from_le_bytes([data[offset], data[offset + 1]]);
+            if placeholder > u16::from(level) {
+                return Err(DocError::InvalidFormat(format!(
+                    "LVL placeholder level {placeholder} exceeds level {level}"
+                )));
+            }
+        }
+        if number_format == NumberFormat::Bullet
+            && (text_len != 1 || placeholders.iter().any(|position| *position != 0))
+        {
+            return Err(DocError::InvalidFormat(
+                "bullet LVL must contain one character and no placeholders".to_string(),
+            ));
+        }
+        let no_restart = flags & 0x08 != 0;
+        let restart = data[26];
+        if no_restart && restart > level {
+            return Err(DocError::InvalidFormat(format!(
+                "LVLF restart limit {restart} exceeds level {level}"
+            )));
+        }
+        Ok((
+            ListLevelMetadata {
+                legal_numbering: flags & 0x04 != 0,
+                no_restart,
+                saved_indent: (flags & 0x10 != 0).then(|| {
+                    i32::from_le_bytes(data[16..20].try_into().expect("LVLF saved indent"))
+                }),
+                ignored_saved_indent: if flags & 0x10 == 0 {
+                    i32::from_le_bytes(data[16..20].try_into().expect("LVLF ignored indent"))
+                } else {
+                    0
+                },
+                converted: flags & 0x20 != 0,
+                tentative: flags & 0x80 != 0,
+                ignored_flags: flags & 0x40,
+                placeholder_positions: placeholders,
+                follow_character: ListFollowCharacter::try_from(data[15]).map_err(|invalid| {
+                    DocError::InvalidFormat(format!("LVLF has invalid follow character {invalid}"))
+                })?,
+                unused_value: u32::from_le_bytes(data[20..24].try_into().expect("LVLF unused2")),
+                restart_limit: no_restart.then_some(restart),
+                ignored_restart_limit: if no_restart { 0 } else { restart },
+                html_compatibility: HtmlCompatibilityFlags::from_raw(data[27]),
+                paragraph_properties: data[28..28 + cb_papx].to_vec(),
+                number_properties: data[28 + cb_papx..text_offset].to_vec(),
+            },
+            total,
+        ))
     }
 
     /// Parse PlfLst (List Table)
@@ -562,8 +1031,17 @@ impl ListTables {
             offset += 16;
         }
 
+        /// Mask for the zero-based `iLvl` field of an `LFOLVL`.
+        const LFOLVL_ILVL_MASK: u32 = 0x0F;
+        /// `fStartAt` flag of an `LFOLVL`.
+        const LFOLVL_F_START_AT: u32 = 0x10;
+        /// `fFormatting` flag of an `LFOLVL`.
+        const LFOLVL_F_FORMATTING: u32 = 0x20;
+        /// Maximum permitted `iStartAt` override value ([MS-DOC] 2.9.133).
+        const LFOLVL_MAX_START_AT: u32 = 0x7FFF;
+
         let mut data_offset = lfo_data_start;
-        for lfo in &overrides {
+        for lfo in &mut overrides {
             data_offset = data_offset.checked_add(4).ok_or_else(|| {
                 DocError::InvalidFormat("PlfLfo LFOData size overflows".to_string())
             })?;
@@ -579,16 +1057,42 @@ impl ListTables {
                 if base_end > data.len() {
                     return Err(DocError::InvalidFormat("LFOLVL is truncated".to_string()));
                 }
+                let start_at = binary::read_u32_le(data, data_offset).map_err(|e| {
+                    DocError::InvalidFormat(format!("Failed to read LFOLVL iStartAt: {e}"))
+                })?;
                 let flags = binary::read_u32_le(data, data_offset + 4).map_err(|e| {
                     DocError::InvalidFormat(format!("Failed to read LFOLVL flags: {e}"))
                 })?;
                 data_offset = base_end;
-                if flags & 0x20 != 0 {
-                    let (_, size) = ListLevel::parse_with_size(&data[data_offset..], 0)?;
+                let level = (flags & LFOLVL_ILVL_MASK) as u8;
+                if level > 8 {
+                    return Err(DocError::InvalidFormat(format!(
+                        "LFOLVL has invalid iLvl {level}"
+                    )));
+                }
+                let overrides_start_at = flags & LFOLVL_F_START_AT != 0;
+                let overrides_formatting = flags & LFOLVL_F_FORMATTING != 0;
+                let mut level_override = ListLevelOverride {
+                    level,
+                    start_at: None,
+                    format: None,
+                };
+                if overrides_formatting {
+                    let (parsed, size) = ListLevel::parse_with_size(&data[data_offset..], level)?;
                     data_offset = data_offset.checked_add(size).ok_or_else(|| {
                         DocError::InvalidFormat("LFOLVL formatting size overflows".to_string())
                     })?;
+                    level_override.format = Some(parsed);
+                } else if overrides_start_at {
+                    // iStartAt is only meaningful when fFormatting is clear.
+                    if start_at > LFOLVL_MAX_START_AT {
+                        return Err(DocError::InvalidFormat(format!(
+                            "LFOLVL start value {start_at} exceeds 32767"
+                        )));
+                    }
+                    level_override.start_at = Some(start_at);
                 }
+                lfo.level_overrides.push(level_override);
             }
         }
         if data_offset != data.len() {
@@ -611,6 +1115,11 @@ impl ListTables {
         &self.list_overrides
     }
 
+    /// Lossless typed metadata for the list tables.
+    pub fn metadata(&self) -> &ListTablesMetadata {
+        &self.metadata
+    }
+
     /// Find a list structure by ID
     pub fn find_structure(&self, list_id: u32) -> Option<&ListStructure> {
         self.list_structures
@@ -627,6 +1136,40 @@ impl ListTables {
     pub fn get_list_for_lfo(&self, lfo_id: u32) -> Option<&ListStructure> {
         self.find_override(lfo_id)
             .and_then(|lfo| self.find_structure(lfo.list_id))
+    }
+
+    /// Resolve the signed paragraph list reference and level without cloning.
+    ///
+    /// `sprmPIlfo` is one-based. Negative values select the same absolute LFO
+    /// index while requesting that paragraph indents be preserved. Level 12 is
+    /// the specification's "skip numbering" sentinel and does not bind a list.
+    pub fn bind_paragraph(&self, signed_lfo: i16, level: u8) -> Option<ParagraphListBinding<'_>> {
+        if signed_lfo == 0 || signed_lfo == i16::MIN || level > 8 {
+            return None;
+        }
+        let lfo_id = u32::from(signed_lfo.unsigned_abs());
+        let format_override = self.find_override(lfo_id)?;
+        let definition = self.find_structure(format_override.list_id)?;
+        let base_level = definition.level(level)?;
+        Some(ParagraphListBinding {
+            lfo_id,
+            level,
+            preserve_indents: signed_lfo.is_negative(),
+            definition,
+            format_override,
+            base_level,
+            level_override: format_override.level_override(level),
+        })
+    }
+
+    /// Resolve the effective level formatting for an LFO ID and zero-based
+    /// level, applying any `LFOLVL` start-at or formatting overrides.
+    pub fn resolve_level(&self, lfo_id: u32, level: u8) -> Option<ListLevel> {
+        let signed_lfo = i16::try_from(lfo_id).ok()?;
+        let binding = self.bind_paragraph(signed_lfo, level)?;
+        let mut resolved = binding.effective_level().clone();
+        resolved.start_at = binding.effective_start_at();
+        Some(resolved)
     }
 }
 
@@ -922,6 +1465,7 @@ mod tests {
             list_id: 12345,
             override_count: 1,
             lfo_id: 1,
+            level_overrides: Vec::new(),
         };
 
         assert_eq!(lfo.list_id, 12345);
@@ -935,6 +1479,7 @@ mod tests {
             list_id: 100,
             override_count: 2,
             lfo_id: 5,
+            level_overrides: Vec::new(),
         };
         let cloned = lfo.clone();
 
@@ -949,6 +1494,7 @@ mod tests {
             list_id: 1,
             override_count: 0,
             lfo_id: 1,
+            level_overrides: Vec::new(),
         };
         let debug_str = format!("{:?}", lfo);
         assert!(debug_str.contains("ListFormatOverride"));
@@ -959,6 +1505,7 @@ mod tests {
         let tables = ListTables {
             list_structures: Vec::new(),
             list_overrides: Vec::new(),
+            metadata: ListTablesMetadata::default(),
         };
 
         assert!(tables.structures().is_empty());
@@ -978,7 +1525,9 @@ mod tests {
                 list_id: 1,
                 override_count: 0,
                 lfo_id: 1,
+                level_overrides: Vec::new(),
             }],
+            metadata: ListTablesMetadata::default(),
         };
 
         assert_eq!(tables.structures().len(), 1);
@@ -1003,6 +1552,7 @@ mod tests {
                 },
             ],
             list_overrides: Vec::new(),
+            metadata: ListTablesMetadata::default(),
         };
 
         assert!(tables.find_structure(100).is_some());
@@ -1019,13 +1569,16 @@ mod tests {
                     list_id: 1,
                     override_count: 0,
                     lfo_id: 10,
+                    level_overrides: Vec::new(),
                 },
                 ListFormatOverride {
                     list_id: 2,
                     override_count: 1,
                     lfo_id: 20,
+                    level_overrides: Vec::new(),
                 },
             ],
+            metadata: ListTablesMetadata::default(),
         };
 
         assert!(tables.find_override(10).is_some());
@@ -1046,7 +1599,9 @@ mod tests {
                 list_id: 100,
                 override_count: 0,
                 lfo_id: 1,
+                level_overrides: Vec::new(),
             }],
+            metadata: ListTablesMetadata::default(),
         };
 
         let lst = tables.get_list_for_lfo(1);
@@ -1066,9 +1621,94 @@ mod tests {
                 levels: Vec::new(),
             }],
             list_overrides: Vec::new(),
+            metadata: ListTablesMetadata::default(),
         };
 
         assert!(tables.get_list_for_lfo(1).is_none());
+    }
+
+    #[test]
+    fn paragraph_binding_borrows_base_level_and_applies_start_override() {
+        let base = ListLevel {
+            start_at: 1,
+            number_format: NumberFormat::Arabic,
+            alignment: ListAlignment::Left,
+            level: 0,
+            follow_char: 0,
+            indent_left: 0,
+            indent_hanging: 0,
+            number_text: "%1.".to_string(),
+        };
+        let tables = ListTables {
+            list_structures: vec![ListStructure {
+                list_id: 42,
+                template_id: 42,
+                is_simple: true,
+                levels: vec![base],
+            }],
+            list_overrides: vec![ListFormatOverride {
+                list_id: 42,
+                override_count: 1,
+                lfo_id: 1,
+                level_overrides: vec![ListLevelOverride {
+                    level: 0,
+                    start_at: Some(7),
+                    format: None,
+                }],
+            }],
+            metadata: ListTablesMetadata::default(),
+        };
+
+        let binding = tables.bind_paragraph(-1, 0).unwrap();
+        assert!(binding.preserve_indents);
+        assert_eq!(binding.definition.list_id, 42);
+        assert_eq!(binding.format_override.lfo_id, 1);
+        assert!(std::ptr::eq(binding.effective_level(), binding.base_level));
+        assert_eq!(binding.effective_start_at(), 7);
+        assert!(binding.has_start_at_override());
+        assert!(!binding.has_formatting_override());
+    }
+
+    #[test]
+    fn paragraph_binding_borrows_formatting_override_and_rejects_sentinels() {
+        let level = |start_at, text: &str| ListLevel {
+            start_at,
+            number_format: NumberFormat::Arabic,
+            alignment: ListAlignment::Left,
+            level: 0,
+            follow_char: 0,
+            indent_left: 0,
+            indent_hanging: 0,
+            number_text: text.to_string(),
+        };
+        let tables = ListTables {
+            list_structures: vec![ListStructure {
+                list_id: 9,
+                template_id: 9,
+                is_simple: true,
+                levels: vec![level(1, "%1.")],
+            }],
+            list_overrides: vec![ListFormatOverride {
+                list_id: 9,
+                override_count: 1,
+                lfo_id: 1,
+                level_overrides: vec![ListLevelOverride {
+                    level: 0,
+                    start_at: None,
+                    format: Some(level(3, "(%1)")),
+                }],
+            }],
+            metadata: ListTablesMetadata::default(),
+        };
+
+        let binding = tables.bind_paragraph(1, 0).unwrap();
+        let replacement = binding.level_override.unwrap().format.as_ref().unwrap();
+        assert!(std::ptr::eq(binding.effective_level(), replacement));
+        assert_eq!(binding.effective_start_at(), 3);
+        assert!(binding.has_formatting_override());
+        assert!(tables.bind_paragraph(0, 0).is_none());
+        assert!(tables.bind_paragraph(i16::MIN, 0).is_none());
+        assert!(tables.bind_paragraph(1, 12).is_none());
     }
 
     #[test]

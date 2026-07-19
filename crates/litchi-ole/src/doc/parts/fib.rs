@@ -152,6 +152,13 @@ impl FileInformationBlock {
         (self.flags & 0x0100) != 0
     }
 
+    /// Whether this FIB describes an AutoText-only glossary document.
+    #[inline]
+    pub fn is_glossary_document(&self) -> bool {
+        // fGlsy is bit 1 of the FibBase flags field.
+        (self.flags & 0x0002) != 0
+    }
+
     /// Check whether the encrypted document uses legacy XOR obfuscation.
     #[inline]
     pub(crate) fn is_obfuscated(&self) -> bool {

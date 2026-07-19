@@ -554,20 +554,11 @@ pub fn write_sx_view_ex9<W: Write>(writer: &mut W) -> XlsResult<()> {
 }
 
 const MSO_DRAWING_GROUP_RECORD_ID: u16 = 0x00EB;
-const MSO_DRAWING_RECORD_ID: u16 = 0x00EC;
 const OBJ_RECORD_ID: u16 = 0x005D;
 
 const ESCHER_DGG_CONTAINER: u16 = 0xF000;
-const ESCHER_DG_CONTAINER: u16 = 0xF002;
-const ESCHER_SPGR_CONTAINER: u16 = 0xF003;
-const ESCHER_SP_CONTAINER: u16 = 0xF004;
 const ESCHER_DGG: u16 = 0xF006;
-const ESCHER_DG: u16 = 0xF008;
-const ESCHER_SPGR: u16 = 0xF009;
-const ESCHER_SP: u16 = 0xF00A;
 const ESCHER_OPT: u16 = 0xF00B;
-const ESCHER_CLIENT_ANCHOR: u16 = 0xF010;
-const ESCHER_CLIENT_DATA: u16 = 0xF011;
 const ESCHER_SPLIT_MENU_COLORS: u16 = 0xF11E;
 
 const OBJ_FT_CMO: u16 = 0x0015;
@@ -575,7 +566,6 @@ const OBJ_FT_CBLS: u16 = 0x000C;
 const OBJ_FT_LBS_DATA: u16 = 0x0013;
 
 const COMBO_BOX_OBJECT_TYPE: u16 = 0x0014;
-const PIVOT_PAGE_OBJECT_ID: u16 = 0x0001;
 const PIVOT_PAGE_OBJECT_FLAGS: u16 = 0x2101;
 const PIVOT_PAGE_CBLS_RESERVED_PREFIX: [u8; 8] = [0; 8];
 const PIVOT_PAGE_CBLS_ACCELERATOR: u16 = 0x0064;
@@ -639,7 +629,7 @@ fn write_obj_subrecord_header<W: Write>(
     Ok(())
 }
 
-fn write_ft_cmo_combo_box<W: Write>(writer: &mut W) -> XlsResult<()> {
+fn write_ft_cmo_combo_box<W: Write>(writer: &mut W, object_id: u16) -> XlsResult<()> {
     write_obj_subrecord_header(
         writer,
         ObjSubrecordHeader {
@@ -648,7 +638,7 @@ fn write_ft_cmo_combo_box<W: Write>(writer: &mut W) -> XlsResult<()> {
         },
     )?;
     writer.write_all(&COMBO_BOX_OBJECT_TYPE.to_le_bytes())?;
-    writer.write_all(&PIVOT_PAGE_OBJECT_ID.to_le_bytes())?;
+    writer.write_all(&object_id.to_le_bytes())?;
     writer.write_all(&PIVOT_PAGE_OBJECT_FLAGS.to_le_bytes())?;
     writer.write_all(&0u32.to_le_bytes())?;
     writer.write_all(&0u32.to_le_bytes())?;
@@ -692,58 +682,6 @@ fn write_ft_lbs_data<W: Write>(writer: &mut W) -> XlsResult<()> {
     writer.write_all(&PIVOT_PAGE_DROPDOWN_MIN_WIDTH.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
     writer.write_all(&[0u8, 0u8])?;
-    Ok(())
-}
-
-fn write_escher_group_shape<W: Write>(writer: &mut W, shape_id: u32) -> XlsResult<()> {
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x000F,
-            record_id: ESCHER_SP_CONTAINER,
-            data_size: 0x28,
-        },
-    )?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x0001,
-            record_id: ESCHER_SPGR,
-            data_size: 0x10,
-        },
-    )?;
-    for _ in 0..4 {
-        writer.write_all(&0u32.to_le_bytes())?;
-    }
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x0002,
-            record_id: ESCHER_SP,
-            data_size: 0x08,
-        },
-    )?;
-    writer.write_all(&shape_id.to_le_bytes())?;
-    writer.write_all(&0x0000_0005u32.to_le_bytes())?;
-    Ok(())
-}
-
-fn write_escher_client_anchor<W: Write>(
-    writer: &mut W,
-    options: u16,
-    fields: [u16; 9],
-) -> XlsResult<()> {
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options,
-            record_id: ESCHER_CLIENT_ANCHOR,
-            data_size: 0x12,
-        },
-    )?;
-    for field in fields {
-        writer.write_all(&field.to_le_bytes())?;
-    }
     Ok(())
 }
 
@@ -848,131 +786,9 @@ pub fn write_mso_drawing_group<W: Write>(writer: &mut W, clusters: &[(u32, u32)]
     Ok(())
 }
 
-/// Write an empty MsoDrawing record (0x00EC) to the data sheet.
-/// Excel expects this when a drawing group is defined but the sheet has no shapes.
-pub fn write_mso_drawing_sheet1<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, MSO_DRAWING_RECORD_ID, 80)?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x000F,
-            record_id: ESCHER_DG_CONTAINER,
-            data_size: 0x48,
-        },
-    )?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x0010,
-            record_id: ESCHER_DG,
-            data_size: 0x08,
-        },
-    )?;
-    writer.write_all(&1u32.to_le_bytes())?;
-    writer.write_all(&0x0000_0400u32.to_le_bytes())?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x000F,
-            record_id: ESCHER_SPGR_CONTAINER,
-            data_size: 0x30,
-        },
-    )?;
-    write_escher_group_shape(writer, 0x0000_0400)?;
-    Ok(())
-}
-
-pub fn write_pivot_page_mso_drawing<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, MSO_DRAWING_RECORD_ID, 170)?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x000F,
-            record_id: ESCHER_DG_CONTAINER,
-            data_size: 0xA2,
-        },
-    )?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x0020,
-            record_id: ESCHER_DG,
-            data_size: 0x08,
-        },
-    )?;
-    writer.write_all(&2u32.to_le_bytes())?;
-    writer.write_all(&0x0000_0801u32.to_le_bytes())?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x000F,
-            record_id: ESCHER_SPGR_CONTAINER,
-            data_size: 0x8A,
-        },
-    )?;
-    write_escher_group_shape(writer, 0x0000_0800)?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x000F,
-            record_id: ESCHER_SP_CONTAINER,
-            data_size: 0x52,
-        },
-    )?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x0C92,
-            record_id: ESCHER_SP,
-            data_size: 0x08,
-        },
-    )?;
-    writer.write_all(&0x0000_0801u32.to_le_bytes())?;
-    writer.write_all(&0x0000_0A00u32.to_le_bytes())?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x0043,
-            record_id: ESCHER_OPT,
-            data_size: 0x18,
-        },
-    )?;
-    write_escher_properties(
-        writer,
-        &[
-            EscherProperty {
-                property_id: 0x007F,
-                value: 0x0104_0104,
-            },
-            EscherProperty {
-                property_id: 0x00BF,
-                value: 0x0008_0008,
-            },
-            EscherProperty {
-                property_id: 0x01FF,
-                value: 0x0008_0000,
-            },
-            EscherProperty {
-                property_id: 0x03BF,
-                value: 0x0002_0000,
-            },
-        ],
-    )?;
-    write_escher_client_anchor(writer, 0x0000, [1, 1, 0, 0, 0, 2, 0, 1, 0])?;
-    write_escher_record_header(
-        writer,
-        EscherRecordHeader {
-            options: 0x0000,
-            record_id: ESCHER_CLIENT_DATA,
-            data_size: 0,
-        },
-    )?;
-    Ok(())
-}
-
-pub fn write_pivot_page_obj<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub fn write_pivot_page_obj<W: Write>(writer: &mut W, object_id: u16) -> XlsResult<()> {
     write_record_header(writer, OBJ_RECORD_ID, 70)?;
-    write_ft_cmo_combo_box(writer)?;
+    write_ft_cmo_combo_box(writer, object_id)?;
     write_ft_cbls(writer)?;
     write_ft_lbs_data(writer)?;
     Ok(())
@@ -1033,7 +849,8 @@ pub struct SxDbConfig {
     /// Stream ID (must match the SxStreamID for this cache).
     pub stream_id: u16,
     /// Number of standard fields (columns) in the source data.
-    pub field_count: u16,
+    pub standard_field_count: u16,
+    pub total_field_count: u16,
     /// SXDB flags. Use `0x0003` (fSaveData | fInvalid) when source data
     /// records (SXDBB/SXNUM) are included in the cache stream.
     pub flags: u16,
@@ -1061,8 +878,8 @@ pub fn write_sxdb<W: Write>(writer: &mut W, cfg: &SxDbConfig) -> XlsResult<()> {
     writer.write_all(&cfg.stream_id.to_le_bytes())?; //  4: mnStrmId
     writer.write_all(&cfg.flags.to_le_bytes())?; //  6: mnFlags
     writer.write_all(&0x07FFu16.to_le_bytes())?; //  8: mnBlockRecs
-    writer.write_all(&cfg.field_count.to_le_bytes())?; // 10: mnStdFields
-    writer.write_all(&cfg.field_count.to_le_bytes())?; // 12: mnTotalFields
+    writer.write_all(&cfg.standard_field_count.to_le_bytes())?; // 10: mnStdFields
+    writer.write_all(&cfg.total_field_count.to_le_bytes())?; // 12: mnTotalFields
     // crdbUsed: number of source records used to build the cache.
     // Per MS-XLS §2.4.269, setting this to 0 is inconsistent with having
     // cache items and may cause Excel to reject the file.
@@ -1090,6 +907,16 @@ pub struct SxFdbConfig<'a> {
     /// (fTextEtcField | fNumMinMaxValid | fNonDates | fCantGetUniqueItems)
     /// and `csxOrig` is set to 0 (no original string items).
     pub is_numeric: bool,
+    /// SXFDB type flags derived from typed shared items.
+    pub data_flags: u16,
+    /// Whether SXINDEXLIST uses 16-bit ordinals for this field.
+    pub use_16bit_indices: bool,
+    pub group_child: Option<u16>,
+    pub group_base: Option<u16>,
+    pub group_item_count: u16,
+    pub base_item_count: u16,
+    pub original_item_count: u16,
+    pub is_grouped: bool,
 }
 
 /// Encode a string as **XLUnicodeString**: `[u16 cch][u8 flags][chars…]`.
@@ -1138,26 +965,27 @@ pub fn write_sxfdb<W: Write>(writer: &mut W, cfg: &SxFdbConfig<'_>) -> XlsResult
     //   String fields with items: fAllAtoms(bit0) | DATA_STR(0x0480) = 0x0481
     //   Numeric fields: fTextEtcField | fNumMinMaxValid | fNonDates | fCantGetUniqueItems = 0x0560
     //   Other fields without items: 0x0000
-    let flags: u16 = if cfg.has_items {
-        0x0001 | 0x0480 // HASITEMS | DATA_STR = 0x0481
+    let mut flags: u16 = if cfg.has_items {
+        0x0001 | cfg.data_flags | if cfg.use_16bit_indices { 0x0200 } else { 0 }
     } else if cfg.is_numeric {
         0x0560
     } else {
         0
     };
+    if cfg.group_child.is_some() { flags |= 0x0008; }
+    if cfg.is_grouped { flags |= 0x0010; }
 
     write_record_header(writer, 0x00C7, data_len)?;
     writer.write_all(&flags.to_le_bytes())?; //  0: flags
     // 0xFFFF = no parent/base group field (ungrouped).
     // 0x0000 would mean "parent is field 0", implying grouping → "group edit mode" error.
-    writer.write_all(&0xFFFFu16.to_le_bytes())?; //  2: ifdbParent
-    writer.write_all(&0xFFFFu16.to_le_bytes())?; //  4: ifdbBase
+    writer.write_all(&cfg.group_child.unwrap_or(0xFFFF).to_le_bytes())?; //  2: ifdbParent
+    writer.write_all(&cfg.group_base.unwrap_or(0xFFFF).to_le_bytes())?; //  4: ifdbBase
     writer.write_all(&cfg.item_count.to_le_bytes())?; //  6: citmUnq (visible)
-    writer.write_all(&0u16.to_le_bytes())?; //  8: csxGroup
-    writer.write_all(&0u16.to_le_bytes())?; // 10: csxBase
+    writer.write_all(&cfg.group_item_count.to_le_bytes())?; //  8: csxGroup
+    writer.write_all(&cfg.base_item_count.to_le_bytes())?; // 10: csxBase
     // csxOrig: for string fields = citmUnq, for numeric fields = 0
-    let csx_orig = if cfg.is_numeric { 0u16 } else { cfg.item_count };
-    writer.write_all(&csx_orig.to_le_bytes())?; // 12: csxOrig
+    writer.write_all(&cfg.original_item_count.to_le_bytes())?; // 12: csxOrig
     writer.write_all(&name_bytes)?;
     Ok(())
 }
@@ -1187,6 +1015,39 @@ pub fn write_sxstring<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
             writer.write_all(&ch.to_le_bytes())?;
         }
     }
+    Ok(())
+}
+
+fn write_pivot_cache_item<W: Write>(writer: &mut W, item: &crate::xls::PivotCacheItem) -> XlsResult<()> {
+    match item {
+        crate::xls::PivotCacheItem::String(value) => write_sxstring(writer, value),
+        crate::xls::PivotCacheItem::Number(value) => write_sxnum(writer, *value),
+        crate::xls::PivotCacheItem::Boolean(value) => {
+            write_record_header(writer, 0x00CA, 2)?;
+            writer.write_all(&u16::from(*value).to_le_bytes())?;
+            Ok(())
+        },
+        crate::xls::PivotCacheItem::Error(value) => {
+            write_record_header(writer, 0x00CB, 2)?;
+            writer.write_all(&value.code().to_le_bytes())?;
+            Ok(())
+        },
+        crate::xls::PivotCacheItem::DateTime(value) => {
+            write_record_header(writer, 0x00CE, 8)?;
+            writer.write_all(&value.year().to_le_bytes())?;
+            writer.write_all(&value.month().to_le_bytes())?;
+            writer.write_all(&[value.day(), value.hour(), value.minute(), value.second()])?;
+            Ok(())
+        },
+        crate::xls::PivotCacheItem::Empty => {
+            write_record_header(writer, 0x00CF, 0)
+        },
+    }
+}
+
+fn write_sxinteger<W: Write>(writer: &mut W, value: i16) -> XlsResult<()> {
+    write_record_header(writer, 0x00CC, 2)?;
+    writer.write_all(&value.to_le_bytes())?;
     Ok(())
 }
 
@@ -1331,11 +1192,14 @@ pub struct PivotCacheFieldInfo<'a> {
     pub name: &'a str,
     /// Cache item string values (unique values from source data).
     /// Empty for numeric (data-axis) fields.
-    pub items: &'a [&'a str],
+    pub items: &'a [crate::xls::PivotCacheItem],
     /// Whether this is a numeric (data-axis) field.
     pub is_numeric: bool,
     /// Number of unique numeric values (only used when `is_numeric` is true).
     pub unique_numeric_count: u16,
+    pub grouping: Option<&'a crate::xls::PivotCacheGrouping>,
+    pub group_child: Option<u16>,
+    pub is_source_field: bool,
 }
 
 /// A single source data row for the pivot cache.
@@ -1344,7 +1208,7 @@ pub struct PivotCacheFieldInfo<'a> {
 /// numeric field. The order matches the field order.
 pub struct PivotCacheSourceRow<'a> {
     /// Packed string-field indices (one byte per string field, in order).
-    pub string_indices: &'a [u8],
+    pub item_indices: &'a [u16],
     /// Numeric values (one per numeric field, in order).
     pub numeric_values: &'a [f64],
 }
@@ -1366,9 +1230,18 @@ pub struct PivotCacheStreamInfo<'a> {
 ///
 /// Each byte is the item index for one string field. Numeric fields are
 /// excluded (they get separate SXNUM records).
-fn write_sxdbb<W: Write>(writer: &mut W, indices: &[u8]) -> XlsResult<()> {
-    write_record_header(writer, 0x00C8, indices.len() as u16)?;
-    writer.write_all(indices)?;
+fn write_sxdbb<W: Write>(writer: &mut W, fields: &[PivotCacheFieldInfo<'_>], indices: &[u16]) -> XlsResult<()> {
+    let expected = fields.iter().filter(|field| field.is_source_field && !field.items.is_empty()).count();
+    if indices.len() != expected { return Err(crate::xls::XlsError::InvalidData("PivotCache row shared-index cardinality mismatch".to_string())); }
+    let size = fields.iter().filter(|field| field.is_source_field && !field.items.is_empty()).try_fold(0usize, |size, field| {
+        size.checked_add(if field.items.len() >= 0x100 { 2 } else { 1 })
+    }).ok_or_else(|| crate::xls::XlsError::InvalidData("SXINDEXLIST size overflow".to_string()))?;
+    write_record_header(writer, 0x00C8, u16::try_from(size).map_err(|_| crate::xls::XlsError::InvalidData("SXINDEXLIST exceeds BIFF record size".to_string()))?)?;
+    let mut index_iter = indices.iter();
+    for field in fields.iter().filter(|field| field.is_source_field && !field.items.is_empty()) {
+        let index = *index_iter.next().unwrap();
+        if field.items.len() >= 0x100 { writer.write_all(&index.to_le_bytes())?; } else { writer.write_all(&[u8::try_from(index).map_err(|_| crate::xls::XlsError::InvalidData("SXINDEXLIST 8-bit index overflow".to_string()))?])?; }
+    }
     Ok(())
 }
 
@@ -1408,7 +1281,8 @@ pub fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult
         &SxDbConfig {
             record_count: info.record_count,
             stream_id: info.stream_id,
-            field_count: info.fields.len() as u16,
+            standard_field_count: info.fields.iter().filter(|field| field.is_source_field).count() as u16,
+            total_field_count: info.fields.len() as u16,
             flags: sxdb_flags,
         },
     )?;
@@ -1419,11 +1293,18 @@ pub fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult
     // Per-field: SXFDB + SXFDBTYPE + SXSTRING items
     // Order per LO XclExpPCField::Save(): SXFIELD, SXFDBTYPE, items
     for field in info.fields {
-        let has_items = !field.items.is_empty();
-        let item_count = if field.is_numeric {
+        let group_items = field.grouping.map_or(&[][..], crate::xls::PivotCacheGrouping::group_items);
+        let has_items = !field.items.is_empty() || !group_items.is_empty();
+        let item_count = if !group_items.is_empty() {
+            group_items.len() as u16
+        } else if field.is_numeric && field.items.is_empty() {
             field.unique_numeric_count
         } else {
             field.items.len() as u16
+        };
+        let group_base = match field.grouping {
+            Some(crate::xls::PivotCacheGrouping::Discrete(value)) => Some(value.base_field_index),
+            _ => None,
         };
         write_sxfdb(
             &mut buf,
@@ -1432,21 +1313,57 @@ pub fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult
                 name: field.name,
                 has_items,
                 is_numeric: field.is_numeric,
+                data_flags: crate::xls::pivot_table::pivot_cache_data_flags(
+                    if matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_))) {
+                        group_items
+                    } else {
+                        field.items
+                    },
+                ),
+                use_16bit_indices: field.items.len() >= 0x100,
+                group_child: field.group_child,
+                group_base,
+                group_item_count: group_items.len() as u16,
+                base_item_count: match field.grouping { Some(crate::xls::PivotCacheGrouping::Discrete(value)) => value.item_to_group.len() as u16, _ => 0 },
+                original_item_count: field.items.len() as u16,
+                is_grouped: field.grouping.is_some(),
             },
         )?;
 
         // SXFDBTYPE — always written after SXFDB per LO
         write_sxfdbtype(&mut buf)?;
 
-        // Write cache items as SXSTRING records (string fields only)
-        for &item_value in field.items {
-            write_sxstring(&mut buf, item_value)?;
+        for item_value in group_items {
+            write_pivot_cache_item(&mut buf, item_value)?;
+        }
+        if let Some(grouping) = field.grouping {
+            match grouping {
+                crate::xls::PivotCacheGrouping::Discrete(value) => {
+                    write_record_header(&mut buf, 0x00D9, (value.item_to_group.len() * 2) as u16)?;
+                    for index in &value.item_to_group { buf.extend_from_slice(&index.to_le_bytes()); }
+                },
+                crate::xls::PivotCacheGrouping::Numeric(value) => {
+                    let flags = 0x0020 | u16::from(value.auto_start) | (u16::from(value.auto_end) << 1);
+                    write_record_header(&mut buf, 0x00D8, 2)?; buf.extend_from_slice(&flags.to_le_bytes());
+                    write_sxnum(&mut buf, value.start)?; write_sxnum(&mut buf, value.end)?; write_sxnum(&mut buf, value.step)?;
+                },
+                crate::xls::PivotCacheGrouping::Date(value) => {
+                    let flags = ((value.unit as u16) << 2) | u16::from(value.auto_start) | (u16::from(value.auto_end) << 1);
+                    write_record_header(&mut buf, 0x00D8, 2)?; buf.extend_from_slice(&flags.to_le_bytes());
+                    write_pivot_cache_item(&mut buf, &crate::xls::PivotCacheItem::DateTime(value.start))?;
+                    write_pivot_cache_item(&mut buf, &crate::xls::PivotCacheItem::DateTime(value.end))?;
+                    write_sxinteger(&mut buf, i16::try_from(value.step).map_err(|_| crate::xls::XlsError::InvalidData("date grouping step exceeds i16".to_string()))?)?;
+                },
+            }
+        }
+        for item_value in field.items {
+            write_pivot_cache_item(&mut buf, item_value)?;
         }
     }
 
     // Source data records: SXDBB + SXNUM per row
     for row in info.source_rows {
-        write_sxdbb(&mut buf, row.string_indices)?;
+        write_sxdbb(&mut buf, info.fields, row.item_indices)?;
         for &val in row.numeric_values {
             write_sxnum(&mut buf, val)?;
         }

@@ -11,7 +11,9 @@ pub(crate) const CALC_ITER_RECORD_TYPE: u16 = 0x0011;
 pub(crate) const UNCALCED_RECORD_TYPE: u16 = 0x005E;
 pub(crate) const CALC_SAVE_RECALC_RECORD_TYPE: u16 = 0x005F;
 pub(crate) const RECALC_ID_RECORD_TYPE: u16 = 0x01C1;
+pub(crate) const MTR_SETTINGS_RECORD_TYPE: u16 = 0x089A;
 pub(crate) const FORCE_FULL_CALCULATION_RECORD_TYPE: u16 = 0x08A3;
+const MAX_CALCULATION_THREADS: u16 = 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XlsCalculationMode {
@@ -26,9 +28,64 @@ pub enum XlsReferenceMode {
     A1,
 }
 
+/// Multithreaded calculation settings stored in an `MTRSettings` record.
+///
+/// This is inert workbook metadata. The reader does not evaluate formulas or
+/// create calculation threads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsMultithreadedCalculation {
+    enabled: bool,
+    user_thread_count: Option<u16>,
+}
+
+impl XlsMultithreadedCalculation {
+    /// Use the application's automatic thread count, with multithreaded
+    /// calculation either enabled or disabled.
+    pub const fn automatic(enabled: bool) -> Self {
+        Self {
+            enabled,
+            user_thread_count: None,
+        }
+    }
+
+    /// Use a user-specified calculation thread count.
+    pub fn try_with_thread_count(enabled: bool, thread_count: u16) -> XlsResult<Self> {
+        if !(1..=MAX_CALCULATION_THREADS).contains(&thread_count) {
+            return invalid(
+                MTR_SETTINGS_RECORD_TYPE,
+                format!(
+                    "calculation thread count must be 1..={MAX_CALCULATION_THREADS}, got {thread_count}"
+                ),
+            );
+        }
+        Ok(Self {
+            enabled,
+            user_thread_count: Some(thread_count),
+        })
+    }
+
+    pub const fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// A user-specified thread count, or `None` when the producer selected the
+    /// count automatically. The count is metadata when calculation is disabled.
+    pub const fn user_thread_count(&self) -> Option<u16> {
+        self.user_thread_count
+    }
+
+    pub(crate) const fn serialized_thread_count(&self) -> u16 {
+        match self.user_thread_count {
+            Some(value) => value,
+            None => 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct XlsWorkbookCalculation {
     full_precision: bool,
+    multithreaded_calculation: Option<XlsMultithreadedCalculation>,
     force_full_calculation: bool,
     recalculation_engine_id: Option<u32>,
 }
@@ -37,6 +94,7 @@ impl Default for XlsWorkbookCalculation {
     fn default() -> Self {
         Self {
             full_precision: true,
+            multithreaded_calculation: None,
             force_full_calculation: false,
             recalculation_engine_id: None,
         }
@@ -46,6 +104,9 @@ impl Default for XlsWorkbookCalculation {
 impl XlsWorkbookCalculation {
     pub fn full_precision(&self) -> bool {
         self.full_precision
+    }
+    pub fn multithreaded_calculation(&self) -> Option<XlsMultithreadedCalculation> {
+        self.multithreaded_calculation
     }
     pub fn force_full_calculation(&self) -> bool {
         self.force_full_calculation
@@ -107,6 +168,7 @@ impl XlsWorksheetCalculation {
 pub(crate) struct WorkbookCalculationCollector {
     calculation: XlsWorkbookCalculation,
     precision_seen: bool,
+    mtr_settings_seen: bool,
     force_seen: bool,
     recalc_id_seen: bool,
     last_rank: Option<u8>,
@@ -117,6 +179,7 @@ impl WorkbookCalculationCollector {
         Self {
             calculation: XlsWorkbookCalculation::default(),
             precision_seen: false,
+            mtr_settings_seen: false,
             force_seen: false,
             recalc_id_seen: false,
             last_rank: None,
@@ -124,10 +187,24 @@ impl WorkbookCalculationCollector {
     }
 
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+        // BIFF8 overloads these future-record IDs. After the workbook
+        // calculation block has advanced past their rank, 0x089A is
+        // CompressPictures rather than MTRSettings and 0x08A3 is Compat12
+        // rather than ForceFullCalculation. Their payloads are otherwise
+        // indistinguishable, so workbook-global record position is the
+        // required discriminator.
+        if (record_type == MTR_SETTINGS_RECORD_TYPE
+            && self.last_rank.is_some_and(|previous| previous > 1))
+            || (record_type == FORCE_FULL_CALCULATION_RECORD_TYPE
+                && self.last_rank.is_some_and(|previous| previous > 2))
+        {
+            return Ok(());
+        }
         let rank = match record_type {
             CALC_PRECISION_RECORD_TYPE => 0,
-            FORCE_FULL_CALCULATION_RECORD_TYPE => 1,
-            RECALC_ID_RECORD_TYPE => 2,
+            MTR_SETTINGS_RECORD_TYPE => 1,
+            FORCE_FULL_CALCULATION_RECORD_TYPE => 2,
+            RECALC_ID_RECORD_TYPE => 3,
             _ => return Ok(()),
         };
         if self.last_rank.is_some_and(|previous| rank < previous) {
@@ -139,21 +216,32 @@ impl WorkbookCalculationCollector {
                 reject_duplicate(record_type, &mut self.precision_seen)?;
                 self.calculation.full_precision = parse_bool16(record_type, data)?;
             },
+            MTR_SETTINGS_RECORD_TYPE => {
+                reject_duplicate(record_type, &mut self.mtr_settings_seen)?;
+                require_future_record_header(record_type, data, 24)?;
+                let enabled = parse_bool32(record_type, &data[12..16])?;
+                let user_set_thread_count = parse_bool32(record_type, &data[16..20])?;
+                let thread_count = read_u32(data, 20);
+                if !(1..=u32::from(MAX_CALCULATION_THREADS)).contains(&thread_count) {
+                    return invalid(
+                        record_type,
+                        format!(
+                            "calculation thread count must be 1..={MAX_CALCULATION_THREADS}, got {thread_count}"
+                        ),
+                    );
+                }
+                self.calculation.multithreaded_calculation = Some(if user_set_thread_count {
+                    XlsMultithreadedCalculation::try_with_thread_count(
+                        enabled,
+                        thread_count as u16,
+                    )?
+                } else {
+                    XlsMultithreadedCalculation::automatic(enabled)
+                });
+            },
             FORCE_FULL_CALCULATION_RECORD_TYPE => {
                 reject_duplicate(record_type, &mut self.force_seen)?;
-                require_length(record_type, data, 16)?;
-                if read_u16(data, 0) != FORCE_FULL_CALCULATION_RECORD_TYPE {
-                    return invalid(
-                        record_type,
-                        "future-record header type does not match containing record",
-                    );
-                }
-                if read_u16(data, 2) != 0 || data[4..12].iter().any(|byte| *byte != 0) {
-                    return invalid(
-                        record_type,
-                        "future-record flags and reserved bytes must be zero",
-                    );
-                }
+                require_future_record_header(record_type, data, 16)?;
                 self.calculation.force_full_calculation = parse_bool32(record_type, &data[12..16])?;
             },
             RECALC_ID_RECORD_TYPE => {
@@ -356,6 +444,27 @@ fn parse_bool32(record_type: u16, data: &[u8]) -> XlsResult<bool> {
     }
 }
 
+fn require_future_record_header(
+    record_type: u16,
+    data: &[u8],
+    expected_length: usize,
+) -> XlsResult<()> {
+    require_length(record_type, data, expected_length)?;
+    if read_u16(data, 0) != record_type {
+        return invalid(
+            record_type,
+            "future-record header type does not match containing record",
+        );
+    }
+    if read_u16(data, 2) != 0 || data[4..12].iter().any(|byte| *byte != 0) {
+        return invalid(
+            record_type,
+            "future-record flags and reserved bytes must be zero",
+        );
+    }
+    Ok(())
+}
+
 fn require_length(record_type: u16, data: &[u8], expected: usize) -> XlsResult<()> {
     if data.len() != expected {
         return invalid(
@@ -432,6 +541,19 @@ mod tests {
                 .feed_record(FORCE_FULL_CALCULATION_RECORD_TYPE, &force)
                 .is_err()
         );
+
+        let mut globals = WorkbookCalculationCollector::new();
+        let mut mtr = [0u8; 24];
+        mtr[0..2].copy_from_slice(&MTR_SETTINGS_RECORD_TYPE.to_le_bytes());
+        mtr[12..16].copy_from_slice(&1u32.to_le_bytes());
+        mtr[16..20].copy_from_slice(&2u32.to_le_bytes());
+        mtr[20..24].copy_from_slice(&4u32.to_le_bytes());
+        assert!(globals.feed_record(MTR_SETTINGS_RECORD_TYPE, &mtr).is_err());
+
+        let mut globals = WorkbookCalculationCollector::new();
+        mtr[16..20].copy_from_slice(&1u32.to_le_bytes());
+        mtr[20..24].copy_from_slice(&1025u32.to_le_bytes());
+        assert!(globals.feed_record(MTR_SETTINGS_RECORD_TYPE, &mtr).is_err());
     }
 
     #[test]
@@ -473,6 +595,12 @@ mod tests {
         globals
             .feed_record(CALC_PRECISION_RECORD_TYPE, &0u16.to_le_bytes())
             .unwrap();
+        let mut mtr = [0u8; 24];
+        mtr[0..2].copy_from_slice(&MTR_SETTINGS_RECORD_TYPE.to_le_bytes());
+        mtr[12..16].copy_from_slice(&1u32.to_le_bytes());
+        mtr[16..20].copy_from_slice(&1u32.to_le_bytes());
+        mtr[20..24].copy_from_slice(&8u32.to_le_bytes());
+        globals.feed_record(MTR_SETTINGS_RECORD_TYPE, &mtr).unwrap();
         let mut force = [0u8; 16];
         force[0..2].copy_from_slice(&FORCE_FULL_CALCULATION_RECORD_TYPE.to_le_bytes());
         force[12..16].copy_from_slice(&1u32.to_le_bytes());
@@ -485,6 +613,10 @@ mod tests {
         globals.feed_record(RECALC_ID_RECORD_TYPE, &recalc).unwrap();
         let calculation = globals.finish();
         assert!(!calculation.full_precision());
+        assert_eq!(
+            calculation.multithreaded_calculation(),
+            Some(XlsMultithreadedCalculation::try_with_thread_count(true, 8).unwrap())
+        );
         assert!(calculation.force_full_calculation());
         assert_eq!(calculation.recalculation_engine_id(), Some(0x1234_5678));
     }
@@ -510,5 +642,14 @@ mod tests {
         let calculation = sheet.finish().unwrap();
         assert_eq!(calculation.mode(), XlsCalculationMode::Automatic);
         assert_eq!(calculation.maximum_iterations(), 100);
+    }
+
+    #[test]
+    fn validates_user_specified_thread_counts() {
+        assert!(XlsMultithreadedCalculation::try_with_thread_count(true, 0).is_err());
+        assert!(XlsMultithreadedCalculation::try_with_thread_count(true, 1025).is_err());
+        let automatic = XlsMultithreadedCalculation::automatic(false);
+        assert!(!automatic.enabled());
+        assert_eq!(automatic.user_thread_count(), None);
     }
 }

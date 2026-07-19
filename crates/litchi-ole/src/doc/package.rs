@@ -226,6 +226,39 @@ impl<R: Read + Seek> Package<R> {
     pub fn ole_file(&mut self) -> &mut OleFile<R> {
         &mut self.ole
     }
+
+    pub fn summary_information(&mut self) -> Result<Option<litchi_cfb::PropertySetStream>> {
+        match self.ole.property_set_stream(&["\u{0005}SummaryInformation"]) {
+            Ok(value) => Ok(Some(value)),
+            Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    /// Verify document XML signatures without evaluating certificate trust or
+    /// opening any VBA project stream.
+    pub fn verify_digital_signatures(
+        &mut self,
+        policy: &crate::signature::SignatureVerificationPolicy,
+    ) -> crate::signature::Result<Vec<crate::signature::BinaryOfficeSignatureVerification>> {
+        crate::signature::verify_binary_office_signatures(
+            &mut self.ole,
+            crate::signature::BinaryOfficeFormat::Doc,
+            policy,
+        )
+    }
+
+    pub fn document_summary_information(&mut self) -> Result<Option<litchi_cfb::PropertySetStream>> {
+        match self.ole.property_set_stream(&["\u{0005}DocumentSummaryInformation"]) {
+            Ok(value) => Ok(Some(value)),
+            Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    pub fn user_defined_properties(&mut self) -> Result<Option<litchi_cfb::PropertySet>> {
+        Ok(self.document_summary_information()?.and_then(|stream| stream.section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID).cloned()))
+    }
 }
 
 // `From<DocError> for litchi_core::Error` lives here (not in the umbrella) so

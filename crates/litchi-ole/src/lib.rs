@@ -8,7 +8,9 @@ mod office_crypto;
 // `litchi::ole` namespace as well as `litchi_cfb` directly.
 pub use litchi_cfb::{
     DirectoryEntry, OleError, OleFile, OleMetadata, OleWriter, PropertySet, PropertySetGuid,
-    PropertySetStream, PropertyValue, is_ole_file,
+    OlePropertySetEditor, PropertySetStream, PropertyValue, StandardPropertySet,
+    DOCUMENT_SUMMARY_INFORMATION_FMTID, SUMMARY_INFORMATION_FMTID,
+    USER_DEFINED_PROPERTIES_FMTID, is_ole_file,
 };
 
 pub use litchi_cfb::writer;
@@ -41,6 +43,9 @@ pub mod sprm_operations;
 /// This module provides shared zero-copy parsing and writing utilities.
 pub mod escher;
 
+/// Safe typed discovery and inert CFB replacement for legacy embedded objects.
+pub mod embedded_object;
+
 /// Legacy Word document (.doc) reader
 ///
 /// This module provides functionality to parse Microsoft Word documents
@@ -53,11 +58,21 @@ pub mod doc;
 /// in the legacy binary format (.ppt files), which are OLE2-based files.
 pub mod ppt;
 
+/// Trust-neutral verification and authoring of legacy binary Office signatures.
+pub mod signature;
+
 /// Legacy Excel spreadsheet (.xls) reader
 ///
 /// This module provides functionality to parse Microsoft Excel spreadsheets
 /// in the legacy binary format (.xls files), which are OLE2-based files.
 pub mod xls;
+
+pub use embedded_object::{
+    discover_legacy_office_objects, CompObjMetadata, DocObjectDescriptor,
+    LegacyOfficeEmbeddedObject, LegacyOfficeObjectCollection, LegacyOfficeObjectEditor,
+    LegacyOfficeObjectFormat, LegacyOfficeObjectKind, LegacyOfficeObjectLimits,
+    LegacyOfficePreview, LegacyOfficePreviewKind, OleNativePackage,
+};
 
 pub use xls::{XlsError, XlsWorkbook};
 

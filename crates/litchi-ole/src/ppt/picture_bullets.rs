@@ -232,15 +232,14 @@ fn validate_fbse(
     }
     if name_length > 0 {
         let name = &payload[36..embedded_offset];
-        if !name.ends_with(&[0, 0])
-            || String::from_utf16(
-                &name[..name.len() - 2]
+        let valid_utf16 = name.ends_with(&[0, 0])
+            && char::decode_utf16(
+                name[..name.len() - 2]
                     .chunks_exact(2)
-                    .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
-                    .collect::<Vec<_>>(),
+                    .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
             )
-            .is_err()
-        {
+            .all(|character| character.is_ok());
+        if !valid_utf16 {
             return Err(PptError::Corrupted(
                 "Picture-bullet FBSE name is not valid null-terminated UTF-16".to_string(),
             ));

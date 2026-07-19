@@ -5,7 +5,6 @@ use crate::xls::{XlsError, XlsResult};
 
 use super::write_record_header;
 
-const MSODRAWING: u16 = 0x00EC;
 const OBJ: u16 = 0x005D;
 const TXO: u16 = 0x01B6;
 const CONTINUE: u16 = 0x003C;
@@ -31,46 +30,7 @@ fn escher_header(out: &mut Vec<u8>, options: u16, record_type: u16, length: u32)
     out.extend_from_slice(&length.to_le_bytes());
 }
 
-fn write_mso<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
-    let length = u16::try_from(data.len())
-        .map_err(|_| XlsError::InvalidData("comment MsoDrawing record is too large".to_string()))?;
-    if length > 8224 {
-        return Err(XlsError::InvalidData(
-            "comment MsoDrawing record exceeds 8224 bytes".to_string(),
-        ));
-    }
-    write_record_header(writer, MSODRAWING, length)?;
-    writer.write_all(data)?;
-    Ok(())
-}
-
-fn group_prefix(drawing_id: u32, comment_count: usize) -> XlsResult<Vec<u8>> {
-    let shape_count = u32::try_from(comment_count + 1)
-        .map_err(|_| XlsError::InvalidData("comment shape count overflows".to_string()))?;
-    let shapes_size = u32::try_from(comment_count).unwrap() * 134;
-    let spgr_length = 48u32
-        .checked_add(shapes_size)
-        .ok_or_else(|| XlsError::InvalidData("comment drawing size overflows".to_string()))?;
-    let dg_length = 16u32
-        .checked_add(8 + spgr_length)
-        .ok_or_else(|| XlsError::InvalidData("comment drawing size overflows".to_string()))?;
-    let patriarch = drawing_id << 10;
-    let mut out = Vec::with_capacity(80);
-    escher_header(&mut out, 0x000F, 0xF002, dg_length);
-    escher_header(&mut out, (drawing_id as u16) << 4, 0xF008, 8);
-    out.extend_from_slice(&shape_count.to_le_bytes());
-    out.extend_from_slice(&(patriarch + shape_count - 1).to_le_bytes());
-    escher_header(&mut out, 0x000F, 0xF003, spgr_length);
-    escher_header(&mut out, 0x000F, 0xF004, 40);
-    escher_header(&mut out, 0x0001, 0xF009, 16);
-    out.extend_from_slice(&[0; 16]);
-    escher_header(&mut out, 0x0002, 0xF00A, 8);
-    out.extend_from_slice(&patriarch.to_le_bytes());
-    out.extend_from_slice(&5u32.to_le_bytes());
-    Ok(out)
-}
-
-fn comment_shape(config: &CommentConfig<'_>, shape_id: u32) -> Vec<u8> {
+pub(super) fn comment_shape(config: &CommentConfig<'_>, shape_id: u32) -> Vec<u8> {
     let mut out = Vec::with_capacity(126);
     escher_header(&mut out, 0x000F, 0xF004, 126);
     escher_header(&mut out, 0x0CA2, 0xF00A, 8);
@@ -119,7 +79,7 @@ fn comment_shape(config: &CommentConfig<'_>, shape_id: u32) -> Vec<u8> {
     out
 }
 
-fn write_obj<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<()> {
+pub(super) fn write_obj<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<()> {
     write_record_header(writer, OBJ, 52)?;
     writer.write_all(&0x0015u16.to_le_bytes())?;
     writer.write_all(&0x0012u16.to_le_bytes())?;
@@ -149,7 +109,7 @@ fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
     Ok(())
 }
 
-fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<()> {
+pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<()> {
     let units: Vec<u16> = config.text.encode_utf16().collect();
     let runs: Vec<XlsCommentTextRunWrite> = if units.is_empty() {
         Vec::new()
@@ -206,7 +166,7 @@ fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<
     Ok(())
 }
 
-fn write_note<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<()> {
+pub(super) fn write_note<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<()> {
     let author: Vec<u16> = config.author.encode_utf16().collect();
     let compressed = author.iter().all(|unit| *unit <= 0x00FF);
     let byte_count = author.len() * if compressed { 1 } else { 2 };
@@ -227,37 +187,5 @@ fn write_note<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult
         }
     }
     writer.write_all(&[0])?;
-    Ok(())
-}
-
-pub(crate) fn write_comments<W: Write>(
-    writer: &mut W,
-    drawing_id: u32,
-    comments: &[CommentConfig<'_>],
-) -> XlsResult<()> {
-    if comments.is_empty() {
-        return Ok(());
-    }
-    let prefix = group_prefix(drawing_id, comments.len())?;
-    for (index, comment) in comments.iter().enumerate() {
-        let mut drawing = if index == 0 {
-            prefix.clone()
-        } else {
-            Vec::new()
-        };
-        drawing.extend_from_slice(&comment_shape(
-            comment,
-            (drawing_id << 10) + index as u32 + 1,
-        ));
-        write_mso(writer, &drawing)?;
-        write_obj(writer, comment)?;
-        let mut textbox = Vec::with_capacity(8);
-        escher_header(&mut textbox, 0, 0xF00D, 0);
-        write_mso(writer, &textbox)?;
-        write_txo(writer, comment)?;
-    }
-    for comment in comments {
-        write_note(writer, comment)?;
-    }
     Ok(())
 }

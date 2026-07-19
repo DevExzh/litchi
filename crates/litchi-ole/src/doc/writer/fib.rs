@@ -126,9 +126,18 @@ pub struct FibBuilder {
     /// List format override table (PlfLfo) offset and size
     fc_plflfo: u32,
     lcb_plflfo: u32,
+    /// List names (`SttbListNames`) offset and size
+    fc_sttb_list_names: u32,
+    lcb_sttb_list_names: u32,
+    /// List-level template codes (`SttbRgtplc`) offset and size
+    fc_sttb_rgtplc: u32,
+    lcb_sttb_rgtplc: u32,
     /// Main document field table (PlcfFldMom) offset and size
     fc_plcffld_mom: u32,
     lcb_plcffld_mom: u32,
+    /// Header/footer field table (PlcfFldHdr) offset and size
+    fc_plcffld_hdr: u32,
+    lcb_plcffld_hdr: u32,
 
     // FibBase fields that need to be set (Apache POI line 906-914)
     fc_min: u32, // Start of text in WordDocument stream
@@ -205,8 +214,14 @@ impl FibBuilder {
             lcb_plflst: 0,
             fc_plflfo: 0,
             lcb_plflfo: 0,
+            fc_sttb_list_names: 0,
+            lcb_sttb_list_names: 0,
+            fc_sttb_rgtplc: 0,
+            lcb_sttb_rgtplc: 0,
             fc_plcffld_mom: 0,
             lcb_plcffld_mom: 0,
+            fc_plcffld_hdr: 0,
+            lcb_plcffld_hdr: 0,
             fc_min: 0,
             fc_mac: 0,
             cb_mac: 0,
@@ -392,10 +407,28 @@ impl FibBuilder {
         self.lcb_plflfo = size;
     }
 
+    /// Set `SttbListNames` offset and size.
+    pub fn set_sttb_list_names(&mut self, offset: u32, size: u32) {
+        self.fc_sttb_list_names = offset;
+        self.lcb_sttb_list_names = size;
+    }
+
+    /// Set `SttbRgtplc` offset and size.
+    pub fn set_sttb_rgtplc(&mut self, offset: u32, size: u32) {
+        self.fc_sttb_rgtplc = offset;
+        self.lcb_sttb_rgtplc = size;
+    }
+
     /// Set main document field table (PlcfFldMom) offset and size
     pub fn set_plcffld_mom(&mut self, offset: u32, size: u32) {
         self.fc_plcffld_mom = offset;
         self.lcb_plcffld_mom = size;
+    }
+
+    /// Set header/footer field table (PlcfFldHdr) offset and size.
+    pub fn set_plcffld_hdr(&mut self, offset: u32, size: u32) {
+        self.fc_plcffld_hdr = offset;
+        self.lcb_plcffld_hdr = size;
     }
 
     /// Set FibBase fields (Apache POI line 906-914)
@@ -614,6 +647,7 @@ impl FibBuilder {
         const PLCFHDD: usize = 11; // Headers/Footers PLCF
         const STTBFFFN: usize = 15; // Font table
         const PLCFFLDMOM: usize = 16; // Main document field table
+        const PLCFFLDHDR: usize = 17; // Header/footer field table
         const STTBFBKMK: usize = 21;
         const PLCFBKF: usize = 22;
         const PLCFBKL: usize = 23;
@@ -626,6 +660,8 @@ impl FibBuilder {
         const STTBFRMARK: usize = 51; // Revision author table
         const PLFLST: usize = 73; // List table (PlfLst)
         const PLFLFO: usize = 74; // List format override table (PlfLfo)
+        const STTBLISTNAMES: usize = 91;
+        const STTBRGTPLC: usize = 96;
         const ATRDEXTRA: usize = 112; // Extended comment metadata
 
         // Write field offsets and sizes
@@ -665,6 +701,7 @@ impl FibBuilder {
         );
         set_field(buf, STTBFFFN, self.fc_sttbfffn, self.lcb_sttbfffn);
         set_field(buf, PLCFFLDMOM, self.fc_plcffld_mom, self.lcb_plcffld_mom);
+        set_field(buf, PLCFFLDHDR, self.fc_plcffld_hdr, self.lcb_plcffld_hdr);
         set_field(
             buf,
             GRPXSTATNOWNERS,
@@ -673,6 +710,13 @@ impl FibBuilder {
         );
         set_field(buf, PLFLST, self.fc_plflst, self.lcb_plflst);
         set_field(buf, PLFLFO, self.fc_plflfo, self.lcb_plflfo);
+        set_field(
+            buf,
+            STTBLISTNAMES,
+            self.fc_sttb_list_names,
+            self.lcb_sttb_list_names,
+        );
+        set_field(buf, STTBRGTPLC, self.fc_sttb_rgtplc, self.lcb_sttb_rgtplc);
         set_field(buf, DOP, self.fc_dop, self.lcb_dop);
         set_field(buf, CLX, self.fc_clx, self.lcb_clx);
 

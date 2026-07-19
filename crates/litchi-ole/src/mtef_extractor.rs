@@ -256,14 +256,11 @@ impl<'arena> MtefExtractor<'arena> {
         &self,
         mtef_data: Vec<u8>,
     ) -> Result<Vec<MathNode<'arena>>, MtefExtractionError> {
-        // We need to create a reference with the arena lifetime
-        // This is a bit of a hack, but we know the data will live long enough
-        let data_ref: &[u8] =
-            unsafe { std::slice::from_raw_parts(mtef_data.as_ptr(), mtef_data.len()) };
-        // Extend the lifetime (this is safe because we control the Vec lifetime)
-        let data_with_lifetime: &'arena [u8] = unsafe { std::mem::transmute(data_ref) };
-
-        let mut parser = MtefParser::new(self.arena, data_with_lifetime);
+        // The parser may borrow string data from its input. Copy the bytes into the
+        // caller-provided arena so the input and returned nodes share the same real
+        // lifetime; the source Vec can then be dropped normally.
+        let arena_data = self.arena.alloc_slice_copy(&mtef_data);
+        let mut parser = MtefParser::new(self.arena, arena_data);
         parser
             .parse()
             .map_err(|e| MtefExtractionError::ParseError(e.to_string()))
@@ -371,5 +368,39 @@ mod tests {
 
         // Just test that it can be created
         // Test passed - no assertions needed
+    }
+
+    fn minimal_mtef() -> Vec<u8> {
+        vec![
+            0x1C, 0x00, 0x00, 0x00, 0x02, 0x00, 0xD3, 0xC2, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x28, 0x04, 0x6D, 0x74, 0x05, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00,
+        ]
+    }
+
+    #[test]
+    fn parsed_nodes_are_tied_to_the_arena_not_the_source_vec() {
+        let formula = Formula::new();
+        let extractor = MtefExtractor::new(formula.arena());
+        let nodes = extractor
+            .parse_mtef_to_ast(minimal_mtef())
+            .expect("arena-owned MTEF parses");
+        // The input Vec was consumed and dropped inside parse_mtef_to_ast. Accessing
+        // the returned nodes remains sound because their borrowed data is in `formula`.
+        assert!(
+            nodes
+                .iter()
+                .all(|node| format!("{node:?}").len() < 1_000_000)
+        );
+    }
+
+    #[test]
+    fn malformed_input_is_inert_and_does_not_escape_a_borrow() {
+        let formula = Formula::new();
+        let extractor = MtefExtractor::new(formula.arena());
+        let nodes = extractor
+            .parse_mtef_to_ast(vec![0xFF; 12])
+            .expect("invalid MTEF uses the parser's empty fallback");
+        assert!(nodes.is_empty());
     }
 }

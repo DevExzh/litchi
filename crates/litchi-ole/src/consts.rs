@@ -68,6 +68,36 @@ pub enum PptRecordType {
     /// PowerPoint 12 embedded DrawingML theme package atom
     RoundTripTheme12Atom = 0x040E,
     /// PowerPoint 12 DrawingML color mapping XML atom
+    DocRoutingSlipAtom = 0x0406,
+    SlideShowDocInfoAtom = 0x0401,
+    Summary = 0x0402,
+    BookmarkCollection = 0x07E3,
+    BookmarkSeedAtom = 0x07E9,
+    BookmarkEntityAtom = 0x0FD0,
+    TextBookmarkAtom = 0x0FA7,
+    PrintOptionsAtom = 0x1770,
+    ExternalObjectRefAtom = 3009,
+    /// Metafile recolor mapping atom.
+    RecolorInfoAtom = 0x0FE7,
+    MetaFile = 0x0FC1,
+    ExternalOleObjectAtom = 0x0FC3,
+    ExternalOleEmbed = 0x0FCC,
+    ExternalOleEmbedAtom = 0x0FCD,
+    ExternalOleLink = 0x0FCE,
+    ExternalOleLinkAtom = 0x0FD1,
+    ExternalOleControl = 0x0FEE,
+    ExternalOleControlAtom = 0x0FFB,
+    ExternalMediaAtom = 0x1004,
+    ExternalVideo = 0x1005,
+    ExternalAviMovie = 0x1006,
+    ExternalMciMovie = 0x1007,
+    ExternalMidiAudio = 0x100D,
+    ExternalCdAudio = 0x100E,
+    ExternalWavAudioEmbedded = 0x100F,
+    ExternalWavAudioLink = 0x1010,
+    ExternalOleObjectStg = 0x1011,
+    ExternalCdAudioAtom = 0x1012,
+    ExternalWavAudioEmbeddedAtom = 0x1013,
     RoundTripColorMapping12Atom = 0x040F,
     /// PowerPoint 12 notes-master text styles atom
     RoundTripNotesMasterTextStyles12Atom = 0x01C5,
@@ -95,6 +125,10 @@ pub enum PptRecordType {
     RoundTripCustomTableStyles12Atom = 0x0428,
     /// OE placeholder atom record (placeholder data)
     OEPlaceholderAtom = 3011,
+    /// ShapeFlagsAtom shape-level flags
+    ShapeAtom = 0x0BDB,
+    /// ShapeFlags10Atom PowerPoint 2002 shape-level flags
+    ShapeFlags10Atom = 0x0BDC,
     /// PowerPoint 12 new placeholder identity atom
     RoundTripNewPlaceholderId12Atom = 0x0BDD,
     /// PowerPoint 12 embedded animation package atom
@@ -153,6 +187,8 @@ pub enum PptRecordType {
     FontEmbedFlags10Atom = 0x32C8,
     /// PowerPoint 10 privacy flags atom
     FilterPrivacyFlags10Atom = 0x36B0,
+    /// PowerPoint 10 reviewing toolbar and gallery state atom
+    DocToolbarStates10Atom = 0x36B1,
     /// PowerPoint 10 photo album settings atom
     PhotoAlbumInfo10Atom = 0x36B2,
     /// PowerPoint 11 smart tag store container
@@ -325,6 +361,22 @@ pub enum PptRecordType {
     CommentIndex10 = 12004,
     /// PowerPoint 10 comment author index atom
     CommentIndex10Atom = 12005,
+    /// PowerPoint 10 linked-shape atom
+    LinkedShape10Atom = 12006,
+    /// PowerPoint 10 linked-slide atom
+    LinkedSlide10Atom = 12007,
+    /// PowerPoint 10 document-comparison tree container
+    DiffTree10 = 0x2EEC,
+    /// PowerPoint 10 document-comparison diff container
+    Diff10 = 0x2EED,
+    /// PowerPoint 10 document-comparison diff atom
+    Diff10Atom = 0x2EEE,
+    /// PowerPoint 10 document-comparison slide-list size atom
+    SlideListTableSize10Atom = 0x2EEF,
+    /// PowerPoint 10 document-comparison slide-list entry atom
+    SlideListEntry10Atom = 0x2EF0,
+    /// PowerPoint 10 document-comparison slide-list table container
+    SlideListTable10 = 0x2EF1,
     /// PowerPoint 10 slide flags atom
     SlideFlags10Atom = 12010,
     /// PowerPoint 10 slide creation time atom
@@ -367,6 +419,35 @@ impl From<u16> for PptRecordType {
             0x0FC9 => PptRecordType::Handout,
             0x01C5 => PptRecordType::RoundTripNotesMasterTextStyles12Atom,
             0x040E => PptRecordType::RoundTripTheme12Atom,
+            0x0406 => PptRecordType::DocRoutingSlipAtom,
+            0x0401 => PptRecordType::SlideShowDocInfoAtom,
+            0x0402 => PptRecordType::Summary,
+            0x07E3 => PptRecordType::BookmarkCollection,
+            0x07E9 => PptRecordType::BookmarkSeedAtom,
+            0x0FD0 => PptRecordType::BookmarkEntityAtom,
+            0x0FA7 => PptRecordType::TextBookmarkAtom,
+            0x1770 => PptRecordType::PrintOptionsAtom,
+            3009 => PptRecordType::ExternalObjectRefAtom,
+            0x0FE7 => PptRecordType::RecolorInfoAtom,
+            0x0FC1 => PptRecordType::MetaFile,
+            0x0FC3 => PptRecordType::ExternalOleObjectAtom,
+            0x0FCC => PptRecordType::ExternalOleEmbed,
+            0x0FCD => PptRecordType::ExternalOleEmbedAtom,
+            0x0FCE => PptRecordType::ExternalOleLink,
+            0x0FD1 => PptRecordType::ExternalOleLinkAtom,
+            0x0FEE => PptRecordType::ExternalOleControl,
+            0x0FFB => PptRecordType::ExternalOleControlAtom,
+            0x1004 => PptRecordType::ExternalMediaAtom,
+            0x1005 => PptRecordType::ExternalVideo,
+            0x1006 => PptRecordType::ExternalAviMovie,
+            0x1007 => PptRecordType::ExternalMciMovie,
+            0x100D => PptRecordType::ExternalMidiAudio,
+            0x100E => PptRecordType::ExternalCdAudio,
+            0x100F => PptRecordType::ExternalWavAudioEmbedded,
+            0x1010 => PptRecordType::ExternalWavAudioLink,
+            0x1011 => PptRecordType::ExternalOleObjectStg,
+            0x1012 => PptRecordType::ExternalCdAudioAtom,
+            0x1013 => PptRecordType::ExternalWavAudioEmbeddedAtom,
             0x040F => PptRecordType::RoundTripColorMapping12Atom,
             0x041C => PptRecordType::RoundTripOriginalMainMasterId12Atom,
             0x041D => PptRecordType::RoundTripCompositeMasterId12Atom,
@@ -380,6 +461,8 @@ impl From<u16> for PptRecordType {
             0x0426 => PptRecordType::RoundTripShapeCheckSumForCustomLayouts12Atom,
             0x0428 => PptRecordType::RoundTripCustomTableStyles12Atom,
             3011 => PptRecordType::OEPlaceholderAtom,
+            0x0BDB => PptRecordType::ShapeAtom,
+            0x0BDC => PptRecordType::ShapeFlags10Atom,
             0x0BDD => PptRecordType::RoundTripNewPlaceholderId12Atom,
             0x2B0B => PptRecordType::RoundTripAnimation12Atom,
             0x2B0D => PptRecordType::RoundTripAnimationHash12Atom,
@@ -409,6 +492,7 @@ impl From<u16> for PptRecordType {
             4024 => PptRecordType::FontEmbeddedData,
             0x32C8 => PptRecordType::FontEmbedFlags10Atom,
             0x36B0 => PptRecordType::FilterPrivacyFlags10Atom,
+            0x36B1 => PptRecordType::DocToolbarStates10Atom,
             0x36B2 => PptRecordType::PhotoAlbumInfo10Atom,
             0x36B3 => PptRecordType::SmartTagStore11,
             0x3714 => PptRecordType::RoundTripSlideSyncInfo12,
@@ -491,6 +575,14 @@ impl From<u16> for PptRecordType {
             12001 => PptRecordType::Comment2000Atom,
             12004 => PptRecordType::CommentIndex10,
             12005 => PptRecordType::CommentIndex10Atom,
+            12006 => PptRecordType::LinkedShape10Atom,
+            12007 => PptRecordType::LinkedSlide10Atom,
+            0x2EEC => PptRecordType::DiffTree10,
+            0x2EED => PptRecordType::Diff10,
+            0x2EEE => PptRecordType::Diff10Atom,
+            0x2EEF => PptRecordType::SlideListTableSize10Atom,
+            0x2EF0 => PptRecordType::SlideListEntry10Atom,
+            0x2EF1 => PptRecordType::SlideListTable10,
             12010 => PptRecordType::SlideFlags10Atom,
             12011 => PptRecordType::SlideTime10Atom,
             _ => PptRecordType::Unknown,
@@ -501,7 +593,7 @@ impl From<u16> for PptRecordType {
 impl PptRecordType {
     /// Get the u16 value of this record type
     pub fn as_u16(self) -> u16 {
-        unsafe { std::mem::transmute::<Self, u16>(self) }
+        self as u16
     }
 }
 
@@ -555,7 +647,7 @@ impl From<u16> for EscherRecordType {
 impl EscherRecordType {
     /// Get the u16 value of this record type
     pub fn as_u16(self) -> u16 {
-        unsafe { std::mem::transmute::<Self, u16>(self) }
+        self as u16
     }
 }
 
@@ -755,6 +847,6 @@ impl From<u16> for EscherShapeType {
 impl EscherShapeType {
     /// Get the u16 value of this shape type
     pub fn as_u16(self) -> u16 {
-        unsafe { std::mem::transmute::<Self, u16>(self) }
+        self as u16
     }
 }

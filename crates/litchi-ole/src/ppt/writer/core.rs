@@ -50,7 +50,7 @@ use super::master_drawing::build_master_ppdrawing;
 use super::notes::{NotesContainerBuilder, NotesPage};
 use super::persist::{PersistPtrBuilder, UserEditAtom};
 use super::records::{
-    RecordBuilder, create_docinfo_list_container_minimal, create_document_atom,
+    RecordBuilder, create_docinfo_list_container, create_document_atom,
     create_end_document, create_environment_minimal, create_main_master_container,
     create_slide_list_with_text_master, record_type, wrap_dg_into_ppdrawing,
     wrap_dgg_into_ppdrawing_group,
@@ -65,9 +65,23 @@ use super::slide_timing::SlideTiming;
 use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
 use super::text_format::{FontEntity, Paragraph, TextAlign};
 use crate::ppt::animation::AnimationInfo;
+use crate::ppt::encryption::{
+    PptEncryptionProfile, WriterEncryptionMaterial, encrypt_pictures_for_write,
+    encrypt_powerpoint_document_for_write, prepare_writer_encryption,
+    validate_writer_password,
+};
+use crate::ppt::modify_password::{
+    PowerPointModifyPassword, validate_value as validate_modify_password,
+};
+use crate::ppt::header_footer::{
+    PowerPointHeaderFooter, PowerPointHeaderFooterParent,
+    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope,
+};
+use crate::ppt::view_info::{PowerPointSlideViewInfo, PowerPointViewKind};
 use litchi_cfb::writer::OleWriter;
 use litchi_core::unit::pt_to_emu_i32;
 use std::collections::HashMap;
+use zeroize::Zeroizing;
 
 /// Error type for PPT writing
 #[derive(Debug)]
@@ -81,7 +95,7 @@ pub enum PptWriteError {
 }
 
 /// Build a minimal, valid Current User stream referencing the given UserEditAtom offset.
-fn build_current_user_stream(offset_to_current_edit: u32) -> Vec<u8> {
+fn build_current_user_stream(offset_to_current_edit: u32, encrypted: bool) -> Vec<u8> {
     // Build per Apache POI CurrentUserAtom:
     // [0..3]   atomHeader = {0x00,0x00,0xF6,0x0F}
     // [4..7]   atomSize = 20 + 4 + lenAsciiUser (we use 0) => 24
@@ -102,8 +116,9 @@ fn build_current_user_stream(offset_to_current_edit: u32) -> Vec<u8> {
     s.extend_from_slice(&24u32.to_le_bytes());
     // details size (20)
     s.extend_from_slice(&20u32.to_le_bytes());
-    // headerToken (unencrypted)
-    s.extend_from_slice(&0xE391C05Fu32.to_le_bytes());
+    // headerToken
+    let token: u32 = if encrypted { 0xF3D1_C4DF } else { 0xE391_C05F };
+    s.extend_from_slice(&token.to_le_bytes());
     // current edit offset
     s.extend_from_slice(&offset_to_current_edit.to_le_bytes());
     // username length (ANSI)
@@ -381,6 +396,44 @@ struct WritableSlide {
     comments: Vec<SlideComment>,
     /// Per-slide timing (auto-advance, hidden, etc.)
     timing: Option<SlideTiming>,
+    /// Optional header/footer override attached directly to this slide.
+    header_footer: Option<PowerPointHeaderFooter>,
+}
+
+struct SerializedHeaderFooters {
+    presentation_slides: Option<Vec<u8>>,
+    notes_and_handouts: Option<Vec<u8>>,
+    main_master: Option<Vec<u8>>,
+    slides: Vec<Option<Vec<u8>>>,
+}
+
+fn append_child_to_built_container(
+    container: &mut Vec<u8>,
+    child: &[u8],
+) -> Result<(), PptWriteError> {
+    if container.len() < 8 {
+        return Err(PptWriteError::InvalidData(
+            "PPT container is missing its record header".to_string(),
+        ));
+    }
+    let stored_len = u32::from_le_bytes([
+        container[4],
+        container[5],
+        container[6],
+        container[7],
+    ]) as usize;
+    if stored_len != container.len() - 8 {
+        return Err(PptWriteError::InvalidData(
+            "PPT container length does not match its payload".to_string(),
+        ));
+    }
+    let new_len = stored_len
+        .checked_add(child.len())
+        .and_then(|len| u32::try_from(len).ok())
+        .ok_or_else(|| PptWriteError::InvalidData("PPT container is too large".to_string()))?;
+    container.extend_from_slice(child);
+    container[4..8].copy_from_slice(&new_len.to_le_bytes());
+    Ok(())
 }
 
 /// Convert ShapeType to Escher MSOSPT value
@@ -597,6 +650,39 @@ pub struct PptWriter {
     fonts: Vec<FontEntity>,
     /// Custom slide shows (named shows)
     custom_shows: Vec<CustomShow>,
+    /// Optional typed override for the slide editing view.
+    slide_view_info: Option<PowerPointSlideViewInfo>,
+    /// Optional typed notes editing view.
+    notes_view_info: Option<PowerPointSlideViewInfo>,
+    /// Presentation-wide defaults for ordinary slides.
+    presentation_header_footer: Option<PowerPointHeaderFooter>,
+    /// Presentation-wide defaults for notes pages and handouts.
+    notes_and_handouts_header_footer: Option<PowerPointHeaderFooter>,
+    /// Header/footer defaults attached directly to the main master.
+    main_master_header_footer: Option<PowerPointHeaderFooter>,
+    /// Password-to-open settings, including a password wiped on replacement or drop.
+    encryption: Option<PptWriterEncryption>,
+    /// Inert modify password, wiped on replacement, clear, or drop.
+    modify_password: Option<PptWriterModifyPassword>,
+}
+
+struct PptWriterEncryption {
+    profile: PptEncryptionProfile,
+    password: Zeroizing<String>,
+}
+
+struct PptWriterModifyPassword {
+    password: Zeroizing<String>,
+}
+
+impl std::fmt::Debug for PptWriterModifyPassword {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PptWriterModifyPassword")
+            .field("utf16_units", &self.password.encode_utf16().count())
+            .field("password", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl PptWriter {
@@ -626,7 +712,120 @@ impl PptWriter {
             hyperlinks: HyperlinkCollection::new(),
             fonts: vec![FontEntity::arial()], // Default font
             custom_shows: Vec::new(),
+            slide_view_info: None,
+            notes_view_info: None,
+            presentation_header_footer: None,
+            notes_and_handouts_header_footer: None,
+            main_master_header_footer: None,
+            encryption: None,
+            modify_password: None,
         }
+    }
+
+    /// Protect the generated presentation with CryptoAPI password-to-open encryption.
+    ///
+    /// Validation is atomic: invalid input leaves any previous setting unchanged.
+    pub fn set_password(
+        &mut self,
+        password: impl Into<String>,
+        profile: PptEncryptionProfile,
+    ) -> Result<(), PptWriteError> {
+        let password = Zeroizing::new(password.into());
+        validate_writer_password(profile, password.as_str())
+            .map_err(PptWriteError::InvalidData)?;
+        self.encryption = Some(PptWriterEncryption { profile, password });
+        Ok(())
+    }
+
+    /// Remove password-to-open protection and wipe the stored password.
+    pub fn clear_password(&mut self) {
+        self.encryption = None;
+    }
+
+    /// Return the configured encryption profile without exposing the password.
+    pub fn encryption_profile(&self) -> Option<PptEncryptionProfile> {
+        self.encryption.as_ref().map(|value| value.profile)
+    }
+
+    /// Set the inert password required by PowerPoint to modify the presentation.
+    ///
+    /// The secret is stored in zeroizing memory. Password-to-open encryption
+    /// must also be configured before the presentation can be written.
+    /// Validation is atomic and does not replace an existing valid value.
+    pub fn set_modify_password(
+        &mut self,
+        password: impl Into<String>,
+    ) -> Result<(), PptWriteError> {
+        let password = Zeroizing::new(password.into());
+        validate_modify_password(password.as_str())
+            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+        self.modify_password = Some(PptWriterModifyPassword { password });
+        Ok(())
+    }
+
+    /// Remove the modify-password atom and wipe the stored secret.
+    pub fn clear_modify_password(&mut self) {
+        self.modify_password = None;
+    }
+
+    /// Return the configured value through the redacted typed password model.
+    pub fn modify_password(&self) -> Option<PowerPointModifyPassword> {
+        self.modify_password.as_ref().map(|value| {
+            PowerPointModifyPassword::new(value.password.as_str())
+                .expect("stored modify password was validated before assignment")
+        })
+    }
+
+    fn validate_encryption(&self) -> Result<(), PptWriteError> {
+        if self.modify_password.is_some() && self.encryption.is_none() {
+            return Err(PptWriteError::InvalidData(
+                "PowerPoint modify-password output requires password-to-open encryption"
+                    .to_string(),
+            ));
+        }
+        if let Some(value) = &self.encryption {
+            validate_writer_password(value.profile, value.password.as_str())
+                .map_err(PptWriteError::InvalidData)?;
+        }
+        if let Some(value) = &self.modify_password {
+            validate_modify_password(value.password.as_str())
+                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    fn build_modify_password_programmable_tag(&self) -> Result<Option<Vec<u8>>, PptWriteError> {
+        let Some(value) = &self.modify_password else {
+            return Ok(None);
+        };
+        validate_modify_password(value.password.as_str())
+            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+
+        let mut atom = RecordBuilder::new(0x00, 3, record_type::CSTRING);
+        let atom_data = value
+            .password
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>();
+        atom.write_data(&atom_data);
+        let mut blob = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
+        blob.write_child(&atom.build()?);
+        let mut binary_tag = RecordBuilder::new(0x0f, 0, record_type::PROG_BINARY_TAG);
+        let mut name = RecordBuilder::new(0x00, 0, record_type::CSTRING);
+        name.write_data(&Ppt10Tag::to_bytes());
+        binary_tag.write_child(&name.build()?);
+        binary_tag.write_child(&blob.build()?);
+        let mut tags = RecordBuilder::new(0x0f, 0, record_type::PROG_TAGS);
+        tags.write_child(&binary_tag.build()?);
+        Ok(Some(tags.build()?))
+    }
+
+    fn prepare_encryption(&self) -> Result<Option<WriterEncryptionMaterial>, PptWriteError> {
+        self.encryption
+            .as_ref()
+            .map(|value| prepare_writer_encryption(value.profile, value.password.as_str()))
+            .transpose()
+            .map_err(PptWriteError::InvalidData)
     }
 
     /// Add a new blank slide
@@ -642,6 +841,7 @@ impl PptWriter {
             notes_page: None,
             comments: Vec::new(),
             timing: None,
+            header_footer: None,
         });
         Ok(index)
     }
@@ -659,6 +859,7 @@ impl PptWriter {
             )));
         }
         self.slides.remove(index);
+        self.reindex_slide_header_footers();
         Ok(())
     }
 
@@ -677,7 +878,194 @@ impl PptWriter {
 
         let slide = self.slides.remove(from_index);
         self.slides.insert(to_index, slide);
+        self.reindex_slide_header_footers();
         Ok(())
+    }
+
+    fn validated_header_footer(
+        mut value: PowerPointHeaderFooter,
+        scope: PowerPointHeaderFooterScope,
+    ) -> Result<PowerPointHeaderFooter, PptWriteError> {
+        value.scope = scope;
+        value
+            .to_record_bytes()
+            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+        Ok(value)
+    }
+
+    fn reindex_slide_header_footers(&mut self) {
+        for (index, slide) in self.slides.iter_mut().enumerate() {
+            if let Some(value) = &mut slide.header_footer {
+                value.scope = PowerPointHeaderFooterScope::Local {
+                    parent: PowerPointHeaderFooterParent::Slide,
+                    parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(index),
+                };
+            }
+        }
+    }
+
+    fn serialize_header_footers(&self) -> Result<SerializedHeaderFooters, PptWriteError> {
+        let serialize = |value: Option<&PowerPointHeaderFooter>, scope| {
+            value
+                .map(|value| {
+                    let mut value = value.clone();
+                    value.scope = scope;
+                    value
+                        .to_record_bytes()
+                        .map_err(|error| PptWriteError::InvalidData(error.to_string()))
+                })
+                .transpose()
+        };
+        let presentation_slides = serialize(
+            self.presentation_header_footer.as_ref(),
+            PowerPointHeaderFooterScope::PresentationSlides,
+        )?;
+        let notes_and_handouts = serialize(
+            self.notes_and_handouts_header_footer.as_ref(),
+            PowerPointHeaderFooterScope::NotesAndHandouts,
+        )?;
+        let main_master = serialize(
+            self.main_master_header_footer.as_ref(),
+            PowerPointHeaderFooterScope::Local {
+                parent: PowerPointHeaderFooterParent::MainMaster,
+                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(0),
+            },
+        )?;
+        let slides = self
+            .slides
+            .iter()
+            .enumerate()
+            .map(|(index, slide)| {
+                serialize(
+                    slide.header_footer.as_ref(),
+                    PowerPointHeaderFooterScope::Local {
+                        parent: PowerPointHeaderFooterParent::Slide,
+                        parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(index),
+                    },
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(SerializedHeaderFooters {
+            presentation_slides,
+            notes_and_handouts,
+            main_master,
+            slides,
+        })
+    }
+
+    /// Set presentation-wide header/footer defaults for ordinary slides.
+    pub fn set_presentation_header_footer(
+        &mut self,
+        value: PowerPointHeaderFooter,
+    ) -> Result<(), PptWriteError> {
+        let value = Self::validated_header_footer(
+            value,
+            PowerPointHeaderFooterScope::PresentationSlides,
+        )?;
+        self.presentation_header_footer = Some(value);
+        Ok(())
+    }
+
+    /// Remove presentation-wide header/footer defaults for ordinary slides.
+    pub fn clear_presentation_header_footer(&mut self) {
+        self.presentation_header_footer = None;
+    }
+
+    /// Return presentation-wide header/footer defaults for ordinary slides.
+    pub fn presentation_header_footer(&self) -> Option<&PowerPointHeaderFooter> {
+        self.presentation_header_footer.as_ref()
+    }
+
+    /// Set presentation-wide header/footer defaults for notes pages and handouts.
+    pub fn set_notes_and_handouts_header_footer(
+        &mut self,
+        value: PowerPointHeaderFooter,
+    ) -> Result<(), PptWriteError> {
+        let value = Self::validated_header_footer(
+            value,
+            PowerPointHeaderFooterScope::NotesAndHandouts,
+        )?;
+        self.notes_and_handouts_header_footer = Some(value);
+        Ok(())
+    }
+
+    /// Remove presentation-wide header/footer defaults for notes pages and handouts.
+    pub fn clear_notes_and_handouts_header_footer(&mut self) {
+        self.notes_and_handouts_header_footer = None;
+    }
+
+    /// Return presentation-wide header/footer defaults for notes pages and handouts.
+    pub fn notes_and_handouts_header_footer(&self) -> Option<&PowerPointHeaderFooter> {
+        self.notes_and_handouts_header_footer.as_ref()
+    }
+
+    /// Set the header/footer defaults attached directly to the main master.
+    pub fn set_main_master_header_footer(
+        &mut self,
+        value: PowerPointHeaderFooter,
+    ) -> Result<(), PptWriteError> {
+        let value = Self::validated_header_footer(
+            value,
+            PowerPointHeaderFooterScope::Local {
+                parent: PowerPointHeaderFooterParent::MainMaster,
+                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(0),
+            },
+        )?;
+        self.main_master_header_footer = Some(value);
+        Ok(())
+    }
+
+    /// Remove the header/footer defaults attached directly to the main master.
+    pub fn clear_main_master_header_footer(&mut self) {
+        self.main_master_header_footer = None;
+    }
+
+    /// Return the header/footer defaults attached directly to the main master.
+    pub fn main_master_header_footer(&self) -> Option<&PowerPointHeaderFooter> {
+        self.main_master_header_footer.as_ref()
+    }
+
+    /// Set a header/footer override attached directly to one slide.
+    pub fn set_slide_header_footer(
+        &mut self,
+        slide: usize,
+        value: PowerPointHeaderFooter,
+    ) -> Result<(), PptWriteError> {
+        if slide >= self.slides.len() {
+            return Err(PptWriteError::InvalidData(format!(
+                "Slide {} does not exist",
+                slide
+            )));
+        }
+        let value = Self::validated_header_footer(
+            value,
+            PowerPointHeaderFooterScope::Local {
+                parent: PowerPointHeaderFooterParent::Slide,
+                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(slide),
+            },
+        )?;
+        self.slides[slide].header_footer = Some(value);
+        Ok(())
+    }
+
+    /// Remove a header/footer override attached directly to one slide.
+    pub fn clear_slide_header_footer(&mut self, slide: usize) -> Result<(), PptWriteError> {
+        let slide = self.slides.get_mut(slide).ok_or_else(|| {
+            PptWriteError::InvalidData(format!("Slide {} does not exist", slide))
+        })?;
+        slide.header_footer = None;
+        Ok(())
+    }
+
+    /// Return the header/footer override attached directly to one slide.
+    pub fn slide_header_footer(
+        &self,
+        slide: usize,
+    ) -> Result<Option<&PowerPointHeaderFooter>, PptWriteError> {
+        self.slides
+            .get(slide)
+            .map(|slide| slide.header_footer.as_ref())
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))
     }
 
     /// Add a text box to a slide
@@ -1374,6 +1762,69 @@ impl PptWriter {
         self.custom_shows.len()
     }
 
+    fn validate_view_info_kind(
+        view: &PowerPointSlideViewInfo,
+        expected: PowerPointViewKind,
+    ) -> Result<(), PptWriteError> {
+        view.to_bytes()
+            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+        if view.kind() != expected {
+            return Err(PptWriteError::InvalidData(format!(
+                "editing-view kind {:?} does not match {:?}",
+                view.kind(),
+                expected
+            )));
+        }
+        Ok(())
+    }
+
+    /// Set the presentation's slide editing-view preferences, zoom, and guides.
+    pub fn set_slide_view_info(
+        &mut self,
+        view: PowerPointSlideViewInfo,
+    ) -> Result<(), PptWriteError> {
+        Self::validate_view_info_kind(&view, PowerPointViewKind::Slide)?;
+        self.slide_view_info = Some(view);
+        Ok(())
+    }
+
+    /// Restore the writer's canonical default slide editing view.
+    pub fn clear_slide_view_info(&mut self) {
+        self.slide_view_info = None;
+    }
+
+    /// Return the explicit slide editing-view override, if present.
+    pub fn slide_view_info(&self) -> Option<&PowerPointSlideViewInfo> {
+        self.slide_view_info.as_ref()
+    }
+
+    /// Set the presentation's notes editing-view preferences, zoom, and guides.
+    pub fn set_notes_view_info(
+        &mut self,
+        view: PowerPointSlideViewInfo,
+    ) -> Result<(), PptWriteError> {
+        Self::validate_view_info_kind(&view, PowerPointViewKind::Notes)?;
+        self.notes_view_info = Some(view);
+        Ok(())
+    }
+
+    /// Remove the optional notes editing-view record.
+    pub fn clear_notes_view_info(&mut self) {
+        self.notes_view_info = None;
+    }
+
+    /// Return the explicit notes editing-view, if present.
+    pub fn notes_view_info(&self) -> Option<&PowerPointSlideViewInfo> {
+        self.notes_view_info.as_ref()
+    }
+
+    fn build_docinfo_list(&self) -> Result<Vec<u8>, PptWriteError> {
+        Ok(create_docinfo_list_container(
+            self.slide_view_info.as_ref(),
+            self.notes_view_info.as_ref(),
+        )?)
+    }
+
     /// Set a presentation property
     ///
     /// # Arguments
@@ -1406,6 +1857,9 @@ impl PptWriter {
     /// - Escher drawing containers - [MS-ODRAW] Section 2.2
     /// - PersistPtr directory - [MS-PPT] Section 2.4.16
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), PptWriteError> {
+        self.validate_encryption()?;
+        let modify_password_tag = self.build_modify_password_programmable_tag()?;
+        let header_footers = self.serialize_header_footers()?;
         // 1) We'll write DocumentContainer at stream offset 0
         let mut ppt_stream = Vec::new();
         let mut persist_builder = PersistPtrBuilder::new();
@@ -1461,8 +1915,15 @@ impl PptWriter {
         doc_container.write_child(&slwt_master);
 
         // 2.4) DocInfo List (0x07D0) before SlideListWithText (slides), per POI empty_textbox.ppt
-        let docinfo = create_docinfo_list_container_minimal()?;
+        let docinfo = self.build_docinfo_list()?;
         doc_container.write_child(&docinfo);
+
+        if let Some(value) = &header_footers.presentation_slides {
+            doc_container.write_child(value);
+        }
+        if let Some(value) = &header_footers.notes_and_handouts {
+            doc_container.write_child(value);
+        }
 
         // 2.5) SlideListWithText (SLIDES) referencing each slide by (persist id ref, slide identifier)
         let mut slide_persist_ids = Vec::with_capacity(self.slides.len());
@@ -1555,6 +2016,10 @@ impl PptWriter {
             }
         }
 
+        if let Some(value) = &modify_password_tag {
+            doc_container.write_child(value);
+        }
+
         // 2.6) EndDocument
         let end_doc = create_end_document()?;
         doc_container.write_child(&end_doc);
@@ -1566,7 +2031,10 @@ impl PptWriter {
         // 3) MainMaster then Slides (top-level after DocumentContainer)
         // 3.1) Write MainMaster using dynamically built PPDrawing (includes all placeholders)
         let master_ppdrawing = build_master_ppdrawing();
-        let master_container = create_main_master_container(&master_ppdrawing)?;
+        let mut master_container = create_main_master_container(&master_ppdrawing)?;
+        if let Some(value) = &header_footers.main_master {
+            append_child_to_built_container(&mut master_container, value)?;
+        }
         let master_offset = ppt_stream.len() as u32;
         persist_builder.set_offset(master_persist_id, master_offset);
         ppt_stream.extend_from_slice(&master_container);
@@ -1620,6 +2088,10 @@ impl PptWriter {
             if let Some(ref timing) = slide.timing {
                 let timing_record = super::slide_timing::build_slide_timing(timing)?;
                 slide_container.write_child(&timing_record);
+            }
+
+            if let Some(value) = &header_footers.slides[i] {
+                slide_container.write_child(value);
             }
 
             // ProgTags with PPT10 binary tag (PowerPoint 2002+ features)
@@ -1677,25 +2149,65 @@ impl PptWriter {
             }
         }
 
+        let mut pictures_stream = if self.blip_store.is_empty() {
+            None
+        } else {
+            Some(
+                self.blip_store
+                    .build_pictures_stream()
+                    .map_err(PptWriteError::Io)?,
+            )
+        };
+        let encryption = self.prepare_encryption()?;
+        let encryption_session_id = if let Some(encryption) = &encryption {
+            let persist_id = persist_builder.allocate_id();
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+            })?;
+            persist_builder.set_offset(persist_id, offset);
+            ppt_stream.extend_from_slice(&encryption.session_record);
+            Some(persist_id)
+        } else {
+            None
+        };
+
         // 4) PersistPtrIncrementalBlock (6002) then single UserEditAtom
         let persist_dir_offset = ppt_stream.len() as u32;
         let persist_dir_block = persist_builder.generate_record();
         ppt_stream.extend_from_slice(&persist_dir_block);
 
-        let user_edit = UserEditAtom::new_minimal(
+        let mut user_edit = UserEditAtom::new_minimal(
             persist_dir_offset,
             doc_persist_id,
             persist_builder.persist_id_seed(),
             self.slides.len() as u32,
         );
+        if let Some(session_id) = encryption_session_id {
+            user_edit = user_edit.with_encryption_session(session_id);
+        }
         let user_edit_offset = ppt_stream.len() as u32;
         let user_edit_record = user_edit.generate_record();
         ppt_stream.extend_from_slice(&user_edit_record);
 
         // 5) Build Current User and property streams
-        let current_user = build_current_user_stream(user_edit_offset);
+        let current_user = build_current_user_stream(user_edit_offset, encryption.is_some());
         let summary_info = build_summary_information_stream();
         let doc_summary = build_document_summary_information_stream();
+
+        if let (Some(encryption), Some(session_id)) = (&encryption, encryption_session_id) {
+            encrypt_powerpoint_document_for_write(
+                &mut ppt_stream,
+                persist_dir_offset as usize,
+                user_edit_offset as usize,
+                session_id,
+                &encryption.crypto,
+            )
+            .map_err(PptWriteError::InvalidData)?;
+            if let Some(pictures) = &mut pictures_stream {
+                encrypt_pictures_for_write(pictures, &encryption.crypto)
+                    .map_err(PptWriteError::InvalidData)?;
+            }
+        }
 
         // 6) Write OLE streams
         let mut ole_writer = OleWriter::new();
@@ -1710,12 +2222,8 @@ impl PptWriter {
         ole_writer.create_stream(&["\u{0005}DocumentSummaryInformation"], &doc_summary)?;
 
         // Pictures stream (per POI: separate stream for BLIP data)
-        if !self.blip_store.is_empty() {
-            let pictures_stream = self
-                .blip_store
-                .build_pictures_stream()
-                .map_err(PptWriteError::Io)?;
-            ole_writer.create_stream(&["Pictures"], &pictures_stream)?;
+        if let Some(pictures_stream) = &pictures_stream {
+            ole_writer.create_stream(&["Pictures"], pictures_stream)?;
         }
 
         ole_writer.save(path)?;
@@ -1736,6 +2244,9 @@ impl PptWriter {
         &mut self,
         writer: &mut W,
     ) -> Result<(), PptWriteError> {
+        self.validate_encryption()?;
+        let modify_password_tag = self.build_modify_password_programmable_tag()?;
+        let header_footers = self.serialize_header_footers()?;
         // Same logic as save(), but writing to provided writer
         let mut ppt_stream = Vec::new();
         let mut persist_builder = PersistPtrBuilder::new();
@@ -1787,8 +2298,15 @@ impl PptWriter {
         doc_container.write_child(&slwt_master);
 
         // DocInfo List before SlideListWithText (slides), matching POI empty_textbox.ppt
-        let docinfo = create_docinfo_list_container_minimal()?;
+        let docinfo = self.build_docinfo_list()?;
         doc_container.write_child(&docinfo);
+
+        if let Some(value) = &header_footers.presentation_slides {
+            doc_container.write_child(value);
+        }
+        if let Some(value) = &header_footers.notes_and_handouts {
+            doc_container.write_child(value);
+        }
 
         // SlideListWithText (SLIDES) for non-empty presentations
         let mut slide_persist_ids = Vec::with_capacity(self.slides.len());
@@ -1858,6 +2376,11 @@ impl PptWriter {
             }
         }
 
+
+        if let Some(value) = &modify_password_tag {
+            doc_container.write_child(value);
+        }
+
         let end_doc = create_end_document()?;
         doc_container.write_child(&end_doc);
 
@@ -1868,7 +2391,10 @@ impl PptWriter {
         // Then write MainMaster and slides as top-level records
         // MainMaster using dynamically built PPDrawing (includes all placeholders)
         let master_ppdrawing = build_master_ppdrawing();
-        let master_container = create_main_master_container(&master_ppdrawing)?;
+        let mut master_container = create_main_master_container(&master_ppdrawing)?;
+        if let Some(value) = &header_footers.main_master {
+            append_child_to_built_container(&mut master_container, value)?;
+        }
         let master_offset = ppt_stream.len() as u32;
         persist_builder.set_offset(master_persist_id, master_offset);
         ppt_stream.extend_from_slice(&master_container);
@@ -1911,6 +2437,10 @@ impl PptWriter {
                 slide_container.write_child(&timing_record);
             }
 
+            if let Some(value) = &header_footers.slides[i] {
+                slide_container.write_child(value);
+            }
+
             // ProgTags with PPT10 binary tag
             let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
             let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
@@ -1938,24 +2468,64 @@ impl PptWriter {
         // 3.3) Notes containers - DISABLED for testing
         // Notes need more work - SlideListWithText instance=2, proper linking
 
+        let mut pictures_stream = if self.blip_store.is_empty() {
+            None
+        } else {
+            Some(
+                self.blip_store
+                    .build_pictures_stream()
+                    .map_err(PptWriteError::Io)?,
+            )
+        };
+        let encryption = self.prepare_encryption()?;
+        let encryption_session_id = if let Some(encryption) = &encryption {
+            let persist_id = persist_builder.allocate_id();
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+            })?;
+            persist_builder.set_offset(persist_id, offset);
+            ppt_stream.extend_from_slice(&encryption.session_record);
+            Some(persist_id)
+        } else {
+            None
+        };
+
         // PersistPtrHolder and UserEditAtom
         let persist_dir_offset = ppt_stream.len() as u32;
         let persist_dir_block = persist_builder.generate_record();
         ppt_stream.extend_from_slice(&persist_dir_block);
 
-        let user_edit = UserEditAtom::new_minimal(
+        let mut user_edit = UserEditAtom::new_minimal(
             persist_dir_offset,
             doc_persist_id,
             persist_builder.persist_id_seed(),
             self.slides.len() as u32,
         );
+        if let Some(session_id) = encryption_session_id {
+            user_edit = user_edit.with_encryption_session(session_id);
+        }
         let user_edit_offset = ppt_stream.len() as u32;
         let user_edit_record = user_edit.generate_record();
         ppt_stream.extend_from_slice(&user_edit_record);
 
-        let current_user = build_current_user_stream(user_edit_offset);
+        let current_user = build_current_user_stream(user_edit_offset, encryption.is_some());
         let summary_info = build_summary_information_stream();
         let doc_summary = build_document_summary_information_stream();
+
+        if let (Some(encryption), Some(session_id)) = (&encryption, encryption_session_id) {
+            encrypt_powerpoint_document_for_write(
+                &mut ppt_stream,
+                persist_dir_offset as usize,
+                user_edit_offset as usize,
+                session_id,
+                &encryption.crypto,
+            )
+            .map_err(PptWriteError::InvalidData)?;
+            if let Some(pictures) = &mut pictures_stream {
+                encrypt_pictures_for_write(pictures, &encryption.crypto)
+                    .map_err(PptWriteError::InvalidData)?;
+            }
+        }
 
         let mut ole_writer = OleWriter::new();
         ole_writer.set_root_clsid([
@@ -1968,12 +2538,8 @@ impl PptWriter {
         ole_writer.create_stream(&["\u{0005}DocumentSummaryInformation"], &doc_summary)?;
 
         // Pictures stream (per POI: separate stream for BLIP data)
-        if !self.blip_store.is_empty() {
-            let pictures_stream = self
-                .blip_store
-                .build_pictures_stream()
-                .map_err(PptWriteError::Io)?;
-            ole_writer.create_stream(&["Pictures"], &pictures_stream)?;
+        if let Some(pictures_stream) = &pictures_stream {
+            ole_writer.create_stream(&["Pictures"], pictures_stream)?;
         }
 
         ole_writer.write_to(writer)?;

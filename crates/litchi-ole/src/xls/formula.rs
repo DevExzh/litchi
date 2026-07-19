@@ -1,9 +1,11 @@
 //! BIFF8 formula token rendering.
 //!
 //! Formula expressions are stored as reverse-Polish `Ptg` token streams.  This
-//! renderer intentionally handles only tokens that can be interpreted without
-//! workbook-global tables.  Callers retain the original bytes when rendering
-//! returns `None`, so unsupported names and 3-D references remain lossless.
+//! renderer resolves workbook-dependent names and 3-D references through a
+//! bounded, inert context. Callers retain the original bytes when rendering
+//! returns `None`, so malformed or unsupported expressions remain lossless.
+
+use super::external_link::{XlsExternalLinks, XlsExternalNameBody};
 
 /// Workbook-global context needed to resolve BIFF `ixti` sheet references.
 #[derive(Debug, Default)]
@@ -11,13 +13,27 @@ pub(crate) struct FormulaContext {
     sup_books: Vec<SupBookKind>,
     extern_sheets: Vec<ExternSheetRef>,
     sheet_names: Vec<String>,
-    defined_names: Vec<Option<String>>,
+    defined_names: Vec<Option<FormulaDefinedName>>,
+    external_names: Vec<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FormulaDefinedName {
+    name: String,
+    sheet_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum SupBookKind {
     Internal,
+    External(ExternalSupBook),
     Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExternalSupBook {
+    workbook: String,
+    sheet_names: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,6 +47,8 @@ impl FormulaContext {
     pub(crate) fn add_sup_book(&mut self, data: &[u8]) {
         let kind = if data.len() == 4 && data[2..4] == [0x01, 0x04] {
             SupBookKind::Internal
+        } else if let Some(external) = parse_external_sup_book(data) {
+            SupBookKind::External(external)
         } else {
             SupBookKind::Other
         };
@@ -62,39 +80,198 @@ impl FormulaContext {
         self.sheet_names = sheet_names;
     }
 
-    pub(crate) fn set_defined_names(&mut self, defined_names: Vec<Option<String>>) {
-        self.defined_names = defined_names;
+    pub(crate) fn set_scoped_defined_names(
+        &mut self,
+        defined_names: Vec<Option<(String, Option<usize>)>>,
+    ) {
+        self.defined_names = defined_names
+            .into_iter()
+            .map(|name| name.map(|(name, sheet_index)| FormulaDefinedName { name, sheet_index }))
+            .collect();
+    }
+
+    pub(crate) fn set_external_links(&mut self, links: &XlsExternalLinks) {
+        self.external_names = vec![Vec::new(); links.supporting_books().len()];
+        for external_name in links.external_names() {
+            let name = match external_name.body() {
+                XlsExternalNameBody::ExternalDefinedName { name, .. }
+                | XlsExternalNameBody::AddInFunction { name, .. }
+                | XlsExternalNameBody::DdeOrOle { name, .. }
+                | XlsExternalNameBody::DdeStandardDocumentName { name } => name,
+            };
+            let Some(book_names) = self
+                .external_names
+                .get_mut(usize::from(external_name.supporting_book_index()))
+            else {
+                continue;
+            };
+            book_names.push(name.clone());
+        }
     }
 
     fn defined_name(&self, one_based_index: u32) -> Option<&str> {
         let index = usize::try_from(one_based_index.checked_sub(1)?).ok()?;
-        self.defined_names.get(index)?.as_deref()
+        Some(self.defined_names.get(index)?.as_ref()?.name.as_str())
+    }
+
+    fn name_x(&self, extern_sheet: u16, one_based_index: u16) -> Option<String> {
+        let reference = self.extern_sheets.get(usize::from(extern_sheet))?;
+        let name_index = usize::from(one_based_index.checked_sub(1)?);
+        if let Some(name) = self
+            .external_names
+            .get(usize::from(reference.sup_book))
+            .and_then(|names| names.get(name_index))
+        {
+            return Some(name.clone());
+        }
+        if reference.first_sheet != -2 || reference.last_sheet != -2 {
+            return None;
+        }
+        let name = self.defined_names.get(name_index)?.as_ref()?;
+        match name.sheet_index {
+            Some(sheet_index) => {
+                let sheet_name = escape_formula_name(self.sheet_names.get(sheet_index)?);
+                Some(format!("'{sheet_name}'!{}", name.name))
+            },
+            None => Some(name.name.clone()),
+        }
     }
 
     fn sheet_prefix(&self, extern_sheet: u16) -> Option<String> {
         let reference = self.extern_sheets.get(usize::from(extern_sheet))?;
-        if self.sup_books.get(usize::from(reference.sup_book))? != &SupBookKind::Internal {
-            return None;
-        }
         let first = usize::try_from(reference.first_sheet).ok()?;
         let last = usize::try_from(reference.last_sheet).ok()?;
-        let first_name = self.sheet_names.get(first)?;
-        let last_name = self.sheet_names.get(last)?;
-        let name = if first == last {
-            escape_sheet_name(first_name)
-        } else {
-            format!(
-                "{}:{}",
-                escape_sheet_name(first_name),
-                escape_sheet_name(last_name)
-            )
-        };
-        Some(format!("'{name}'!"))
+        match self.sup_books.get(usize::from(reference.sup_book))? {
+            SupBookKind::Internal => {
+                let first_name = self.sheet_names.get(first)?;
+                let last_name = self.sheet_names.get(last)?;
+                let name = if first == last {
+                    escape_formula_name(first_name)
+                } else {
+                    format!(
+                        "{}:{}",
+                        escape_formula_name(first_name),
+                        escape_formula_name(last_name)
+                    )
+                };
+                Some(format!("'{name}'!"))
+            },
+            SupBookKind::External(external) => {
+                let first_name = external.sheet_names.get(first)?;
+                let last_name = external.sheet_names.get(last)?;
+                let workbook = external.workbook.replace('[', "(").replace(']', ")");
+                let workbook = escape_formula_name(&workbook);
+                let first_name = escape_formula_name(first_name);
+                if first == last {
+                    Some(format!("'[{workbook}]{first_name}'!"))
+                } else {
+                    let last_name = escape_formula_name(last_name);
+                    Some(format!("'[{workbook}]{first_name}:{last_name}'!"))
+                }
+            },
+            SupBookKind::Other => None,
+        }
     }
 }
 
-fn escape_sheet_name(name: &str) -> String {
+fn escape_formula_name(name: &str) -> String {
     name.replace('\'', "''")
+}
+
+fn parse_external_sup_book(data: &[u8]) -> Option<ExternalSupBook> {
+    if data.len() <= 4 {
+        return None;
+    }
+    let sheet_count = usize::from(u16::from_le_bytes([*data.first()?, *data.get(1)?]));
+    let (encoded_workbook, mut offset) = parse_biff_unicode_string(data, 2)?;
+    let workbook = decode_sup_book_url(&encoded_workbook)?;
+    let mut sheet_names = Vec::with_capacity(sheet_count);
+    for _ in 0..sheet_count {
+        let (sheet_name, next) = parse_biff_unicode_string(data, offset)?;
+        if sheet_name.is_empty()
+            || sheet_name
+                .chars()
+                .any(|character| matches!(character, '\0' | '\r' | '\n'))
+        {
+            return None;
+        }
+        sheet_names.push(sheet_name);
+        offset = next;
+    }
+    if offset != data.len() {
+        return None;
+    }
+    Some(ExternalSupBook {
+        workbook,
+        sheet_names,
+    })
+}
+
+fn parse_biff_unicode_string(data: &[u8], offset: usize) -> Option<(String, usize)> {
+    let header = data.get(offset..offset.checked_add(3)?)?;
+    let count = usize::from(u16::from_le_bytes([header[0], header[1]]));
+    let flags = header[2];
+    if flags & !1 != 0 {
+        return None;
+    }
+    let width = if flags == 0 { 1usize } else { 2 };
+    let start = offset.checked_add(3)?;
+    let end = start.checked_add(count.checked_mul(width)?)?;
+    let bytes = data.get(start..end)?;
+    let value = if width == 1 {
+        bytes.iter().map(|byte| char::from(*byte)).collect()
+    } else {
+        let units = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units).ok()?
+    };
+    Some((value, end))
+}
+
+fn decode_sup_book_url(encoded: &str) -> Option<String> {
+    const ENCODED_FILE: char = '\u{1}';
+    const SELF_REFERENCE: char = '\u{2}';
+    const EMPTY_WORKBOOK: char = '\0';
+    const SAME_VOLUME: char = '\u{2}';
+    const DOWN_DIRECTORY: char = '\u{3}';
+    const UP_DIRECTORY: char = '\u{4}';
+    const LONG_VOLUME: char = '\u{5}';
+    const STARTUP_DIRECTORY: char = '\u{6}';
+    const ALTERNATE_STARTUP_DIRECTORY: char = '\u{7}';
+    const LIBRARY_DIRECTORY: char = '\u{8}';
+
+    let mut characters = encoded.chars();
+    match characters.next()? {
+        EMPTY_WORKBOOK | SELF_REFERENCE => Some(characters.collect()),
+        ENCODED_FILE => {
+            let mut output = String::with_capacity(encoded.len());
+            while let Some(character) = characters.next() {
+                match character {
+                    ENCODED_FILE => {
+                        let volume = characters.next()?;
+                        if volume == '@' {
+                            output.push_str("\\\\");
+                        } else {
+                            output.push(volume);
+                            output.push(':');
+                        }
+                    },
+                    SAME_VOLUME | DOWN_DIRECTORY => output.push('\\'),
+                    UP_DIRECTORY => output.push_str("..\\"),
+                    LONG_VOLUME => {},
+                    STARTUP_DIRECTORY | ALTERNATE_STARTUP_DIRECTORY | LIBRARY_DIRECTORY => {
+                        output.push_str(".\\");
+                    },
+                    '\0' | '\r' | '\n' => return None,
+                    other => output.push(other),
+                }
+            }
+            Some(output)
+        },
+        _ => None,
+    }
 }
 
 /// Render a BIFF8 formula token stream in A1 notation.
@@ -129,6 +306,7 @@ struct FormulaDecoder<'a> {
     data: &'a [u8],
     pos: usize,
     stack: Vec<String>,
+    name_x_operands: Vec<usize>,
     context: Option<&'a FormulaContext>,
     shared_origin: Option<(u16, u16)>,
 }
@@ -143,6 +321,7 @@ impl<'a> FormulaDecoder<'a> {
             data,
             pos: 0,
             stack: Vec::new(),
+            name_x_operands: Vec::new(),
             context,
             shared_origin,
         }
@@ -249,17 +428,26 @@ impl<'a> FormulaDecoder<'a> {
         match base {
             0x21 => {
                 let index = self.u16()?;
-                let (name, fixed_args) = function_metadata(index).ok_or(())?;
-                self.function(name, fixed_args.ok_or(())?)
+                let metadata = function_metadata(index).ok_or(())?;
+                self.function(metadata.name, metadata.fixed_arity().ok_or(())?)
             },
             0x22 => {
                 let args = self.byte()? as usize;
                 let raw_index = self.u16()?;
-                if raw_index & 0xf000 != 0 {
+                if raw_index == 255 {
+                    return self.external_function(args);
+                }
+                const COMMAND_EQUIVALENT_BIT: u16 = 0x8000;
+                let index = raw_index & !COMMAND_EQUIVALENT_BIT;
+                if raw_index & COMMAND_EQUIVALENT_BIT != 0 {
+                    let name = command_function_name(index).ok_or(())?;
+                    return self.function(name, args);
+                }
+                let metadata = function_metadata(index).ok_or(())?;
+                if !metadata.accepts_arity(args) {
                     return Err(());
                 }
-                let (name, _) = function_metadata(raw_index).ok_or(())?;
-                self.function(name, args)
+                self.function(metadata.name, args)
             },
             0x23 => {
                 let index = self.u32()?;
@@ -316,6 +504,20 @@ impl<'a> FormulaDecoder<'a> {
                 let first = cell_reference(first_row, first_col)?;
                 let last = cell_reference(last_row, last_col)?;
                 self.stack.push(format!("{first}:{last}"));
+                Ok(())
+            },
+            0x39 => {
+                let extern_sheet = self.u16()?;
+                let name_index = self.u16()?;
+                if self.u16()? != 0 {
+                    return Err(());
+                }
+                let name = self
+                    .context
+                    .and_then(|context| context.name_x(extern_sheet, name_index))
+                    .ok_or(())?;
+                self.name_x_operands.push(self.stack.len());
+                self.stack.push(name);
                 Ok(())
             },
             0x3a => {
@@ -416,7 +618,25 @@ impl<'a> FormulaDecoder<'a> {
             return Err(());
         }
         let start = self.stack.len() - count;
+        self.name_x_operands.retain(|operand| *operand < start);
         let args = self.stack.split_off(start);
+        self.stack.push(format!("{name}({})", args.join(",")));
+        Ok(())
+    }
+
+    fn external_function(&mut self, count: usize) -> Result<(), ()> {
+        if count == 0 || self.stack.len() < count {
+            return Err(());
+        }
+        let start = self.stack.len() - count;
+        if !self.name_x_operands.contains(&start) {
+            return Err(());
+        }
+        self.name_x_operands.retain(|operand| *operand < start);
+        let operands = self.stack.split_off(start);
+        let mut operands = operands.into_iter();
+        let name = operands.next().ok_or(())?;
+        let args = operands.collect::<Vec<_>>();
         self.stack.push(format!("{name}({})", args.join(",")));
         Ok(())
     }
@@ -442,6 +662,8 @@ impl<'a> FormulaDecoder<'a> {
     }
 
     fn pop(&mut self) -> Result<String, ()> {
+        let index = self.stack.len().checked_sub(1).ok_or(())?;
+        self.name_x_operands.retain(|operand| *operand != index);
         self.stack.pop().ok_or(())
     }
 
@@ -533,27 +755,7 @@ fn column_name(mut column: usize) -> String {
     }
 }
 
-/// Names and fixed arities for the writer's currently supported built-ins.
-/// A `None` arity denotes a variable-argument function.
-fn function_metadata(index: u16) -> Option<(&'static str, Option<usize>)> {
-    match index {
-        0 => Some(("COUNT", None)),
-        1 => Some(("IF", None)),
-        4 => Some(("SUM", None)),
-        5 => Some(("AVERAGE", None)),
-        6 => Some(("MIN", None)),
-        7 => Some(("MAX", None)),
-        24 => Some(("ABS", Some(1))),
-        27 => Some(("ROUND", Some(2))),
-        31 => Some(("MID", Some(3))),
-        32 => Some(("LEN", Some(1))),
-        102 => Some(("VLOOKUP", None)),
-        115 => Some(("LEFT", None)),
-        116 => Some(("RIGHT", None)),
-        336 => Some(("CONCATENATE", None)),
-        _ => None,
-    }
-}
+include!("formula_function_metadata.rs");
 
 #[cfg(test)]
 mod tests {
@@ -654,7 +856,7 @@ mod tests {
     #[test]
     fn renders_one_based_internal_name_without_expanding_it() {
         let mut context = FormulaContext::default();
-        context.set_defined_names(vec![None, Some("TaxRate".to_string())]);
+        context.set_scoped_defined_names(vec![None, Some(("TaxRate".to_string(), None))]);
         assert_eq!(
             render_formula(&[0x23, 2, 0, 0, 0], Some(&context)).as_deref(),
             Some("=TaxRate")
@@ -693,5 +895,173 @@ mod tests {
         );
         assert_eq!(ptg_exp_anchor(&[0x01, 5, 0, 3, 0]), Some((5, 3)));
         assert_eq!(ptg_exp_anchor(&[0x01, 5, 0]), None);
+    }
+
+    fn push_biff_unicode(data: &mut Vec<u8>, value: &str) {
+        let units = value.encode_utf16().collect::<Vec<_>>();
+        data.extend_from_slice(&(units.len() as u16).to_le_bytes());
+        let compressed = units.iter().all(|unit| *unit <= 0xff);
+        data.push(u8::from(!compressed));
+        for unit in units {
+            if compressed {
+                data.push(unit as u8);
+            } else {
+                data.extend_from_slice(&unit.to_le_bytes());
+            }
+        }
+    }
+
+    #[test]
+    fn renders_inert_external_workbook_cell_and_sheet_range_references() {
+        let mut sup_book = 2u16.to_le_bytes().to_vec();
+        push_biff_unicode(&mut sup_book, "\u{1}\u{1}C\u{3}Book.xls");
+        push_biff_unicode(&mut sup_book, "Data One");
+        push_biff_unicode(&mut sup_book, "Data Two");
+        let mut context = FormulaContext::default();
+        context.add_sup_book(&sup_book);
+        context
+            .add_extern_sheet(&[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
+            .unwrap();
+
+        assert_eq!(
+            render_formula(&[0x3a, 0, 0, 0, 0, 0, 0], Some(&context)).as_deref(),
+            Some("='[C:\\Book.xls]Data One'!$A$1")
+        );
+        assert_eq!(
+            render_formula(&[0x3b, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0], Some(&context)).as_deref(),
+            Some("='[C:\\Book.xls]Data One:Data Two'!$A$1:$B$2")
+        );
+    }
+
+    #[test]
+    fn malformed_or_add_in_sup_books_remain_lossless_and_unrendered() {
+        let mut malformed = 1u16.to_le_bytes().to_vec();
+        malformed.extend_from_slice(&[1, 0, 0x80, b'X']);
+        let mut context = FormulaContext::default();
+        context.add_sup_book(&malformed);
+        context.add_sup_book(&[1, 0, 1, 0x3a]);
+        context
+            .add_extern_sheet(&[2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0xff, 0xff, 0xff, 0xff])
+            .unwrap();
+        assert_eq!(
+            render_formula(&[0x3a, 0, 0, 0, 0, 0, 0], Some(&context)),
+            None
+        );
+        assert_eq!(
+            render_formula(&[0x3a, 1, 0, 0, 0, 0, 0], Some(&context)),
+            None
+        );
+    }
+
+    #[test]
+    fn renders_external_and_internal_name_x_tokens_by_contextual_index() {
+        let mut external = FormulaContext::default();
+        external.add_sup_book(&[1, 0, 1, 0x3a]);
+        external
+            .add_extern_sheet(&[1, 0, 0, 0, 0xfe, 0xff, 0xfe, 0xff])
+            .unwrap();
+        external.external_names = vec![vec!["ISODD".to_string(), "RemoteName".to_string()]];
+        assert_eq!(
+            render_formula(&[0x59, 0, 0, 2, 0, 0, 0], Some(&external)).as_deref(),
+            Some("=RemoteName")
+        );
+
+        let mut internal = FormulaContext::default();
+        internal.add_sup_book(&[1, 0, 1, 4]);
+        internal
+            .add_extern_sheet(&[1, 0, 0, 0, 0xfe, 0xff, 0xfe, 0xff])
+            .unwrap();
+        internal.set_sheet_names(vec!["Data One".to_string()]);
+        internal.set_scoped_defined_names(vec![Some(("LocalRate".to_string(), Some(0)))]);
+        assert_eq!(
+            render_formula(&[0x39, 0, 0, 1, 0, 0, 0], Some(&internal)).as_deref(),
+            Some("='Data One'!LocalRate")
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_name_x_indices_and_reserved_field() {
+        let mut context = FormulaContext::default();
+        context.add_sup_book(&[1, 0, 1, 0x3a]);
+        context
+            .add_extern_sheet(&[1, 0, 0, 0, 0xfe, 0xff, 0xfe, 0xff])
+            .unwrap();
+        context.external_names = vec![vec!["Fn".to_string()]];
+        for tokens in [
+            [0x39, 0, 0, 0, 0, 0, 0],
+            [0x39, 0, 0, 2, 0, 0, 0],
+            [0x39, 0, 0, 1, 0, 1, 0],
+        ] {
+            assert_eq!(render_formula(&tokens, Some(&context)), None);
+        }
+    }
+
+    #[test]
+    fn renders_inert_add_in_functions_from_name_x_and_func_var() {
+        let mut context = FormulaContext::default();
+        context.add_sup_book(&[1, 0, 1, 0x3a]);
+        context
+            .add_extern_sheet(&[1, 0, 0, 0, 0xfe, 0xff, 0xfe, 0xff])
+            .unwrap();
+        context.external_names = vec![vec!["ISODD".to_string()]];
+
+        assert_eq!(
+            render_formula(
+                &[
+                    0x39, 0, 0, 1, 0, 0, 0, // NameX ISODD
+                    0x1e, 3, 0, // integer 3
+                    0x42, 2, 0xff, 0, // external FuncVar with two operands
+                ],
+                Some(&context),
+            )
+            .as_deref(),
+            Some("=ISODD(3)")
+        );
+        assert_eq!(
+            render_formula(
+                &[
+                    0x39, 0, 0, 1, 0, 0, 0, // NameX ISODD
+                    0x42, 1, 0xff, 0, // external FuncVar with no call arguments
+                ],
+                Some(&context),
+            )
+            .as_deref(),
+            Some("=ISODD()")
+        );
+    }
+
+    #[test]
+    fn rejects_external_func_var_without_leading_name_x() {
+        assert_eq!(render_formula(&[0x1e, 3, 0, 0x42, 1, 0xff, 0], None), None);
+        assert_eq!(render_formula(&[0x42, 0, 0xff, 0], None), None);
+    }
+
+    #[test]
+    fn renders_complete_biff_builtin_metadata_and_checks_arity() {
+        assert_eq!(
+            render_formula(&[0x1e, 0, 0, 0x41, 15, 0], None).as_deref(),
+            Some("=SIN(0)")
+        );
+        assert_eq!(
+            render_formula(&[0x1e, 2, 0, 0x1e, 8, 0, 0x41, 0x51, 0x01], None,).as_deref(),
+            Some("=POWER(2,8)")
+        );
+        assert_eq!(
+            render_formula(&[0x1e, 2, 0, 0x1e, 8, 0, 0x42, 2, 0xe3, 0], None,).as_deref(),
+            Some("=MEDIAN(2,8)")
+        );
+        assert_eq!(
+            render_formula(&[0x1e, 1, 0, 0x1e, 2, 0, 0x42, 2, 102, 0], None),
+            None
+        );
+    }
+
+    #[test]
+    fn renders_command_equivalents_as_inert_text_only() {
+        assert_eq!(
+            render_formula(&[0x42, 0, 0, 0x80], None).as_deref(),
+            Some("=BEEP()")
+        );
+        assert_eq!(render_formula(&[0x42, 0, 0x29, 0x83], None), None);
     }
 }

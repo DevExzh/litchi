@@ -1143,12 +1143,15 @@ pub fn write_default_selection<W: Write>(
     Ok(())
 }
 
-pub fn write_pivot_window2<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub fn write_pivot_window2<W: Write>(writer: &mut W, selected: bool) -> XlsResult<()> {
+    const FLAGS: u16 = 0x00B6;
     static DATA: &[u8] = &[
-        0xB6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11,
-        0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00,
+        0x00, 0x00,
     ];
-    write_record_header(writer, 0x023E, DATA.len() as u16)?;
+    write_record_header(writer, 0x023E, 18)?;
+    let flags = FLAGS | if selected { 0x0200 } else { 0 };
+    writer.write_all(&flags.to_le_bytes())?;
     writer.write_all(DATA)?;
     Ok(())
 }

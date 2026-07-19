@@ -80,6 +80,9 @@ use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
 use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 use crate::doc::CommentDateTime;
+use crate::doc::encryption::{
+    DocEncryptionProfile, encrypt_document_streams_for_write, validate_writer_password,
+};
 use crate::doc::parts::pap::{
     AutoNumberAlignment, Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle,
     Borders as ParagraphBorders, DropCap, FontAlignment, FrameAnchor, FrameHeight,
@@ -88,9 +91,11 @@ use crate::doc::parts::pap::{
     LegacyBorderStyle, PhysicalJustification, Shading as ParagraphShading, TabAlignment, TabLeader,
     TabStop, TextBoxTightWrap,
 };
+use crate::doc::parts::{list_names::ListNamesTable, list_templates::ListTemplateTable};
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
+use zeroize::Zeroizing;
 
 /// Error type for DOC writing
 #[derive(Debug)]
@@ -139,6 +144,138 @@ fn utf16_code_unit_len(text: &str) -> Result<u32, DocWriteError> {
     Ok(length)
 }
 
+const MAX_HEADER_FOOTER_PARAGRAPHS: usize = 65_535;
+const MAX_HEADER_FOOTER_RUNS: usize = 65_535;
+const MAX_HEADER_FIELD_DEPTH: usize = 128;
+
+#[derive(Default)]
+struct HeaderFieldState {
+    separator_seen: Vec<bool>,
+}
+
+impl HeaderFieldState {
+    fn observe(
+        &mut self,
+        character: char,
+        formatting: &CharacterFormatting,
+    ) -> Result<bool, DocWriteError> {
+        if !matches!(character as u32, 0x0013..=0x0015) {
+            return Ok(false);
+        }
+        if formatting.special != Some(true) {
+            return Err(DocWriteError::InvalidData(
+                "DOC header/footer field marker requires fSpec formatting".to_string(),
+            ));
+        }
+        match character as u32 {
+            0x0013 => {
+                if self.separator_seen.len() >= MAX_HEADER_FIELD_DEPTH {
+                    return Err(DocWriteError::InvalidData(
+                        "DOC header/footer field nesting exceeds the limit".to_string(),
+                    ));
+                }
+                self.separator_seen.push(false);
+            },
+            0x0014 => {
+                let seen = self.separator_seen.last_mut().ok_or_else(|| {
+                    DocWriteError::InvalidData(
+                        "DOC header/footer field separator has no begin marker".to_string(),
+                    )
+                })?;
+                if *seen {
+                    return Err(DocWriteError::InvalidData(
+                        "DOC header/footer field has duplicate separators".to_string(),
+                    ));
+                }
+                *seen = true;
+            },
+            0x0015 => {
+                self.separator_seen.pop().ok_or_else(|| {
+                    DocWriteError::InvalidData(
+                        "DOC header/footer field end has no begin marker".to_string(),
+                    )
+                })?;
+            },
+            _ => unreachable!(),
+        }
+        Ok(true)
+    }
+
+    fn finish(self) -> Result<(), DocWriteError> {
+        if self.separator_seen.is_empty() {
+            Ok(())
+        } else {
+            Err(DocWriteError::InvalidData(
+                "DOC header/footer field is not terminated within its story".to_string(),
+            ))
+        }
+    }
+}
+
+fn checked_text_fc(text_fc_start: u32, stream_length: usize) -> Result<u32, DocWriteError> {
+    let stream_length = u32::try_from(stream_length).map_err(|_| {
+        DocWriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
+    })?;
+    text_fc_start
+        .checked_add(stream_length)
+        .ok_or_else(|| DocWriteError::InvalidData("DOC text stream FC range overflows".to_string()))
+}
+
+fn validate_header_footer_paragraphs(
+    paragraphs: &[HeaderFooterParagraph],
+) -> Result<(), DocWriteError> {
+    if paragraphs.is_empty() {
+        return Err(DocWriteError::InvalidData(
+            "DOC header/footer story requires at least one paragraph".to_string(),
+        ));
+    }
+    if paragraphs.len() > MAX_HEADER_FOOTER_PARAGRAPHS {
+        return Err(DocWriteError::InvalidData(
+            "DOC header/footer story exceeds the paragraph limit".to_string(),
+        ));
+    }
+
+    let mut run_count = 0usize;
+    let mut character_count = 1u32; // Inter-story guard paragraph mark.
+    let mut field_state = HeaderFieldState::default();
+    for paragraph in paragraphs {
+        run_count = run_count.checked_add(paragraph.runs.len()).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC header/footer run count overflows".to_string())
+        })?;
+        if run_count > MAX_HEADER_FOOTER_RUNS {
+            return Err(DocWriteError::InvalidData(
+                "DOC header/footer story exceeds the run limit".to_string(),
+            ));
+        }
+        for (text, formatting) in &paragraph.runs {
+            if text.contains('\r') {
+                return Err(DocWriteError::InvalidData(
+                    "DOC header/footer run contains an embedded paragraph mark".to_string(),
+                ));
+            }
+            for character in text.chars() {
+                field_state.observe(character, formatting)?;
+            }
+            character_count = character_count
+                .checked_add(utf16_code_unit_len(text)?)
+                .ok_or_else(|| {
+                    DocWriteError::InvalidData(
+                        "DOC header/footer story CP range overflows".to_string(),
+                    )
+                })?;
+        }
+        character_count = character_count.checked_add(1).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC header/footer story CP range overflows".to_string())
+        })?;
+    }
+    if character_count >= 0x7FFF_FFFF {
+        return Err(DocWriteError::InvalidData(
+            "DOC header/footer story exceeds the MS-DOC CP limit".to_string(),
+        ));
+    }
+    field_state.finish()
+}
+
 pub(super) fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteError> {
     let Some(value) = value else {
         return Ok(0);
@@ -163,7 +300,11 @@ pub(super) fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteE
 }
 
 type NoteStoryData = (Vec<u8>, Vec<u8>, u32);
-type HeaderStoryData = (Vec<u8>, u32);
+struct HeaderStoryData {
+    plcfhdd: Vec<u8>,
+    fields: Vec<u8>,
+    char_count: u32,
+}
 
 struct CommentStoryData {
     owners: Vec<u8>,
@@ -225,6 +366,12 @@ pub struct CharacterFormatting {
     pub field_vanish: Option<bool>,
     /// Font size (in half-points, e.g., 24 = 12pt)
     pub font_size: Option<u16>,
+    /// Vertical offset relative to the normal baseline, in signed half-points.
+    pub position: Option<crate::doc::parts::chp::CharacterPosition>,
+    /// Word-breaking behavior used when this run is hyphenated.
+    pub hyphenation: Option<crate::doc::parts::chp::HresiOperand>,
+    /// Animated text effect applied to this run.
+    pub text_effect: Option<crate::doc::parts::chp::TextEffect>,
     /// Font name
     pub font_name: Option<String>,
     /// Text color as (R,G,B)
@@ -496,6 +643,89 @@ fn writable_paragraph_from_runs(
     WritableParagraph { runs, formatting }
 }
 
+/// One formatted paragraph in a header or footer story.
+///
+/// The paragraph owns its runs so callers can build content without tying the
+/// writer to temporary buffers. Paragraph marks are emitted by the writer and
+/// therefore MUST NOT be embedded in run text passed to [`Self::from_runs`].
+#[derive(Debug, Clone)]
+pub struct HeaderFooterParagraph {
+    runs: Vec<(String, CharacterFormatting)>,
+    formatting: ParagraphFormatting,
+}
+
+impl HeaderFooterParagraph {
+    /// Construct a plain paragraph containing one run.
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self {
+            runs: vec![(text.into(), CharacterFormatting::default())],
+            formatting: ParagraphFormatting::default(),
+        }
+    }
+
+    /// Construct a paragraph from owned character runs and paragraph formatting.
+    pub fn from_runs(
+        runs: Vec<(String, CharacterFormatting)>,
+        formatting: ParagraphFormatting,
+    ) -> Self {
+        Self { runs, formatting }
+    }
+
+    /// Construct a paragraph containing one inert Word field.
+    ///
+    /// The instruction is transported verbatim and is never evaluated.
+    pub fn field(
+        instruction: impl Into<String>,
+        result: impl Into<String>,
+        result_formatting: CharacterFormatting,
+    ) -> Result<Self, DocWriteError> {
+        let instruction = instruction.into();
+        let result = result.into();
+        if instruction.is_empty() {
+            return Err(DocWriteError::InvalidData(
+                "DOC header/footer field instruction is empty".to_string(),
+            ));
+        }
+        if instruction
+            .chars()
+            .chain(result.chars())
+            .any(|character| character == '\r' || matches!(character as u32, 0x0013..=0x0015))
+        {
+            return Err(DocWriteError::InvalidData(
+                "DOC header/footer field text contains a structural control character".to_string(),
+            ));
+        }
+        let special = CharacterFormatting {
+            special: Some(true),
+            ..CharacterFormatting::default()
+        };
+        let hidden = CharacterFormatting {
+            field_vanish: Some(true),
+            ..CharacterFormatting::default()
+        };
+        Ok(Self::from_runs(
+            vec![
+                ("\u{0013}".to_string(), special.clone()),
+                (instruction, hidden),
+                ("\u{0014}".to_string(), special.clone()),
+                (result, result_formatting),
+                ("\u{0015}".to_string(), special),
+            ],
+            ParagraphFormatting::default(),
+        ))
+    }
+
+    /// Character runs in document order.
+    pub fn runs(&self) -> &[(String, CharacterFormatting)] {
+        &self.runs
+    }
+
+    /// Paragraph-level formatting.
+    pub fn formatting(&self) -> &ParagraphFormatting {
+        &self.formatting
+    }
+}
+
 /// Represents a table cell
 #[derive(Debug, Clone)]
 struct TableCell {
@@ -529,17 +759,17 @@ pub struct DocWriter {
     tables: Vec<WritableTable>,
     /// Document properties
     properties: HashMap<String, String>,
-    /// Header/Footer texts (None = not set)
+    /// Header/footer paragraphs (`None` means the story is not set).
     /// Indices map to plcfHdd entries (following Apache POI HeaderStories indexing):
     /// 0..5: footnote/endnote separators (unused here)
     /// 6: even header, 7: odd header, 10: first header
     /// 8: even footer, 9: odd footer, 11: first footer
-    header_even: Option<String>,
-    header_odd: Option<String>,
-    header_first: Option<String>,
-    footer_even: Option<String>,
-    footer_odd: Option<String>,
-    footer_first: Option<String>,
+    header_even: Option<Vec<HeaderFooterParagraph>>,
+    header_odd: Option<Vec<HeaderFooterParagraph>>,
+    header_first: Option<Vec<HeaderFooterParagraph>>,
+    footer_even: Option<Vec<HeaderFooterParagraph>>,
+    footer_odd: Option<Vec<HeaderFooterParagraph>>,
+    footer_first: Option<Vec<HeaderFooterParagraph>>,
     /// Footnote entries
     footnotes: Vec<FootnoteEntry>,
     /// Endnote entries
@@ -550,10 +780,25 @@ pub struct DocWriter {
     bookmarks: Vec<BookmarkEntry>,
     /// Property revision metadata for the writer's single document section
     section_formatting_revision: Option<FormattingRevision>,
+    /// Explicit column geometry for the writer's single document section.
+    section_columns: Option<crate::doc::SectionColumnLayout>,
+    /// Whether section columns are populated from right to left.
+    section_right_to_left: bool,
+    /// Section-wide glyph and line flow.
+    section_text_flow: crate::doc::SectionTextFlow,
+    /// Explicit page-border edges and placement for the single section.
+    section_page_borders: Option<crate::doc::SectionPageBorders>,
     /// Numbering writer for list tables
     numbering: NumberingWriter,
     /// User-defined styles appended after the fifteen fixed style slots
     styles: Vec<super::stylesheet::DocStyleDefinition>,
+    /// Password-to-open settings. The password is wiped when replaced, cleared, or dropped.
+    encryption: Option<DocWriterEncryption>,
+}
+
+struct DocWriterEncryption {
+    profile: DocEncryptionProfile,
+    password: Zeroizing<String>,
 }
 
 fn build_plcffld(field_char_cps: &[(u32, u16)], text_length: u32) -> Vec<u8> {
@@ -610,9 +855,68 @@ impl DocWriter {
             comments: Vec::new(),
             bookmarks: Vec::new(),
             section_formatting_revision: None,
+            section_columns: None,
+            section_right_to_left: false,
+            section_text_flow: crate::doc::SectionTextFlow::default(),
+            section_page_borders: None,
             numbering: NumberingWriter::new(),
             styles: Vec::new(),
+            encryption: None,
         }
+    }
+
+    /// Protect the generated document with a password-to-open profile.
+    ///
+    /// Validation is atomic: an invalid password or profile leaves any previous
+    /// password setting unchanged.
+    pub fn set_password(
+        &mut self,
+        password: impl Into<String>,
+        profile: DocEncryptionProfile,
+    ) -> Result<(), DocWriteError> {
+        let password = Zeroizing::new(password.into());
+        validate_writer_password(profile, password.as_str())
+            .map_err(DocWriteError::InvalidData)?;
+        self.encryption = Some(DocWriterEncryption { profile, password });
+        Ok(())
+    }
+
+    /// Remove password-to-open protection and wipe the stored password.
+    pub fn clear_password(&mut self) {
+        self.encryption = None;
+    }
+
+    /// Return the configured password-to-open profile without exposing the password.
+    pub fn encryption_profile(&self) -> Option<DocEncryptionProfile> {
+        self.encryption.as_ref().map(|value| value.profile)
+    }
+
+    fn encryption_table_header_len(&self) -> Result<usize, DocWriteError> {
+        self.encryption
+            .as_ref()
+            .map(|value| value.profile.table_header_len())
+            .transpose()
+            .map(|value| value.unwrap_or(0))
+            .map_err(DocWriteError::InvalidData)
+    }
+
+    fn encrypt_output_streams(
+        &self,
+        word_document: &mut [u8],
+        table_stream: &mut [u8],
+        data_stream: &mut [u8],
+    ) -> Result<(), DocWriteError> {
+        let Some(encryption) = &self.encryption else {
+            return Ok(());
+        };
+        encrypt_document_streams_for_write(
+            encryption.profile,
+            encryption.password.as_str(),
+            word_document,
+            table_stream,
+            data_stream,
+        )
+        .map_err(DocWriteError::InvalidData)
     }
 
     /// Add a custom paragraph, character, table, or numbering style.
@@ -776,27 +1080,87 @@ impl DocWriter {
 
     /// Set the odd-page header text (HeaderStories index 7)
     pub fn set_odd_header(&mut self, text: &str) {
-        self.header_odd = Some(text.to_string());
+        self.header_odd = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
     /// Set the even-page header text (HeaderStories index 6)
     pub fn set_even_header(&mut self, text: &str) {
-        self.header_even = Some(text.to_string());
+        self.header_even = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
     /// Set the first-page header text (HeaderStories index 10)
     pub fn set_first_header(&mut self, text: &str) {
-        self.header_first = Some(text.to_string());
+        self.header_first = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
     /// Set the odd-page footer text (HeaderStories index 9)
     pub fn set_odd_footer(&mut self, text: &str) {
-        self.footer_odd = Some(text.to_string());
+        self.footer_odd = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
     /// Set the even-page footer text (HeaderStories index 8)
     pub fn set_even_footer(&mut self, text: &str) {
-        self.footer_even = Some(text.to_string());
+        self.footer_even = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
     /// Set the first-page footer text (HeaderStories index 11)
     pub fn set_first_footer(&mut self, text: &str) {
-        self.footer_first = Some(text.to_string());
+        self.footer_first = Some(vec![HeaderFooterParagraph::plain(text)]);
+    }
+
+    /// Set formatted odd-page header paragraphs (HeaderStories index 7).
+    pub fn set_odd_header_paragraphs(
+        &mut self,
+        paragraphs: Vec<HeaderFooterParagraph>,
+    ) -> Result<(), DocWriteError> {
+        validate_header_footer_paragraphs(&paragraphs)?;
+        self.header_odd = Some(paragraphs);
+        Ok(())
+    }
+
+    /// Set formatted even-page header paragraphs (HeaderStories index 6).
+    pub fn set_even_header_paragraphs(
+        &mut self,
+        paragraphs: Vec<HeaderFooterParagraph>,
+    ) -> Result<(), DocWriteError> {
+        validate_header_footer_paragraphs(&paragraphs)?;
+        self.header_even = Some(paragraphs);
+        Ok(())
+    }
+
+    /// Set formatted first-page header paragraphs (HeaderStories index 10).
+    pub fn set_first_header_paragraphs(
+        &mut self,
+        paragraphs: Vec<HeaderFooterParagraph>,
+    ) -> Result<(), DocWriteError> {
+        validate_header_footer_paragraphs(&paragraphs)?;
+        self.header_first = Some(paragraphs);
+        Ok(())
+    }
+
+    /// Set formatted odd-page footer paragraphs (HeaderStories index 9).
+    pub fn set_odd_footer_paragraphs(
+        &mut self,
+        paragraphs: Vec<HeaderFooterParagraph>,
+    ) -> Result<(), DocWriteError> {
+        validate_header_footer_paragraphs(&paragraphs)?;
+        self.footer_odd = Some(paragraphs);
+        Ok(())
+    }
+
+    /// Set formatted even-page footer paragraphs (HeaderStories index 8).
+    pub fn set_even_footer_paragraphs(
+        &mut self,
+        paragraphs: Vec<HeaderFooterParagraph>,
+    ) -> Result<(), DocWriteError> {
+        validate_header_footer_paragraphs(&paragraphs)?;
+        self.footer_even = Some(paragraphs);
+        Ok(())
+    }
+
+    /// Set formatted first-page footer paragraphs (HeaderStories index 11).
+    pub fn set_first_footer_paragraphs(
+        &mut self,
+        paragraphs: Vec<HeaderFooterParagraph>,
+    ) -> Result<(), DocWriteError> {
+        validate_header_footer_paragraphs(&paragraphs)?;
+        self.footer_first = Some(paragraphs);
+        Ok(())
     }
 
     /// Add a footnote to the document.
@@ -830,6 +1194,16 @@ impl DocWriter {
     /// Add a list format override.
     pub fn add_list_override(&mut self, lfo: ListFormatOverride) {
         self.numbering.add_override(lfo);
+    }
+
+    /// Set names parallel to the document's list definitions.
+    pub fn set_list_names(&mut self, table: ListNamesTable) {
+        self.numbering.set_list_names(table);
+    }
+
+    /// Set template codes parallel to the document's list definitions.
+    pub fn set_list_templates(&mut self, table: ListTemplateTable) {
+        self.numbering.set_list_templates(table);
     }
 
     /// Build footnote or endnote subdocument text and PLCFs.
@@ -1885,9 +2259,6 @@ impl DocWriter {
         current_cp_total: &mut u32,
         font_builder: &mut FontTableBuilder,
     ) -> Result<Option<HeaderStoryData>, DocWriteError> {
-        // TODO(stage:headers_footers): support complex content (multiple paragraphs, fields)
-        // For now, each defined header/footer is one paragraph, terminated by chEop (0x0D)
-
         // Short-circuit if nothing set
         if self.header_even.is_none()
             && self.header_odd.is_none()
@@ -1899,7 +2270,7 @@ impl DocWriter {
             return Ok(None);
         }
 
-        // Build index->text mapping for 12 slots per MS-DOC PlcfHdd / Apache POI:
+        // Build index->paragraph mapping for 12 slots per MS-DOC PlcfHdd / Apache POI:
         //   Slots 0-5:  footnote/endnote separator/continuation stories
         //   Slot 6:     even page header (section 0)
         //   Slot 7:     odd page header (section 0) — "default" when no facing pages
@@ -1909,24 +2280,24 @@ impl DocWriter {
         //   Slot 11:    first page footer (section 0)
         // PlcfHdd has 14 CPs (12 slot starts + story end + ignored final CP).
         // Verified against LibreOffice DOC writer output.
-        let mut idx_text: [Option<&str>; 12] = [None; 12];
-        if let Some(ref s) = self.header_even {
-            idx_text[6] = Some(s.as_str());
+        let mut idx_paragraphs: [Option<&[HeaderFooterParagraph]>; 12] = [None; 12];
+        if let Some(ref paragraphs) = self.header_even {
+            idx_paragraphs[6] = Some(paragraphs);
         }
-        if let Some(ref s) = self.header_odd {
-            idx_text[7] = Some(s.as_str());
+        if let Some(ref paragraphs) = self.header_odd {
+            idx_paragraphs[7] = Some(paragraphs);
         }
-        if let Some(ref s) = self.header_first {
-            idx_text[10] = Some(s.as_str());
+        if let Some(ref paragraphs) = self.header_first {
+            idx_paragraphs[10] = Some(paragraphs);
         }
-        if let Some(ref s) = self.footer_even {
-            idx_text[8] = Some(s.as_str());
+        if let Some(ref paragraphs) = self.footer_even {
+            idx_paragraphs[8] = Some(paragraphs);
         }
-        if let Some(ref s) = self.footer_odd {
-            idx_text[9] = Some(s.as_str());
+        if let Some(ref paragraphs) = self.footer_odd {
+            idx_paragraphs[9] = Some(paragraphs);
         }
-        if let Some(ref s) = self.footer_first {
-            idx_text[11] = Some(s.as_str());
+        if let Some(ref paragraphs) = self.footer_first {
+            idx_paragraphs[11] = Some(paragraphs);
         }
 
         // Local CP within header story (counts only header subdocument)
@@ -1934,55 +2305,120 @@ impl DocWriter {
         // mark and a separate guard paragraph mark.
         let mut header_cp: u32 = 0;
         let mut cp_starts: [u32; 12] = [0; 12];
+        let mut field_char_cps = Vec::new();
 
         for i in 0..12 {
             cp_starts[i] = header_cp;
-            if let Some(text) = idx_text[i] {
-                // Slot has content: write text + paragraph mark + guard paragraph mark
-                let fc_para_start = text_fc_start + text_stream.len() as u32;
-                let mut para_chars: u32 = 0;
+            if let Some(paragraphs) = idx_paragraphs[i] {
+                let mut field_state = HeaderFieldState::default();
+                let fc_story_start = checked_text_fc(text_fc_start, text_stream.len())?;
+                let mut story_chars = 0u32;
 
-                let char_fmt = CharacterFormatting::default();
-                let grpprl = build_chpx_grpprl(&char_fmt, font_builder);
-                let run_fc_start = fc_para_start;
-                for u in text.encode_utf16() {
-                    text_stream.extend_from_slice(&u.to_le_bytes());
+                for paragraph in paragraphs {
+                    let fc_para_start = checked_text_fc(text_fc_start, text_stream.len())?;
+                    let mut paragraph_chars = 0u32;
+                    let mut last_chpx = None;
+
+                    for (text, formatting) in &paragraph.runs {
+                        let run_chars = utf16_code_unit_len(text)?;
+                        let mut marker_cp = header_cp
+                            .checked_add(story_chars)
+                            .and_then(|value| value.checked_add(paragraph_chars))
+                            .ok_or_else(|| {
+                                DocWriteError::InvalidData(
+                                    "DOC header/footer field CP range overflows".to_string(),
+                                )
+                            })?;
+                        for character in text.chars() {
+                            if field_state.observe(character, formatting)? {
+                                field_char_cps.push((marker_cp, character as u16));
+                            }
+                            marker_cp = marker_cp
+                                .checked_add(character.len_utf16() as u32)
+                                .ok_or_else(|| {
+                                    DocWriteError::InvalidData(
+                                        "DOC header/footer field CP range overflows".to_string(),
+                                    )
+                                })?;
+                        }
+                        if run_chars == 0 {
+                            continue;
+                        }
+                        let run_fc_start = checked_text_fc(text_fc_start, text_stream.len())?;
+                        for unit in text.encode_utf16() {
+                            text_stream.extend_from_slice(&unit.to_le_bytes());
+                        }
+                        let run_fc_end = checked_text_fc(text_fc_start, text_stream.len())?;
+                        chpx_entries.push((
+                            run_fc_start,
+                            run_fc_end,
+                            build_chpx_grpprl(formatting, font_builder),
+                        ));
+                        last_chpx = Some(chpx_entries.len() - 1);
+                        paragraph_chars =
+                            paragraph_chars.checked_add(run_chars).ok_or_else(|| {
+                                DocWriteError::InvalidData(
+                                    "DOC header/footer paragraph CP range overflows".to_string(),
+                                )
+                            })?;
+                    }
+
+                    text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+                    let fc_para_end = checked_text_fc(text_fc_start, text_stream.len())?;
+                    if let Some(index) = last_chpx {
+                        chpx_entries[index].1 = fc_para_end;
+                    } else {
+                        chpx_entries.push((fc_para_start, fc_para_end, Vec::new()));
+                    }
+                    papx_entries.push((
+                        fc_para_start,
+                        fc_para_end,
+                        build_papx_grpprl(&paragraph.formatting),
+                    ));
+                    story_chars = story_chars
+                        .checked_add(paragraph_chars)
+                        .and_then(|value| value.checked_add(1))
+                        .ok_or_else(|| {
+                            DocWriteError::InvalidData(
+                                "DOC header/footer story CP range overflows".to_string(),
+                            )
+                        })?;
                 }
-                para_chars += utf16_code_unit_len(text)?;
-                let run_fc_end = run_fc_start + para_chars * 2;
-                chpx_entries.push((run_fc_start, run_fc_end, grpprl));
-                let current_chpx_idx = chpx_entries.len() - 1;
 
-                // Content paragraph mark
+                // Guard paragraph mark required between stories.
+                let fc_guard_start = checked_text_fc(text_fc_start, text_stream.len())?;
                 text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-                chpx_entries[current_chpx_idx].1 += 2;
-                let fc_para_end = text_fc_start + text_stream.len() as u32;
-                papx_entries.push((
-                    fc_para_start,
-                    fc_para_end,
-                    build_papx_grpprl(&ParagraphFormatting::default()),
-                ));
-
-                // Guard paragraph mark (required separator between stories)
-                let fc_guard_start = fc_para_end;
-                text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-                chpx_entries[current_chpx_idx].1 += 2;
-                let fc_guard_end = fc_guard_start + 2;
+                let fc_guard_end = checked_text_fc(text_fc_start, text_stream.len())?;
+                chpx_entries.push((fc_guard_start, fc_guard_end, Vec::new()));
                 papx_entries.push((
                     fc_guard_start,
                     fc_guard_end,
                     build_papx_grpprl(&ParagraphFormatting::default()),
                 ));
+                story_chars = story_chars.checked_add(1).ok_or_else(|| {
+                    DocWriteError::InvalidData(
+                        "DOC header/footer story CP range overflows".to_string(),
+                    )
+                })?;
 
-                // Piece for content + guard
+                let cp_story_end = current_cp_total.checked_add(story_chars).ok_or_else(|| {
+                    DocWriteError::InvalidData(
+                        "DOC header/footer total CP range overflows".to_string(),
+                    )
+                })?;
                 pieces.push(Piece::new(
                     *current_cp_total,
-                    *current_cp_total + para_chars + 2,
-                    fc_para_start,
+                    cp_story_end,
+                    fc_story_start,
                     true,
                 ));
-                *current_cp_total += para_chars + 2;
-                header_cp += para_chars + 2;
+                *current_cp_total = cp_story_end;
+                header_cp = header_cp.checked_add(story_chars).ok_or_else(|| {
+                    DocWriteError::InvalidData(
+                        "DOC header/footer subdocument CP range overflows".to_string(),
+                    )
+                })?;
+                field_state.finish()?;
             }
         }
 
@@ -2014,7 +2450,16 @@ impl DocWriter {
         plcfhdd.extend_from_slice(&stories_end.to_le_bytes());
         plcfhdd.extend_from_slice(&header_cp.to_le_bytes());
 
-        Ok(Some((plcfhdd, header_cp)))
+        let fields = if field_char_cps.is_empty() {
+            Vec::new()
+        } else {
+            build_plcffld(&field_char_cps, header_cp)
+        };
+        Ok(Some(HeaderStoryData {
+            plcfhdd,
+            fields,
+            char_count: header_cp,
+        }))
     }
 
     /// Create a new table with the specified dimensions
@@ -2085,6 +2530,68 @@ impl DocWriter {
     /// this revision applies to that complete section.
     pub fn set_section_formatting_revision(&mut self, revision: FormattingRevision) {
         self.section_formatting_revision = Some(revision);
+    }
+
+    /// Set validated column geometry for the writer's single section.
+    pub fn set_section_columns(
+        &mut self,
+        columns: crate::doc::SectionColumnLayout,
+    ) -> Result<(), DocWriteError> {
+        columns
+            .validate()
+            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+        self.section_columns = Some(columns);
+        Ok(())
+    }
+
+    /// Return explicit section column geometry, or `None` for the file-format default.
+    pub fn section_columns(&self) -> Option<&crate::doc::SectionColumnLayout> {
+        self.section_columns.as_ref()
+    }
+
+    /// Remove the explicit column override and restore the single-column default.
+    pub fn clear_section_columns(&mut self) {
+        self.section_columns = None;
+    }
+
+    /// Select left-to-right or right-to-left section column population order.
+    pub fn set_section_right_to_left(&mut self, value: bool) {
+        self.section_right_to_left = value;
+    }
+
+    pub fn section_right_to_left(&self) -> bool {
+        self.section_right_to_left
+    }
+
+    /// Set the section-wide text-flow mode.
+    pub fn set_section_text_flow(&mut self, value: crate::doc::SectionTextFlow) {
+        self.section_text_flow = value;
+    }
+
+    pub fn section_text_flow(&self) -> crate::doc::SectionTextFlow {
+        self.section_text_flow
+    }
+
+    /// Set validated page borders for the writer's single section.
+    pub fn set_section_page_borders(
+        &mut self,
+        borders: crate::doc::SectionPageBorders,
+    ) -> Result<(), DocWriteError> {
+        borders
+            .validate()
+            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+        self.section_page_borders = Some(borders);
+        Ok(())
+    }
+
+    /// Return explicit page borders, or `None` for the file-format default.
+    pub fn section_page_borders(&self) -> Option<&crate::doc::SectionPageBorders> {
+        self.section_page_borders.as_ref()
+    }
+
+    /// Remove all explicit page-border edges and placement controls.
+    pub fn clear_section_page_borders(&mut self) {
+        self.section_page_borders = None;
     }
 
     /// Set text in a table cell
@@ -2220,13 +2727,14 @@ impl DocWriter {
     /// - Character and paragraph formatting via SPRMs - [MS-DOC] Section 2.6.1
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), DocWriteError> {
         self.validate_style_references()?;
+        let table_header_len = self.encryption_table_header_len()?;
 
         // Based on Apache POI's HWPFDocument.write() implementation
         // This includes ALL mandatory structures required by Microsoft Word
 
         // Initialize streams for building the document
         let mut word_document_stream = Vec::new();
-        let mut table_stream = Vec::new();
+        let mut table_stream = vec![0u8; table_header_len];
 
         // 1. Reserve space for FIB (File Information Block)
         // Word 2007+ format (nFib 0x0101) requires 1248 bytes
@@ -2421,8 +2929,7 @@ impl DocWriter {
         )?;
 
         // Build header/footer story
-        let mut header_plcfhdd: Option<(Vec<u8>, u32)> = None;
-        if let Some((plcf_bytes, header_cp)) = self.build_header_story(
+        let header_plcfhdd = self.build_header_story(
             text_fc_start,
             &mut text_stream,
             &mut chpx_entries,
@@ -2430,9 +2937,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
-        )? {
-            header_plcfhdd = Some((plcf_bytes, header_cp));
-        }
+        )?;
 
         // Comments follow headers and precede endnotes in the concatenated CP space.
         let comment_story = Self::build_comment_story(
@@ -2491,8 +2996,8 @@ impl DocWriter {
         if let Some((_, _, ftn_cp)) = &footnote_plcfs {
             fib.set_ccp_ftn(*ftn_cp);
         }
-        if let Some((_, header_cp)) = &header_plcfhdd {
-            fib.set_ccp_hdd(*header_cp);
+        if let Some(header) = &header_plcfhdd {
+            fib.set_ccp_hdd(header.char_count);
         }
         if let Some(comment) = &comment_story {
             fib.set_ccp_atn(comment.char_count);
@@ -2501,7 +3006,7 @@ impl DocWriter {
             fib.set_ccp_edn(*edn_cp);
         }
 
-        let mut table_offset = 0u32;
+        let mut table_offset = table_stream.len() as u32;
 
         // 3. Write StyleSheet to table stream (MANDATORY - POI line 681-684)
         let stylesheet_data = crate::doc::writer::stylesheet::generate_stylesheet(
@@ -2551,10 +3056,15 @@ impl DocWriter {
         table_offset = table_stream.len() as u32;
 
         // Write PlcfHdd if present (headers/footers PLCF)
-        if let Some((plcf_bytes, _header_cp)) = &header_plcfhdd {
-            fib.set_plcfhdd(table_offset, plcf_bytes.len() as u32);
-            table_stream.extend_from_slice(plcf_bytes);
+        if let Some(header) = &header_plcfhdd {
+            fib.set_plcfhdd(table_offset, header.plcfhdd.len() as u32);
+            table_stream.extend_from_slice(&header.plcfhdd);
             table_offset = table_stream.len() as u32;
+            if !header.fields.is_empty() {
+                fib.set_plcffld_hdr(table_offset, header.fields.len() as u32);
+                table_stream.extend_from_slice(&header.fields);
+                table_offset = table_stream.len() as u32;
+            }
         }
 
         // Write footnote PLCFs if present
@@ -2615,6 +3125,17 @@ impl DocWriter {
             fib.set_plflfo(table_offset, plflfo.len() as u32);
             table_stream.extend_from_slice(&plflfo);
             table_offset = table_stream.len() as u32;
+
+            if let Some(list_names) = self.numbering.build_sttb_list_names()? {
+                fib.set_sttb_list_names(table_offset, list_names.len() as u32);
+                table_stream.extend_from_slice(&list_names);
+                table_offset = table_stream.len() as u32;
+            }
+            if let Some(list_templates) = self.numbering.build_sttb_rgtplc()? {
+                fib.set_sttb_rgtplc(table_offset, list_templates.len() as u32);
+                table_stream.extend_from_slice(&list_templates);
+                table_offset = table_stream.len() as u32;
+            }
         }
 
         // 6-8. Bin tables and section table are written AFTER FKPs
@@ -2716,11 +3237,16 @@ impl DocWriter {
                 ))
             })
             .transpose()?;
-        let sepx_data = crate::doc::writer::section::generate_sepx_with_revision(
+        let sepx_data = crate::doc::writer::section::generate_sepx_with_properties(
             first_page,
             grpf_ihdt,
             section_revision,
-        );
+            self.section_columns.as_ref(),
+            self.section_right_to_left,
+            self.section_text_flow,
+            self.section_page_borders.as_ref(),
+        )
+        .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
         word_document_stream.extend_from_slice(&sepx_data);
 
         // 10c. Write section table to table stream with correct SEPX offset
@@ -2760,6 +3286,15 @@ impl DocWriter {
         pad_to_4096(&mut word_document_stream);
         pad_to_4096(&mut table_stream);
 
+        // Data is staged with the clear document and encrypted with the other
+        // document streams only after every clear structure has been validated.
+        let mut data_stream = vec![0u8; 4096];
+        self.encrypt_output_streams(
+            &mut word_document_stream,
+            &mut table_stream,
+            &mut data_stream,
+        )?;
+
         // 15. Create OLE compound document
         let mut ole_writer = OleWriter::new();
 
@@ -2776,7 +3311,6 @@ impl DocWriter {
         ole_writer.create_stream(&["1Table"], &table_stream)?;
 
         // Data stream (MANDATORY per POI - even if empty, padded to 4096)
-        let data_stream = vec![0u8; 4096];
         ole_writer.create_stream(&["Data"], &data_stream)?;
 
         // Create OLE metadata streams (optional for type association)
@@ -2797,12 +3331,13 @@ impl DocWriter {
         writer: &mut W,
     ) -> Result<(), DocWriteError> {
         self.validate_style_references()?;
+        let table_header_len = self.encryption_table_header_len()?;
 
         // Same implementation as save() but writes to a writer
         // Based on Apache POI's HWPFDocument.write() implementation
 
         let mut word_document_stream = Vec::new();
-        let mut table_stream = Vec::new();
+        let mut table_stream = vec![0u8; table_header_len];
 
         // Reserve space for FIB (Word 2007+ format = 1248 bytes, includes cswNew)
         let fib_placeholder = vec![0u8; 1248];
@@ -2983,8 +3518,7 @@ impl DocWriter {
             &mut font_builder,
         )?;
 
-        let mut header_plcfhdd: Option<(Vec<u8>, u32)> = None;
-        if let Some((plcf_bytes, header_cp)) = self.build_header_story(
+        let header_plcfhdd = self.build_header_story(
             text_fc_start,
             &mut text_stream,
             &mut chpx_entries,
@@ -2992,9 +3526,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
-        )? {
-            header_plcfhdd = Some((plcf_bytes, header_cp));
-        }
+        )?;
 
         let comment_story = Self::build_comment_story(
             &self.comments,
@@ -3047,8 +3579,8 @@ impl DocWriter {
         if let Some((_, _, ftn_cp)) = &footnote_plcfs {
             fib.set_ccp_ftn(*ftn_cp);
         }
-        if let Some((_, header_cp)) = &header_plcfhdd {
-            fib.set_ccp_hdd(*header_cp);
+        if let Some(header) = &header_plcfhdd {
+            fib.set_ccp_hdd(header.char_count);
         }
         if let Some(comment) = &comment_story {
             fib.set_ccp_atn(comment.char_count);
@@ -3057,7 +3589,7 @@ impl DocWriter {
             fib.set_ccp_edn(*edn_cp);
         }
 
-        let mut table_offset = 0u32;
+        let mut table_offset = table_stream.len() as u32;
 
         let stylesheet_data = crate::doc::writer::stylesheet::generate_stylesheet(
             &self.styles,
@@ -3104,10 +3636,15 @@ impl DocWriter {
         table_offset = table_stream.len() as u32;
 
         // Write PlcfHdd if present
-        if let Some((plcf_bytes, _header_cp)) = &header_plcfhdd {
-            fib.set_plcfhdd(table_offset, plcf_bytes.len() as u32);
-            table_stream.extend_from_slice(plcf_bytes);
+        if let Some(header) = &header_plcfhdd {
+            fib.set_plcfhdd(table_offset, header.plcfhdd.len() as u32);
+            table_stream.extend_from_slice(&header.plcfhdd);
             table_offset = table_stream.len() as u32;
+            if !header.fields.is_empty() {
+                fib.set_plcffld_hdr(table_offset, header.fields.len() as u32);
+                table_stream.extend_from_slice(&header.fields);
+                table_offset = table_stream.len() as u32;
+            }
         }
 
         // Write footnote PLCFs if present
@@ -3165,6 +3702,17 @@ impl DocWriter {
             fib.set_plflfo(table_offset, plflfo.len() as u32);
             table_stream.extend_from_slice(&plflfo);
             table_offset = table_stream.len() as u32;
+
+            if let Some(list_names) = self.numbering.build_sttb_list_names()? {
+                fib.set_sttb_list_names(table_offset, list_names.len() as u32);
+                table_stream.extend_from_slice(&list_names);
+                table_offset = table_stream.len() as u32;
+            }
+            if let Some(list_templates) = self.numbering.build_sttb_rgtplc()? {
+                fib.set_sttb_rgtplc(table_offset, list_templates.len() as u32);
+                table_stream.extend_from_slice(&list_templates);
+                table_offset = table_stream.len() as u32;
+            }
         }
 
         // 6-8. Bin tables and section table written AFTER FKPs (need page numbers).
@@ -3258,11 +3806,16 @@ impl DocWriter {
                 ))
             })
             .transpose()?;
-        let sepx_data = crate::doc::writer::section::generate_sepx_with_revision(
+        let sepx_data = crate::doc::writer::section::generate_sepx_with_properties(
             first_page,
             grpf_ihdt,
             section_revision,
-        );
+            self.section_columns.as_ref(),
+            self.section_right_to_left,
+            self.section_text_flow,
+            self.section_page_borders.as_ref(),
+        )
+        .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
         word_document_stream.extend_from_slice(&sepx_data);
 
         // Write section table to table stream
@@ -3290,6 +3843,13 @@ impl DocWriter {
         pad_to_4096(&mut word_document_stream);
         pad_to_4096(&mut table_stream);
 
+        let mut data_stream = vec![0u8; 4096];
+        self.encrypt_output_streams(
+            &mut word_document_stream,
+            &mut table_stream,
+            &mut data_stream,
+        )?;
+
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
 
@@ -3305,7 +3865,6 @@ impl DocWriter {
         ole_writer.create_stream(&["1Table"], &table_stream)?;
 
         // Data stream (MANDATORY per POI - even if empty, padded to 4096)
-        let data_stream = vec![0u8; 4096];
         ole_writer.create_stream(&["Data"], &data_stream)?;
 
         // Add metadata streams after core ones
@@ -3407,6 +3966,14 @@ fn build_chpx_grpprl(fmt: &CharacterFormatting, font_builder: &mut FontTableBuil
     if let Some(hps) = fmt.font_size {
         push_word(&mut grp, SPRM_C_HPS, hps);
     }
+    if let Some(position) = fmt.position {
+        grp.extend_from_slice(&SPRM_C_HPS_POS.to_le_bytes());
+        grp.extend_from_slice(&position.half_points().to_le_bytes());
+    }
+    if let Some(hyphenation) = fmt.hyphenation {
+        grp.extend_from_slice(&SPRM_C_HRESI.to_le_bytes());
+        grp.extend_from_slice(&hyphenation.bytes());
+    }
     // Font name -> map to ftc index via FontTableBuilder and set default font
     if let Some(name) = &fmt.font_name {
         let idx = font_builder.get_or_add(name);
@@ -3416,6 +3983,9 @@ fn build_chpx_grpprl(fmt: &CharacterFormatting, font_builder: &mut FontTableBuil
     if let Some((r, g, b)) = fmt.color {
         let cv: u32 = (r as u32) | ((g as u32) << 8) | ((b as u32) << 16);
         push_dword(&mut grp, SPRM_C_CV, cv);
+    }
+    if let Some(effect) = fmt.text_effect {
+        push_byte(&mut grp, SPRM_C_SFXT_TEXT, effect.into());
     }
 
     grp
@@ -5033,12 +5603,30 @@ mod tests {
         writer.set_odd_footer("Odd Footer");
         writer.set_even_footer("Even Footer");
         writer.set_first_footer("First Footer");
-        assert_eq!(writer.header_odd, Some("Odd Header".to_string()));
-        assert_eq!(writer.header_even, Some("Even Header".to_string()));
-        assert_eq!(writer.header_first, Some("First Header".to_string()));
-        assert_eq!(writer.footer_odd, Some("Odd Footer".to_string()));
-        assert_eq!(writer.footer_even, Some("Even Footer".to_string()));
-        assert_eq!(writer.footer_first, Some("First Footer".to_string()));
+        assert_eq!(
+            writer.header_odd.as_ref().unwrap()[0].runs[0].0,
+            "Odd Header"
+        );
+        assert_eq!(
+            writer.header_even.as_ref().unwrap()[0].runs[0].0,
+            "Even Header"
+        );
+        assert_eq!(
+            writer.header_first.as_ref().unwrap()[0].runs[0].0,
+            "First Header"
+        );
+        assert_eq!(
+            writer.footer_odd.as_ref().unwrap()[0].runs[0].0,
+            "Odd Footer"
+        );
+        assert_eq!(
+            writer.footer_even.as_ref().unwrap()[0].runs[0].0,
+            "Even Footer"
+        );
+        assert_eq!(
+            writer.footer_first.as_ref().unwrap()[0].runs[0].0,
+            "First Footer"
+        );
     }
 
     #[test]
@@ -6477,6 +7065,16 @@ mod tests {
         writer.add_list_override(crate::doc::writer::numbering::ListFormatOverride::new(
             42, 1,
         ));
+        writer.set_list_names(
+            crate::doc::ListNamesTable::try_new(vec!["Outline".to_string()]).unwrap(),
+        );
+        let template = crate::doc::ListTemplateCode::BuiltIn {
+            format: crate::doc::BuiltInListTemplate::ArabicPeriod,
+            language: crate::doc::ListTemplateLanguageId::new(0x0409),
+        };
+        writer.set_list_templates(
+            crate::doc::ListTemplateTable::try_new(vec![Some([template; 9])]).unwrap(),
+        );
         writer
             .add_paragraph_runs(
                 vec![("List item".to_string(), CharacterFormatting::default())],
@@ -6497,6 +7095,11 @@ mod tests {
         assert_eq!(tables.structures().len(), 1);
         assert_eq!(tables.overrides().len(), 1);
         assert_eq!(tables.structures()[0].levels[0].number_text, "%1.😀");
+        assert_eq!(document.list_names().unwrap().name(0), Some("Outline"));
+        assert_eq!(
+            document.list_templates().unwrap().get(0).unwrap(),
+            &[template; 9]
+        );
 
         let paragraphs = document.paragraphs().unwrap();
         let info = document.paragraph_list_info(&paragraphs[0]).unwrap();
@@ -6595,5 +7198,59 @@ mod tests {
             )
             .unwrap();
         assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
+    }
+}
+
+#[cfg(test)]
+mod chpx_position_hresi_effect_writer_tests {
+    use super::*;
+    use crate::doc::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
+    use std::io::Cursor;
+
+    #[test]
+    fn emits_canonical_typed_sprms_and_round_trips_package() {
+        let position = CharacterPosition::new(-3168).unwrap();
+        let hyphenation =
+            HresiOperand::with_character(HyphenationMode::DeleteAndChange, b'Z').unwrap();
+        let formatting = CharacterFormatting {
+            position: Some(position),
+            hyphenation: Some(hyphenation),
+            text_effect: Some(TextEffect::Shimmer),
+            ..CharacterFormatting::default()
+        };
+        let mut fonts = FontTableBuilder::new();
+        let grpprl = build_chpx_grpprl(&formatting, &mut fonts);
+        let mut expected = Vec::new();
+        expected.extend_from_slice(&SPRM_C_HPS_POS.to_le_bytes());
+        expected.extend_from_slice(&(-3168i16).to_le_bytes());
+        expected.extend_from_slice(&SPRM_C_HRESI.to_le_bytes());
+        expected.extend_from_slice(&[6, b'Z']);
+        expected.extend_from_slice(&SPRM_C_SFXT_TEXT.to_le_bytes());
+        expected.push(6);
+        assert_eq!(grpprl, expected);
+
+        let properties = crate::doc::parts::chp::CharacterProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.position, position);
+        assert_eq!(properties.hyphenation, hyphenation);
+        assert_eq!(properties.text_effect, TextEffect::Shimmer);
+
+        let mut writer = DocWriter::new();
+        writer
+            .add_paragraph_runs(
+                vec![("effects".to_string(), formatting)],
+                ParagraphFormatting::default(),
+            )
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+        let document = package.document().unwrap();
+        let paragraphs = document.paragraphs().unwrap();
+        let runs = paragraphs[0].runs().unwrap();
+        let properties = runs[0].properties();
+        assert_eq!(properties.position, position);
+        assert_eq!(properties.hyphenation, hyphenation);
+        assert_eq!(properties.text_effect, TextEffect::Shimmer);
     }
 }

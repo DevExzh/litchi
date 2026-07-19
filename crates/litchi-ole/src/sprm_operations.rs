@@ -861,17 +861,50 @@ pub const SPRM_T_JC90: u16 = 0x5400;
 // Based on Apache POI's SectionProperties and LibreOffice sprmids.hxx
 
 /// sprmSBkc - Break code (operation 0x00)
-pub const SPRM_S_BKC: u16 = 0x3000;
+pub const SPRM_S_BKC: u16 = 0x3009;
 
 /// sprmSFTitlePage - Title page (ispmd=0x09, sgc=4(section), spra=1(1-byte))
 /// Encodes to: 001_100_0_000001001 = 0x3009
-pub const SPRM_S_F_TITLE_PAGE: u16 = 0x3009;
+pub const SPRM_S_F_TITLE_PAGE: u16 = 0x300A;
 
 /// sprmSCcolumns - Number of columns (operation 0x02)
-pub const SPRM_S_C_COLUMNS: u16 = 0x3002;
+pub const SPRM_S_C_COLUMNS: u16 = 0x500B;
 
 /// sprmSDxaColumns - Column width (operation 0x03)
-pub const SPRM_S_DXA_COLUMNS: u16 = 0x9003;
+pub const SPRM_S_DXA_COLUMNS: u16 = 0x900C;
+
+/// sprmSDxaColWidth - Indexed unequal-column width.
+pub const SPRM_S_DXA_COL_WIDTH: u16 = 0xF203;
+
+/// sprmSDxaColSpacing - Indexed unequal-column following spacing.
+pub const SPRM_S_DXA_COL_SPACING: u16 = 0xF204;
+
+/// sprmSFEvenlySpaced - Whether columns use common automatic widths.
+pub const SPRM_S_F_EVENLY_SPACED: u16 = 0x3005;
+
+/// sprmSLBetween - Draw a rule between adjacent columns.
+pub const SPRM_S_L_BETWEEN: u16 = 0x3019;
+
+/// sprmSFBiDi - Populate section columns right-to-left.
+pub const SPRM_S_F_BIDI: u16 = 0x3228;
+
+/// sprmSBrcTop80 - top page border as a four-byte Brc80.
+pub const SPRM_S_BRC_TOP80: u16 = 0x702B;
+
+/// sprmSBrcLeft80 - left page border as a four-byte Brc80.
+pub const SPRM_S_BRC_LEFT80: u16 = 0x702C;
+
+/// sprmSBrcBottom80 - bottom page border as a four-byte Brc80.
+pub const SPRM_S_BRC_BOTTOM80: u16 = 0x702D;
+
+/// sprmSBrcRight80 - right page border as a four-byte Brc80.
+pub const SPRM_S_BRC_RIGHT80: u16 = 0x702E;
+
+/// sprmSPgbProp - shared page-border placement as SPgbPropOperand.
+pub const SPRM_S_PGB_PROP: u16 = 0x522F;
+
+/// sprmSTextFlow - Section-wide MSOTXFL value.
+pub const SPRM_S_TEXT_FLOW: u16 = 0x5033;
 
 /// sprmSGprfIhdt - Header/Footer presence mask in section (ispmd=0x0E, sgc=4(section), spra=1(1-byte))
 /// Bits: 0x01=EvenHdr, 0x02=OddHdr, 0x04=EvenFtr, 0x08=OddFtr, 0x10=FirstHdr, 0x20=FirstFtr

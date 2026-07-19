@@ -8,13 +8,26 @@
 //! - Sound support
 //! - Build animations (chart, diagram, paragraph)
 
+pub mod hash;
+mod linked_slide;
 pub mod motion_path;
 pub mod parser;
+mod slide_metadata;
 pub mod sound;
 pub mod triggers;
 pub mod types;
 pub mod writer;
+mod editor;
 
+pub use editor::{
+    PowerPointAnimationEditor, PowerPointAnimationEditorLimits, PowerPointAnimationScope,
+    PowerPointAnimationTimeline, PowerPointLegacyShapeAnimation,
+};
+
+pub use hash::{PowerPointAnimationHash10, PowerPointAnimationHash10Limits};
+pub use linked_slide::{
+    PowerPoint10LinkedShape, PowerPoint10LinkedSlide, PowerPoint10LinkedSlideLimits,
+};
 pub use motion_path::{MotionPath, MotionPathBuilder, MotionPathType, PathCommand, PathEditMode};
 pub use parser::{
     parse_animation_info, parse_animation_info_atom, parse_build_list, parse_extended_time_node,
@@ -30,6 +43,7 @@ pub use parser::{
     parse_time_set_behavior, parse_time_set_behavior_atom, parse_time_sub_effect,
     parse_time_visual_element,
 };
+pub use slide_metadata::{PowerPoint10SlideMetadataLimits, PowerPoint10SlideTime};
 pub use sound::{AnimationSound, BuiltinSound, SoundType};
 pub use triggers::{
     AnimationCondition, BeginCondition, EndCondition, InteractiveTrigger, IterationType,

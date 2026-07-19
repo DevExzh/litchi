@@ -143,7 +143,7 @@ fn comment_records_follow_client_boundaries_and_note_order() {
 }
 
 #[test]
-fn comments_and_pivot_objects_use_separate_drawing_and_object_ids() {
+fn comments_and_pivot_objects_share_one_drawing_and_use_separate_object_ids() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Mixed").unwrap();
     writer
@@ -182,7 +182,7 @@ fn comments_and_pivot_objects_use_separate_drawing_and_object_ids() {
         .iter()
         .find(|(record_type, _)| *record_type == 0x00EB)
         .unwrap();
-    assert_eq!(drawing_group.1.len(), 106);
+    assert_eq!(drawing_group.1.len(), 90);
     let comment_object = records
         .iter()
         .find(|(record_type, data)| {

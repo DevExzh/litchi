@@ -71,6 +71,12 @@ pub mod slide_timing;
 
 // Re-export public types from core
 pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
+pub use crate::ppt::encryption::PptEncryptionProfile;
+pub use crate::ppt::view_info::{
+    PowerPointGuide, PowerPointGuideOrientation, PowerPointRatio, PowerPointSlideViewInfo,
+    PowerPointSlideViewPreferences, PowerPointViewKind, PowerPointViewOrigin,
+    PowerPointZoomViewInfo,
+};
 
 // Re-export commonly used types from submodules
 pub use crate::ppt::shapes::geometry::{GeometryRect, ShapePathType};

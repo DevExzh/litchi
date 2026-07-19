@@ -59,6 +59,7 @@ pub mod hyperlinks;
 pub mod numbering;
 
 // Re-export public types
+pub use crate::doc::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
 pub use crate::doc::parts::pap::{
     AutoNumberAlignment, Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle,
     Borders as ParagraphBorders, DropCap, DropCapType, FontAlignment, FrameAnchor, FrameHeight,
@@ -76,7 +77,11 @@ pub use crate::doc::parts::tap::{
 };
 pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;
-pub use core::{CharacterFormatting, DocWriteError, DocWriter, LineSpacing, ParagraphFormatting};
+pub use core::{
+    CharacterFormatting, DocWriteError, DocWriter, HeaderFooterParagraph, LineSpacing,
+    ParagraphFormatting,
+};
+pub use crate::doc::encryption::DocEncryptionProfile;
 pub use fib::FibBuilder;
 pub use fkp::{ChpxFkpBuilder, PapxFkpBuilder};
 pub use footnotes::{EndnotesWriter, FootnoteEntry, FootnotesWriter};

@@ -18,7 +18,8 @@ use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
 use super::parts::list_names::ListNamesTable;
-use super::parts::numbering::ListTables;
+use super::parts::list_templates::ListTemplateTable;
+use super::parts::numbering::{ListTables, ParagraphListBinding};
 use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
@@ -33,14 +34,6 @@ use crate::mtef_extractor::MtefExtractor;
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 use std::sync::Arc;
-
-/// Type alias for parsed MTEF formula data with arena allocations
-#[cfg(feature = "formula")]
-type ParsedMtefData = (
-    Vec<litchi_formula::Formula<'static>>,
-    Vec<Box<[u8]>>,
-    HashMap<String, Arc<Vec<litchi_formula::MathNode<'static>>>>,
-);
 
 /// A Word document (.doc).
 ///
@@ -99,6 +92,8 @@ pub struct Document {
     associated_strings: Option<DocumentAssociatedStrings>,
     /// Names parallel to list definitions for LISTNUM fields
     list_names: Option<ListNamesTable>,
+    /// List-level template codes parallel to list definitions
+    list_templates: Option<ListTemplateTable>,
     /// Deferred strict spelling/grammar proofing metadata parse
     proofing_tables: Result<ProofingTables>,
     /// Section ranges, layout, and property revision marks
@@ -112,23 +107,36 @@ pub struct Document {
     /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
     #[allow(dead_code)] // Stored for debugging and raw access
     mtef_data: std::collections::HashMap<String, Vec<u8>>,
-    /// Formula arenas that own the memory for parsed formulas
-    /// These must be stored to keep the arena allocations alive for the lifetime of Document
-    #[cfg(feature = "formula")]
-    #[allow(dead_code)] // Stored for arena lifetime management, not directly accessed
-    formula_arenas: Vec<litchi_formula::Formula<'static>>,
-    /// Data buffers that store the MTEF binary data with 'static lifetime
-    /// These must be stored to keep the buffer allocations alive for the lifetime of Document
-    #[cfg(feature = "formula")]
-    #[allow(dead_code)] // Stored for buffer lifetime management, not directly accessed
-    data_buffers: Vec<Box<[u8]>>,
-    /// Parsed MTEF formulas (stream_name -> parsed_ast)
-    /// Using Arc to share AST nodes across multiple runs without cloning (thread-safe)
-    #[cfg(feature = "formula")]
-    parsed_mtef: std::collections::HashMap<String, Arc<Vec<litchi_formula::MathNode<'static>>>>,
-    /// Parsed MTEF formulas placeholder (when formula feature is disabled)
-    #[cfg(not(feature = "formula"))]
-    parsed_mtef: std::collections::HashMap<String, Arc<Vec<()>>>,
+    /// Parsed MTEF formulas rendered while their temporary parser arena is alive.
+    /// Owned strings avoid a self-referential document and remain cheap to share.
+    parsed_mtef: std::collections::HashMap<String, Arc<str>>,
+}
+
+#[cfg(all(test, feature = "formula"))]
+mod owned_mtef_tests {
+    use super::*;
+
+    #[test]
+    fn malformed_multiple_formulas_are_independently_owned_and_dropped() {
+        let mut inputs = HashMap::new();
+        inputs.insert("equation-a".to_string(), vec![0xAA; 7]);
+        inputs.insert("equation-b".to_string(), vec![0xBB; 13]);
+
+        let rendered = Document::parse_all_mtef_data(&inputs).expect("malformed formulas render");
+        assert_eq!(rendered.len(), 2);
+        assert!(rendered["equation-a"].contains("Invalid MTEF format"));
+        assert!(rendered["equation-b"].contains("Invalid MTEF format"));
+        assert!(!Arc::ptr_eq(
+            &rendered["equation-a"],
+            &rendered["equation-b"]
+        ));
+
+        let retained = Arc::clone(&rendered["equation-a"]);
+        let weak = Arc::downgrade(&retained);
+        drop(retained);
+        drop(rendered);
+        assert!(weak.upgrade().is_none());
+    }
 }
 
 impl Document {
@@ -198,6 +206,7 @@ impl Document {
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
         let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
         let list_names = ListNamesTable::parse(&fib, &table_stream)?;
+        let list_templates = ListTemplateTable::parse(&fib, &table_stream)?;
         let proofing_tables = ProofingTables::parse(&fib, &table_stream);
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
@@ -227,7 +236,7 @@ impl Document {
 
         // Parse MTEF data into AST nodes
         #[cfg(feature = "formula")]
-        let (formula_arenas, data_buffers, parsed_mtef) = Self::parse_all_mtef_data(&mtef_data)?;
+        let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
         #[cfg(not(feature = "formula"))]
         let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
 
@@ -268,16 +277,13 @@ impl Document {
             revision_authors,
             associated_strings,
             list_names,
+            list_templates,
             proofing_tables,
             sections,
             hyperlinks_table,
             list_tables,
             stylesheet,
             mtef_data,
-            #[cfg(feature = "formula")]
-            formula_arenas,
-            #[cfg(feature = "formula")]
-            data_buffers,
             parsed_mtef,
         })
     }
@@ -332,93 +338,56 @@ impl Document {
         Self::table_slice(fib, table_stream, 33).and_then(PieceTable::parse)
     }
 
-    /// Parse all extracted MTEF data into AST nodes using proper arena allocation.
+    /// Parse each MTEF stream in a scoped arena and retain an owned rendering.
     ///
-    /// This function creates Formula arenas for each MTEF stream and stores them
-    /// to ensure the arena allocations remain valid for the lifetime of the Document.
-    /// Both arenas and data buffers are kept in Vecs so they can be properly dropped
-    /// when the Document is dropped, completely avoiding memory leaks.
-    ///
-    /// # Safety
-    ///
-    /// This function uses `unsafe` to extend lifetimes to 'static. This is safe because:
-    /// - The formula arenas are stored in the returned Vec and owned by Document
-    /// - The data buffers are stored in the returned Vec and owned by Document  
-    /// - Both will live as long as the Document struct
-    /// - The MathNode references remain valid because they point into these owned arenas
+    /// `MathNode` is intentionally arena-borrowing. Converting before the local
+    /// arena is dropped keeps `Document` an ordinary owning type with no dependent
+    /// fields, leaked allocations, or extended lifetimes.
     #[cfg(feature = "formula")]
-    fn parse_all_mtef_data(mtef_data: &HashMap<String, Vec<u8>>) -> Result<ParsedMtefData> {
-        let mut formula_arenas = Vec::new();
-        let mut data_buffers = Vec::new();
+    fn parse_all_mtef_data(
+        mtef_data: &HashMap<String, Vec<u8>>,
+    ) -> Result<HashMap<String, Arc<str>>> {
         let mut parsed_mtef = HashMap::new();
 
         for (stream_name, data) in mtef_data {
-            // Create a formula arena for parsing
             let formula = litchi_formula::Formula::new();
-
-            // Clone data into a boxed slice - we'll store this to avoid leaking
-            let data_box = data.clone().into_boxed_slice();
-
-            // Get 'static references for parsing
-            // Safety: We store both the arena and data buffer in the Document,
-            // so they will live as long as the Document. The 'static lifetime is sound.
-            let arena_ref: &'static bumpalo::Bump = unsafe {
-                std::mem::transmute::<&bumpalo::Bump, &'static bumpalo::Bump>(formula.arena())
-            };
-            let data_ptr: &'static [u8] =
-                unsafe { std::mem::transmute::<&[u8], &'static [u8]>(data_box.as_ref()) };
-
-            // Parse the MTEF data
-            let mut parser = litchi_formula::MtefParser::new(arena_ref, data_ptr);
+            let mut parser = litchi_formula::MtefParser::new(formula.arena(), data);
 
             if parser.is_valid() {
                 match parser.parse() {
                     Ok(nodes) if !nodes.is_empty() => {
-                        // Successfully parsed - store the AST nodes in Arc for sharing, arena, and buffer
-                        parsed_mtef.insert(stream_name.clone(), Arc::new(nodes));
-                        formula_arenas.push(formula);
-                        data_buffers.push(data_box);
+                        let mut converter = litchi_formula::LatexConverter::new();
+                        let rendered = converter.convert_nodes(&nodes).map_err(|error| {
+                            DocError::InvalidFormat(format!(
+                                "Failed to render MTEF formula {stream_name}: {error}"
+                            ))
+                        })?;
+                        parsed_mtef.insert(stream_name.clone(), Arc::<str>::from(rendered));
                     },
-                    Ok(_) => {
-                        // Empty result - skip, arena and buffer will be dropped
-                    },
+                    Ok(_) => {},
                     Err(e) => {
-                        // Parse error - store placeholder text using the arena
-                        let error_text =
-                            arena_ref.alloc_str(&format!("[Formula parsing error: {}]", e));
                         parsed_mtef.insert(
                             stream_name.clone(),
-                            Arc::new(vec![litchi_formula::MathNode::Text(
-                                std::borrow::Cow::Borrowed(error_text),
-                            )]),
+                            Arc::<str>::from(format!("[Formula parsing error: {e}]")),
                         );
-                        formula_arenas.push(formula);
-                        data_buffers.push(data_box);
                     },
                 }
             } else {
-                // Invalid MTEF format - store placeholder using the arena
-                let error_text =
-                    arena_ref.alloc_str(&format!("[Invalid MTEF format ({} bytes)]", data.len()));
                 parsed_mtef.insert(
                     stream_name.clone(),
-                    Arc::new(vec![litchi_formula::MathNode::Text(
-                        std::borrow::Cow::Borrowed(error_text),
-                    )]),
+                    Arc::<str>::from(format!("[Invalid MTEF format ({} bytes)]", data.len())),
                 );
-                formula_arenas.push(formula);
-                data_buffers.push(data_box);
             }
         }
 
-        Ok((formula_arenas, data_buffers, parsed_mtef))
+        Ok(parsed_mtef)
     }
 
     /// Parse all extracted MTEF data fallback (when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
     fn parse_all_mtef_data(
         _mtef_data: &HashMap<String, Vec<u8>>,
-    ) -> Result<HashMap<String, Arc<Vec<()>>>> {
+    ) -> Result<HashMap<String, Arc<str>>> {
         Ok(HashMap::new())
     }
 
@@ -437,10 +406,7 @@ impl Document {
 
     /// Parse MTEF data for a given text pattern
     #[cfg(feature = "formula")]
-    fn parse_mtef_for_text(
-        &self,
-        _text: &str,
-    ) -> Option<Arc<Vec<litchi_formula::MathNode<'static>>>> {
+    fn parse_mtef_for_text(&self, _text: &str) -> Option<Arc<str>> {
         // For now, try to find any parsed MTEF data
         // In a more sophisticated implementation, we'd match specific text patterns
         // to specific MTEF streams
@@ -456,7 +422,7 @@ impl Document {
 
     /// Parse MTEF data for a given text pattern (fallback when formula feature is disabled)
     #[cfg(not(feature = "formula"))]
-    fn parse_mtef_for_text(&self, _text: &str) -> Option<Arc<Vec<()>>> {
+    fn parse_mtef_for_text(&self, _text: &str) -> Option<Arc<str>> {
         None
     }
 
@@ -567,6 +533,11 @@ impl Document {
     /// Get the ordered `LISTNUM` list-name metadata table.
     pub fn list_names(&self) -> Option<&ListNamesTable> {
         self.list_names.as_ref()
+    }
+
+    /// Get list-level template codes parallel to the document's list definitions.
+    pub fn list_templates(&self) -> Option<&ListTemplateTable> {
+        self.list_templates.as_ref()
     }
 
     /// Strictly access spelling and grammar proofing-state ranges.
@@ -914,29 +885,32 @@ impl Document {
 
     /// Get list/numbering information for a specific paragraph.
     ///
-    /// Returns `Some(ListInfo)` if the paragraph is part of a list,
-    /// `None` otherwise.
+    /// Returns `Some(ListLevel)` if the paragraph is part of a list,
+    /// `None` otherwise. Any `LFOLVL` start-at or formatting overrides
+    /// attached to the paragraph's LFO are applied to the result.
     pub fn paragraph_list_info(
         &self,
         paragraph: &Paragraph,
     ) -> Option<super::parts::numbering::ListLevel> {
-        let props = paragraph.properties();
-        let lfo_index = props.list_format_override?;
-        if lfo_index <= 0 {
-            return None;
-        }
+        let binding = self.paragraph_list_binding(paragraph)?;
+        let mut level = binding.effective_level().clone();
+        level.start_at = binding.effective_start_at();
+        Some(level)
+    }
 
-        let tables = self.list_tables.as_ref()?;
-
-        // LFO index is 1-based in paragraph properties
-        let lfo = tables.overrides().get((lfo_index - 1) as usize)?;
-
-        // Look up the list structure by list_id
-        let list = tables.find_structure(lfo.list_id)?;
-
-        // Get the specific level
-        let level = props.list_level.unwrap_or(0);
-        list.level(level).cloned()
+    /// Resolve typed list metadata for a paragraph without cloning list data.
+    ///
+    /// The returned binding exposes the selected `LSTF`, `LFO`, base `LVL`,
+    /// optional `LFOLVL`, effective formatting, start value, and the
+    /// preserve-indents bit encoded by a negative `sprmPIlfo`.
+    pub fn paragraph_list_binding(
+        &self,
+        paragraph: &Paragraph,
+    ) -> Option<ParagraphListBinding<'_>> {
+        let properties = paragraph.properties();
+        let signed_lfo = properties.list_format_override?;
+        let level = properties.list_level.unwrap_or(0);
+        self.list_tables.as_ref()?.bind_paragraph(signed_lfo, level)
     }
 
     // ──────────────────────────────────────────────────────────────────

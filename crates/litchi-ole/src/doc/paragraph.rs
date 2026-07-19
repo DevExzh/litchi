@@ -287,13 +287,8 @@ pub struct Run {
     text: String,
     /// Character formatting properties
     properties: CharacterProperties,
-    /// Parsed MTEF formula AST (if this run contains a formula)
-    /// Using Arc to share AST across multiple runs without cloning (thread-safe)
-    #[cfg(feature = "formula")]
-    mtef_formula_ast: Option<Arc<Vec<litchi_formula::MathNode<'static>>>>,
-    /// Parsed MTEF formula AST placeholder (when formula feature is disabled)
-    #[cfg(not(feature = "formula"))]
-    mtef_formula_ast: Option<Arc<Vec<()>>>,
+    /// Owned LaTeX rendered from MTEF while its scoped parser arena is alive.
+    mtef_formula_latex: Option<Arc<str>>,
     /// Embedded image (metadata only, data loaded lazily via Document::image_data)
     image: Option<super::image::Image>,
     /// Resolved insertion revision metadata.
@@ -312,7 +307,7 @@ impl Run {
         Self {
             text,
             properties,
-            mtef_formula_ast: None,
+            mtef_formula_latex: None,
             image: None,
             insertion_revision: None,
             deletion_revision: None,
@@ -326,12 +321,12 @@ impl Run {
     pub(crate) fn with_mtef_formula(
         text: String,
         properties: CharacterProperties,
-        mtef_ast: Arc<Vec<litchi_formula::MathNode<'static>>>,
+        mtef_latex: Arc<str>,
     ) -> Self {
         Self {
             text,
             properties,
-            mtef_formula_ast: Some(mtef_ast),
+            mtef_formula_latex: Some(mtef_latex),
             image: None,
             insertion_revision: None,
             deletion_revision: None,
@@ -345,12 +340,12 @@ impl Run {
     pub(crate) fn with_mtef_formula(
         text: String,
         properties: CharacterProperties,
-        _mtef_ast: Arc<Vec<()>>,
+        _mtef_latex: Arc<str>,
     ) -> Self {
         Self {
             text,
             properties,
-            mtef_formula_ast: None,
+            mtef_formula_latex: None,
             image: None,
             insertion_revision: None,
             deletion_revision: None,
@@ -368,7 +363,7 @@ impl Run {
         Self {
             text,
             properties,
-            mtef_formula_ast: None,
+            mtef_formula_latex: None,
             image: Some(image),
             insertion_revision: None,
             deletion_revision: None,
@@ -562,36 +557,20 @@ impl Run {
     ///
     /// Returns true if this run contains a parsed MTEF formula AST.
     pub fn has_mtef_formula(&self) -> bool {
-        self.mtef_formula_ast.is_some()
+        self.mtef_formula_latex.is_some()
     }
 
-    /// Get the MTEF formula AST if this run contains a formula.
+    /// Get the owned LaTeX rendering for this MTEF formula.
     ///
-    /// Returns the parsed MTEF formula as AST nodes if this run contains a MathType equation,
-    /// None otherwise.
-    #[cfg(feature = "formula")]
-    pub fn mtef_formula_ast(&self) -> Option<&Arc<Vec<litchi_formula::MathNode<'static>>>> {
-        self.mtef_formula_ast.as_ref()
+    /// This replaces the former `'static` AST accessor, whose nodes depended on
+    /// allocations owned elsewhere in the document.
+    pub fn mtef_formula_latex(&self) -> Option<&str> {
+        self.mtef_formula_latex.as_deref()
     }
 
-    #[cfg(not(feature = "formula"))]
-    pub fn mtef_formula_ast(&self) -> Option<&Arc<Vec<()>>> {
-        self.mtef_formula_ast.as_ref()
-    }
-
-    /// Get a mutable reference to the MTEF formula AST.
-    ///
-    /// This allows for modification of the formula AST if needed.
-    #[cfg(feature = "formula")]
-    pub fn mtef_formula_ast_mut(
-        &mut self,
-    ) -> &mut Option<Arc<Vec<litchi_formula::MathNode<'static>>>> {
-        &mut self.mtef_formula_ast
-    }
-
-    #[cfg(not(feature = "formula"))]
-    pub fn mtef_formula_ast_mut(&mut self) -> &mut Option<Arc<Vec<()>>> {
-        &mut self.mtef_formula_ast
+    /// Replace or remove the owned MTEF rendering.
+    pub fn mtef_formula_latex_mut(&mut self) -> &mut Option<Arc<str>> {
+        &mut self.mtef_formula_latex
     }
 
     /// Get the MTEF formula as LaTeX string if this run contains a formula.
@@ -609,26 +588,13 @@ impl Run {
     /// ```
     #[cfg(feature = "formula")]
     pub fn formula_as_latex(&self) -> Result<Option<String>> {
-        if let Some(ast) = &self.mtef_formula_ast {
-            use litchi_formula::LatexConverter;
-            let mut converter = LatexConverter::new();
-            // Dereference Rc to access the Vec
-            match converter.convert_nodes(ast.as_ref()) {
-                Ok(latex) => Ok(Some(latex.to_string())),
-                Err(e) => {
-                    // Return error message as placeholder
-                    Ok(Some(format!("[Formula conversion error: {}]", e)))
-                },
-            }
-        } else {
-            Ok(None)
-        }
+        Ok(self.mtef_formula_latex.as_deref().map(str::to_owned))
     }
 
     /// Convert formula to LaTeX (fallback when formula feature is disabled).
     #[cfg(not(feature = "formula"))]
     pub fn formula_as_latex(&self) -> Result<Option<String>> {
-        if self.mtef_formula_ast.is_some() {
+        if self.mtef_formula_latex.is_some() {
             Ok(Some(
                 "[Formula support disabled - enable 'formula' feature]".to_string(),
             ))

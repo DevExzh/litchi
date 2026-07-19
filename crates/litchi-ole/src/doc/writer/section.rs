@@ -20,6 +20,28 @@ pub(crate) fn generate_sepx_with_revision(
     grpf_ihdt: u8,
     revision: Option<(u16, u32)>,
 ) -> Vec<u8> {
+    generate_sepx_with_properties(
+        first_page_header,
+        grpf_ihdt,
+        revision,
+        None,
+        false,
+        crate::doc::SectionTextFlow::HorizontalNonAsian,
+        None,
+    )
+    .expect("default section properties are valid")
+}
+
+/// Generate Word 97+ SEPX properties for the writer's single section.
+pub(crate) fn generate_sepx_with_properties(
+    first_page_header: bool,
+    grpf_ihdt: u8,
+    revision: Option<(u16, u32)>,
+    columns: Option<&crate::doc::SectionColumnLayout>,
+    right_to_left: bool,
+    text_flow: crate::doc::SectionTextFlow,
+    page_borders: Option<&crate::doc::SectionPageBorders>,
+) -> Result<Vec<u8>, String> {
     let mut grpprl: Vec<u8> = Vec::with_capacity(8);
     if first_page_header {
         // sprmSFTitlePage (u16 opcode) + 1-byte operand (1)
@@ -30,6 +52,138 @@ pub(crate) fn generate_sepx_with_revision(
         // sprmSGprfIhdt (u16 opcode) + 1-byte operand (bitfield)
         grpprl.extend_from_slice(&crate::sprm_operations::SPRM_S_GPRF_IHDT.to_le_bytes());
         grpprl.push(grpf_ihdt);
+    }
+    if let Some(columns) = columns {
+        columns.validate().map_err(|error| error.to_string())?;
+        let count_minus_one = u16::try_from(columns.count() - 1)
+            .expect("validated section column count fits u16");
+        push_word(
+            &mut grpprl,
+            crate::sprm_operations::SPRM_S_C_COLUMNS,
+            count_minus_one,
+        );
+        match columns {
+            crate::doc::SectionColumnLayout::Even {
+                spacing_twips,
+                line_between,
+                ..
+            } => {
+                push_bool(
+                    &mut grpprl,
+                    crate::sprm_operations::SPRM_S_F_EVENLY_SPACED,
+                    true,
+                );
+                push_word(
+                    &mut grpprl,
+                    crate::sprm_operations::SPRM_S_DXA_COLUMNS,
+                    *spacing_twips,
+                );
+                push_bool(
+                    &mut grpprl,
+                    crate::sprm_operations::SPRM_S_L_BETWEEN,
+                    *line_between,
+                );
+            },
+            crate::doc::SectionColumnLayout::Unequal {
+                columns,
+                line_between,
+            } => {
+                push_bool(
+                    &mut grpprl,
+                    crate::sprm_operations::SPRM_S_F_EVENLY_SPACED,
+                    false,
+                );
+                for (index, column) in columns.iter().enumerate() {
+                    push_indexed_twips(
+                        &mut grpprl,
+                        crate::sprm_operations::SPRM_S_DXA_COL_WIDTH,
+                        index,
+                        column.width_twips,
+                    );
+                    if let Some(spacing) = column.spacing_after_twips {
+                        push_indexed_twips(
+                            &mut grpprl,
+                            crate::sprm_operations::SPRM_S_DXA_COL_SPACING,
+                            index,
+                            spacing,
+                        );
+                    }
+                }
+                push_bool(
+                    &mut grpprl,
+                    crate::sprm_operations::SPRM_S_L_BETWEEN,
+                    *line_between,
+                );
+            },
+        }
+    }
+    if right_to_left {
+        push_bool(
+            &mut grpprl,
+            crate::sprm_operations::SPRM_S_F_BIDI,
+            true,
+        );
+    }
+    if let Some(page_borders) = page_borders {
+        page_borders.validate().map_err(|error| error.to_string())?;
+        for (opcode, border) in [
+            (
+                crate::sprm_operations::SPRM_S_BRC_TOP80,
+                page_borders.top,
+            ),
+            (
+                crate::sprm_operations::SPRM_S_BRC_LEFT80,
+                page_borders.left,
+            ),
+            (
+                crate::sprm_operations::SPRM_S_BRC_BOTTOM80,
+                page_borders.bottom,
+            ),
+            (
+                crate::sprm_operations::SPRM_S_BRC_RIGHT80,
+                page_borders.right,
+            ),
+        ] {
+            if let Some(border) = border {
+                push_page_border(&mut grpprl, opcode, border);
+            }
+        }
+        if page_borders.apply_to != crate::doc::SectionPageBorderApplyTo::AllPages
+            || page_borders.depth != crate::doc::SectionPageBorderDepth::InFront
+            || page_borders.offset_from != crate::doc::SectionPageBorderOffsetFrom::Text
+        {
+            let apply_to = match page_borders.apply_to {
+                crate::doc::SectionPageBorderApplyTo::AllPages => 0,
+                crate::doc::SectionPageBorderApplyTo::FirstPage => 1,
+                crate::doc::SectionPageBorderApplyTo::AllButFirstPage => 2,
+            };
+            let depth = match page_borders.depth {
+                crate::doc::SectionPageBorderDepth::InFront => 0,
+                crate::doc::SectionPageBorderDepth::Behind => 1,
+            };
+            let offset_from = match page_borders.offset_from {
+                crate::doc::SectionPageBorderOffsetFrom::Text => 0,
+                crate::doc::SectionPageBorderOffsetFrom::PageEdge => 1,
+            };
+            grpprl.extend_from_slice(&crate::sprm_operations::SPRM_S_PGB_PROP.to_le_bytes());
+            grpprl.push(apply_to | depth << 3 | offset_from << 5);
+            grpprl.push(0);
+        }
+    }
+    if text_flow != crate::doc::SectionTextFlow::HorizontalNonAsian {
+        let value = match text_flow {
+            crate::doc::SectionTextFlow::HorizontalNonAsian => 0,
+            crate::doc::SectionTextFlow::TopToBottomAsian => 1,
+            crate::doc::SectionTextFlow::BottomToTop => 2,
+            crate::doc::SectionTextFlow::TopToBottomNonAsian => 3,
+            crate::doc::SectionTextFlow::HorizontalAsian => 4,
+            crate::doc::SectionTextFlow::VerticalNonAsian => 5,
+        };
+        push_word(
+            &mut grpprl,
+            crate::sprm_operations::SPRM_S_TEXT_FLOW,
+            value,
+        );
     }
     if let Some((author_index, timestamp)) = revision {
         // sprmSPropRMark + PropRMarkOperand(cb=7, active, ibstshort, DTTM)
@@ -43,7 +197,131 @@ pub(crate) fn generate_sepx_with_revision(
     let mut sepx = Vec::with_capacity(2 + grpprl.len());
     sepx.extend_from_slice(&size.to_le_bytes());
     sepx.extend_from_slice(&grpprl);
-    sepx
+    Ok(sepx)
+}
+
+fn push_bool(output: &mut Vec<u8>, opcode: u16, value: bool) {
+    output.extend_from_slice(&opcode.to_le_bytes());
+    output.push(u8::from(value));
+}
+
+fn push_word(output: &mut Vec<u8>, opcode: u16, value: u16) {
+    output.extend_from_slice(&opcode.to_le_bytes());
+    output.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_indexed_twips(output: &mut Vec<u8>, opcode: u16, index: usize, value: u16) {
+    output.extend_from_slice(&opcode.to_le_bytes());
+    output.push(u8::try_from(index).expect("validated section column index fits u8"));
+    output.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_page_border(
+    output: &mut Vec<u8>,
+    opcode: u16,
+    border: crate::doc::SectionPageBorder,
+) {
+    let style = match border.style {
+        crate::doc::SectionPageBorderStyle::Single => 0x01,
+        crate::doc::SectionPageBorderStyle::Double => 0x03,
+        crate::doc::SectionPageBorderStyle::Thick => 0x05,
+        crate::doc::SectionPageBorderStyle::Dotted => 0x06,
+        crate::doc::SectionPageBorderStyle::Dashed => 0x07,
+        crate::doc::SectionPageBorderStyle::DotDash => 0x08,
+        crate::doc::SectionPageBorderStyle::DotDotDash => 0x09,
+        crate::doc::SectionPageBorderStyle::Triple => 0x0A,
+        crate::doc::SectionPageBorderStyle::ThinThickSmallGap => 0x0B,
+        crate::doc::SectionPageBorderStyle::ThickThinSmallGap => 0x0C,
+        crate::doc::SectionPageBorderStyle::ThinThickThinSmallGap => 0x0D,
+        crate::doc::SectionPageBorderStyle::ThinThickMediumGap => 0x0E,
+        crate::doc::SectionPageBorderStyle::ThickThinMediumGap => 0x0F,
+        crate::doc::SectionPageBorderStyle::ThinThickThinMediumGap => 0x10,
+        crate::doc::SectionPageBorderStyle::ThinThickLargeGap => 0x11,
+        crate::doc::SectionPageBorderStyle::ThickThinLargeGap => 0x12,
+        crate::doc::SectionPageBorderStyle::ThinThickThinLargeGap => 0x13,
+        crate::doc::SectionPageBorderStyle::Wave => 0x14,
+        crate::doc::SectionPageBorderStyle::DoubleWave => 0x15,
+        crate::doc::SectionPageBorderStyle::DashSmallGap => 0x16,
+        crate::doc::SectionPageBorderStyle::DashDotStroked => 0x17,
+        crate::doc::SectionPageBorderStyle::ThreeDEmboss => 0x18,
+        crate::doc::SectionPageBorderStyle::ThreeDEngrave => 0x19,
+        crate::doc::SectionPageBorderStyle::Art(art) => art.code(),
+    };
+    let color = match border.color {
+        crate::doc::SectionPageBorderColor::Automatic => 0x00,
+        crate::doc::SectionPageBorderColor::Black => 0x01,
+        crate::doc::SectionPageBorderColor::Blue => 0x02,
+        crate::doc::SectionPageBorderColor::Cyan => 0x03,
+        crate::doc::SectionPageBorderColor::Green => 0x04,
+        crate::doc::SectionPageBorderColor::Magenta => 0x05,
+        crate::doc::SectionPageBorderColor::Red => 0x06,
+        crate::doc::SectionPageBorderColor::Yellow => 0x07,
+        crate::doc::SectionPageBorderColor::White => 0x08,
+        crate::doc::SectionPageBorderColor::DarkBlue => 0x09,
+        crate::doc::SectionPageBorderColor::DarkCyan => 0x0A,
+        crate::doc::SectionPageBorderColor::DarkGreen => 0x0B,
+        crate::doc::SectionPageBorderColor::DarkMagenta => 0x0C,
+        crate::doc::SectionPageBorderColor::DarkRed => 0x0D,
+        crate::doc::SectionPageBorderColor::DarkYellow => 0x0E,
+        crate::doc::SectionPageBorderColor::DarkGray => 0x0F,
+        crate::doc::SectionPageBorderColor::LightGray => 0x10,
+    };
+    output.extend_from_slice(&opcode.to_le_bytes());
+    output.extend_from_slice(&[
+        border.width_eighth_points,
+        style,
+        color,
+        border.spacing_points | u8::from(border.shadow) << 5 | u8::from(border.frame) << 6,
+    ]);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generate_sepx_with_properties;
+
+    #[test]
+    fn page_border_default_is_omitted_and_nondefault_is_canonical() {
+        let default = crate::doc::SectionPageBorders::default();
+        assert_eq!(
+            generate_sepx_with_properties(
+                false,
+                0,
+                None,
+                None,
+                false,
+                crate::doc::SectionTextFlow::HorizontalNonAsian,
+                Some(&default),
+            )
+            .unwrap(),
+            [0, 0]
+        );
+
+        let borders = crate::doc::SectionPageBorders {
+            top: Some(crate::doc::SectionPageBorder {
+                style: crate::doc::SectionPageBorderStyle::Single,
+                width_eighth_points: 8,
+                color: crate::doc::SectionPageBorderColor::Red,
+                spacing_points: 3,
+                shadow: true,
+                frame: false,
+            }),
+            apply_to: crate::doc::SectionPageBorderApplyTo::FirstPage,
+            ..default
+        };
+        assert_eq!(
+            generate_sepx_with_properties(
+                false,
+                0,
+                None,
+                None,
+                false,
+                crate::doc::SectionTextFlow::HorizontalNonAsian,
+                Some(&borders),
+            )
+            .unwrap(),
+            [10, 0, 0x2B, 0x70, 8, 1, 6, 0x23, 0x2F, 0x52, 1, 0]
+        );
+    }
 }
 
 /// Generate minimal SEPX (Section Properties) structure (no section SPRMs)

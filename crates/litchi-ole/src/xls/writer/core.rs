@@ -35,13 +35,22 @@ use super::formatting::{CellStyle, ExtendedFormat, FormattingManager};
 use crate::xls::page_setup::{
     XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
 };
+use crate::xls::{
+    XlsDifferentialFormat, XlsListObject, XlsTableStyle, XlsTableStyles, XlsXfProperty,
+};
+use crate::xls::encryption::{
+    XlsWriterEncryption, encrypt_workbook_for_write, validate_writer_encryption,
+};
+use crate::xls::XlsEncryptionProfile;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
+use zeroize::Zeroizing;
 
 mod comment;
 mod conditional_format;
 mod data_validation;
 mod named_range;
+mod shape;
 mod stream;
 mod worksheet;
 
@@ -59,6 +68,10 @@ pub use self::data_validation::{
 };
 use self::named_range::XlsDefinedName as InternalDefinedName;
 pub use self::named_range::{XlsDefinedName, XlsDefinedNameRecordOptions};
+pub use self::shape::{
+    XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText,
+    XlsShapeTextRun, XlsShapeWrite,
+};
 use self::worksheet::{
     AutoFilterColumnDef, AutoFilterRange, MergedRange, PivotCellXfRole, SortConfig, WritableCell,
     WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
@@ -139,12 +152,14 @@ pub struct XlsPivotFieldConfig {
     /// Unique source data values for this field's cache items.
     /// These become SXSTRING records in the pivot cache stream.
     /// For data-axis (numeric) fields, leave this empty.
-    pub cache_items: Vec<String>,
+    pub cache_items: Vec<crate::xls::PivotCacheItem>,
     /// Whether this is a numeric (data-axis) field.
     ///
     /// Numeric fields use SXFDB flags `0x0560` and contribute SXNUM records
     /// (instead of SXDBB indices) in the cache source data.
     pub is_numeric: bool,
+    /// Optional numeric, calendar, or discrete grouping definition.
+    pub grouping: Option<crate::xls::PivotCacheGrouping>,
 }
 
 /// A single cell value in the pivot cache source data.
@@ -152,8 +167,186 @@ pub struct XlsPivotFieldConfig {
 pub enum PivotCacheValue {
     /// Index into the field's `cache_items` (for string fields).
     StringIndex(u8),
+    /// Index into the field's typed shared-item list.
+    SharedItemIndex(u16),
     /// Raw numeric value (for numeric/data-axis fields).
     Number(f64),
+    Boolean(bool),
+    Error(crate::xls::PivotCacheError),
+    DateTime(crate::xls::PivotCacheDateTime),
+    Empty,
+}
+
+impl PivotCacheValue {
+    fn shared_item(&self) -> Option<crate::xls::PivotCacheItem> {
+        match self {
+            Self::Boolean(value) => Some(crate::xls::PivotCacheItem::Boolean(*value)),
+            Self::Error(value) => Some(crate::xls::PivotCacheItem::Error(*value)),
+            Self::DateTime(value) => Some(crate::xls::PivotCacheItem::DateTime(*value)),
+            Self::Empty => Some(crate::xls::PivotCacheItem::Empty),
+            Self::StringIndex(_) | Self::SharedItemIndex(_) | Self::Number(_) => None,
+        }
+    }
+}
+
+fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
+    if config.source_first_row > config.source_last_row
+        || config.source_first_col > config.source_last_col
+    {
+        return Err(XlsError::InvalidData("PivotTable source range is reversed".to_string()));
+    }
+    u16::try_from(config.fields.len()).map_err(|_| {
+        XlsError::InvalidData("PivotTable field count exceeds BIFF8 capacity".to_string())
+    })?;
+    let expected_rows = usize::from(config.source_last_row - config.source_first_row);
+    if !config.source_data.is_empty() && config.source_data.len() != expected_rows {
+        return Err(XlsError::InvalidData(format!(
+            "PivotCache source row count {} does not match source range row count {expected_rows}",
+            config.source_data.len()
+        )));
+    }
+    let mut group_children = vec![None; config.fields.len()];
+    for (field_index, field) in config.fields.iter().enumerate() {
+        if let Some(crate::xls::PivotCacheGrouping::Discrete(grouping)) = &field.grouping {
+            let base = usize::from(grouping.base_field_index);
+            if base >= config.fields.len() || base == field_index {
+                return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} has invalid base field {base}")));
+            }
+            if group_children[base].replace(field_index).is_some() {
+                return Err(XlsError::InvalidData(format!("PivotCache base field {base} has multiple grouping children")));
+            }
+            let mut cursor = base;
+            let mut seen = vec![false; config.fields.len()];
+            while let Some(crate::xls::PivotCacheGrouping::Discrete(parent)) = &config.fields[cursor].grouping {
+                if seen[cursor] { return Err(XlsError::InvalidData("PivotCache grouping chain contains a cycle".to_string())); }
+                seen[cursor] = true;
+                cursor = usize::from(parent.base_field_index);
+                if cursor >= config.fields.len() { break; }
+            }
+        }
+    }
+    for (field_index, field) in config.fields.iter().enumerate() {
+        u16::try_from(field.cache_items.len()).map_err(|_| {
+            XlsError::InvalidData(format!("PivotCache field {field_index} has too many shared items"))
+        })?;
+        if field.is_numeric && !field.cache_items.is_empty() && field.grouping.is_none() {
+            return Err(XlsError::InvalidData(format!(
+                "numeric PivotCache field {field_index} must use inline Number rows"
+            )));
+        }
+        for (item_index, item) in field.cache_items.iter().enumerate() {
+            item.validate()?;
+            if matches!(item, crate::xls::PivotCacheItem::Number(_))
+                && !matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Numeric(_)))
+            {
+                return Err(XlsError::InvalidData(format!(
+                    "non-numeric PivotCache field {field_index} cannot contain numeric shared item {item_index}"
+                )));
+            }
+            if field.cache_items[..item_index].contains(item) {
+                return Err(XlsError::InvalidData(format!(
+                    "PivotCache field {field_index} contains duplicate shared item {item_index}"
+                )));
+            }
+        }
+        if let Some(grouping) = &field.grouping {
+            let group_items = grouping.group_items();
+            if group_items.is_empty() || group_items.len() > usize::from(u16::MAX) {
+                return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} has invalid group-item count")));
+            }
+            for (index, item) in group_items.iter().enumerate() {
+                item.validate()?;
+                if group_items[..index].contains(item) {
+                    return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} has duplicate group item {index}")));
+                }
+            }
+            match grouping {
+                crate::xls::PivotCacheGrouping::Numeric(value) => {
+                    if !value.start.is_finite() || !value.end.is_finite() || !value.step.is_finite()
+                        || value.start >= value.end || value.step <= 0.0
+                    { return Err(XlsError::InvalidData(format!("PivotCache numeric grouping field {field_index} has invalid bounds or step"))); }
+                    if field.cache_items.iter().any(|item| !matches!(item, crate::xls::PivotCacheItem::Number(_))) {
+                        return Err(XlsError::InvalidData(format!("PivotCache numeric grouping field {field_index} has nonnumeric original items")));
+                    }
+                },
+                crate::xls::PivotCacheGrouping::Date(value) => {
+                    if value.start >= value.end || value.step == 0 || value.step > i16::MAX as u16 {
+                        return Err(XlsError::InvalidData(format!("PivotCache date grouping field {field_index} has invalid bounds or step")));
+                    }
+                    if field.cache_items.iter().any(|item| !matches!(item, crate::xls::PivotCacheItem::DateTime(_) | crate::xls::PivotCacheItem::Empty)) {
+                        return Err(XlsError::InvalidData(format!("PivotCache date grouping field {field_index} has invalid original items")));
+                    }
+                },
+                crate::xls::PivotCacheGrouping::Discrete(value) => {
+                    if !field.cache_items.is_empty() || field.is_numeric {
+                        return Err(XlsError::InvalidData(format!("discrete PivotCache grouping field {field_index} must be derived")));
+                    }
+                    let base_items = config.fields[usize::from(value.base_field_index)].cache_items.len();
+                    if value.item_to_group.len() != base_items {
+                        return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} mapping is not exhaustive")));
+                    }
+                    let mut used = vec![false; value.group_items.len()];
+                    for mapped in &value.item_to_group {
+                        let mapped = usize::from(*mapped);
+                        if mapped >= used.len() { return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} mapping index is out of range"))); }
+                        used[mapped] = true;
+                    }
+                    if used.iter().any(|used| !used) { return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} contains an unused group item"))); }
+                },
+            }
+        }
+        for item in &field.items {
+            let visible_count = field.grouping.as_ref().map_or(field.cache_items.len(), |grouping| grouping.group_items().len());
+            if item.item_type == 0 && usize::from(item.cache_index) >= visible_count {
+                return Err(XlsError::InvalidData(format!(
+                    "PivotTable field {field_index} SXVI cache index {} is out of range",
+                    item.cache_index
+                )));
+            }
+        }
+    }
+    for (row_index, row) in config.source_data.iter().enumerate() {
+        let source_field_count = config.fields.iter().filter(|field| !matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_)))).count();
+        if row.len() != source_field_count {
+            return Err(XlsError::InvalidData(format!(
+                "PivotCache row {row_index} has {} values for {} fields",
+                row.len(), source_field_count
+            )));
+        }
+        let mut row_values = row.iter();
+        for (field_index, field) in config.fields.iter().enumerate() {
+            if matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_))) { continue; }
+            let value = row_values.next().unwrap();
+            if field.is_numeric && field.grouping.is_none() {
+                match value {
+                    PivotCacheValue::Number(number) if number.is_finite() => {},
+                    PivotCacheValue::Number(_) => return Err(XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} is non-finite"))),
+                    _ => return Err(XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} does not match numeric field type"))),
+                }
+                continue;
+            }
+            let index = match value {
+                PivotCacheValue::StringIndex(index) => usize::from(*index),
+                PivotCacheValue::SharedItemIndex(index) => usize::from(*index),
+                PivotCacheValue::Number(number) if matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Numeric(_))) => {
+                    field.cache_items.iter().position(|candidate| candidate == &crate::xls::PivotCacheItem::Number(*number)).ok_or_else(|| {
+                        XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} numeric value is absent from original items"))
+                    })?
+                },
+                PivotCacheValue::Number(_) => return Err(XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} does not match shared field type"))),
+                typed => {
+                    let item = typed.shared_item().expect("typed shared value");
+                    field.cache_items.iter().position(|candidate| candidate == &item).ok_or_else(|| {
+                        XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} value is absent from shared items"))
+                    })?
+                },
+            };
+            if index >= field.cache_items.len() {
+                return Err(XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} shared index {index} is out of range")));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// A single pivot item.
@@ -395,6 +588,9 @@ pub struct XlsCalculationSettings {
     pub reference_mode: crate::xls::XlsReferenceMode,
     pub recalculate_before_save: bool,
     pub recalculation_engine_id: u32,
+    /// Optional BIFF8 multithreaded-calculation metadata. This controls only
+    /// serialized workbook settings; the writer never evaluates formulas.
+    pub multithreaded_calculation: Option<crate::xls::XlsMultithreadedCalculation>,
     pub force_full_calculation: bool,
 }
 
@@ -477,21 +673,20 @@ pub struct XlsAddInFunctionOptions {
     pub unused_data: Vec<u8>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct XlsDdeOrOleItemOptions {
     pub name: String,
     pub automatic: bool,
     pub picture: bool,
     pub standard_document_name: bool,
     pub ole_link: bool,
-    pub clipboard_format: i16,
+    pub clipboard_format: crate::xls::XlsExternalClipboardFormat,
     pub displayed_as_icon: bool,
     pub storage_id: u32,
-    pub opaque_data: Vec<u8>,
-    pub continuation_chunks: Vec<Vec<u8>>,
+    pub matrix: Option<crate::xls::XlsDdeOleValueMatrix>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct XlsDdeOrOleLinkOptions {
     pub encoded_virtual_path: String,
     pub items: Vec<XlsDdeOrOleItemOptions>,
@@ -562,42 +757,31 @@ impl XlsDdeOrOleLinkOptions {
         }
         for item in &self.items {
             validate_short_external_name(&item.name)?;
-            if !matches!(
-                item.clipboard_format,
-                -1 | 0 | 2 | 5 | 6 | 7 | 8 | 9 | 16 | 20 | 30 | 36 | 44 | 63
-            ) {
-                return Err(XlsError::InvalidData(
-                    "invalid DDE/OLE clipboard format".to_string(),
-                ));
-            }
             if item.standard_document_name {
                 if item.ole_link
                     || item.displayed_as_icon
                     || item.storage_id != 0
                     || item.name != "StdDocumentName"
-                    || !item.opaque_data.is_empty()
-                    || !item.continuation_chunks.is_empty()
+                    || item.matrix.is_some()
                 {
                     return Err(XlsError::InvalidData(
                         "invalid standard-document DDE item".to_string(),
                     ));
                 }
-            }
-            let mut opaque_size = item.opaque_data.len();
-            for chunk in &item.continuation_chunks {
-                if chunk.is_empty() || chunk.len() > 8224 {
+            } else {
+                if !item.ole_link && item.storage_id != 0 {
                     return Err(XlsError::InvalidData(
-                        "DDE/OLE continuation must be 1..=8224 bytes".to_string(),
+                        "DDE item cannot identify OLE link storage".to_string(),
                     ));
                 }
-                opaque_size = opaque_size.checked_add(chunk.len()).ok_or_else(|| {
-                    XlsError::InvalidData("DDE/OLE opaque data size overflows".to_string())
-                })?;
+                if item.displayed_as_icon && !item.ole_link {
+                    return Err(XlsError::InvalidData(
+                        "only an OLE item can be displayed as an icon".to_string(),
+                    ));
+                }
             }
-            if opaque_size > 1_048_576 {
-                return Err(XlsError::InvalidData(
-                    "DDE/OLE opaque data exceeds resource bound".to_string(),
-                ));
+            if let Some(matrix) = &item.matrix {
+                matrix.validate()?;
             }
         }
         Ok(())
@@ -821,10 +1005,186 @@ impl Default for XlsCalculationSettings {
             reference_mode: crate::xls::XlsReferenceMode::A1,
             recalculate_before_save: true,
             recalculation_engine_id: 0x000E_EA35,
+            multithreaded_calculation: None,
             force_full_calculation: false,
         }
     }
 }
+/// A complete caller-defined BIFF8 table-style family.
+#[derive(Debug, Clone, PartialEq)]
+pub struct XlsCustomTableStyles {
+    differential_formats: Vec<XlsDifferentialFormat>,
+    catalog: XlsTableStyles,
+}
+
+impl XlsCustomTableStyles {
+    pub fn try_new(
+        differential_formats: Vec<XlsDifferentialFormat>,
+        catalog: XlsTableStyles,
+    ) -> XlsResult<Self> {
+        let value = Self {
+            differential_formats,
+            catalog,
+        };
+        value.validate_structure()?;
+        Ok(value)
+    }
+
+    pub fn try_from_styles(
+        differential_formats: Vec<XlsDifferentialFormat>,
+        default_table_style: impl Into<String>,
+        default_pivot_style: impl Into<String>,
+        custom_styles: Vec<XlsTableStyle>,
+    ) -> XlsResult<Self> {
+        Self::try_new(
+            differential_formats,
+            XlsTableStyles::try_with_custom_styles(
+                default_table_style,
+                default_pivot_style,
+                custom_styles,
+            )?,
+        )
+    }
+
+    pub fn differential_formats(&self) -> &[XlsDifferentialFormat] {
+        &self.differential_formats
+    }
+
+    pub const fn catalog(&self) -> &XlsTableStyles {
+        &self.catalog
+    }
+
+    fn validate_structure(&self) -> XlsResult<()> {
+        if self.differential_formats.len() > usize::from(u16::MAX) + 1 {
+            return Err(XlsError::InvalidData(
+                "custom table styles contain more than 65,536 DXFs".to_string(),
+            ));
+        }
+        for differential_format in &self.differential_formats {
+            differential_format.to_record_bytes()?;
+        }
+        self.catalog
+            .to_family_record_bytes(self.differential_formats.len())?;
+        Ok(())
+    }
+
+    pub(super) fn validate(&self, formatting: &FormattingManager) -> XlsResult<()> {
+        self.validate_structure()?;
+        for (dxf_index, differential_format) in self.differential_formats.iter().enumerate() {
+            for property in differential_format.properties().properties() {
+                if let XlsXfProperty::NumberFormatId(number_format_id) = property
+                    && !formatting.contains_number_format_id(*number_format_id)
+                {
+                    return Err(XlsError::InvalidData(format!(
+                        "custom table-style DXF {dxf_index} references undefined number format {number_format_id}"
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn is_builtin_table_style(name: &str) -> bool {
+    [
+        ("TableStyleLight", 21u16),
+        ("TableStyleMedium", 28),
+        ("TableStyleDark", 11),
+    ]
+    .iter()
+    .any(|(prefix, maximum)| {
+        name.strip_prefix(prefix)
+            .and_then(|suffix| suffix.parse::<u16>().ok())
+            .is_some_and(|value| (1..=*maximum).contains(&value))
+    })
+}
+
+pub(super) fn validate_list_object_style(
+    name: &str,
+    custom: Option<&XlsCustomTableStyles>,
+) -> XlsResult<()> {
+    if is_builtin_table_style(name)
+        || custom.is_some_and(|styles| {
+            styles.catalog().custom_styles().iter().any(|style| {
+                style.name().eq_ignore_ascii_case(name) && style.is_available_for_tables()
+            })
+        })
+    {
+        return Ok(());
+    }
+    Err(XlsError::InvalidData(format!(
+        "table style {name:?} is not a table-capable built-in or configured custom style"
+    )))
+}
+
+fn validate_list_object_relationships(
+    worksheets: &[WritableWorksheet],
+    custom: Option<&XlsCustomTableStyles>,
+    defined_names: &[InternalDefinedName],
+    defined_name_records: &[(
+        XlsDefinedNameRecordOptions,
+        crate::xls::XlsDefinedNameFutureRecords,
+    )],
+) -> XlsResult<()> {
+    let mut ids = std::collections::HashSet::new();
+    let mut names = std::collections::HashSet::new();
+    let defined_names = defined_names
+        .iter()
+        .map(|name| name.name.to_lowercase())
+        .chain(
+            defined_name_records
+                .iter()
+                .map(|(name, _)| name.name.to_lowercase()),
+        )
+        .collect::<std::collections::HashSet<_>>();
+    for worksheet in worksheets {
+        for (index, table) in worksheet.list_objects.iter().enumerate() {
+            table.validate()?;
+            validate_list_object_style(table.style().unwrap().name(), custom)?;
+            if !ids.insert(table.id()) || !names.insert(table.name().to_lowercase()) {
+                return Err(XlsError::InvalidData(
+                    "duplicate workbook table identifier or name".to_string(),
+                ));
+            }
+            if defined_names.contains(&table.name().to_lowercase()) {
+                return Err(XlsError::InvalidData(
+                    "table name collides with a workbook defined name".to_string(),
+                ));
+            }
+            if worksheet.list_objects[..index]
+                .iter()
+                .any(|existing| existing.range().overlaps(table.range()))
+            {
+                return Err(XlsError::InvalidData(
+                    "table ranges overlap within the worksheet".to_string(),
+                ));
+            }
+            if worksheet.auto_filter.is_some_and(|filter| {
+                u32::from(table.range().first_row()) <= filter.last_row
+                    && filter.first_row <= u32::from(table.range().last_row())
+                    && table.range().first_column() <= filter.last_col
+                    && filter.first_col <= table.range().last_column()
+            }) {
+                return Err(XlsError::InvalidData(
+                    "table range overlaps the worksheet AutoFilter".to_string(),
+                ));
+            }
+        }
+        if let Some(sort) = &worksheet.sort_data
+            && let crate::xls::XlsSortParent::Table { id } = sort.parent()
+            && !worksheet
+                .list_objects
+                .iter()
+                .any(|table| table.id().value() == id)
+        {
+            return Err(XlsError::InvalidData(
+                "table SortData references an unknown ListObject identifier".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// XLS file writer
 ///
 /// Provides methods to create and modify XLS (BIFF8) files.
@@ -857,6 +1217,8 @@ pub struct XlsWriter {
     external_names: Vec<Vec<XlsExternalDefinedNameOptions>>,
     add_in_functions: Vec<XlsAddInFunctionOptions>,
     dde_or_ole_links: Vec<XlsDdeOrOleLinkOptions>,
+    custom_table_styles: Option<XlsCustomTableStyles>,
+    encryption: Option<XlsWriterEncryption>,
 }
 
 impl XlsWriter {
@@ -882,7 +1244,37 @@ impl XlsWriter {
             external_names: Vec::new(),
             add_in_functions: Vec::new(),
             dde_or_ole_links: Vec::new(),
+            custom_table_styles: None,
+            encryption: None,
         }
+    }
+
+    /// Configure BIFF8 password-to-open encryption for subsequent writes.
+    ///
+    /// Validation is atomic: an invalid password or profile leaves the current
+    /// encryption configuration unchanged.
+    pub fn set_password(
+        &mut self,
+        password: impl Into<String>,
+        profile: XlsEncryptionProfile,
+    ) -> XlsResult<()> {
+        let password = password.into();
+        validate_writer_encryption(&password, profile)?;
+        self.encryption = Some(XlsWriterEncryption {
+            password: Zeroizing::new(password),
+            profile,
+        });
+        Ok(())
+    }
+
+    /// Remove password-to-open encryption from subsequent writes.
+    pub fn clear_password(&mut self) {
+        self.encryption = None;
+    }
+
+    /// Return the configured password-to-open encryption profile.
+    pub fn encryption_profile(&self) -> Option<XlsEncryptionProfile> {
+        self.encryption.as_ref().map(|value| value.profile)
     }
 
     /// Add a new worksheet
@@ -1059,6 +1451,127 @@ impl XlsWriter {
         self.fmt.add_format(format)
     }
 
+    /// Installs a complete custom table-style family.
+    ///
+    /// Validation happens before assignment, so an error leaves the current
+    /// writer configuration unchanged.
+    pub fn set_custom_table_styles(&mut self, styles: XlsCustomTableStyles) -> XlsResult<()> {
+        styles.validate(&self.fmt)?;
+        self.custom_table_styles = Some(styles);
+        Ok(())
+    }
+
+    /// Removes caller-defined table styles and restores the default write path.
+    pub fn clear_custom_table_styles(&mut self) {
+        self.custom_table_styles = None;
+    }
+
+    /// Adds a legacy BIFF8 worksheet table and writes its header captions.
+    pub fn add_list_object(&mut self, sheet: usize, table: XlsListObject) -> XlsResult<()> {
+        table.validate()?;
+        validate_list_object_style(
+            table.style().unwrap().name(),
+            self.custom_table_styles.as_ref(),
+        )?;
+        if self
+            .worksheets
+            .iter()
+            .flat_map(|worksheet| &worksheet.list_objects)
+            .any(|existing| {
+                existing.id() == table.id() || existing.name().eq_ignore_ascii_case(table.name())
+            })
+        {
+            return Err(XlsError::InvalidData(
+                "table identifier or name collides within the workbook".to_string(),
+            ));
+        }
+        if self
+            .defined_names
+            .iter()
+            .any(|name| name.name.eq_ignore_ascii_case(table.name()))
+            || self
+                .defined_name_records
+                .iter()
+                .any(|(name, _)| name.name.eq_ignore_ascii_case(table.name()))
+        {
+            return Err(XlsError::InvalidData(
+                "table name collides with a workbook defined name".to_string(),
+            ));
+        }
+        let worksheet = self
+            .worksheets
+            .get(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        if worksheet
+            .list_objects
+            .iter()
+            .any(|existing| existing.range().overlaps(table.range()))
+        {
+            return Err(XlsError::InvalidData(
+                "table ranges overlap within the worksheet".to_string(),
+            ));
+        }
+        if worksheet.auto_filter.is_some_and(|filter| {
+            u32::from(table.range().first_row()) <= filter.last_row
+                && filter.first_row <= u32::from(table.range().last_row())
+                && table.range().first_column() <= filter.last_col
+                && filter.first_col <= table.range().last_column()
+        }) {
+            return Err(XlsError::InvalidData(
+                "table range overlaps the worksheet AutoFilter".to_string(),
+            ));
+        }
+        for (offset, column) in table
+            .columns()
+            .iter()
+            .enumerate()
+            .filter(|_| table.has_header_row())
+        {
+            let key = (
+                u32::from(table.range().first_row()),
+                table.range().first_column() + offset as u16,
+            );
+            if let Some(cell) = worksheet.cells.get(&key)
+                && !matches!(&cell.value, XlsCellValue::String(value) if value == column.name())
+            {
+                return Err(XlsError::InvalidData(
+                    "table header collides with a different cell value".to_string(),
+                ));
+            }
+        }
+        let worksheet = self.worksheets.get_mut(sheet).unwrap();
+        worksheet.include_list_object_range(table.range());
+        for (offset, column) in table
+            .columns()
+            .iter()
+            .enumerate()
+            .filter(|_| table.has_header_row())
+        {
+            let row = u32::from(table.range().first_row());
+            let col = table.range().first_column() + offset as u16;
+            if !worksheet.cells.contains_key(&(row, col)) {
+                worksheet.add_cell(WritableCell {
+                    row,
+                    col,
+                    value: XlsCellValue::String(column.name().to_string()),
+                    format_idx: 0,
+                    pivot_xf_role: None,
+                });
+            }
+        }
+        worksheet.list_objects.push(table);
+        Ok(())
+    }
+
+    pub fn clear_list_objects(&mut self, sheet: usize) -> XlsResult<()> {
+        self.worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?
+            .list_objects
+            .clear();
+        Ok(())
+    }
+
     /// Validate a defined name according to basic Excel constraints.
     ///
     /// This helper enforces only well-defined structural rules from the
@@ -1211,6 +1724,83 @@ impl XlsWriter {
         Ok(())
     }
 
+    /// Add a validated, macro-inert primitive shape and return its worksheet OBJ identifier.
+    pub fn add_shape(&mut self, sheet: usize, mut shape: XlsShapeWrite) -> XlsResult<u16> {
+        shape.validate()?;
+        let worksheet = self
+            .worksheets
+            .get(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        let pivot_ids = worksheet
+            .pivot_tables
+            .iter()
+            .flat_map(|table| table.page_entries.iter().map(|entry| entry.2))
+            .filter(|id| *id != 0 && *id != u16::MAX)
+            .collect::<std::collections::HashSet<_>>();
+        let shape_ids = worksheet
+            .shapes
+            .iter()
+            .filter_map(|shape| shape.object_id)
+            .collect::<std::collections::HashSet<_>>();
+        let object_count = pivot_ids
+            .union(&shape_ids)
+            .count()
+            .checked_add(worksheet.comments.len())
+            .ok_or_else(|| XlsError::InvalidData("worksheet shape count overflows".to_string()))?;
+        if object_count >= 1022 {
+            return Err(XlsError::InvalidData(
+                "a worksheet cannot contain more than 1022 drawing objects".to_string(),
+            ));
+        }
+        let object_id = if let Some(requested) = shape.object_id {
+            if pivot_ids.contains(&requested) || shape_ids.contains(&requested) {
+                return Err(XlsError::InvalidData(
+                    "shape object ID collides with another worksheet object".to_string(),
+                ));
+            }
+            requested
+        } else {
+            (1..u16::MAX)
+                .find(|candidate| !pivot_ids.contains(candidate) && !shape_ids.contains(candidate))
+                .ok_or_else(|| {
+                    XlsError::InvalidData("worksheet object IDs are exhausted".to_string())
+                })?
+        };
+        shape.object_id = Some(object_id);
+        self.worksheets.get_mut(sheet).unwrap().shapes.push(shape);
+        Ok(object_id)
+    }
+
+    /// Remove a primitive by its assigned OBJ identifier.
+    pub fn remove_shape(&mut self, sheet: usize, object_id: u16) -> XlsResult<XlsShapeWrite> {
+        if object_id == 0 || object_id == u16::MAX {
+            return Err(XlsError::InvalidData(
+                "shape object ID 0 and 65535 are reserved".to_string(),
+            ));
+        }
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        let index = worksheet
+            .shapes
+            .iter()
+            .position(|shape| shape.object_id == Some(object_id))
+            .ok_or_else(|| XlsError::InvalidData("shape object ID was not found".to_string()))?;
+        Ok(worksheet.shapes.remove(index))
+    }
+
+    /// Remove all writable primitive shapes from a worksheet.
+    pub fn clear_shapes(&mut self, sheet: usize) -> XlsResult<usize> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        let count = worksheet.shapes.len();
+        worksheet.shapes.clear();
+        Ok(count)
+    }
+
     pub fn set_auto_filter(
         &mut self,
         sheet: usize,
@@ -1234,6 +1824,19 @@ impl XlsWriter {
         if last_col >= 256 {
             return Err(XlsError::InvalidData(
                 "set_auto_filter: column index must be < 256 for BIFF8".to_string(),
+            ));
+        }
+
+        if let Some(worksheet) = self.worksheets.get(sheet)
+            && worksheet.list_objects.iter().any(|table| {
+                first_row <= u32::from(table.range().last_row())
+                    && u32::from(table.range().first_row()) <= last_row
+                    && first_col <= table.range().last_column()
+                    && table.range().first_column() <= last_col
+            })
+        {
+            return Err(XlsError::InvalidData(
+                "set_auto_filter: range overlaps a worksheet table".to_string(),
             ));
         }
 
@@ -1367,6 +1970,24 @@ impl XlsWriter {
         Ok(())
     }
 
+    /// Set extended BIFF8 sort metadata for a worksheet.
+    ///
+    /// Unlike [`set_sort`](Self::set_sort), this preserves the complete
+    /// `SortData` model, including an explicit range, more than three keys,
+    /// custom lists, differential-format colors, and icon sets.
+    pub fn set_sort_data(
+        &mut self,
+        sheet: usize,
+        sort_data: crate::xls::XlsSortData,
+    ) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        worksheet.set_sort_data(sort_data);
+        Ok(())
+    }
+
     /// Add a pivot table definition to a worksheet.
     ///
     /// This writes the SX* record family (SXVS, SXVIEW, SXVD, SXVI, SXDI,
@@ -1378,6 +1999,7 @@ impl XlsWriter {
     /// * `sheet` — worksheet index (0-based)
     /// * `config` — pivot table configuration (see [`XlsPivotTableConfig`])
     pub fn add_pivot_table(&mut self, sheet: usize, config: XlsPivotTableConfig) -> XlsResult<()> {
+        validate_pivot_table_config(&config)?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
@@ -1416,14 +2038,14 @@ impl XlsWriter {
                     let al = f
                         .cache_items
                         .get(a.cache_index as usize)
-                        .map(String::as_str)
-                        .unwrap_or("");
+                        .map(crate::xls::PivotCacheItem::display_text)
+                        .unwrap_or_default();
                     let bl = f
                         .cache_items
                         .get(b.cache_index as usize)
-                        .map(String::as_str)
-                        .unwrap_or("");
-                    al.cmp(bl)
+                        .map(crate::xls::PivotCacheItem::display_text)
+                        .unwrap_or_default();
+                    al.cmp(&bl)
                 });
 
                 WritablePivotField {
@@ -1435,6 +2057,7 @@ impl XlsWriter {
                     cache_name: f.cache_name,
                     cache_items: f.cache_items,
                     is_numeric: f.is_numeric,
+                    grouping: f.grouping,
                 }
             })
             .collect();
@@ -1705,20 +2328,20 @@ impl XlsWriter {
         };
 
         // Build (original_index, label) pairs and sort by label.
-        let mut indexed: Vec<(usize, &str)> = f
+        let mut indexed: Vec<(usize, String)> = f
             .cache_items
             .iter()
             .enumerate()
-            .map(|(i, s)| (i, s.as_str()))
+            .map(|(i, item)| (i, item.display_text()))
             .collect();
-        indexed.sort_unstable_by(|a, b| a.1.cmp(b.1));
+        indexed.sort_unstable_by(|a, b| a.1.cmp(&b.1));
 
-        let sorted_labels: Vec<String> = indexed.iter().map(|(_, s)| (*s).to_string()).collect();
+        let sorted_labels: Vec<String> = indexed.iter().map(|(_, value)| value.clone()).collect();
 
         // cache_to_sorted[original_cache_idx] = position in sorted output
         let mut cache_to_sorted = vec![0usize; f.cache_items.len()];
-        for (sorted_pos, &(orig_idx, _)) in indexed.iter().enumerate() {
-            cache_to_sorted[orig_idx] = sorted_pos;
+        for (sorted_pos, (orig_idx, _)) in indexed.iter().enumerate() {
+            cache_to_sorted[*orig_idx] = sorted_pos;
         }
 
         (sorted_labels, cache_to_sorted)
@@ -3073,7 +3696,7 @@ impl XlsWriter {
     /// Generate the complete Workbook stream (plus pivot cache streams) with
     /// all BIFF records.
     fn generate_workbook_streams(&self) -> XlsResult<stream::WorkbookStreams> {
-        stream::generate_workbook_stream(
+        let mut streams = stream::generate_workbook_stream(
             self.use_1904_dates,
             self.calculation_settings,
             self.vba_metadata.as_ref(),
@@ -3085,6 +3708,7 @@ impl XlsWriter {
             &self.add_in_functions,
             &self.dde_or_ole_links,
             &self.fmt,
+            self.custom_table_styles.as_ref(),
             &self.defined_names,
             &self.defined_name_records,
             &self.shared_strings,
@@ -3093,7 +3717,11 @@ impl XlsWriter {
             self.file_sharing.as_ref(),
             &self.worksheets,
             &self.string_map,
-        )
+        )?;
+        if let Some(encryption) = &self.encryption {
+            streams.workbook = encrypt_workbook_for_write(streams.workbook, encryption)?;
+        }
+        Ok(streams)
     }
 
     /// Get the number of worksheets in this workbook

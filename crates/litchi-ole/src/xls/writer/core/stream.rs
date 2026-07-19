@@ -8,8 +8,8 @@ use crate::xls::{XlsError, XlsResult};
 use super::named_range::XlsDefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
 use super::{
-    XlsCalculationSettings, XlsCellValue, XlsExternalWorkbookOptions, XlsFileSharing,
-    XlsFunctionGroupOptions, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions,
+    XlsCalculationSettings, XlsCellValue, XlsCustomTableStyles, XlsExternalWorkbookOptions,
+    XlsFileSharing, XlsFunctionGroupOptions, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions,
     XlsWorkbookProtection, XlsWorkbookWindowOptions,
 };
 
@@ -25,6 +25,54 @@ pub(crate) struct WorkbookStreams {
     pub pivot_caches: Vec<(u16, Vec<u8>)>,
 }
 
+#[derive(Clone, Copy)]
+struct PivotCacheIdentity {
+    /// Zero-based index used by SXVIEW.iCache.
+    cache_index: u16,
+    /// One-based identifier used by SXStreamID and `_SX_DB_CUR/nnnn`.
+    stream_id: u16,
+}
+
+fn stage_pivot_cache_identities(
+    worksheets: &[WritableWorksheet],
+) -> XlsResult<Vec<Vec<PivotCacheIdentity>>> {
+    let pivot_count = worksheets.iter().try_fold(0usize, |count, worksheet| {
+        count
+            .checked_add(worksheet.pivot_tables.len())
+            .ok_or_else(|| XlsError::InvalidData("PivotTable cache count overflow".to_string()))
+    })?;
+    if pivot_count > usize::from(u16::MAX) {
+        return Err(XlsError::InvalidData(format!(
+            "PivotTable cache count {pivot_count} exceeds the BIFF8 limit of {}",
+            u16::MAX
+        )));
+    }
+
+    let mut next_index = 0usize;
+    worksheets
+        .iter()
+        .map(|worksheet| {
+            (0..worksheet.pivot_tables.len())
+                .map(|_| {
+                    let cache_index = u16::try_from(next_index).map_err(|_| {
+                        XlsError::InvalidData("PivotTable cache index overflow".to_string())
+                    })?;
+                    let stream_id = cache_index.checked_add(1).ok_or_else(|| {
+                        XlsError::InvalidData("PivotTable cache stream ID overflow".to_string())
+                    })?;
+                    next_index = next_index.checked_add(1).ok_or_else(|| {
+                        XlsError::InvalidData("PivotTable cache index overflow".to_string())
+                    })?;
+                    Ok(PivotCacheIdentity {
+                        cache_index,
+                        stream_id,
+                    })
+                })
+                .collect()
+        })
+        .collect()
+}
+
 #[allow(clippy::too_many_arguments)] // TODO: Refactor this function to accept a struct
 pub(crate) fn generate_workbook_stream(
     use_1904_dates: bool,
@@ -38,6 +86,7 @@ pub(crate) fn generate_workbook_stream(
     add_in_functions: &[super::XlsAddInFunctionOptions],
     dde_or_ole_links: &[super::XlsDdeOrOleLinkOptions],
     fmt: &FormattingManager,
+    custom_table_styles: Option<&XlsCustomTableStyles>,
     defined_names: &[InternalDefinedName],
     defined_name_records: &[(
         super::XlsDefinedNameRecordOptions,
@@ -50,6 +99,15 @@ pub(crate) fn generate_workbook_stream(
     worksheets: &[WritableWorksheet],
     string_map: &HashMap<String, u32>,
 ) -> XlsResult<WorkbookStreams> {
+    if let Some(styles) = custom_table_styles {
+        styles.validate(fmt)?;
+    }
+    super::validate_list_object_relationships(
+        worksheets,
+        custom_table_styles,
+        defined_names,
+        defined_name_records,
+    )?;
     workbook_window.validate_for_sheet_count(worksheets.len())?;
     let active_sheet = usize::from(workbook_window.active_sheet_index);
     if !worksheets[active_sheet].view.selected {
@@ -67,6 +125,10 @@ pub(crate) fn generate_workbook_stream(
             workbook_window.selected_sheet_count
         )));
     }
+    // Stage the complete workbook-global cache identity map before emitting any
+    // BIFF bytes. SXVIEW uses the zero-based index while SXStreamID and the OLE
+    // cache stream name use the corresponding one-based stream ID.
+    let pivot_cache_identities = stage_pivot_cache_identities(worksheets)?;
     let mut stream = Vec::new();
     let has_pivot_tables = worksheets.iter().any(|ws| !ws.pivot_tables.is_empty());
     let sheet_count = u16::try_from(worksheets.len()).unwrap_or(u16::MAX);
@@ -151,6 +213,9 @@ pub(crate) fn generate_workbook_stream(
     fmt.write_fonts(&mut stream)?;
     fmt.write_number_formats(&mut stream)?;
     fmt.write_formats(&mut stream)?;
+    if let Some(styles) = custom_table_styles {
+        biff::write_differential_formats(&mut stream, styles.differential_formats())?;
+    }
     if has_pivot_tables {
         biff::write_pivot_xfext_block(&mut stream)?;
     }
@@ -160,7 +225,13 @@ pub(crate) fn generate_workbook_stream(
     // etc.) visible to Excel even though we currently only use the default
     // cell XF (index 15) for all cells.
     biff::write_builtin_styles(&mut stream)?;
-    if has_pivot_tables {
+    if let Some(styles) = custom_table_styles {
+        biff::write_custom_table_styles(
+            &mut stream,
+            styles.catalog(),
+            styles.differential_formats().len(),
+        )?;
+    } else if has_pivot_tables {
         biff::write_table_styles(&mut stream)?;
     }
 
@@ -236,18 +307,16 @@ pub(crate) fn generate_workbook_stream(
     // The actual cache data (SXDB + SXFDB) goes in a *separate* OLE
     // storage `_SX_DB_CUR/nnnn`, NOT in the Workbook stream.
     let mut pivot_caches: Vec<(u16, Vec<u8>)> = Vec::new();
-    let has_any_page_fields: bool;
     {
         // Collect all pivot tables across worksheets.
         let all_pts: Vec<&super::worksheet::WritablePivotTable> = worksheets
             .iter()
             .flat_map(|ws| ws.pivot_tables.iter())
             .collect();
-        has_any_page_fields = all_pts.iter().any(|pt| !pt.page_entries.is_empty());
-
-        for (idx, pt) in all_pts.iter().enumerate() {
-            // LO uses 1-based IDs: maPCInfo.mnStrmId = nListIdx + 1
-            let id = (idx + 1) as u16;
+        let all_identities = pivot_cache_identities.iter().flatten();
+        for (pt, identity) in all_pts.iter().zip(all_identities) {
+            // LO uses 1-based IDs: maPCInfo.mnStrmId = nListIdx + 1.
+            let id = identity.stream_id;
 
             // PIVOTCACHEDEFINITION in globals: SxStreamID + SXVS + DCONREF
             biff::write_sx_stream_id(&mut stream, id)?;
@@ -265,12 +334,6 @@ pub(crate) fn generate_workbook_stream(
             // Build per-field cache info from the dedicated cache_items lists.
             // cache_name is the source column header (SXFDB name).
             // cache_items are the unique source data values (SXSTRING records).
-            let field_item_refs: Vec<Vec<&str>> = pt
-                .fields
-                .iter()
-                .map(|f| f.cache_items.iter().map(String::as_str).collect())
-                .collect();
-
             // Count unique numeric values per numeric field from source_data.
             let unique_numeric_counts: Vec<u16> = pt
                 .fields
@@ -299,41 +362,56 @@ pub(crate) fn generate_workbook_stream(
             let cache_fields: Vec<biff::PivotCacheFieldInfo<'_>> = pt
                 .fields
                 .iter()
-                .zip(field_item_refs.iter())
+                .enumerate()
                 .zip(unique_numeric_counts.iter())
-                .map(|((f, items), &uniq_count)| biff::PivotCacheFieldInfo {
+                .map(|((field_index, f), &uniq_count)| biff::PivotCacheFieldInfo {
                     name: &f.cache_name,
-                    items: items.as_slice(),
+                    items: &f.cache_items,
                     is_numeric: f.is_numeric,
                     unique_numeric_count: uniq_count,
+                    grouping: f.grouping.as_ref(),
+                    group_child: pt.fields.iter().position(|candidate| matches!(&candidate.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(value)) if usize::from(value.base_field_index) == field_index)).map(|index| index as u16),
+                    is_source_field: !matches!(f.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_))),
                 })
                 .collect();
 
             // Build source rows: split each PivotCacheValue row into
             // string_indices (for SXDBB) and numeric_values (for SXNUM).
-            let num_string_fields = pt.fields.iter().filter(|f| !f.is_numeric).count();
-            let num_numeric_fields = pt.fields.iter().filter(|f| f.is_numeric).count();
-            let mut row_string_indices: Vec<Vec<u8>> = Vec::with_capacity(pt.source_data.len());
+            let num_string_fields = pt.fields.iter().filter(|f| !f.cache_items.is_empty() && !matches!(f.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_)))).count();
+            let num_numeric_fields = pt.fields.iter().filter(|f| f.is_numeric && f.cache_items.is_empty() && f.grouping.is_none()).count();
+            let mut row_item_indices: Vec<Vec<u16>> = Vec::with_capacity(pt.source_data.len());
             let mut row_numeric_values: Vec<Vec<f64>> = Vec::with_capacity(pt.source_data.len());
             for row in &pt.source_data {
                 let mut si = Vec::with_capacity(num_string_fields);
                 let mut nv = Vec::with_capacity(num_numeric_fields);
-                for (fi, val) in row.iter().enumerate() {
-                    let is_num = pt.fields.get(fi).is_some_and(|f| f.is_numeric);
+                let mut values = row.iter();
+                for field in &pt.fields {
+                    if matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_))) { continue; }
+                    let val = values.next().unwrap();
+                    let is_num = field.is_numeric && field.cache_items.is_empty() && field.grouping.is_none();
                     match val {
-                        super::PivotCacheValue::StringIndex(idx) if !is_num => si.push(*idx),
+                        super::PivotCacheValue::StringIndex(idx) if !is_num => si.push(u16::from(*idx)),
+                        super::PivotCacheValue::SharedItemIndex(idx) if !is_num => si.push(*idx),
                         super::PivotCacheValue::Number(v) if is_num => nv.push(*v),
+                        value if !is_num => {
+                            let item = match value { super::PivotCacheValue::Number(number) => Some(crate::xls::PivotCacheItem::Number(*number)), _ => value.shared_item() };
+                            if let Some(item) = item
+                                && let Some(index) = field.cache_items.iter().position(|candidate| candidate == &item)
+                            {
+                                si.push(index as u16);
+                            }
+                        },
                         _ => {}, // type mismatch — skip
                     }
                 }
-                row_string_indices.push(si);
+                row_item_indices.push(si);
                 row_numeric_values.push(nv);
             }
-            let source_rows: Vec<biff::PivotCacheSourceRow<'_>> = row_string_indices
+            let source_rows: Vec<biff::PivotCacheSourceRow<'_>> = row_item_indices
                 .iter()
                 .zip(row_numeric_values.iter())
                 .map(|(si, nv)| biff::PivotCacheSourceRow {
-                    string_indices: si.as_slice(),
+                    item_indices: si.as_slice(),
                     numeric_values: nv.as_slice(),
                 })
                 .collect();
@@ -350,23 +428,32 @@ pub(crate) fn generate_workbook_stream(
     }
 
     let mut drawing_clusters = Vec::<(u32, u32)>::new();
-    if has_any_page_fields {
-        drawing_clusters.extend_from_slice(&[(1, 1), (2, 2)]);
+    let mut worksheet_drawing_ids = Vec::with_capacity(worksheets.len());
+    let mut next_drawing_id = 1u32;
+    for worksheet in worksheets {
+        let pivot_ids = worksheet
+            .pivot_tables
+            .iter()
+            .flat_map(|table| table.page_entries.iter().map(|entry| entry.2))
+            .filter(|id| *id != 0 && *id != u16::MAX)
+            .collect::<HashSet<_>>();
+        let object_count = pivot_ids.len() + worksheet.shapes.len() + worksheet.comments.len();
+        if object_count > 1022 {
+            return Err(XlsError::InvalidData(
+                "a worksheet cannot contain more than 1022 drawing objects".to_string(),
+            ));
+        }
+        if object_count == 0 {
+            worksheet_drawing_ids.push(None);
+        } else {
+            let drawing_id = next_drawing_id;
+            next_drawing_id = next_drawing_id.checked_add(1).ok_or_else(|| {
+                XlsError::InvalidData("workbook drawing IDs are exhausted".to_string())
+            })?;
+            drawing_clusters.push((drawing_id, object_count as u32 + 1));
+            worksheet_drawing_ids.push(Some(drawing_id));
+        }
     }
-    let mut next_comment_drawing_id = if has_any_page_fields { 3u32 } else { 1u32 };
-    let comment_drawing_ids = worksheets
-        .iter()
-        .map(|worksheet| {
-            if worksheet.comments.is_empty() {
-                None
-            } else {
-                let drawing_id = next_comment_drawing_id;
-                next_comment_drawing_id += 1;
-                drawing_clusters.push((drawing_id, worksheet.comments.len() as u32 + 1));
-                Some(drawing_id)
-            }
-        })
-        .collect::<Vec<_>>();
 
     biff::write_usesel_fs_value(&mut stream, environment.supports_natural_language_formulas)?;
 
@@ -374,6 +461,20 @@ pub(crate) fn generate_workbook_stream(
         boundsheet_positions.push(stream.len());
         biff::write_boundsheet(&mut stream, 0, &worksheet.name)?;
     }
+
+    if let Some(settings) = calculation_settings.multithreaded_calculation {
+        biff::write_mtr_settings(&mut stream, settings)?;
+    }
+    if calculation_settings.force_full_calculation {
+        biff::write_force_full_calculation(&mut stream, true)?;
+    }
+
+    biff::write_country(
+        &mut stream,
+        environment.default_country_code,
+        environment.current_country_code,
+    )?;
+    biff::write_recalc_id(&mut stream, calculation_settings.recalculation_engine_id)?;
 
     if has_pivot_tables {
         biff::write_compress_pictures(&mut stream)?;
@@ -385,21 +486,10 @@ pub(crate) fn generate_workbook_stream(
         biff::write_mso_drawing_group(&mut stream, &drawing_clusters)?;
     }
 
-    biff::write_country(
-        &mut stream,
-        environment.default_country_code,
-        environment.current_country_code,
-    )?;
-
     // SST record (shared string table)
     if !shared_strings.is_empty() {
         biff::write_sst(&mut stream, shared_strings, sst_total)?;
     }
-
-    if calculation_settings.force_full_calculation {
-        biff::write_force_full_calculation(&mut stream, true)?;
-    }
-    biff::write_recalc_id(&mut stream, calculation_settings.recalculation_engine_id)?;
 
     // EOF record (end of workbook globals)
     biff::write_eof(&mut stream)?;
@@ -571,6 +661,11 @@ pub(crate) fn generate_workbook_stream(
                 sort.sort_by_columns,
                 &sort.keys,
             )?;
+        }
+        if let Some(ref sort_data) = worksheet.sort_data
+            && !matches!(sort_data.parent(), crate::xls::XlsSortParent::Table { .. })
+        {
+            sort_data.write_biff_records(&mut stream)?;
         }
 
         // Column width / hidden state via COLINFO records.
@@ -758,28 +853,32 @@ pub(crate) fn generate_workbook_stream(
         stream.splice(index_record_pos..index_record_pos, index_record);
         stream.extend_from_slice(&row_table);
 
-        if has_any_page_fields && worksheet.pivot_tables.is_empty() {
-            biff::write_mso_drawing_sheet1(&mut stream)?;
-        }
-        let has_pivot_page_object = worksheet.pivot_tables.iter().any(|pt| {
-            pt.page_entries
-                .iter()
-                .any(|&(_, _, object_id)| object_id != 0xFFFF)
-        });
-        if has_pivot_page_object {
-            biff::write_pivot_page_mso_drawing(&mut stream)?;
-            biff::write_pivot_page_obj(&mut stream)?;
-        }
-        if let Some(drawing_id) = comment_drawing_ids[worksheet_index] {
-            let mut reserved = HashSet::from([1u16]);
-            for object_id in worksheet
+        if let Some(drawing_id) = worksheet_drawing_ids[worksheet_index] {
+            let pivot_object_ids = worksheet
                 .pivot_tables
                 .iter()
                 .flat_map(|table| table.page_entries.iter().map(|entry| entry.2))
-            {
-                if object_id != 0xFFFF && object_id != 0 {
-                    reserved.insert(object_id);
+                .filter(|id| *id != 0 && *id != u16::MAX)
+                .collect::<Vec<_>>();
+            let mut reserved = HashSet::new();
+            for &object_id in &pivot_object_ids {
+                if !reserved.insert(object_id) {
+                    return Err(XlsError::InvalidData(
+                        "pivot page object ID is duplicated on the worksheet".to_string(),
+                    ));
                 }
+            }
+            let mut primitive_configs = Vec::with_capacity(worksheet.shapes.len());
+            for shape in &worksheet.shapes {
+                let object_id = shape.object_id.ok_or_else(|| {
+                    XlsError::InvalidData("writable shape has no assigned object ID".to_string())
+                })?;
+                if object_id == 0 || object_id == u16::MAX || !reserved.insert(object_id) {
+                    return Err(XlsError::InvalidData(
+                        "shape object ID is reserved or duplicated on the worksheet".to_string(),
+                    ));
+                }
+                primitive_configs.push(biff::PrimitiveShapeConfig { shape, object_id });
             }
             let mut next_object_id = 1u16;
             let mut configs = Vec::with_capacity(worksheet.comments.len());
@@ -822,7 +921,13 @@ pub(crate) fn generate_workbook_stream(
                     object_id,
                 });
             }
-            biff::write_comments(&mut stream, drawing_id, &configs)?;
+            biff::write_worksheet_drawing(
+                &mut stream,
+                drawing_id,
+                &pivot_object_ids,
+                &primitive_configs,
+                &configs,
+            )?;
         }
 
         // Hyperlink records for cells or ranges.
@@ -997,7 +1102,11 @@ pub(crate) fn generate_workbook_stream(
         //   [SXPI]
         //   *SXDI
         //   SxEx
-        for (pt_local_idx, pt) in worksheet.pivot_tables.iter().enumerate() {
+        for (pt, identity) in worksheet
+            .pivot_tables
+            .iter()
+            .zip(&pivot_cache_identities[worksheet_index])
+        {
             let field_count = pt.fields.len() as u16;
             let data_field_count = pt.data_items.len() as u16;
 
@@ -1055,7 +1164,7 @@ pub(crate) fn generate_workbook_stream(
             let data_row_count = pt.last_row.saturating_sub(pt.first_data_row) + 1;
             let data_col_count = pt.last_col.saturating_sub(pt.first_data_col) + 1;
 
-            let cache_index = pt_local_idx as u16;
+            let cache_index = identity.cache_index;
 
             // 1) SXVIEW — view definition
             biff::write_sxview(
@@ -1167,7 +1276,7 @@ pub(crate) fn generate_workbook_stream(
                 .collect();
 
             biff::write_pivot_modern_extensions(&mut stream, &pt.name, &pivot_field_names)?;
-            biff::write_pivot_window2(&mut stream)?;
+            biff::write_pivot_window2(&mut stream, worksheet.view.selected)?;
             biff::write_plv(&mut stream)?;
             biff::write_selection(&mut stream)?;
             biff::write_phonetic_pr(&mut stream)?;
@@ -1177,6 +1286,12 @@ pub(crate) fn generate_workbook_stream(
         if let Some(code_name) = &worksheet.vba_code_name {
             biff::write_code_name(&mut stream, code_name)?;
         }
+
+        biff::write_list_objects(
+            &mut stream,
+            &worksheet.list_objects,
+            worksheet.sort_data.as_ref(),
+        )?;
 
         // EOF record (end of worksheet)
         biff::write_eof(&mut stream)?;

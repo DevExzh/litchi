@@ -429,8 +429,13 @@ impl DefinedNameSlot {
     }
 
     /// Symbol table entry. Macro slots intentionally remain `None`.
-    pub(crate) fn symbol(&self) -> Option<String> {
-        (!(self.function || self.vba_procedure || self.procedure)).then(|| self.name.clone())
+    pub(crate) fn formula_symbol(&self) -> Option<(String, Option<usize>)> {
+        (!(self.function || self.vba_procedure || self.procedure)).then(|| {
+            (
+                self.name.clone(),
+                (self.itab != 0).then(|| usize::from(self.itab - 1)),
+            )
+        })
     }
 
     pub(crate) fn into_public(
@@ -743,7 +748,7 @@ mod tests {
     #[test]
     fn macro_slots_keep_indices_but_have_no_symbol_or_public_value() {
         let slot = DefinedNameSlot::parse(&lbl(FLAG_PROCEDURE, 0, "Macro", false, &[]), 7).unwrap();
-        assert!(slot.symbol().is_none());
+        assert!(slot.formula_symbol().is_none());
         assert!(
             slot.into_public(1, &FormulaContext::default())
                 .unwrap()

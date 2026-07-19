@@ -49,6 +49,12 @@ pub struct CharacterProperties {
     pub highlight: Option<HighlightColor>,
     /// Superscript/subscript
     pub vertical_position: VerticalPosition,
+    /// Vertical offset relative to the normal baseline, in signed half-points.
+    pub position: CharacterPosition,
+    /// Word-breaking behavior used when this run is hyphenated.
+    pub hyphenation: HresiOperand,
+    /// Animated text effect applied to this run.
+    pub text_effect: TextEffect,
     /// Small caps
     pub is_small_caps: Option<bool>,
     /// All caps
@@ -145,6 +151,190 @@ pub struct CharacterProperties {
     pub formatting_revision_timestamp: Option<u32>,
     /// Revision metadata for a LISTNUM display-field result.
     pub display_field_revision: Option<DisplayFieldRevisionProperties>,
+}
+
+/// Vertical text position in signed half-points (`sprmCHpsPos`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CharacterPosition(i16);
+
+impl CharacterPosition {
+    /// Normal baseline position.
+    pub const NORMAL: Self = Self(0);
+
+    /// Construct a validated vertical position in half-points.
+    pub fn new(half_points: i16) -> Result<Self> {
+        if !(-3168..=3168).contains(&half_points) {
+            return Err(DocError::Corrupted(format!(
+                "sprmCHpsPos value {half_points} is outside -3168..=3168"
+            )));
+        }
+        Ok(Self(half_points))
+    }
+
+    /// Return the signed half-point offset.
+    pub const fn half_points(self) -> i16 {
+        self.0
+    }
+}
+
+/// Word-breaking method stored in an [`HresiOperand`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum HyphenationMode {
+    /// Insert a hyphen and continue on the next line.
+    #[default]
+    Normal,
+    /// Add the replacement character before the hyphen.
+    AddBefore,
+    /// Change the character before the hyphen.
+    ChangeBefore,
+    /// Delete the character before the hyphen.
+    DeleteBefore,
+    /// Change the character after the hyphen.
+    ChangeAfter,
+    /// Delete two characters before the hyphen and replace them.
+    DeleteAndChange,
+}
+
+impl HyphenationMode {
+    const fn raw(self) -> u8 {
+        match self {
+            Self::Normal => 1,
+            Self::AddBefore => 2,
+            Self::ChangeBefore => 3,
+            Self::DeleteBefore => 4,
+            Self::ChangeAfter => 5,
+            Self::DeleteAndChange => 6,
+        }
+    }
+
+    fn from_raw(value: u8) -> Result<Self> {
+        match value {
+            1 => Ok(Self::Normal),
+            2 => Ok(Self::AddBefore),
+            3 => Ok(Self::ChangeBefore),
+            4 => Ok(Self::DeleteBefore),
+            5 => Ok(Self::ChangeAfter),
+            6 => Ok(Self::DeleteAndChange),
+            _ => Err(DocError::Corrupted(format!(
+                "sprmCHresi has invalid Hres mode {value}"
+            ))),
+        }
+    }
+}
+
+/// Validated two-byte `HresiOperand` used by `sprmCHresi`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct HresiOperand {
+    mode: HyphenationMode,
+    replacement_character: Option<u8>,
+}
+
+impl HresiOperand {
+    /// Normal word-breaking, whose dependent `ChHres` byte is zero.
+    pub const fn normal() -> Self {
+        Self {
+            mode: HyphenationMode::Normal,
+            replacement_character: None,
+        }
+    }
+
+    /// Construct a non-normal word-breaking operand with a printable ASCII byte.
+    pub fn with_character(mode: HyphenationMode, replacement_character: u8) -> Result<Self> {
+        if mode == HyphenationMode::Normal {
+            return Err(DocError::Corrupted(
+                "normal HresiOperand cannot have a replacement character".to_string(),
+            ));
+        }
+        if !replacement_character.is_ascii_graphic() && replacement_character != b' ' {
+            return Err(DocError::Corrupted(format!(
+                "sprmCHresi ChHres byte 0x{replacement_character:02X} is not printable ASCII"
+            )));
+        }
+        Ok(Self {
+            mode,
+            replacement_character: Some(replacement_character),
+        })
+    }
+
+    fn from_bytes(mode: u8, replacement_character: u8) -> Result<Self> {
+        let mode = HyphenationMode::from_raw(mode)?;
+        if mode == HyphenationMode::Normal {
+            if replacement_character != 0 {
+                return Err(DocError::Corrupted(
+                    "normal sprmCHresi requires ChHres 0x00".to_string(),
+                ));
+            }
+            Ok(Self::normal())
+        } else {
+            Self::with_character(mode, replacement_character)
+        }
+    }
+
+    pub(crate) fn bytes(self) -> [u8; 2] {
+        [self.mode.raw(), self.replacement_character.unwrap_or(0)]
+    }
+
+    /// Return the word-breaking mode.
+    pub const fn mode(self) -> HyphenationMode {
+        self.mode
+    }
+
+    /// Return the dependent printable ASCII byte, or `None` for normal breaking.
+    pub const fn replacement_character(self) -> Option<u8> {
+        self.replacement_character
+    }
+}
+
+impl Default for HresiOperand {
+    fn default() -> Self {
+        Self::normal()
+    }
+}
+
+/// Animated text effect stored by `sprmCSfxText`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum TextEffect {
+    /// No text effect.
+    #[default]
+    None = 0,
+    /// Las Vegas Lights.
+    LasVegasLights = 1,
+    /// Blinking background.
+    BlinkingBackground = 2,
+    /// Sparkle Text.
+    SparkleText = 3,
+    /// Marching Black Ants.
+    MarchingBlackAnts = 4,
+    /// Marching Red Ants.
+    MarchingRedAnts = 5,
+    /// Shimmer.
+    Shimmer = 6,
+}
+
+impl TryFrom<u8> for TextEffect {
+    type Error = DocError;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            0 => Ok(Self::None),
+            1 => Ok(Self::LasVegasLights),
+            2 => Ok(Self::BlinkingBackground),
+            3 => Ok(Self::SparkleText),
+            4 => Ok(Self::MarchingBlackAnts),
+            5 => Ok(Self::MarchingRedAnts),
+            6 => Ok(Self::Shimmer),
+            _ => Err(DocError::Corrupted(format!(
+                "sprmCSfxText has invalid text effect {value}"
+            ))),
+        }
+    }
+}
+
+impl From<TextEffect> for u8 {
+    fn from(value: TextEffect) -> Self {
+        value as u8
+    }
 }
 
 /// Conditional character formatting carried by `sprmCCnf` in a table style.
@@ -851,9 +1041,10 @@ impl CharacterProperties {
             },
             // Operation 0x45: sprmCHpsPos - Superscript/subscript position
             0x45 => {
-                if let Some(_pos) = sprm.operand_i16() {
-                    // Position in half-points
-                }
+                let position = sprm.operand_i16().ok_or_else(|| {
+                    DocError::Corrupted("sprmCHpsPos is missing its signed operand".to_string())
+                })?;
+                chp.position = CharacterPosition::new(position)?;
             },
             // Operation 0x46: sprmCHpsPosAdj - Position adjustment
             0x46 => {
@@ -908,7 +1099,10 @@ impl CharacterProperties {
             },
             // Operation 0x4E: sprmCHresi - Hyphenation
             0x4E => {
-                // Hyphenation information
+                let operand = sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmCHresi is missing its HresiOperand".to_string())
+                })?;
+                chp.hyphenation = HresiOperand::from_bytes(operand as u8, (operand >> 8) as u8)?;
             },
             // Operation 0x4F: sprmCRgFtc0 - Font for ASCII
             0x4F => {
@@ -969,7 +1163,10 @@ impl CharacterProperties {
             },
             // Operation 0x59: sprmCSfxtText - Text animation
             0x59 => {
-                // Text animation effect
+                let effect = sprm.operand_byte().ok_or_else(|| {
+                    DocError::Corrupted("sprmCSfxText is missing its byte operand".to_string())
+                })?;
+                chp.text_effect = TextEffect::try_from(effect)?;
             },
             // Operation 0x5A: sprmCFBiDi - Complex-script formatting.
             0x5A => {
@@ -1347,6 +1544,9 @@ impl CharacterProperties {
             || self.shading.is_some()
             || self.highlight.is_some()
             || self.vertical_position != VerticalPosition::Normal
+            || self.position != CharacterPosition::NORMAL
+            || self.hyphenation != HresiOperand::normal()
+            || self.text_effect != TextEffect::None
             || self.is_bidi.is_some()
             || self.is_bold_bidi.is_some()
             || self.is_italic_bidi.is_some()
@@ -1722,5 +1922,96 @@ mod tests {
             properties.shading.unwrap().pattern,
             CharacterShadingPattern::Reserved(0x001A)
         );
+    }
+}
+
+#[cfg(test)]
+mod chpx_position_hresi_effect_tests {
+    use super::*;
+
+    fn append(grpprl: &mut Vec<u8>, opcode: u16, operand: &[u8]) {
+        grpprl.extend_from_slice(&opcode.to_le_bytes());
+        grpprl.extend_from_slice(operand);
+    }
+
+    #[test]
+    fn decodes_all_values_boundaries_defaults_and_later_wins() {
+        let modes = [
+            (HyphenationMode::Normal, [1, 0]),
+            (HyphenationMode::AddBefore, [2, b'A']),
+            (HyphenationMode::ChangeBefore, [3, b'B']),
+            (HyphenationMode::DeleteBefore, [4, b' ']),
+            (HyphenationMode::ChangeAfter, [5, b'Y']),
+            (HyphenationMode::DeleteAndChange, [6, b'Z']),
+        ];
+        for (mode, bytes) in modes {
+            let mut grpprl = Vec::new();
+            append(&mut grpprl, SPRM_C_HRESI, &bytes);
+            let properties = CharacterProperties::from_sprm(&grpprl).unwrap();
+            assert_eq!(properties.hyphenation.mode(), mode);
+            assert_eq!(properties.hyphenation.bytes(), bytes);
+        }
+        for (raw, effect) in [
+            (0, TextEffect::None),
+            (1, TextEffect::LasVegasLights),
+            (2, TextEffect::BlinkingBackground),
+            (3, TextEffect::SparkleText),
+            (4, TextEffect::MarchingBlackAnts),
+            (5, TextEffect::MarchingRedAnts),
+            (6, TextEffect::Shimmer),
+        ] {
+            let mut grpprl = Vec::new();
+            append(&mut grpprl, SPRM_C_SFXT_TEXT, &[raw]);
+            assert_eq!(
+                CharacterProperties::from_sprm(&grpprl).unwrap().text_effect,
+                effect
+            );
+        }
+
+        let mut grpprl = Vec::new();
+        append(&mut grpprl, SPRM_C_HPS_POS, &(-3168i16).to_le_bytes());
+        append(&mut grpprl, SPRM_C_HPS_POS, &3168i16.to_le_bytes());
+        append(&mut grpprl, SPRM_C_HRESI, &[1, 0]);
+        append(&mut grpprl, SPRM_C_HRESI, &[5, b'Q']);
+        append(&mut grpprl, SPRM_C_SFXT_TEXT, &[1]);
+        append(&mut grpprl, SPRM_C_SFXT_TEXT, &[6]);
+        let properties = CharacterProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.position.half_points(), 3168);
+        assert_eq!(properties.hyphenation.mode(), HyphenationMode::ChangeAfter);
+        assert_eq!(properties.hyphenation.replacement_character(), Some(b'Q'));
+        assert_eq!(properties.text_effect, TextEffect::Shimmer);
+        assert!(properties.has_formatting());
+
+        let defaults = CharacterProperties::default();
+        assert_eq!(defaults.position, CharacterPosition::NORMAL);
+        assert_eq!(defaults.hyphenation, HresiOperand::normal());
+        assert_eq!(defaults.text_effect, TextEffect::None);
+    }
+
+    #[test]
+    fn rejects_out_of_range_and_dependent_operands() {
+        assert!(CharacterPosition::new(-3169).is_err());
+        assert!(CharacterPosition::new(3169).is_err());
+        assert!(CharacterPosition::new(-3168).is_ok());
+        assert!(CharacterPosition::new(3168).is_ok());
+        assert!(HresiOperand::with_character(HyphenationMode::Normal, b'A').is_err());
+        for byte in [0x00, 0x1F, 0x7F, 0x80, 0xFF] {
+            assert!(HresiOperand::with_character(HyphenationMode::AddBefore, byte).is_err());
+        }
+
+        for (opcode, operand) in [
+            (SPRM_C_HPS_POS, 3169i16.to_le_bytes()),
+            (SPRM_C_HRESI, [0, 0]),
+            (SPRM_C_HRESI, [7, b'A']),
+            (SPRM_C_HRESI, [1, b'A']),
+            (SPRM_C_HRESI, [2, 0]),
+        ] {
+            let mut grpprl = Vec::new();
+            append(&mut grpprl, opcode, &operand);
+            assert!(CharacterProperties::from_sprm(&grpprl).is_err());
+        }
+        let mut grpprl = Vec::new();
+        append(&mut grpprl, SPRM_C_SFXT_TEXT, &[7]);
+        assert!(CharacterProperties::from_sprm(&grpprl).is_err());
     }
 }
