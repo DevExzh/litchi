@@ -48,10 +48,12 @@ pub struct HeaderFooter {
 
 impl HeaderFooter {
     fn semantic_xml(&self) -> Result<Arc<Vec<u8>>> {
-        Ok(match crate::common::mce::process_ooxml(self.xml_bytes.as_slice())? {
-            std::borrow::Cow::Borrowed(_) => Arc::clone(&self.xml_bytes),
-            std::borrow::Cow::Owned(xml) => Arc::new(xml),
-        })
+        Ok(
+            match crate::common::mce::process_ooxml(self.xml_bytes.as_slice())? {
+                std::borrow::Cow::Borrowed(_) => Arc::clone(&self.xml_bytes),
+                std::borrow::Cow::Owned(xml) => Arc::new(xml),
+            },
+        )
     }
     /// Create a new HeaderFooter from a Part.
     ///
@@ -140,18 +142,10 @@ impl HeaderFooter {
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let xml = self.semantic_xml()?;
         let mut paragraphs = Vec::new();
-        scan_word_element_ranges(
-            xml.as_slice(),
-            &[b"p".as_slice()],
-            |_, start, length| {
-                paragraphs.push(Paragraph::from_arc_range(
-                    Arc::clone(&xml),
-                    start,
-                    length,
-                ));
-                Ok(())
-            },
-        )?;
+        scan_word_element_ranges(xml.as_slice(), &[b"p".as_slice()], |_, start, length| {
+            paragraphs.push(Paragraph::from_arc_range(Arc::clone(&xml), start, length));
+            Ok(())
+        })?;
         Ok(paragraphs)
     }
 
@@ -179,18 +173,10 @@ impl HeaderFooter {
     pub fn tables(&self) -> Result<Vec<Table>> {
         let xml = self.semantic_xml()?;
         let mut tables = Vec::new();
-        scan_word_element_ranges(
-            xml.as_slice(),
-            &[b"tbl".as_slice()],
-            |_, start, length| {
-                tables.push(Table::from_arc_range(
-                    Arc::clone(&xml),
-                    start,
-                    length,
-                ));
-                Ok(())
-            },
-        )?;
+        scan_word_element_ranges(xml.as_slice(), &[b"tbl".as_slice()], |_, start, length| {
+            tables.push(Table::from_arc_range(Arc::clone(&xml), start, length));
+            Ok(())
+        })?;
         Ok(tables)
     }
 
@@ -209,14 +195,10 @@ impl HeaderFooter {
     pub fn table_count(&self) -> Result<usize> {
         let xml = self.semantic_xml()?;
         let mut count = 0;
-        scan_word_element_ranges(
-            xml.as_slice(),
-            &[b"tbl".as_slice()],
-            |_, _, _| {
-                count += 1;
-                Ok(())
-            },
-        )?;
+        scan_word_element_ranges(xml.as_slice(), &[b"tbl".as_slice()], |_, _, _| {
+            count += 1;
+            Ok(())
+        })?;
         Ok(count)
     }
 

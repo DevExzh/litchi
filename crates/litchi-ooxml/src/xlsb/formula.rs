@@ -42,6 +42,275 @@ pub struct FormulaExternalSheet {
     pub last_sheet: i32,
 }
 
+/// Workbook table metadata required to resolve resident `PtgList` tokens.
+/// A PivotTable view associated with a workbook PivotCache.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormulaPivotViewDefinition {
+    cache_id: u32,
+    sheet_index: usize,
+    name: String,
+}
+
+impl FormulaPivotViewDefinition {
+    pub fn try_new(cache_id: u32, sheet_index: usize, name: String) -> XlsbResult<Self> {
+        validate_pivot_identifier(&name, "PivotTable view name", 255)?;
+        Ok(Self {
+            cache_id,
+            sheet_index,
+            name,
+        })
+    }
+
+    pub fn cache_id(&self) -> u32 {
+        self.cache_id
+    }
+
+    pub fn sheet_index(&self) -> usize {
+        self.sheet_index
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+/// Aggregation encoded by `BrtBeginPName.ifn` for a calculated-field reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FormulaPivotAggregation {
+    Sum,
+    CountA,
+    Average,
+    Max,
+    Min,
+    Product,
+    Count,
+    StandardDeviation,
+    PopulationStandardDeviation,
+    Variance,
+    PopulationVariance,
+}
+
+impl FormulaPivotAggregation {
+    fn formula_name(self) -> &'static str {
+        match self {
+            Self::Sum => "SUM",
+            Self::CountA => "COUNTA",
+            Self::Average => "AVERAGE",
+            Self::Max => "MAX",
+            Self::Min => "MIN",
+            Self::Product => "PRODUCT",
+            Self::Count => "COUNT",
+            Self::StandardDeviation => "STDEV",
+            Self::PopulationStandardDeviation => "STDEVP",
+            Self::Variance => "VAR",
+            Self::PopulationVariance => "VARP",
+        }
+    }
+}
+
+/// A calculated-item position encoded by a `BrtBeginPNPair` record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormulaPivotItemReference {
+    Name(String),
+    AbsolutePosition(u32),
+    RelativePosition(i32),
+}
+
+/// The formula text represented by one `BrtBeginPName` record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormulaPivotNameReference {
+    Field {
+        name: String,
+        aggregation: Option<FormulaPivotAggregation>,
+    },
+    Item {
+        field_name: String,
+        item: FormulaPivotItemReference,
+    },
+}
+
+impl FormulaPivotNameReference {
+    fn validate(&self) -> XlsbResult<()> {
+        match self {
+            Self::Field { name, .. } => {
+                validate_pivot_identifier(name, "pivot cache field name", 32_767)
+            },
+            Self::Item { field_name, item } => {
+                validate_pivot_identifier(field_name, "pivot item field name", 32_767)?;
+                match item {
+                    FormulaPivotItemReference::Name(name) => {
+                        validate_pivot_identifier(name, "pivot item name", 32_767)
+                    },
+                    FormulaPivotItemReference::AbsolutePosition(position) => {
+                        if *position == 0 || *position > i32::MAX as u32 {
+                            return Err(invalid(
+                                "PtgSxName",
+                                format!(
+                                    "absolute pivot item position {position} is outside 1..={}",
+                                    i32::MAX
+                                ),
+                            ));
+                        }
+                        Ok(())
+                    },
+                    FormulaPivotItemReference::RelativePosition(position) => {
+                        if *position == 0 {
+                            return Err(invalid(
+                                "PtgSxName",
+                                "relative pivot item position must not be zero",
+                            ));
+                        }
+                        Ok(())
+                    },
+                }
+            },
+        }
+    }
+
+    fn to_formula_text(&self) -> String {
+        match self {
+            Self::Field { name, aggregation } => {
+                let name = format_pivot_identifier(name);
+                match aggregation {
+                    Some(aggregation) => format!("{}({name})", aggregation.formula_name()),
+                    None => name,
+                }
+            },
+            Self::Item { field_name, item } => {
+                let field_name = format_pivot_identifier(field_name);
+                let item = match item {
+                    FormulaPivotItemReference::Name(name) => format_pivot_identifier(name),
+                    FormulaPivotItemReference::AbsolutePosition(position) => position.to_string(),
+                    FormulaPivotItemReference::RelativePosition(position) if *position > 0 => {
+                        format!("+{position}")
+                    },
+                    FormulaPivotItemReference::RelativePosition(position) => position.to_string(),
+                };
+                format!("{field_name}[{item}]")
+            },
+        }
+    }
+}
+
+/// Formula-local `BrtBeginPName` collection for one PivotTable view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormulaPivotNameScope {
+    cache_id: u32,
+    sheet_index: usize,
+    view_name: String,
+    references: std::sync::Arc<[FormulaPivotNameReference]>,
+}
+
+impl FormulaPivotNameScope {
+    pub fn try_new(
+        cache_id: u32,
+        sheet_index: usize,
+        view_name: String,
+        references: Vec<FormulaPivotNameReference>,
+    ) -> XlsbResult<Self> {
+        validate_pivot_identifier(&view_name, "PivotTable view name", 255)?;
+        if references.len() > 16_384 {
+            return Err(invalid(
+                "BrtBeginPNames",
+                format!(
+                    "pivot calculated-name count {} exceeds 16384",
+                    references.len()
+                ),
+            ));
+        }
+        for reference in &references {
+            reference.validate()?;
+        }
+        Ok(Self {
+            cache_id,
+            sheet_index,
+            view_name,
+            references: references.into(),
+        })
+    }
+
+    pub fn cache_id(&self) -> u32 {
+        self.cache_id
+    }
+
+    pub fn sheet_index(&self) -> usize {
+        self.sheet_index
+    }
+
+    pub fn view_name(&self) -> &str {
+        &self.view_name
+    }
+
+    pub fn references(&self) -> &[FormulaPivotNameReference] {
+        &self.references
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormulaTableDefinition {
+    table_id: u32,
+    sheet_index: usize,
+    display_name: String,
+    columns: std::sync::Arc<[String]>,
+}
+
+impl FormulaTableDefinition {
+    /// Build a validated table definition with columns in table-relative order.
+    pub fn try_new(
+        table_id: u32,
+        sheet_index: usize,
+        display_name: impl Into<String>,
+        columns: Vec<String>,
+    ) -> XlsbResult<Self> {
+        if table_id == 0 || table_id == u32::MAX {
+            return Err(XlsbError::InvalidFormula(format!(
+                "table identifier {table_id} is outside 1..=4294967294"
+            )));
+        }
+        let display_name = display_name.into();
+        validate_table_name(&display_name)?;
+        if columns.is_empty() || columns.len() > 16_384 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "table {display_name:?} has {} columns, outside 1..=16384",
+                columns.len()
+            )));
+        }
+        for (index, column) in columns.iter().enumerate() {
+            validate_table_column_name(column, index)?;
+            if columns[..index]
+                .iter()
+                .any(|existing| excel_name_eq(existing, column))
+            {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "table {display_name:?} contains duplicate column {column:?}"
+                )));
+            }
+        }
+        Ok(Self {
+            table_id,
+            sheet_index,
+            display_name,
+            columns: columns.into(),
+        })
+    }
+
+    pub fn table_id(&self) -> u32 {
+        self.table_id
+    }
+
+    pub fn sheet_index(&self) -> usize {
+        self.sheet_index
+    }
+
+    pub fn display_name(&self) -> &str {
+        &self.display_name
+    }
+
+    pub fn columns(&self) -> &[String] {
+        &self.columns
+    }
+}
+
 /// Metadata from one XLSB External Link part.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct FormulaExternalBook {
@@ -71,6 +340,10 @@ pub struct FormulaResolutionContext {
     pub(crate) external_sheets: std::sync::Arc<[FormulaExternalSheet]>,
     pub(crate) external_books: std::sync::Arc<[FormulaExternalBook]>,
     pub(crate) defined_names: std::sync::Arc<[String]>,
+    pub(crate) tables: std::sync::Arc<[FormulaTableDefinition]>,
+    pub(crate) pivot_views: std::sync::Arc<[FormulaPivotViewDefinition]>,
+    pub(crate) pivot_name_scopes: std::sync::Arc<[FormulaPivotNameScope]>,
+    pub(crate) active_pivot_scope: Option<(u32, usize, String)>,
     pub(crate) current_sheet: Option<usize>,
 }
 
@@ -79,6 +352,207 @@ impl FormulaResolutionContext {
         let mut context = self.clone();
         context.current_sheet = Some(sheet_index);
         context
+    }
+
+    /// Bind formula-local `BrtBeginPName` metadata to an exact PivotTable view.
+    pub fn for_pivot_formula(&self, scope: FormulaPivotNameScope) -> XlsbResult<Self> {
+        let mut context = self.clone();
+        context.current_sheet = Some(scope.sheet_index);
+        context.active_pivot_scope =
+            Some((scope.cache_id, scope.sheet_index, scope.view_name.clone()));
+        context.pivot_name_scopes = vec![scope].into();
+        context.validate_active_pivot_scope()?;
+        Ok(context)
+    }
+
+    fn resolve_table_sheet(&self, index: u16) -> XlsbResult<usize> {
+        if index == u16::MAX {
+            return Err(XlsbError::InvalidFormula(
+                "structured reference uses invalid Xti index 0xFFFF".to_string(),
+            ));
+        }
+        let xti = self
+            .external_sheets
+            .get(usize::from(index))
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "structured-reference Xti index {index} exceeds {} entries",
+                    self.external_sheets.len()
+                ))
+            })?;
+        let link = self
+            .supporting_links
+            .get(usize::try_from(xti.external_link).map_err(|_| {
+                XlsbError::InvalidFormula("table external-link index overflow".to_string())
+            })?)
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "structured-reference Xti {index} refers to missing supporting link {}",
+                    xti.external_link
+                ))
+            })?;
+        match link {
+            FormulaSupportingLink::SelfWorkbook => {
+                if xti.first_sheet < 0 || xti.first_sheet != xti.last_sheet {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "structured-reference Xti {index} must select exactly one worksheet"
+                    )));
+                }
+                let sheet = usize::try_from(xti.first_sheet).map_err(|_| {
+                    XlsbError::InvalidFormula("table worksheet index overflow".to_string())
+                })?;
+                if sheet >= self.worksheet_names.len() {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "structured-reference worksheet {} exceeds {} worksheets",
+                        xti.first_sheet,
+                        self.worksheet_names.len()
+                    )));
+                }
+                Ok(sheet)
+            },
+            FormulaSupportingLink::SameSheet => {
+                if xti.first_sheet != -2 || xti.last_sheet != -2 {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "same-sheet structured-reference Xti {index} must use -2/-2"
+                    )));
+                }
+                self.current_sheet.ok_or_else(|| {
+                    XlsbError::InvalidFormula(
+                        "same-sheet structured reference has no consuming worksheet".to_string(),
+                    )
+                })
+            },
+            FormulaSupportingLink::ExternalWorkbook(_) => Err(XlsbError::InvalidFormula(
+                "resident structured reference points to an external workbook".to_string(),
+            )),
+            FormulaSupportingLink::AddIn => Err(XlsbError::InvalidFormula(
+                "structured reference points to an add-in".to_string(),
+            )),
+        }
+    }
+
+    fn resolve_external_table_prefix(&self, index: u16) -> XlsbResult<String> {
+        let xti = self
+            .external_sheets
+            .get(usize::from(index))
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "external structured-reference Xti index {index} exceeds {} entries",
+                    self.external_sheets.len()
+                ))
+            })?;
+        let link = self
+            .supporting_links
+            .get(usize::try_from(xti.external_link).map_err(|_| {
+                XlsbError::InvalidFormula("table external-link index overflow".to_string())
+            })?)
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "external structured-reference Xti {index} has no supporting link"
+                ))
+            })?;
+        if !matches!(link, FormulaSupportingLink::ExternalWorkbook(_)) {
+            return Err(XlsbError::InvalidFormula(
+                "nonresident structured reference does not point to an external workbook"
+                    .to_string(),
+            ));
+        }
+        self.resolve_sheet_prefix(index)
+    }
+
+    fn resolve_table_reference(&self, reference: &FormulaTableReference) -> XlsbResult<String> {
+        if let Some(external) = &reference.external {
+            if reference.row_type.is_some()
+                || reference.columns.is_some()
+                || reference.list_index.is_some()
+            {
+                return Err(XlsbError::InvalidFormula(
+                    "nonresident structured reference also contains resident metadata".to_string(),
+                ));
+            }
+            validate_table_name(&external.table)?;
+            validate_named_table_columns(&external.columns)?;
+            let prefix = self.resolve_external_table_prefix(reference.sheet_index)?;
+            return Ok(format!(
+                "{prefix}!{}",
+                format_structured_reference(
+                    &external.table,
+                    external.row_type,
+                    &external.columns,
+                    reference.square_bracket_space,
+                    reference.comma_space,
+                )
+            ));
+        }
+
+        let table_id = reference.list_index.ok_or_else(|| {
+            XlsbError::InvalidFormula("resident structured reference omits table ID".to_string())
+        })?;
+        let row_type = reference.row_type.ok_or_else(|| {
+            XlsbError::InvalidFormula("resident structured reference omits row type".to_string())
+        })?;
+        let columns = reference.columns.ok_or_else(|| {
+            XlsbError::InvalidFormula("resident structured reference omits columns".to_string())
+        })?;
+        let sheet = self.resolve_table_sheet(reference.sheet_index)?;
+        let mut matches = self
+            .tables
+            .iter()
+            .filter(|table| table.table_id == table_id);
+        let table = matches.next().ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "structured reference names missing table ID {table_id}"
+            ))
+        })?;
+        if matches.next().is_some() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "structured reference table ID {table_id} is ambiguous"
+            )));
+        }
+        if table.sheet_index != sheet {
+            return Err(XlsbError::InvalidFormula(format!(
+                "structured reference locates table ID {table_id} on worksheet {sheet}, but metadata places it on {}",
+                table.sheet_index
+            )));
+        }
+        let named_columns = match columns {
+            FormulaTableColumns::All => FormulaTableNamedColumns::All,
+            FormulaTableColumns::One(index) => {
+                let name = table.columns.get(usize::from(index)).ok_or_else(|| {
+                    XlsbError::InvalidFormula(format!(
+                        "structured-reference column {index} exceeds {} columns in table {:?}",
+                        table.columns.len(),
+                        table.display_name
+                    ))
+                })?;
+                FormulaTableNamedColumns::One(name.clone())
+            },
+            FormulaTableColumns::Range { first, last } => {
+                let first_name = table.columns.get(usize::from(first)).ok_or_else(|| {
+                    XlsbError::InvalidFormula(format!(
+                        "structured-reference first column {first} exceeds {} columns",
+                        table.columns.len()
+                    ))
+                })?;
+                let last_name = table.columns.get(usize::from(last)).ok_or_else(|| {
+                    XlsbError::InvalidFormula(format!(
+                        "structured-reference last column {last} exceeds {} columns",
+                        table.columns.len()
+                    ))
+                })?;
+                FormulaTableNamedColumns::Range {
+                    first: first_name.clone(),
+                    last: last_name.clone(),
+                }
+            },
+        };
+        Ok(format_structured_reference(
+            &table.display_name,
+            row_type,
+            &named_columns,
+            reference.square_bracket_space,
+            reference.comma_space,
+        ))
     }
 
     fn resolve_sheet_prefix(&self, index: u16) -> XlsbResult<String> {
@@ -290,6 +764,203 @@ fn format_formula_prefix(value: &str) -> String {
     }
 }
 
+impl FormulaResolutionContext {
+    fn validate_active_pivot_scope(&self) -> XlsbResult<&FormulaPivotNameScope> {
+        let (cache_id, sheet_index, view_name) =
+            self.active_pivot_scope.as_ref().ok_or_else(|| {
+                XlsbError::InvalidFormula(
+                    "PtgSxName requires an explicit pivot cache, sheet, and view scope".to_string(),
+                )
+            })?;
+        if *sheet_index >= self.worksheet_names.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "pivot sheet index {sheet_index} is outside the workbook sheet range"
+            )));
+        }
+        if self.current_sheet != Some(*sheet_index) {
+            return Err(XlsbError::InvalidFormula(format!(
+                "pivot scope sheet {sheet_index} does not match the formula sheet {:?}",
+                self.current_sheet
+            )));
+        }
+
+        let mut views = self.pivot_views.iter().filter(|view| {
+            view.cache_id == *cache_id
+                && view.sheet_index == *sheet_index
+                && view.name.eq_ignore_ascii_case(view_name)
+        });
+        let _view = views.next().ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "PivotTable view {view_name:?} on sheet {sheet_index} does not use cache {cache_id}"
+            ))
+        })?;
+        if views.next().is_some() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PivotTable view {view_name:?} on sheet {sheet_index} and cache {cache_id} is ambiguous"
+            )));
+        }
+
+        let mut scopes = self.pivot_name_scopes.iter().filter(|scope| {
+            scope.cache_id == *cache_id
+                && scope.sheet_index == *sheet_index
+                && scope.view_name.eq_ignore_ascii_case(view_name)
+        });
+        let scope = scopes.next().ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "calculated-name metadata is missing for PivotTable view {view_name:?}"
+            ))
+        })?;
+        if scopes.next().is_some() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "calculated-name metadata for PivotTable view {view_name:?} is ambiguous"
+            )));
+        }
+        Ok(scope)
+    }
+
+    fn resolve_pivot_name(&self, index: u32) -> XlsbResult<String> {
+        let scope = self.validate_active_pivot_scope()?;
+        let index = usize::try_from(index).map_err(|_| {
+            XlsbError::InvalidFormula("pivot calculated-name index overflow".to_string())
+        })?;
+        let reference = scope.references.get(index).ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "pivot calculated-name index {index} is outside 0..{}",
+                scope.references.len()
+            ))
+        })?;
+        Ok(reference.to_formula_text())
+    }
+}
+
+fn validate_pivot_identifier(name: &str, field: &str, max_utf16_len: usize) -> XlsbResult<()> {
+    let utf16_len = name.encode_utf16().count();
+    if utf16_len == 0 || utf16_len > max_utf16_len || name.contains('\0') {
+        return Err(invalid(
+            "PtgSxName",
+            format!("{field} must contain 1..={max_utf16_len} UTF-16 code units and no NUL"),
+        ));
+    }
+    Ok(())
+}
+
+fn invalid(typ: &'static str, value: impl Into<String>) -> XlsbError {
+    XlsbError::InvalidFormula(format!("{typ}: {}", value.into()))
+}
+
+fn format_pivot_identifier(name: &str) -> String {
+    if !name.eq_ignore_ascii_case("All")
+        && !name.eq_ignore_ascii_case("Blank")
+        && validate_table_name(name).is_ok()
+    {
+        name.to_string()
+    } else {
+        format!("'{}'", name.replace('\'', "''"))
+    }
+}
+
+fn validate_table_name(name: &str) -> XlsbResult<()> {
+    crate::xlsb::named_ranges::validate_defined_name(name)?;
+    if name
+        .get(..3)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("_xl"))
+    {
+        return Err(XlsbError::InvalidFormula(format!(
+            "table display name {name:?} uses reserved _xl prefix"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_table_column_name(name: &str, index: usize) -> XlsbResult<()> {
+    let units = name.encode_utf16().count();
+    if units == 0 || units > 255 || name.contains('\0') {
+        return Err(XlsbError::InvalidFormula(format!(
+            "table column {index} has invalid name length or NUL content"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_named_table_columns(columns: &FormulaTableNamedColumns) -> XlsbResult<()> {
+    match columns {
+        FormulaTableNamedColumns::All => Ok(()),
+        FormulaTableNamedColumns::One(name) => validate_table_column_name(name, 0),
+        FormulaTableNamedColumns::Range { first, last } => {
+            validate_table_column_name(first, 0)?;
+            validate_table_column_name(last, 1)
+        },
+    }
+}
+
+fn escape_structured_column(name: &str) -> String {
+    let mut escaped = String::with_capacity(name.len());
+    for ch in name.chars() {
+        if matches!(ch, '#' | '[' | ']' | '\'' | '@') {
+            escaped.push('\'');
+        }
+        escaped.push(ch);
+    }
+    escaped
+}
+
+fn format_structured_reference(
+    table: &str,
+    row_type: FormulaTableRowType,
+    columns: &FormulaTableNamedColumns,
+    square_bracket_space: bool,
+    comma_space: bool,
+) -> String {
+    let mut items = Vec::new();
+    match row_type {
+        FormulaTableRowType::Data => {},
+        FormulaTableRowType::All => items.push("[#All]".to_string()),
+        FormulaTableRowType::Headers => items.push("[#Headers]".to_string()),
+        FormulaTableRowType::DataAlternate => items.push("[#Data]".to_string()),
+        FormulaTableRowType::DataAndHeaders => {
+            items.push("[#Headers]".to_string());
+            items.push("[#Data]".to_string());
+        },
+        FormulaTableRowType::Totals => items.push("[#Totals]".to_string()),
+        FormulaTableRowType::DataAndTotals => {
+            items.push("[#Data]".to_string());
+            items.push("[#Totals]".to_string());
+        },
+        FormulaTableRowType::Current => items.push("[#This Row]".to_string()),
+    }
+    let has_range = matches!(columns, FormulaTableNamedColumns::Range { .. });
+    match columns {
+        FormulaTableNamedColumns::All => {},
+        FormulaTableNamedColumns::One(name) => {
+            items.push(format!("[{}]", escape_structured_column(name)));
+        },
+        FormulaTableNamedColumns::Range { first, last } => {
+            items.push(format!(
+                "[{}]:[{}]",
+                escape_structured_column(first),
+                escape_structured_column(last)
+            ));
+        },
+    }
+    if items.is_empty() {
+        return table.to_string();
+    }
+    let separator = if comma_space { ", " } else { "," };
+    let body = items.join(separator);
+    let specifiers = if items.len() == 1 && !has_range {
+        if square_bracket_space {
+            format!("[ {} ]", &body[1..body.len() - 1])
+        } else {
+            body
+        }
+    } else if square_bracket_space {
+        format!("[ {body} ]")
+    } else {
+        format!("[{body}]")
+    };
+    format!("{table}{specifiers}")
+}
+
 /// Inclusive worksheet range used by array and shared formulas.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FormulaRange {
@@ -399,6 +1070,65 @@ pub enum FormulaMemoryKind {
     Error(u8),
     Function,
     NoMemory,
+}
+
+/// Row subset selected by an XLSB structured table reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FormulaTableRowType {
+    Data,
+    All,
+    Headers,
+    DataAlternate,
+    DataAndHeaders,
+    Totals,
+    DataAndTotals,
+    Current,
+}
+
+/// Column subset selected by a resident structured table reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FormulaTableColumns {
+    All,
+    One(u16),
+    Range { first: u16, last: u16 },
+}
+
+/// Operand class carried by `PtgList`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FormulaTableDataType {
+    Reference,
+    Value,
+    Array,
+}
+
+/// Named column subset stored in a nonresident `PtgExtraList`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormulaTableNamedColumns {
+    All,
+    One(String),
+    Range { first: String, last: String },
+}
+
+/// Ancillary table/column names for a structured reference in another workbook.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormulaExternalTableReference {
+    pub table: String,
+    pub row_type: FormulaTableRowType,
+    pub columns: FormulaTableNamedColumns,
+}
+
+/// Typed XLSB `PtgList` structured table reference.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormulaTableReference {
+    pub sheet_index: u16,
+    pub row_type: Option<FormulaTableRowType>,
+    pub columns: Option<FormulaTableColumns>,
+    pub square_bracket_space: bool,
+    pub comma_space: bool,
+    pub data_type: FormulaTableDataType,
+    pub invalid: bool,
+    pub list_index: Option<u32>,
+    pub external: Option<FormulaExternalTableReference>,
 }
 
 impl CellParsedFormula {
@@ -624,6 +1354,7 @@ pub mod ptg_types {
     pub const PTG_PAREN: u8 = 0x15; // Parentheses
     pub const PTG_MISSING_ARG: u8 = 0x16; // Missing argument
     pub const PTG_STR: u8 = 0x17; // String constant
+    pub const PTG_EXTENDED: u8 = 0x18; // Extended token prefix
     pub const PTG_ATTR: u8 = 0x19; // Attribute
     pub const PTG_SHEET: u8 = 0x1A; // Sheet reference
     pub const PTG_END_SHEET: u8 = 0x1B; // End sheet reference
@@ -658,6 +1389,8 @@ pub mod ptg_types {
     // Array and name
     pub const PTG_NAME: u8 = 0x23; // Defined name
     pub const PTG_ARRAY: u8 = 0x20; // Array constant
+    pub const EPTG_LIST: u8 = 0x19; // Structured table reference
+    pub const EPTG_SX_NAME: u8 = 0x1D; // Pivot calculated name
 }
 
 /// Formula token representation
@@ -753,8 +1486,171 @@ pub enum FormulaToken {
     Name(u32),
     /// Defined name in an external workbook.
     ExternalName { sheet_index: u16, name_index: u32 },
+    /// Structured table reference (`PtgList`), including nonresident ancillary names.
+    TableReference(FormulaTableReference),
+    /// Zero-based calculated pivot field/item name index (`PtgSxName`).
+    PivotName(u32),
     /// Unknown/unsupported token
     Unknown(u8),
+}
+
+impl FormulaToken {
+    /// Encode one of the XLSB extended tokens implemented by this model.
+    ///
+    /// The first vector is the `Rgce` token and the second is its corresponding
+    /// `RgbExtra` payload. Other token families are intentionally rejected.
+    pub fn to_extended_binary(&self) -> XlsbResult<(Vec<u8>, Vec<u8>)> {
+        match self {
+            Self::PivotName(index) => {
+                let mut token = Vec::with_capacity(6);
+                token.extend([ptg_types::PTG_EXTENDED, ptg_types::EPTG_SX_NAME]);
+                token.extend_from_slice(&index.to_le_bytes());
+                Ok((token, Vec::new()))
+            },
+            Self::TableReference(reference) => reference.to_extended_binary(),
+            _ => Err(XlsbError::InvalidFormula(
+                "token is not an extended PtgList/PtgSxName token".to_string(),
+            )),
+        }
+    }
+}
+
+impl FormulaTableReference {
+    fn to_extended_binary(&self) -> XlsbResult<(Vec<u8>, Vec<u8>)> {
+        let external = self.external.as_ref();
+        if self.invalid {
+            if self.row_type.is_some()
+                || self.columns.is_some()
+                || self.list_index.is_some()
+                || external.is_some()
+            {
+                return Err(XlsbError::InvalidFormula(
+                    "invalid PtgList cannot carry resident or external table metadata".to_string(),
+                ));
+            }
+        } else if external.is_some() {
+            if self.row_type.is_some() || self.columns.is_some() || self.list_index.is_some() {
+                return Err(XlsbError::InvalidFormula(
+                    "nonresident PtgList cannot carry resident table metadata".to_string(),
+                ));
+            }
+        } else if self.row_type.is_none() || self.columns.is_none() || self.list_index.is_none() {
+            return Err(XlsbError::InvalidFormula(
+                "resident PtgList is missing table metadata".to_string(),
+            ));
+        }
+
+        let mut flags = match self.data_type {
+            FormulaTableDataType::Reference => 0,
+            FormulaTableDataType::Value => 1 << 10,
+            FormulaTableDataType::Array => 2 << 10,
+        };
+        if self.square_bracket_space {
+            flags |= 0x0080;
+        }
+        if self.comma_space {
+            flags |= 0x0100;
+        }
+        if self.invalid {
+            flags |= 0x1000;
+        }
+        if external.is_some() {
+            flags |= 0x2000;
+        }
+
+        let (list_index, first, last) = if let (Some(row_type), Some(columns), Some(list_index)) =
+            (self.row_type, self.columns, self.list_index)
+        {
+            if list_index == 0 || list_index == u32::MAX {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "PtgList has invalid table identifier {list_index}"
+                )));
+            }
+            flags |= u16::from(table_row_type_raw(row_type)) << 2;
+            match columns {
+                FormulaTableColumns::All => (list_index, 0, 0),
+                FormulaTableColumns::One(column) => {
+                    if column >= 16_384 {
+                        return Err(XlsbError::InvalidFormula(
+                            "PtgList column is outside worksheet bounds".to_string(),
+                        ));
+                    }
+                    flags |= 1;
+                    (list_index, column, column)
+                },
+                FormulaTableColumns::Range { first, last } => {
+                    if first > last || last >= 16_384 {
+                        return Err(XlsbError::InvalidFormula(
+                            "PtgList column range is invalid".to_string(),
+                        ));
+                    }
+                    flags |= 2;
+                    (list_index, first, last)
+                },
+            }
+        } else {
+            (0, 0, 0)
+        };
+
+        let mut token = Vec::with_capacity(14);
+        token.extend([ptg_types::PTG_EXTENDED, ptg_types::EPTG_LIST]);
+        token.extend_from_slice(&self.sheet_index.to_le_bytes());
+        token.extend_from_slice(&flags.to_le_bytes());
+        token.extend_from_slice(&list_index.to_le_bytes());
+        token.extend_from_slice(&first.to_le_bytes());
+        token.extend_from_slice(&last.to_le_bytes());
+        let extra = external
+            .map(write_extra_list)
+            .transpose()?
+            .unwrap_or_default();
+        Ok((token, extra))
+    }
+}
+
+fn write_extra_list(reference: &FormulaExternalTableReference) -> XlsbResult<Vec<u8>> {
+    let table_units = reference.table.encode_utf16().count();
+    if table_units == 0 || table_units >= 256 {
+        return Err(XlsbError::InvalidFormula(format!(
+            "PtgExtraList table length {table_units} is outside 1..=255"
+        )));
+    }
+    let has_columns = !matches!(reference.columns, FormulaTableNamedColumns::All);
+    let mut extra = Vec::new();
+    extra.push(u8::from(has_columns));
+    extra.extend_from_slice(&u16::from(table_row_type_raw(reference.row_type)).to_le_bytes());
+    extra.extend_from_slice(&(table_units as u16).to_le_bytes());
+    push_formula_utf16(&mut extra, &reference.table);
+    match &reference.columns {
+        FormulaTableNamedColumns::All => {},
+        FormulaTableNamedColumns::One(name) => {
+            extra.extend([0, 0, 1]);
+            write_sxos(&mut extra, false, name)?;
+        },
+        FormulaTableNamedColumns::Range { first, last } => {
+            extra.extend([0, 0, 2]);
+            write_sxos(&mut extra, true, first)?;
+            write_sxos(&mut extra, false, last)?;
+        },
+    }
+    Ok(extra)
+}
+
+fn write_sxos(output: &mut Vec<u8>, not_last: bool, name: &str) -> XlsbResult<()> {
+    let units = name.encode_utf16().count();
+    if units == 0 || units > 1_048_576 {
+        return Err(XlsbError::InvalidFormula(format!(
+            "structured-reference column length {units} is outside 1..=1048576"
+        )));
+    }
+    output.push(u8::from(not_last));
+    output.extend_from_slice(&2u16.to_le_bytes());
+    output.extend_from_slice(&(units as u32).to_le_bytes());
+    push_formula_utf16(output, name);
+    Ok(())
+}
+
+fn push_formula_utf16(output: &mut Vec<u8>, value: &str) {
+    output.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
 }
 
 /// Binary operators
@@ -933,6 +1829,7 @@ impl<'a> FormulaParser<'a> {
             PTG_PERCENT => Ok(FormulaToken::UnaryOp(UnaryOperator::Percent)),
             PTG_PAREN => Ok(FormulaToken::Parenthesis),
             PTG_MISSING_ARG => Ok(FormulaToken::MissingArg),
+            PTG_EXTENDED => self.parse_extended(),
             PTG_ATTR => self.parse_attr(),
 
             PTG_INT => self.parse_int(),
@@ -1146,6 +2043,215 @@ impl<'a> FormulaParser<'a> {
                 "unknown PtgAttr selector 0x{selector:02X}"
             ))),
         }
+    }
+
+    fn parse_extended(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(1, "extended Ptg selector")?;
+        let selector = self.data[self.offset];
+        self.offset += 1;
+        match selector {
+            ptg_types::EPTG_LIST => self.parse_list(),
+            ptg_types::EPTG_SX_NAME => {
+                self.require(4, "PtgSxName")?;
+                let index = binary::read_u32_le_at(self.data, self.offset)?;
+                self.offset += 4;
+                Ok(FormulaToken::PivotName(index))
+            },
+            _ => Err(XlsbError::InvalidFormula(format!(
+                "unknown extended Ptg selector 0x{selector:02X}"
+            ))),
+        }
+    }
+
+    fn parse_list(&mut self) -> XlsbResult<FormulaToken> {
+        self.require(12, "PtgList")?;
+        let sheet_index = binary::read_u16_le_at(self.data, self.offset)?;
+        let flags = binary::read_u16_le_at(self.data, self.offset + 2)?;
+        let raw_list_index = binary::read_u32_le_at(self.data, self.offset + 4)?;
+        let col_first = binary::read_u16_le_at(self.data, self.offset + 8)?;
+        let col_last = binary::read_u16_le_at(self.data, self.offset + 10)?;
+        self.offset += 12;
+
+        if flags & 0xC000 != 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgList reserved flag bits are nonzero: 0x{:04X}",
+                flags & 0xC000
+            )));
+        }
+        let data_type = match (flags >> 10) & 0x03 {
+            0 => FormulaTableDataType::Reference,
+            1 => FormulaTableDataType::Value,
+            2 => FormulaTableDataType::Array,
+            _ => {
+                return Err(XlsbError::InvalidFormula(
+                    "PtgList has reserved data type 3".to_string(),
+                ));
+            },
+        };
+        let invalid = flags & 0x1000 != 0;
+        let nonresident = !invalid && flags & 0x2000 != 0;
+        let (row_type, columns, list_index) = if invalid || nonresident {
+            (None, None, None)
+        } else {
+            if raw_list_index == 0 || raw_list_index == u32::MAX {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "PtgList has invalid table identifier {raw_list_index}"
+                )));
+            }
+            let row_type = parse_table_row_type(((flags >> 2) & 0x1F) as u8)?;
+            let columns = match flags & 0x03 {
+                0 => FormulaTableColumns::All,
+                1 => {
+                    if col_first >= 16_384 {
+                        return Err(XlsbError::InvalidFormula(
+                            "PtgList first column is outside worksheet bounds".to_string(),
+                        ));
+                    }
+                    FormulaTableColumns::One(col_first)
+                },
+                2 => {
+                    if col_first > col_last || col_last >= 16_384 {
+                        return Err(XlsbError::InvalidFormula(
+                            "PtgList column range is invalid".to_string(),
+                        ));
+                    }
+                    FormulaTableColumns::Range {
+                        first: col_first,
+                        last: col_last,
+                    }
+                },
+                _ => {
+                    return Err(XlsbError::InvalidFormula(
+                        "PtgList has reserved column selector 3".to_string(),
+                    ));
+                },
+            };
+            (Some(row_type), Some(columns), Some(raw_list_index))
+        };
+        let external = if nonresident {
+            Some(self.parse_extra_list()?)
+        } else {
+            None
+        };
+        Ok(FormulaToken::TableReference(FormulaTableReference {
+            sheet_index,
+            row_type,
+            columns,
+            square_bracket_space: flags & 0x0080 != 0,
+            comma_space: flags & 0x0100 != 0,
+            data_type,
+            invalid,
+            list_index,
+            external,
+        }))
+    }
+
+    fn parse_extra_list(&mut self) -> XlsbResult<FormulaExternalTableReference> {
+        self.require_extra(5, "PtgExtraList header")?;
+        let has_columns = match self.extra[self.extra_offset] {
+            0 => false,
+            1 => true,
+            value => {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "invalid PtgExtraList hasColumns {value}"
+                )));
+            },
+        };
+        let row_flags = binary::read_u16_le_at(self.extra, self.extra_offset + 1)?;
+        if row_flags & !0x001F != 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgExtraList reserved row bits are nonzero: 0x{:04X}",
+                row_flags & !0x001F
+            )));
+        }
+        let row_type = parse_table_row_type((row_flags & 0x1F) as u8)?;
+        let table_len = usize::from(binary::read_u16_le_at(self.extra, self.extra_offset + 3)?);
+        self.extra_offset += 5;
+        if table_len == 0 || table_len >= 256 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "PtgExtraList table length {table_len} is outside 1..=255"
+            )));
+        }
+        let table = self.parse_extra_utf16(table_len, "PtgExtraList table")?;
+        let columns = if has_columns {
+            self.require_extra(3, "SxSu header")?;
+            let reserved = binary::read_u16_le_at(self.extra, self.extra_offset)?;
+            let count = self.extra[self.extra_offset + 2];
+            self.extra_offset += 3;
+            if reserved != 0 {
+                return Err(XlsbError::InvalidFormula(
+                    "SxSu reserved field is nonzero".to_string(),
+                ));
+            }
+            if !matches!(count, 1 | 2) {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "invalid SxSu column count {count}"
+                )));
+            }
+            let first = self.parse_sxos(count == 2, "SxSu first column")?;
+            if count == 1 {
+                FormulaTableNamedColumns::One(first)
+            } else {
+                let last = self.parse_sxos(false, "SxSu last column")?;
+                FormulaTableNamedColumns::Range { first, last }
+            }
+        } else {
+            FormulaTableNamedColumns::All
+        };
+        Ok(FormulaExternalTableReference {
+            table,
+            row_type,
+            columns,
+        })
+    }
+
+    fn parse_sxos(&mut self, expected_not_last: bool, context: &str) -> XlsbResult<String> {
+        self.require_extra(7, context)?;
+        let not_last = match self.extra[self.extra_offset] {
+            0 => false,
+            1 => true,
+            value => {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "invalid {context} notLast {value}"
+                )));
+            },
+        };
+        let reserved = binary::read_u16_le_at(self.extra, self.extra_offset + 1)?;
+        let length = usize::try_from(binary::read_u32_le_at(self.extra, self.extra_offset + 3)?)
+            .map_err(|_| XlsbError::InvalidFormula(format!("{context} length overflow")))?;
+        self.extra_offset += 7;
+        if not_last != expected_not_last {
+            return Err(XlsbError::InvalidFormula(format!(
+                "{context} has inconsistent notLast flag"
+            )));
+        }
+        if reserved != 2 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "{context} reserved field is {reserved}, expected 2"
+            )));
+        }
+        if length == 0 {
+            return Err(XlsbError::InvalidFormula(format!(
+                "{context} name is empty"
+            )));
+        }
+        self.parse_extra_utf16(length, context)
+    }
+
+    fn parse_extra_utf16(&mut self, units: usize, context: &str) -> XlsbResult<String> {
+        let byte_len = units
+            .checked_mul(2)
+            .ok_or_else(|| XlsbError::InvalidFormula(format!("{context} length overflow")))?;
+        self.require_extra(byte_len, context)?;
+        let value = char::decode_utf16(
+            self.extra[self.extra_offset..self.extra_offset + byte_len]
+                .chunks_exact(2)
+                .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
+        )
+        .collect::<Result<String, _>>()
+        .map_err(|_| XlsbError::Encoding(format!("invalid UTF-16 in {context}")))?;
+        self.extra_offset += byte_len;
+        Ok(value)
     }
 
     fn require_extra(&self, len: usize, context: &str) -> XlsbResult<()> {
@@ -1910,6 +3016,26 @@ impl FormulaConverter {
                     })?;
                     stack.push(context.resolve_external_name(*sheet_index, *name_index)?);
                 },
+                FormulaToken::TableReference(reference) if reference.invalid => {
+                    stack.push("#REF!".to_string())
+                },
+                FormulaToken::TableReference(reference) => {
+                    let context = context.ok_or_else(|| {
+                        XlsbError::UnsupportedFeature(format!(
+                            "structured table reference on Xti {} requires table-definition resolution",
+                            reference.sheet_index
+                        ))
+                    })?;
+                    stack.push(context.resolve_table_reference(reference)?);
+                },
+                FormulaToken::PivotName(index) => {
+                    let context = context.ok_or_else(|| {
+                        XlsbError::InvalidFormula(
+                            "PtgSxName requires pivot-cache calculated-name metadata".to_string(),
+                        )
+                    })?;
+                    stack.push(context.resolve_pivot_name(*index)?);
+                },
                 FormulaToken::Unknown(t) => {
                     return Err(XlsbError::UnsupportedFeature(format!(
                         "XLSB formula token 0x{t:02X}"
@@ -1972,6 +3098,35 @@ impl FormulaConverter {
             0x2B => "#GETTING_DATA".to_string(),
             _ => format!("#ERR{:02X}!", code),
         }
+    }
+}
+
+fn parse_table_row_type(value: u8) -> XlsbResult<FormulaTableRowType> {
+    match value {
+        0x00 => Ok(FormulaTableRowType::Data),
+        0x01 => Ok(FormulaTableRowType::All),
+        0x02 => Ok(FormulaTableRowType::Headers),
+        0x04 => Ok(FormulaTableRowType::DataAlternate),
+        0x06 => Ok(FormulaTableRowType::DataAndHeaders),
+        0x08 => Ok(FormulaTableRowType::Totals),
+        0x0C => Ok(FormulaTableRowType::DataAndTotals),
+        0x10 => Ok(FormulaTableRowType::Current),
+        _ => Err(XlsbError::InvalidFormula(format!(
+            "invalid PtgRowType 0x{value:02X}"
+        ))),
+    }
+}
+
+fn table_row_type_raw(value: FormulaTableRowType) -> u8 {
+    match value {
+        FormulaTableRowType::Data => 0x00,
+        FormulaTableRowType::All => 0x01,
+        FormulaTableRowType::Headers => 0x02,
+        FormulaTableRowType::DataAlternate => 0x04,
+        FormulaTableRowType::DataAndHeaders => 0x06,
+        FormulaTableRowType::Totals => 0x08,
+        FormulaTableRowType::DataAndTotals => 0x0C,
+        FormulaTableRowType::Current => 0x10,
     }
 }
 
@@ -2051,10 +3206,14 @@ pub(crate) struct FormulaDefinedName {
 }
 
 /// Workbook metadata used to compile context-dependent formula operands.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct FormulaCompilationContext<'a> {
     pub(crate) worksheet_names: &'a [String],
     pub(crate) defined_names: &'a [FormulaDefinedName],
+    pub(crate) tables: &'a [FormulaTableDefinition],
+    pub(crate) supporting_links: &'a [FormulaSupportingLink],
+    pub(crate) external_sheets: &'a [FormulaExternalSheet],
+    pub(crate) external_books: &'a [FormulaExternalBook],
     pub(crate) sheet_ranges: &'a std::cell::RefCell<Vec<(u32, u32)>>,
     pub(crate) current_sheet: u32,
 }
@@ -2083,9 +3242,24 @@ enum CompileExpr {
     Ref3d(u16, A1Reference),
     Area3d(u16, A1Reference, A1Reference),
     Name(u32),
+    TableReference(FormulaTableReference),
     Unary(UnaryOperator, Box<CompileExpr>),
     Binary(BinaryOperator, Box<CompileExpr>, Box<CompileExpr>),
     Function(BuiltinFunction, Vec<CompileExpr>),
+}
+
+#[derive(Debug)]
+struct ParsedStructuredReference {
+    row_type: FormulaTableRowType,
+    columns: FormulaTableNamedColumns,
+    square_bracket_space: bool,
+    comma_space: bool,
+}
+
+#[derive(Debug)]
+struct StructuredReferenceItem {
+    text: String,
+    first_character_escaped: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -2315,6 +3489,29 @@ impl<'a> FormulaCompiler<'a> {
             if !self.consume("!") {
                 return Err(self.error("expected '!' after quoted worksheet name"));
             }
+            if sheet_qualifier.starts_with('[') {
+                let table = self.parse_identifier()?;
+                if self.peek_char() == Some('[') || parse_a1_reference(&table).is_none() {
+                    let selection = if self.peek_char() == Some('[') {
+                        self.parse_structured_reference()?
+                    } else {
+                        ParsedStructuredReference {
+                            row_type: FormulaTableRowType::Data,
+                            columns: FormulaTableNamedColumns::All,
+                            square_bracket_space: false,
+                            comma_space: false,
+                        }
+                    };
+                    return self.compile_external_table_reference(
+                        &sheet_qualifier,
+                        table,
+                        selection,
+                    );
+                }
+                return Err(self.error(
+                    "external cell references are not supported by this compilation context",
+                ));
+            }
             let (first_sheet, last_sheet) = Self::split_sheet_qualifier(&sheet_qualifier)?;
             return self.parse_qualified_reference(first_sheet, last_sheet);
         }
@@ -2330,6 +3527,10 @@ impl<'a> FormulaCompiler<'a> {
         }
         if self.consume("!") {
             return self.parse_qualified_reference(&identifier, None);
+        }
+        if self.peek_char() == Some('[') {
+            let selection = self.parse_structured_reference()?;
+            return self.compile_resident_table_reference(&identifier, selection);
         }
         if self.consume("(") {
             let function = builtin_function_by_name(&identifier).ok_or_else(|| {
@@ -2378,6 +3579,10 @@ impl<'a> FormulaCompiler<'a> {
             return Ok(CompileExpr::Bool(false));
         }
 
+        if let Some(reference) = self.compile_bare_resident_table_reference(&identifier)? {
+            return Ok(reference);
+        }
+
         let Some(first) = parse_a1_reference(&identifier) else {
             return self
                 .resolve_defined_name(&identifier)
@@ -2391,6 +3596,470 @@ impl<'a> FormulaCompiler<'a> {
         } else {
             Ok(CompileExpr::Ref(first))
         }
+    }
+
+    fn parse_structured_reference(&mut self) -> XlsbResult<ParsedStructuredReference> {
+        debug_assert_eq!(self.peek_char(), Some('['));
+        self.offset += 1;
+        let leading_space = self.consume_structured_space()?;
+        let nested = self.peek_char() == Some('[');
+        let mut items = Vec::new();
+        let mut separators = Vec::new();
+        let mut comma_space = None;
+        let mut unwrapped_trailing_space = false;
+
+        if nested {
+            loop {
+                items.push(self.parse_structured_reference_item(true)?);
+                match self.peek_char() {
+                    Some(',') => {
+                        self.offset += 1;
+                        separators.push(',');
+                        let spaced = self.consume_structured_space()?;
+                        if comma_space.replace(spaced).is_some_and(|previous| previous != spaced) {
+                            return Err(self.error(
+                                "structured-reference commas use inconsistent whitespace",
+                            ));
+                        }
+                    },
+                    Some(':') => {
+                        self.offset += 1;
+                        separators.push(':');
+                    },
+                    _ => break,
+                }
+            }
+        } else {
+            let mut item = self.parse_structured_reference_item(false)?;
+            if item.text.ends_with(char::is_whitespace) {
+                if !item.text.ends_with(' ')
+                    || item
+                        .text
+                        .strip_suffix(' ')
+                        .is_some_and(|text| text.ends_with(char::is_whitespace))
+                {
+                    return Err(self.error(
+                        "structured-reference whitespace cannot be represented by XLSB flags",
+                    ));
+                }
+                item.text.pop();
+                if item.text.is_empty() {
+                    return Err(self.error("structured-reference item is empty"));
+                }
+                unwrapped_trailing_space = true;
+            }
+            items.push(item);
+        }
+
+        let trailing_space = if nested {
+            self.consume_structured_space()?
+        } else {
+            unwrapped_trailing_space
+        };
+        if leading_space != trailing_space {
+            return Err(self.error(
+                "structured-reference square-bracket whitespace is asymmetric",
+            ));
+        }
+        if self.peek_char() != Some(']') {
+            return Err(self.error("expected closing structured-reference bracket"));
+        }
+        self.offset += 1;
+        if nested && items.len() == 1 {
+            return Err(self.error(
+                "redundant nested structured reference cannot be represented faithfully",
+            ));
+        }
+
+        let (row_type, columns) = Self::classify_structured_reference(items, &separators)?;
+        Ok(ParsedStructuredReference {
+            row_type,
+            columns,
+            square_bracket_space: leading_space,
+            comma_space: comma_space.unwrap_or(false),
+        })
+    }
+
+    fn parse_structured_reference_item(
+        &mut self,
+        bracketed: bool,
+    ) -> XlsbResult<StructuredReferenceItem> {
+        if bracketed {
+            if self.peek_char() != Some('[') {
+                return Err(self.error("expected nested structured-reference item"));
+            }
+            self.offset += 1;
+        }
+        let mut text = String::new();
+        let mut first_character_escaped = false;
+        loop {
+            let Some(ch) = self.peek_char() else {
+                return Err(self.error("unterminated structured reference"));
+            };
+            if ch == ']' {
+                if bracketed {
+                    self.offset += 1;
+                }
+                break;
+            }
+            self.offset += ch.len_utf8();
+            if ch == '\'' {
+                let Some(escaped) = self.peek_char() else {
+                    return Err(self.error("unterminated structured-reference escape"));
+                };
+                if !matches!(escaped, '#' | '[' | ']' | '\'' | '@') {
+                    return Err(self.error("invalid structured-reference escape"));
+                }
+                if text.is_empty() {
+                    first_character_escaped = true;
+                }
+                self.offset += escaped.len_utf8();
+                text.push(escaped);
+            } else {
+                text.push(ch);
+            }
+        }
+        if text.is_empty() {
+            return Err(self.error("structured-reference item is empty"));
+        }
+        Ok(StructuredReferenceItem {
+            text,
+            first_character_escaped,
+        })
+    }
+
+    fn consume_structured_space(&mut self) -> XlsbResult<bool> {
+        let start = self.offset;
+        while self.peek_char().is_some_and(char::is_whitespace) {
+            self.offset += self.peek_char().expect("checked").len_utf8();
+        }
+        if self.offset == start {
+            return Ok(false);
+        }
+        if &self.input[start..self.offset] != " " {
+            return Err(self.error(
+                "structured-reference whitespace cannot be represented by XLSB flags",
+            ));
+        }
+        Ok(true)
+    }
+
+    fn classify_structured_reference(
+        items: Vec<StructuredReferenceItem>,
+        separators: &[char],
+    ) -> XlsbResult<(FormulaTableRowType, FormulaTableNamedColumns)> {
+        if separators.len() + 1 != items.len() {
+            return Err(XlsbError::InvalidFormula(
+                "structured-reference separator count is invalid".to_string(),
+            ));
+        }
+
+        let mut rows = Vec::new();
+        let mut columns = Vec::new();
+        let mut item_is_column = Vec::with_capacity(items.len());
+        for item in items {
+            let row = if item.first_character_escaped {
+                None
+            } else if item.text.eq_ignore_ascii_case("#All") {
+                Some(FormulaTableRowType::All)
+            } else if item.text.eq_ignore_ascii_case("#Data") {
+                Some(FormulaTableRowType::DataAlternate)
+            } else if item.text.eq_ignore_ascii_case("#Headers") {
+                Some(FormulaTableRowType::Headers)
+            } else if item.text.eq_ignore_ascii_case("#Totals") {
+                Some(FormulaTableRowType::Totals)
+            } else if item.text.eq_ignore_ascii_case("#This Row") {
+                Some(FormulaTableRowType::Current)
+            } else {
+                None
+            };
+            if let Some(row) = row {
+                rows.push(row);
+                item_is_column.push(false);
+            } else if !item.first_character_escaped && item.text.starts_with('#') {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "unknown structured-reference row selector {:?}",
+                    item.text
+                )));
+            } else if !item.first_character_escaped && item.text.starts_with('@') {
+                let column = item.text[1..].to_string();
+                if column.is_empty() || !rows.is_empty() {
+                    return Err(XlsbError::InvalidFormula(
+                        "invalid or duplicate current-row structured reference".to_string(),
+                    ));
+                }
+                rows.push(FormulaTableRowType::Current);
+                columns.push(column);
+                item_is_column.push(true);
+            } else {
+                columns.push(item.text);
+                item_is_column.push(true);
+            }
+        }
+
+        let mut colon = None;
+        for (index, separator) in separators.iter().copied().enumerate() {
+            match separator {
+                ':' if item_is_column[index] && item_is_column[index + 1] => {
+                    if colon.replace(index).is_some() {
+                        return Err(XlsbError::InvalidFormula(
+                            "structured reference has more than one column range".to_string(),
+                        ));
+                    }
+                },
+                ',' if !item_is_column[index] || !item_is_column[index + 1] => {},
+                ',' => {
+                    return Err(XlsbError::InvalidFormula(
+                        "disjoint structured-reference columns cannot fit one PtgList".to_string(),
+                    ));
+                },
+                _ => {
+                    return Err(XlsbError::InvalidFormula(
+                        "structured-reference separator has invalid operands".to_string(),
+                    ));
+                },
+            }
+        }
+
+        let row_type = match rows.as_slice() {
+            [] => FormulaTableRowType::Data,
+            [row] => *row,
+            [FormulaTableRowType::Headers, FormulaTableRowType::DataAlternate] => {
+                FormulaTableRowType::DataAndHeaders
+            },
+            [FormulaTableRowType::DataAlternate, FormulaTableRowType::Totals] => {
+                FormulaTableRowType::DataAndTotals
+            },
+            _ => {
+                return Err(XlsbError::InvalidFormula(
+                    "structured-reference row union cannot fit one PtgList".to_string(),
+                ));
+            },
+        };
+        let columns = match columns.as_slice() {
+            [] => FormulaTableNamedColumns::All,
+            [column] if colon.is_none() => FormulaTableNamedColumns::One(column.clone()),
+            [first, last] if colon.is_some() => FormulaTableNamedColumns::Range {
+                first: first.clone(),
+                last: last.clone(),
+            },
+            _ => {
+                return Err(XlsbError::InvalidFormula(
+                    "structured-reference columns cannot fit one PtgList".to_string(),
+                ));
+            },
+        };
+        validate_named_table_columns(&columns)?;
+        Ok((row_type, columns))
+    }
+
+    fn compile_bare_resident_table_reference(
+        &self,
+        table_name: &str,
+    ) -> XlsbResult<Option<CompileExpr>> {
+        let Some(context) = self.context else {
+            return Ok(None);
+        };
+        if !context
+            .tables
+            .iter()
+            .any(|table| excel_name_eq(table.display_name(), table_name))
+        {
+            return Ok(None);
+        }
+        self.compile_resident_table_reference(
+            table_name,
+            ParsedStructuredReference {
+                row_type: FormulaTableRowType::Data,
+                columns: FormulaTableNamedColumns::All,
+                square_bracket_space: false,
+                comma_space: false,
+            },
+        )
+        .map(Some)
+    }
+
+    fn compile_resident_table_reference(
+        &self,
+        table_name: &str,
+        selection: ParsedStructuredReference,
+    ) -> XlsbResult<CompileExpr> {
+        let context = self.context.ok_or_else(|| {
+            XlsbError::UnsupportedFeature(format!(
+                "structured table reference {table_name:?} requires workbook compilation context"
+            ))
+        })?;
+        let mut matches = context
+            .tables
+            .iter()
+            .filter(|table| excel_name_eq(table.display_name(), table_name));
+        let table = matches.next().ok_or_else(|| {
+            XlsbError::InvalidFormula(format!("structured reference names missing table {table_name:?}"))
+        })?;
+        if matches.next().is_some() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "structured reference table name {table_name:?} is ambiguous"
+            )));
+        }
+        let current_sheet = usize::try_from(context.current_sheet)
+            .map_err(|_| XlsbError::InvalidFormula("current worksheet index overflow".to_string()))?;
+        if table.sheet_index() != current_sheet {
+            return Err(XlsbError::InvalidFormula(format!(
+                "table {table_name:?} is on worksheet {}, not the formula worksheet {current_sheet}",
+                table.sheet_index()
+            )));
+        }
+        let columns = match selection.columns {
+            FormulaTableNamedColumns::All => FormulaTableColumns::All,
+            FormulaTableNamedColumns::One(name) => {
+                FormulaTableColumns::One(Self::resolve_table_column(table, &name)?)
+            },
+            FormulaTableNamedColumns::Range { first, last } => {
+                let first = Self::resolve_table_column(table, &first)?;
+                let last = Self::resolve_table_column(table, &last)?;
+                if first > last {
+                    return Err(XlsbError::InvalidFormula(
+                        "structured-reference column range is reversed".to_string(),
+                    ));
+                }
+                FormulaTableColumns::Range { first, last }
+            },
+        };
+        let sheet_index = u16::try_from(current_sheet)
+            .ok()
+            .and_then(|index| index.checked_add(2))
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(
+                    "table worksheet cannot be represented in the extern-sheet table".to_string(),
+                )
+            })?;
+        Ok(CompileExpr::TableReference(FormulaTableReference {
+            sheet_index,
+            row_type: Some(selection.row_type),
+            columns: Some(columns),
+            square_bracket_space: selection.square_bracket_space,
+            comma_space: selection.comma_space,
+            data_type: FormulaTableDataType::Reference,
+            invalid: false,
+            list_index: Some(table.table_id()),
+            external: None,
+        }))
+    }
+
+    fn resolve_table_column(table: &FormulaTableDefinition, name: &str) -> XlsbResult<u16> {
+        let mut matches = table
+            .columns()
+            .iter()
+            .enumerate()
+            .filter(|(_, column)| excel_name_eq(column, name));
+        let (index, _) = matches.next().ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "structured reference names missing column {name:?} in table {:?}",
+                table.display_name()
+            ))
+        })?;
+        if matches.next().is_some() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "structured-reference column {name:?} is ambiguous"
+            )));
+        }
+        u16::try_from(index).map_err(|_| {
+            XlsbError::InvalidFormula("structured-reference column index overflow".to_string())
+        })
+    }
+
+    fn compile_external_table_reference(
+        &self,
+        qualifier: &str,
+        table: String,
+        selection: ParsedStructuredReference,
+    ) -> XlsbResult<CompileExpr> {
+        validate_table_name(&table)?;
+        let sheet_index = self.resolve_external_table_xti(qualifier)?;
+        Ok(CompileExpr::TableReference(FormulaTableReference {
+            sheet_index,
+            row_type: None,
+            columns: None,
+            square_bracket_space: selection.square_bracket_space,
+            comma_space: selection.comma_space,
+            data_type: FormulaTableDataType::Reference,
+            invalid: false,
+            list_index: None,
+            external: Some(FormulaExternalTableReference {
+                table,
+                row_type: selection.row_type,
+                columns: selection.columns,
+            }),
+        }))
+    }
+
+    fn resolve_external_table_xti(&self, qualifier: &str) -> XlsbResult<u16> {
+        let context = self.context.ok_or_else(|| {
+            XlsbError::UnsupportedFeature(
+                "external structured reference requires workbook compilation context".to_string(),
+            )
+        })?;
+        let close = qualifier.find(']').ok_or_else(|| {
+            XlsbError::InvalidFormula("external structured reference omits ']'".to_string())
+        })?;
+        if !qualifier.starts_with('[') || close == 1 || close + 1 == qualifier.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "invalid external structured-reference qualifier {qualifier:?}"
+            )));
+        }
+        let target = &qualifier[1..close];
+        let sheet = &qualifier[close + 1..];
+        if sheet.contains(':') {
+            return Err(XlsbError::InvalidFormula(
+                "external structured reference must select exactly one worksheet".to_string(),
+            ));
+        }
+
+        let mut found = None;
+        for (xti_index, xti) in context.external_sheets.iter().enumerate() {
+            if xti.first_sheet < 0 || xti.first_sheet != xti.last_sheet {
+                continue;
+            }
+            let Ok(link_index) = usize::try_from(xti.external_link) else {
+                continue;
+            };
+            let Some(FormulaSupportingLink::ExternalWorkbook(book_index)) =
+                context.supporting_links.get(link_index)
+            else {
+                continue;
+            };
+            let Ok(book_index) = usize::try_from(*book_index) else {
+                continue;
+            };
+            let Some(book) = context.external_books.get(book_index) else {
+                continue;
+            };
+            let Ok(sheet_index) = usize::try_from(xti.first_sheet) else {
+                continue;
+            };
+            if !book.is_workbook
+                || !excel_name_eq(&book.target, target)
+                || !book
+                    .sheet_names
+                    .get(sheet_index)
+                    .is_some_and(|candidate| excel_name_eq(candidate, sheet))
+            {
+                continue;
+            }
+            let xti_index = u16::try_from(xti_index).map_err(|_| {
+                XlsbError::InvalidFormula("external structured-reference Xti overflow".to_string())
+            })?;
+            if xti_index == u16::MAX || found.replace(xti_index).is_some() {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "external structured-reference qualifier {qualifier:?} is ambiguous"
+                )));
+            }
+        }
+        found.ok_or_else(|| {
+            XlsbError::InvalidFormula(format!(
+                "external structured-reference qualifier {qualifier:?} is missing"
+            ))
+        })
     }
 
     fn parse_string(&mut self) -> XlsbResult<String> {
@@ -2853,6 +4522,11 @@ impl<'a> FormulaCompiler<'a> {
             CompileExpr::Name(index) => {
                 output.push(0x43); // PtgName, VALUE class
                 output.extend_from_slice(&index.to_le_bytes());
+            },
+            CompileExpr::TableReference(reference) => {
+                let (token, payload) = reference.to_extended_binary()?;
+                output.extend_from_slice(&token);
+                extra.extend_from_slice(&payload);
             },
             CompileExpr::Unary(operator, operand) => {
                 Self::emit(operand, output, extra, encoding)?;
@@ -3331,6 +5005,10 @@ mod tests {
         let context = FormulaCompilationContext {
             worksheet_names: &worksheet_names,
             defined_names: &defined_names,
+            tables: &[],
+            supporting_links: &[],
+            external_sheets: &[],
+            external_books: &[],
             sheet_ranges: &sheet_ranges,
             current_sheet: 1,
         };
@@ -3570,6 +5248,10 @@ mod tests {
             .into(),
             external_books: Vec::new().into(),
             defined_names: vec!["Rate".to_string()].into(),
+            tables: Vec::new().into(),
+            pivot_views: Vec::new().into(),
+            pivot_name_scopes: Vec::new().into(),
+            active_pivot_scope: None,
             current_sheet: None,
         };
 
@@ -3604,6 +5286,10 @@ mod tests {
             external_sheets: Vec::new().into(),
             external_books: Vec::new().into(),
             defined_names: Vec::new().into(),
+            tables: Vec::new().into(),
+            pivot_views: Vec::new().into(),
+            pivot_name_scopes: Vec::new().into(),
+            active_pivot_scope: None,
             current_sheet: None,
         };
         let invalid_xti = [0x5A, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -3666,6 +5352,10 @@ mod tests {
             .into(),
             external_books: Vec::new().into(),
             defined_names: Vec::new().into(),
+            tables: Vec::new().into(),
+            pivot_views: Vec::new().into(),
+            pivot_name_scopes: Vec::new().into(),
+            active_pivot_scope: None,
             current_sheet: None,
         }
         .for_sheet(1);
@@ -3697,6 +5387,10 @@ mod tests {
             }]
             .into(),
             defined_names: Vec::new().into(),
+            tables: Vec::new().into(),
+            pivot_views: Vec::new().into(),
+            pivot_name_scopes: Vec::new().into(),
+            active_pivot_scope: None,
             current_sheet: None,
         };
 
@@ -4036,5 +5730,527 @@ mod tests {
     fn truncated_token_is_an_error_instead_of_becoming_unknown_bytes() {
         let error = FormulaParser::new(&[0x44, 0x01]).parse().unwrap_err();
         assert!(matches!(error, XlsbError::InvalidFormula(_)));
+    }
+
+    fn resident_table_reference(
+        row_type: FormulaTableRowType,
+        columns: FormulaTableColumns,
+    ) -> FormulaToken {
+        FormulaToken::TableReference(FormulaTableReference {
+            sheet_index: 0,
+            row_type: Some(row_type),
+            columns: Some(columns),
+            square_bracket_space: false,
+            comma_space: false,
+            data_type: FormulaTableDataType::Reference,
+            invalid: false,
+            list_index: Some(7),
+            external: None,
+        })
+    }
+
+    fn table_context() -> FormulaResolutionContext {
+        FormulaResolutionContext {
+            worksheet_names: vec!["Data".to_string()].into(),
+            supporting_links: vec![FormulaSupportingLink::SelfWorkbook].into(),
+            external_sheets: vec![FormulaExternalSheet {
+                external_link: 0,
+                first_sheet: 0,
+                last_sheet: 0,
+            }]
+            .into(),
+            external_books: Vec::new().into(),
+            defined_names: Vec::new().into(),
+            tables: vec![
+                FormulaTableDefinition::try_new(
+                    7,
+                    0,
+                    "Sales",
+                    vec![
+                        "Item".to_string(),
+                        "Price]Gross".to_string(),
+                        "@Tag".to_string(),
+                    ],
+                )
+                .unwrap(),
+            ]
+            .into(),
+            pivot_views: Vec::new().into(),
+            pivot_name_scopes: Vec::new().into(),
+            active_pivot_scope: None,
+            current_sheet: Some(0),
+        }
+    }
+
+    #[test]
+    fn resolves_resident_structured_references_faithfully() {
+        let context = table_context();
+        for (row_type, expected) in [
+            (FormulaTableRowType::Data, "Sales"),
+            (FormulaTableRowType::All, "Sales[#All]"),
+            (FormulaTableRowType::Headers, "Sales[#Headers]"),
+            (FormulaTableRowType::DataAlternate, "Sales[#Data]"),
+            (
+                FormulaTableRowType::DataAndHeaders,
+                "Sales[[#Headers],[#Data]]",
+            ),
+            (FormulaTableRowType::Totals, "Sales[#Totals]"),
+            (
+                FormulaTableRowType::DataAndTotals,
+                "Sales[[#Data],[#Totals]]",
+            ),
+            (FormulaTableRowType::Current, "Sales[#This Row]"),
+        ] {
+            let token = resident_table_reference(row_type, FormulaTableColumns::All);
+            assert_eq!(
+                FormulaConverter::try_tokens_to_string_with_context(&[token], &context).unwrap(),
+                expected
+            );
+        }
+
+        let token = resident_table_reference(
+            FormulaTableRowType::Current,
+            FormulaTableColumns::Range { first: 1, last: 2 },
+        );
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string_with_context(&[token], &context).unwrap(),
+            "Sales[[#This Row],[Price']Gross]:['@Tag]]"
+        );
+
+        let mut spaced =
+            resident_table_reference(FormulaTableRowType::Current, FormulaTableColumns::One(0));
+        let FormulaToken::TableReference(reference) = &mut spaced else {
+            unreachable!()
+        };
+        reference.square_bracket_space = true;
+        reference.comma_space = true;
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string_with_context(&[spaced], &context).unwrap(),
+            "Sales[ [#This Row], [Item] ]"
+        );
+    }
+
+    #[test]
+    fn resolves_nonresident_structured_references_with_external_prefix() {
+        let context = FormulaResolutionContext {
+            worksheet_names: Vec::new().into(),
+            supporting_links: vec![FormulaSupportingLink::ExternalWorkbook(0)].into(),
+            external_sheets: vec![FormulaExternalSheet {
+                external_link: 0,
+                first_sheet: 0,
+                last_sheet: 0,
+            }]
+            .into(),
+            external_books: vec![FormulaExternalBook {
+                target: "Book.xlsx".to_string(),
+                sheet_names: vec!["Data Sheet".to_string()].into(),
+                defined_names: Vec::new().into(),
+                is_workbook: true,
+            }]
+            .into(),
+            defined_names: Vec::new().into(),
+            tables: Vec::new().into(),
+            pivot_views: Vec::new().into(),
+            pivot_name_scopes: Vec::new().into(),
+            active_pivot_scope: None,
+            current_sheet: None,
+        };
+        let token = FormulaToken::TableReference(FormulaTableReference {
+            sheet_index: 0,
+            row_type: None,
+            columns: None,
+            square_bracket_space: false,
+            comma_space: false,
+            data_type: FormulaTableDataType::Reference,
+            invalid: false,
+            list_index: None,
+            external: Some(FormulaExternalTableReference {
+                table: "Remote".to_string(),
+                row_type: FormulaTableRowType::Totals,
+                columns: FormulaTableNamedColumns::One("Amount".to_string()),
+            }),
+        });
+        assert_eq!(
+            FormulaConverter::try_tokens_to_string_with_context(&[token], &context).unwrap(),
+            "'[Book.xlsx]Data Sheet'!Remote[[#Totals],[Amount]]"
+        );
+    }
+
+    #[test]
+    fn structured_reference_resolution_rejects_ambiguous_and_invalid_metadata() {
+        assert!(FormulaTableDefinition::try_new(0, 0, "Sales", vec!["A".into()]).is_err());
+        assert!(FormulaTableDefinition::try_new(1, 0, "_xlBad", vec!["A".into()]).is_err());
+        assert!(FormulaTableDefinition::try_new(1, 0, "Sales", Vec::new()).is_err());
+        assert!(
+            FormulaTableDefinition::try_new(1, 0, "Sales", vec!["A".into(), "a".into()]).is_err()
+        );
+
+        let token =
+            resident_table_reference(FormulaTableRowType::Data, FormulaTableColumns::One(3));
+        assert!(FormulaConverter::try_tokens_to_string(&[token.clone()]).is_err());
+        assert!(
+            FormulaConverter::try_tokens_to_string_with_context(&[token], &table_context())
+                .is_err()
+        );
+
+        let mut missing = table_context();
+        missing.tables = Vec::new().into();
+        assert!(
+            FormulaConverter::try_tokens_to_string_with_context(
+                &[resident_table_reference(
+                    FormulaTableRowType::Data,
+                    FormulaTableColumns::All,
+                )],
+                &missing,
+            )
+            .is_err()
+        );
+
+        let mut ambiguous = table_context();
+        ambiguous.tables = vec![
+            ambiguous.tables[0].clone(),
+            FormulaTableDefinition::try_new(7, 0, "Other", vec!["A".into()]).unwrap(),
+        ]
+        .into();
+        assert!(
+            FormulaConverter::try_tokens_to_string_with_context(
+                &[resident_table_reference(
+                    FormulaTableRowType::Data,
+                    FormulaTableColumns::All,
+                )],
+                &ambiguous,
+            )
+            .is_err()
+        );
+
+        let mut wrong_sheet = table_context();
+        wrong_sheet.external_sheets = vec![FormulaExternalSheet {
+            external_link: 0,
+            first_sheet: 0,
+            last_sheet: 1,
+        }]
+        .into();
+        assert!(
+            FormulaConverter::try_tokens_to_string_with_context(
+                &[resident_table_reference(
+                    FormulaTableRowType::Data,
+                    FormulaTableColumns::All,
+                )],
+                &wrong_sheet,
+            )
+            .is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+mod structured_reference_compiler_tests {
+    use super::*;
+
+    fn tables() -> Vec<FormulaTableDefinition> {
+        vec![
+            FormulaTableDefinition::try_new(
+                7,
+                0,
+                "Sales",
+                vec![
+                    "Item".to_string(),
+                    "Price]Gross".to_string(),
+                    "@Tag".to_string(),
+                    "Amount".to_string(),
+                ],
+            )
+            .unwrap(),
+        ]
+    }
+
+    #[test]
+    fn compiles_parses_and_stringifies_resident_and_nonresident_structured_references() {
+        let worksheet_names = vec!["Data".to_string()];
+        let tables = tables();
+        let defined_names = Vec::new();
+        let supporting_links = vec![
+            FormulaSupportingLink::ExternalWorkbook(0),
+            FormulaSupportingLink::SelfWorkbook,
+        ];
+        let external_sheets = vec![
+            FormulaExternalSheet {
+                external_link: 0,
+                first_sheet: 0,
+                last_sheet: 0,
+            },
+            FormulaExternalSheet {
+                external_link: 1,
+                first_sheet: 0,
+                last_sheet: 0,
+            },
+            FormulaExternalSheet {
+                external_link: 1,
+                first_sheet: 0,
+                last_sheet: 0,
+            },
+        ];
+        let external_books = vec![FormulaExternalBook {
+            target: "Book.xlsx".to_string(),
+            sheet_names: vec!["Data Sheet".to_string()].into(),
+            defined_names: Vec::new().into(),
+            is_workbook: true,
+        }];
+        let sheet_ranges = std::cell::RefCell::new(Vec::new());
+        let compile_context = FormulaCompilationContext {
+            worksheet_names: &worksheet_names,
+            defined_names: &defined_names,
+            tables: &tables,
+            supporting_links: &supporting_links,
+            external_sheets: &external_sheets,
+            external_books: &external_books,
+            sheet_ranges: &sheet_ranges,
+            current_sheet: 0,
+        };
+        let resolution_context = FormulaResolutionContext {
+            worksheet_names: worksheet_names.clone().into(),
+            supporting_links: supporting_links.clone().into(),
+            external_sheets: external_sheets.clone().into(),
+            external_books: external_books.clone().into(),
+            defined_names: Vec::new().into(),
+            tables: tables.clone().into(),
+            pivot_views: Vec::new().into(),
+            pivot_name_scopes: Vec::new().into(),
+            active_pivot_scope: None,
+            current_sheet: Some(0),
+        };
+
+        for source in [
+            "Sales",
+            "Sales[Item]",
+            "Sales[#All]",
+            "Sales[[#Headers],[#Data]]",
+            "Sales[[#Data],[#Totals]]",
+            "Sales[[#This Row],[Price']Gross]:['@Tag]]",
+            "Sales[ [#This Row], [Item] ]",
+            "'[Book.xlsx]Data Sheet'!Remote[[#Totals],[Amount]]",
+        ] {
+            let compiled = FormulaCompiler::compile_with_context(source, &compile_context).unwrap();
+            let tokens = FormulaParser::with_extra(&compiled.rgce, &compiled.rgcb)
+                .parse()
+                .unwrap();
+            assert_eq!(
+                FormulaConverter::try_tokens_to_string_with_context(
+                    &tokens,
+                    &resolution_context,
+                )
+                .unwrap(),
+                source
+            );
+            assert!(matches!(tokens.as_slice(), [FormulaToken::TableReference(_)]));
+        }
+    }
+
+    #[test]
+    fn structured_reference_compiler_rejects_ambiguous_missing_and_unrepresentable_inputs() {
+        let worksheet_names = vec!["Data".to_string(), "Other".to_string()];
+        let defined_names = Vec::new();
+        let supporting_links = Vec::new();
+        let external_sheets = Vec::new();
+        let external_books = Vec::new();
+        let sheet_ranges = std::cell::RefCell::new(Vec::new());
+        let base_tables = tables();
+        let context = FormulaCompilationContext {
+            worksheet_names: &worksheet_names,
+            defined_names: &defined_names,
+            tables: &base_tables,
+            supporting_links: &supporting_links,
+            external_sheets: &external_sheets,
+            external_books: &external_books,
+            sheet_ranges: &sheet_ranges,
+            current_sheet: 0,
+        };
+        for source in [
+            "Missing[Item]",
+            "Sales[Missing]",
+            "Sales[[Amount]:[Item]]",
+            "Sales[[Item],[Amount]]",
+            "Sales[[#Headers],[#Totals]]",
+            "Sales[ Item]",
+            "Sales[Item ]",
+            "Sales[Bad'x]",
+            "'[Book.xlsx]Data Sheet'!Remote[Amount]",
+            "Other!Sales[Item]",
+        ] {
+            assert!(
+                FormulaCompiler::compile_with_context(source, &context).is_err(),
+                "{source} unexpectedly compiled"
+            );
+        }
+
+        let ambiguous = vec![
+            base_tables[0].clone(),
+            FormulaTableDefinition::try_new(8, 0, "sales", vec!["Item".to_string()])
+                .unwrap(),
+        ];
+        let ambiguous_context = FormulaCompilationContext {
+            tables: &ambiguous,
+            ..context
+        };
+        assert!(
+            FormulaCompiler::compile_with_context("Sales[Item]", &ambiguous_context).is_err()
+        );
+
+        let wrong_sheet = vec![
+            FormulaTableDefinition::try_new(7, 1, "Sales", vec!["Item".to_string()]).unwrap(),
+        ];
+        let wrong_sheet_context = FormulaCompilationContext {
+            tables: &wrong_sheet,
+            ..context
+        };
+        assert!(
+            FormulaCompiler::compile_with_context("Sales[Item]", &wrong_sheet_context).is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+mod pivot_name_resolution_tests {
+    use super::*;
+
+    fn references() -> Vec<FormulaPivotNameReference> {
+        vec![
+            FormulaPivotNameReference::Field {
+                name: "Sales".to_string(),
+                aggregation: None,
+            },
+            FormulaPivotNameReference::Field {
+                name: "Gross Profit".to_string(),
+                aggregation: Some(FormulaPivotAggregation::Average),
+            },
+            FormulaPivotNameReference::Item {
+                field_name: "Region".to_string(),
+                item: FormulaPivotItemReference::Name("North".to_string()),
+            },
+            FormulaPivotNameReference::Item {
+                field_name: "Sales Region".to_string(),
+                item: FormulaPivotItemReference::Name("O'Brien".to_string()),
+            },
+            FormulaPivotNameReference::Item {
+                field_name: "Quarter".to_string(),
+                item: FormulaPivotItemReference::AbsolutePosition(2),
+            },
+            FormulaPivotNameReference::Item {
+                field_name: "Quarter".to_string(),
+                item: FormulaPivotItemReference::RelativePosition(1),
+            },
+            FormulaPivotNameReference::Item {
+                field_name: "Quarter".to_string(),
+                item: FormulaPivotItemReference::RelativePosition(-1),
+            },
+        ]
+    }
+
+    fn scope() -> FormulaPivotNameScope {
+        FormulaPivotNameScope::try_new(7, 1, "Sales Pivot".to_string(), references()).unwrap()
+    }
+
+    fn pivot_context() -> FormulaResolutionContext {
+        FormulaResolutionContext {
+            worksheet_names: vec!["Data".to_string(), "Report".to_string()].into(),
+            supporting_links: Vec::new().into(),
+            external_sheets: Vec::new().into(),
+            external_books: Vec::new().into(),
+            defined_names: Vec::new().into(),
+            tables: Vec::new().into(),
+            pivot_views: vec![
+                FormulaPivotViewDefinition::try_new(7, 1, "Sales Pivot".to_string()).unwrap(),
+            ]
+            .into(),
+            pivot_name_scopes: vec![scope()].into(),
+            active_pivot_scope: Some((7, 1, "Sales Pivot".to_string())),
+            current_sheet: Some(1),
+        }
+    }
+
+    fn render(index: u32, context: &FormulaResolutionContext) -> XlsbResult<String> {
+        FormulaConverter::try_tokens_to_string_with_context(
+            &[FormulaToken::PivotName(index)],
+            context,
+        )
+    }
+
+    #[test]
+    fn resolves_pivot_names_to_faithful_field_and_item_syntax() {
+        let context = pivot_context();
+        assert_eq!(render(0, &context).unwrap(), "Sales");
+        assert_eq!(render(1, &context).unwrap(), "AVERAGE('Gross Profit')");
+        assert_eq!(render(2, &context).unwrap(), "Region[North]");
+        assert_eq!(render(3, &context).unwrap(), "'Sales Region'['O''Brien']");
+        assert_eq!(render(4, &context).unwrap(), "Quarter[2]");
+        assert_eq!(render(5, &context).unwrap(), "Quarter[+1]");
+        assert_eq!(render(6, &context).unwrap(), "Quarter[-1]");
+    }
+
+    #[test]
+    fn rejects_missing_ambiguous_cross_sheet_and_out_of_range_pivot_metadata() {
+        assert!(FormulaConverter::try_tokens_to_string(&[FormulaToken::PivotName(0)]).is_err());
+
+        let mut context = pivot_context();
+        assert!(render(7, &context).is_err());
+        context.current_sheet = Some(0);
+        assert!(render(0, &context).is_err());
+
+        let mut context = pivot_context();
+        context.pivot_views = vec![
+            FormulaPivotViewDefinition::try_new(7, 1, "Sales Pivot".to_string()).unwrap(),
+            FormulaPivotViewDefinition::try_new(7, 1, "sales pivot".to_string()).unwrap(),
+        ]
+        .into();
+        assert!(render(0, &context).is_err());
+
+        let mut context = pivot_context();
+        context.pivot_name_scopes = vec![scope(), scope()].into();
+        assert!(render(0, &context).is_err());
+
+        let mut context = pivot_context();
+        context.active_pivot_scope = Some((8, 1, "Sales Pivot".to_string()));
+        assert!(render(0, &context).is_err());
+    }
+
+    #[test]
+    fn validates_bounded_pivot_names_and_positions() {
+        assert!(FormulaPivotViewDefinition::try_new(1, 0, String::new()).is_err());
+        assert!(
+            FormulaPivotNameScope::try_new(
+                1,
+                0,
+                "Pivot".to_string(),
+                vec![FormulaPivotNameReference::Item {
+                    field_name: "Quarter".to_string(),
+                    item: FormulaPivotItemReference::AbsolutePosition(0),
+                }],
+            )
+            .is_err()
+        );
+        assert!(
+            FormulaPivotNameScope::try_new(
+                1,
+                0,
+                "Pivot".to_string(),
+                vec![FormulaPivotNameReference::Item {
+                    field_name: "Quarter".to_string(),
+                    item: FormulaPivotItemReference::RelativePosition(0),
+                }],
+            )
+            .is_err()
+        );
+        assert!(
+            FormulaPivotNameScope::try_new(
+                1,
+                0,
+                "Pivot".to_string(),
+                vec![FormulaPivotNameReference::Field {
+                    name: "bad\0field".to_string(),
+                    aggregation: None,
+                }],
+            )
+            .is_err()
+        );
     }
 }

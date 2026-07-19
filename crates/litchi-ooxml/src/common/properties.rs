@@ -236,7 +236,6 @@ impl DocumentProperties {
             xml.push_str("</dcterms:modified>");
         }
 
-
         if let Some(ref last_printed) = self.last_printed {
             xml.push_str("<cp:lastPrinted>");
             xml.push_str(&last_printed.to_rfc3339());

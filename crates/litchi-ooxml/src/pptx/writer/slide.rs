@@ -1016,7 +1016,15 @@ impl MutableSlide {
 
         // Add timing/animations if present
         if !self.animations.is_empty() {
-            xml.push_str(&self.animations.to_xml());
+            let mut targets = std::collections::HashSet::with_capacity(
+                self.shapes.len() + self.media.len() + usize::from(self.title.is_some()),
+            );
+            if self.title.is_some() {
+                targets.insert(2);
+            }
+            targets.extend(self.shapes.iter().map(|shape| shape.shape_id));
+            targets.extend((0..self.media.len()).map(|index| base_shape_id + index as u32));
+            xml.push_str(&self.animations.to_xml_for_slide(&targets)?);
         }
 
         xml.push_str("</p:sld>");
@@ -1426,6 +1434,114 @@ mod tests {
             100,
         );
         assert_eq!(slide.animation_count(), 1);
+    }
+
+    #[test]
+    fn simple_animation_timing_round_trips_through_slide_xml() {
+        use crate::pptx::animations::{
+            Animation, AnimationDirection, AnimationFill, AnimationProgress, AnimationRepeat,
+            AnimationRestart, AnimationSequence, AnimationSpeed, AnimationSyncBehavior,
+            AnimationTimeFilter, AnimationTimePoint, Duration, NormalizedTime,
+        };
+
+        let mut slide = MutableSlide::new(256);
+        slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
+        slide.animations.add(
+            Animation::new(3, AnimationEffect::FlyIn)
+                .with_trigger(AnimationTrigger::OnClick)
+                .with_duration(Duration::Indefinite)
+                .with_delay(15)
+                .with_direction(AnimationDirection::UpRight),
+        );
+        slide.animations.add(
+            Animation::new(3, AnimationEffect::Wipe)
+                .with_trigger(AnimationTrigger::WithPrevious)
+                .with_duration_ms(750)
+                .with_delay(25)
+                .with_direction(AnimationDirection::DownLeft),
+        );
+        slide.animations.add(
+            Animation::new(3, AnimationEffect::GrowShrink)
+                .with_trigger(AnimationTrigger::AfterPrevious)
+                .with_duration_ms(900)
+                .with_delay(35),
+        );
+        slide.animations.add(
+            Animation::new(3, AnimationEffect::Split)
+                .with_trigger(AnimationTrigger::WithPrevious)
+                .with_duration_ms(650)
+                .with_direction(AnimationDirection::VerticalOut),
+        );
+        slide.animations.add(
+            Animation::new(3, AnimationEffect::Zoom)
+                .with_trigger(AnimationTrigger::AfterPrevious)
+                .with_duration_ms(800)
+                .with_direction(AnimationDirection::InFromScreenCenter)
+                .with_fill(AnimationFill::Freeze)
+                .with_restart(AnimationRestart::WhenNotActive)
+                .with_auto_reverse(true)
+                .with_repeat(AnimationRepeat::Finite(2500))
+                .with_speed(AnimationSpeed::new(125000).unwrap())
+                .with_acceleration(AnimationProgress::new(20000).unwrap())
+                .with_deceleration(AnimationProgress::new(15000).unwrap())
+                .with_display(false)
+                .with_repeat_duration(Duration::Indefinite)
+                .with_sync_behavior(AnimationSyncBehavior::CanSlip)
+                .with_after_effect(true)
+                .with_time_filter(
+                    AnimationTimeFilter::new(vec![
+                        AnimationTimePoint::new(
+                            NormalizedTime::from_millionths(0).unwrap(),
+                            NormalizedTime::from_millionths(0).unwrap(),
+                        ),
+                        AnimationTimePoint::new(
+                            NormalizedTime::from_millionths(500_000).unwrap(),
+                            NormalizedTime::from_millionths(250_000).unwrap(),
+                        ),
+                        AnimationTimePoint::new(
+                            NormalizedTime::from_millionths(1_000_000).unwrap(),
+                            NormalizedTime::from_millionths(1_000_000).unwrap(),
+                        ),
+                    ])
+                    .unwrap(),
+                ),
+        );
+
+        let xml = slide.to_xml().unwrap();
+        let parsed = AnimationSequence::parse_slide_xml(xml.as_bytes()).unwrap();
+        assert_eq!(parsed, slide.animations);
+    }
+
+    #[test]
+    fn slide_serialization_rejects_invalid_animation_targets_and_timing() {
+        use crate::pptx::animations::{
+            Animation, AnimationDirection, AnimationRepeat, Duration, MAX_TIMING_MILLISECONDS,
+        };
+
+        let mut slide = MutableSlide::new(256);
+        slide.add_text_box("Animated", 1000, 2000, 3000, 1000);
+        slide.add_animation(99, AnimationEffect::Fade);
+        assert!(slide.to_xml().is_err());
+
+        slide.clear_animations();
+        slide.animations.add(
+            Animation::new(3, AnimationEffect::Fade)
+                .with_duration(Duration::Finite(MAX_TIMING_MILLISECONDS + 1)),
+        );
+        assert!(slide.to_xml().is_err());
+
+        slide.clear_animations();
+        slide
+            .animations
+            .add(Animation::new(3, AnimationEffect::Fade).with_direction(AnimationDirection::Left));
+        assert!(slide.to_xml().is_err());
+
+        slide.clear_animations();
+        slide.animations.add(
+            Animation::new(3, AnimationEffect::Fade)
+                .with_repeat(AnimationRepeat::Finite(MAX_TIMING_MILLISECONDS + 1)),
+        );
+        assert!(slide.to_xml().is_err());
     }
 
     #[test]

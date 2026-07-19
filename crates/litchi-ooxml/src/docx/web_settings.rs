@@ -58,7 +58,9 @@ impl WebSettingsConformance {
 
     const fn relationships(self) -> &'static str {
         match self {
-            Self::Transitional => "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            Self::Transitional => {
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            },
             Self::Strict => "http://purl.oclc.org/ooxml/officeDocument/relationships",
         }
     }
@@ -1285,10 +1287,7 @@ impl WebSettings {
     }
 
     /// Serialize deterministically using the selected OOXML namespace family.
-    pub fn to_xml_with_conformance(
-        &self,
-        conformance: WebSettingsConformance,
-    ) -> Result<String> {
+    pub fn to_xml_with_conformance(&self, conformance: WebSettingsConformance) -> Result<String> {
         let mut xml = String::with_capacity(1024);
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
         xml.push_str("<w:webSettings xmlns:w=\"");

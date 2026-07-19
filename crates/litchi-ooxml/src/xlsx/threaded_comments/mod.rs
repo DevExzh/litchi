@@ -7,12 +7,41 @@
 //! support conversation threads, @mentions, and richer collaboration features.
 
 pub mod person;
+pub mod package;
 pub mod reader;
 pub mod writer;
 
+pub use package::{
+    ThreadedCommentGraph, WorkbookPersonPart, WorksheetThreadedCommentPart,
+    add_threaded_comment, add_threaded_comment_person, add_threaded_comment_reply,
+    find_threaded_comment, find_threaded_comment_person, load_threaded_comment_graph,
+    remove_threaded_comment, remove_threaded_comment_person, reorder_threaded_comment_persons,
+    reorder_threaded_comments, replace_threaded_comment, replace_threaded_comment_person,
+    update_threaded_comment, update_threaded_comment_person, validate_threaded_comment_graph,
+};
 pub use person::{Mention, Person, PersonList};
 pub use reader::{read_persons, read_threaded_comments};
 pub use writer::{write_persons, write_threaded_comments};
+
+pub(crate) const MAX_THREADED_PART_BYTES: usize = 64 * 1024 * 1024;
+pub(crate) const MAX_THREADED_PERSONS: usize = 100_000;
+pub(crate) const MAX_THREADED_COMMENTS: usize = 100_000;
+pub(crate) const MAX_THREADED_MENTIONS: usize = 100_000;
+pub(crate) const MAX_THREADED_TEXT_UTF16: usize = 1_048_576;
+pub(crate) const MAX_THREADED_IDENTITY_BYTES: usize = 16_384;
+
+pub(crate) fn validate_threaded_timestamp(value: Option<&str>) -> litchi_core::sheet::Result<()> {
+    use chrono::{DateTime, NaiveDateTime};
+
+    let Some(value) = value else { return Ok(()); };
+    if DateTime::parse_from_rfc3339(value).is_ok()
+        || NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f").is_ok()
+    {
+        Ok(())
+    } else {
+        Err(format!("invalid threaded-comment timestamp '{value}'").into())
+    }
+}
 
 /// A threaded comment in an Excel worksheet.
 ///

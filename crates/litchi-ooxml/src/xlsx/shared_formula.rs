@@ -47,7 +47,6 @@ impl CellRange {
         (self.first_row..=self.last_row).contains(&row)
             && (self.first_column..=self.last_column).contains(&column)
     }
-
 }
 
 #[derive(Debug)]
@@ -266,12 +265,7 @@ fn translate_formula(
         }
         if let Some(parsed) = parse_reference(formula, index) {
             output.push_str(parsed.prefix);
-            render_reference(
-                parsed.reference,
-                row_delta,
-                column_delta,
-                &mut output,
-            );
+            render_reference(parsed.reference, row_delta, column_delta, &mut output);
             index = parsed.end;
             continue;
         }
@@ -315,8 +309,8 @@ fn bracket_end(bytes: &[u8], start: usize) -> usize {
                 if depth == 0 {
                     return index + 1;
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
         index += 1;
     }
@@ -332,7 +326,10 @@ fn parse_reference(formula: &str, start: usize) -> Option<ParsedReference<'_>> {
     let reference_start = parse_prefix(formula, start).unwrap_or(start);
     let prefix = &formula[start..reference_start];
     let (reference, end) = parse_reference_body(formula, reference_start)?;
-    if bytes.get(end).is_some_and(|byte| is_identifier_byte(*byte) || *byte == b'(') {
+    if bytes
+        .get(end)
+        .is_some_and(|byte| is_identifier_byte(*byte) || *byte == b'(')
+    {
         return None;
     }
     Some(ParsedReference {
@@ -367,7 +364,7 @@ fn parse_prefix(formula: &str, start: usize) -> Option<usize> {
             b']' if bracket_depth != 0 => bracket_depth -= 1,
             b'!' if bracket_depth == 0 && index != start => return Some(index + 1),
             byte if bracket_depth == 0 && !is_prefix_byte(byte) => return None,
-            _ => {}
+            _ => {},
         }
         index += 1;
     }
@@ -457,17 +454,17 @@ fn render_reference(reference: Reference, row_delta: i64, column_delta: i64, out
             render_cell(first, row_delta, column_delta, output);
             output.push(':');
             render_cell(last, row_delta, column_delta, output);
-        }
+        },
         Reference::Columns(first, last) => {
             render_column(first, column_delta, output);
             output.push(':');
             render_column(last, column_delta, output);
-        }
+        },
         Reference::Rows(first, last) => {
             render_row(first, row_delta, output);
             output.push(':');
             render_row(last, row_delta, output);
-        }
+        },
     }
 }
 
@@ -530,7 +527,10 @@ mod tests {
         (formula, cached_value.as_deref())
     }
 
-    fn parse_fixture(bytes: &[u8], sheet: &str) -> Result<crate::xlsx::parsers::worksheet_parser::ParsedWorksheetData> {
+    fn parse_fixture(
+        bytes: &[u8],
+        sheet: &str,
+    ) -> Result<crate::xlsx::parsers::worksheet_parser::ParsedWorksheetData> {
         let package = OpcPackage::from_bytes(bytes)?;
         let part = package.get_part(&PackURI::new(sheet)?)?;
         parse_worksheet_data(std::str::from_utf8(part.blob())?)
@@ -548,16 +548,15 @@ mod tests {
     #[test]
     fn checked_reference_shift_produces_ref_error() {
         assert_eq!(translate_formula("A1:$A$1", 2, 2, 1, 1), "#REF!:$A$1");
-        assert_eq!(
-            translate_formula("XFD1048576", 1, 1, 2, 2),
-            "#REF!"
-        );
+        assert_eq!(translate_formula("XFD1048576", 1, 1, 2, 2), "#REF!");
     }
 
     #[test]
     fn validates_missing_duplicate_and_outside_groups() {
         let xml = |body: &str| {
-            format!(r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{body}</sheetData></worksheet>"#)
+            format!(
+                r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{body}</sheetData></worksheet>"#
+            )
         };
         for body in [
             r#"<row r="1"><c r="A1"><f t="shared" si="0"/></c></row>"#,
@@ -590,19 +589,71 @@ mod tests {
     #[test]
     fn rejects_duplicate_or_ambiguous_actual_membership() {
         let mut cells = HashMap::from([
-            (1, HashMap::from([
-                (1, CellValue::Formula { formula: "A1".into(), cached_value: None, is_array: false, array_range: None }),
-                (2, CellValue::Formula { formula: "B1".into(), cached_value: None, is_array: false, array_range: None }),
-            ])),
-            (2, HashMap::from([
-                (1, CellValue::Formula { formula: String::new(), cached_value: None, is_array: false, array_range: None }),
-            ])),
+            (
+                1,
+                HashMap::from([
+                    (
+                        1,
+                        CellValue::Formula {
+                            formula: "A1".into(),
+                            cached_value: None,
+                            is_array: false,
+                            array_range: None,
+                        },
+                    ),
+                    (
+                        2,
+                        CellValue::Formula {
+                            formula: "B1".into(),
+                            cached_value: None,
+                            is_array: false,
+                            array_range: None,
+                        },
+                    ),
+                ]),
+            ),
+            (
+                2,
+                HashMap::from([(
+                    1,
+                    CellValue::Formula {
+                        formula: String::new(),
+                        cached_value: None,
+                        is_array: false,
+                        array_range: None,
+                    },
+                )]),
+            ),
         ]);
         let shared = vec![
-            SharedFormulaCell { row: 1, column: 1, index: 0, reference: Some("A1:A2".into()), formula: "A1".into() },
-            SharedFormulaCell { row: 1, column: 2, index: 1, reference: Some("B1:B2".into()), formula: "B1".into() },
-            SharedFormulaCell { row: 2, column: 1, index: 0, reference: None, formula: String::new() },
-            SharedFormulaCell { row: 2, column: 1, index: 1, reference: None, formula: String::new() },
+            SharedFormulaCell {
+                row: 1,
+                column: 1,
+                index: 0,
+                reference: Some("A1:A2".into()),
+                formula: "A1".into(),
+            },
+            SharedFormulaCell {
+                row: 1,
+                column: 2,
+                index: 1,
+                reference: Some("B1:B2".into()),
+                formula: "B1".into(),
+            },
+            SharedFormulaCell {
+                row: 2,
+                column: 1,
+                index: 0,
+                reference: None,
+                formula: String::new(),
+            },
+            SharedFormulaCell {
+                row: 2,
+                column: 1,
+                index: 1,
+                reference: None,
+                formula: String::new(),
+            },
         ];
         assert!(resolve_shared_formulas(&mut cells, &shared).is_err());
     }
@@ -615,9 +666,15 @@ mod tests {
             <row r="3"><c r="A3" t="str"><f t="shared" si="7"/><v>three</v></c></row>
         </sheetData></worksheet>"#;
         let data = parse_worksheet_data(xml).unwrap();
-        assert_eq!(formula(&data.cells[&1][&1]), ("B1", Some(&CellValue::String("one".into()))));
+        assert_eq!(
+            formula(&data.cells[&1][&1]),
+            ("B1", Some(&CellValue::String("one".into())))
+        );
         assert_eq!(formula(&data.cells[&2][&1]).0, "B2+1");
-        assert_eq!(formula(&data.cells[&3][&1]), ("B3", Some(&CellValue::String("three".into()))));
+        assert_eq!(
+            formula(&data.cells[&3][&1]),
+            ("B3", Some(&CellValue::String("three".into())))
+        );
     }
 
     #[test]
@@ -631,7 +688,9 @@ mod tests {
         assert_eq!(formula(&poi.cells[&41][&1]).0, "B41");
 
         let shifted = parse_fixture(
-            include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx"),
+            include_bytes!(
+                "../../../../3rdparty/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx"
+            ),
             "/xl/worksheets/sheet1.xml",
         )
         .unwrap();
@@ -658,7 +717,10 @@ mod tests {
             "/xl/worksheets/sheet1.xml",
         )
         .unwrap();
-        assert_eq!(formula(&text.cells[&4][&2]), ("A4", Some(&CellValue::String("C".into()))));
+        assert_eq!(
+            formula(&text.cells[&4][&2]),
+            ("A4", Some(&CellValue::String("C".into())))
+        );
 
         parse_fixture(
             include_bytes!("../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx"),

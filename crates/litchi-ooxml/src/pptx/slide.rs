@@ -377,6 +377,14 @@ impl<'a> Slide<'a> {
         self.part.transition()
     }
 
+    /// Get typed simple animation timing metadata for this slide.
+    ///
+    /// Targets are validated against shape IDs on the current slide. Unsupported
+    /// timing subtrees remain inert and are not interpreted.
+    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
+        self.part.animations()
+    }
+
     /// Get the background for this slide.
     ///
     /// Returns `None` if no background is defined (uses master background).
@@ -432,7 +440,9 @@ impl<'a> Slide<'a> {
 
     /// Get the validated inert raw notes-slide resource for this slide.
     pub fn notes_resource(&self) -> Result<Option<crate::pptx::notes::PptxNotesSlideResource>> {
-        let Some(package) = self.package else { return Ok(None); };
+        let Some(package) = self.package else {
+            return Ok(None);
+        };
         crate::pptx::notes::load_slide_notes_resource(package, self.part.part().partname())
     }
 

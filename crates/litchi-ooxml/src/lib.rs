@@ -52,9 +52,9 @@ pub mod opc {
 }
 pub mod pivot;
 pub mod pptx;
+pub mod web_extensions;
 pub mod xlsb;
 pub mod xlsx;
-pub mod web_extensions;
 
 #[cfg(feature = "encryption")]
 pub mod crypto;
@@ -63,10 +63,18 @@ pub mod crypto;
 pub mod fonts;
 
 // Re-export commonly used types from OPC layer
-pub use opc::{OpcPackage, PackURI};
+pub use opc::{
+    CanonicalizationMethod, CertificateTrust, DigitalSignatureError,
+    DigitalSignatureVerification, EmbeddedCertificate, OpcPackage, PackURI, PackageSigner,
+    ReferenceVerification, Sha1Policy, SignatureAlgorithm, SignatureVerificationPolicy,
+    VerificationStatus,
+};
 
 // Re-export common utilities
-pub use common::{DocumentProperties,ExpandedName,MceCapabilities,MceError,MceLimits,MceOutput,MceReport,process_markup_compatibility};
+pub use common::{
+    DocumentProperties, ExpandedName, MceCapabilities, MceError, MceLimits, MceOutput, MceReport,
+    process_markup_compatibility,
+};
 
 // Re-export custom properties
 pub use custom_properties::{CustomProperties, PropertyValue};
@@ -75,6 +83,5 @@ pub use custom_properties::{CustomProperties, PropertyValue};
 pub use error::{OoxmlError, Result};
 
 pub use embedded_object::{
-    EmbeddedPart, EmbeddedPartKind, EmbeddedPayload, EmbeddedTarget,
-    MAX_EMBEDDED_RELATIONSHIPS,
+    EmbeddedPart, EmbeddedPartKind, EmbeddedPayload, EmbeddedTarget, MAX_EMBEDDED_RELATIONSHIPS,
 };

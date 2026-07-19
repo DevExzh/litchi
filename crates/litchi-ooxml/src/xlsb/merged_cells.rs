@@ -3,6 +3,13 @@
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use litchi_core::binary;
 
+/// Maximum row index in an XLSB worksheet, inclusive.
+pub const MAX_MERGED_CELL_ROW: u32 = 1_048_575;
+/// Maximum column index in an XLSB worksheet, inclusive.
+pub const MAX_MERGED_CELL_COLUMN: u32 = 16_383;
+/// Maximum number of `BrtMergeCell` records in one worksheet collection.
+pub const MAX_MERGED_CELL_RANGES: usize = 1_048_576;
+
 /// Merged cell range
 ///
 /// Represents a range of cells that are merged together.
@@ -41,19 +48,44 @@ impl MergedCell {
 
     /// Parse from XLSB BrtMergeCell record
     pub fn parse(data: &[u8]) -> XlsbResult<Self> {
-        if data.len() < 16 {
+        if data.len() != 16 {
             return Err(XlsbError::InvalidLength {
                 expected: 16,
                 found: data.len(),
             });
         }
 
-        Ok(MergedCell {
+        let range = MergedCell {
             row_first: binary::read_u32_le_at(data, 0)?,
             row_last: binary::read_u32_le_at(data, 4)?,
             col_first: binary::read_u32_le_at(data, 8)?,
             col_last: binary::read_u32_le_at(data, 12)?,
-        })
+        };
+        range.validate()?;
+        Ok(range)
+    }
+
+    /// Validate normalized XLSB worksheet bounds for this range.
+    pub fn validate(&self) -> XlsbResult<()> {
+        if self.row_first > self.row_last
+            || self.row_last > MAX_MERGED_CELL_ROW
+            || self.col_first > self.col_last
+            || self.col_last > MAX_MERGED_CELL_COLUMN
+        {
+            return Err(XlsbError::InvalidCellReference(format!(
+                "invalid merged range rows {}..={} columns {}..={}",
+                self.row_first, self.row_last, self.col_first, self.col_last
+            )));
+        }
+        Ok(())
+    }
+
+    /// Return whether this range shares at least one cell with another range.
+    pub fn overlaps(&self, other: &Self) -> bool {
+        self.row_first <= other.row_last
+            && other.row_first <= self.row_last
+            && self.col_first <= other.col_last
+            && other.col_first <= self.col_last
     }
 
     /// Serialize to XLSB BrtMergeCell record

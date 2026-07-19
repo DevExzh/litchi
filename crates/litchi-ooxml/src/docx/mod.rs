@@ -87,7 +87,10 @@ pub mod variables;
 pub mod web_settings;
 pub mod writer;
 
-pub use alt_chunk::{AltChunk, AlternativeFormatKind, AlternativeFormatPart};
+pub use alt_chunk::{
+    AltChunk, AltChunkNamespace, AlternativeFormatData, AlternativeFormatImport,
+    AlternativeFormatKind, AlternativeFormatPart, AlternativeFormatTarget,
+};
 pub use bookmark::Bookmark;
 pub use chart::{
     DocxChartCompanionResource, DocxChartConformance, DocxChartEmbeddedWorkbookContentType,
@@ -96,24 +99,31 @@ pub use chart::{
 };
 pub use comment::Comment;
 pub use content_control::ContentControl;
-pub use custom_xml::CustomXmlPart;
+pub use custom_xml::{CustomXmlBinding, CustomXmlPart, NewCustomXmlDataStore};
 pub use document::Document;
 pub use drawing::{DrawingObject, ShapeType};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::Field;
 pub use font_table::{
-    EmbeddedFont, EmbeddedFontResource, EmbeddedFontStyle, Font, FontCharacterSet, FontFamily,
-    FontPitch, FontSignature, FontTable, FontTableConformance, FontTableExtensionAttribute,
-    parse_font_table, write_font_table,
+    EmbeddedFont, EmbeddedFontLicensing, EmbeddedFontResource, EmbeddedFontStyle, Font,
+    FontCharacterSet, FontFamily, FontPitch, FontSignature, FontTable, FontTableConformance,
+    FontTableExtensionAttribute, add_font, deobfuscate_embedded_font_data, find_font,
+    load_font_table, obfuscate_embedded_font_data, parse_font_table, remove_font, reorder_fonts,
+    replace_font, store_font_table, update_font, validate_embedded_font_usage, write_font_table,
 };
 pub use footnote::{Note, NoteType};
+pub use glossary::{
+    DocPartCategory, DocPartGallery, DocPartName, DocPartProperties, DocPartType,
+    GlossaryAuxiliaryPart, GlossaryDocument, GlossaryEntry, GlossaryPackage,
+    GlossaryRelationship, InsertionBehavior,
+};
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::InlineImage;
 pub use mail_merge::{
     MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
     MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,
-    MailMergeRecipients, MailMergeSettings,
+    MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
 };
 pub use modern_comments::{
     CommentExtension, CommentIdMapping, CommentReaction, CommentReactionInfo, CommentReactionUser,
@@ -131,7 +141,7 @@ pub use paragraph::{
 };
 pub use revision::{Revision, RevisionType};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
-pub use settings::{DocumentSettings, ProtectionType, SmartTagType};
+pub use settings::{AttachedTemplate, DocumentSettings, ProtectionType, SmartTagType};
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use statistics::DocumentStatistics;
 pub use styles::{Style, Styles};
@@ -149,9 +159,15 @@ pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle,
 pub use writer::{
     CellProperties, ColorScheme, ContentControlType, DocumentProtection, ListType, MutableBookmark,
     MutableComment, MutableContentControl, MutableDocument, MutableField, MutableHyperlink,
-    MutableInlineImage, MutableParagraph, MutableRun, MutableSmartTag, MutableSmartTagAttribute,
-    MutableStyle, MutableTable, MutableTheme, PageNumberFormat, PageOrientation, RunContent,
-    SectionProperties, TableBorder, TableBorders, TableOfContents, Watermark, generate_styles_xml,
+    MutableInlineImage, MutableParagraph, MutableRevision, MutableRun, MutableSmartTag,
+    MutableSmartTagAttribute, MutableStyle, MutableTable, MutableTheme, PageNumberFormat,
+    PageOrientation, RevisionContentControl, RevisionKind, RevisionMetadata, RowRevisionKind,
+    CellRevisionKind, TableCellMergeRevisionState, TableRevisionKind, RunContent,
+    DocumentGridType, NoteNumberRestart, SectionColumn, SectionColumns, SectionDocumentGrid,
+    SectionHeaderFooterPart, SectionHeaderFooterReference, SectionNoteProperties,
+    SectionPageNumbering, SectionProperties, SectionTextDirection, TableBorder, TableBorders,
+    TableOfContents, Watermark,
+    generate_styles_xml,
 };
 // Note: writer::Note is not re-exported to avoid naming conflict with footnote::Note
 // Use writer::Note explicitly if needed

@@ -857,6 +857,10 @@ impl XlsbWorkbookWriter {
             let formula_context = FormulaCompilationContext {
                 worksheet_names: &worksheet_names,
                 defined_names: &defined_names,
+                tables: &[],
+                supporting_links: &[],
+                external_sheets: &[],
+                external_books: &[],
                 sheet_ranges: &formula_sheet_ranges,
                 current_sheet,
             };

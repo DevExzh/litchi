@@ -12,6 +12,8 @@ use super::field::MutableField;
 use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
 use super::run::MutableRun;
+use super::revision::{MutableRevision, ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode};
+use super::section::SectionProperties;
 use super::smart_tag::MutableSmartTag;
 
 /// Elements that can appear in a paragraph.
@@ -28,6 +30,8 @@ pub(crate) enum ParagraphElement {
     Field(MutableField),
     /// Run-level smart tag.
     SmartTag(MutableSmartTag),
+    /// Typed tracked-change wrapper.
+    Revision(MutableRevision),
 }
 
 impl ParagraphElement {
@@ -37,11 +41,21 @@ impl ParagraphElement {
         hyperlink_index: &mut usize,
         image_index: &mut usize,
     ) -> Result<()> {
+        self.write_placeholder_mode(xml, hyperlink_index, image_index, RevisionTextMode::Normal)
+    }
+
+    pub(crate) fn write_placeholder_mode(
+        &self,
+        xml: &mut String,
+        hyperlink_index: &mut usize,
+        image_index: &mut usize,
+        mode: RevisionTextMode,
+    ) -> Result<()> {
         match self {
-            Self::Run(run) => run.to_xml(xml),
+            Self::Run(run) => run.to_xml_mode(xml, mode),
             Self::Hyperlink(hyperlink) => {
                 let placeholder = format!("{{{{HYPERLINK_{}}}}}", *hyperlink_index);
-                hyperlink.to_xml(xml, Some(&placeholder))?;
+                hyperlink.to_xml_mode(xml, Some(&placeholder), mode)?;
                 *hyperlink_index += 1;
                 Ok(())
             },
@@ -61,11 +75,12 @@ impl ParagraphElement {
                 .map_err(|error| OoxmlError::Xml(error.to_string())),
             Self::Field(field) => {
                 xml.push_str("<w:r>");
-                xml.push_str(&field.to_xml()?);
+                xml.push_str(&field.to_xml_mode(mode)?);
                 xml.push_str("</w:r>");
                 Ok(())
             },
-            Self::SmartTag(tag) => tag.write_placeholder(xml, hyperlink_index, image_index),
+            Self::SmartTag(tag) => tag.write_placeholder_mode(xml, hyperlink_index, image_index, mode),
+            Self::Revision(revision) => revision.write_placeholder(xml, hyperlink_index, image_index),
         }
     }
 
@@ -76,19 +91,30 @@ impl ParagraphElement {
         hyperlink_index: &mut usize,
         image_index: &mut usize,
     ) -> Result<()> {
+        self.write_with_rels_mode(xml, rel_mapper, hyperlink_index, image_index, RevisionTextMode::Normal)
+    }
+
+    pub(crate) fn write_with_rels_mode(
+        &self,
+        xml: &mut String,
+        rel_mapper: &crate::docx::writer::relmap::RelationshipMapper,
+        hyperlink_index: &mut usize,
+        image_index: &mut usize,
+        mode: RevisionTextMode,
+    ) -> Result<()> {
         match self {
-            Self::Run(run) => run.to_xml(xml),
+            Self::Run(run) => run.to_xml_mode(xml, mode),
             Self::Hyperlink(hyperlink) => {
                 if hyperlink.url.is_some() {
                     if let Some(rel_id) = rel_mapper.get_hyperlink_id(*hyperlink_index) {
-                        hyperlink.to_xml(xml, Some(rel_id))?;
+                        hyperlink.to_xml_mode(xml, Some(rel_id), mode)?;
                     } else {
                         let placeholder = format!("{{{{HYPERLINK_{}}}}}", *hyperlink_index);
-                        hyperlink.to_xml(xml, Some(&placeholder))?;
+                        hyperlink.to_xml_mode(xml, Some(&placeholder), mode)?;
                     }
                     *hyperlink_index += 1;
                 } else {
-                    hyperlink.to_xml(xml, None)?;
+                    hyperlink.to_xml_mode(xml, None, mode)?;
                 }
                 Ok(())
             },
@@ -112,13 +138,12 @@ impl ParagraphElement {
                 .map_err(|error| OoxmlError::Xml(error.to_string())),
             Self::Field(field) => {
                 xml.push_str("<w:r>");
-                xml.push_str(&field.to_xml()?);
+                xml.push_str(&field.to_xml_mode(mode)?);
                 xml.push_str("</w:r>");
                 Ok(())
             },
-            Self::SmartTag(tag) => {
-                tag.write_with_rels(xml, rel_mapper, hyperlink_index, image_index)
-            },
+            Self::SmartTag(tag) => tag.write_with_rels_mode(xml, rel_mapper, hyperlink_index, image_index, mode),
+            Self::Revision(revision) => revision.write_with_rels(xml, rel_mapper, hyperlink_index, image_index),
         }
     }
 
@@ -126,6 +151,7 @@ impl ParagraphElement {
         match self {
             Self::Hyperlink(link) if let Some(url) = &link.url => urls.push(url.clone()),
             Self::SmartTag(tag) => tag.collect_hyperlink_urls(urls),
+            Self::Revision(revision) => revision.collect_hyperlink_urls(urls),
             _ => {},
         }
     }
@@ -137,6 +163,7 @@ impl ParagraphElement {
         match self {
             Self::InlineImage(image) => images.push((image.data(), image.format())),
             Self::SmartTag(tag) => tag.collect_images(images),
+            Self::Revision(revision) => revision.collect_images(images),
             _ => {},
         }
     }
@@ -145,6 +172,7 @@ impl ParagraphElement {
         match self {
             Self::Run(run) => text.push_str(&run.get_text()),
             Self::SmartTag(tag) => tag.append_run_text(text),
+            Self::Revision(revision) => revision.append_run_text(text),
             _ => {},
         }
     }
@@ -159,6 +187,7 @@ pub struct MutableParagraph {
     pub(crate) style: Option<String>,
     /// Paragraph properties
     pub(crate) properties: ParagraphProperties,
+    pub(crate) property_change: Option<ParagraphPropertyChange>,
 }
 
 impl MutableParagraph {
@@ -167,6 +196,7 @@ impl MutableParagraph {
             elements: Vec::new(),
             style: None,
             properties: ParagraphProperties::default(),
+            property_change: None,
         }
     }
 
@@ -300,6 +330,30 @@ impl MutableParagraph {
         }
     }
 
+    /// Add a typed tracked-change wrapper to this paragraph.
+    pub fn add_revision(
+        &mut self,
+        kind: RevisionKind,
+        metadata: RevisionMetadata,
+    ) -> &mut MutableRevision {
+        self.elements
+            .push(ParagraphElement::Revision(MutableRevision::new(kind, metadata)));
+        match self.elements.last_mut() {
+            Some(ParagraphElement::Revision(revision)) => revision,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Record the paragraph properties that existed before this formatting revision.
+    pub fn set_property_change(
+        &mut self,
+        metadata: RevisionMetadata,
+        previous: &MutableParagraph,
+    ) -> &mut Self {
+        self.property_change = Some(ParagraphPropertyChange::snapshot(metadata, previous));
+        self
+    }
+
     /// Set the paragraph style.
     pub fn set_style(&mut self, style_id: &str) {
         self.style = Some(style_id.to_string());
@@ -395,11 +449,33 @@ impl MutableParagraph {
         self.elements.clear();
     }
 
+    /// Set the section break ending at this paragraph.
+    pub fn set_section_break(&mut self, properties: SectionProperties) -> Result<()> {
+        properties.validate()?;
+        self.properties.section = Some(properties);
+        Ok(())
+    }
+
+    /// Remove and return the section break ending at this paragraph.
+    pub fn remove_section_break(&mut self) -> Option<SectionProperties> {
+        self.properties.section.take()
+    }
+
+    /// Return this paragraph's section-break properties.
+    pub fn section_break(&self) -> Option<&SectionProperties> {
+        self.properties.section.as_ref()
+    }
+
+    /// Mutably access this paragraph's section-break properties.
+    pub fn section_break_mut(&mut self) -> Option<&mut SectionProperties> {
+        self.properties.section.as_mut()
+    }
+
     pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
         xml.push_str("<w:p>");
 
         // Write paragraph properties
-        if self.style.is_some() || self.properties.has_properties() {
+        if self.style.is_some() || self.properties.has_properties() || self.property_change.is_some() {
             xml.push_str("<w:pPr>");
 
             if let Some(ref style) = self.style {
@@ -517,6 +593,14 @@ impl MutableParagraph {
             if let Some(ref division_id) = self.properties.division_id {
                 write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(division_id))
                     .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+            }
+
+            if let Some(section) = &self.properties.section {
+                section.write_xml(xml, None)?;
+            }
+
+            if let Some(change) = &self.property_change {
+                change.write_xml(xml, None)?;
             }
 
             xml.push_str("</w:pPr>");
@@ -548,7 +632,7 @@ impl MutableParagraph {
         xml.push_str("<w:p>");
 
         // Write paragraph properties (same as to_xml)
-        if self.style.is_some() || self.properties.has_properties() {
+        if self.style.is_some() || self.properties.has_properties() || self.property_change.is_some() {
             xml.push_str("<w:pPr>");
 
             if let Some(ref style) = self.style {
@@ -668,6 +752,14 @@ impl MutableParagraph {
                     .map_err(|e| OoxmlError::Xml(e.to_string()))?;
             }
 
+            if let Some(section) = &self.properties.section {
+                section.write_xml(xml, Some(rel_mapper))?;
+            }
+
+            if let Some(change) = &self.property_change {
+                change.write_xml(xml, Some(rel_mapper))?;
+            }
+
             xml.push_str("</w:pPr>");
         }
 
@@ -691,7 +783,7 @@ pub(crate) struct TabStop {
 }
 
 /// Paragraph properties.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct ParagraphProperties {
     pub(crate) alignment: Option<ParagraphAlignment>,
     pub(crate) numbering: Option<NumberingProperties>,
@@ -703,6 +795,7 @@ pub(crate) struct ParagraphProperties {
     pub(crate) indent_first_line: Option<i32>,
     pub(crate) tab_stops: Vec<TabStop>,
     pub(crate) division_id: Option<String>,
+    pub(crate) section: Option<SectionProperties>,
 }
 
 impl ParagraphProperties {
@@ -717,6 +810,43 @@ impl ParagraphProperties {
             || self.indent_first_line.is_some()
             || !self.tab_stops.is_empty()
             || self.division_id.is_some()
+            || self.section.is_some()
+    }
+
+    pub(crate) fn write_values(
+        &self,
+        xml: &mut String,
+        style: Option<&str>,
+        rel_mapper: Option<&crate::docx::writer::relmap::RelationshipMapper>,
+    ) -> Result<()> {
+        if let Some(style) = style { write!(xml, "<w:pStyle w:val=\"{}\"/>", escape_xml(style))?; }
+        if let Some(alignment) = self.alignment { write!(xml, "<w:jc w:val=\"{}\"/>", alignment.as_str())?; }
+        if let Some(n) = &self.numbering { write!(xml, "<w:numPr><w:ilvl w:val=\"{}\"/><w:numId w:val=\"{}\"/></w:numPr>", n.ilvl, n.num_id)?; }
+        if self.space_before.is_some() || self.space_after.is_some() || self.line_spacing.is_some() {
+            xml.push_str("<w:spacing");
+            if let Some(v) = self.space_before { write!(xml, " w:before=\"{v}\"")?; }
+            if let Some(v) = self.space_after { write!(xml, " w:after=\"{v}\"")?; }
+            if let Some(v) = &self.line_spacing {
+                let (line, rule) = match v { LineSpacing::Single => (240, "auto"), LineSpacing::OneAndHalf => (360, "auto"), LineSpacing::Double => (480, "auto"), LineSpacing::Multiple(f) => ((*f * 240.0) as u32, "auto"), LineSpacing::Exact(f) => ((*f * 20.0) as u32, "exact"), LineSpacing::AtLeast(f) => ((*f * 20.0) as u32, "atLeast") };
+                write!(xml, " w:line=\"{line}\" w:lineRule=\"{rule}\"")?;
+            }
+            xml.push_str("/>");
+        }
+        if self.indent_left.is_some() || self.indent_right.is_some() || self.indent_first_line.is_some() {
+            xml.push_str("<w:ind");
+            if let Some(v) = self.indent_left { write!(xml, " w:left=\"{v}\"")?; }
+            if let Some(v) = self.indent_right { write!(xml, " w:right=\"{v}\"")?; }
+            if let Some(v) = self.indent_first_line { if v >= 0 { write!(xml, " w:firstLine=\"{v}\"")?; } else { write!(xml, " w:hanging=\"{}\"", -v)?; } }
+            xml.push_str("/>");
+        }
+        if !self.tab_stops.is_empty() {
+            xml.push_str("<w:tabs>");
+            for tab in &self.tab_stops { write!(xml, "<w:tab w:val=\"{}\" w:pos=\"{}\"", escape_xml(&tab.alignment), tab.position)?; if let Some(leader) = &tab.leader { write!(xml, " w:leader=\"{}\"", escape_xml(leader))?; } xml.push_str("/>"); }
+            xml.push_str("</w:tabs>");
+        }
+        if let Some(v) = &self.division_id { write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(v))?; }
+        if let Some(section) = &self.section { section.write_xml(xml, rel_mapper)?; }
+        Ok(())
     }
 }
 

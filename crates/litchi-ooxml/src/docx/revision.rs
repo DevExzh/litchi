@@ -59,6 +59,22 @@ pub enum RevisionType {
     TableInsert,
     /// Table deletion
     TableDelete,
+    /// Table property change
+    TablePropertiesChange,
+    /// Table row insertion
+    RowInsert,
+    /// Table row deletion
+    RowDelete,
+    /// Table row property change
+    RowPropertiesChange,
+    /// Table cell insertion
+    CellInsert,
+    /// Table cell deletion
+    CellDelete,
+    /// Table cell merge change
+    CellMerge,
+    /// Table cell property change
+    CellPropertiesChange,
     /// Custom or unknown revision type
     Unknown,
 }
@@ -73,6 +89,14 @@ impl fmt::Display for RevisionType {
             Self::FormatChange => write!(f, "Format Change"),
             Self::TableInsert => write!(f, "Table Insert"),
             Self::TableDelete => write!(f, "Table Delete"),
+            Self::TablePropertiesChange => write!(f, "Table Properties Change"),
+            Self::RowInsert => write!(f, "Row Insert"),
+            Self::RowDelete => write!(f, "Row Delete"),
+            Self::RowPropertiesChange => write!(f, "Row Properties Change"),
+            Self::CellInsert => write!(f, "Cell Insert"),
+            Self::CellDelete => write!(f, "Cell Delete"),
+            Self::CellMerge => write!(f, "Cell Merge"),
+            Self::CellPropertiesChange => write!(f, "Cell Properties Change"),
             Self::Unknown => write!(f, "Unknown"),
         }
     }
@@ -217,72 +241,91 @@ pub(crate) fn parse_revisions(xml_bytes: &[u8]) -> Result<SmallVec<[Revision; 4]
     // State tracking for parsing
     let mut in_revision = false;
     let mut in_revision_text = false;
+    let mut in_row_properties = false;
     let mut current_revision: Option<Revision> = None;
+
+    fn revision_type(local_name: &[u8], in_row_properties: bool) -> Option<RevisionType> {
+        match local_name {
+            b"ins" if in_row_properties => Some(RevisionType::RowInsert),
+            b"del" if in_row_properties => Some(RevisionType::RowDelete),
+            b"ins" => Some(RevisionType::Insert),
+            b"del" => Some(RevisionType::Delete),
+            b"moveFrom" => Some(RevisionType::MoveFrom),
+            b"moveTo" => Some(RevisionType::MoveTo),
+            b"rPrChange" | b"pPrChange" => Some(RevisionType::FormatChange),
+            b"tblIns" => Some(RevisionType::TableInsert),
+            b"tblDel" => Some(RevisionType::TableDelete),
+            b"tblPrChange" => Some(RevisionType::TablePropertiesChange),
+            b"trPrChange" => Some(RevisionType::RowPropertiesChange),
+            b"cellIns" => Some(RevisionType::CellInsert),
+            b"cellDel" => Some(RevisionType::CellDelete),
+            b"cellMerge" => Some(RevisionType::CellMerge),
+            b"tcPrChange" => Some(RevisionType::CellPropertiesChange),
+            _ => None,
+        }
+    }
+
+    fn revision_from_element(
+        element: &quick_xml::events::BytesStart<'_>,
+        revision_type: RevisionType,
+    ) -> Revision {
+        let mut author = String::new();
+        let mut date = None;
+        let mut id = String::new();
+
+        for attr in element.attributes().flatten() {
+            let value = std::str::from_utf8(attr.value.as_ref())
+                .ok()
+                .and_then(|value| quick_xml::escape::unescape(value).ok())
+                .map(|value| value.into_owned())
+                .unwrap_or_default();
+            match attr.key.as_ref() {
+                b"w:author" | b"author" => author = value,
+                b"w:date" | b"date" => date = Some(value),
+                b"w:id" | b"id" => id = value,
+                _ => {},
+            }
+        }
+
+        Revision::new(revision_type, author, date, id)
+    }
 
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+            Ok(Event::Start(e)) => {
                 let local_name_ref = e.local_name();
                 let local_name = local_name_ref.as_ref();
 
-                // Check for revision elements
-                let revision_type = match local_name {
-                    b"ins" => Some(RevisionType::Insert),
-                    b"del" => Some(RevisionType::Delete),
-                    b"moveFrom" => Some(RevisionType::MoveFrom),
-                    b"moveTo" => Some(RevisionType::MoveTo),
-                    b"rPrChange" => Some(RevisionType::FormatChange),
-                    b"tblIns" => Some(RevisionType::TableInsert),
-                    b"tblDel" => Some(RevisionType::TableDelete),
-                    _ => None,
-                };
+                if local_name == b"trPr" {
+                    in_row_properties = true;
+                }
 
-                if let Some(rev_type) = revision_type {
+                if let Some(rev_type) = revision_type(local_name, in_row_properties) {
                     in_revision = true;
-
-                    // Parse revision attributes
-                    let mut author = String::new();
-                    let mut date = None;
-                    let mut id = String::new();
-
-                    for attr in e.attributes().flatten() {
-                        match attr.key.as_ref() {
-                            b"w:author" | b"author" => {
-                                if let Ok(s) = std::str::from_utf8(&attr.value) {
-                                    author = s.to_string();
-                                }
-                            },
-                            b"w:date" | b"date" => {
-                                if let Ok(s) = std::str::from_utf8(&attr.value) {
-                                    date = Some(s.to_string());
-                                }
-                            },
-                            b"w:id" | b"id" => {
-                                if let Ok(s) = std::str::from_utf8(&attr.value) {
-                                    id = s.to_string();
-                                }
-                            },
-                            _ => {},
-                        }
-                    }
-
-                    current_revision = Some(Revision::new(rev_type, author, date, id));
+                    current_revision = Some(revision_from_element(&e, rev_type));
                 } else if in_revision {
                     // Check for text elements within revision
                     match local_name {
-                        b"t" | b"delText" => {
+                        b"t" | b"delText" | b"delInstrText" => {
                             in_revision_text = true;
                         },
                         _ => {},
                     }
                 }
             },
+            Ok(Event::Empty(e)) => {
+                let local_name_ref = e.local_name();
+                if let Some(rev_type) = revision_type(local_name_ref.as_ref(), in_row_properties) {
+                    revisions.push(revision_from_element(&e, rev_type));
+                }
+            },
             Ok(Event::Text(e)) if in_revision_text => {
                 // Extract text content from revision
                 if let Some(ref mut rev) = current_revision
-                    && let Ok(text) = std::str::from_utf8(e.as_ref())
+                    && let Ok(encoded) = e.decode()
+                    && let Ok(text) = quick_xml::escape::unescape(&encoded)
                 {
-                    rev.append_text(text);
+                    rev.append_text(&text);
                 }
             },
             Ok(Event::End(e)) => {
@@ -290,8 +333,10 @@ pub(crate) fn parse_revisions(xml_bytes: &[u8]) -> Result<SmallVec<[Revision; 4]
                 let local_name = local_name_ref.as_ref();
 
                 match local_name {
-                    b"ins" | b"del" | b"moveFrom" | b"moveTo" | b"rPrChange" | b"tblIns"
-                    | b"tblDel" => {
+                    b"ins" | b"del" | b"moveFrom" | b"moveTo" | b"rPrChange"
+                    | b"pPrChange" | b"tblIns" | b"tblDel" | b"tblPrChange"
+                    | b"trPrChange" | b"cellIns" | b"cellDel" | b"cellMerge"
+                    | b"tcPrChange" => {
                         // Finished parsing a revision
                         in_revision = false;
 
@@ -299,9 +344,10 @@ pub(crate) fn parse_revisions(xml_bytes: &[u8]) -> Result<SmallVec<[Revision; 4]
                             revisions.push(revision);
                         }
                     },
-                    b"t" | b"delText" => {
+                    b"t" | b"delText" | b"delInstrText" => {
                         in_revision_text = false;
                     },
+                    b"trPr" => in_row_properties = false,
                     _ => {},
                 }
             },

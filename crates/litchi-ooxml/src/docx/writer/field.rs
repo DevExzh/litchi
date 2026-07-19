@@ -2,6 +2,7 @@
 use crate::error::Result;
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
+use super::revision::{RevisionTextMode};
 
 /// A mutable field in a Word document.
 ///
@@ -154,6 +155,10 @@ impl MutableField {
     /// Generate XML for this field.
     #[allow(dead_code)]
     pub(crate) fn to_xml(&self) -> Result<String> {
+        self.to_xml_mode(RevisionTextMode::Normal)
+    }
+
+    pub(crate) fn to_xml_mode(&self, mode: RevisionTextMode) -> Result<String> {
         let mut xml = String::with_capacity(256);
 
         match self {
@@ -166,11 +171,8 @@ impl MutableField {
                 xml.push_str(r#"<w:fldChar w:fldCharType="begin"/>"#);
 
                 // Field instruction
-                write!(
-                    &mut xml,
-                    "</w:r><w:r><w:instrText>{}</w:instrText>",
-                    escape_xml(instruction)
-                )?;
+                let instruction_name = if mode == RevisionTextMode::Deleted { "delInstrText" } else { "instrText" };
+                write!(&mut xml, "</w:r><w:r><w:{instruction_name}>{}</w:{instruction_name}>", escape_xml(instruction))?;
 
                 // Separate run
                 if *dirty {
@@ -183,7 +185,8 @@ impl MutableField {
 
                 // Field result
                 if let Some(res) = result {
-                    write!(&mut xml, "</w:r><w:r><w:t>{}</w:t>", escape_xml(res))?;
+                    let text_name = if mode == RevisionTextMode::Deleted { "delText" } else { "t" };
+                    write!(&mut xml, "</w:r><w:r><w:{text_name}>{}</w:{text_name}>", escape_xml(res))?;
                 }
 
                 // Field end
@@ -193,11 +196,8 @@ impl MutableField {
                 xml.push_str(r#"<w:fldChar w:fldCharType="begin"/>"#);
             },
             Self::Instruction(text) => {
-                write!(
-                    &mut xml,
-                    r#"<w:instrText xml:space="preserve">{}</w:instrText>"#,
-                    escape_xml(text)
-                )?;
+                let name = if mode == RevisionTextMode::Deleted { "delInstrText" } else { "instrText" };
+                write!(&mut xml, r#"<w:{name} xml:space="preserve">{}</w:{name}>"#, escape_xml(text))?;
             },
             Self::Separate { dirty } => {
                 if *dirty {

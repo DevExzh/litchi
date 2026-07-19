@@ -14,29 +14,36 @@ use litchi_opc::Relationships;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
 use super::RichTextRun;
+use super::auto_filter::{AutoFilterDefinition, parse_auto_filter};
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
 use super::comments::parse_comments_xml;
+use super::conditional_formatting::{
+    ConditionalFormatting as ParsedConditionalFormatting,
+    ConditionalFormattingRule as ParsedConditionalFormattingRule, DifferentialFormat,
+    DifferentialFormatRef, ExtensionAssociation, parse_conditional_formattings,
+};
+use super::data_consolidation::{WorksheetDataConsolidation, parse_worksheet_data_consolidation};
+use super::data_validation::{
+    DataValidationCollection as ParsedDataValidationCollection, ParsedDataValidation,
+    parse_data_validation_collections,
+};
 use super::drawing::parse_drawing_xml;
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
 use super::header_footer::{WorksheetHeaderFooter, parse_worksheet_header_footer};
 use super::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
+use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
+use super::outline_properties::WorksheetOutlineProperties;
+use super::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
+use super::page_setup::{WorksheetPageSetup, parse_complete_worksheet_page_setup};
 use super::parsers::worksheet_parser;
-use super::conditional_formatting::{
-    parse_conditional_formattings, ConditionalFormatting as ParsedConditionalFormatting,
-    ConditionalFormattingRule as ParsedConditionalFormattingRule, DifferentialFormat,
-    DifferentialFormatRef, ExtensionAssociation,
+use super::phonetic_properties::{
+    WorksheetPhoneticProperties, parse_worksheet_phonetic_properties,
 };
-use super::auto_filter::{AutoFilterDefinition, parse_auto_filter};
-use super::data_validation::{
-    DataValidationCollection as ParsedDataValidationCollection,
-    ParsedDataValidation, parse_data_validation_collections,
+use super::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
+use super::query_table::{
+    QUERY_TABLE_CONTENT_TYPE, WorksheetQueryTable, is_query_table_relationship_type,
+    parse_query_table,
 };
-use super::data_consolidation::{
-    WorksheetDataConsolidation, parse_worksheet_data_consolidation,
-};
-use super::sort::SortState;
-use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
-use super::sheet_view::{WorksheetViewCollection, parse_worksheet_views};
 use super::sheet_format::{
     WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties,
 };
@@ -45,19 +52,10 @@ use super::sheet_protection::{
     WorksheetProtectedRange, WorksheetProtection, WorksheetProtectionMetadata,
     parse_worksheet_protection,
 };
-use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
-use super::outline_properties::WorksheetOutlineProperties;
-use super::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
-use super::page_setup::{WorksheetPageSetup, parse_complete_worksheet_page_setup};
-use super::phonetic_properties::{
-    WorksheetPhoneticProperties, parse_worksheet_phonetic_properties,
-};
-use super::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
+use super::sheet_view::{WorksheetViewCollection, parse_worksheet_views};
+use super::sort::SortState;
+use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::table::{Table, parse_table_xml};
-use super::query_table::{
-    QUERY_TABLE_CONTENT_TYPE, WorksheetQueryTable, is_query_table_relationship_type,
-    parse_query_table,
-};
 use super::views::SheetView;
 use super::writer::sheet::Image;
 use super::{
@@ -458,8 +456,10 @@ impl<'a> Worksheet<'a> {
         let sheet_properties = parse_worksheet_sheet_properties(sheet_data.as_bytes())?;
         let phonetic_properties = parse_worksheet_phonetic_properties(sheet_data.as_bytes())?;
         let data_consolidation = parse_worksheet_data_consolidation(sheet_data.as_bytes())?;
-        let outline_properties = sheet_properties.as_ref()
-            .and_then(WorksheetSheetProperties::outline_properties).copied();
+        let outline_properties = sheet_properties
+            .as_ref()
+            .and_then(WorksheetSheetProperties::outline_properties)
+            .copied();
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -467,9 +467,19 @@ impl<'a> Worksheet<'a> {
         self.merged_regions = parsed.merged_regions;
         self.columns = parsed.columns;
         self.data_validations = parsed.data_validations;
-        self.data_validations.extend(data_validation_collections.iter()
-            .filter(|collection| collection.source() == super::data_validation::DataValidationSource::Office2010)
-            .flat_map(|collection| collection.validations().iter().map(ParsedDataValidation::to_legacy)));
+        self.data_validations.extend(
+            data_validation_collections
+                .iter()
+                .filter(|collection| {
+                    collection.source() == super::data_validation::DataValidationSource::Office2010
+                })
+                .flat_map(|collection| {
+                    collection
+                        .validations()
+                        .iter()
+                        .map(ParsedDataValidation::to_legacy)
+                }),
+        );
         self.data_validation_collections = data_validation_collections;
         self.conditional_formats = parsed.conditional_formats;
         self.conditional_formattings = conditional_formattings;
@@ -860,7 +870,8 @@ impl<'a> Worksheet<'a> {
                 return Err(format!(
                     "Worksheet query-table relationship '{}' cannot be external",
                     relationship.r_id()
-                ).into());
+                )
+                .into());
             }
             let part_uri = relationship.target_partname()?;
             candidates.push((relationship.r_id().to_string(), part_uri));
@@ -883,9 +894,13 @@ impl<'a> Worksheet<'a> {
                     return Err(format!(
                         "Table query-table relationship '{}' cannot be external",
                         relationship.r_id()
-                    ).into());
+                    )
+                    .into());
                 }
-                candidates.push((relationship.r_id().to_string(), relationship.target_partname()?));
+                candidates.push((
+                    relationship.r_id().to_string(),
+                    relationship.target_partname()?,
+                ));
             }
         }
         if candidates.len() > MAX_QUERY_TABLES {
@@ -901,11 +916,15 @@ impl<'a> Worksheet<'a> {
             if part.content_type() != QUERY_TABLE_CONTENT_TYPE {
                 return Err(format!(
                     "Worksheet query-table part '{part_uri}' has content type '{}', expected '{}'",
-                    part.content_type(), QUERY_TABLE_CONTENT_TYPE
-                ).into());
+                    part.content_type(),
+                    QUERY_TABLE_CONTENT_TYPE
+                )
+                .into());
             }
             if part.rels().iter().next().is_some() {
-                return Err(format!("Query-table part '{part_uri}' has unexpected relationships").into());
+                return Err(
+                    format!("Query-table part '{part_uri}' has unexpected relationships").into(),
+                );
             }
             let query_table = parse_query_table(part.blob())?;
             query_tables.push(WorksheetQueryTable::new(
@@ -2130,7 +2149,9 @@ impl<'a> Worksheet<'a> {
 
     /// Complete core and Office 2010 validation rules in document order.
     pub fn parsed_data_validations(&self) -> impl Iterator<Item = &ParsedDataValidation> {
-        self.data_validation_collections.iter().flat_map(|collection| collection.validations())
+        self.data_validation_collections
+            .iter()
+            .flat_map(|collection| collection.validations())
     }
 
     // ===== Conditional Formatting =====

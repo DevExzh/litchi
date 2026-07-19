@@ -134,7 +134,9 @@ impl<'a> Styles<'a> {
             if let Some(numbering) = style.numbering {
                 return Ok(Some(numbering));
             }
-            let Some(parent) = style.based_on.as_deref() else { return Ok(None); };
+            let Some(parent) = style.based_on.as_deref() else {
+                return Ok(None);
+            };
             current = parent;
         }
     }
@@ -204,13 +206,18 @@ impl<'a> Styles<'a> {
 
                     current_style = Some(builder);
                 },
-                Ok(Event::Start(e)) if current_style.is_some()
-                    && e.local_name().as_ref() == b"pPr" => in_ppr = true,
-                Ok(Event::Start(e)) if current_style.is_some() && in_ppr
-                    && e.local_name().as_ref() == b"numPr" => {
+                Ok(Event::Start(e))
+                    if current_style.is_some() && e.local_name().as_ref() == b"pPr" =>
+                {
+                    in_ppr = true
+                },
+                Ok(Event::Start(e))
+                    if current_style.is_some() && in_ppr && e.local_name().as_ref() == b"numPr" =>
+                {
                     if in_num_pr {
                         return Err(OoxmlError::InvalidFormat(
-                            "style has nested numPr".to_owned()));
+                            "style has nested numPr".to_owned(),
+                        ));
                     }
                     in_num_pr = true;
                     pending_num_id = None;
@@ -222,7 +229,8 @@ impl<'a> Styles<'a> {
                         b"numId" if in_num_pr => {
                             if pending_num_id.is_some() {
                                 return Err(OoxmlError::InvalidFormat(
-                                    "style has duplicate numId".to_owned()));
+                                    "style has duplicate numId".to_owned(),
+                                ));
                             }
                             let raw = required_style_value(&e, reader.decoder())?;
                             pending_num_id = Some(raw.parse::<u32>().map_err(|_| {
@@ -232,13 +240,20 @@ impl<'a> Styles<'a> {
                         b"ilvl" if in_num_pr => {
                             if pending_level.is_some() {
                                 return Err(OoxmlError::InvalidFormat(
-                                    "style has duplicate ilvl".to_owned()));
+                                    "style has duplicate ilvl".to_owned(),
+                                ));
                             }
                             let raw = required_style_value(&e, reader.decoder())?;
-                            pending_level = Some(raw.parse::<u8>().ok()
-                                .filter(|value| *value <= 8).ok_or_else(|| {
-                                    OoxmlError::InvalidFormat(format!("invalid style ilvl '{raw}'"))
-                                })?);
+                            pending_level = Some(
+                                raw.parse::<u8>()
+                                    .ok()
+                                    .filter(|value| *value <= 8)
+                                    .ok_or_else(|| {
+                                        OoxmlError::InvalidFormat(format!(
+                                            "invalid style ilvl '{raw}'"
+                                        ))
+                                    })?,
+                            );
                         },
                         b"name" => {
                             // Parse name attribute
@@ -296,14 +311,18 @@ impl<'a> Styles<'a> {
                     let num_id = pending_num_id.take().ok_or_else(|| {
                         OoxmlError::InvalidFormat("style numPr is missing numId".to_owned())
                     })?;
-                    current_style.as_mut().expect("style checked").numbering = Some(
-                        ParagraphNumbering { num_id, level: pending_level.take().unwrap_or(0) });
+                    current_style.as_mut().expect("style checked").numbering =
+                        Some(ParagraphNumbering {
+                            num_id,
+                            level: pending_level.take().unwrap_or(0),
+                        });
                     in_num_pr = false;
                 },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"pPr" && in_ppr => {
                     if in_num_pr {
                         return Err(OoxmlError::InvalidFormat(
-                            "unterminated style numPr".to_owned()));
+                            "unterminated style numPr".to_owned(),
+                        ));
                     }
                     in_ppr = false;
                 },
@@ -465,12 +484,15 @@ impl Style {
     }
 }
 
-fn required_style_value(element: &quick_xml::events::BytesStart<'_>,
-    decoder: quick_xml::encoding::Decoder) -> Result<String> {
+fn required_style_value(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<String> {
     for attribute in element.attributes().with_checks(false) {
         let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() == b"val" {
-            return attribute.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            return attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
                 .map(|value| value.into_owned())
                 .map_err(|error| OoxmlError::Xml(error.to_string()));
         }
@@ -492,28 +514,37 @@ mod tests {
         assert_eq!(style_type, WdStyleType::Paragraph);
     }
 
-    fn styles(xml: &[u8]) -> Styles<'static> {
-        let part = Box::leak(Box::new(BlobPart::new(
+    fn with_styles<T>(xml: &[u8], inspect: impl FnOnce(&mut Styles<'_>) -> T) -> T {
+        let part = BlobPart::new(
             PackURI::new("/word/styles.xml").unwrap(),
-            "application/xml".to_owned(), xml.to_vec(),
-        )));
-        Styles::from_part(part)
+            "application/xml".to_owned(),
+            xml.to_vec(),
+        );
+        let mut styles = Styles::from_part(&part);
+        inspect(&mut styles)
     }
 
     #[test]
     fn resolves_inherited_numbering_and_retains_cancellation() {
-        let mut value = styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Base"><w:pPr><w:numPr><w:ilvl w:val="2"/><w:numId w:val="7"/></w:numPr></w:pPr></w:style><w:style w:type="paragraph" w:styleId="Child"><w:basedOn w:val="Base"/></w:style><w:style w:type="paragraph" w:styleId="Cancel"><w:pPr><w:numPr><w:numId w:val="0"/></w:numPr></w:pPr></w:style></w:styles>"#);
-        assert_eq!(value.resolved_numbering("Child").unwrap(),
-            Some(ParagraphNumbering { num_id: 7, level: 2 }));
-        assert_eq!(value.resolved_numbering("Cancel").unwrap(),
-            Some(ParagraphNumbering { num_id: 0, level: 0 }));
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Base"><w:pPr><w:numPr><w:ilvl w:val="2"/><w:numId w:val="7"/></w:numPr></w:pPr></w:style><w:style w:type="paragraph" w:styleId="Child"><w:basedOn w:val="Base"/></w:style><w:style w:type="paragraph" w:styleId="Cancel"><w:pPr><w:numPr><w:numId w:val="0"/></w:numPr></w:pPr></w:style></w:styles>"#, |value| {
+            assert_eq!(
+                value.resolved_numbering("Child").unwrap(),
+                Some(ParagraphNumbering { num_id: 7, level: 2 })
+            );
+            assert_eq!(
+                value.resolved_numbering("Cancel").unwrap(),
+                Some(ParagraphNumbering { num_id: 0, level: 0 })
+            );
+        });
     }
 
     #[test]
     fn rejects_based_on_cycles_and_malformed_num_pr() {
-        let mut cycle = styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:basedOn w:val="B"/></w:style><w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="A"/></w:style></w:styles>"#);
-        assert!(cycle.resolved_numbering("A").is_err());
-        let mut malformed = styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:pPr><w:numPr><w:ilvl w:val="9"/></w:numPr></w:pPr></w:style></w:styles>"#);
-        assert!(malformed.len().is_err());
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:basedOn w:val="B"/></w:style><w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="A"/></w:style></w:styles>"#, |cycle| {
+            assert!(cycle.resolved_numbering("A").is_err());
+        });
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:pPr><w:numPr><w:ilvl w:val="9"/></w:numPr></w:pPr></w:style></w:styles>"#, |malformed| {
+            assert!(malformed.len().is_err());
+        });
     }
 }

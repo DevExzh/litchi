@@ -14,8 +14,7 @@ use std::collections::{HashMap, HashSet};
 
 pub const TRANSITIONAL_CUSTOM_XML_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/customXml";
-pub const STRICT_CUSTOM_XML_NAMESPACE: &str =
-    "http://purl.oclc.org/ooxml/officeDocument/customXml";
+pub const STRICT_CUSTOM_XML_NAMESPACE: &str = "http://purl.oclc.org/ooxml/officeDocument/customXml";
 pub const TRANSITIONAL_CUSTOM_XML_RELATIONSHIP: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml";
 pub const STRICT_CUSTOM_XML_RELATIONSHIP: &str =
@@ -128,7 +127,7 @@ pub fn write_custom_xml_properties(
     properties: &CustomXmlDataProperties,
     conformance: CustomXmlConformance,
 ) -> Result<Vec<u8>> {
-    validate_properties(properties)?;
+    validate_custom_xml_properties(properties)?;
     let mut out = String::with_capacity(256 + properties.schema_references.len() * 64);
     out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
     out.push_str("<ds:datastoreItem xmlns:ds=\"");
@@ -224,17 +223,16 @@ pub fn discover_custom_xml_data(package: &OpcPackage) -> Result<Vec<CustomXmlDat
 }
 
 /// Add a validated data part, optional properties part, and both relationships.
-pub fn add_custom_xml_data(
-    package: &mut OpcPackage,
-    item: NewCustomXmlDataItem,
-) -> Result<()> {
+pub fn add_custom_xml_data(package: &mut OpcPackage, item: NewCustomXmlDataItem) -> Result<()> {
     require_xml_content_type(&item.content_type)?;
     validate_custom_xml_payload(&item.xml)?;
     if item.relationship_id.is_empty() {
         return invalid("custom XML relationship ID must not be empty".into());
     }
     if item.properties.is_some() != item.properties_part_name.is_some() {
-        return invalid("properties and properties_part_name must either both be present or absent".into());
+        return invalid(
+            "properties and properties_part_name must either both be present or absent".into(),
+        );
     }
     if package
         .iter_parts()
@@ -263,15 +261,11 @@ pub fn add_custom_xml_data(
         ));
     }
 
-    let mut data_part = XmlPart::new(
-        item.data_part_name.clone(),
-        item.content_type,
-        item.xml,
-    );
+    let mut data_part = XmlPart::new(item.data_part_name.clone(), item.content_type, item.xml);
     if let (Some(properties), Some(properties_part_name)) =
         (item.properties, item.properties_part_name)
     {
-        validate_properties(&properties)?;
+        validate_custom_xml_properties(&properties)?;
         if item.properties_relationship_id.is_empty() {
             return invalid("custom XML properties relationship ID must not be empty".into());
         }
@@ -309,7 +303,9 @@ pub fn add_custom_xml_data(
         )));
     }
     package.add_part(Box::new(data_part));
-    let target = item.data_part_name.relative_ref(item.source_part_name.base_uri());
+    let target = item
+        .data_part_name
+        .relative_ref(item.source_part_name.base_uri());
     package
         .get_part_mut(&item.source_part_name)?
         .rels_mut()
@@ -401,7 +397,7 @@ fn resolve_properties(
     Ok((Some(properties_part_name), Some(properties)))
 }
 
-fn validate_properties(properties: &CustomXmlDataProperties) -> Result<()> {
+pub fn validate_custom_xml_properties(properties: &CustomXmlDataProperties) -> Result<()> {
     if !is_st_guid(&properties.item_id) {
         return invalid(format!(
             "custom XML itemID '{}' is not ST_Guid",
@@ -428,20 +424,23 @@ fn validate_properties(properties: &CustomXmlDataProperties) -> Result<()> {
     Ok(())
 }
 
-fn is_st_guid(value: &str) -> bool {
-    let Some(inner) = value.strip_prefix('{').and_then(|value| value.strip_suffix('}')) else {
+pub fn is_st_guid(value: &str) -> bool {
+    let Some(inner) = value
+        .strip_prefix('{')
+        .and_then(|value| value.strip_suffix('}'))
+    else {
         return false;
     };
     let groups = [8, 4, 4, 4, 12];
     let mut parts = inner.split('-');
     groups.into_iter().all(|length| {
-        parts
-            .next()
-            .is_some_and(|part| part.len() == length && part.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        parts.next().is_some_and(|part| {
+            part.len() == length && part.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
     }) && parts.next().is_none()
 }
 
-fn validate_custom_xml_payload(xml: &[u8]) -> Result<ExpandedName> {
+pub fn validate_custom_xml_payload(xml: &[u8]) -> Result<ExpandedName> {
     if xml.len() > MAX_CUSTOM_XML_PART_BYTES {
         return invalid(format!(
             "custom XML payload exceeds {MAX_CUSTOM_XML_PART_BYTES} bytes"
@@ -465,7 +464,9 @@ fn validate_custom_xml_payload(xml: &[u8]) -> Result<ExpandedName> {
                 let info = resolve_element(&reader, &element, namespaces.last(), version)?;
                 element_count += 1;
                 if element_count > MAX_CUSTOM_XML_ELEMENTS {
-                    return invalid(format!("custom XML element count exceeds {MAX_CUSTOM_XML_ELEMENTS}"));
+                    return invalid(format!(
+                        "custom XML element count exceeds {MAX_CUSTOM_XML_ELEMENTS}"
+                    ));
                 }
                 if namespaces.is_empty() {
                     if closed_root || root.is_some() {
@@ -477,12 +478,14 @@ fn validate_custom_xml_payload(xml: &[u8]) -> Result<ExpandedName> {
                     });
                 }
                 namespaces.push(info.namespaces);
-            }
+            },
             Event::Empty(element) => {
                 let info = resolve_element(&reader, &element, namespaces.last(), version)?;
                 element_count += 1;
                 if element_count > MAX_CUSTOM_XML_ELEMENTS {
-                    return invalid(format!("custom XML element count exceeds {MAX_CUSTOM_XML_ELEMENTS}"));
+                    return invalid(format!(
+                        "custom XML element count exceeds {MAX_CUSTOM_XML_ELEMENTS}"
+                    ));
                 }
                 if namespaces.is_empty() {
                     if closed_root || root.is_some() {
@@ -494,7 +497,7 @@ fn validate_custom_xml_payload(xml: &[u8]) -> Result<ExpandedName> {
                     });
                     closed_root = true;
                 }
-            }
+            },
             Event::End(_) => {
                 if namespaces.pop().is_none() {
                     return invalid("custom XML payload has an unexpected end tag".into());
@@ -502,7 +505,7 @@ fn validate_custom_xml_payload(xml: &[u8]) -> Result<ExpandedName> {
                 if namespaces.is_empty() {
                     closed_root = true;
                 }
-            }
+            },
             Event::DocType(_) => return invalid("DTD is forbidden in custom XML payloads".into()),
             Event::GeneralRef(reference) => {
                 let reference = reference.as_ref();
@@ -510,15 +513,15 @@ fn validate_custom_xml_payload(xml: &[u8]) -> Result<ExpandedName> {
                 if !predefined && !reference.starts_with(b"#") {
                     return invalid("custom XML payload contains a non-predefined entity".into());
                 }
-            }
+            },
             Event::Text(text) if namespaces.is_empty() && !is_xml_whitespace(text.as_ref()) => {
                 return invalid("custom XML payload has text outside its root".into());
-            }
+            },
             Event::CData(text) if namespaces.is_empty() && !is_xml_whitespace(text.as_ref()) => {
                 return invalid("custom XML payload has CDATA outside its root".into());
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -563,8 +566,8 @@ fn resolve_element(
         }
     }
     let qname = element.name();
-    let raw_name = std::str::from_utf8(qname.as_ref())
-        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    let raw_name =
+        std::str::from_utf8(qname.as_ref()).map_err(|error| OoxmlError::Xml(error.to_string()))?;
     let (prefix, local_name) = split_qname(raw_name);
     let namespace = if prefix.is_empty() {
         namespaces.get(prefix).cloned().unwrap_or_default()
@@ -585,7 +588,9 @@ fn resolve_element(
             })?
         };
         if !seen.insert((namespace.clone(), local_name.to_owned())) {
-            return invalid(format!("duplicate XML attribute {{{namespace}}}{local_name}"));
+            return invalid(format!(
+                "duplicate XML attribute {{{namespace}}}{local_name}"
+            ));
         }
         attributes.push((namespace, local_name.to_owned(), value));
     }
@@ -624,7 +629,7 @@ fn parse_properties_xml(xml: &[u8]) -> Result<CustomXmlDataProperties> {
                 )?;
                 contexts.push(context);
                 namespaces.push(info.namespaces);
-            }
+            },
             Event::Empty(element) => {
                 let info = resolve_element(&reader, &element, namespaces.last(), version)?;
                 properties_start(
@@ -638,7 +643,7 @@ fn parse_properties_xml(xml: &[u8]) -> Result<CustomXmlDataProperties> {
                 if contexts.is_empty() {
                     closed_root = true;
                 }
-            }
+            },
             Event::End(_) => {
                 if contexts.pop().is_none() || namespaces.pop().is_none() {
                     return invalid("unexpected custom XML properties end tag".into());
@@ -646,16 +651,18 @@ fn parse_properties_xml(xml: &[u8]) -> Result<CustomXmlDataProperties> {
                 if contexts.is_empty() {
                     closed_root = true;
                 }
-            }
-            Event::DocType(_) => return invalid("DTD is forbidden in custom XML properties".into()),
+            },
+            Event::DocType(_) => {
+                return invalid("DTD is forbidden in custom XML properties".into());
+            },
             Event::Text(text) if !is_xml_whitespace(text.as_ref()) => {
                 return invalid("text is not permitted in custom XML properties".into());
-            }
+            },
             Event::CData(text) if !is_xml_whitespace(text.as_ref()) => {
                 return invalid("CDATA is not permitted in custom XML properties".into());
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
         buffer.clear();
     }
@@ -663,12 +670,11 @@ fn parse_properties_xml(xml: &[u8]) -> Result<CustomXmlDataProperties> {
         return invalid("custom XML properties root is incomplete".into());
     }
     let properties = CustomXmlDataProperties {
-        item_id: item_id.ok_or_else(|| {
-            OoxmlError::InvalidFormat("datastoreItem requires ds:itemID".into())
-        })?,
+        item_id: item_id
+            .ok_or_else(|| OoxmlError::InvalidFormat("datastoreItem requires ds:itemID".into()))?,
         schema_references,
     };
-    validate_properties(&properties)?;
+    validate_custom_xml_properties(&properties)?;
     Ok(properties)
 }
 
@@ -697,7 +703,7 @@ fn properties_start(
             *item_id = Some(required_resolved_attr(element, &element.namespace, "itemID")?.into());
             *root_namespace = Some(element.namespace.clone());
             Ok(PropertiesContext::DataStoreItem)
-        }
+        },
         Some(PropertiesContext::DataStoreItem)
             if root_namespace.as_deref() == Some(element.namespace.as_str())
                 && element.local_name == "schemaRefs" =>
@@ -708,7 +714,7 @@ fn properties_start(
             *seen_schema_references = true;
             reject_attributes_except(element, &[])?;
             Ok(PropertiesContext::SchemaReferences)
-        }
+        },
         Some(PropertiesContext::SchemaReferences)
             if root_namespace.as_deref() == Some(element.namespace.as_str())
                 && element.local_name == "schemaRef" =>
@@ -719,11 +725,10 @@ fn properties_start(
                     "schema reference count exceeds {MAX_CUSTOM_XML_SCHEMA_REFERENCES}"
                 ));
             }
-            schema_references.push(
-                required_resolved_attr(element, &element.namespace, "uri")?.into(),
-            );
+            schema_references
+                .push(required_resolved_attr(element, &element.namespace, "uri")?.into());
             Ok(PropertiesContext::SchemaReference)
-        }
+        },
         _ => invalid(format!(
             "unexpected custom XML properties element {{{}}}{}",
             element.namespace, element.local_name
@@ -733,12 +738,9 @@ fn properties_start(
 
 fn reject_attributes_except(element: &ResolvedElement, allowed: &[(&str, &str)]) -> Result<()> {
     for (namespace, local_name, _) in &element.attributes {
-        if !allowed
-            .iter()
-            .any(|(allowed_namespace, allowed_name)| {
-                namespace == allowed_namespace && local_name == allowed_name
-            })
-        {
+        if !allowed.iter().any(|(allowed_namespace, allowed_name)| {
+            namespace == allowed_namespace && local_name == allowed_name
+        }) {
             return invalid(format!(
                 "unexpected attribute {{{namespace}}}{local_name} on {}",
                 element.local_name
@@ -785,6 +787,11 @@ fn require_xml_content_type(content_type: &str) -> Result<()> {
     }
 }
 
+/// Validate that a Custom XML Data Storage content type is XML-based.
+pub fn validate_custom_xml_content_type(content_type: &str) -> Result<()> {
+    require_xml_content_type(content_type)
+}
+
 fn is_data_relationship(value: &str) -> bool {
     matches!(
         value,
@@ -795,8 +802,7 @@ fn is_data_relationship(value: &str) -> bool {
 fn is_properties_relationship(value: &str) -> bool {
     matches!(
         value,
-        TRANSITIONAL_CUSTOM_XML_PROPERTIES_RELATIONSHIP
-            | STRICT_CUSTOM_XML_PROPERTIES_RELATIONSHIP
+        TRANSITIONAL_CUSTOM_XML_PROPERTIES_RELATIONSHIP | STRICT_CUSTOM_XML_PROPERTIES_RELATIONSHIP
     )
 }
 
@@ -812,7 +818,9 @@ fn split_qname(value: &str) -> (&str, &str) {
 }
 
 fn is_xml_whitespace(value: &[u8]) -> bool {
-    value.iter().all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+    value
+        .iter()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
 }
 
 fn escape_attribute(out: &mut String, value: &str) {
@@ -837,9 +845,8 @@ mod tests {
     use super::*;
     use litchi_opc::part::BlobPart;
 
-    const POI_XLSX: &[u8] = include_bytes!(
-        "../../../3rdparty/poi/test-data/spreadsheet/customIndexedColors.xlsx"
-    );
+    const POI_XLSX: &[u8] =
+        include_bytes!("../../../3rdparty/poi/test-data/spreadsheet/customIndexedColors.xlsx");
     const LO_DOCX: &[u8] = include_bytes!(
         "../../../3rdparty/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx"
     );
@@ -850,7 +857,15 @@ mod tests {
         let items = discover_custom_xml_data(&poi).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].root_name.local_name, "easyPacket");
-        assert_eq!(items[0].properties.as_ref().unwrap().schema_references.len(), 0);
+        assert_eq!(
+            items[0]
+                .properties
+                .as_ref()
+                .unwrap()
+                .schema_references
+                .len(),
+            0
+        );
 
         let libreoffice = OpcPackage::from_bytes(LO_DOCX).unwrap();
         let items = discover_custom_xml_data(&libreoffice).unwrap();
@@ -866,11 +881,14 @@ mod tests {
     fn strict_properties_writer_is_deterministic_and_round_trips() {
         let properties = sample_properties();
         let first = write_custom_xml_properties(&properties, CustomXmlConformance::Strict).unwrap();
-        let second = write_custom_xml_properties(&properties, CustomXmlConformance::Strict).unwrap();
+        let second =
+            write_custom_xml_properties(&properties, CustomXmlConformance::Strict).unwrap();
         assert_eq!(first, second);
-        assert!(std::str::from_utf8(&first)
-            .unwrap()
-            .contains(STRICT_CUSTOM_XML_NAMESPACE));
+        assert!(
+            std::str::from_utf8(&first)
+                .unwrap()
+                .contains(STRICT_CUSTOM_XML_NAMESPACE)
+        );
         assert_eq!(parse_custom_xml_properties(&first).unwrap(), properties);
     }
 
@@ -904,9 +922,7 @@ mod tests {
                 data_part_name: PackURI::new("/customXml/item1.xml").unwrap(),
                 content_type: "application/xml".into(),
                 xml: b"<customer xmlns=\"urn:customer\" id=\"7\"/>".to_vec(),
-                properties_part_name: Some(
-                    PackURI::new("/customXml/itemProps1.xml").unwrap(),
-                ),
+                properties_part_name: Some(PackURI::new("/customXml/itemProps1.xml").unwrap()),
                 properties_relationship_id: "rIdProps".into(),
                 properties: Some(sample_properties()),
                 conformance: CustomXmlConformance::Transitional,
@@ -922,9 +938,8 @@ mod tests {
     #[test]
     fn rejects_malformed_properties_payloads_and_package_graphs() {
         assert!(parse_custom_xml_properties(br#"<!DOCTYPE x><x/>"#).is_err());
-        let missing_id = format!(
-            r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_CUSTOM_XML_NAMESPACE}"/>"#
-        );
+        let missing_id =
+            format!(r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_CUSTOM_XML_NAMESPACE}"/>"#);
         assert!(parse_custom_xml_properties(missing_id.as_bytes()).is_err());
         let duplicate_refs = format!(
             r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_CUSTOM_XML_NAMESPACE}" ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><ds:schemaRefs/><ds:schemaRefs/></ds:datastoreItem>"#
@@ -953,11 +968,9 @@ mod tests {
     fn enforces_guid_schema_count_depth_and_size_caps() {
         let mut invalid_guid = sample_properties();
         invalid_guid.item_id = "not-a-guid".into();
-        assert!(write_custom_xml_properties(
-            &invalid_guid,
-            CustomXmlConformance::Transitional
-        )
-        .is_err());
+        assert!(
+            write_custom_xml_properties(&invalid_guid, CustomXmlConformance::Transitional).is_err()
+        );
 
         let deep = format!(
             "{}{}",

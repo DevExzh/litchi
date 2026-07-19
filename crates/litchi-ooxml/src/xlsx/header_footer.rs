@@ -40,11 +40,18 @@ pub struct HeaderFooterText {
 impl HeaderFooterText {
     fn new(raw: String) -> Self {
         let (left, center, right) = split_sections(&raw);
-        Self { raw, left, center, right }
+        Self {
+            raw,
+            left,
+            center,
+            right,
+        }
     }
 
     /// Complete decoded text, including alignment and formatting controls.
-    pub fn raw(&self) -> &str { &self.raw }
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
 
     /// Content of a logical alignment section, excluding its alignment marker.
     pub fn section(&self, kind: HeaderFooterSectionKind) -> Option<&str> {
@@ -55,9 +62,15 @@ impl HeaderFooterText {
         }
     }
 
-    pub fn left(&self) -> Option<&str> { self.left.as_deref() }
-    pub fn center(&self) -> Option<&str> { self.center.as_deref() }
-    pub fn right(&self) -> Option<&str> { self.right.as_deref() }
+    pub fn left(&self) -> Option<&str> {
+        self.left.as_deref()
+    }
+    pub fn center(&self) -> Option<&str> {
+        self.center.as_deref()
+    }
+    pub fn right(&self) -> Option<&str> {
+        self.right.as_deref()
+    }
 }
 
 /// Complete core `headerFooter` settings for one worksheet.
@@ -76,16 +89,36 @@ pub struct WorksheetHeaderFooter {
 }
 
 impl WorksheetHeaderFooter {
-    pub fn different_odd_even(&self) -> bool { self.different_odd_even }
-    pub fn different_first(&self) -> bool { self.different_first }
-    pub fn scale_with_document(&self) -> bool { self.scale_with_document }
-    pub fn align_with_margins(&self) -> bool { self.align_with_margins }
-    pub fn odd_header(&self) -> Option<&HeaderFooterText> { self.odd_header.as_ref() }
-    pub fn odd_footer(&self) -> Option<&HeaderFooterText> { self.odd_footer.as_ref() }
-    pub fn even_header(&self) -> Option<&HeaderFooterText> { self.even_header.as_ref() }
-    pub fn even_footer(&self) -> Option<&HeaderFooterText> { self.even_footer.as_ref() }
-    pub fn first_header(&self) -> Option<&HeaderFooterText> { self.first_header.as_ref() }
-    pub fn first_footer(&self) -> Option<&HeaderFooterText> { self.first_footer.as_ref() }
+    pub fn different_odd_even(&self) -> bool {
+        self.different_odd_even
+    }
+    pub fn different_first(&self) -> bool {
+        self.different_first
+    }
+    pub fn scale_with_document(&self) -> bool {
+        self.scale_with_document
+    }
+    pub fn align_with_margins(&self) -> bool {
+        self.align_with_margins
+    }
+    pub fn odd_header(&self) -> Option<&HeaderFooterText> {
+        self.odd_header.as_ref()
+    }
+    pub fn odd_footer(&self) -> Option<&HeaderFooterText> {
+        self.odd_footer.as_ref()
+    }
+    pub fn even_header(&self) -> Option<&HeaderFooterText> {
+        self.even_header.as_ref()
+    }
+    pub fn even_footer(&self) -> Option<&HeaderFooterText> {
+        self.even_footer.as_ref()
+    }
+    pub fn first_header(&self) -> Option<&HeaderFooterText> {
+        self.first_header.as_ref()
+    }
+    pub fn first_footer(&self) -> Option<&HeaderFooterText> {
+        self.first_footer.as_ref()
+    }
 }
 
 impl Default for WorksheetHeaderFooter {
@@ -142,9 +175,16 @@ impl TextKind {
 
 /// Parse a worksheet's core header/footer settings.
 pub fn parse_worksheet_header_footer(xml: &[u8]) -> Result<Option<WorksheetHeaderFooter>> {
-    if xml.len() > MAX_XML_BYTES { return Err(invalid("worksheet XML is too large")); }
-    let validated = process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
-    let selected = if validated.report.alternate_content_count == 0 { xml } else { validated.xml.as_ref() };
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("worksheet XML is too large"));
+    }
+    let validated =
+        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+    let selected = if validated.report.alternate_content_count == 0 {
+        xml
+    } else {
+        validated.xml.as_ref()
+    };
     parse_selected(selected)
 }
 
@@ -165,15 +205,27 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetHeaderFooter>> {
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                depth = depth.checked_add(1).ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
-                if depth > MAX_DEPTH { return Err(invalid("worksheet XML nesting is too deep")); }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
+                if depth > MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
                 if depth == 1 {
-                    if root_seen || !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" {
+                    if root_seen
+                        || !spreadsheet(&namespace)
+                        || element.local_name().as_ref() != b"worksheet"
+                    {
                         return Err(invalid("header/footer parser requires a worksheet root"));
                     }
                     root_seen = true;
-                } else if depth == 2 && spreadsheet(&namespace) && element.local_name().as_ref() == b"headerFooter" {
-                    if result.is_some() || header_footer.is_some() { return Err(invalid("duplicate worksheet headerFooter element")); }
+                } else if depth == 2
+                    && spreadsheet(&namespace)
+                    && element.local_name().as_ref() == b"headerFooter"
+                {
+                    if result.is_some() || header_footer.is_some() {
+                        return Err(invalid("duplicate worksheet headerFooter element"));
+                    }
                     header_footer = Some((depth, parse_settings(&element, decoder)?, None));
                 } else if let Some((container_depth, _, last_order)) = header_footer.as_mut() {
                     if depth != *container_depth + 1 || !spreadsheet(&namespace) {
@@ -184,17 +236,25 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetHeaderFooter>> {
                     validate_child_attributes(&element)?;
                     check_order(*last_order, kind)?;
                     *last_order = Some(kind.order());
-                    if text.is_some() { return Err(invalid("nested header/footer text element")); }
+                    if text.is_some() {
+                        return Err(invalid("nested header/footer text element"));
+                    }
                     text = Some((depth, kind, String::new()));
                 } else if text.is_some() {
                     return Err(invalid("header/footer text cannot contain child elements"));
                 }
-            }
+            },
             Event::Empty(element) => {
-                if depth == 1 && spreadsheet(&namespace) && element.local_name().as_ref() == b"headerFooter" {
-                    if result.is_some() || header_footer.is_some() { return Err(invalid("duplicate worksheet headerFooter element")); }
+                if depth == 1
+                    && spreadsheet(&namespace)
+                    && element.local_name().as_ref() == b"headerFooter"
+                {
+                    if result.is_some() || header_footer.is_some() {
+                        return Err(invalid("duplicate worksheet headerFooter element"));
+                    }
                     result = Some(parse_settings(&element, decoder)?);
-                } else if let Some((container_depth, settings, last_order)) = header_footer.as_mut() {
+                } else if let Some((container_depth, settings, last_order)) = header_footer.as_mut()
+                {
                     if depth + 1 != *container_depth + 1 || !spreadsheet(&namespace) {
                         return Err(invalid("unexpected empty content in headerFooter"));
                     }
@@ -205,55 +265,74 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetHeaderFooter>> {
                     *last_order = Some(kind.order());
                     assign_text(settings, kind, String::new())?;
                 }
-            }
+            },
             Event::Text(value) => {
                 if let Some((_, _, output)) = text.as_mut() {
                     let decoded = value.decode().map_err(xml_error)?;
                     let decoded = unescape(&decoded).map_err(xml_error)?;
                     append_bounded(output, &decoded)?;
-                } else if header_footer.is_some() && !value.as_ref().iter().all(u8::is_ascii_whitespace) {
+                } else if header_footer.is_some()
+                    && !value.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
                     return Err(invalid("headerFooter cannot contain direct text"));
                 }
-            }
+            },
             Event::CData(value) => {
                 if let Some((_, _, output)) = text.as_mut() {
                     append_bounded(output, &value.decode().map_err(xml_error)?)?;
                 } else {
                     return Err(invalid("CDATA is outside header/footer text"));
                 }
-            }
+            },
             Event::GeneralRef(reference) => {
-                let resolved = if let Some(character) = reference.resolve_char_ref().map_err(xml_error)? {
-                    character.to_string()
-                } else {
-                    match reference.decode().map_err(xml_error)?.as_ref() {
-                        "amp" => "&".to_string(),
-                        "lt" => "<".to_string(),
-                        "gt" => ">".to_string(),
-                        "apos" => "'".to_string(),
-                        "quot" => "\"".to_string(),
-                        _ => return Err(invalid("custom XML entities are rejected")),
-                    }
-                };
-                if let Some((_, _, output)) = text.as_mut() { append_bounded(output, &resolved)?; }
-            }
+                let resolved =
+                    if let Some(character) = reference.resolve_char_ref().map_err(xml_error)? {
+                        character.to_string()
+                    } else {
+                        match reference.decode().map_err(xml_error)?.as_ref() {
+                            "amp" => "&".to_string(),
+                            "lt" => "<".to_string(),
+                            "gt" => ">".to_string(),
+                            "apos" => "'".to_string(),
+                            "quot" => "\"".to_string(),
+                            _ => return Err(invalid("custom XML entities are rejected")),
+                        }
+                    };
+                if let Some((_, _, output)) = text.as_mut() {
+                    append_bounded(output, &resolved)?;
+                }
+            },
             Event::End(element) => {
-                if text.as_ref().is_some_and(|(text_depth, _, _)| *text_depth == depth) {
+                if text
+                    .as_ref()
+                    .is_some_and(|(text_depth, _, _)| *text_depth == depth)
+                {
                     let (_, kind, value) = text.take().expect("checked above");
-                    let (_, settings, _) = header_footer.as_mut().ok_or_else(|| invalid("orphan header/footer text"))?;
+                    let (_, settings, _) = header_footer
+                        .as_mut()
+                        .ok_or_else(|| invalid("orphan header/footer text"))?;
                     assign_text(settings, kind, value)?;
-                } else if header_footer.as_ref().is_some_and(|(container_depth, _, _)| *container_depth == depth) {
+                } else if header_footer
+                    .as_ref()
+                    .is_some_and(|(container_depth, _, _)| *container_depth == depth)
+                {
                     let (_, settings, _) = header_footer.take().expect("checked above");
                     result = Some(settings);
                 }
                 if depth == 1 {
-                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" { return Err(invalid("invalid worksheet closing element")); }
+                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" {
+                        return Err(invalid("invalid worksheet closing element"));
+                    }
                     root_closed = true;
                 }
-                depth = depth.checked_sub(1).ok_or_else(|| invalid("unexpected XML end element"))?;
-            }
-            Event::DocType(_) | Event::PI(_) => return Err(invalid("DTD and processing instructions are rejected")),
-            Event::Decl(_) | Event::Comment(_) => {}
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unexpected XML end element"))?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTD and processing instructions are rejected"));
+            },
+            Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
         }
     }
@@ -268,7 +347,9 @@ fn parse_settings(element: &BytesStart<'_>, decoder: Decoder) -> Result<Workshee
     let mut seen = [false; 4];
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
-        if attribute.key.as_ref().contains(&b':') { continue; }
+        if attribute.key.as_ref().contains(&b':') {
+            continue;
+        }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?;
@@ -277,9 +358,16 @@ fn parse_settings(element: &BytesStart<'_>, decoder: Decoder) -> Result<Workshee
             b"differentFirst" => (1, &mut settings.different_first),
             b"scaleWithDoc" => (2, &mut settings.scale_with_document),
             b"alignWithMargins" => (3, &mut settings.align_with_margins),
-            name => return Err(invalid(format!("unknown headerFooter attribute '{}'", String::from_utf8_lossy(name)))),
+            name => {
+                return Err(invalid(format!(
+                    "unknown headerFooter attribute '{}'",
+                    String::from_utf8_lossy(name)
+                )));
+            },
         };
-        if seen[slot] { return Err(invalid("duplicate headerFooter attribute")); }
+        if seen[slot] {
+            return Err(invalid("duplicate headerFooter attribute"));
+        }
         seen[slot] = true;
         *target = parse_bool(&value)?;
     }
@@ -289,14 +377,20 @@ fn parse_settings(element: &BytesStart<'_>, decoder: Decoder) -> Result<Workshee
 fn validate_child_attributes(element: &BytesStart<'_>) -> Result<()> {
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
-        if !attribute.key.as_ref().contains(&b':') { return Err(invalid("header/footer text elements cannot have attributes")); }
+        if !attribute.key.as_ref().contains(&b':') {
+            return Err(invalid(
+                "header/footer text elements cannot have attributes",
+            ));
+        }
     }
     Ok(())
 }
 
 fn check_order(last_order: Option<u8>, kind: TextKind) -> Result<()> {
     if last_order.is_some_and(|last| kind.order() <= last) {
-        return Err(invalid("headerFooter children are duplicated or out of schema order"));
+        return Err(invalid(
+            "headerFooter children are duplicated or out of schema order",
+        ));
     }
     Ok(())
 }
@@ -310,7 +404,9 @@ fn assign_text(settings: &mut WorksheetHeaderFooter, kind: TextKind, value: Stri
         TextKind::FirstHeader => &mut settings.first_header,
         TextKind::FirstFooter => &mut settings.first_footer,
     };
-    if target.replace(HeaderFooterText::new(value)).is_some() { return Err(invalid("duplicate header/footer text element")); }
+    if target.replace(HeaderFooterText::new(value)).is_some() {
+        return Err(invalid("duplicate header/footer text element"));
+    }
     Ok(())
 }
 
@@ -320,13 +416,25 @@ fn split_sections(raw: &str) -> (Option<String>, Option<String>, Option<String>)
     let mut index = 0usize;
     while index < raw.len() {
         let tail = &raw[index..];
-        if let Some(marker) = tail.as_bytes().get(1).copied().filter(|_| tail.as_bytes()[0] == b'&') {
+        if let Some(marker) = tail
+            .as_bytes()
+            .get(1)
+            .copied()
+            .filter(|_| tail.as_bytes()[0] == b'&')
+        {
             if marker == b'&' {
-                sections[current].get_or_insert_with(String::new).push_str("&&");
+                sections[current]
+                    .get_or_insert_with(String::new)
+                    .push_str("&&");
                 index += 2;
                 continue;
             }
-            if let Some(next) = match marker { b'L' => Some(0), b'C' => Some(1), b'R' => Some(2), _ => None } {
+            if let Some(next) = match marker {
+                b'L' => Some(0),
+                b'C' => Some(1),
+                b'R' => Some(2),
+                _ => None,
+            } {
                 current = next;
                 sections[current].get_or_insert_with(String::new);
                 index += 2;
@@ -334,34 +442,53 @@ fn split_sections(raw: &str) -> (Option<String>, Option<String>, Option<String>)
             }
         }
         let character = tail.chars().next().expect("non-empty tail");
-        sections[current].get_or_insert_with(String::new).push(character);
+        sections[current]
+            .get_or_insert_with(String::new)
+            .push(character);
         index += character.len_utf8();
     }
-    if raw.is_empty() { sections[1] = Some(String::new()); }
+    if raw.is_empty() {
+        sections[1] = Some(String::new());
+    }
     (sections[0].take(), sections[1].take(), sections[2].take())
 }
 
 fn append_bounded(output: &mut String, value: &str) -> Result<()> {
-    if output.len().saturating_add(value.len()) > MAX_TEXT_BYTES { return Err(invalid("header/footer text is too large")); }
+    if output.len().saturating_add(value.len()) > MAX_TEXT_BYTES {
+        return Err(invalid("header/footer text is too large"));
+    }
     output.push_str(value);
     Ok(())
 }
 
 fn parse_bool(value: &str) -> Result<bool> {
-    match value { "1" | "true" => Ok(true), "0" | "false" => Ok(false), _ => Err(invalid("invalid headerFooter boolean")) }
+    match value {
+        "1" | "true" => Ok(true),
+        "0" | "false" => Ok(false),
+        _ => Err(invalid("invalid headerFooter boolean")),
+    }
 }
 
-fn spreadsheet(namespace: &ResolveResult<'_>) -> bool { exact(namespace, CORE) || exact(namespace, STRICT) }
-fn exact(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool { matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == expected) }
-fn invalid(message: impl Into<String>) -> OoxmlError { OoxmlError::InvalidFormat(message.into()) }
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError { OoxmlError::Xml(error.to_string()) }
+fn spreadsheet(namespace: &ResolveResult<'_>) -> bool {
+    exact(namespace, CORE) || exact(namespace, STRICT)
+}
+fn exact(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == expected)
+}
+fn invalid(message: impl Into<String>) -> OoxmlError {
+    OoxmlError::InvalidFormat(message.into())
+}
+fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
+    OoxmlError::Xml(error.to_string())
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use litchi_opc::{OpcPackage, PackURI};
 
-    const START: &str = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+    const START: &str =
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
 
     fn parse(body: &str) -> Result<Option<WorksheetHeaderFooter>> {
         parse_worksheet_header_footer(format!("{START}{body}</worksheet>").as_bytes())
@@ -370,7 +497,9 @@ mod tests {
     fn parse_fixture(path: &str) -> WorksheetHeaderFooter {
         let package = OpcPackage::open(path).unwrap();
         let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
-        parse_worksheet_header_footer(package.get_part(&uri).unwrap().blob()).unwrap().unwrap()
+        parse_worksheet_header_footer(package.get_part(&uri).unwrap().blob())
+            .unwrap()
+            .unwrap()
     }
 
     #[test]
@@ -405,14 +534,23 @@ mod tests {
 
     #[test]
     fn loads_poi_ampersand_fixture() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/poi/test-data/spreadsheet/AmpersandHeader.xlsx");
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/AmpersandHeader.xlsx"
+        );
         let settings = parse_fixture(path);
-        assert_eq!(settings.odd_header().unwrap().center(), Some("one && two &&&&"));
+        assert_eq!(
+            settings.odd_header().unwrap().center(),
+            Some("one && two &&&&")
+        );
     }
 
     #[test]
     fn loads_libreoffice_color_sections_fixture() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx");
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx"
+        );
         let settings = parse_fixture(path);
         let header = settings.odd_header().unwrap();
         assert_eq!(header.left(), Some("&KC06040l"));

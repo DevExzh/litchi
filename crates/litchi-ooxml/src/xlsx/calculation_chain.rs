@@ -53,8 +53,12 @@ pub struct CalculationChainExtensionAttribute {
 }
 
 impl CalculationChainExtensionAttribute {
-    pub fn qualified_name(&self) -> &str { &self.qualified_name }
-    pub fn value(&self) -> &str { &self.value }
+    pub fn qualified_name(&self) -> &str {
+        &self.qualified_name
+    }
+    pub fn value(&self) -> &str {
+        &self.value
+    }
 }
 
 /// One formula cell in calculation order.
@@ -84,19 +88,48 @@ impl CalculationCell {
         })
     }
 
-    pub fn reference(&self) -> &str { &self.reference }
-    pub fn sheet_id(&self) -> Option<i32> { self.sheet_id }
-    pub fn child_chain_override(&self) -> Option<bool> { self.child_chain }
-    pub fn starts_new_dependency_level(&self) -> bool { self.new_dependency_level }
-    pub fn starts_new_thread(&self) -> bool { self.new_thread }
-    pub fn is_array_formula(&self) -> bool { self.array_formula }
-    pub fn extension_attributes(&self) -> &[CalculationChainExtensionAttribute] { &self.extension_attributes }
+    pub fn reference(&self) -> &str {
+        &self.reference
+    }
+    pub fn sheet_id(&self) -> Option<i32> {
+        self.sheet_id
+    }
+    pub fn child_chain_override(&self) -> Option<bool> {
+        self.child_chain
+    }
+    pub fn starts_new_dependency_level(&self) -> bool {
+        self.new_dependency_level
+    }
+    pub fn starts_new_thread(&self) -> bool {
+        self.new_thread
+    }
+    pub fn is_array_formula(&self) -> bool {
+        self.array_formula
+    }
+    pub fn extension_attributes(&self) -> &[CalculationChainExtensionAttribute] {
+        &self.extension_attributes
+    }
 
-    pub fn set_sheet_id(&mut self, value: Option<i32>) -> &mut Self { self.sheet_id = value; self }
-    pub fn set_child_chain_override(&mut self, value: Option<bool>) -> &mut Self { self.child_chain = value; self }
-    pub fn set_starts_new_dependency_level(&mut self, value: bool) -> &mut Self { self.new_dependency_level = value; self }
-    pub fn set_starts_new_thread(&mut self, value: bool) -> &mut Self { self.new_thread = value; self }
-    pub fn set_array_formula(&mut self, value: bool) -> &mut Self { self.array_formula = value; self }
+    pub fn set_sheet_id(&mut self, value: Option<i32>) -> &mut Self {
+        self.sheet_id = value;
+        self
+    }
+    pub fn set_child_chain_override(&mut self, value: Option<bool>) -> &mut Self {
+        self.child_chain = value;
+        self
+    }
+    pub fn set_starts_new_dependency_level(&mut self, value: bool) -> &mut Self {
+        self.new_dependency_level = value;
+        self
+    }
+    pub fn set_starts_new_thread(&mut self, value: bool) -> &mut Self {
+        self.new_thread = value;
+        self
+    }
+    pub fn set_array_formula(&mut self, value: bool) -> &mut Self {
+        self.array_formula = value;
+        self
+    }
 }
 
 /// Ordered metadata from the workbook's single Calculation Chain part.
@@ -109,55 +142,102 @@ pub struct CalculationChain {
 }
 
 impl CalculationChain {
-    pub fn new() -> Self { Self::default() }
-    pub fn cells(&self) -> &[CalculationCell] { &self.cells }
-    pub fn cells_mut(&mut self) -> &mut Vec<CalculationCell> { &mut self.cells }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn cells(&self) -> &[CalculationCell] {
+        &self.cells
+    }
+    pub fn cells_mut(&mut self) -> &mut Vec<CalculationCell> {
+        &mut self.cells
+    }
     pub fn push(&mut self, cell: CalculationCell) -> Result<&mut Self> {
-        if self.cells.len() >= MAX_CELLS { return Err(invalid("calculation chain has too many cells")); }
+        if self.cells.len() >= MAX_CELLS {
+            return Err(invalid("calculation chain has too many cells"));
+        }
         self.cells.push(cell);
         Ok(self)
     }
-    pub fn extension_list_xml(&self) -> Option<&str> { self.extension_list_xml.as_deref() }
-    pub fn extension_attributes(&self) -> &[CalculationChainExtensionAttribute] { &self.extension_attributes }
+    pub fn extension_list_xml(&self) -> Option<&str> {
+        self.extension_list_xml.as_deref()
+    }
+    pub fn extension_attributes(&self) -> &[CalculationChainExtensionAttribute] {
+        &self.extension_attributes
+    }
 
     /// Resolve the inherited sheet ID at `index`, if any preceding record specifies one.
     pub fn effective_sheet_id(&self, index: usize) -> Option<i32> {
-        self.cells.get(..=index)?.iter().rev().find_map(|cell| cell.sheet_id)
+        self.cells
+            .get(..=index)?
+            .iter()
+            .rev()
+            .find_map(|cell| cell.sheet_id)
     }
 
     /// Resolve the inherited child-chain flag at `index` (false before the first override).
     pub fn effective_child_chain(&self, index: usize) -> Option<bool> {
-        self.cells.get(..=index).map(|cells| cells.iter().rev().find_map(|cell| cell.child_chain).unwrap_or(false))
+        self.cells.get(..=index).map(|cells| {
+            cells
+                .iter()
+                .rev()
+                .find_map(|cell| cell.child_chain)
+                .unwrap_or(false)
+        })
     }
 
     pub fn to_xml(&self, conformance: CalculationChainConformance) -> Result<String> {
-        if self.cells.is_empty() { return Err(invalid("calculation chain must contain at least one cell")); }
-        if self.cells.len() > MAX_CELLS { return Err(invalid("calculation chain has too many cells")); }
-        let mut xml = String::with_capacity(self.cells.len().saturating_mul(32).saturating_add(256));
+        if self.cells.is_empty() {
+            return Err(invalid("calculation chain must contain at least one cell"));
+        }
+        if self.cells.len() > MAX_CELLS {
+            return Err(invalid("calculation chain has too many cells"));
+        }
+        let mut xml =
+            String::with_capacity(self.cells.len().saturating_mul(32).saturating_add(256));
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
         xml.push_str("<calcChain xmlns=\"");
         xml.push_str(conformance.namespace());
         xml.push('"');
         for (name, value) in &self.namespace_declarations {
             if name != "xmlns" {
-                xml.push(' '); xml.push_str(name); xml.push_str("=\""); escape_attribute(&mut xml, value); xml.push('"');
+                xml.push(' ');
+                xml.push_str(name);
+                xml.push_str("=\"");
+                escape_attribute(&mut xml, value);
+                xml.push('"');
             }
         }
         write_extension_attributes(&mut xml, &self.extension_attributes)?;
         xml.push('>');
         for cell in &self.cells {
             validate_reference(&cell.reference)?;
-            xml.push_str("<c r=\""); escape_attribute(&mut xml, &cell.reference); xml.push('"');
-            if let Some(value) = cell.sheet_id { xml.push_str(" i=\""); xml.push_str(&value.to_string()); xml.push('"'); }
-            if let Some(value) = cell.child_chain { write_bool_attribute(&mut xml, "s", value); }
-            if cell.new_dependency_level { write_bool_attribute(&mut xml, "l", true); }
-            if cell.new_thread { write_bool_attribute(&mut xml, "t", true); }
-            if cell.array_formula { write_bool_attribute(&mut xml, "a", true); }
+            xml.push_str("<c r=\"");
+            escape_attribute(&mut xml, &cell.reference);
+            xml.push('"');
+            if let Some(value) = cell.sheet_id {
+                xml.push_str(" i=\"");
+                xml.push_str(&value.to_string());
+                xml.push('"');
+            }
+            if let Some(value) = cell.child_chain {
+                write_bool_attribute(&mut xml, "s", value);
+            }
+            if cell.new_dependency_level {
+                write_bool_attribute(&mut xml, "l", true);
+            }
+            if cell.new_thread {
+                write_bool_attribute(&mut xml, "t", true);
+            }
+            if cell.array_formula {
+                write_bool_attribute(&mut xml, "a", true);
+            }
             write_extension_attributes(&mut xml, &cell.extension_attributes)?;
             xml.push_str("/>");
         }
         if let Some(extension) = &self.extension_list_xml {
-            if extension.len() > MAX_EXTENSION_BYTES { return Err(invalid("calculation-chain extension list is too large")); }
+            if extension.len() > MAX_EXTENSION_BYTES {
+                return Err(invalid("calculation-chain extension list is too large"));
+            }
             xml.push_str(extension);
         }
         xml.push_str("</calcChain>");
@@ -179,7 +259,10 @@ pub fn parse_calculation_chain(xml: &[u8]) -> Result<CalculationChain> {
     loop {
         let start = position(&reader)?;
         let decoder = reader.decoder();
-        let event = reader.read_event().map_err(|error| OoxmlError::Xml(error.to_string()))?.into_owned();
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -190,42 +273,79 @@ pub fn parse_calculation_chain(xml: &[u8]) -> Result<CalculationChain> {
             },
             Event::Empty(element) if !saw_root => {
                 validate_root(&namespace, &element, closed_root)?;
-                saw_root = true; closed_root = true;
+                saw_root = true;
+                closed_root = true;
                 parse_root_attributes(&element, decoder, &resolver, &mut chain)?;
             },
-            Event::Empty(element) if saw_root && !closed_root && is_name(&namespace, &element, b"c") => {
-                if saw_extensions { return Err(invalid("calculation cells must precede extLst")); }
+            Event::Empty(element)
+                if saw_root && !closed_root && is_name(&namespace, &element, b"c") =>
+            {
+                if saw_extensions {
+                    return Err(invalid("calculation cells must precede extLst"));
+                }
                 push_cell(&mut chain, parse_cell(&element, decoder, &resolver)?)?;
             },
-            Event::Start(element) if saw_root && !closed_root && is_name(&namespace, &element, b"c") => {
-                if saw_extensions { return Err(invalid("calculation cells must precede extLst")); }
+            Event::Start(element)
+                if saw_root && !closed_root && is_name(&namespace, &element, b"c") =>
+            {
+                if saw_extensions {
+                    return Err(invalid("calculation cells must precede extLst"));
+                }
                 let cell = parse_cell(&element, decoder, &resolver)?;
                 consume_leaf(&mut reader, b"c")?;
                 push_cell(&mut chain, cell)?;
             },
-            Event::Empty(element) if saw_root && !closed_root && is_name(&namespace, &element, b"extLst") => {
-                if std::mem::replace(&mut saw_extensions, true) { return Err(invalid("duplicate calculation-chain extLst")); }
+            Event::Empty(element)
+                if saw_root && !closed_root && is_name(&namespace, &element, b"extLst") =>
+            {
+                if std::mem::replace(&mut saw_extensions, true) {
+                    return Err(invalid("duplicate calculation-chain extLst"));
+                }
                 let end = position(&reader)?;
                 chain.extension_list_xml = Some(raw_range(bytes, start, end)?);
             },
-            Event::Start(element) if saw_root && !closed_root && is_name(&namespace, &element, b"extLst") => {
-                if std::mem::replace(&mut saw_extensions, true) { return Err(invalid("duplicate calculation-chain extLst")); }
+            Event::Start(element)
+                if saw_root && !closed_root && is_name(&namespace, &element, b"extLst") =>
+            {
+                if std::mem::replace(&mut saw_extensions, true) {
+                    return Err(invalid("duplicate calculation-chain extLst"));
+                }
                 let end = consume_extension_list(&mut reader)?;
                 chain.extension_list_xml = Some(raw_range(bytes, start, end)?);
             },
             Event::Start(element) | Event::Empty(element) if saw_root && !closed_root => {
-                return Err(invalid(format!("unexpected calculation-chain child '{}'", String::from_utf8_lossy(element.local_name().as_ref()))));
+                return Err(invalid(format!(
+                    "unexpected calculation-chain child '{}'",
+                    String::from_utf8_lossy(element.local_name().as_ref())
+                )));
             },
-            Event::End(element) if saw_root && !closed_root && element.local_name().as_ref() == b"calcChain" => closed_root = true,
-            Event::Text(text) if text.decode().map_err(|error| OoxmlError::Xml(error.to_string()))?.trim().is_empty() => {},
+            Event::End(element)
+                if saw_root && !closed_root && element.local_name().as_ref() == b"calcChain" =>
+            {
+                closed_root = true
+            },
+            Event::Text(text)
+                if text
+                    .decode()
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty() => {},
             Event::Comment(_) | Event::Decl(_) => {},
-            Event::DocType(_) | Event::PI(_) => return Err(invalid("DTD and processing instructions are rejected in calculation-chain XML")),
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "DTD and processing instructions are rejected in calculation-chain XML",
+                ));
+            },
             Event::Eof => break,
             _ => return Err(invalid("invalid calculation-chain XML structure")),
         }
     }
-    if !saw_root || !closed_root { return Err(invalid("calculation-chain XML has no complete root")); }
-    if chain.cells.is_empty() { return Err(invalid("calculation chain must contain at least one cell")); }
+    if !saw_root || !closed_root {
+        return Err(invalid("calculation-chain XML has no complete root"));
+    }
+    if chain.cells.is_empty() {
+        return Err(invalid("calculation chain must contain at least one cell"));
+    }
     Ok(chain)
 }
 
@@ -237,48 +357,88 @@ pub(crate) fn load_calculation_chain(
     let mut relationships = workbook.rels().iter().filter(|relationship| {
         relationship.reltype() == RELATIONSHIP || relationship.reltype() == STRICT_RELATIONSHIP
     });
-    let Some(relationship) = relationships.next() else { return Ok(None); };
-    if relationships.next().is_some() { return Err("workbook has multiple calculation-chain relationships".into()); }
-    if relationship.is_external() { return Err("calculation-chain relationship cannot be external".into()); }
+    let Some(relationship) = relationships.next() else {
+        return Ok(None);
+    };
+    if relationships.next().is_some() {
+        return Err("workbook has multiple calculation-chain relationships".into());
+    }
+    if relationship.is_external() {
+        return Err("calculation-chain relationship cannot be external".into());
+    }
     let uri = relationship.target_partname()?;
     let part = package.get_part(&uri)?;
     if part.content_type() != CONTENT_TYPE {
-        return Err(format!("calculation-chain part '{uri}' has invalid content type '{}'", part.content_type()).into());
+        return Err(format!(
+            "calculation-chain part '{uri}' has invalid content type '{}'",
+            part.content_type()
+        )
+        .into());
     }
-    if part.rels().iter().next().is_some() { return Err("calculation-chain part cannot have relationships".into()); }
+    if part.rels().iter().next().is_some() {
+        return Err("calculation-chain part cannot have relationships".into());
+    }
     let xml = crate::common::mce::process_part(part)?;
     Ok(Some(parse_calculation_chain(xml.as_ref())?))
 }
 
-fn validate_root(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, closed: bool) -> Result<()> {
-    if closed || !is_name(namespace, element, b"calcChain") { return Err(invalid("calculation-chain XML has an invalid or trailing root")); }
+fn validate_root(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    closed: bool,
+) -> Result<()> {
+    if closed || !is_name(namespace, element, b"calcChain") {
+        return Err(invalid(
+            "calculation-chain XML has an invalid or trailing root",
+        ));
+    }
     Ok(())
 }
 
 fn is_name(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, local: &[u8]) -> bool {
-    element.local_name().as_ref() == local && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == TRANSITIONAL_NS.as_bytes() || *value == STRICT_NS.as_bytes())
+    element.local_name().as_ref() == local
+        && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == TRANSITIONAL_NS.as_bytes() || *value == STRICT_NS.as_bytes())
 }
 
-fn parse_root_attributes(element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceResolver, chain: &mut CalculationChain) -> Result<()> {
+fn parse_root_attributes(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    chain: &mut CalculationChain,
+) -> Result<()> {
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
         let raw = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
-        let value = attribute.decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder).map_err(|error| OoxmlError::Xml(error.to_string()))?.into_owned();
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
         if raw == "xmlns" || raw.starts_with("xmlns:") {
             if raw != "xmlns" {
-                if chain.namespace_declarations.len() >= MAX_EXTENSION_ATTRIBUTES { return Err(invalid("too many calculation-chain namespace declarations")); }
+                if chain.namespace_declarations.len() >= MAX_EXTENSION_ATTRIBUTES {
+                    return Err(invalid("too many calculation-chain namespace declarations"));
+                }
                 chain.namespace_declarations.push((raw, value));
             }
             continue;
         }
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
-        if matches!(namespace, ResolveResult::Unbound | ResolveResult::Unknown(_)) { return Err(invalid(format!("unexpected calcChain attribute '{raw}'"))); }
+        if matches!(
+            namespace,
+            ResolveResult::Unbound | ResolveResult::Unknown(_)
+        ) {
+            return Err(invalid(format!("unexpected calcChain attribute '{raw}'")));
+        }
         push_extension_attribute(&mut chain.extension_attributes, raw, value)?;
     }
     Ok(())
 }
 
-fn parse_cell(element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceResolver) -> Result<CalculationCell> {
+fn parse_cell(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<CalculationCell> {
     let mut reference = None;
     let mut sheet_id = None;
     let mut child_chain = None;
@@ -289,8 +449,13 @@ fn parse_cell(element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceRe
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
         let raw = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
-        let value = attribute.decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder).map_err(|error| OoxmlError::Xml(error.to_string()))?.into_owned();
-        if raw == "xmlns" || raw.starts_with("xmlns:") { continue; }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        if raw == "xmlns" || raw.starts_with("xmlns:") {
+            continue;
+        }
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if matches!(namespace, ResolveResult::Unbound) {
             match attribute.key.local_name().as_ref() {
@@ -300,10 +465,16 @@ fn parse_cell(element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceRe
                 b"l" => set_once(&mut new_level, parse_bool(&value, "l")?, "l")?,
                 b"t" => set_once(&mut new_thread, parse_bool(&value, "t")?, "t")?,
                 b"a" => set_once(&mut array, parse_bool(&value, "a")?, "a")?,
-                _ => return Err(invalid(format!("unexpected calculation-cell attribute '{raw}'"))),
+                _ => {
+                    return Err(invalid(format!(
+                        "unexpected calculation-cell attribute '{raw}'"
+                    )));
+                },
             }
         } else if matches!(namespace, ResolveResult::Unknown(_)) {
-            return Err(invalid(format!("unbound calculation-cell attribute '{raw}'")));
+            return Err(invalid(format!(
+                "unbound calculation-cell attribute '{raw}'"
+            )));
         } else {
             push_extension_attribute(&mut extension_attributes, raw, value)?;
         }
@@ -322,18 +493,30 @@ fn parse_cell(element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceRe
 }
 
 fn push_cell(chain: &mut CalculationChain, cell: CalculationCell) -> Result<()> {
-    if chain.cells.len() >= MAX_CELLS { return Err(invalid("calculation chain has too many cells")); }
+    if chain.cells.len() >= MAX_CELLS {
+        return Err(invalid("calculation chain has too many cells"));
+    }
     chain.cells.push(cell);
     Ok(())
 }
 
 fn consume_leaf(reader: &mut NsReader<&[u8]>, local: &[u8]) -> Result<()> {
     loop {
-        match reader.read_event().map_err(|error| OoxmlError::Xml(error.to_string()))? {
+        match reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        {
             Event::End(element) if element.local_name().as_ref() == local => return Ok(()),
-            Event::Text(text) if text.decode().map_err(|error| OoxmlError::Xml(error.to_string()))?.trim().is_empty() => {},
+            Event::Text(text)
+                if text
+                    .decode()
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty() => {},
             Event::Comment(_) => {},
-            Event::Start(_) | Event::Empty(_) | Event::CData(_) => return Err(invalid("calculation cell must be empty")),
+            Event::Start(_) | Event::Empty(_) | Event::CData(_) => {
+                return Err(invalid("calculation cell must be empty"));
+            },
             Event::Eof => return Err(invalid("unterminated calculation cell")),
             _ => return Err(invalid("invalid calculation-cell content")),
         }
@@ -344,18 +527,35 @@ fn consume_extension_list(reader: &mut NsReader<&[u8]>) -> Result<usize> {
     let mut depth = 1usize;
     let mut nodes = 0usize;
     while depth != 0 {
-        match reader.read_event().map_err(|error| OoxmlError::Xml(error.to_string()))? {
+        match reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        {
             Event::Start(_) => {
-                depth = depth.checked_add(1).ok_or_else(|| invalid("extension nesting overflow"))?;
-                nodes = nodes.checked_add(1).ok_or_else(|| invalid("extension node count overflow"))?;
-                if depth > MAX_EXTENSION_DEPTH || nodes > MAX_CELLS { return Err(invalid("calculation-chain extension is too complex")); }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("extension nesting overflow"))?;
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("extension node count overflow"))?;
+                if depth > MAX_EXTENSION_DEPTH || nodes > MAX_CELLS {
+                    return Err(invalid("calculation-chain extension is too complex"));
+                }
             },
             Event::Empty(_) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| invalid("extension node count overflow"))?;
-                if nodes > MAX_CELLS { return Err(invalid("calculation-chain extension has too many nodes")); }
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("extension node count overflow"))?;
+                if nodes > MAX_CELLS {
+                    return Err(invalid("calculation-chain extension has too many nodes"));
+                }
             },
             Event::End(_) => depth -= 1,
-            Event::DocType(_) | Event::PI(_) => return Err(invalid("DTD and processing instructions are rejected in extensions")),
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "DTD and processing instructions are rejected in extensions",
+                ));
+            },
             Event::Eof => return Err(invalid("unterminated calculation-chain extLst")),
             _ => {},
         }
@@ -364,64 +564,117 @@ fn consume_extension_list(reader: &mut NsReader<&[u8]>) -> Result<usize> {
 }
 
 fn validate_reference(value: &str) -> Result<()> {
-    if value.is_empty() || value.len() > MAX_REFERENCE_BYTES { return Err(invalid("calculation-cell reference has invalid length")); }
-    Cell::reference_to_coords(value).map(|_| ()).map_err(|error| invalid(error.to_string()))
+    if value.is_empty() || value.len() > MAX_REFERENCE_BYTES {
+        return Err(invalid("calculation-cell reference has invalid length"));
+    }
+    Cell::reference_to_coords(value)
+        .map(|_| ())
+        .map_err(|error| invalid(error.to_string()))
 }
 
 fn parse_i32(value: &str, name: &str) -> Result<i32> {
-    value.parse::<i32>().map_err(|_| invalid(format!("calculation-cell {name} is outside the signed 32-bit bound")))
+    value.parse::<i32>().map_err(|_| {
+        invalid(format!(
+            "calculation-cell {name} is outside the signed 32-bit bound"
+        ))
+    })
 }
 
 fn parse_bool(value: &str, name: &str) -> Result<bool> {
     match value {
         "1" | "true" => Ok(true),
         "0" | "false" => Ok(false),
-        _ => Err(invalid(format!("invalid calculation-cell {name} boolean '{value}'"))),
+        _ => Err(invalid(format!(
+            "invalid calculation-cell {name} boolean '{value}'"
+        ))),
     }
 }
 
 fn set_once<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {
-    if slot.replace(value).is_some() { return Err(invalid(format!("duplicate calculation-cell {name} attribute"))); }
+    if slot.replace(value).is_some() {
+        return Err(invalid(format!(
+            "duplicate calculation-cell {name} attribute"
+        )));
+    }
     Ok(())
 }
 
-fn push_extension_attribute(attributes: &mut Vec<CalculationChainExtensionAttribute>, qualified_name: String, value: String) -> Result<()> {
-    if attributes.len() >= MAX_EXTENSION_ATTRIBUTES { return Err(invalid("too many preserved calculation-chain attributes")); }
-    if attributes.iter().any(|attribute| attribute.qualified_name == qualified_name) { return Err(invalid(format!("duplicate preserved attribute '{qualified_name}'"))); }
-    attributes.push(CalculationChainExtensionAttribute { qualified_name, value });
+fn push_extension_attribute(
+    attributes: &mut Vec<CalculationChainExtensionAttribute>,
+    qualified_name: String,
+    value: String,
+) -> Result<()> {
+    if attributes.len() >= MAX_EXTENSION_ATTRIBUTES {
+        return Err(invalid("too many preserved calculation-chain attributes"));
+    }
+    if attributes
+        .iter()
+        .any(|attribute| attribute.qualified_name == qualified_name)
+    {
+        return Err(invalid(format!(
+            "duplicate preserved attribute '{qualified_name}'"
+        )));
+    }
+    attributes.push(CalculationChainExtensionAttribute {
+        qualified_name,
+        value,
+    });
     Ok(())
 }
 
-fn write_extension_attributes(xml: &mut String, attributes: &[CalculationChainExtensionAttribute]) -> Result<()> {
-    if attributes.len() > MAX_EXTENSION_ATTRIBUTES { return Err(invalid("too many preserved calculation-chain attributes")); }
+fn write_extension_attributes(
+    xml: &mut String,
+    attributes: &[CalculationChainExtensionAttribute],
+) -> Result<()> {
+    if attributes.len() > MAX_EXTENSION_ATTRIBUTES {
+        return Err(invalid("too many preserved calculation-chain attributes"));
+    }
     for attribute in attributes {
-        xml.push(' '); xml.push_str(&attribute.qualified_name); xml.push_str("=\""); escape_attribute(xml, &attribute.value); xml.push('"');
+        xml.push(' ');
+        xml.push_str(&attribute.qualified_name);
+        xml.push_str("=\"");
+        escape_attribute(xml, &attribute.value);
+        xml.push('"');
     }
     Ok(())
 }
 
 fn write_bool_attribute(xml: &mut String, name: &str, value: bool) {
-    xml.push(' '); xml.push_str(name); xml.push_str(if value { "=\"1\"" } else { "=\"0\"" });
+    xml.push(' ');
+    xml.push_str(name);
+    xml.push_str(if value { "=\"1\"" } else { "=\"0\"" });
 }
 
 fn escape_attribute(xml: &mut String, value: &str) {
     for character in value.chars() {
         match character {
-            '&' => xml.push_str("&amp;"), '<' => xml.push_str("&lt;"), '"' => xml.push_str("&quot;"),
-            '\t' => xml.push_str("&#x9;"), '\n' => xml.push_str("&#xA;"), '\r' => xml.push_str("&#xD;"),
+            '&' => xml.push_str("&amp;"),
+            '<' => xml.push_str("&lt;"),
+            '"' => xml.push_str("&quot;"),
+            '\t' => xml.push_str("&#x9;"),
+            '\n' => xml.push_str("&#xA;"),
+            '\r' => xml.push_str("&#xD;"),
             _ => xml.push(character),
         }
     }
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|_| invalid("calculation-chain XML offset overflow"))
+    usize::try_from(reader.buffer_position())
+        .map_err(|_| invalid("calculation-chain XML offset overflow"))
 }
 
 fn raw_range(bytes: &[u8], start: usize, end: usize) -> Result<String> {
-    if end < start || end - start > MAX_EXTENSION_BYTES { return Err(invalid("calculation-chain extension list is too large")); }
-    std::str::from_utf8(bytes.get(start..end).ok_or_else(|| invalid("invalid calculation-chain extension range"))?)
-        .map(str::to_owned).map_err(|error| invalid(format!("calculation-chain extension is not UTF-8: {error}")))
+    if end < start || end - start > MAX_EXTENSION_BYTES {
+        return Err(invalid("calculation-chain extension list is too large"));
+    }
+    std::str::from_utf8(
+        bytes
+            .get(start..end)
+            .ok_or_else(|| invalid("invalid calculation-chain extension range"))?,
+    )
+    .map(str::to_owned)
+    .map_err(|error| invalid(format!("calculation-chain extension is not UTF-8: {error}")))
 }
 
 #[cfg(test)]
@@ -447,29 +700,47 @@ mod tests {
         assert!(strict.contains("<extLst>"));
         let reparsed = parse_calculation_chain(strict.as_bytes()).unwrap();
         assert_eq!(reparsed.cells(), chain.cells());
-        assert_eq!(reparsed.to_xml(CalculationChainConformance::Strict).unwrap(), strict);
+        assert_eq!(
+            reparsed
+                .to_xml(CalculationChainConformance::Strict)
+                .unwrap(),
+            strict
+        );
     }
 
     #[test]
     fn preprocesses_mce_and_rejects_malformed_records() {
         let mce = br#"<calcChain xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><mc:AlternateContent><mc:Choice Requires="x"><x:c/></mc:Choice><mc:Fallback><c r="C3"/></mc:Fallback></mc:AlternateContent></calcChain>"#;
-        assert_eq!(parse_calculation_chain(mce).unwrap().cells()[0].reference(), "C3");
+        assert_eq!(
+            parse_calculation_chain(mce).unwrap().cells()[0].reference(),
+            "C3"
+        );
         let invalid = [
             format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"/>"#),
             format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c/></calcChain>"#),
             format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="XFE1"/></calcChain>"#),
             format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1" l="yes"/></calcChain>"#),
-            format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1" i="2147483648"/></calcChain>"#),
+            format!(
+                r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1" i="2147483648"/></calcChain>"#
+            ),
             format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><extLst/><c r="A1"/></calcChain>"#),
-            format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1"><c r="B1"/></c></calcChain>"#),
+            format!(
+                r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1"><c r="B1"/></c></calcChain>"#
+            ),
             format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1" bogus="1"/></calcChain>"#),
         ];
-        for xml in invalid { assert!(parse_calculation_chain(xml.as_bytes()).is_err(), "accepted {xml}"); }
+        for xml in invalid {
+            assert!(
+                parse_calculation_chain(xml.as_bytes()).is_err(),
+                "accepted {xml}"
+            );
+        }
     }
 
     #[test]
     fn loads_real_poi_and_synthetic_packages_and_validates_relationships() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..//3rdparty/poi/test-data/spreadsheet/62834.xlsx");
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..//3rdparty/poi/test-data/spreadsheet/62834.xlsx");
         let workbook = crate::xlsx::Workbook::open(path).unwrap();
         let chain = workbook.calculation_chain().unwrap();
         assert_eq!(chain.cells().len(), 3);
@@ -479,24 +750,55 @@ mod tests {
 
         let package = synthetic_package(RELATIONSHIP, false, CONTENT_TYPE, false);
         let workbook = crate::xlsx::Workbook::new(package).unwrap();
-        assert_eq!(workbook.calculation_chain().unwrap().cells()[0].reference(), "A1");
+        assert_eq!(
+            workbook.calculation_chain().unwrap().cells()[0].reference(),
+            "A1"
+        );
 
-        assert!(crate::xlsx::Workbook::new(synthetic_package(RELATIONSHIP, true, CONTENT_TYPE, false)).is_err());
-        assert!(crate::xlsx::Workbook::new(synthetic_package(RELATIONSHIP, false, ct::XML, false)).is_err());
-        assert!(crate::xlsx::Workbook::new(synthetic_package(RELATIONSHIP, false, CONTENT_TYPE, true)).is_err());
+        assert!(
+            crate::xlsx::Workbook::new(synthetic_package(RELATIONSHIP, true, CONTENT_TYPE, false))
+                .is_err()
+        );
+        assert!(
+            crate::xlsx::Workbook::new(synthetic_package(RELATIONSHIP, false, ct::XML, false))
+                .is_err()
+        );
+        assert!(
+            crate::xlsx::Workbook::new(synthetic_package(RELATIONSHIP, false, CONTENT_TYPE, true))
+                .is_err()
+        );
     }
 
-    fn synthetic_package(relationship_type: &str, external: bool, content_type: &str, outbound: bool) -> OpcPackage {
+    fn synthetic_package(
+        relationship_type: &str,
+        external: bool,
+        content_type: &str,
+        outbound: bool,
+    ) -> OpcPackage {
         let mut package = OpcPackage::new();
         let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
-        let mut workbook = BlobPart::new(workbook_uri.clone(), ct::SML_SHEET_MAIN.into(), format!(r#"<workbook xmlns="{TRANSITIONAL_NS}"><sheets/></workbook>"#).into_bytes());
-        if external { workbook.relate_to_ext("https://example.invalid/calcChain.xml", relationship_type); }
-        else { workbook.relate_to("calcChain.xml", relationship_type); }
+        let mut workbook = BlobPart::new(
+            workbook_uri.clone(),
+            ct::SML_SHEET_MAIN.into(),
+            format!(r#"<workbook xmlns="{TRANSITIONAL_NS}"><sheets/></workbook>"#).into_bytes(),
+        );
+        if external {
+            workbook.relate_to_ext("https://example.invalid/calcChain.xml", relationship_type);
+        } else {
+            workbook.relate_to("calcChain.xml", relationship_type);
+        }
         package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
         package.add_part(Box::new(workbook));
         if !external {
-            let mut chain = BlobPart::new(PackURI::new("/xl/calcChain.xml").unwrap(), content_type.into(), format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1" i="1"/></calcChain>"#).into_bytes());
-            if outbound { chain.relate_to("worksheets/sheet1.xml", rt::WORKSHEET); }
+            let mut chain = BlobPart::new(
+                PackURI::new("/xl/calcChain.xml").unwrap(),
+                content_type.into(),
+                format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="A1" i="1"/></calcChain>"#)
+                    .into_bytes(),
+            );
+            if outbound {
+                chain.relate_to("worksheets/sheet1.xml", rt::WORKSHEET);
+            }
             package.add_part(Box::new(chain));
         }
         package

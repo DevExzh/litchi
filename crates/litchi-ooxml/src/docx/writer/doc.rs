@@ -1,4 +1,5 @@
 /// Document writer implementation for DOCX.
+use crate::docx::alt_chunk::{AltChunk, AltChunkNamespace, scan_alt_chunks};
 use crate::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
 
@@ -90,6 +91,7 @@ impl CollectGlyphs for MutableDocument {
                 BodyElement::PreservedParagraph(_)
                 | BodyElement::PreservedTable(_)
                 | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAltChunk(_, _)
                 | BodyElement::PreservedOther(_) => continue,
             };
             for (font, bitmap) in element_glyphs {
@@ -209,6 +211,11 @@ impl MutableDocument {
     /// Create a mutable document from existing XML content.
     pub fn from_xml(xml: &str) -> Result<Self> {
         let parsed = DocumentBody::from_xml(xml)?;
+        parsed.body.validate_section_placement()?;
+        let section = parsed
+            .body
+            .final_section_properties()?
+            .unwrap_or_default();
         Ok(Self {
             body: parsed.body,
             toc_config: None,
@@ -219,7 +226,7 @@ impl MutableDocument {
             comments: Vec::new(),
             protection: None,
             protection_dirty: false,
-            section: SectionProperties::default(),
+            section,
             theme: None,
             watermark: None,
             modified: false,
@@ -239,6 +246,92 @@ impl MutableDocument {
     /// Get a reference to the section properties.
     pub fn section(&self) -> &SectionProperties {
         &self.section
+    }
+
+    /// Number of paragraph-level section breaks, excluding the body-final section.
+    pub fn section_break_count(&self) -> Result<usize> {
+        self.body.section_break_count()
+    }
+
+    /// Insert a section break at the end of the selected paragraph.
+    pub fn insert_section_break(
+        &mut self,
+        paragraph_index: usize,
+        properties: SectionProperties,
+    ) -> Result<()> {
+        properties.validate()?;
+        self.body.insert_section_break(paragraph_index, properties)?;
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Return an owned snapshot of a paragraph-level section break.
+    pub fn section_break(&self, index: usize) -> Result<SectionProperties> {
+        self.body.section_break(index)
+    }
+
+    /// Mutate a paragraph-level section break without rewriting unrelated paragraph XML.
+    pub fn update_section_break(
+        &mut self,
+        index: usize,
+        update: impl FnOnce(&mut SectionProperties),
+    ) -> Result<()> {
+        self.body.update_section_break(index, update)?;
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Remove and return a paragraph-level section break.
+    pub fn remove_section_break(&mut self, index: usize) -> Result<SectionProperties> {
+        let properties = self.body.remove_section_break(index)?;
+        self.modified = true;
+        Ok(properties)
+    }
+
+    /// Move a section break to the end of another paragraph.
+    pub fn move_section_break(
+        &mut self,
+        index: usize,
+        after_paragraph: usize,
+    ) -> Result<()> {
+        let properties = self.remove_section_break(index)?;
+        self.insert_section_break(after_paragraph, properties)
+    }
+
+    pub(crate) fn collect_section_header_footer_parts(
+        &self,
+    ) -> Result<Vec<(bool, super::section::SectionHeaderFooterPart)>> {
+        let mut parts = Vec::new();
+        collect_section_parts(&self.section, &mut parts)?;
+        self.body.collect_section_parts(&mut parts)?;
+        let mut unique: Vec<(bool, super::section::SectionHeaderFooterPart)> = Vec::new();
+        for (header, part) in parts {
+            if let Some((existing_header, existing)) =
+                unique.iter().find(|(_, existing)| existing.key == part.key)
+            {
+                if *existing_header != header || existing.xml != part.xml {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "section header/footer key {:?} has conflicting definitions",
+                        part.key
+                    )));
+                }
+            } else {
+                unique.push((header, part));
+            }
+        }
+        Ok(unique)
+    }
+
+    pub(crate) fn collect_explicit_section_header_footer_relationships(
+        &self,
+    ) -> Result<Vec<(String, bool)>> {
+        let mut relationships = Vec::new();
+        collect_explicit_section_relationships(&self.section, &mut relationships);
+        self.body
+            .collect_explicit_section_relationships(&mut relationships)?;
+        relationships.sort();
+        relationships.dedup();
+        Ok(relationships)
     }
 
     /// Add a new paragraph to the end of the document.
@@ -968,6 +1061,49 @@ impl MutableDocument {
         self.body.table(index)
     }
 
+    /// Return the direct alternative-format anchors in body order.
+    pub fn alt_chunks(&self) -> Vec<AltChunk> {
+        self.body.alt_chunks()
+    }
+
+    /// Insert an alternative-format anchor at an anchor-relative index.
+    pub fn insert_alt_chunk(
+        &mut self,
+        index: usize,
+        chunk: AltChunk,
+        namespace: AltChunkNamespace,
+    ) -> Result<()> {
+        self.body.insert_alt_chunk(index, chunk, namespace)?;
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Replace an alternative-format anchor without disturbing adjacent XML.
+    pub fn replace_alt_chunk(
+        &mut self,
+        index: usize,
+        chunk: AltChunk,
+        namespace: AltChunkNamespace,
+    ) -> Result<AltChunk> {
+        let old = self.body.replace_alt_chunk(index, chunk, namespace)?;
+        self.modified = true;
+        Ok(old)
+    }
+
+    /// Remove an alternative-format anchor.
+    pub fn remove_alt_chunk(&mut self, index: usize) -> Result<AltChunk> {
+        let old = self.body.remove_alt_chunk(index)?;
+        self.modified = true;
+        Ok(old)
+    }
+
+    /// Move an alternative-format anchor to another anchor-relative index.
+    pub fn move_alt_chunk(&mut self, from: usize, to: usize) -> Result<()> {
+        self.body.move_alt_chunk(from, to)?;
+        self.modified = true;
+        Ok(())
+    }
+
     /// Serialize the document to XML.
     pub fn to_xml(&self) -> Result<String> {
         let mut xml = String::with_capacity(4096);
@@ -975,7 +1111,7 @@ impl MutableDocument {
         let preserve_section = !self.section_dirty && self.body.has_preserved_section();
         self.body.write_contents(&mut xml, preserve_section)?;
         if !preserve_section {
-            Self::write_default_section_properties(&mut xml);
+            self.section.write_xml(&mut xml, None)?;
         }
         self.write_document_suffix(&mut xml);
         Ok(xml)
@@ -1023,86 +1159,13 @@ impl MutableDocument {
         }
     }
 
-    fn write_default_section_properties(xml: &mut String) {
-        xml.push_str("<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/>");
-        xml.push_str(
-            "<w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\"/>",
-        );
-        xml.push_str("</w:sectPr>");
-    }
-
     /// Generate section properties XML including header/footer/footnote/endnote references.
     fn generate_section_properties(
         &self,
         xml: &mut String,
         rel_mapper: &super::relmap::RelationshipMapper,
     ) -> Result<()> {
-        xml.push_str("<w:sectPr>");
-
-        // IMPORTANT: Element order MUST follow OOXML spec (ISO/IEC 29500)
-        // Microsoft Word strictly enforces this ordering!
-
-        // 1. Add header reference if present (must come before footnotePr)
-        if let Some(header_id) = rel_mapper.get_header_id() {
-            write!(
-                xml,
-                r#"<w:headerReference w:type="default" r:id="{}"/>"#,
-                header_id
-            )
-            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-        }
-
-        // 2. Add footer reference if present (must come before footnotePr)
-        if let Some(footer_id) = rel_mapper.get_footer_id() {
-            write!(
-                xml,
-                r#"<w:footerReference w:type="default" r:id="{}"/>"#,
-                footer_id
-            )
-            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-        }
-
-        // 3. Add footnote properties if present
-        if rel_mapper.get_footnotes_id().is_some() {
-            write!(
-                xml,
-                r#"<w:footnotePr><w:numFmt w:val="decimal"/></w:footnotePr>"#
-            )
-            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-        }
-
-        // 4. Add endnote properties if present
-        if rel_mapper.get_endnotes_id().is_some() {
-            write!(
-                xml,
-                r#"<w:endnotePr><w:numFmt w:val="decimal"/></w:endnotePr>"#
-            )
-            .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-        }
-
-        // Add page size and margins
-        write!(
-            xml,
-            r#"<w:pgSz w:w="{}" w:h="{}" w:orient="{}"/>"#,
-            self.section.page_width,
-            self.section.page_height,
-            self.section.orientation.as_str()
-        )
-        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-
-        write!(
-            xml,
-            r#"<w:pgMar w:top="{}" w:right="{}" w:bottom="{}" w:left="{}" w:header="{}" w:footer="{}"/>"#,
-            self.section.margin_top,
-            self.section.margin_right,
-            self.section.margin_bottom,
-            self.section.margin_left,
-            self.section.header_distance,
-            self.section.footer_distance
-        ).map_err(|e| OoxmlError::Xml(e.to_string()))?;
-
-        xml.push_str("</w:sectPr>");
-        Ok(())
+        self.section.write_xml(xml, Some(rel_mapper))
     }
 }
 
@@ -1413,6 +1476,7 @@ enum PreservedBodyKind {
     Paragraph,
     Table,
     SectionProperties,
+    AltChunk,
     Other,
 }
 
@@ -1647,6 +1711,98 @@ impl DocumentBody {
             .unwrap_or(self.elements.len())
     }
 
+    fn alt_chunk_positions(&self) -> Vec<usize> {
+        self.elements
+            .iter()
+            .enumerate()
+            .filter_map(|(index, element)| {
+                matches!(element, BodyElement::PreservedAltChunk(_, _)).then_some(index)
+            })
+            .collect()
+    }
+
+    fn alt_chunks(&self) -> Vec<AltChunk> {
+        self.elements
+            .iter()
+            .filter_map(|element| match element {
+                BodyElement::PreservedAltChunk(_, chunk) => Some(chunk.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn insert_alt_chunk(
+        &mut self,
+        index: usize,
+        chunk: AltChunk,
+        namespace: AltChunkNamespace,
+    ) -> Result<()> {
+        let positions = self.alt_chunk_positions();
+        if index > positions.len() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "altChunk index {index} is out of range"
+            )));
+        }
+        let position = positions
+            .get(index)
+            .copied()
+            .unwrap_or_else(|| self.content_insertion_index());
+        let xml = chunk.to_xml(namespace);
+        self.elements
+            .insert(position, BodyElement::PreservedAltChunk(xml, chunk));
+        Ok(())
+    }
+
+    fn replace_alt_chunk(
+        &mut self,
+        index: usize,
+        chunk: AltChunk,
+        namespace: AltChunkNamespace,
+    ) -> Result<AltChunk> {
+        let position = self.alt_chunk_positions().get(index).copied().ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
+        })?;
+        let xml = chunk.to_xml(namespace);
+        match std::mem::replace(
+            &mut self.elements[position],
+            BodyElement::PreservedAltChunk(xml, chunk),
+        ) {
+            BodyElement::PreservedAltChunk(_, old) => Ok(old),
+            _ => unreachable!(),
+        }
+    }
+
+    fn remove_alt_chunk(&mut self, index: usize) -> Result<AltChunk> {
+        let position = self.alt_chunk_positions().get(index).copied().ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
+        })?;
+        match self.elements.remove(position) {
+            BodyElement::PreservedAltChunk(_, chunk) => Ok(chunk),
+            _ => unreachable!(),
+        }
+    }
+
+    fn move_alt_chunk(&mut self, from: usize, to: usize) -> Result<()> {
+        let count = self.alt_chunk_positions().len();
+        if from >= count || to >= count {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "altChunk move {from} -> {to} is out of range"
+            )));
+        }
+        if from == to {
+            return Ok(());
+        }
+        let source = self.alt_chunk_positions()[from];
+        let element = self.elements.remove(source);
+        let remaining = self.alt_chunk_positions();
+        let destination = remaining
+            .get(to)
+            .copied()
+            .unwrap_or_else(|| self.content_insertion_index());
+        self.elements.insert(destination, element);
+        Ok(())
+    }
+
     fn paragraph_count(&self) -> usize {
         self.elements
             .iter()
@@ -1722,7 +1878,8 @@ impl DocumentBody {
                 BodyElement::Table(t) => t.to_xml(xml)?,
                 BodyElement::PreservedParagraph(raw)
                 | BodyElement::PreservedTable(raw)
-                | BodyElement::PreservedOther(raw) => xml.push_str(raw),
+                | BodyElement::PreservedOther(raw)
+                | BodyElement::PreservedAltChunk(raw, _) => xml.push_str(raw),
                 BodyElement::PreservedSectionProperties(raw) if preserve_section => {
                     xml.push_str(raw);
                 },
@@ -1736,6 +1893,254 @@ impl DocumentBody {
         self.elements
             .iter()
             .any(|element| matches!(element, BodyElement::PreservedSectionProperties(_)))
+    }
+
+    fn final_section_properties(&self) -> Result<Option<SectionProperties>> {
+        self.elements
+            .iter()
+            .find_map(|element| match element {
+                BodyElement::PreservedSectionProperties(raw) => Some(SectionProperties::from_xml(raw)),
+                _ => None,
+            })
+            .transpose()
+    }
+
+    fn validate_section_placement(&self) -> Result<()> {
+        let mut final_section = None;
+        for (index, element) in self.elements.iter().enumerate() {
+            match element {
+                BodyElement::PreservedSectionProperties(raw) => {
+                    if final_section.replace(index).is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "document body contains multiple final section properties".to_string(),
+                        ));
+                    }
+                    SectionProperties::from_xml(raw)?;
+                },
+                BodyElement::PreservedParagraph(raw) => {
+                    paragraph_section_range(raw)?;
+                },
+                _ => {},
+            }
+        }
+        if let Some(index) = final_section
+            && self.elements[index + 1..].iter().any(|element| {
+                !matches!(element, BodyElement::PreservedOther(raw) if raw.trim().is_empty())
+            })
+        {
+            return Err(OoxmlError::InvalidFormat(
+                "body-final section properties are not the final body child".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn section_break_count(&self) -> Result<usize> {
+        let mut count = 0usize;
+        for element in &self.elements {
+            match element {
+                BodyElement::Paragraph(paragraph) if paragraph.properties.section.is_some() => {
+                    count += 1;
+                },
+                BodyElement::PreservedParagraph(raw) if paragraph_section_range(raw)?.is_some() => {
+                    count += 1;
+                },
+                _ => {},
+            }
+        }
+        Ok(count)
+    }
+
+    fn insert_section_break(
+        &mut self,
+        paragraph_index: usize,
+        properties: SectionProperties,
+    ) -> Result<()> {
+        let element = self.paragraph_element_mut(paragraph_index).ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!("paragraph index {paragraph_index} is out of range"))
+        })?;
+        match element {
+            BodyElement::Paragraph(paragraph) => {
+                if paragraph.properties.section.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "paragraph already ends a section".to_string(),
+                    ));
+                }
+                paragraph.set_section_break(properties)
+            },
+            BodyElement::PreservedParagraph(raw) => {
+                if paragraph_section_range(raw)?.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "paragraph already ends a section".to_string(),
+                    ));
+                }
+                let mut section_xml = String::new();
+                properties.write_xml(&mut section_xml, None)?;
+                *raw = insert_paragraph_property(raw, &section_xml)?;
+                Ok(())
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    fn section_break(&self, index: usize) -> Result<SectionProperties> {
+        let mut current = 0usize;
+        for element in &self.elements {
+            match element {
+                BodyElement::Paragraph(paragraph) => {
+                    if let Some(section) = &paragraph.properties.section {
+                        if current == index {
+                            return Ok(section.clone());
+                        }
+                        current += 1;
+                    }
+                },
+                BodyElement::PreservedParagraph(raw) => {
+                    if let Some((start, end)) = paragraph_section_range(raw)? {
+                        if current == index {
+                            return SectionProperties::from_xml(&raw[start..end]);
+                        }
+                        current += 1;
+                    }
+                },
+                _ => {},
+            }
+        }
+        Err(OoxmlError::InvalidFormat(format!(
+            "section break index {index} is out of range"
+        )))
+    }
+
+    fn update_section_break(
+        &mut self,
+        index: usize,
+        update: impl FnOnce(&mut SectionProperties),
+    ) -> Result<()> {
+        let mut current = 0usize;
+        let mut update = Some(update);
+        for element in &mut self.elements {
+            match element {
+                BodyElement::Paragraph(paragraph) => {
+                    if let Some(section) = paragraph.properties.section.as_mut() {
+                        if current == index {
+                            update.take().expect("called once")(section);
+                            return section.validate();
+                        }
+                        current += 1;
+                    }
+                },
+                BodyElement::PreservedParagraph(raw) => {
+                    if let Some((start, end)) = paragraph_section_range(raw)? {
+                        if current == index {
+                            let mut section = SectionProperties::from_xml(&raw[start..end])?;
+                            update.take().expect("called once")(&mut section);
+                            section.validate()?;
+                            let mut replacement = String::new();
+                            section.write_xml(&mut replacement, None)?;
+                            raw.replace_range(start..end, &replacement);
+                            return Ok(());
+                        }
+                        current += 1;
+                    }
+                },
+                _ => {},
+            }
+        }
+        Err(OoxmlError::InvalidFormat(format!(
+            "section break index {index} is out of range"
+        )))
+    }
+
+    fn remove_section_break(&mut self, index: usize) -> Result<SectionProperties> {
+        let mut current = 0usize;
+        for element in &mut self.elements {
+            match element {
+                BodyElement::Paragraph(paragraph) => {
+                    if paragraph.properties.section.is_some() {
+                        if current == index {
+                            return paragraph.remove_section_break().ok_or_else(|| {
+                                OoxmlError::InvalidFormat("section break disappeared".to_string())
+                            });
+                        }
+                        current += 1;
+                    }
+                },
+                BodyElement::PreservedParagraph(raw) => {
+                    if let Some((start, end)) = paragraph_section_range(raw)? {
+                        if current == index {
+                            let section = SectionProperties::from_xml(&raw[start..end])?;
+                            raw.replace_range(start..end, "");
+                            return Ok(section);
+                        }
+                        current += 1;
+                    }
+                },
+                _ => {},
+            }
+        }
+        Err(OoxmlError::InvalidFormat(format!(
+            "section break index {index} is out of range"
+        )))
+    }
+
+    fn paragraph_element_mut(&mut self, index: usize) -> Option<&mut BodyElement> {
+        let mut current = 0usize;
+        for element in &mut self.elements {
+            if matches!(element, BodyElement::Paragraph(_) | BodyElement::PreservedParagraph(_)) {
+                if current == index {
+                    return Some(element);
+                }
+                current += 1;
+            }
+        }
+        None
+    }
+
+    fn collect_section_parts(
+        &self,
+        parts: &mut Vec<(bool, super::section::SectionHeaderFooterPart)>,
+    ) -> Result<()> {
+        for element in &self.elements {
+            match element {
+                BodyElement::Paragraph(paragraph) => {
+                    if let Some(section) = &paragraph.properties.section {
+                        collect_section_parts(section, parts)?;
+                    }
+                },
+                BodyElement::PreservedParagraph(raw) => {
+                    if let Some((start, end)) = paragraph_section_range(raw)? {
+                        collect_section_parts(&SectionProperties::from_xml(&raw[start..end])?, parts)?;
+                    }
+                },
+                _ => {},
+            }
+        }
+        Ok(())
+    }
+
+    fn collect_explicit_section_relationships(
+        &self,
+        relationships: &mut Vec<(String, bool)>,
+    ) -> Result<()> {
+        for element in &self.elements {
+            match element {
+                BodyElement::Paragraph(paragraph) => {
+                    if let Some(section) = &paragraph.properties.section {
+                        collect_explicit_section_relationships(section, relationships);
+                    }
+                },
+                BodyElement::PreservedParagraph(raw) => {
+                    if let Some((start, end)) = paragraph_section_range(raw)? {
+                        collect_explicit_section_relationships(
+                            &SectionProperties::from_xml(&raw[start..end])?,
+                            relationships,
+                        );
+                    }
+                },
+                _ => {},
+            }
+        }
+        Ok(())
     }
 
     /// Generate XML with actual relationship IDs from the mapper.
@@ -1762,7 +2167,8 @@ impl DocumentBody {
                 BodyElement::Table(t) => t.to_xml(xml)?, // Tables don't need rel mapping for now
                 BodyElement::PreservedParagraph(raw)
                 | BodyElement::PreservedTable(raw)
-                | BodyElement::PreservedOther(raw) => xml.push_str(raw),
+                | BodyElement::PreservedOther(raw)
+                | BodyElement::PreservedAltChunk(raw, _) => xml.push_str(raw),
                 BodyElement::PreservedSectionProperties(raw) if preserve_section => {
                     xml.push_str(raw);
                 },
@@ -1771,6 +2177,135 @@ impl DocumentBody {
         }
         Ok(())
     }
+}
+
+fn collect_section_parts(
+    section: &SectionProperties,
+    parts: &mut Vec<(bool, super::section::SectionHeaderFooterPart)>,
+) -> Result<()> {
+    section.validate()?;
+    for reference in &section.headers {
+        if let Some(part) = &reference.part {
+            parts.push((true, part.clone()));
+        }
+    }
+    for reference in &section.footers {
+        if let Some(part) = &reference.part {
+            parts.push((false, part.clone()));
+        }
+    }
+    Ok(())
+}
+
+fn collect_explicit_section_relationships(
+    section: &SectionProperties,
+    relationships: &mut Vec<(String, bool)>,
+) {
+    for reference in &section.headers {
+        if let Some(id) = &reference.relationship_id {
+            relationships.push((id.clone(), true));
+        }
+    }
+    for reference in &section.footers {
+        if let Some(id) = &reference.relationship_id {
+            relationships.push((id.clone(), false));
+        }
+    }
+}
+
+fn word_ranges(xml: &str, target: &[u8]) -> Result<Vec<(usize, usize)>> {
+    let mut ranges = Vec::new();
+    crate::docx::namespace::scan_word_element_ranges(
+        xml.as_bytes(),
+        &[target],
+        |_, start, length| {
+            let start = usize::try_from(start)
+                .map_err(|_| OoxmlError::InvalidFormat("Word range overflow".to_string()))?;
+            let length = usize::try_from(length)
+                .map_err(|_| OoxmlError::InvalidFormat("Word range overflow".to_string()))?;
+            ranges.push((start, start + length));
+            Ok(())
+        },
+    )?;
+    Ok(ranges)
+}
+
+fn paragraph_section_range(xml: &str) -> Result<Option<(usize, usize)>> {
+    let sections = word_ranges(xml, b"sectPr")?;
+    if sections.len() > 1 {
+        return Err(OoxmlError::InvalidFormat(
+            "paragraph contains multiple section properties".to_string(),
+        ));
+    }
+    let Some(section) = sections.first().copied() else {
+        return Ok(None);
+    };
+    let properties = word_ranges(xml, b"pPr")?;
+    if properties.len() != 1 || section.0 < properties[0].0 || section.1 > properties[0].1 {
+        return Err(OoxmlError::InvalidFormat(
+            "paragraph section properties must be inside one pPr".to_string(),
+        ));
+    }
+    let close = xml[..properties[0].1].rfind("</").unwrap_or(properties[0].1);
+    if !xml[section.1..close].trim().is_empty() {
+        return Err(OoxmlError::InvalidFormat(
+            "paragraph section properties must be the final pPr child".to_string(),
+        ));
+    }
+    SectionProperties::from_xml(&xml[section.0..section.1])?;
+    Ok(Some(section))
+}
+
+fn insert_paragraph_property(xml: &str, property: &str) -> Result<String> {
+    let properties = word_ranges(xml, b"pPr")?;
+    if properties.len() > 1 {
+        return Err(OoxmlError::InvalidFormat(
+            "paragraph contains multiple pPr elements".to_string(),
+        ));
+    }
+    if let Some((start, end)) = properties.first().copied() {
+        if xml[start..end].trim_end().ends_with("/>") {
+            let empty_end = xml[..end].rfind("/>").ok_or_else(|| {
+                OoxmlError::InvalidFormat("invalid empty paragraph properties".to_string())
+            })?;
+            let name_end = xml[start + 1..]
+                .find(|ch: char| ch.is_whitespace() || ch == '/' || ch == '>')
+                .map(|offset| start + 1 + offset)
+                .ok_or_else(|| OoxmlError::InvalidFormat("invalid pPr name".to_string()))?;
+            let name = &xml[start + 1..name_end];
+            return Ok(format!(
+                "{}>{property}</{name}>{}",
+                &xml[..empty_end],
+                &xml[end..]
+            ));
+        }
+        let close = xml[..end].rfind("</").ok_or_else(|| {
+            OoxmlError::InvalidFormat("paragraph properties are not closed".to_string())
+        })?;
+        return Ok(format!("{}{property}{}", &xml[..close], &xml[close..]));
+    }
+
+    let open_end = xml.find('>').ok_or_else(|| {
+        OoxmlError::InvalidFormat("paragraph opening element is missing".to_string())
+    })?;
+    if xml[..=open_end].trim_end().ends_with("/>") {
+        let empty_end = xml[..=open_end].rfind("/>").expect("checked");
+        let name_end = xml[1..]
+            .find(|ch: char| ch.is_whitespace() || ch == '/' || ch == '>')
+            .map(|offset| 1 + offset)
+            .ok_or_else(|| OoxmlError::InvalidFormat("invalid paragraph name".to_string()))?;
+        let name = &xml[1..name_end];
+        return Ok(format!(
+            "{}><w:pPr>{property}</w:pPr></{name}>{}",
+            &xml[..empty_end],
+            &xml[open_end + 1..]
+        ));
+    }
+    Ok(format!(
+        "{}<w:pPr>{property}</w:pPr>{}",
+        &xml[..=open_end],
+        &xml[open_end + 1..]
+    ))
 }
 
 fn preserved_body_kind(
@@ -1782,6 +2317,7 @@ fn preserved_body_kind(
             b"p" => PreservedBodyKind::Paragraph,
             b"tbl" => PreservedBodyKind::Table,
             b"sectPr" => PreservedBodyKind::SectionProperties,
+            b"altChunk" => PreservedBodyKind::AltChunk,
             _ => PreservedBodyKind::Other,
         };
     }
@@ -1878,6 +2414,33 @@ fn push_raw_body_xml(
         PreservedBodyKind::Paragraph => BodyElement::PreservedParagraph(raw_xml),
         PreservedBodyKind::Table => BodyElement::PreservedTable(raw_xml),
         PreservedBodyKind::SectionProperties => BodyElement::PreservedSectionProperties(raw_xml),
+        PreservedBodyKind::AltChunk => {
+            let namespace_pairs = [
+                (
+                    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+                ),
+                (
+                    "http://purl.oclc.org/ooxml/wordprocessingml/main",
+                    "http://purl.oclc.org/ooxml/officeDocument/relationships",
+                ),
+            ];
+            let parsed = namespace_pairs.into_iter().find_map(|(word, relationship)| {
+                let wrapped = format!(
+                    r#"<root xmlns:w="{word}" xmlns:r="{relationship}">{raw_xml}</root>"#
+                );
+                let mut chunks = scan_alt_chunks(wrapped.as_bytes()).ok()?;
+                (chunks.len() == 1).then(|| chunks.pop_first().expect("length checked").1)
+            });
+            BodyElement::PreservedAltChunk(
+                raw_xml,
+                parsed.ok_or_else(|| {
+                    OoxmlError::InvalidFormat(
+                        "direct altChunk body child did not parse as one anchor".to_string(),
+                    )
+                })?,
+            )
+        },
         PreservedBodyKind::Other => BodyElement::PreservedOther(raw_xml),
     });
     Ok(())
@@ -1891,6 +2454,7 @@ pub(crate) enum BodyElement {
     PreservedParagraph(String),
     PreservedTable(String),
     PreservedSectionProperties(String),
+    PreservedAltChunk(String, AltChunk),
     PreservedOther(String),
 }
 

@@ -7,6 +7,7 @@ use std::fmt::Write as FmtWrite;
 pub use super::super::format::UnderlineStyle;
 // Import section types for PageNumberFormat
 use super::section::PageNumberFormat;
+use super::revision::{RevisionMetadata, RevisionTextMode, RunPropertyChange};
 
 /// Run content type.
 #[derive(Debug, Clone)]
@@ -30,12 +31,13 @@ pub enum RunContent {
 /// A mutable run.
 ///
 /// Runs contain text and character formatting.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableRun {
     /// Run content
     pub(crate) content: RunContent,
     /// Run properties
     pub(crate) properties: RunProperties,
+    pub(crate) property_change: Option<RunPropertyChange>,
 }
 
 #[cfg(feature = "fonts")]
@@ -72,6 +74,7 @@ impl MutableRun {
         Self {
             content: RunContent::Text(String::new()),
             properties: RunProperties::default(),
+            property_change: None,
         }
     }
 
@@ -172,11 +175,21 @@ impl MutableRun {
         self
     }
 
-    pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
+    /// Record the run properties that existed before this formatting revision.
+    pub fn set_property_change(
+        &mut self,
+        metadata: RevisionMetadata,
+        previous: &MutableRun,
+    ) -> &mut Self {
+        self.property_change = Some(RunPropertyChange::snapshot(metadata, previous));
+        self
+    }
+
+    pub(crate) fn to_xml_mode(&self, xml: &mut String, mode: RevisionTextMode) -> Result<()> {
         xml.push_str("<w:r>");
 
         // Write run properties
-        if self.properties.has_properties() {
+        if self.properties.has_properties() || self.property_change.is_some() {
             xml.push_str("<w:rPr>");
 
             if let Some(bold) = self.properties.bold
@@ -229,17 +242,18 @@ impl MutableRun {
                 xml.push_str("<w:webHidden/>");
             }
 
+            if let Some(change) = &self.property_change {
+                change.write_xml(xml)?;
+            }
+
             xml.push_str("</w:rPr>");
         }
 
         // Write content based on type
         match &self.content {
             RunContent::Text(text) if !text.is_empty() => {
-                write!(
-                    xml,
-                    "<w:t xml:space=\"preserve\">{}</w:t>",
-                    escape_xml(text)
-                )
+                let name = if mode == RevisionTextMode::Deleted { "delText" } else { "t" };
+                write!(xml, "<w:{name} xml:space=\"preserve\">{}</w:{name}>", escape_xml(text))
                 .map_err(|e| OoxmlError::Xml(e.to_string()))?;
             },
             RunContent::PageNumber(format) => {
@@ -255,11 +269,8 @@ impl MutableRun {
                     xml.push_str("</w:rPr>");
                 }
                 // Field instruction
-                write!(
-                    xml,
-                    "<w:instrText xml:space=\"preserve\">PAGE \\* {}</w:instrText></w:r><w:r>",
-                    format.as_str()
-                )
+                let name = if mode == RevisionTextMode::Deleted { "delInstrText" } else { "instrText" };
+                write!(xml, "<w:{name} xml:space=\"preserve\">PAGE \\* {}</w:{name}></w:r><w:r>", format.as_str())
                 .map_err(|e| OoxmlError::Xml(e.to_string()))?;
                 // Field separate
                 xml.push_str("<w:fldChar w:fldCharType=\"separate\"/></w:r><w:r>");
@@ -273,7 +284,7 @@ impl MutableRun {
                     xml.push_str("</w:rPr>");
                 }
                 // Placeholder text
-                xml.push_str("<w:t>1</w:t></w:r><w:r>");
+                if mode == RevisionTextMode::Deleted { xml.push_str("<w:delText>1</w:delText></w:r><w:r>"); } else { xml.push_str("<w:t>1</w:t></w:r><w:r>"); }
                 // Field end
                 xml.push_str("<w:fldChar w:fldCharType=\"end\"/>");
             },
@@ -288,9 +299,7 @@ impl MutableRun {
                     }
                     xml.push_str("</w:rPr>");
                 }
-                xml.push_str(
-                    "<w:instrText xml:space=\"preserve\">NUMPAGES</w:instrText></w:r><w:r>",
-                );
+                if mode == RevisionTextMode::Deleted { xml.push_str("<w:delInstrText xml:space=\"preserve\">NUMPAGES</w:delInstrText></w:r><w:r>"); } else { xml.push_str("<w:instrText xml:space=\"preserve\">NUMPAGES</w:instrText></w:r><w:r>"); }
                 xml.push_str("<w:fldChar w:fldCharType=\"separate\"/></w:r><w:r>");
                 if self.properties.has_properties() {
                     xml.push_str("<w:rPr>");
@@ -301,7 +310,7 @@ impl MutableRun {
                     }
                     xml.push_str("</w:rPr>");
                 }
-                xml.push_str("<w:t>1</w:t></w:r><w:r>");
+                if mode == RevisionTextMode::Deleted { xml.push_str("<w:delText>1</w:delText></w:r><w:r>"); } else { xml.push_str("<w:t>1</w:t></w:r><w:r>"); }
                 xml.push_str("<w:fldChar w:fldCharType=\"end\"/>");
             },
             RunContent::Tab => {
@@ -333,7 +342,7 @@ impl MutableRun {
 }
 
 /// Run properties.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct RunProperties {
     pub(crate) bold: Option<bool>,
     pub(crate) italic: Option<bool>,
@@ -358,5 +367,18 @@ impl RunProperties {
             || self.highlight.is_some()
             || self.no_proof
             || self.web_hidden
+    }
+
+    pub(crate) fn write_values(&self, xml: &mut String) -> Result<()> {
+        if self.bold == Some(true) { xml.push_str("<w:b/>"); }
+        if self.italic == Some(true) { xml.push_str("<w:i/>"); }
+        if let Some(v) = self.underline { write!(xml, "<w:u w:val=\"{}\"/>", v.as_str())?; }
+        if let Some(v) = self.font_size { write!(xml, "<w:sz w:val=\"{v}\"/>")?; }
+        if let Some(v) = &self.font_name { write!(xml, "<w:rFonts w:ascii=\"{}\" w:hAnsi=\"{}\"/>", escape_xml(v), escape_xml(v))?; }
+        if let Some(v) = &self.color { write!(xml, "<w:color w:val=\"{}\"/>", escape_xml(v))?; }
+        if let Some(v) = &self.highlight { write!(xml, "<w:highlight w:val=\"{}\"/>", escape_xml(v))?; }
+        if self.no_proof { xml.push_str("<w:noProof/>"); }
+        if self.web_hidden { xml.push_str("<w:webHidden/>"); }
+        Ok(())
     }
 }

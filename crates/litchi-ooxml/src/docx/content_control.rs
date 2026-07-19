@@ -4,6 +4,7 @@
 /// specific types of content (text, dates, lists, etc.).
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
+use crate::custom_xml_data::is_st_guid;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -183,6 +184,24 @@ impl ContentControl {
         self.data_binding_prefix_mappings.as_deref()
     }
 
+    /// Validate binding metadata without evaluating the XPath or resolving URIs.
+    pub fn validate_data_binding(&self) -> Result<()> {
+        match (
+            self.data_binding_xpath.as_deref(),
+            self.data_binding_store_item_id.as_deref(),
+        ) {
+            (None, None) => Ok(()),
+            (Some(xpath), Some(store_item_id)) => validate_data_binding_values(
+                xpath,
+                store_item_id,
+                self.data_binding_prefix_mappings.as_deref(),
+            ),
+            _ => Err(OoxmlError::InvalidFormat(
+                "content-control data binding is incomplete".to_string(),
+            )),
+        }
+    }
+
     /// Get the display text and values declared by a list control.
     #[inline]
     pub fn list_items(&self) -> &[(String, String)] {
@@ -325,6 +344,100 @@ impl ContentControl {
 
         Ok(controls)
     }
+}
+
+/// Validate the lexical form of an SDT data binding without executing XPath.
+pub fn validate_data_binding_values(
+    xpath: &str,
+    store_item_id: &str,
+    prefix_mappings: Option<&str>,
+) -> Result<()> {
+    const MAX_BINDING_BYTES: usize = 64 * 1024;
+    if xpath.is_empty()
+        || xpath.len() > MAX_BINDING_BYTES
+        || xpath.chars().any(|character| character == '\0' || character.is_control() && !character.is_whitespace())
+    {
+        return Err(OoxmlError::InvalidFormat(
+            "content-control XPath is empty or exceeds lexical limits".to_string(),
+        ));
+    }
+    if !is_st_guid(store_item_id) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "content-control storeItemID '{store_item_id}' is not ST_Guid"
+        )));
+    }
+    let Some(mut remaining) = prefix_mappings else {
+        return Ok(());
+    };
+    if remaining.len() > MAX_BINDING_BYTES {
+        return Err(OoxmlError::InvalidFormat(
+            "content-control prefixMappings exceeds lexical limits".to_string(),
+        ));
+    }
+    let mut prefixes = std::collections::HashSet::new();
+    while !remaining.trim_start().is_empty() {
+        remaining = remaining.trim_start();
+        let after_xmlns = remaining.strip_prefix("xmlns").ok_or_else(|| {
+            OoxmlError::InvalidFormat("prefixMappings requires xmlns declarations".to_string())
+        })?;
+        let (prefix, after_prefix) = if let Some(after_colon) = after_xmlns.strip_prefix(':') {
+            let end = after_colon.find('=').ok_or_else(|| {
+                OoxmlError::InvalidFormat("prefixMappings declaration has no '='".to_string())
+            })?;
+            let prefix = &after_colon[..end];
+            if prefix.is_empty()
+                || !prefix.bytes().enumerate().all(|(index, byte)| {
+                    byte.is_ascii_alphabetic()
+                        || byte == b'_'
+                        || index > 0 && (byte.is_ascii_digit() || matches!(byte, b'.' | b'-'))
+                })
+            {
+                return Err(OoxmlError::InvalidFormat(
+                    "prefixMappings contains an invalid namespace prefix".to_string(),
+                ));
+            }
+            (prefix, &after_colon[end..])
+        } else {
+            ("", after_xmlns)
+        };
+        if !prefixes.insert(prefix.to_string()) {
+            return Err(OoxmlError::InvalidFormat(
+                "prefixMappings contains a duplicate namespace prefix".to_string(),
+            ));
+        }
+        let after_equals = after_prefix.strip_prefix('=').ok_or_else(|| {
+            OoxmlError::InvalidFormat("prefixMappings declaration has no '='".to_string())
+        })?;
+        let quote = after_equals.as_bytes().first().copied().ok_or_else(|| {
+            OoxmlError::InvalidFormat("prefixMappings declaration has no URI".to_string())
+        })?;
+        if !matches!(quote, b'\'' | b'"') {
+            return Err(OoxmlError::InvalidFormat(
+                "prefixMappings URI must be quoted".to_string(),
+            ));
+        }
+        let quoted = &after_equals[1..];
+        let end = quoted.find(quote as char).ok_or_else(|| {
+            OoxmlError::InvalidFormat("prefixMappings URI quote is not closed".to_string())
+        })?;
+        if quoted[..end].is_empty() {
+            return Err(OoxmlError::InvalidFormat(
+                "prefixMappings namespace URI must not be empty".to_string(),
+            ));
+        }
+        remaining = &quoted[end + 1..];
+        if !remaining.is_empty()
+            && !remaining
+                .as_bytes()
+                .first()
+                .is_some_and(u8::is_ascii_whitespace)
+        {
+            return Err(OoxmlError::InvalidFormat(
+                "prefixMappings declarations must be whitespace separated".to_string(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

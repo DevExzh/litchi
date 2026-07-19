@@ -14,8 +14,14 @@ use crate::xlsx::namespace::{
     SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
 };
 use crate::xlsx::worksheet::WorksheetInfo;
+use crate::xlsx::writer::NamedRange;
 
 const INITIAL_SHEETS_CAPACITY: usize = 16;
+const MAX_DEFINED_NAMES: usize = 65_536;
+const MAX_DEFINED_NAME_FORMULA_BYTES: usize = 1_048_576;
+const MAX_DEFINED_NAME_CHARACTERS: usize = 255;
+const MAX_DEFINED_NAME_COMMENT_CHARACTERS: usize = 255;
+const MAX_LOCAL_SHEET_ID: u32 = 32_766;
 const RELATIONSHIPS_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
@@ -32,13 +38,6 @@ enum WorkbookContext {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DefinedName {
-    pub(crate) name: String,
-    pub(crate) local_sheet_id: Option<u32>,
-    pub(crate) value: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PivotCacheInfo {
     pub(crate) cache_id: u32,
     pub(crate) relationship_id: String,
@@ -48,7 +47,7 @@ pub(crate) struct WorkbookParseResult {
     pub(crate) sheets: Vec<WorksheetInfo>,
     pub(crate) active_sheet_index: usize,
     pub(crate) uses_1904_date_system: bool,
-    pub(crate) defined_names: Vec<DefinedName>,
+    pub(crate) defined_names: Vec<NamedRange>,
     pub(crate) pivot_caches: Vec<PivotCacheInfo>,
     pub(crate) external_reference_ids: Vec<String>,
 }
@@ -67,8 +66,8 @@ struct WorkbookInfo {
     sheet_ids: HashSet<u32>,
     relationship_ids: HashSet<String>,
     defined_name_keys: HashSet<(Option<u32>, String)>,
-    defined_names: Vec<DefinedName>,
-    pending_defined_name: Option<DefinedName>,
+    defined_names: Vec<NamedRange>,
+    pending_defined_name: Option<NamedRange>,
     pivot_cache_ids: HashSet<u32>,
     pivot_cache_relationship_ids: HashSet<String>,
     pivot_caches: Vec<PivotCacheInfo>,
@@ -103,8 +102,9 @@ impl WorkbookInfo {
     }
 
     fn parse(content: &str) -> Result<Self> {
-        let processed=crate::common::mce::process_ooxml(content.as_bytes())?;
-        let content=std::str::from_utf8(processed.as_ref()).map_err(|e|OoxmlError::Xml(e.to_string()))?;
+        let processed = crate::common::mce::process_ooxml(content.as_bytes())?;
+        let content =
+            std::str::from_utf8(processed.as_ref()).map_err(|e| OoxmlError::Xml(e.to_string()))?;
         let mut reader = NsReader::from_reader(content.as_bytes());
         let mut info = Self::new();
         let mut stack = Vec::new();
@@ -270,9 +270,15 @@ impl WorkbookInfo {
             if self.pending_defined_name.is_some() {
                 return Err(invalid("nested workbook definedName element"));
             }
+            if self.defined_names.len() >= MAX_DEFINED_NAMES {
+                return Err(invalid("workbook defined-name limit exceeded"));
+            }
             let name = required_string(element, b"name", decoder, "defined name")?;
-            if name.is_empty() {
-                return Err(invalid("workbook defined name cannot be empty"));
+            let name_characters = name.chars().count();
+            if name_characters == 0 || name_characters > MAX_DEFINED_NAME_CHARACTERS {
+                return Err(invalid(format!(
+                    "workbook defined name must contain 1 to {MAX_DEFINED_NAME_CHARACTERS} characters"
+                )));
             }
             let local_sheet_id = optional_u32(
                 element,
@@ -280,10 +286,62 @@ impl WorkbookInfo {
                 decoder,
                 "defined name localSheetId",
             )?;
-            self.pending_defined_name = Some(DefinedName {
+            if local_sheet_id.is_some_and(|value| value > MAX_LOCAL_SHEET_ID) {
+                return Err(invalid(format!(
+                    "defined name localSheetId exceeds {MAX_LOCAL_SHEET_ID}"
+                )));
+            }
+            let comment = optional_string(element, b"comment", decoder)?;
+            if comment
+                .as_ref()
+                .is_some_and(|value| value.chars().count() > MAX_DEFINED_NAME_COMMENT_CHARACTERS)
+            {
+                return Err(invalid(format!(
+                    "defined name comment exceeds {MAX_DEFINED_NAME_COMMENT_CHARACTERS} characters"
+                )));
+            }
+            self.pending_defined_name = Some(NamedRange {
                 name,
                 local_sheet_id,
-                value: String::new(),
+                reference: String::new(),
+                comment,
+                custom_menu: optional_string(element, b"customMenu", decoder)?,
+                description: optional_string(element, b"description", decoder)?,
+                help: optional_string(element, b"help", decoder)?,
+                status_bar: optional_string(element, b"statusBar", decoder)?,
+                shortcut_key: optional_string(element, b"shortcutKey", decoder)?,
+                hidden: optional_bool(element, b"hidden", decoder, "defined name hidden")?
+                    .unwrap_or(false),
+                function: optional_bool(element, b"function", decoder, "defined name function")?
+                    .unwrap_or(false),
+                vb_procedure: optional_bool(
+                    element,
+                    b"vbProcedure",
+                    decoder,
+                    "defined name vbProcedure",
+                )?
+                .unwrap_or(false),
+                xlm: optional_bool(element, b"xlm", decoder, "defined name xlm")?.unwrap_or(false),
+                function_group_id: optional_u32(
+                    element,
+                    b"functionGroupId",
+                    decoder,
+                    "defined name functionGroupId",
+                )?,
+                publish_to_server: optional_bool(
+                    element,
+                    b"publishToServer",
+                    decoder,
+                    "defined name publishToServer",
+                )?
+                .unwrap_or(false),
+                workbook_parameter: optional_bool(
+                    element,
+                    b"workbookParameter",
+                    decoder,
+                    "defined name workbookParameter",
+                )?
+                .unwrap_or(false),
             });
         } else if parent == WorkbookContext::PivotCaches
             && is_spreadsheetml_name(namespace, element.name(), b"pivotCache")
@@ -322,9 +380,14 @@ impl WorkbookInfo {
             let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
                 .ok_or_else(|| invalid("workbook external reference is missing relationship ID"))?;
             if relationship_id.is_empty() {
-                return Err(invalid("workbook external-reference relationship ID cannot be empty"));
+                return Err(invalid(
+                    "workbook external-reference relationship ID cannot be empty",
+                ));
             }
-            if !self.external_reference_id_set.insert(relationship_id.clone()) {
+            if !self
+                .external_reference_id_set
+                .insert(relationship_id.clone())
+            {
                 return Err(invalid(format!(
                     "duplicate workbook external-reference relationship ID '{relationship_id}'"
                 )));
@@ -410,11 +473,19 @@ impl WorkbookInfo {
     }
 
     fn push_defined_name_text(&mut self, text: &str) -> Result<()> {
-        self.pending_defined_name
+        let defined_name = self
+            .pending_defined_name
             .as_mut()
-            .ok_or_else(|| invalid("defined-name text outside a definedName element"))?
-            .value
-            .push_str(text);
+            .ok_or_else(|| invalid("defined-name text outside a definedName element"))?;
+        let new_len = defined_name
+            .reference
+            .len()
+            .checked_add(text.len())
+            .ok_or_else(|| invalid("defined-name formula length overflow"))?;
+        if new_len > MAX_DEFINED_NAME_FORMULA_BYTES {
+            return Err(invalid("workbook defined-name formula limit exceeded"));
+        }
+        defined_name.reference.push_str(text);
         Ok(())
     }
 
@@ -522,6 +593,14 @@ fn required_string(
 ) -> Result<String> {
     unqualified_attribute_value(element, name, decoder)?
         .ok_or_else(|| invalid(format!("missing {description} attribute")))
+}
+
+fn optional_string(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> Result<Option<String>> {
+    unqualified_attribute_value(element, name, decoder)
 }
 
 fn required_u32(
@@ -644,8 +723,41 @@ mod tests {
         assert_eq!(details.defined_names.len(), 2);
         assert_eq!(details.defined_names[0].name, "_xlnm.Print_Area");
         assert_eq!(details.defined_names[0].local_sheet_id, Some(0));
-        assert_eq!(details.defined_names[0].value, "'A & B'!$A$1:$D$20");
-        assert_eq!(details.defined_names[1].value, "42");
+        assert_eq!(details.defined_names[0].reference, "'A & B'!$A$1:$D$20");
+        assert_eq!(details.defined_names[1].reference, "42");
+        assert_eq!(
+            details.defined_names[0].built_in(),
+            Some(crate::xlsx::DefinedNameBuiltIn::PrintArea)
+        );
+    }
+
+    #[test]
+    fn round_trips_defined_name_scope_and_standard_attributes() {
+        let xml = format!(
+            r#"<workbook xmlns="{S}" xmlns:r="{R}">
+                <sheets><sheet name="One" sheetId="1" r:id="r1"/></sheets>
+                <definedNames><definedName name="LocalName" localSheetId="0"
+                    comment="A &amp; B" customMenu="Menu" description="Description"
+                    help="Help" statusBar="Status" shortcutKey="K" hidden="1"
+                    function="true" vbProcedure="1" xlm="true" functionGroupId="7"
+                    publishToServer="1" workbookParameter="true">SUM(One!$A$1:$A$2)</definedName></definedNames>
+            </workbook>"#
+        );
+        let parsed = parse_workbook_details(&xml).unwrap();
+        let name = &parsed.defined_names[0];
+        assert_eq!(name.local_sheet_id, Some(0));
+        assert_eq!(name.comment.as_deref(), Some("A & B"));
+        assert!(name.hidden && name.function && name.vb_procedure && name.xlm);
+        assert!(name.publish_to_server && name.workbook_parameter);
+        assert_eq!(name.function_group_id, Some(7));
+
+        let mut writable = crate::xlsx::MutableWorkbookData::new();
+        writable.named_ranges = parsed.defined_names.clone();
+        let serialized = writable
+            .generate_workbook_xml_with_external_rels(&["rId1".to_string()], &[], &[])
+            .unwrap();
+        let reparsed = parse_workbook_details(&serialized).unwrap();
+        assert_eq!(reparsed.defined_names, parsed.defined_names);
     }
 
     #[test]
@@ -692,10 +804,30 @@ mod tests {
             format!(
                 r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames/><definedNames/></workbook>"#
             ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="x" hidden="yes">1</definedName></definedNames></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="x" localSheetId="32767">1</definedName></definedNames></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="{}">1</definedName></definedNames></workbook>"#,
+                "n".repeat(MAX_DEFINED_NAME_CHARACTERS + 1)
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="x" comment="{}">1</definedName></definedNames></workbook>"#,
+                "c".repeat(MAX_DEFINED_NAME_COMMENT_CHARACTERS + 1)
+            ),
         ];
         for xml in invalid {
             assert!(parse_workbook_details(&xml).is_err(), "accepted {xml}");
         }
+
+        let oversized_formula = format!(
+            r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="x">{}</definedName></definedNames></workbook>"#,
+            "1".repeat(MAX_DEFINED_NAME_FORMULA_BYTES + 1)
+        );
+        assert!(parse_workbook_details(&oversized_formula).is_err());
     }
 
     #[test]

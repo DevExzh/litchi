@@ -25,10 +25,8 @@ pub const TASK_PANES_RELATIONSHIP_TYPE: &str =
     "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes";
 pub const WEB_EXTENSION_RELATIONSHIP_TYPE: &str =
     "http://schemas.microsoft.com/office/2011/relationships/webextension";
-pub const TASK_PANES_CONTENT_TYPE: &str =
-    "application/vnd.ms-office.webextensiontaskpanes+xml";
-pub const WEB_EXTENSION_CONTENT_TYPE: &str =
-    "application/vnd.ms-office.webextension+xml";
+pub const TASK_PANES_CONTENT_TYPE: &str = "application/vnd.ms-office.webextensiontaskpanes+xml";
+pub const WEB_EXTENSION_CONTENT_TYPE: &str = "application/vnd.ms-office.webextension+xml";
 
 const IMAGE_RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
@@ -531,8 +529,7 @@ fn parse_task_pane(node: &Node) -> Result<ParsedTaskPane> {
         .ok_or_else(|| OoxmlError::InvalidFormat("webextensionref requires r:id".into()))?
         .to_owned();
     if children.len() > 2
-        || (children.len() == 2
-            && !matches!(children[1].local_name.as_str(), "extLst" | "float"))
+        || (children.len() == 2 && !matches!(children[1].local_name.as_str(), "extLst" | "float"))
     {
         return invalid("unexpected taskpane child or child order".into());
     }
@@ -550,10 +547,19 @@ fn parse_store_reference(node: &Node) -> Result<WebExtensionStoreReference> {
     require_name(node, WEB_EXTENSION_NAMESPACE, "reference")?;
     reject_unknown_attributes(
         node,
-        &[("", "id"), ("", "version"), ("", "store"), ("", "storeType")],
+        &[
+            ("", "id"),
+            ("", "version"),
+            ("", "store"),
+            ("", "storeType"),
+        ],
     )?;
     let children = element_children(node);
-    if children.len() > 1 || children.first().is_some_and(|child| child.local_name != "extLst") {
+    if children.len() > 1
+        || children
+            .first()
+            .is_some_and(|child| child.local_name != "extLst")
+    {
         return invalid("reference permits only one trailing extLst".into());
     }
     Ok(WebExtensionStoreReference {
@@ -583,7 +589,11 @@ fn parse_binding(node: &Node) -> Result<WebExtensionBinding> {
     require_name(node, WEB_EXTENSION_NAMESPACE, "binding")?;
     reject_unknown_attributes(node, &[("", "id"), ("", "type"), ("", "appref")])?;
     let children = element_children(node);
-    if children.len() > 1 || children.first().is_some_and(|child| child.local_name != "extLst") {
+    if children.len() > 1
+        || children
+            .first()
+            .is_some_and(|child| child.local_name != "extLst")
+    {
         return invalid("binding permits only one trailing extLst".into());
     }
     Ok(WebExtensionBinding {
@@ -614,8 +624,10 @@ fn validate_snapshot_relationships(
                 relationship.r_id()
             ));
         }
-        if !matches!(relationship.reltype(), IMAGE_RELATIONSHIP_TYPE | STRICT_IMAGE_RELATIONSHIP_TYPE)
-        {
+        if !matches!(
+            relationship.reltype(),
+            IMAGE_RELATIONSHIP_TYPE | STRICT_IMAGE_RELATIONSHIP_TYPE
+        ) {
             return invalid(format!(
                 "snapshot relationship '{}' is not an image relationship",
                 relationship.r_id()
@@ -642,7 +654,11 @@ fn validate_snapshot_relationships(
         }
     }
     for id in referenced {
-        if !part.rels().iter().any(|relationship| relationship.r_id() == id) {
+        if !part
+            .rels()
+            .iter()
+            .any(|relationship| relationship.r_id() == id)
+        {
             return invalid(format!("snapshot references missing relationship '{id}'"));
         }
     }
@@ -841,16 +857,16 @@ fn parse_xml(xml: &[u8]) -> Result<XmlDocument> {
             Event::DocType(_) => return invalid("DTD is forbidden in web extension XML".into()),
             Event::Text(text) if !text.as_ref().iter().all(u8::is_ascii_whitespace) => {
                 return invalid("text is not permitted in web extension structures".into());
-            }
+            },
             Event::CData(text) if !text.as_ref().iter().all(u8::is_ascii_whitespace) => {
                 return invalid("CDATA is not permitted in web extension structures".into());
-            }
+            },
             Event::End(_) if stack.is_empty() => return invalid("unexpected XML end tag".into()),
             Event::End(_) => {
                 let (node, _) = stack.pop().expect("stack checked above");
                 attach_node(&mut document, &mut stack, node)?;
-            }
-            _ => {}
+            },
+            _ => {},
         }
         buffer.clear();
     }
@@ -881,10 +897,7 @@ fn push_element(
         .last()
         .map(|(_, namespaces)| namespaces.clone())
         .unwrap_or_default();
-    namespaces.insert(
-        "xml".into(),
-        "http://www.w3.org/XML/1998/namespace".into(),
-    );
+    namespaces.insert("xml".into(), "http://www.w3.org/XML/1998/namespace".into());
     let mut raw_attributes = Vec::new();
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
@@ -984,9 +997,7 @@ fn require_name(node: &Node, namespace: &str, local_name: &str) -> Result<()> {
 fn attr<'a>(node: &'a Node, namespace: &str, local_name: &str) -> Option<&'a str> {
     node.attributes
         .iter()
-        .find(|attribute| {
-            attribute.namespace == namespace && attribute.local_name == local_name
-        })
+        .find(|attribute| attribute.namespace == namespace && attribute.local_name == local_name)
         .map(|attribute| attribute.value.as_str())
 }
 
@@ -1020,7 +1031,9 @@ fn is_relationship_namespace(namespace: &str) -> bool {
 }
 
 fn optional_bool_attr(node: &Node, namespace: &str, local_name: &str) -> Result<Option<bool>> {
-    attr(node, namespace, local_name).map(parse_bool).transpose()
+    attr(node, namespace, local_name)
+        .map(parse_bool)
+        .transpose()
 }
 
 fn reject_unknown_attributes(node: &Node, allowed: &[(&str, &str)]) -> Result<()> {
@@ -1038,9 +1051,9 @@ fn reject_unknown_attributes(node: &Node, allowed: &[(&str, &str)]) -> Result<()
 }
 
 fn is_next(children: &[&Node], position: usize, namespace: &str, local_name: &str) -> bool {
-    children.get(position).is_some_and(|child| {
-        child.namespace == namespace && child.local_name == local_name
-    })
+    children
+        .get(position)
+        .is_some_and(|child| child.namespace == namespace && child.local_name == local_name)
 }
 
 fn next_required<'a>(
@@ -1086,12 +1099,18 @@ mod tests {
         let omex = OpcPackage::from_bytes(LO_OMEX_DOCX).unwrap();
         let panes = load_web_extension_task_panes(&omex).unwrap().unwrap();
         assert_eq!(panes.panes.len(), 1);
-        assert_eq!(panes.panes[0].web_extension.reference.store_type, WebExtensionStoreType::Omex);
+        assert_eq!(
+            panes.panes[0].web_extension.reference.store_type,
+            WebExtensionStoreType::Omex
+        );
         assert!(panes.panes[0].visible);
 
         let registry = OpcPackage::from_bytes(LO_REGISTRY_DOCX).unwrap();
         let panes = load_web_extension_task_panes(&registry).unwrap().unwrap();
-        assert_eq!(panes.panes[0].web_extension.reference.store_type, WebExtensionStoreType::Registry);
+        assert_eq!(
+            panes.panes[0].web_extension.reference.store_type,
+            WebExtensionStoreType::Registry
+        );
         assert!(!panes.panes[0].visible);
     }
 
@@ -1101,27 +1120,44 @@ mod tests {
         let first = write_web_extension(&extension, OoxmlConformance::Strict).unwrap();
         let second = write_web_extension(&extension, OoxmlConformance::Strict).unwrap();
         assert_eq!(first, second);
-        assert!(std::str::from_utf8(&first)
-            .unwrap()
-            .contains(STRICT_RELATIONSHIPS_NAMESPACE));
+        assert!(
+            std::str::from_utf8(&first)
+                .unwrap()
+                .contains(STRICT_RELATIONSHIPS_NAMESPACE)
+        );
         assert_eq!(parse_web_extension(&first).unwrap(), extension);
     }
 
     #[test]
     fn accepts_mce_alternate_content_and_strict_relationship_attributes() {
-        let xml = format!(r#"<we:webextension xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:r="{STRICT_RELATIONSHIPS_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" id="x"><we:reference id="a" version="1"/><mc:AlternateContent><mc:Choice Requires="we"><we:alternateReferences/></mc:Choice><mc:Fallback/></mc:AlternateContent><we:properties/><we:bindings/><we:snapshot r:embed="rId1"/></we:webextension>"#);
+        let xml = format!(
+            r#"<we:webextension xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:r="{STRICT_RELATIONSHIPS_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" id="x"><we:reference id="a" version="1"/><mc:AlternateContent><mc:Choice Requires="we"><we:alternateReferences/></mc:Choice><mc:Fallback/></mc:AlternateContent><we:properties/><we:bindings/><we:snapshot r:embed="rId1"/></we:webextension>"#
+        );
         let extension = parse_web_extension(xml.as_bytes()).unwrap();
-        assert_eq!(extension.snapshot.unwrap().embedded_relationship_id.as_deref(), Some("rId1"));
+        assert_eq!(
+            extension
+                .snapshot
+                .unwrap()
+                .embedded_relationship_id
+                .as_deref(),
+            Some("rId1")
+        );
     }
 
     #[test]
     fn rejects_dtd_bad_order_bad_store_and_nonfinite_width() {
         assert!(parse_web_extension(br#"<!DOCTYPE x><x/>"#).is_err());
-        let bad_order = format!(r#"<we:webextension xmlns:we="{WEB_EXTENSION_NAMESPACE}" id="x"><we:properties/><we:reference id="a" version="1"/><we:bindings/></we:webextension>"#);
+        let bad_order = format!(
+            r#"<we:webextension xmlns:we="{WEB_EXTENSION_NAMESPACE}" id="x"><we:properties/><we:reference id="a" version="1"/><we:bindings/></we:webextension>"#
+        );
         assert!(parse_web_extension(bad_order.as_bytes()).is_err());
-        let bad_store = format!(r#"<we:webextension xmlns:we="{WEB_EXTENSION_NAMESPACE}" id="x"><we:reference id="a" version="1" storeType="Network"/><we:properties/><we:bindings/></we:webextension>"#);
+        let bad_store = format!(
+            r#"<we:webextension xmlns:we="{WEB_EXTENSION_NAMESPACE}" id="x"><we:reference id="a" version="1" storeType="Network"/><we:properties/><we:bindings/></we:webextension>"#
+        );
         assert!(parse_web_extension(bad_store.as_bytes()).is_err());
-        let bad_width = format!(r#"<wetp:taskpanes xmlns:wetp="{TASK_PANES_NAMESPACE}" xmlns:r="{TRANSITIONAL_RELATIONSHIPS_NAMESPACE}"><wetp:taskpane dockstate="right" visibility="1" width="NaN" row="0"><wetp:webextensionref r:id="rId1"/></wetp:taskpane></wetp:taskpanes>"#);
+        let bad_width = format!(
+            r#"<wetp:taskpanes xmlns:wetp="{TASK_PANES_NAMESPACE}" xmlns:r="{TRANSITIONAL_RELATIONSHIPS_NAMESPACE}"><wetp:taskpane dockstate="right" visibility="1" width="NaN" row="0"><wetp:webextensionref r:id="rId1"/></wetp:taskpane></wetp:taskpanes>"#
+        );
         assert!(parse_task_panes(bad_width.as_bytes()).is_err());
     }
 
@@ -1129,15 +1165,17 @@ mod tests {
     fn enforces_input_and_list_caps() {
         assert!(parse_web_extension(&vec![b' '; MAX_WEB_EXTENSION_XML_BYTES + 1]).is_err());
         let mut model = WebExtensionTaskPanes::default();
-        model.panes.resize_with(MAX_WEB_EXTENSION_ITEMS + 1, || WebExtensionTaskPane {
-            dock_state: "right".into(),
-            visible: false,
-            width: 320.0,
-            row: 0,
-            locked: false,
-            relationship_id: "rId1".into(),
-            web_extension: sample_extension(),
-        });
+        model
+            .panes
+            .resize_with(MAX_WEB_EXTENSION_ITEMS + 1, || WebExtensionTaskPane {
+                dock_state: "right".into(),
+                visible: false,
+                width: 320.0,
+                row: 0,
+                locked: false,
+                relationship_id: "rId1".into(),
+                web_extension: sample_extension(),
+            });
         assert!(write_task_panes(&model, OoxmlConformance::Transitional).is_err());
     }
 
@@ -1164,11 +1202,8 @@ mod tests {
         let task_panes_xml = format!(
             r#"<wetp:taskpanes xmlns:wetp="{TASK_PANES_NAMESPACE}" xmlns:r="{TRANSITIONAL_RELATIONSHIPS_NAMESPACE}"><wetp:taskpane dockstate="right" visibility="0" width="320" row="0"><wetp:webextensionref r:id="{pane_relationship_id}"/></wetp:taskpane></wetp:taskpanes>"#
         );
-        let extension_xml = write_web_extension(
-            &sample_extension(),
-            OoxmlConformance::Transitional,
-        )
-        .unwrap();
+        let extension_xml =
+            write_web_extension(&sample_extension(), OoxmlConformance::Transitional).unwrap();
         let mut package = OpcPackage::new();
         package.rels_mut().add_relationship(
             TASK_PANES_RELATIONSHIP_TYPE.into(),

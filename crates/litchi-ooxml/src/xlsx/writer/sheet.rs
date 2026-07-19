@@ -2,8 +2,18 @@ use crate::drawings::blip::write_a_blip_embed_rid_num;
 use crate::drawings::ext::write_a16_creation_id_extlst;
 use crate::drawings::fill::write_a_stretch_fill_rect;
 use crate::xlsx::cell::Cell;
+use crate::xlsx::data_validation::{
+    DataValidationCollection, DataValidationConformance,
+    validate_data_validation_collections, write_data_validation_core,
+    write_data_validation_extensions,
+};
 use crate::xlsx::sort::{SortCondition, SortState};
 use crate::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
+use crate::xlsx::sheet_protection::{
+    ProtectionPasswordVerifier, WorksheetProtection, WorksheetProtectionConformance,
+    WorksheetProtectionMetadata, write_worksheet_protection_core,
+    write_worksheet_protection_extensions,
+};
 use crate::xlsx::table::Table;
 use crate::xlsx::views::{SheetPane, SheetSelection, SheetView};
 /// Writer module for creating and modifying Excel worksheets.
@@ -39,20 +49,105 @@ pub struct FreezePanes {
     pub freeze_rows: u32,
 }
 
-/// Named range definition.
+/// A standard SpreadsheetML defined name.
 ///
-/// Associates a name with a cell or range of cells for easier formula references.
-#[derive(Debug, Clone)]
+/// `reference` is retained as inert formula text. Reading or writing this type never
+/// evaluates the formula or invokes a macro procedure.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct NamedRange {
-    /// Name of the range (e.g., "TaxRate", "SalesData")
+    /// Name of the definition (for example, `TaxRate` or `_xlnm.Print_Area`).
     pub name: String,
-    /// Reference formula (e.g., "Sheet1!$A$1:$B$10", "Sheet1!$C$5")
+    /// Inert name-formula text (for example, `Sheet1!$A$1:$B$10` or `42`).
     pub reference: String,
-    /// Optional comment/description
+    /// Optional user comment.
     pub comment: Option<String>,
-    /// Whether this is a workbook-scoped or sheet-scoped name
-    /// If None, it's workbook-scoped; if Some(sheet_index), it's sheet-scoped
+    /// Zero-based workbook sheet index for a local name; `None` means workbook scope.
     pub local_sheet_id: Option<u32>,
+    pub custom_menu: Option<String>,
+    pub description: Option<String>,
+    pub help: Option<String>,
+    pub status_bar: Option<String>,
+    pub shortcut_key: Option<String>,
+    pub hidden: bool,
+    pub function: bool,
+    pub vb_procedure: bool,
+    pub xlm: bool,
+    pub function_group_id: Option<u32>,
+    pub publish_to_server: bool,
+    pub workbook_parameter: bool,
+}
+
+impl NamedRange {
+    /// Return the standardized built-in represented by this name, if any.
+    pub fn built_in(&self) -> Option<DefinedNameBuiltIn> {
+        DefinedNameBuiltIn::from_name(&self.name)
+    }
+
+    pub fn is_sheet_scoped(&self) -> bool {
+        self.local_sheet_id.is_some()
+    }
+}
+
+/// Built-in names reserved by SpreadsheetML (ECMA-376, `definedName`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DefinedNameBuiltIn {
+    ConsolidateArea,
+    AutoOpen,
+    AutoClose,
+    Extract,
+    Database,
+    Criteria,
+    PrintArea,
+    PrintTitles,
+    Recorder,
+    DataForm,
+    AutoActivate,
+    AutoDeactivate,
+    SheetTitle,
+    FilterDatabase,
+}
+
+impl DefinedNameBuiltIn {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ConsolidateArea => "_xlnm.Consolidate_Area",
+            Self::AutoOpen => "_xlnm.Auto_Open",
+            Self::AutoClose => "_xlnm.Auto_Close",
+            Self::Extract => "_xlnm.Extract",
+            Self::Database => "_xlnm.Database",
+            Self::Criteria => "_xlnm.Criteria",
+            Self::PrintArea => "_xlnm.Print_Area",
+            Self::PrintTitles => "_xlnm.Print_Titles",
+            Self::Recorder => "_xlnm.Recorder",
+            Self::DataForm => "_xlnm.Data_Form",
+            Self::AutoActivate => "_xlnm.Auto_Activate",
+            Self::AutoDeactivate => "_xlnm.Auto_Deactivate",
+            Self::SheetTitle => "_xlnm.Sheet_Title",
+            Self::FilterDatabase => "_xlnm._FilterDatabase",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        const BUILT_INS: [DefinedNameBuiltIn; 14] = [
+            DefinedNameBuiltIn::ConsolidateArea,
+            DefinedNameBuiltIn::AutoOpen,
+            DefinedNameBuiltIn::AutoClose,
+            DefinedNameBuiltIn::Extract,
+            DefinedNameBuiltIn::Database,
+            DefinedNameBuiltIn::Criteria,
+            DefinedNameBuiltIn::PrintArea,
+            DefinedNameBuiltIn::PrintTitles,
+            DefinedNameBuiltIn::Recorder,
+            DefinedNameBuiltIn::DataForm,
+            DefinedNameBuiltIn::AutoActivate,
+            DefinedNameBuiltIn::AutoDeactivate,
+            DefinedNameBuiltIn::SheetTitle,
+            DefinedNameBuiltIn::FilterDatabase,
+        ];
+        BUILT_INS
+            .into_iter()
+            .find(|built_in| name.eq_ignore_ascii_case(built_in.as_str()))
+    }
 }
 
 /// Page setup configuration.
@@ -68,6 +163,33 @@ pub struct PageSetup {
     pub fit_to_width: Option<u32>,
     /// Fit to page height
     pub fit_to_height: Option<u32>,
+}
+
+/// Optional authoring state for `sheetPr/pageSetUpPr`.
+///
+/// `None` preserves attribute absence. This is distinct from an explicitly
+/// written `false`, which is useful when interoperating with producers that
+/// persist the effective defaults.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PageSetupProperties {
+    fit_to_page: Option<bool>,
+    automatic_page_breaks: Option<bool>,
+}
+
+impl PageSetupProperties {
+    /// The explicitly authored `fitToPage` value, if present.
+    pub fn fit_to_page(&self) -> Option<bool> {
+        self.fit_to_page
+    }
+
+    /// The explicitly authored `autoPageBreaks` value, if present.
+    pub fn automatic_page_breaks(&self) -> Option<bool> {
+        self.automatic_page_breaks
+    }
+
+    fn is_empty(&self) -> bool {
+        self.fit_to_page.is_none() && self.automatic_page_breaks.is_none()
+    }
 }
 
 /// Header and footer configuration.
@@ -103,39 +225,6 @@ pub struct AutoFilter {
     pub range: String,
     /// Optional sort state associated with the auto-filter.
     pub sort_state: Option<SortState>,
-}
-
-/// Sheet protection configuration.
-#[derive(Debug, Clone)]
-pub struct SheetProtection {
-    /// Password hash (optional)
-    pub password_hash: Option<String>,
-    /// Allow select locked cells
-    pub select_locked_cells: bool,
-    /// Allow select unlocked cells
-    pub select_unlocked_cells: bool,
-    /// Allow format cells
-    pub format_cells: bool,
-    /// Allow format columns
-    pub format_columns: bool,
-    /// Allow format rows
-    pub format_rows: bool,
-    /// Allow insert columns
-    pub insert_columns: bool,
-    /// Allow insert rows
-    pub insert_rows: bool,
-    /// Allow insert hyperlinks
-    pub insert_hyperlinks: bool,
-    /// Allow delete columns
-    pub delete_columns: bool,
-    /// Allow delete rows
-    pub delete_rows: bool,
-    /// Allow sort
-    pub sort: bool,
-    /// Allow auto filter
-    pub auto_filter: bool,
-    /// Allow pivot tables
-    pub pivot_tables: bool,
 }
 
 /// Hyperlink information for a cell.
@@ -275,6 +364,8 @@ pub struct MutableWorksheet {
     charts: Vec<WorksheetChart>,
     /// Data validation rules
     validations: Vec<DataValidation>,
+    /// Complete typed core and Office 2010 validation collections.
+    typed_data_validations: Option<Vec<DataValidationCollection>>,
     /// Column widths (col -> width in characters)
     column_widths: HashMap<u32, f64>,
     /// Hidden columns
@@ -295,6 +386,8 @@ pub struct MutableWorksheet {
     tab_color: Option<String>,
     /// Page setup configuration
     page_setup: Option<PageSetup>,
+    /// Optional flags serialized as `sheetPr/pageSetUpPr`.
+    page_setup_properties: Option<PageSetupProperties>,
     /// Print area
     print_area: Option<String>,
     /// Header and footer
@@ -312,7 +405,7 @@ pub struct MutableWorksheet {
     /// Manual column page breaks
     col_breaks: Vec<PageBreak>,
     /// Sheet protection configuration
-    protection: Option<SheetProtection>,
+    protection: WorksheetProtectionMetadata,
     /// Hyperlinks by cell reference
     hyperlinks: Vec<Hyperlink>,
     /// Cell comments
@@ -347,6 +440,7 @@ impl MutableWorksheet {
             merged_cells: Vec::new(),
             charts: Vec::new(),
             validations: Vec::new(),
+            typed_data_validations: None,
             column_widths: HashMap::new(),
             hidden_columns: std::collections::HashSet::new(),
             row_heights: HashMap::new(),
@@ -357,6 +451,7 @@ impl MutableWorksheet {
             is_active: false,
             tab_color: None,
             page_setup: None,
+            page_setup_properties: None,
             print_area: None,
             header_footer: None,
             repeating_rows: None,
@@ -365,7 +460,7 @@ impl MutableWorksheet {
             sheet_view: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
-            protection: None,
+            protection: WorksheetProtectionMetadata::default(),
             hyperlinks: Vec::new(),
             comments: Vec::new(),
             conditional_formats: Vec::new(),
@@ -671,6 +766,7 @@ impl MutableWorksheet {
         error_title: Option<&str>,
         error_message: Option<&str>,
     ) {
+        self.typed_data_validations = None;
         self.validations.push(DataValidation {
             range: range.to_string(),
             validation_type,
@@ -681,6 +777,28 @@ impl MutableWorksheet {
             error_title: error_title.map(|s| s.to_string()),
             error_message: error_message.map(|s| s.to_string()),
         });
+        self.modified = true;
+    }
+
+    /// Replace validations with complete typed core/x14 collections.
+    pub fn set_data_validation_collections(
+        &mut self,
+        collections: Vec<DataValidationCollection>,
+    ) -> SheetResult<()> {
+        validate_data_validation_collections(&collections)?;
+        self.validations.clear();
+        self.typed_data_validations = Some(collections);
+        self.modified = true;
+        Ok(())
+    }
+
+    pub fn data_validation_collections(&self) -> Option<&[DataValidationCollection]> {
+        self.typed_data_validations.as_deref()
+    }
+
+    pub fn clear_data_validations(&mut self) {
+        self.validations.clear();
+        self.typed_data_validations = Some(Vec::new());
         self.modified = true;
     }
 
@@ -1553,6 +1671,68 @@ impl MutableWorksheet {
     }
 
     // ===== Page Setup =====
+
+    /// Set the worksheet's fit-to-page mode.
+    ///
+    /// This controls `sheetPr/pageSetUpPr@fitToPage`. It does not alter the
+    /// independently configured `pageSetup@fitToWidth` or `@fitToHeight`
+    /// dimensions.
+    pub fn set_fit_to_page(&mut self, enabled: bool) {
+        self.page_setup_properties
+            .get_or_insert_with(PageSetupProperties::default)
+            .fit_to_page = Some(enabled);
+        self.modified = true;
+    }
+
+    /// Remove the authored `fitToPage` attribute without discarding dimensions.
+    pub fn clear_fit_to_page(&mut self) {
+        if let Some(properties) = self.page_setup_properties.as_mut() {
+            properties.fit_to_page = None;
+            if properties.is_empty() {
+                self.page_setup_properties = None;
+            }
+            self.modified = true;
+        }
+    }
+
+    /// Get the explicitly authored fit-to-page mode.
+    pub fn fit_to_page(&self) -> Option<bool> {
+        self.page_setup_properties
+            .as_ref()
+            .and_then(PageSetupProperties::fit_to_page)
+    }
+
+    /// Set whether page breaks are calculated automatically.
+    pub fn set_automatic_page_breaks(&mut self, enabled: bool) {
+        self.page_setup_properties
+            .get_or_insert_with(PageSetupProperties::default)
+            .automatic_page_breaks = Some(enabled);
+        self.modified = true;
+    }
+
+    /// Remove the authored `autoPageBreaks` attribute.
+    pub fn clear_automatic_page_breaks(&mut self) {
+        if let Some(properties) = self.page_setup_properties.as_mut() {
+            properties.automatic_page_breaks = None;
+            if properties.is_empty() {
+                self.page_setup_properties = None;
+            }
+            self.modified = true;
+        }
+    }
+
+    /// Get the explicitly authored automatic-page-break setting.
+    pub fn automatic_page_breaks(&self) -> Option<bool> {
+        self.page_setup_properties
+            .as_ref()
+            .and_then(PageSetupProperties::automatic_page_breaks)
+    }
+
+    /// Get the complete optional `pageSetUpPr` authoring state.
+    pub fn page_setup_properties(&self) -> Option<&PageSetupProperties> {
+        self.page_setup_properties.as_ref()
+    }
+
     /// Configure page setup for printing.
     ///
     /// # Arguments
@@ -1596,15 +1776,50 @@ impl MutableWorksheet {
         scale: Option<u32>,
         fit_to_width: Option<u32>,
         fit_to_height: Option<u32>,
-    ) {
-        self.page_setup = Some(PageSetup {
+    ) -> SheetResult<()> {
+        if !matches!(orientation, "portrait" | "landscape") {
+            return Err(format!(
+                "page orientation must be 'portrait' or 'landscape', got '{orientation}'"
+            )
+            .into());
+        }
+        if let Some(scale) = scale
+            && !(10..=400).contains(&scale)
+        {
+            return Err(format!("page scale must be between 10 and 400, got {scale}").into());
+        }
+        const MAX_EXCEL_FIT_PAGES: u32 = 32_767;
+        for (name, value) in [
+            ("fit-to-width", fit_to_width),
+            ("fit-to-height", fit_to_height),
+        ] {
+            if let Some(value) = value
+                && value > MAX_EXCEL_FIT_PAGES
+            {
+                return Err(format!(
+                    "{name} must be between 0 and {MAX_EXCEL_FIT_PAGES}, got {value}"
+                )
+                .into());
+            }
+        }
+
+        let setup = PageSetup {
             orientation: orientation.to_string(),
             paper_size,
             scale,
             fit_to_width,
             fit_to_height,
-        });
+        };
+        let activates_fit_to_page = fit_to_width.is_some() || fit_to_height.is_some();
+
+        self.page_setup = Some(setup);
+        if activates_fit_to_page {
+            self.page_setup_properties
+                .get_or_insert_with(PageSetupProperties::default)
+                .fit_to_page = Some(true);
+        }
         self.modified = true;
+        Ok(())
     }
 
     /// Get the page setup configuration.
@@ -1936,24 +2151,29 @@ impl MutableWorksheet {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn protect_sheet(&mut self, password: Option<&str>) {
-        let password_hash = password.map(Self::hash_password);
-
-        self.protection = Some(SheetProtection {
-            password_hash,
-            select_locked_cells: true,
-            select_unlocked_cells: true,
-            format_cells: false,
-            format_columns: false,
-            format_rows: false,
-            insert_columns: false,
-            insert_rows: false,
-            insert_hyperlinks: false,
-            delete_columns: false,
-            delete_rows: false,
-            sort: false,
-            auto_filter: false,
-            pivot_tables: false,
-        });
+        let mut protection = WorksheetProtection::default();
+        protection.set_sheet_locked(true);
+        protection.set_format_cells_locked(false);
+        protection.set_format_columns_locked(false);
+        protection.set_format_rows_locked(false);
+        protection.set_insert_columns_locked(false);
+        protection.set_insert_rows_locked(false);
+        protection.set_insert_hyperlinks_locked(false);
+        protection.set_delete_columns_locked(false);
+        protection.set_delete_rows_locked(false);
+        protection.set_sort_locked(false);
+        protection.set_auto_filter_locked(false);
+        protection.set_pivot_tables_locked(false);
+        if let Some(password) = password {
+            protection
+                .set_verifier(Some(ProtectionPasswordVerifier::Legacy(
+                    u16::from_str_radix(&Self::hash_password(password), 16).unwrap(),
+                )))
+                .expect("legacy verifier is valid");
+        }
+        self.protection
+            .set_sheet_protection(Some(protection))
+            .expect("constructed protection is valid");
         self.modified = true;
     }
 
@@ -1965,27 +2185,49 @@ impl MutableWorksheet {
     pub fn protect_sheet_with_options(
         &mut self,
         password: Option<&str>,
-        mut permissions: SheetProtection,
+        mut permissions: WorksheetProtection,
     ) {
-        permissions.password_hash = password.map(Self::hash_password);
-        self.protection = Some(permissions);
+        if let Some(password) = password {
+            permissions
+                .set_verifier(Some(ProtectionPasswordVerifier::Legacy(
+                    u16::from_str_radix(&Self::hash_password(password), 16).unwrap(),
+                )))
+                .expect("legacy verifier is valid");
+        }
+        self.protection
+            .set_sheet_protection(Some(permissions))
+            .expect("typed worksheet protection is valid");
         self.modified = true;
+    }
+
+    pub fn set_protection_metadata(
+        &mut self,
+        metadata: WorksheetProtectionMetadata,
+    ) -> SheetResult<()> {
+        crate::xlsx::sheet_protection::validate_worksheet_protection_metadata(&metadata)?;
+        self.protection = metadata;
+        self.modified = true;
+        Ok(())
+    }
+
+    pub fn protection_metadata(&self) -> &WorksheetProtectionMetadata {
+        &self.protection
     }
 
     /// Unprotect the worksheet.
     pub fn unprotect_sheet(&mut self) {
-        self.protection = None;
+        self.protection.clear_sheet_protection();
         self.modified = true;
     }
 
     /// Check if the worksheet is protected.
     pub fn is_protected(&self) -> bool {
-        self.protection.is_some()
+        self.protection.sheet_protection().is_some()
     }
 
     /// Get the protection configuration.
-    pub fn get_protection(&self) -> Option<&SheetProtection> {
-        self.protection.as_ref()
+    pub fn get_protection(&self) -> Option<&WorksheetProtection> {
+        self.protection.sheet_protection()
     }
 
     /// Simple password hashing for Excel (XOR-based).
@@ -2194,11 +2436,27 @@ impl MutableWorksheet {
         .map_err(|e| format!("XML write error: {}", e))?;
 
         // Write sheetPr (sheet properties) if needed - must come BEFORE dimension per OOXML spec
-        if self.tab_color.is_some() {
+        if self.tab_color.is_some() || self.page_setup_properties.is_some() {
             xml.push_str("<sheetPr>");
             if let Some(ref color) = self.tab_color {
                 write!(xml, r#"<tabColor rgb="{}"/>"#, color)
                     .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            if let Some(properties) = self.page_setup_properties {
+                xml.push_str("<pageSetUpPr");
+                if let Some(automatic_page_breaks) = properties.automatic_page_breaks {
+                    write!(
+                        xml,
+                        r#" autoPageBreaks="{}""#,
+                        u8::from(automatic_page_breaks)
+                    )
+                    .map_err(|e| format!("XML write error: {}", e))?;
+                }
+                if let Some(fit_to_page) = properties.fit_to_page {
+                    write!(xml, r#" fitToPage="{}""#, u8::from(fit_to_page))
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                }
+                xml.push_str("/>");
             }
             xml.push_str("</sheetPr>");
         }
@@ -2322,7 +2580,13 @@ impl MutableWorksheet {
         xml.push_str("</sheetData>");
 
         // Write sheet protection if configured (must come right after sheetData per OOXML spec)
-        if self.protection.is_some() {
+        if self.protection.sheet_protection().is_some()
+            || self
+                .protection
+                .protected_range_collections()
+                .iter()
+                .any(|collection| collection.source() == crate::xlsx::ProtectedRangeSource::Core)
+        {
             self.write_sheet_protection(&mut xml)?;
         }
 
@@ -2360,7 +2624,12 @@ impl MutableWorksheet {
         }
 
         // Write data validations
-        if !self.validations.is_empty() {
+        if let Some(collections) = self.typed_data_validations.as_ref() {
+            xml.push_str(&write_data_validation_core(
+                collections,
+                DataValidationConformance::Transitional,
+            )?);
+        } else if !self.validations.is_empty() {
             self.write_data_validations(&mut xml)?;
         }
 
@@ -2420,6 +2689,16 @@ impl MutableWorksheet {
             xml.push_str("</extLst>");
         }
 
+        if let Some(collections) = self.typed_data_validations.as_ref() {
+            xml.push_str(&write_data_validation_extensions(
+                collections,
+                DataValidationConformance::Transitional,
+            )?);
+        }
+        xml.push_str(&write_worksheet_protection_extensions(
+            &self.protection,
+            WorksheetProtectionConformance::Transitional,
+        )?);
         xml.push_str("</worksheet>");
 
         Ok(xml)
@@ -3560,60 +3839,10 @@ impl MutableWorksheet {
 
     /// Write sheet protection section.
     fn write_sheet_protection(&self, xml: &mut String) -> SheetResult<()> {
-        if let Some(ref protection) = self.protection {
-            xml.push_str("<sheetProtection sheet=\"1\"");
-
-            // Add password hash if present
-            if let Some(ref hash) = protection.password_hash {
-                write!(xml, r#" password="{}""#, hash)
-                    .map_err(|e| format!("XML write error: {}", e))?;
-            }
-
-            // Add permission attributes (1 = allowed, 0 or omitted = not allowed)
-            // Note: In Excel, these are typically set to 0 to restrict, 1 to allow
-            if !protection.select_locked_cells {
-                xml.push_str(r#" selectLockedCells="0""#);
-            }
-            if !protection.select_unlocked_cells {
-                xml.push_str(r#" selectUnlockedCells="0""#);
-            }
-            if protection.format_cells {
-                xml.push_str(r#" formatCells="0""#);
-            }
-            if protection.format_columns {
-                xml.push_str(r#" formatColumns="0""#);
-            }
-            if protection.format_rows {
-                xml.push_str(r#" formatRows="0""#);
-            }
-            if protection.insert_columns {
-                xml.push_str(r#" insertColumns="0""#);
-            }
-            if protection.insert_rows {
-                xml.push_str(r#" insertRows="0""#);
-            }
-            if protection.insert_hyperlinks {
-                xml.push_str(r#" insertHyperlinks="0""#);
-            }
-            if protection.delete_columns {
-                xml.push_str(r#" deleteColumns="0""#);
-            }
-            if protection.delete_rows {
-                xml.push_str(r#" deleteRows="0""#);
-            }
-            if protection.sort {
-                xml.push_str(r#" sort="0""#);
-            }
-            if protection.auto_filter {
-                xml.push_str(r#" autoFilter="0""#);
-            }
-            if protection.pivot_tables {
-                xml.push_str(r#" pivotTables="0""#);
-            }
-
-            xml.push_str("/>");
-        }
-
+        xml.push_str(&write_worksheet_protection_core(
+            &self.protection,
+            WorksheetProtectionConformance::Transitional,
+        )?);
         Ok(())
     }
 }
@@ -3912,5 +4141,95 @@ mod tests {
         assert_eq!(pane.state, Some(crate::xlsx::SheetPaneState::Frozen));
         assert_eq!(view.selections[0].active_cell.as_deref(), Some("B3"));
         assert_eq!(view.selections[0].sqref.as_deref(), Some("B3"));
+    }
+
+    #[test]
+    fn fit_to_page_serializes_in_sheet_properties_order_and_round_trips() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_tab_color("FF336699");
+        ws.set_automatic_page_breaks(true);
+        ws.set_page_setup_with_options("landscape", 9, None, Some(1), Some(0))
+            .unwrap();
+
+        let mut shared_strings = MutableSharedStrings::new();
+        let xml = ws.to_xml(&mut shared_strings, &HashMap::new()).unwrap();
+        assert!(xml.contains(
+            r#"<sheetPr><tabColor rgb="FF336699"/><pageSetUpPr autoPageBreaks="1" fitToPage="1"/></sheetPr>"#
+        ));
+        assert!(xml.contains(
+            r#"<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>"#
+        ));
+
+        let properties = crate::xlsx::parse_worksheet_sheet_properties(xml.as_bytes())
+            .unwrap()
+            .unwrap();
+        let page_setup = properties.page_setup_properties().unwrap();
+        assert!(page_setup.automatic_page_breaks());
+        assert!(page_setup.fit_to_page());
+        assert_eq!(properties.tab_color().unwrap().argb(), Some([255, 51, 102, 153]));
+    }
+
+    #[test]
+    fn fit_to_page_default_omission_explicit_false_and_clear_are_distinct() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        let mut shared_strings = MutableSharedStrings::new();
+        let styles = HashMap::new();
+        assert!(!ws
+            .to_xml(&mut shared_strings, &styles)
+            .unwrap()
+            .contains("<sheetPr>"));
+
+        ws.set_fit_to_page(false);
+        assert_eq!(ws.fit_to_page(), Some(false));
+        let xml = ws.to_xml(&mut shared_strings, &styles).unwrap();
+        assert!(xml.contains(r#"<sheetPr><pageSetUpPr fitToPage="0"/></sheetPr>"#));
+
+        ws.clear_fit_to_page();
+        assert_eq!(ws.fit_to_page(), None);
+        assert!(!ws
+            .to_xml(&mut shared_strings, &styles)
+            .unwrap()
+            .contains("<sheetPr>"));
+    }
+
+    #[test]
+    fn clearing_fit_mode_preserves_dimensions_and_invalid_update_is_atomic() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_page_setup_with_options("portrait", 9, None, Some(1), Some(2))
+            .unwrap();
+        ws.clear_fit_to_page();
+        assert_eq!(ws.fit_to_page(), None);
+        assert_eq!(ws.get_page_setup().unwrap().fit_to_width, Some(1));
+        assert_eq!(ws.get_page_setup().unwrap().fit_to_height, Some(2));
+
+        assert!(
+            ws.set_page_setup_with_options("portrait", 9, None, Some(32_768), Some(1))
+                .is_err()
+        );
+        assert_eq!(ws.get_page_setup().unwrap().fit_to_width, Some(1));
+        assert_eq!(ws.get_page_setup().unwrap().fit_to_height, Some(2));
+        assert_eq!(ws.fit_to_page(), None);
+    }
+
+    #[test]
+    fn strict_namespace_parser_oracle_accepts_authored_page_setup_properties() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+        ws.set_fit_to_page(true);
+        ws.set_automatic_page_breaks(false);
+        let mut shared_strings = MutableSharedStrings::new();
+        let xml = ws
+            .to_xml(&mut shared_strings, &HashMap::new())
+            .unwrap()
+            .replace(
+                "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+                "http://purl.oclc.org/ooxml/spreadsheetml/main",
+            );
+
+        let properties = crate::xlsx::parse_worksheet_sheet_properties(xml.as_bytes())
+            .unwrap()
+            .unwrap();
+        let page_setup = properties.page_setup_properties().unwrap();
+        assert!(!page_setup.automatic_page_breaks());
+        assert!(page_setup.fit_to_page());
     }
 }

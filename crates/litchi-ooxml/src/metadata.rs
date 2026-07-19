@@ -4,8 +4,8 @@ use crate::common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, Utc};
 use litchi_core::Metadata;
-use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::OpcPackage;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -72,9 +72,7 @@ pub fn extract_metadata(package: &OpcPackage) -> Result<Metadata> {
     parse_core_properties_xml(xml)
 }
 
-fn find_core_properties_part(
-    package: &OpcPackage,
-) -> Result<Option<&dyn litchi_opc::part::Part>> {
+fn find_core_properties_part(package: &OpcPackage) -> Result<Option<&dyn litchi_opc::part::Part>> {
     let mut relationships = package.rels().iter().filter(|relationship| {
         matches!(
             relationship.reltype(),
@@ -251,31 +249,27 @@ fn parse_property(namespace: Option<&[u8]>, local: &[u8]) -> Result<CoreProperty
         (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"keywords") => {
             CoreProperty::Keywords
         },
-        (
-            Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE),
-            b"lastModifiedBy",
-        ) => CoreProperty::LastModifiedBy,
+        (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"lastModifiedBy") => {
+            CoreProperty::LastModifiedBy
+        },
         (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"revision") => {
             CoreProperty::Revision
         },
         (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"category") => {
             CoreProperty::Category
         },
-        (
-            Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE),
-            b"contentStatus",
-        ) => CoreProperty::ContentStatus,
-        (
-            Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE),
-            b"contentType",
-        ) => CoreProperty::ContentType,
+        (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"contentStatus") => {
+            CoreProperty::ContentStatus
+        },
+        (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"contentType") => {
+            CoreProperty::ContentType
+        },
         (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"version") => {
             CoreProperty::Version
         },
-        (
-            Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE),
-            b"lastPrinted",
-        ) => CoreProperty::LastPrinted,
+        (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"lastPrinted") => {
+            CoreProperty::LastPrinted
+        },
         (Some(DUBLIN_CORE_TERMS_NAMESPACE), _) => {
             return Err(OoxmlError::InvalidFormat(
                 "OPC M4.3 permits only dcterms:created and dcterms:modified".to_string(),
@@ -306,8 +300,9 @@ fn validate_attributes(
 ) -> Result<()> {
     let mut has_w3cdtf = false;
     for attribute in element.attributes() {
-        let attribute = attribute
-            .map_err(|error| OoxmlError::Xml(format!("invalid core property attribute: {error}")))?;
+        let attribute = attribute.map_err(|error| {
+            OoxmlError::Xml(format!("invalid core property attribute: {error}"))
+        })?;
         let raw_key = attribute.key.as_ref();
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
@@ -509,7 +504,10 @@ mod tests {
             ct::OPC_CORE_PROPERTIES.to_string(),
             decoy.to_vec(),
         )));
-        assert_eq!(extract_metadata(&package).unwrap().title.as_deref(), Some("Target"));
+        assert_eq!(
+            extract_metadata(&package).unwrap().title.as_deref(),
+            Some("Target")
+        );
         assert!(!extract_metadata(&OpcPackage::new()).unwrap().has_data());
     }
 
@@ -588,8 +586,8 @@ mod tests {
 
     #[test]
     fn matches_poi_success_timezone_and_m4_conformance_fixtures() {
-        let success = extract_metadata(&poi_package("OPCCompliance_CoreProperties_SUCCESS.docx"))
-            .unwrap();
+        let success =
+            extract_metadata(&poi_package("OPCCompliance_CoreProperties_SUCCESS.docx")).unwrap();
         assert_eq!(success.title.as_deref(), Some("MyTitle"));
         assert_eq!(success.revision.as_deref(), Some("2"));
 
@@ -607,7 +605,10 @@ mod tests {
             "OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx",
             "OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx",
         ] {
-            assert!(extract_metadata(&poi_package(name)).is_err(), "accepted {name}");
+            assert!(
+                extract_metadata(&poi_package(name)).is_err(),
+                "accepted {name}"
+            );
         }
     }
 

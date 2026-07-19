@@ -5,22 +5,34 @@
 
 use crate::common::DocumentProperties;
 use crate::pivot::PivotTable;
+use crate::xlsx::calculation_chain::{CalculationChain, load_calculation_chain};
+use crate::xlsx::calculation_properties::{
+    WorkbookCalculationProperties, parse_workbook_calculation_properties,
+};
+use crate::xlsx::external_links::{
+    ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
+    build_external_link_part_with_conformance, load_external_link,
+};
 use crate::xlsx::writer::workbook::{
     generate_pivot_cache_definition_xml, generate_pivot_cache_records_xml,
     generate_pivot_table_definition_xml, render_pivot_table_sheet_cells,
 };
-use crate::xlsx::writer::{MutableWorkbookData, MutableWorksheet};
+use crate::xlsx::writer::{MutableWorkbookData, MutableWorksheet, NamedRange};
 use crate::xlsx::{Cell, SharedStrings, Styles};
-use crate::xlsx::external_links::{ExternalLinkEntry, load_external_link};
-use crate::xlsx::calculation_properties::{
-    WorkbookCalculationProperties, parse_workbook_calculation_properties,
+use crate::xlsx::data_validation::{
+    DataValidationCollection, parse_data_validation_collections,
+    replace_data_validation_collections, validate_data_validation_collections,
 };
-use crate::xlsx::calculation_chain::{CalculationChain, load_calculation_chain};
+use crate::xlsx::sheet_protection::{
+    WorksheetProtectedRangeCollection, WorksheetProtection, WorksheetProtectionMetadata,
+    parse_worksheet_protection, replace_worksheet_protection,
+    validate_worksheet_protection_metadata,
+};
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
 use litchi_opc::{OpcPackage, PackURI};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::parsers::workbook_parser;
 use super::worksheet::{Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksheetIterator};
@@ -53,6 +65,171 @@ pub struct Workbook {
     /// Inert workbook calculation order from `calcChain.xml`.
     calculation_chain: Option<CalculationChain>,
     external_links: Vec<ExternalLinkEntry>,
+    defined_names: Vec<NamedRange>,
+    worksheet_protection_mutations: HashMap<usize, WorksheetProtectionMetadata>,
+    worksheet_data_validation_mutations: HashMap<usize, Vec<DataValidationCollection>>,
+}
+
+fn patch_workbook_external_references(
+    xml: &[u8],
+    relationship_ids: &[String],
+    conformance: ExternalLinkConformance,
+) -> SheetResult<Vec<u8>> {
+    use quick_xml::Reader;
+    use quick_xml::events::Event;
+
+    if xml.len() > 64 * 1024 * 1024 {
+        return Err("workbook XML exceeds the external-link mutation limit".into());
+    }
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut root_name = Vec::new();
+    let mut root_prefix = String::new();
+    let mut relationship_prefix_bound = false;
+    let mut existing_start = None;
+    let mut existing_end = None;
+    let mut insertion = None;
+    let mut active_external_depth = None;
+    loop {
+        let before = reader.buffer_position() as usize;
+        match reader.read_event()? {
+            Event::Start(element) => {
+                let name = element.name().as_ref().to_vec();
+                let local = name.rsplit(|byte| *byte == b':').next().unwrap_or(&name);
+                if depth == 0 {
+                    root_name = name.clone();
+                    root_prefix = name
+                        .split(|byte| *byte == b':')
+                        .next()
+                        .filter(|_| name.contains(&b':'))
+                        .map(|value| String::from_utf8_lossy(value).into_owned())
+                        .unwrap_or_default();
+                    for attribute in element.attributes().with_checks(false) {
+                        let attribute = attribute?;
+                        if attribute.key.as_ref() == b"xmlns:r" {
+                            relationship_prefix_bound = true;
+                        }
+                    }
+                } else if depth == 1 {
+                    if local == b"externalReferences" {
+                        if existing_start.replace(before).is_some() {
+                            return Err("workbook has multiple externalReferences elements".into());
+                        }
+                        active_external_depth = Some(depth);
+                    } else if insertion.is_none()
+                        && matches!(
+                            local,
+                            b"definedNames" | b"calcPr" | b"oleSize" | b"customWorkbookViews"
+                                | b"pivotCaches" | b"smartTagPr" | b"smartTagTypes"
+                                | b"webPublishing" | b"fileRecoveryPr" | b"webPublishObjects"
+                                | b"extLst"
+                        )
+                    {
+                        insertion = Some(before);
+                    }
+                }
+                depth = depth.checked_add(1).ok_or("workbook XML depth overflow")?;
+            }
+            Event::Empty(element) => {
+                let name = element.name().as_ref().to_vec();
+                let local = name.rsplit(|byte| *byte == b':').next().unwrap_or(&name);
+                if depth == 1 && local == b"externalReferences" {
+                    return Err("workbook externalReferences cannot be empty".into());
+                }
+                if depth == 1
+                    && insertion.is_none()
+                    && matches!(
+                        local,
+                        b"definedNames" | b"calcPr" | b"oleSize" | b"customWorkbookViews"
+                            | b"pivotCaches" | b"smartTagPr" | b"smartTagTypes"
+                            | b"webPublishing" | b"fileRecoveryPr" | b"webPublishObjects"
+                            | b"extLst"
+                    )
+                {
+                    insertion = Some(before);
+                }
+            }
+            Event::End(element) => {
+                depth = depth.checked_sub(1).ok_or("invalid workbook XML depth")?;
+                if active_external_depth == Some(depth) {
+                    existing_end = Some(reader.buffer_position() as usize);
+                    active_external_depth = None;
+                }
+                if depth == 0 {
+                    if element.name().as_ref() != root_name.as_slice() {
+                        return Err("workbook root element is unbalanced".into());
+                    }
+                    insertion.get_or_insert(before);
+                    break;
+                }
+            }
+            Event::Eof => return Err("workbook XML ended before the root closed".into()),
+            _ => {}
+        }
+    }
+
+    let mut fragment = Vec::new();
+    if !relationship_ids.is_empty() {
+        let prefix = if root_prefix.is_empty() {
+            String::new()
+        } else {
+            format!("{}:", root_prefix)
+        };
+        let relationship_namespace = match conformance {
+            ExternalLinkConformance::Transitional => {
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            }
+            ExternalLinkConformance::Strict => {
+                "http://purl.oclc.org/ooxml/officeDocument/relationships"
+            }
+        };
+        let mut value = format!("<{prefix}externalReferences");
+        if !relationship_prefix_bound {
+            value.push_str(" xmlns:r=\"");
+            value.push_str(relationship_namespace);
+            value.push('"');
+        }
+        value.push('>');
+        for relationship_id in relationship_ids {
+            if relationship_id.is_empty()
+                || relationship_id.len() > 1024
+                || relationship_id.chars().any(char::is_control)
+            {
+                return Err("invalid external-link relationship ID".into());
+            }
+            value.push('<');
+            value.push_str(&prefix);
+            value.push_str("externalReference r:id=\"");
+            value.push_str(&litchi_core::xml::escape_xml(relationship_id));
+            value.push_str("\"/>");
+        }
+        value.push_str("</");
+        value.push_str(&prefix);
+        value.push_str("externalReferences>");
+        fragment = value.into_bytes();
+    }
+    let (start, end) = match (existing_start, existing_end) {
+        (Some(start), Some(end)) => (start, end),
+        (None, None) => {
+            let position = insertion.ok_or("workbook insertion point is missing")?;
+            (position, position)
+        }
+        _ => return Err("workbook externalReferences element is unbalanced".into()),
+    };
+    let new_len = xml
+        .len()
+        .checked_sub(end - start)
+        .and_then(|length| length.checked_add(fragment.len()))
+        .ok_or("workbook externalReferences size overflow")?;
+    if new_len > 64 * 1024 * 1024 {
+        return Err("mutated workbook XML exceeds 64 MiB".into());
+    }
+    let mut output = Vec::with_capacity(new_len);
+    output.extend_from_slice(&xml[..start]);
+    output.extend_from_slice(&fragment);
+    output.extend_from_slice(&xml[end..]);
+    Ok(output)
 }
 
 impl Workbook {
@@ -206,10 +383,14 @@ impl Workbook {
             calculation_properties: None,
             calculation_chain: None,
             external_links: Vec::new(),
+            defined_names: Vec::new(),
+            worksheet_protection_mutations: HashMap::new(),
+            worksheet_data_validation_mutations: HashMap::new(),
         };
 
         workbook.load_workbook_info()?;
-        workbook.calculation_chain = load_calculation_chain(&workbook.package, &workbook.workbook_uri)?;
+        workbook.calculation_chain =
+            load_calculation_chain(&workbook.package, &workbook.workbook_uri)?;
         workbook.load_external_links()?;
         workbook.load_shared_strings()?;
         workbook.load_styles()?;
@@ -235,6 +416,7 @@ impl Workbook {
         self.active_sheet_index = details.active_sheet_index;
         self.is_1904_date_system = details.uses_1904_date_system;
         self.calculation_properties = calculation_properties;
+        self.defined_names = details.defined_names;
 
         Ok(())
     }
@@ -246,14 +428,29 @@ impl Workbook {
         let details = workbook_parser::parse_workbook_details(content)?;
         let mut links = Vec::with_capacity(details.external_reference_ids.len());
         for (offset, relationship_id) in details.external_reference_ids.into_iter().enumerate() {
-            let relationship = workbook_part.rels().get(&relationship_id).ok_or_else(|| format!("workbook external reference '{relationship_id}' has no relationship"))?;
-            if relationship.is_external() || !matches!(relationship.reltype(), rt::EXTERNAL_LINK | rt::STRICT_EXTERNAL_LINK) {
-                return Err(format!("workbook external reference '{relationship_id}' has an invalid relationship").into());
+            let relationship = workbook_part.rels().get(&relationship_id).ok_or_else(|| {
+                format!("workbook external reference '{relationship_id}' has no relationship")
+            })?;
+            if relationship.is_external()
+                || !matches!(
+                    relationship.reltype(),
+                    rt::EXTERNAL_LINK | rt::STRICT_EXTERNAL_LINK
+                )
+            {
+                return Err(format!(
+                    "workbook external reference '{relationship_id}' has an invalid relationship"
+                )
+                .into());
             }
             let uri = relationship.target_partname()?;
             let part = self.package.get_part(&uri)?;
             if part.content_type() != ct::SML_EXTERNAL_LINK {
-                return Err(format!("external-link part '{uri}' has invalid content type '{}', expected '{}'", part.content_type(), ct::SML_EXTERNAL_LINK).into());
+                return Err(format!(
+                    "external-link part '{uri}' has invalid content type '{}', expected '{}'",
+                    part.content_type(),
+                    ct::SML_EXTERNAL_LINK
+                )
+                .into());
             }
             let index = u32::try_from(offset + 1).map_err(|_| "external-link index overflow")?;
             links.push(load_external_link(part, relationship_id, index)?);
@@ -277,7 +474,255 @@ impl Workbook {
     }
 
     pub fn external_link(&self, one_based_index: u32) -> Option<&ExternalLinkEntry> {
-        one_based_index.checked_sub(1).and_then(|index| self.external_links.get(index as usize))
+        one_based_index
+            .checked_sub(1)
+            .and_then(|index| self.external_links.get(index as usize))
+    }
+
+    /// Find an external link by its workbook relationship ID.
+    pub fn find_external_link_by_relationship_id(
+        &self,
+        relationship_id: &str,
+    ) -> Option<&ExternalLinkEntry> {
+        self.external_links
+            .iter()
+            .find(|entry| entry.relationship_id == relationship_id)
+    }
+
+    /// Find inert workbook/OLE links whose relationship target matches exactly.
+    pub fn find_external_links_by_target(&self, target: &str) -> Vec<&ExternalLinkEntry> {
+        self.external_links
+            .iter()
+            .filter(|entry| match &entry.kind {
+                ExternalLinkKind::Workbook(link) => link.target.target == target,
+                ExternalLinkKind::Ole(link) => link.target.target == target,
+                ExternalLinkKind::Dde(_) => false,
+            })
+            .collect()
+    }
+
+    /// Add a fully typed external-workbook, DDE, or OLE link without opening its target.
+    pub fn add_external_link(&mut self, kind: ExternalLinkKind) -> SheetResult<u32> {
+        let conformance = self.external_link_conformance()?;
+        self.add_external_link_with_conformance(kind, conformance)
+    }
+
+    /// Add an inert external link using the requested strict/transitional namespaces.
+    pub fn add_external_link_with_conformance(
+        &mut self,
+        kind: ExternalLinkKind,
+        conformance: ExternalLinkConformance,
+    ) -> SheetResult<u32> {
+        if self.external_links.len() >= 4096 {
+            return Err("workbook external-link limit exceeded".into());
+        }
+        let mut selected = None;
+        for suffix in 1..=4097u32 {
+            let uri = PackURI::new(&format!("/xl/externalLinks/externalLink{suffix}.xml"))?;
+            if self.package.get_part(&uri).is_err() {
+                selected = Some((suffix, uri));
+                break;
+            }
+        }
+        let (suffix, part_uri) = selected.ok_or("no free external-link part name")?;
+        let part = build_external_link_part_with_conformance(part_uri.clone(), &kind, conformance)?;
+        let target = format!("externalLinks/externalLink{suffix}.xml");
+        let relationship_id = self.next_workbook_relationship_id("rIdExternalLink")?;
+        let mut ids = self
+            .external_links
+            .iter()
+            .map(|entry| entry.relationship_id.clone())
+            .collect::<Vec<_>>();
+        ids.push(relationship_id.clone());
+        let original = self.package.get_part(&self.workbook_uri)?.blob().to_vec();
+        let replacement = patch_workbook_external_references(&original, &ids, conformance)?;
+        workbook_parser::parse_workbook_details(std::str::from_utf8(&replacement)?)?;
+        self.package.try_add_part(Box::new(part))?;
+        let workbook = self.package.get_part_mut(&self.workbook_uri)?;
+        workbook.rels_mut().add_relationship(
+            conformance.external_link_relationship().to_string(),
+            target,
+            relationship_id.clone(),
+            false,
+        );
+        workbook.set_blob(replacement);
+        let index = u32::try_from(self.external_links.len() + 1)
+            .map_err(|_| "external-link index overflow")?;
+        self.external_links.push(ExternalLinkEntry {
+            index,
+            relationship_id,
+            part_uri,
+            kind,
+        });
+        let _ = self.package.clear_digital_signatures();
+        Ok(index)
+    }
+
+    /// Replace a typed external link while preserving its workbook relationship and part URI.
+    pub fn replace_external_link(
+        &mut self,
+        one_based_index: u32,
+        kind: ExternalLinkKind,
+    ) -> SheetResult<()> {
+        let offset = one_based_index
+            .checked_sub(1)
+            .ok_or("external-link indices are one-based")? as usize;
+        let entry = self
+            .external_links
+            .get(offset)
+            .ok_or("external-link index is out of bounds")?;
+        let part_uri = entry.part_uri.clone();
+        let conformance = self.external_link_conformance()?;
+        let part = build_external_link_part_with_conformance(part_uri, &kind, conformance)?;
+        load_external_link(&part, entry.relationship_id.clone(), one_based_index)?;
+        self.package.add_part(Box::new(part));
+        self.external_links[offset].kind = kind;
+        let _ = self.package.clear_digital_signatures();
+        Ok(())
+    }
+
+    /// Alias for index-stable replacement.
+    pub fn update_external_link(
+        &mut self,
+        one_based_index: u32,
+        kind: ExternalLinkKind,
+    ) -> SheetResult<()> {
+        self.replace_external_link(one_based_index, kind)
+    }
+
+    /// Remove one external link when doing so cannot reinterpret a formula index.
+    pub fn remove_external_link(&mut self, one_based_index: u32) -> SheetResult<ExternalLinkEntry> {
+        let offset = one_based_index
+            .checked_sub(1)
+            .ok_or("external-link indices are one-based")? as usize;
+        if offset >= self.external_links.len() {
+            return Err("external-link index is out of bounds".into());
+        }
+        let affected = (one_based_index..=self.external_links.len() as u32).collect::<Vec<_>>();
+        self.ensure_external_formula_indices_unused(&affected)?;
+        let conformance = self.external_link_conformance()?;
+        let ids = self
+            .external_links
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| *index != offset)
+            .map(|(_, entry)| entry.relationship_id.clone())
+            .collect::<Vec<_>>();
+        let original = self.package.get_part(&self.workbook_uri)?.blob().to_vec();
+        let replacement = patch_workbook_external_references(&original, &ids, conformance)?;
+        workbook_parser::parse_workbook_details(std::str::from_utf8(&replacement)?)?;
+
+        let removed = self.external_links.remove(offset);
+        let workbook = self.package.get_part_mut(&self.workbook_uri)?;
+        workbook.rels_mut().remove(&removed.relationship_id);
+        workbook.set_blob(replacement);
+        for (index, entry) in self.external_links.iter_mut().enumerate() {
+            entry.index = u32::try_from(index + 1).map_err(|_| "external-link index overflow")?;
+        }
+        if !self.package_part_is_referenced(&removed.part_uri) {
+            self.package.remove_part(&removed.part_uri);
+        }
+        let _ = self.package.clear_digital_signatures();
+        Ok(removed)
+    }
+
+    /// Reorder links by their current one-based indices.
+    ///
+    /// The operation is rejected when a moved index appears in package formula text; this
+    /// prevents a reorder from silently changing the workbook a formula points at.
+    pub fn reorder_external_links(&mut self, order: &[u32]) -> SheetResult<()> {
+        if order.len() != self.external_links.len() {
+            return Err("external-link reorder must contain every link exactly once".into());
+        }
+        let expected = (1..=self.external_links.len() as u32).collect::<HashSet<_>>();
+        let actual = order.iter().copied().collect::<HashSet<_>>();
+        if actual != expected || actual.len() != order.len() {
+            return Err("external-link reorder is not a permutation".into());
+        }
+        let moved = order
+            .iter()
+            .enumerate()
+            .filter_map(|(new, old)| (*old != new as u32 + 1).then_some(*old))
+            .collect::<Vec<_>>();
+        self.ensure_external_formula_indices_unused(&moved)?;
+        let reordered = order
+            .iter()
+            .map(|index| self.external_links[(*index - 1) as usize].clone())
+            .collect::<Vec<_>>();
+        let ids = reordered
+            .iter()
+            .map(|entry| entry.relationship_id.clone())
+            .collect::<Vec<_>>();
+        let conformance = self.external_link_conformance()?;
+        let original = self.package.get_part(&self.workbook_uri)?.blob().to_vec();
+        let replacement = patch_workbook_external_references(&original, &ids, conformance)?;
+        workbook_parser::parse_workbook_details(std::str::from_utf8(&replacement)?)?;
+        self.package
+            .get_part_mut(&self.workbook_uri)?
+            .set_blob(replacement);
+        self.external_links = reordered;
+        for (index, entry) in self.external_links.iter_mut().enumerate() {
+            entry.index = u32::try_from(index + 1).map_err(|_| "external-link index overflow")?;
+        }
+        let _ = self.package.clear_digital_signatures();
+        Ok(())
+    }
+
+    fn external_link_conformance(&self) -> SheetResult<ExternalLinkConformance> {
+        let xml = self.package.get_part(&self.workbook_uri)?.blob();
+        if xml.windows(b"http://purl.oclc.org/ooxml/spreadsheetml/main".len()).any(|window| {
+            window == b"http://purl.oclc.org/ooxml/spreadsheetml/main"
+        }) {
+            Ok(ExternalLinkConformance::Strict)
+        } else {
+            Ok(ExternalLinkConformance::Transitional)
+        }
+    }
+
+    fn next_workbook_relationship_id(&self, prefix: &str) -> SheetResult<String> {
+        let relationships = self.package.get_part(&self.workbook_uri)?.rels();
+        for suffix in 1..=65_537u32 {
+            let candidate = format!("{prefix}{suffix}");
+            if relationships.get(&candidate).is_none() {
+                return Ok(candidate);
+            }
+        }
+        Err("no free workbook relationship ID".into())
+    }
+
+    fn ensure_external_formula_indices_unused(&self, indices: &[u32]) -> SheetResult<()> {
+        if indices.is_empty() {
+            return Ok(());
+        }
+        let needles = indices
+            .iter()
+            .map(|index| format!("[{index}]"))
+            .collect::<Vec<_>>();
+        if self.package.iter_parts().any(|part| {
+            let Ok(text) = std::str::from_utf8(part.blob()) else {
+                return false;
+            };
+            needles.iter().any(|needle| text.contains(needle))
+        }) {
+            return Err("external-link operation would change an index referenced by formula metadata".into());
+        }
+        Ok(())
+    }
+
+    fn package_part_is_referenced(&self, part_uri: &PackURI) -> bool {
+        self.package.iter_parts().any(|part| {
+            part.rels().iter().any(|relationship| {
+                !relationship.is_external()
+                    && relationship
+                        .target_partname()
+                        .is_ok_and(|target| target == *part_uri)
+            })
+        }) || self.package.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|target| target == *part_uri)
+        })
     }
 
     /// Load shared strings from xl/sharedStrings.xml
@@ -353,7 +798,7 @@ impl Workbook {
 
     /// Apply sheet-scoped print-area and print-title defined names.
     fn apply_defined_name_print_settings(
-        defined_names: &[workbook_parser::DefinedName],
+        defined_names: &[NamedRange],
         worksheets: &mut [WorksheetInfo],
     ) {
         for defined_name in defined_names {
@@ -365,13 +810,18 @@ impl Workbook {
             };
             let worksheet = &mut worksheets[sheet_idx];
             if defined_name.name == "_xlnm.Print_Area" {
-                worksheet.print_area = Self::parse_print_area(&defined_name.value);
+                worksheet.print_area = Self::parse_print_area(&defined_name.reference);
             } else if defined_name.name == "_xlnm.Print_Titles" {
-                let (rows, columns) = Self::parse_print_titles(&defined_name.value);
+                let (rows, columns) = Self::parse_print_titles(&defined_name.reference);
                 worksheet.repeating_rows = rows;
                 worksheet.repeating_columns = columns;
             }
         }
+    }
+
+    /// Return all workbook- and sheet-scoped defined names as inert metadata.
+    pub fn defined_names(&self) -> &[NamedRange] {
+        &self.defined_names
     }
 
     /// Parse the print area reference from a defined name value.
@@ -493,6 +943,46 @@ impl Workbook {
     /// Get the OPC package (for internal use by worksheet)
     pub(crate) fn package(&self) -> &OpcPackage {
         &self.package
+    }
+
+    /// Get the underlying OPC package.
+    pub fn opc_package(&self) -> &OpcPackage {
+        &self.package
+    }
+
+    /// Get mutable OPC access, dropping signatures that would become stale.
+    pub fn opc_package_mut(&mut self) -> &mut OpcPackage {
+        let _ = self.package.clear_digital_signatures();
+        &mut self.package
+    }
+
+    /// Verify package signatures without making a PKI trust determination.
+    pub fn verify_digital_signatures(
+        &self,
+        policy: &litchi_opc::SignatureVerificationPolicy,
+    ) -> litchi_opc::signature::Result<Vec<litchi_opc::DigitalSignatureVerification>> {
+        self.package.verify_digital_signatures(policy)
+    }
+
+    /// Sign the current, fully materialized package while preserving valid signatures.
+    pub fn add_digital_signature(
+        &mut self,
+        signer: &litchi_opc::PackageSigner,
+    ) -> litchi_opc::signature::Result<PackURI> {
+        self.package.add_digital_signature(signer)
+    }
+
+    /// Replace all package signatures with one new signature.
+    pub fn resign_digital_signature(
+        &mut self,
+        signer: &litchi_opc::PackageSigner,
+    ) -> litchi_opc::signature::Result<PackURI> {
+        self.package.resign_digital_signature(signer)
+    }
+
+    /// Remove all package digital signatures.
+    pub fn clear_digital_signatures(&mut self) -> litchi_opc::signature::Result<()> {
+        self.package.clear_digital_signatures()
     }
 
     /// Resolve a worksheet through the relationship declared by workbook.xml.
@@ -633,6 +1123,137 @@ impl Workbook {
         self.mutable_data.as_mut().unwrap().worksheet_mut(index)
     }
 
+    /// Return typed protection metadata, including any queued mutation.
+    pub fn worksheet_protection_metadata(
+        &self,
+        index: usize,
+    ) -> SheetResult<WorksheetProtectionMetadata> {
+        if let Some(value) = self.worksheet_protection_mutations.get(&index) {
+            return Ok(value.clone());
+        }
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        let part = self.package.get_part(&uri)?;
+        parse_worksheet_protection(part.blob()).map_err(Into::into)
+    }
+
+    /// Atomically replace all worksheet protection metadata.
+    pub fn replace_worksheet_protection(
+        &mut self,
+        index: usize,
+        metadata: WorksheetProtectionMetadata,
+    ) -> SheetResult<()> {
+        validate_worksheet_protection_metadata(&metadata)?;
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        let part = self.package.get_part(&uri)?;
+        replace_worksheet_protection(part.blob(), &metadata)?;
+        self.worksheet_protection_mutations.insert(index, metadata);
+        Ok(())
+    }
+
+    /// Atomically update worksheet protection through a cloned candidate.
+    pub fn update_worksheet_protection<F>(&mut self, index: usize, update: F) -> SheetResult<()>
+    where
+        F: FnOnce(&mut WorksheetProtectionMetadata),
+    {
+        let mut candidate = self.worksheet_protection_metadata(index)?;
+        update(&mut candidate);
+        self.replace_worksheet_protection(index, candidate)
+    }
+
+    pub fn set_sheet_protection(
+        &mut self,
+        index: usize,
+        protection: WorksheetProtection,
+    ) -> SheetResult<()> {
+        let mut candidate = self.worksheet_protection_metadata(index)?;
+        candidate.set_sheet_protection(Some(protection))?;
+        self.replace_worksheet_protection(index, candidate)
+    }
+
+    pub fn remove_sheet_protection(&mut self, index: usize) -> SheetResult<()> {
+        let mut candidate = self.worksheet_protection_metadata(index)?;
+        candidate.clear_sheet_protection();
+        self.replace_worksheet_protection(index, candidate)
+    }
+
+    pub fn set_protected_ranges(
+        &mut self,
+        index: usize,
+        collections: Vec<WorksheetProtectedRangeCollection>,
+    ) -> SheetResult<()> {
+        let mut candidate = self.worksheet_protection_metadata(index)?;
+        candidate.set_protected_range_collections(collections)?;
+        self.replace_worksheet_protection(index, candidate)
+    }
+
+    pub fn remove_protected_ranges(&mut self, index: usize) -> SheetResult<()> {
+        let mut candidate = self.worksheet_protection_metadata(index)?;
+        candidate.clear_protected_ranges();
+        self.replace_worksheet_protection(index, candidate)
+    }
+
+    /// Return complete core and Office 2010 data-validation collections.
+    pub fn worksheet_data_validation_collections(
+        &self,
+        index: usize,
+    ) -> SheetResult<Vec<DataValidationCollection>> {
+        if let Some(value) = self.worksheet_data_validation_mutations.get(&index) {
+            return Ok(value.clone());
+        }
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        let part = self.package.get_part(&uri)?;
+        parse_data_validation_collections(part.blob()).map_err(Into::into)
+    }
+
+    /// Atomically replace all data-validation collections on one existing worksheet.
+    pub fn replace_worksheet_data_validations(
+        &mut self,
+        index: usize,
+        collections: Vec<DataValidationCollection>,
+    ) -> SheetResult<()> {
+        validate_data_validation_collections(&collections)?;
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        let part = self.package.get_part(&uri)?;
+        replace_data_validation_collections(part.blob(), &collections)?;
+        self.worksheet_data_validation_mutations
+            .insert(index, collections);
+        Ok(())
+    }
+
+    /// Atomically update cloned data-validation collections and commit only if valid.
+    pub fn update_worksheet_data_validations<F>(
+        &mut self,
+        index: usize,
+        update: F,
+    ) -> SheetResult<()>
+    where
+        F: FnOnce(&mut Vec<DataValidationCollection>),
+    {
+        let mut candidate = self.worksheet_data_validation_collections(index)?;
+        update(&mut candidate);
+        self.replace_worksheet_data_validations(index, candidate)
+    }
+
+    pub fn remove_worksheet_data_validations(&mut self, index: usize) -> SheetResult<()> {
+        self.replace_worksheet_data_validations(index, Vec::new())
+    }
+
     /// Add a pivot table to the workbook (writer).
     ///
     /// This wires the pivot cache/table into the save pipeline; when you call
@@ -759,7 +1380,7 @@ impl Workbook {
     /// # Arguments
     /// * `name` - Name for the range
     /// * `reference` - Reference formula
-    /// * `sheet_id` - 1-based sheet ID
+    /// * `sheet_id` - Zero-based workbook sheet index (`localSheetId` in OOXML)
     pub fn define_name_local(&mut self, name: &str, reference: &str, sheet_id: u32) {
         if self.mutable_data.is_none() {
             self.mutable_data = Some(MutableWorkbookData::new());
@@ -896,8 +1517,60 @@ impl Workbook {
         // Update app properties (extended properties)
         self.update_app_properties()?;
 
-        self.package.save(path)?;
+        let staged = self.stage_worksheet_mutations()?;
+        for (uri, _, replacement) in &staged {
+            self.package
+                .get_part_mut(uri)?
+                .set_blob(replacement.clone());
+        }
+        let save_result = self.package.save(path);
+        for (uri, original, _) in staged {
+            self.package
+                .get_part_mut(&uri)
+                .expect("staged worksheet part remains present")
+                .set_blob(original);
+        }
+        save_result?;
         Ok(())
+    }
+
+    fn stage_worksheet_mutations(
+        &self,
+    ) -> SheetResult<Vec<(PackURI, Vec<u8>, Vec<u8>)>> {
+        use litchi_opc::constants::content_type as ct;
+        let indexes: HashSet<usize> = self
+            .worksheet_protection_mutations
+            .keys()
+            .chain(self.worksheet_data_validation_mutations.keys())
+            .copied()
+            .collect();
+        let mut staged = Vec::with_capacity(indexes.len());
+        for index in indexes {
+            let info = self
+                .worksheets
+                .get(index)
+                .ok_or("Worksheet index out of bounds")?;
+            let uri = self.worksheet_part_uri(info)?;
+            let part = self.package.get_part(&uri)?;
+            if part.content_type() != ct::SML_WORKSHEET {
+                return Err(format!(
+                    "Worksheet '{}' has invalid content type '{}'",
+                    info.name,
+                    part.content_type()
+                )
+                .into());
+            }
+            let original = part.blob().to_vec();
+            let mut replacement = original.clone();
+            if let Some(metadata) = self.worksheet_protection_mutations.get(&index) {
+                replacement = replace_worksheet_protection(&replacement, metadata)?;
+            }
+            if let Some(collections) = self.worksheet_data_validation_mutations.get(&index) {
+                replacement = replace_data_validation_collections(&replacement, collections)?;
+            }
+            staged.push((uri, original, replacement));
+        }
+        Ok(staged)
     }
 
     /// Generate metadata.xml for threaded comments support.
@@ -991,10 +1664,27 @@ impl Workbook {
 
         let preserved_external_relationships = {
             let workbook_part = self.package.get_part(&self.workbook_uri)?;
-            self.external_links.iter().map(|link| {
-                let relationship = workbook_part.rels().get(&link.relationship_id).ok_or_else(|| format!("missing preserved external-link relationship '{}'", link.relationship_id))?;
-                Ok((relationship.reltype().to_string(), relationship.target_ref().to_string(), relationship.r_id().to_string(), relationship.is_external()))
-            }).collect::<SheetResult<Vec<_>>>()?
+            self.external_links
+                .iter()
+                .map(|link| {
+                    let relationship =
+                        workbook_part
+                            .rels()
+                            .get(&link.relationship_id)
+                            .ok_or_else(|| {
+                                format!(
+                                    "missing preserved external-link relationship '{}'",
+                                    link.relationship_id
+                                )
+                            })?;
+                    Ok((
+                        relationship.reltype().to_string(),
+                        relationship.target_ref().to_string(),
+                        relationship.r_id().to_string(),
+                        relationship.is_external(),
+                    ))
+                })
+                .collect::<SheetResult<Vec<_>>>()?
         };
 
         let workbook_uri = PackURI::new("/xl/workbook.xml")?;
@@ -1005,8 +1695,15 @@ impl Workbook {
             ct::SML_SHEET_MAIN.to_string(),
             Vec::new(),
         );
-        for (relationship_type, target, relationship_id, external) in preserved_external_relationships {
-            temp_wb_part.rels_mut().add_relationship(relationship_type, target, relationship_id, external);
+        for (relationship_type, target, relationship_id, external) in
+            preserved_external_relationships
+        {
+            temp_wb_part.rels_mut().add_relationship(
+                relationship_type,
+                target,
+                relationship_id,
+                external,
+            );
         }
 
         // Build styles from all worksheets FIRST
@@ -1763,7 +2460,11 @@ impl Workbook {
         data.sync_print_settings_to_defined_names();
 
         // Now generate workbook XML with actual relationship IDs
-        let external_reference_ids: Vec<String> = self.external_links.iter().map(|link| link.relationship_id.clone()).collect();
+        let external_reference_ids: Vec<String> = self
+            .external_links
+            .iter()
+            .map(|link| link.relationship_id.clone())
+            .collect();
         let workbook_xml = data.generate_workbook_xml_with_external_rels(
             &worksheet_rel_ids,
             &pivot_cache_rel_ids,
@@ -3312,17 +4013,14 @@ mod tests {
 
     fn replace_hyperlink_relationship(package: &mut OpcPackage, reltype: &str, external: bool) {
         let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
-        let relationships = package
-            .get_part_mut(&worksheet_uri)
-            .unwrap()
-            .rels_mut();
+        let relationships = package.get_part_mut(&worksheet_uri).unwrap().rels_mut();
         relationships.remove("rId1").unwrap();
         relationships.add_relationship(
-                reltype.to_string(),
-                "https://example.com/replaced".to_string(),
-                "rId1".to_string(),
-                external,
-            );
+            reltype.to_string(),
+            "https://example.com/replaced".to_string(),
+            "rId1".to_string(),
+            external,
+        );
     }
 
     #[test]
@@ -3464,17 +4162,14 @@ mod tests {
     fn rejects_external_comments_relationship() {
         let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
         let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
-        let relationships = package
-            .get_part_mut(&worksheet_uri)
-            .unwrap()
-            .rels_mut();
+        let relationships = package.get_part_mut(&worksheet_uri).unwrap().rels_mut();
         relationships.remove("rId2").unwrap();
         relationships.add_relationship(
-                rt::COMMENTS.to_string(),
-                "https://example.com/comments.xml".to_string(),
-                "rId2".to_string(),
-                true,
-            );
+            rt::COMMENTS.to_string(),
+            "https://example.com/comments.xml".to_string(),
+            "rId2".to_string(),
+            true,
+        );
         let workbook = Workbook::new(package).unwrap();
 
         assert!(workbook.get_worksheet(0).is_err());

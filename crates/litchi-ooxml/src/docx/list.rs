@@ -36,17 +36,23 @@ impl Numbering {
         if level > 8 {
             return Err(invalid(&format!("invalid numbering level '{level}'")));
         }
-        let num = self.get_num(num_id).ok_or_else(|| {
-            invalid(&format!("paragraph references missing numId {num_id}"))
-        })?;
-        let abstract_num = self.get_abstract_num(num.abstract_num_id()).ok_or_else(|| {
-            invalid(&format!("numId {num_id} references a missing abstract numbering definition"))
-        })?;
+        let num = self
+            .get_num(num_id)
+            .ok_or_else(|| invalid(&format!("paragraph references missing numId {num_id}")))?;
+        let abstract_num = self
+            .get_abstract_num(num.abstract_num_id())
+            .ok_or_else(|| {
+                invalid(&format!(
+                    "numId {num_id} references a missing abstract numbering definition"
+                ))
+            })?;
         let level_override = num.overrides().iter().find(|value| value.level == level);
         let mut resolved = match level_override.and_then(|value| value.definition.clone()) {
             Some(value) => value,
             None => abstract_num.level(level).cloned().ok_or_else(|| {
-                invalid(&format!("numId {num_id} has no definition for level {level}"))
+                invalid(&format!(
+                    "numId {num_id} has no definition for level {level}"
+                ))
             })?,
         };
         if let Some(start) = level_override.and_then(|value| value.start_override) {
@@ -57,12 +63,16 @@ impl Numbering {
 }
 
 impl ListCounterState {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Advance one numbered paragraph and return its typed marker and suffix.
-    pub fn advance(&mut self, numbering: &Numbering, properties: ParagraphNumbering)
-        -> Result<(ListMarker, NumberingSuffix)>
-    {
+    pub fn advance(
+        &mut self,
+        numbering: &Numbering,
+        properties: ParagraphNumbering,
+    ) -> Result<(ListMarker, NumberingSuffix)> {
         if properties.num_id == 0 {
             return Err(invalid("numId 0 cancels numbering and cannot be advanced"));
         }
@@ -71,17 +81,17 @@ impl ListCounterState {
 
         for ancestor in 0..properties.level {
             if counters[usize::from(ancestor)].is_none() {
-                counters[usize::from(ancestor)] = Some(
-                    numbering.resolve_level(properties.num_id, ancestor)?.start);
+                counters[usize::from(ancestor)] =
+                    Some(numbering.resolve_level(properties.num_id, ancestor)?.start);
             }
         }
 
         let slot = &mut counters[usize::from(properties.level)];
         *slot = Some(match *slot {
             None => current_level.start,
-            Some(value) => value.checked_add(1).ok_or_else(|| {
-                invalid("numbering counter overflow")
-            })?,
+            Some(value) => value
+                .checked_add(1)
+                .ok_or_else(|| invalid("numbering counter overflow"))?,
         });
 
         for deeper in properties.level.saturating_add(1)..=8 {
@@ -103,9 +113,12 @@ impl ListCounterState {
     }
 }
 
-fn render_marker(numbering: &Numbering, properties: ParagraphNumbering,
-    counters: &[Option<i64>; 9], current: &NumberingLevel) -> Result<ListMarker>
-{
+fn render_marker(
+    numbering: &Numbering,
+    properties: ParagraphNumbering,
+    counters: &[Option<i64>; 9],
+    current: &NumberingLevel,
+) -> Result<ListMarker> {
     if let Some(id) = current.picture_bullet_id {
         return Ok(ListMarker::PictureBullet { id });
     }
@@ -127,12 +140,19 @@ fn render_marker(numbering: &Numbering, properties: ParagraphNumbering,
                 if referenced <= properties.level {
                     let level = numbering.resolve_level(properties.num_id, referenced)?;
                     let value = counters[usize::from(referenced)].unwrap_or(level.start);
-                    let format = if current.legal { &NumberFormat::Decimal } else { &level.format };
+                    let format = if current.legal {
+                        &NumberFormat::Decimal
+                    } else {
+                        &level.format
+                    };
                     match format_number(value, format) {
                         Some(rendered) => output.push_str(&rendered),
-                        None => return Ok(ListMarker::UnsupportedFormat {
-                            format: format.as_str().to_owned(), value,
-                        }),
+                        None => {
+                            return Ok(ListMarker::UnsupportedFormat {
+                                format: format.as_str().to_owned(),
+                                value,
+                            });
+                        },
                     }
                 }
                 if output.len() > MAX_LABEL_BYTES {
@@ -152,27 +172,55 @@ fn render_marker(numbering: &Numbering, properties: ParagraphNumbering,
 fn format_number(value: i64, format: &NumberFormat) -> Option<String> {
     match format {
         NumberFormat::Decimal => Some(value.to_string()),
+        NumberFormat::DecimalHalfWidth => Some(value.to_string()),
+        NumberFormat::DecimalFullWidth | NumberFormat::DecimalFullWidth2 => {
+            Some(full_width_decimal(value))
+        },
         NumberFormat::DecimalZero => {
-            if (0..10).contains(&value) { Some(format!("0{value}")) } else { Some(value.to_string()) }
-        }
+            if (0..10).contains(&value) {
+                Some(format!("0{value}"))
+            } else {
+                Some(value.to_string())
+            }
+        },
+        NumberFormat::Hex => u64::try_from(value).ok().map(|value| format!("{value:X}")),
         NumberFormat::LowerLetter => letters(value, false),
         NumberFormat::UpperLetter => letters(value, true),
         NumberFormat::LowerRoman => roman(value).map(|value| value.to_ascii_lowercase()),
         NumberFormat::UpperRoman => roman(value),
         NumberFormat::None => Some(String::new()),
-        NumberFormat::Bullet | NumberFormat::Other(_) => None,
+        _ => None,
     }
+}
+
+fn full_width_decimal(value: i64) -> String {
+    let decimal = value.to_string();
+    let mut output = String::with_capacity(decimal.len().saturating_mul(3));
+    for character in decimal.chars() {
+        match character {
+            '0'..='9' => output.push(
+                char::from_u32(u32::from(character) - u32::from('0') + u32::from('\u{ff10}'))
+                    .expect("ASCII digit always maps to a full-width digit"),
+            ),
+            other => output.push(other),
+        }
+    }
+    output
 }
 
 fn letters(value: i64, uppercase: bool) -> Option<String> {
     let mut value = u64::try_from(value).ok()?;
-    if value == 0 { return None; }
+    if value == 0 {
+        return None;
+    }
     let mut output = Vec::new();
     while value != 0 {
         value -= 1;
         output.push(if uppercase { b'A' } else { b'a' } + (value % 26) as u8);
         value /= 26;
-        if output.len() > 32 { return None; }
+        if output.len() > 32 {
+            return None;
+        }
     }
     output.reverse();
     String::from_utf8(output).ok()
@@ -180,12 +228,24 @@ fn letters(value: i64, uppercase: bool) -> Option<String> {
 
 fn roman(value: i64) -> Option<String> {
     let mut value = u16::try_from(value).ok()?;
-    if value == 0 || value > 3999 { return None; }
+    if value == 0 || value > 3999 {
+        return None;
+    }
     let mut output = String::new();
     for (amount, digits) in [
-        (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"),
-        (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"),
-        (5, "V"), (4, "IV"), (1, "I"),
+        (1000, "M"),
+        (900, "CM"),
+        (500, "D"),
+        (400, "CD"),
+        (100, "C"),
+        (90, "XC"),
+        (50, "L"),
+        (40, "XL"),
+        (10, "X"),
+        (9, "IX"),
+        (5, "V"),
+        (4, "IV"),
+        (1, "I"),
     ] {
         while value >= amount {
             output.push_str(digits);
@@ -195,7 +255,9 @@ fn roman(value: i64) -> Option<String> {
     Some(output)
 }
 
-fn invalid(message: &str) -> OoxmlError { OoxmlError::InvalidFormat(message.to_owned()) }
+fn invalid(message: &str) -> OoxmlError {
+    OoxmlError::InvalidFormat(message.to_owned())
+}
 
 #[cfg(test)]
 mod tests {
@@ -203,16 +265,35 @@ mod tests {
     use crate::docx::numbering::{AbstractNum, LevelOverride, Num};
 
     fn level(index: u8, start: i64, format: NumberFormat, text: &str) -> NumberingLevel {
-        NumberingLevel { level: index, start, format, custom_format: None,
-            level_text: Some(text.to_owned()), suffix: NumberingSuffix::Space,
-            restart: LevelRestart::Default, legal: false, paragraph_style: None,
-            picture_bullet_id: None }
+        NumberingLevel {
+            level: index,
+            start,
+            format,
+            custom_format: None,
+            level_text: Some(text.to_owned()),
+            suffix: NumberingSuffix::Space,
+            restart: LevelRestart::Default,
+            legal: false,
+            paragraph_style: None,
+            picture_bullet_id: None,
+        }
     }
 
     fn numbering(levels: Vec<NumberingLevel>) -> Numbering {
-        Numbering { abstract_nums: vec![AbstractNum { id: 1, num_type: None,
-            num_style_link: None, style_link: None, levels }],
-            nums: vec![Num { id: 4, abstract_num_id: 1, overrides: Vec::new() }] }
+        Numbering {
+            abstract_nums: vec![AbstractNum {
+                id: 1,
+                num_type: None,
+                num_style_link: None,
+                style_link: None,
+                levels,
+            }],
+            nums: vec![Num {
+                id: 4,
+                abstract_num_id: 1,
+                overrides: Vec::new(),
+            }],
+        }
     }
 
     #[test]
@@ -222,51 +303,209 @@ mod tests {
             level(1, 1, NumberFormat::LowerLetter, "%1.%2)"),
         ]);
         let mut state = ListCounterState::new();
-        assert_eq!(state.advance(&numbering, ParagraphNumbering { num_id: 4, level: 0 }).unwrap().0,
-            ListMarker::Text("1.".to_owned()));
-        assert_eq!(state.advance(&numbering, ParagraphNumbering { num_id: 4, level: 1 }).unwrap().0,
-            ListMarker::Text("1.a)".to_owned()));
-        state.advance(&numbering, ParagraphNumbering { num_id: 4, level: 0 }).unwrap();
-        assert_eq!(state.advance(&numbering, ParagraphNumbering { num_id: 4, level: 1 }).unwrap().0,
-            ListMarker::Text("2.a)".to_owned()));
+        assert_eq!(
+            state
+                .advance(
+                    &numbering,
+                    ParagraphNumbering {
+                        num_id: 4,
+                        level: 0
+                    }
+                )
+                .unwrap()
+                .0,
+            ListMarker::Text("1.".to_owned())
+        );
+        assert_eq!(
+            state
+                .advance(
+                    &numbering,
+                    ParagraphNumbering {
+                        num_id: 4,
+                        level: 1
+                    }
+                )
+                .unwrap()
+                .0,
+            ListMarker::Text("1.a)".to_owned())
+        );
+        state
+            .advance(
+                &numbering,
+                ParagraphNumbering {
+                    num_id: 4,
+                    level: 0,
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            state
+                .advance(
+                    &numbering,
+                    ParagraphNumbering {
+                        num_id: 4,
+                        level: 1
+                    }
+                )
+                .unwrap()
+                .0,
+            ListMarker::Text("2.a)".to_owned())
+        );
     }
 
     #[test]
     fn applies_start_override_without_mutating_definition() {
         let mut value = numbering(vec![level(0, 1, NumberFormat::Decimal, "%1")]);
-        value.nums[0].overrides.push(LevelOverride { level: 0,
-            start_override: Some(7), definition: None });
+        value.nums[0].overrides.push(LevelOverride {
+            level: 0,
+            start_override: Some(7),
+            definition: None,
+        });
         let mut state = ListCounterState::new();
-        assert_eq!(state.advance(&value, ParagraphNumbering { num_id: 4, level: 0 }).unwrap().0,
-            ListMarker::Text("7".to_owned()));
+        assert_eq!(
+            state
+                .advance(
+                    &value,
+                    ParagraphNumbering {
+                        num_id: 4,
+                        level: 0
+                    }
+                )
+                .unwrap()
+                .0,
+            ListMarker::Text("7".to_owned())
+        );
         assert_eq!(value.abstract_nums[0].levels[0].start, 1);
     }
 
     #[test]
     fn returns_typed_markers_for_unsupported_and_picture_formats() {
-        let value = numbering(vec![level(0, 2, NumberFormat::Other("circleNum".to_owned()), "%1")]);
+        let value = numbering(vec![level(
+            0,
+            2,
+            NumberFormat::Other("circleNum".to_owned()),
+            "%1",
+        )]);
         let mut state = ListCounterState::new();
-        assert_eq!(state.advance(&value, ParagraphNumbering { num_id: 4, level: 0 }).unwrap().0,
-            ListMarker::UnsupportedFormat { format: "circleNum".to_owned(), value: 2 });
+        assert_eq!(
+            state
+                .advance(
+                    &value,
+                    ParagraphNumbering {
+                        num_id: 4,
+                        level: 0
+                    }
+                )
+                .unwrap()
+                .0,
+            ListMarker::UnsupportedFormat {
+                format: "circleNum".to_owned(),
+                value: 2
+            }
+        );
 
         let mut picture = level(0, 1, NumberFormat::Bullet, "ignored");
         picture.picture_bullet_id = Some(3);
         let value = numbering(vec![picture]);
-        assert_eq!(ListCounterState::new().advance(&value,
-            ParagraphNumbering { num_id: 4, level: 0 }).unwrap().0,
-            ListMarker::PictureBullet { id: 3 });
+        assert_eq!(
+            ListCounterState::new()
+                .advance(
+                    &value,
+                    ParagraphNumbering {
+                        num_id: 4,
+                        level: 0
+                    }
+                )
+                .unwrap()
+                .0,
+            ListMarker::PictureBullet { id: 3 }
+        );
+    }
+
+    #[test]
+    fn renders_script_independent_extended_number_formats() {
+        for (format, start, expected) in [
+            (NumberFormat::Hex, 255, "FF"),
+            (NumberFormat::DecimalHalfWidth, 123, "123"),
+            (NumberFormat::DecimalFullWidth, 123, "１２３"),
+            (NumberFormat::DecimalFullWidth2, -42, "-４２"),
+        ] {
+            let value = numbering(vec![level(0, start, format, "%1")]);
+            assert_eq!(
+                ListCounterState::new()
+                    .advance(
+                        &value,
+                        ParagraphNumbering {
+                            num_id: 4,
+                            level: 0
+                        }
+                    )
+                    .unwrap()
+                    .0,
+                ListMarker::Text(expected.to_owned())
+            );
+        }
+
+        let value = numbering(vec![level(0, -1, NumberFormat::Hex, "%1")]);
+        assert_eq!(
+            ListCounterState::new()
+                .advance(
+                    &value,
+                    ParagraphNumbering {
+                        num_id: 4,
+                        level: 0
+                    }
+                )
+                .unwrap()
+                .0,
+            ListMarker::UnsupportedFormat {
+                format: "hex".to_owned(),
+                value: -1
+            }
+        );
     }
 
     #[test]
     fn rejects_counter_overflow_and_oversized_templates() {
         let value = numbering(vec![level(0, i64::MAX, NumberFormat::Decimal, "%1")]);
         let mut state = ListCounterState::new();
-        state.advance(&value, ParagraphNumbering { num_id: 4, level: 0 }).unwrap();
-        assert!(state.advance(&value, ParagraphNumbering { num_id: 4, level: 0 }).is_err());
+        state
+            .advance(
+                &value,
+                ParagraphNumbering {
+                    num_id: 4,
+                    level: 0,
+                },
+            )
+            .unwrap();
+        assert!(
+            state
+                .advance(
+                    &value,
+                    ParagraphNumbering {
+                        num_id: 4,
+                        level: 0
+                    }
+                )
+                .is_err()
+        );
 
-        let value = numbering(vec![level(0, 1, NumberFormat::Decimal,
-            &"x".repeat(MAX_LEVEL_TEXT_BYTES + 1))]);
-        assert!(ListCounterState::new().advance(&value,
-            ParagraphNumbering { num_id: 4, level: 0 }).is_err());
+        let value = numbering(vec![level(
+            0,
+            1,
+            NumberFormat::Decimal,
+            &"x".repeat(MAX_LEVEL_TEXT_BYTES + 1),
+        )]);
+        assert!(
+            ListCounterState::new()
+                .advance(
+                    &value,
+                    ParagraphNumbering {
+                        num_id: 4,
+                        level: 0
+                    }
+                )
+                .is_err()
+        );
     }
 }

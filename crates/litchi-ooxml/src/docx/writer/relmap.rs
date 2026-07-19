@@ -24,6 +24,8 @@ pub struct RelationshipMapper {
     footnotes_id: Option<String>,
     /// Endnotes relationship ID (if any)
     endnotes_id: Option<String>,
+    /// Explicitly keyed per-section header/footer relationships.
+    section_header_footer_ids: HashMap<String, String>,
 }
 
 impl RelationshipMapper {
@@ -90,6 +92,14 @@ impl RelationshipMapper {
     /// Get the endnotes relationship ID.
     pub fn get_endnotes_id(&self) -> Option<&str> {
         self.endnotes_id.as_deref()
+    }
+
+    pub fn add_section_header_footer_id(&mut self, key: String, rel_id: String) {
+        self.section_header_footer_ids.insert(key, rel_id);
+    }
+
+    pub fn get_section_header_footer_id(&self, key: &str) -> Option<&str> {
+        self.section_header_footer_ids.get(key).map(String::as_str)
     }
 }
 

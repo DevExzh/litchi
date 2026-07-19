@@ -13,7 +13,12 @@ use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use std::sync::Arc;
 
-fn processed(part:&dyn Part)->Result<Arc<Vec<u8>>>{Ok(match crate::common::mce::process_ooxml(part.blob())?{std::borrow::Cow::Borrowed(_)=>part.blob_arc(),std::borrow::Cow::Owned(v)=>Arc::new(v)})}
+fn processed(part: &dyn Part) -> Result<Arc<Vec<u8>>> {
+    Ok(match crate::common::mce::process_ooxml(part.blob())? {
+        std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+        std::borrow::Cow::Owned(v) => Arc::new(v),
+    })
+}
 
 /// A slide part.
 ///
@@ -27,7 +32,8 @@ pub struct SlidePart<'a> {
 impl<'a> SlidePart<'a> {
     /// Create a SlidePart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let xml=processed(part)?;Ok(Self { part, xml })
+        let xml = processed(part)?;
+        Ok(Self { part, xml })
     }
 
     /// Get the XML bytes of the slide.
@@ -100,6 +106,11 @@ impl<'a> SlidePart<'a> {
         crate::pptx::transitions::SlideTransition::from_xml(self.xml_bytes())
     }
 
+    /// Parse the simple shape-animation metadata in this slide's timing tree.
+    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
+        crate::pptx::animations::AnimationSequence::parse_slide_xml(self.xml_bytes())
+    }
+
     /// Get the background for this slide.
     ///
     /// Parses the `<p:bg>` element from the slide XML.
@@ -121,7 +132,8 @@ pub struct SlideLayoutPart<'a> {
 impl<'a> SlideLayoutPart<'a> {
     /// Create a SlideLayoutPart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let xml=processed(part)?;Ok(Self { part, xml })
+        let xml = processed(part)?;
+        Ok(Self { part, xml })
     }
 
     /// Get the XML bytes of the layout.
@@ -154,7 +166,8 @@ pub struct SlideMasterPart<'a> {
 impl<'a> SlideMasterPart<'a> {
     /// Create a SlideMasterPart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let xml=processed(part)?;Ok(Self { part, xml })
+        let xml = processed(part)?;
+        Ok(Self { part, xml })
     }
 
     /// Get the XML bytes of the master.
@@ -294,6 +307,26 @@ mod tests {
         let blob = part("/ppt/slides/slide1.xml", xml);
         let slide = SlidePart::from_part(&blob).unwrap();
         assert!(slide.shapes().is_err());
+    }
+
+    #[test]
+    fn slide_part_exposes_animation_metadata() {
+        let xml = format!(
+            r#"<p:sld xmlns:p="{P}"><p:cSld><p:spTree><p:sp><p:nvSpPr>
+            <p:cNvPr id="3" name="Animated"/></p:nvSpPr></p:sp></p:spTree></p:cSld>
+            <p:timing><p:tnLst><p:par><p:cTn><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst>
+            <p:childTnLst><p:par><p:cTn><p:stCondLst><p:cond delay="25"/></p:stCondLst>
+            <p:childTnLst><p:par><p:cTn presetID="10" presetClass="entr" nodeType="clickEffect" dur="500">
+            <p:childTnLst><p:set><p:cBhvr><p:tgtEl><p:spTgt spid="3"/></p:tgtEl></p:cBhvr></p:set>
+            </p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>
+            </p:tnLst></p:timing></p:sld>"#
+        );
+        let blob = part("/ppt/slides/slide1.xml", xml);
+        let animations = SlidePart::from_part(&blob).unwrap().animations().unwrap();
+        assert_eq!(animations.len(), 1);
+        assert_eq!(animations.animations[0].shape_id, 3);
+        assert_eq!(animations.animations[0].duration, 500);
+        assert_eq!(animations.animations[0].delay, 25);
     }
 
     #[test]

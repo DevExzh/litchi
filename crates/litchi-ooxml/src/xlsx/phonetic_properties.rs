@@ -25,7 +25,9 @@ impl WorksheetPhoneticType {
             "fullwidthKatakana" => Ok(Self::FullWidthKatakana),
             "Hiragana" => Ok(Self::Hiragana),
             "noConversion" => Ok(Self::NoConversion),
-            _ => Err(invalid(format!("invalid worksheet phonetic type '{value}'"))),
+            _ => Err(invalid(format!(
+                "invalid worksheet phonetic type '{value}'"
+            ))),
         }
     }
 }
@@ -46,7 +48,9 @@ impl WorksheetPhoneticAlignment {
             "left" => Ok(Self::Left),
             "center" => Ok(Self::Center),
             "distributed" => Ok(Self::Distributed),
-            _ => Err(invalid(format!("invalid worksheet phonetic alignment '{value}'"))),
+            _ => Err(invalid(format!(
+                "invalid worksheet phonetic alignment '{value}'"
+            ))),
         }
     }
 }
@@ -61,13 +65,23 @@ pub struct WorksheetPhoneticProperties {
 
 impl WorksheetPhoneticProperties {
     /// Zero-based font index. Out-of-range indices fall back to the Normal-style font.
-    pub fn font_id(&self) -> u32 { self.font_id }
-    pub fn phonetic_type(&self) -> WorksheetPhoneticType { self.phonetic_type }
-    pub fn alignment(&self) -> WorksheetPhoneticAlignment { self.alignment }
+    pub fn font_id(&self) -> u32 {
+        self.font_id
+    }
+    pub fn phonetic_type(&self) -> WorksheetPhoneticType {
+        self.phonetic_type
+    }
+    pub fn alignment(&self) -> WorksheetPhoneticAlignment {
+        self.alignment
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Context { Outside, Worksheet, PhoneticProperties }
+enum Context {
+    Outside,
+    Worksheet,
+    PhoneticProperties,
+}
 
 struct Parser {
     stack: Vec<Context>,
@@ -79,15 +93,14 @@ struct Parser {
 pub fn parse_worksheet_phonetic_properties(
     xml: &[u8],
 ) -> Result<Option<WorksheetPhoneticProperties>> {
-    let processed = process_markup_compatibility(
-        xml,
-        &MceCapabilities::default(),
-        &MceLimits::default(),
-    )?;
+    let processed =
+        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
     reader.config_mut().trim_text(false);
     let mut parser = Parser {
-        stack: Vec::new(), properties: None, seen_properties: false,
+        stack: Vec::new(),
+        properties: None,
+        seen_properties: false,
     };
     loop {
         let decoder = reader.decoder();
@@ -103,15 +116,17 @@ pub fn parse_worksheet_phonetic_properties(
                 if !text.decode().map_err(xml_error)?.trim().is_empty() {
                     return Err(invalid("unexpected text in worksheet phoneticPr"));
                 }
-            }
+            },
             Event::CData(_) if parser.parent() == Context::PhoneticProperties => {
                 return Err(invalid("unexpected CDATA in worksheet phoneticPr"));
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
     }
-    if !parser.stack.is_empty() { return Err(invalid("unterminated worksheet phoneticPr XML")); }
+    if !parser.stack.is_empty() {
+        return Err(invalid("unterminated worksheet phoneticPr XML"));
+    }
     Ok(parser.properties)
 }
 
@@ -121,8 +136,11 @@ impl Parser {
     }
 
     fn start(
-        &mut self, namespace: &ResolveResult<'_>, element: &BytesStart<'_>,
-        decoder: Decoder, resolver: &NamespaceResolver,
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
     ) -> Result<()> {
         let local = element.local_name();
         let core = is_spreadsheetml_name(namespace, element.name(), local.as_ref());
@@ -134,36 +152,43 @@ impl Parser {
             (Context::Worksheet, true, b"phoneticPr") => {
                 self.add_properties(element, decoder, resolver)?;
                 self.stack.push(Context::PhoneticProperties);
-            }
+            },
             (Context::PhoneticProperties, _, _) => {
                 return Err(invalid("worksheet phoneticPr is a leaf element"));
-            }
+            },
             _ => self.stack.push(Context::Outside),
         }
         Ok(())
     }
 
     fn empty(
-        &mut self, namespace: &ResolveResult<'_>, element: &BytesStart<'_>,
-        decoder: Decoder, resolver: &NamespaceResolver,
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
     ) -> Result<()> {
         let local = element.local_name();
         let core = is_spreadsheetml_name(namespace, element.name(), local.as_ref());
-        if self.stack.is_empty() { return Err(invalid("worksheet root cannot be empty")); }
+        if self.stack.is_empty() {
+            return Err(invalid("worksheet root cannot be empty"));
+        }
         match (self.parent(), core, local.as_ref()) {
             (Context::Worksheet, true, b"phoneticPr") => {
                 self.add_properties(element, decoder, resolver)?;
-            }
+            },
             (Context::PhoneticProperties, _, _) => {
                 return Err(invalid("worksheet phoneticPr is a leaf element"));
-            }
-            _ => {}
+            },
+            _ => {},
         }
         Ok(())
     }
 
     fn end(&mut self, local: &[u8]) -> Result<()> {
-        let context = self.stack.pop()
+        let context = self
+            .stack
+            .pop()
             .ok_or_else(|| invalid("unexpected worksheet phoneticPr end element"))?;
         match context {
             Context::Worksheet if local == b"worksheet" => Ok(()),
@@ -174,10 +199,14 @@ impl Parser {
     }
 
     fn add_properties(
-        &mut self, element: &BytesStart<'_>, decoder: Decoder,
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
         resolver: &NamespaceResolver,
     ) -> Result<()> {
-        if self.seen_properties { return Err(invalid("duplicate worksheet phoneticPr element")); }
+        if self.seen_properties {
+            return Err(invalid("duplicate worksheet phoneticPr element"));
+        }
         self.seen_properties = true;
         self.properties = Some(parse_attributes(element, decoder, resolver)?);
         Ok(())
@@ -185,29 +214,46 @@ impl Parser {
 }
 
 fn parse_attributes(
-    element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceResolver,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
 ) -> Result<WorksheetPhoneticProperties> {
     let mut font_id = None;
     let mut phonetic_type = None;
     let mut alignment = None;
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
-        if is_namespace_declaration(attribute.key.as_ref()) { continue; }
+        if is_namespace_declaration(attribute.key.as_ref()) {
+            continue;
+        }
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if !matches!(namespace, ResolveResult::Unbound) {
-            return Err(invalid(format!("unknown namespaced phoneticPr attribute '{}'",
-                String::from_utf8_lossy(attribute.key.as_ref()))));
+            return Err(invalid(format!(
+                "unknown namespaced phoneticPr attribute '{}'",
+                String::from_utf8_lossy(attribute.key.as_ref())
+            )));
         }
-        let value = attribute.decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(xml_error)?;
         match local.as_ref() {
             b"fontId" => set_once(&mut font_id, parse_font_id(&value)?, "fontId")?,
-            b"type" => set_once(&mut phonetic_type,
-                WorksheetPhoneticType::parse(&value)?, "type")?,
-            b"alignment" => set_once(&mut alignment,
-                WorksheetPhoneticAlignment::parse(&value)?, "alignment")?,
-            name => return Err(invalid(format!("unknown phoneticPr attribute '{}'",
-                String::from_utf8_lossy(name)))),
+            b"type" => set_once(
+                &mut phonetic_type,
+                WorksheetPhoneticType::parse(&value)?,
+                "type",
+            )?,
+            b"alignment" => set_once(
+                &mut alignment,
+                WorksheetPhoneticAlignment::parse(&value)?,
+                "alignment",
+            )?,
+            name => {
+                return Err(invalid(format!(
+                    "unknown phoneticPr attribute '{}'",
+                    String::from_utf8_lossy(name)
+                )));
+            },
         }
     }
     Ok(WorksheetPhoneticProperties {
@@ -218,12 +264,15 @@ fn parse_attributes(
 }
 
 fn parse_font_id(value: &str) -> Result<u32> {
-    value.parse::<u32>()
+    value
+        .parse::<u32>()
         .map_err(|_| invalid(format!("invalid worksheet phoneticPr fontId '{value}'")))
 }
 
 fn set_once<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {
-    if slot.is_some() { return Err(invalid(format!("duplicate phoneticPr {name} attribute"))); }
+    if slot.is_some() {
+        return Err(invalid(format!("duplicate phoneticPr {name} attribute")));
+    }
     *slot = Some(value);
     Ok(())
 }
@@ -238,8 +287,7 @@ fn reject_unsafe_event(event: &Event<'_>) -> Result<()> {
     }
     if let Event::GeneralRef(reference) = event {
         let name = reference.decode().map_err(xml_error)?;
-        if !matches!(name.as_ref(), "amp" | "lt" | "gt" | "apos" | "quot")
-            && !name.starts_with('#')
+        if !matches!(name.as_ref(), "amp" | "lt" | "gt" | "apos" | "quot") && !name.starts_with('#')
         {
             return Err(invalid("custom XML entities are rejected"));
         }
@@ -270,19 +318,31 @@ mod tests {
 
     #[test]
     fn parses_all_values_and_effective_defaults() {
-        let defaults = parse(r#"<phoneticPr fontId="4294967295"/>"#).unwrap().unwrap();
+        let defaults = parse(r#"<phoneticPr fontId="4294967295"/>"#)
+            .unwrap()
+            .unwrap();
         assert_eq!(defaults.font_id(), u32::MAX);
-        assert_eq!(defaults.phonetic_type(), WorksheetPhoneticType::FullWidthKatakana);
+        assert_eq!(
+            defaults.phonetic_type(),
+            WorksheetPhoneticType::FullWidthKatakana
+        );
         assert_eq!(defaults.alignment(), WorksheetPhoneticAlignment::Left);
 
         for (lexical, expected) in [
-            ("halfwidthKatakana", WorksheetPhoneticType::HalfWidthKatakana),
-            ("fullwidthKatakana", WorksheetPhoneticType::FullWidthKatakana),
+            (
+                "halfwidthKatakana",
+                WorksheetPhoneticType::HalfWidthKatakana,
+            ),
+            (
+                "fullwidthKatakana",
+                WorksheetPhoneticType::FullWidthKatakana,
+            ),
             ("Hiragana", WorksheetPhoneticType::Hiragana),
             ("noConversion", WorksheetPhoneticType::NoConversion),
         ] {
             let value = parse(&format!(r#"<phoneticPr fontId="3" type="{lexical}"/>"#))
-                .unwrap().unwrap();
+                .unwrap()
+                .unwrap();
             assert_eq!(value.phonetic_type(), expected);
         }
         for (lexical, expected) in [
@@ -291,8 +351,11 @@ mod tests {
             ("center", WorksheetPhoneticAlignment::Center),
             ("distributed", WorksheetPhoneticAlignment::Distributed),
         ] {
-            let value = parse(&format!(r#"<phoneticPr fontId="3" alignment="{lexical}"/>"#))
-                .unwrap().unwrap();
+            let value = parse(&format!(
+                r#"<phoneticPr fontId="3" alignment="{lexical}"/>"#
+            ))
+            .unwrap()
+            .unwrap();
             assert_eq!(value.alignment(), expected);
         }
         assert!(parse("").unwrap().is_none());
@@ -301,19 +364,34 @@ mod tests {
     #[test]
     fn supports_strict_mce_and_exact_scoping() {
         let strict = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><phoneticPr fontId="9" type="Hiragana" alignment="center"/></worksheet>"#;
-        let value = parse_worksheet_phonetic_properties(strict).unwrap().unwrap();
+        let value = parse_worksheet_phonetic_properties(strict)
+            .unwrap()
+            .unwrap();
         assert_eq!(value.font_id(), 9);
         assert_eq!(value.phonetic_type(), WorksheetPhoneticType::Hiragana);
         assert_eq!(value.alignment(), WorksheetPhoneticAlignment::Center);
 
-        let mce = format!(concat!(
-            r#"<worksheet xmlns="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:x" mc:Ignorable="x">"#,
-            r#"<mc:AlternateContent><mc:Choice Requires="x"><x:phoneticPr fontId="8"/>"#,
-            r#"</mc:Choice><mc:Fallback><phoneticPr fontId="7" x:future="1"/>"#,
-            r#"</mc:Fallback></mc:AlternateContent></worksheet>"#,
-        ), NS);
-        assert_eq!(parse_worksheet_phonetic_properties(mce.as_bytes()).unwrap().unwrap().font_id(), 7);
-        assert!(parse("<wrapper><phoneticPr fontId=\"1\"/></wrapper>").unwrap().is_none());
+        let mce = format!(
+            concat!(
+                r#"<worksheet xmlns="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:x" mc:Ignorable="x">"#,
+                r#"<mc:AlternateContent><mc:Choice Requires="x"><x:phoneticPr fontId="8"/>"#,
+                r#"</mc:Choice><mc:Fallback><phoneticPr fontId="7" x:future="1"/>"#,
+                r#"</mc:Fallback></mc:AlternateContent></worksheet>"#,
+            ),
+            NS
+        );
+        assert_eq!(
+            parse_worksheet_phonetic_properties(mce.as_bytes())
+                .unwrap()
+                .unwrap()
+                .font_id(),
+            7
+        );
+        assert!(
+            parse("<wrapper><phoneticPr fontId=\"1\"/></wrapper>")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -337,27 +415,43 @@ mod tests {
 
     fn fixture(bytes: &[u8]) -> WorksheetPhoneticProperties {
         let package = OpcPackage::from_bytes(bytes).unwrap();
-        let part = package.get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap()).unwrap();
-        parse_worksheet_phonetic_properties(part.blob()).unwrap().unwrap()
+        let part = package
+            .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+            .unwrap();
+        parse_worksheet_phonetic_properties(part.blob())
+            .unwrap()
+            .unwrap()
     }
 
     #[test]
     fn reads_poi_and_libreoffice_fixtures() {
-        let preserve_attributes = fixture(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/48962.xlsx")));
+        let preserve_attributes = fixture(include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/48962.xlsx"
+        )));
         assert_eq!(preserve_attributes.font_id(), 3);
-        assert_eq!(preserve_attributes.phonetic_type(), WorksheetPhoneticType::NoConversion);
+        assert_eq!(
+            preserve_attributes.phonetic_type(),
+            WorksheetPhoneticType::NoConversion
+        );
 
-        let poi = fixture(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/54071.xlsx")));
+        let poi = fixture(include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/54071.xlsx"
+        )));
         assert_eq!(poi.font_id(), 1);
         assert_eq!(poi.phonetic_type(), WorksheetPhoneticType::NoConversion);
         assert_eq!(poi.alignment(), WorksheetPhoneticAlignment::Left);
 
-        let libreoffice = fixture(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx")));
+        let libreoffice = fixture(include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx"
+        )));
         assert_eq!(libreoffice.font_id(), 1);
-        assert_eq!(libreoffice.phonetic_type(), WorksheetPhoneticType::NoConversion);
+        assert_eq!(
+            libreoffice.phonetic_type(),
+            WorksheetPhoneticType::NoConversion
+        );
         assert_eq!(libreoffice.alignment(), WorksheetPhoneticAlignment::Left);
     }
 }

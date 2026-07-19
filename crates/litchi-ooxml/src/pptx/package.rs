@@ -535,6 +535,35 @@ impl Package {
         &self.opc
     }
 
+    /// Verify package signatures without making a PKI trust determination.
+    pub fn verify_digital_signatures(
+        &self,
+        policy: &litchi_opc::SignatureVerificationPolicy,
+    ) -> litchi_opc::signature::Result<Vec<litchi_opc::DigitalSignatureVerification>> {
+        self.opc.verify_digital_signatures(policy)
+    }
+
+    /// Sign the current, fully materialized package while preserving valid signatures.
+    pub fn add_digital_signature(
+        &mut self,
+        signer: &litchi_opc::PackageSigner,
+    ) -> litchi_opc::signature::Result<PackURI> {
+        self.opc.add_digital_signature(signer)
+    }
+
+    /// Replace all package signatures with one new signature.
+    pub fn resign_digital_signature(
+        &mut self,
+        signer: &litchi_opc::PackageSigner,
+    ) -> litchi_opc::signature::Result<PackURI> {
+        self.opc.resign_digital_signature(signer)
+    }
+
+    /// Remove all package digital signatures.
+    pub fn clear_digital_signatures(&mut self) -> litchi_opc::signature::Result<()> {
+        self.opc.clear_digital_signatures()
+    }
+
     /// Discover inert embedded-object and embedded-package relationships.
     pub fn embedded_parts(&self) -> Result<Vec<crate::EmbeddedPart<'_>>> {
         crate::embedded_object::discover_embedded_parts(&self.opc)
@@ -557,6 +586,7 @@ impl Package {
     /// This provides access to lower-level package operations for modification.
     #[inline]
     pub fn opc_package_mut(&mut self) -> &mut OpcPackage {
+        let _ = self.opc.clear_digital_signatures();
         &mut self.opc
     }
 

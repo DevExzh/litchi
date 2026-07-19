@@ -8,10 +8,11 @@ pub mod workbook;
 
 // Re-export main types
 pub use sheet::{
-    AutoFilter, CellComment, ConditionalFormat, ConditionalFormatType, FreezePanes, HeaderFooter,
-    Hyperlink, Image, MutableWorksheet, NamedRange, PageBreak, PageSetup, RichTextRun,
-    SheetProtection,
+    AutoFilter, CellComment, ConditionalFormat, ConditionalFormatType, DefinedNameBuiltIn,
+    FreezePanes, HeaderFooter, Hyperlink, Image, MutableWorksheet, NamedRange, PageBreak,
+    PageSetup, PageSetupProperties, RichTextRun,
 };
+pub use crate::xlsx::sheet_protection::WorksheetProtection as SheetProtection;
 pub use strings::MutableSharedStrings;
 pub use styles::StylesBuilder;
 pub use workbook::{MutableWorkbookData, WorkbookProtection};

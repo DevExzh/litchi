@@ -5,6 +5,7 @@ use super::run::MutableRun;
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
+use super::revision::RevisionTextMode;
 
 /// Elements that can appear in a hyperlink.
 #[derive(Debug)]
@@ -102,8 +103,8 @@ impl MutableHyperlink {
         self
     }
 
-    /// Serialize the hyperlink to XML.
-    pub(crate) fn to_xml(&self, xml: &mut String, r_id: Option<&str>) -> Result<()> {
+    /// Serialize the hyperlink to XML in the requested revision text mode.
+    pub(crate) fn to_xml_mode(&self, xml: &mut String, r_id: Option<&str>, mode: RevisionTextMode) -> Result<()> {
         // Start hyperlink element
         if let Some(anchor) = &self.anchor {
             // Internal anchor hyperlink
@@ -124,11 +125,11 @@ impl MutableHyperlink {
             for element in &self.elements {
                 match element {
                     HyperlinkElement::Run(run) => {
-                        run.to_xml(xml)?;
+                        run.to_xml_mode(xml, mode)?;
                     },
                     HyperlinkElement::Field(field) => {
                         xml.push_str("<w:r>");
-                        let field_xml = field.to_xml()?;
+                        let field_xml = field.to_xml_mode(mode)?;
                         xml.push_str(&field_xml);
                         xml.push_str("</w:r>");
                     },
@@ -137,7 +138,8 @@ impl MutableHyperlink {
         } else if let Some(text) = &self.text {
             // Fallback to simple text (backward compatibility)
             xml.push_str("<w:r><w:rPr><w:rStyle w:val=\"Hyperlink\"/></w:rPr>");
-            write!(xml, "<w:t>{}</w:t>", escape_xml(text))
+            let name = if mode == RevisionTextMode::Deleted { "delText" } else { "t" };
+            write!(xml, "<w:{name}>{}</w:{name}>", escape_xml(text))
                 .map_err(|e| OoxmlError::Xml(e.to_string()))?;
             xml.push_str("</w:r>");
         }
@@ -189,7 +191,7 @@ mod tests {
     fn test_hyperlink_to_xml_with_anchor() {
         let link = MutableHyperlink::new_anchor("bookmark1");
         let mut xml = String::new();
-        let result = link.to_xml(&mut xml, None);
+        let result = link.to_xml_mode(&mut xml, None, RevisionTextMode::Normal);
         assert!(result.is_ok());
         assert!(xml.contains("<w:hyperlink"));
         assert!(xml.contains("w:anchor=\"bookmark1\""));
@@ -200,7 +202,7 @@ mod tests {
     fn test_hyperlink_to_xml_with_url() {
         let link = MutableHyperlink::new("https://example.com", "Click here");
         let mut xml = String::new();
-        let result = link.to_xml(&mut xml, Some("rId1"));
+        let result = link.to_xml_mode(&mut xml, Some("rId1"), RevisionTextMode::Normal);
         assert!(result.is_ok());
         assert!(xml.contains("<w:hyperlink"));
         assert!(xml.contains("r:id=\"rId1\""));
@@ -212,7 +214,7 @@ mod tests {
     fn test_hyperlink_to_xml_without_r_id_or_anchor() {
         let link = MutableHyperlink::new("https://example.com", "Click here");
         let mut xml = String::new();
-        let result = link.to_xml(&mut xml, None);
+        let result = link.to_xml_mode(&mut xml, None, RevisionTextMode::Normal);
         assert!(result.is_err());
     }
 

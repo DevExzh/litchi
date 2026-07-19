@@ -158,6 +158,11 @@ impl Clone for Table {
 }
 
 impl Table {
+    /// Returns tracked revisions in this table and its descendant rows and cells.
+    pub fn revisions(&self) -> Result<Vec<crate::docx::Revision>> {
+        Ok(crate::docx::revision::parse_revisions(self.xml_bytes())?.into_vec())
+    }
+
     /// Create a new Table from XML bytes (owned).
     #[inline]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
@@ -276,6 +281,11 @@ impl Clone for Row {
 }
 
 impl Row {
+    /// Returns tracked revisions in this row and its descendant cells.
+    pub fn revisions(&self) -> Result<Vec<crate::docx::Revision>> {
+        Ok(crate::docx::revision::parse_revisions(self.xml_bytes())?.into_vec())
+    }
+
     /// Create a new Row from XML bytes.
     #[inline]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
@@ -374,6 +384,11 @@ impl Clone for Cell {
 }
 
 impl Cell {
+    /// Returns tracked revisions in this cell.
+    pub fn revisions(&self) -> Result<Vec<crate::docx::Revision>> {
+        Ok(crate::docx::revision::parse_revisions(self.xml_bytes())?.into_vec())
+    }
+
     /// Create a new Cell from XML bytes.
     #[inline]
     pub fn new(xml_bytes: Vec<u8>) -> Self {

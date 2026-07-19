@@ -72,8 +72,12 @@ pub struct PositiveUniversalMeasure {
 }
 
 impl PositiveUniversalMeasure {
-    pub fn value(self) -> f64 { self.value }
-    pub fn unit(self) -> UniversalMeasureUnit { self.unit }
+    pub fn value(self) -> f64 {
+        self.value
+    }
+    pub fn unit(self) -> UniversalMeasureUnit {
+        self.unit
+    }
 
     pub fn inches(self) -> f64 {
         match self.unit {
@@ -85,7 +89,9 @@ impl PositiveUniversalMeasure {
         }
     }
 
-    pub fn millimeters(self) -> f64 { self.inches() * 25.4 }
+    pub fn millimeters(self) -> f64 {
+        self.inches() * 25.4
+    }
 }
 
 /// Complete effective settings from one worksheet `pageSetup` element.
@@ -113,25 +119,63 @@ pub struct WorksheetPageSetup {
 }
 
 impl WorksheetPageSetup {
-    pub fn paper_size(&self) -> u32 { self.paper_size }
-    pub fn paper_width(&self) -> Option<PositiveUniversalMeasure> { self.paper_width }
-    pub fn paper_height(&self) -> Option<PositiveUniversalMeasure> { self.paper_height }
-    pub fn scale(&self) -> u32 { self.scale }
-    pub fn first_page_number(&self) -> u32 { self.first_page_number }
-    pub fn fit_to_width(&self) -> u32 { self.fit_to_width }
-    pub fn fit_to_height(&self) -> u32 { self.fit_to_height }
-    pub fn page_order(&self) -> PageSetupOrder { self.page_order }
-    pub fn orientation(&self) -> PageSetupOrientation { self.orientation }
-    pub fn use_printer_defaults(&self) -> bool { self.use_printer_defaults }
-    pub fn black_and_white(&self) -> bool { self.black_and_white }
-    pub fn draft(&self) -> bool { self.draft }
-    pub fn cell_comments(&self) -> PageSetupCellComments { self.cell_comments }
-    pub fn use_first_page_number(&self) -> bool { self.use_first_page_number }
-    pub fn print_errors(&self) -> PageSetupPrintErrors { self.print_errors }
-    pub fn horizontal_dpi(&self) -> u32 { self.horizontal_dpi }
-    pub fn vertical_dpi(&self) -> u32 { self.vertical_dpi }
-    pub fn copies(&self) -> u32 { self.copies }
-    pub fn printer_settings_relationship_id(&self) -> Option<&str> { self.printer_settings_relationship_id.as_deref() }
+    pub fn paper_size(&self) -> u32 {
+        self.paper_size
+    }
+    pub fn paper_width(&self) -> Option<PositiveUniversalMeasure> {
+        self.paper_width
+    }
+    pub fn paper_height(&self) -> Option<PositiveUniversalMeasure> {
+        self.paper_height
+    }
+    pub fn scale(&self) -> u32 {
+        self.scale
+    }
+    pub fn first_page_number(&self) -> u32 {
+        self.first_page_number
+    }
+    pub fn fit_to_width(&self) -> u32 {
+        self.fit_to_width
+    }
+    pub fn fit_to_height(&self) -> u32 {
+        self.fit_to_height
+    }
+    pub fn page_order(&self) -> PageSetupOrder {
+        self.page_order
+    }
+    pub fn orientation(&self) -> PageSetupOrientation {
+        self.orientation
+    }
+    pub fn use_printer_defaults(&self) -> bool {
+        self.use_printer_defaults
+    }
+    pub fn black_and_white(&self) -> bool {
+        self.black_and_white
+    }
+    pub fn draft(&self) -> bool {
+        self.draft
+    }
+    pub fn cell_comments(&self) -> PageSetupCellComments {
+        self.cell_comments
+    }
+    pub fn use_first_page_number(&self) -> bool {
+        self.use_first_page_number
+    }
+    pub fn print_errors(&self) -> PageSetupPrintErrors {
+        self.print_errors
+    }
+    pub fn horizontal_dpi(&self) -> u32 {
+        self.horizontal_dpi
+    }
+    pub fn vertical_dpi(&self) -> u32 {
+        self.vertical_dpi
+    }
+    pub fn copies(&self) -> u32 {
+        self.copies
+    }
+    pub fn printer_settings_relationship_id(&self) -> Option<&str> {
+        self.printer_settings_relationship_id.as_deref()
+    }
 }
 
 impl Default for WorksheetPageSetup {
@@ -162,9 +206,16 @@ impl Default for WorksheetPageSetup {
 
 /// Parse a worksheet's optional complete core `pageSetup` element.
 pub fn parse_complete_worksheet_page_setup(xml: &[u8]) -> Result<Option<WorksheetPageSetup>> {
-    if xml.len() > MAX_XML_BYTES { return Err(invalid("worksheet XML is too large")); }
-    let validated = process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
-    let selected = if validated.report.alternate_content_count == 0 { xml } else { validated.xml.as_ref() };
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("worksheet XML is too large"));
+    }
+    let validated =
+        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+    let selected = if validated.report.alternate_content_count == 0 {
+        xml
+    } else {
+        validated.xml.as_ref()
+    };
     parse_selected(selected)
 }
 
@@ -184,96 +235,208 @@ fn parse_selected(xml: &[u8]) -> Result<Option<WorksheetPageSetup>> {
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                depth = depth.checked_add(1).ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
-                if depth > MAX_DEPTH { return Err(invalid("worksheet XML nesting is too deep")); }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
+                if depth > MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
                 if depth == 1 {
-                    if root_seen || !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" {
+                    if root_seen
+                        || !spreadsheet(&namespace)
+                        || element.local_name().as_ref() != b"worksheet"
+                    {
                         return Err(invalid("page-setup parser requires a worksheet root"));
                     }
                     root_seen = true;
-                } else if depth == 2 && spreadsheet(&namespace) && element.local_name().as_ref() == b"pageSetup" {
-                    if result.is_some() || open.is_some() { return Err(invalid("duplicate worksheet pageSetup element")); }
+                } else if depth == 2
+                    && spreadsheet(&namespace)
+                    && element.local_name().as_ref() == b"pageSetup"
+                {
+                    if result.is_some() || open.is_some() {
+                        return Err(invalid("duplicate worksheet pageSetup element"));
+                    }
                     open = Some((depth, parse_setup(&element, decoder, &resolver)?));
                 } else if open.is_some() {
                     return Err(invalid("pageSetup must not contain child elements"));
                 }
-            }
+            },
             Event::Empty(element) => {
-                if depth == 1 && spreadsheet(&namespace) && element.local_name().as_ref() == b"pageSetup" {
-                    if result.is_some() || open.is_some() { return Err(invalid("duplicate worksheet pageSetup element")); }
+                if depth == 1
+                    && spreadsheet(&namespace)
+                    && element.local_name().as_ref() == b"pageSetup"
+                {
+                    if result.is_some() || open.is_some() {
+                        return Err(invalid("duplicate worksheet pageSetup element"));
+                    }
                     result = Some(parse_setup(&element, decoder, &resolver)?);
                 } else if open.is_some() {
                     return Err(invalid("pageSetup must not contain child elements"));
                 }
-            }
+            },
             Event::Text(text) => {
-                if open.is_some() && !text.as_ref().iter().all(u8::is_ascii_whitespace) { return Err(invalid("pageSetup must not contain text")); }
-            }
-            Event::CData(_) if open.is_some() => return Err(invalid("pageSetup must not contain CDATA")),
+                if open.is_some() && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("pageSetup must not contain text"));
+                }
+            },
+            Event::CData(_) if open.is_some() => {
+                return Err(invalid("pageSetup must not contain CDATA"));
+            },
             Event::End(element) => {
-                if open.as_ref().is_some_and(|(element_depth, _)| *element_depth == depth) {
+                if open
+                    .as_ref()
+                    .is_some_and(|(element_depth, _)| *element_depth == depth)
+                {
                     let (_, setup) = open.take().expect("checked above");
                     result = Some(setup);
                 }
                 if depth == 1 {
-                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" { return Err(invalid("invalid worksheet closing element")); }
+                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" {
+                        return Err(invalid("invalid worksheet closing element"));
+                    }
                     root_closed = true;
                 }
-                depth = depth.checked_sub(1).ok_or_else(|| invalid("unexpected XML end element"))?;
-            }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unexpected XML end element"))?;
+            },
             Event::GeneralRef(reference) => {
                 if reference.resolve_char_ref().map_err(xml_error)?.is_none()
-                    && !matches!(reference.decode().map_err(xml_error)?.as_ref(), "amp" | "lt" | "gt" | "apos" | "quot")
-                { return Err(invalid("custom XML entities are rejected")); }
-                if open.is_some() { return Err(invalid("pageSetup must not contain entity text")); }
-            }
-            Event::DocType(_) | Event::PI(_) => return Err(invalid("DTD and processing instructions are rejected")),
-            Event::Decl(_) | Event::Comment(_) | Event::CData(_) => {}
+                    && !matches!(
+                        reference.decode().map_err(xml_error)?.as_ref(),
+                        "amp" | "lt" | "gt" | "apos" | "quot"
+                    )
+                {
+                    return Err(invalid("custom XML entities are rejected"));
+                }
+                if open.is_some() {
+                    return Err(invalid("pageSetup must not contain entity text"));
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTD and processing instructions are rejected"));
+            },
+            Event::Decl(_) | Event::Comment(_) | Event::CData(_) => {},
             Event::Eof => break,
         }
     }
-    if !root_seen || !root_closed || depth != 0 || open.is_some() { return Err(invalid("incomplete worksheet page-setup XML")); }
+    if !root_seen || !root_closed || depth != 0 || open.is_some() {
+        return Err(invalid("incomplete worksheet page-setup XML"));
+    }
     Ok(result)
 }
 
-fn parse_setup(element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceResolver) -> Result<WorksheetPageSetup> {
+fn parse_setup(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<WorksheetPageSetup> {
     let mut setup = WorksheetPageSetup::default();
     let mut seen = [false; 18];
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
-        if attribute.key.as_ref().contains(&b':') { continue; }
-        let value = attribute.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder).map_err(xml_error)?;
+        if attribute.key.as_ref().contains(&b':') {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?;
         let slot = match attribute.key.local_name().as_ref() {
-            b"paperSize" => { setup.paper_size = parse_u32(&value, "paperSize")?; 0 }
-            b"paperWidth" => { setup.paper_width = Some(parse_measure(&value, "paperWidth")?); 1 }
-            b"paperHeight" => { setup.paper_height = Some(parse_measure(&value, "paperHeight")?); 2 }
+            b"paperSize" => {
+                setup.paper_size = parse_u32(&value, "paperSize")?;
+                0
+            },
+            b"paperWidth" => {
+                setup.paper_width = Some(parse_measure(&value, "paperWidth")?);
+                1
+            },
+            b"paperHeight" => {
+                setup.paper_height = Some(parse_measure(&value, "paperHeight")?);
+                2
+            },
             b"scale" => {
                 setup.scale = parse_u32(&value, "scale")?;
-                if !(10..=400).contains(&setup.scale) { return Err(invalid("pageSetup scale must be between 10 and 400")); }
+                if !(10..=400).contains(&setup.scale) {
+                    return Err(invalid("pageSetup scale must be between 10 and 400"));
+                }
                 3
-            }
-            b"firstPageNumber" => { setup.first_page_number = parse_u32(&value, "firstPageNumber")?; 4 }
-            b"fitToWidth" => { setup.fit_to_width = parse_u32(&value, "fitToWidth")?; 5 }
-            b"fitToHeight" => { setup.fit_to_height = parse_u32(&value, "fitToHeight")?; 6 }
-            b"pageOrder" => { setup.page_order = parse_order(&value)?; 7 }
-            b"orientation" => { setup.orientation = parse_orientation(&value)?; 8 }
-            b"usePrinterDefaults" => { setup.use_printer_defaults = parse_bool(&value, "usePrinterDefaults")?; 9 }
-            b"blackAndWhite" => { setup.black_and_white = parse_bool(&value, "blackAndWhite")?; 10 }
-            b"draft" => { setup.draft = parse_bool(&value, "draft")?; 11 }
-            b"cellComments" => { setup.cell_comments = parse_comments(&value)?; 12 }
-            b"useFirstPageNumber" => { setup.use_first_page_number = parse_bool(&value, "useFirstPageNumber")?; 13 }
-            b"errors" => { setup.print_errors = parse_errors(&value)?; 14 }
-            b"horizontalDpi" => { setup.horizontal_dpi = parse_u32(&value, "horizontalDpi")?; 15 }
-            b"verticalDpi" => { setup.vertical_dpi = parse_u32(&value, "verticalDpi")?; 16 }
-            b"copies" => { setup.copies = parse_u32(&value, "copies")?; 17 }
-            name => return Err(invalid(format!("unknown pageSetup attribute '{}'", String::from_utf8_lossy(name)))),
+            },
+            b"firstPageNumber" => {
+                setup.first_page_number = parse_u32(&value, "firstPageNumber")?;
+                4
+            },
+            b"fitToWidth" => {
+                setup.fit_to_width = parse_u32(&value, "fitToWidth")?;
+                5
+            },
+            b"fitToHeight" => {
+                setup.fit_to_height = parse_u32(&value, "fitToHeight")?;
+                6
+            },
+            b"pageOrder" => {
+                setup.page_order = parse_order(&value)?;
+                7
+            },
+            b"orientation" => {
+                setup.orientation = parse_orientation(&value)?;
+                8
+            },
+            b"usePrinterDefaults" => {
+                setup.use_printer_defaults = parse_bool(&value, "usePrinterDefaults")?;
+                9
+            },
+            b"blackAndWhite" => {
+                setup.black_and_white = parse_bool(&value, "blackAndWhite")?;
+                10
+            },
+            b"draft" => {
+                setup.draft = parse_bool(&value, "draft")?;
+                11
+            },
+            b"cellComments" => {
+                setup.cell_comments = parse_comments(&value)?;
+                12
+            },
+            b"useFirstPageNumber" => {
+                setup.use_first_page_number = parse_bool(&value, "useFirstPageNumber")?;
+                13
+            },
+            b"errors" => {
+                setup.print_errors = parse_errors(&value)?;
+                14
+            },
+            b"horizontalDpi" => {
+                setup.horizontal_dpi = parse_u32(&value, "horizontalDpi")?;
+                15
+            },
+            b"verticalDpi" => {
+                setup.vertical_dpi = parse_u32(&value, "verticalDpi")?;
+                16
+            },
+            b"copies" => {
+                setup.copies = parse_u32(&value, "copies")?;
+                17
+            },
+            name => {
+                return Err(invalid(format!(
+                    "unknown pageSetup attribute '{}'",
+                    String::from_utf8_lossy(name)
+                )));
+            },
         };
-        if seen[slot] { return Err(invalid("duplicate pageSetup attribute")); }
+        if seen[slot] {
+            return Err(invalid("duplicate pageSetup attribute"));
+        }
         seen[slot] = true;
     }
-    setup.printer_settings_relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?;
+    setup.printer_settings_relationship_id =
+        relationship_attribute_value(element, b"id", decoder, resolver)?;
     if let Some(id) = setup.printer_settings_relationship_id.as_ref() {
-        if id.is_empty() || id.len() > MAX_RELATIONSHIP_ID_BYTES { return Err(invalid("invalid pageSetup printer-settings relationship id")); }
+        if id.is_empty() || id.len() > MAX_RELATIONSHIP_ID_BYTES {
+            return Err(invalid(
+                "invalid pageSetup printer-settings relationship id",
+            ));
+        }
     }
     Ok(setup)
 }
@@ -286,25 +449,78 @@ fn parse_measure(raw: &str, field: &str) -> Result<PositiveUniversalMeasure> {
         ("pt", UniversalMeasureUnit::Point),
         ("pc", UniversalMeasureUnit::Pica),
         ("pi", UniversalMeasureUnit::PicaAlternative),
-    ].into_iter().find_map(|(suffix, unit)| raw.strip_suffix(suffix).map(|number| (number, unit)))
-        .ok_or_else(|| invalid(format!("invalid {field} unit")))?;
-    if number.is_empty() || number.starts_with('-') { return Err(invalid(format!("{field} must be positive"))); }
-    let value = number.parse::<f64>().map_err(|_| invalid(format!("invalid {field} measure")))?;
-    if !value.is_finite() || value <= 0.0 { return Err(invalid(format!("{field} must be finite and positive"))); }
+    ]
+    .into_iter()
+    .find_map(|(suffix, unit)| raw.strip_suffix(suffix).map(|number| (number, unit)))
+    .ok_or_else(|| invalid(format!("invalid {field} unit")))?;
+    if number.is_empty() || number.starts_with('-') {
+        return Err(invalid(format!("{field} must be positive")));
+    }
+    let value = number
+        .parse::<f64>()
+        .map_err(|_| invalid(format!("invalid {field} measure")))?;
+    if !value.is_finite() || value <= 0.0 {
+        return Err(invalid(format!("{field} must be finite and positive")));
+    }
     Ok(PositiveUniversalMeasure { value, unit })
 }
 
-fn parse_u32(raw: &str, field: &str) -> Result<u32> { raw.parse().map_err(|_| invalid(format!("invalid pageSetup {field}"))) }
-fn parse_bool(raw: &str, field: &str) -> Result<bool> { match raw { "1" | "true" => Ok(true), "0" | "false" => Ok(false), _ => Err(invalid(format!("invalid pageSetup {field} boolean"))) } }
-fn parse_orientation(raw: &str) -> Result<PageSetupOrientation> { match raw { "default" => Ok(PageSetupOrientation::Default), "portrait" => Ok(PageSetupOrientation::Portrait), "landscape" => Ok(PageSetupOrientation::Landscape), _ => Err(invalid("invalid pageSetup orientation")) } }
-fn parse_order(raw: &str) -> Result<PageSetupOrder> { match raw { "downThenOver" => Ok(PageSetupOrder::DownThenOver), "overThenDown" => Ok(PageSetupOrder::OverThenDown), _ => Err(invalid("invalid pageSetup pageOrder")) } }
-fn parse_comments(raw: &str) -> Result<PageSetupCellComments> { match raw { "none" => Ok(PageSetupCellComments::None), "asDisplayed" => Ok(PageSetupCellComments::AsDisplayed), "atEnd" => Ok(PageSetupCellComments::AtEnd), _ => Err(invalid("invalid pageSetup cellComments")) } }
-fn parse_errors(raw: &str) -> Result<PageSetupPrintErrors> { match raw { "displayed" => Ok(PageSetupPrintErrors::Displayed), "blank" => Ok(PageSetupPrintErrors::Blank), "dash" => Ok(PageSetupPrintErrors::Dash), "NA" => Ok(PageSetupPrintErrors::NotAvailable), _ => Err(invalid("invalid pageSetup errors")) } }
+fn parse_u32(raw: &str, field: &str) -> Result<u32> {
+    raw.parse()
+        .map_err(|_| invalid(format!("invalid pageSetup {field}")))
+}
+fn parse_bool(raw: &str, field: &str) -> Result<bool> {
+    match raw {
+        "1" | "true" => Ok(true),
+        "0" | "false" => Ok(false),
+        _ => Err(invalid(format!("invalid pageSetup {field} boolean"))),
+    }
+}
+fn parse_orientation(raw: &str) -> Result<PageSetupOrientation> {
+    match raw {
+        "default" => Ok(PageSetupOrientation::Default),
+        "portrait" => Ok(PageSetupOrientation::Portrait),
+        "landscape" => Ok(PageSetupOrientation::Landscape),
+        _ => Err(invalid("invalid pageSetup orientation")),
+    }
+}
+fn parse_order(raw: &str) -> Result<PageSetupOrder> {
+    match raw {
+        "downThenOver" => Ok(PageSetupOrder::DownThenOver),
+        "overThenDown" => Ok(PageSetupOrder::OverThenDown),
+        _ => Err(invalid("invalid pageSetup pageOrder")),
+    }
+}
+fn parse_comments(raw: &str) -> Result<PageSetupCellComments> {
+    match raw {
+        "none" => Ok(PageSetupCellComments::None),
+        "asDisplayed" => Ok(PageSetupCellComments::AsDisplayed),
+        "atEnd" => Ok(PageSetupCellComments::AtEnd),
+        _ => Err(invalid("invalid pageSetup cellComments")),
+    }
+}
+fn parse_errors(raw: &str) -> Result<PageSetupPrintErrors> {
+    match raw {
+        "displayed" => Ok(PageSetupPrintErrors::Displayed),
+        "blank" => Ok(PageSetupPrintErrors::Blank),
+        "dash" => Ok(PageSetupPrintErrors::Dash),
+        "NA" => Ok(PageSetupPrintErrors::NotAvailable),
+        _ => Err(invalid("invalid pageSetup errors")),
+    }
+}
 
-fn spreadsheet(namespace: &ResolveResult<'_>) -> bool { exact(namespace, CORE) || exact(namespace, STRICT) }
-fn exact(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool { matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == expected) }
-fn invalid(message: impl Into<String>) -> OoxmlError { OoxmlError::InvalidFormat(message.into()) }
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError { OoxmlError::Xml(error.to_string()) }
+fn spreadsheet(namespace: &ResolveResult<'_>) -> bool {
+    exact(namespace, CORE) || exact(namespace, STRICT)
+}
+fn exact(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == expected)
+}
+fn invalid(message: impl Into<String>) -> OoxmlError {
+    OoxmlError::InvalidFormat(message.into())
+}
+fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
+    OoxmlError::Xml(error.to_string())
+}
 
 #[cfg(test)]
 mod tests {
@@ -313,11 +529,15 @@ mod tests {
 
     const START: &str = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#;
 
-    fn parse(body: &str) -> Result<Option<WorksheetPageSetup>> { parse_complete_worksheet_page_setup(format!("{START}{body}</worksheet>").as_bytes()) }
+    fn parse(body: &str) -> Result<Option<WorksheetPageSetup>> {
+        parse_complete_worksheet_page_setup(format!("{START}{body}</worksheet>").as_bytes())
+    }
     fn parse_fixture(path: &str) -> WorksheetPageSetup {
         let package = OpcPackage::open(path).unwrap();
         let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
-        parse_complete_worksheet_page_setup(package.get_part(&uri).unwrap().blob()).unwrap().unwrap()
+        parse_complete_worksheet_page_setup(package.get_part(&uri).unwrap().blob())
+            .unwrap()
+            .unwrap()
     }
 
     #[test]
@@ -354,7 +574,10 @@ mod tests {
 
     #[test]
     fn loads_poi_dpi_sentinel_and_relationship_fixture() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/poi/test-data/spreadsheet/45540_classic_Header.xlsx");
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/45540_classic_Header.xlsx"
+        );
         let setup = parse_fixture(path);
         assert_eq!(setup.orientation(), PageSetupOrientation::Portrait);
         assert_eq!(setup.horizontal_dpi(), 1200);
@@ -364,7 +587,10 @@ mod tests {
 
     #[test]
     fn loads_libreoffice_paper_and_orientation_fixture() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx");
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx"
+        );
         let setup = parse_fixture(path);
         assert_eq!(setup.paper_size(), 70);
         assert_eq!(setup.orientation(), PageSetupOrientation::Landscape);

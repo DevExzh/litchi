@@ -9,7 +9,7 @@ use quick_xml::events::Event;
 use std::collections::HashMap;
 
 /// A custom slide show definition.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CustomShow {
     /// Unique ID for the custom show
     pub id: u32,
@@ -52,7 +52,7 @@ impl CustomShow {
 }
 
 /// Collection of custom slide shows for a presentation.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CustomShowList {
     /// List of custom shows
     pub shows: Vec<CustomShow>,
@@ -93,6 +93,54 @@ impl CustomShowList {
     /// Get a custom show by ID.
     pub fn get_by_id(&self, id: u32) -> Option<&CustomShow> {
         self.shows.iter().find(|s| s.id == id)
+    }
+
+    /// Get mutable access to a custom show by ID.
+    pub fn get_by_id_mut(&mut self, id: u32) -> Option<&mut CustomShow> {
+        self.shows.iter_mut().find(|show| show.id == id)
+    }
+
+    /// Replace a custom show while retaining its stable ID.
+    pub fn replace_by_id(&mut self, id: u32, mut replacement: CustomShow) -> Result<()> {
+        let target = self
+            .shows
+            .iter_mut()
+            .find(|show| show.id == id)
+            .ok_or_else(|| OoxmlError::InvalidFormat(format!("custom show {id} was not found")))?;
+        replacement.id = id;
+        *target = replacement;
+        Ok(())
+    }
+
+    /// Remove a custom show by ID.
+    pub fn remove_by_id(&mut self, id: u32) -> Option<CustomShow> {
+        self.shows
+            .iter()
+            .position(|show| show.id == id)
+            .map(|offset| self.shows.remove(offset))
+    }
+
+    /// Reorder custom shows by a complete ID permutation.
+    pub fn reorder(&mut self, ordered_ids: &[u32]) -> Result<()> {
+        let expected = self.shows.iter().map(|show| show.id).collect::<std::collections::HashSet<_>>();
+        let actual = ordered_ids.iter().copied().collect::<std::collections::HashSet<_>>();
+        if expected != actual || ordered_ids.len() != self.shows.len() {
+            return Err(OoxmlError::InvalidFormat(
+                "custom-show reorder is not a permutation".into(),
+            ));
+        }
+        self.shows = ordered_ids
+            .iter()
+            .map(|id| self.get_by_id(*id).expect("permutation was validated").clone())
+            .collect();
+        Ok(())
+    }
+
+    /// Remove a slide from every custom show.
+    pub(crate) fn remove_slide_membership(&mut self, slide_id: u32) {
+        for show in &mut self.shows {
+            show.slide_ids.retain(|id| *id != slide_id);
+        }
     }
 
     /// Remove a custom show by name.

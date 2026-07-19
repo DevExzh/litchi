@@ -1,4 +1,6 @@
-use crate::docx::alt_chunk::{AltChunk, AlternativeFormatPart, is_alternative_format_relationship};
+use crate::docx::alt_chunk::{
+    AltChunk, AlternativeFormatPart, AlternativeFormatTarget, is_alternative_format_relationship,
+};
 /// Document - the main API for working with Word document content.
 use crate::docx::bookmark::Bookmark;
 use crate::docx::comment::Comment;
@@ -7,6 +9,7 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::Field;
 use crate::docx::footnote::Note;
+use crate::docx::glossary::GlossaryDocument;
 use crate::docx::header_footer::HeaderFooter;
 use crate::docx::hyperlink::Hyperlink;
 use crate::docx::mail_merge::{MailMergeRecipients, is_settings_relationship};
@@ -29,8 +32,6 @@ use crate::docx::writer::Watermark;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
-use quick_xml::Reader;
-use quick_xml::events::Event;
 
 /// A Word document.
 ///
@@ -88,6 +89,12 @@ impl<'a> Document<'a> {
     /// ```
     pub fn text(&self) -> Result<String> {
         self.part.extract_text()
+    }
+
+    /// Return the package's glossary/building-block document, if present.
+    pub fn glossary_document(&self) -> Result<Option<GlossaryDocument>> {
+        crate::docx::glossary::load_from_package(self.opc)
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
     /// Return numbered paragraphs with resolved, typed list markers.
@@ -419,6 +426,38 @@ impl<'a> Document<'a> {
         Ok(AlternativeFormatPart::new(part))
     }
 
+    /// Resolve an alternative-format target without fetching or interpreting it.
+    ///
+    /// Internal targets are returned as opaque package bytes. External targets
+    /// are returned as their relationship URI and are never accessed.
+    pub fn resolve_alt_chunk_target<'b>(
+        &'b self,
+        chunk: &AltChunk,
+    ) -> Result<AlternativeFormatTarget<'b>> {
+        let relationship = self
+            .part
+            .part()
+            .rels()
+            .get(chunk.relationship_id())
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!(
+                    "altChunk relationship {:?} is missing",
+                    chunk.relationship_id()
+                ))
+            })?;
+        if !is_alternative_format_relationship(relationship.reltype()) {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "relationship {:?} is not an alternative-format import",
+                chunk.relationship_id()
+            )));
+        }
+        if relationship.is_external() {
+            return Ok(AlternativeFormatTarget::External(relationship.target_ref()));
+        }
+        self.resolve_alt_chunk(chunk)
+            .map(AlternativeFormatTarget::Internal)
+    }
+
     /// Get all sections in the document.
     ///
     /// Returns a `Sections` collection providing access to each section's
@@ -502,72 +541,27 @@ impl<'a> Document<'a> {
     /// 2. At the end of `<w:body>` - defines the last section
     fn extract_sections(&self) -> Result<Sections> {
         let xml_bytes = self.part.xml_bytes();
-        let mut reader = Reader::from_reader(xml_bytes);
-        reader.config_mut().trim_text(true);
-
         let mut sections_xml = Vec::new();
-        let mut depth = 0;
-        let mut in_sect_pr = false;
-        let mut sect_pr_content = Vec::new();
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    if e.local_name().as_ref() == b"sectPr" {
-                        in_sect_pr = true;
-                        depth = 1;
-                        sect_pr_content.clear();
-                        // Store the opening tag
-                        sect_pr_content.extend_from_slice(b"<w:sectPr>");
-                    } else if in_sect_pr {
-                        depth += 1;
-                        // Store the element
-                        sect_pr_content.extend_from_slice(b"<");
-                        sect_pr_content.extend_from_slice(e.name().as_ref());
-                        for attr in e.attributes().flatten() {
-                            sect_pr_content.extend_from_slice(b" ");
-                            sect_pr_content.extend_from_slice(attr.key.as_ref());
-                            sect_pr_content.extend_from_slice(b"=\"");
-                            sect_pr_content.extend_from_slice(&attr.value);
-                            sect_pr_content.extend_from_slice(b"\"");
-                        }
-                        sect_pr_content.extend_from_slice(b">");
-                    }
-                },
-                Ok(Event::End(e)) if in_sect_pr => {
-                    if e.local_name().as_ref() == b"sectPr" && depth == 1 {
-                        // End of sectPr element
-                        sect_pr_content.extend_from_slice(b"</w:sectPr>");
-                        sections_xml.push(Section::from_xml_bytes(sect_pr_content.clone())?);
-                        in_sect_pr = false;
-                    } else {
-                        depth -= 1;
-                        sect_pr_content.extend_from_slice(b"</");
-                        sect_pr_content.extend_from_slice(e.name().as_ref());
-                        sect_pr_content.extend_from_slice(b">");
-                    }
-                },
-                Ok(Event::Empty(e)) if in_sect_pr => {
-                    // Self-closing element inside sectPr
-                    sect_pr_content.extend_from_slice(b"<");
-                    sect_pr_content.extend_from_slice(e.name().as_ref());
-                    for attr in e.attributes().flatten() {
-                        sect_pr_content.extend_from_slice(b" ");
-                        sect_pr_content.extend_from_slice(attr.key.as_ref());
-                        sect_pr_content.extend_from_slice(b"=\"");
-                        sect_pr_content.extend_from_slice(&attr.value);
-                        sect_pr_content.extend_from_slice(b"\"");
-                    }
-                    sect_pr_content.extend_from_slice(b"/>");
-                },
-                Ok(Event::Text(e)) if in_sect_pr => {
-                    sect_pr_content.extend_from_slice(e.as_ref());
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
+        crate::docx::namespace::scan_word_element_ranges(
+            xml_bytes,
+            &[b"sectPr"],
+            |_, start, length| {
+                let start = usize::try_from(start).map_err(|_| {
+                    OoxmlError::InvalidFormat("section offset overflow".to_string())
+                })?;
+                let length = usize::try_from(length).map_err(|_| {
+                    OoxmlError::InvalidFormat("section length overflow".to_string())
+                })?;
+                let end = start.checked_add(length).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("section range overflow".to_string())
+                })?;
+                let raw = xml_bytes.get(start..end).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("section range is outside document XML".to_string())
+                })?;
+                sections_xml.push(Section::from_xml_bytes(raw.to_vec())?);
+                Ok(())
+            },
+        )?;
 
         // If no sections were found, create a default section
         if sections_xml.is_empty() {
@@ -1446,18 +1440,32 @@ impl<'a> Document<'a> {
     /// ```
     pub fn document_variables(&self) -> Result<Option<DocumentVariables>> {
         let main_part = self.opc.main_document_part()?;
-        let rels = main_part.rels();
-
-        match rels.part_with_reltype(relationship_type::SETTINGS) {
-            Ok(rel) => {
-                let target = rel.target_partname()?;
-                let settings_part = self.opc.get_part(&target)?;
-                Ok(Some(DocumentVariables::extract_from_settings_part(
-                    settings_part,
-                )?))
-            },
-            Err(_) => Ok(None),
+        const STRICT_SETTINGS_RELATIONSHIP: &str =
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
+        let mut matches = main_part.rels().iter().filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                relationship_type::SETTINGS | STRICT_SETTINGS_RELATIONSHIP
+            )
+        });
+        let Some(relationship) = matches.next() else {
+            return Ok(None);
+        };
+        if matches.next().is_some() {
+            return Err(OoxmlError::InvalidFormat(
+                "document has multiple settings relationships".into(),
+            ));
         }
+        if relationship.is_external() {
+            return Err(OoxmlError::InvalidFormat(
+                "settings relationship cannot be external".into(),
+            ));
+        }
+        let target = relationship.target_partname()?;
+        let settings_part = self.opc.get_part(&target)?;
+        Ok(Some(DocumentVariables::extract_from_settings_part(
+            settings_part,
+        )?))
     }
 
     /// Get the document theme.

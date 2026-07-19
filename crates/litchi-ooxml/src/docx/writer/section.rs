@@ -1,26 +1,40 @@
-/// Page number format for headers/footers.
-#[derive(Debug, Clone, Copy)]
+use crate::docx::enums::{WdHeaderFooter, WdSectionStart};
+use crate::error::{OoxmlError, Result};
+use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
+use std::fmt::Write;
+
+/// Page number format used by page, footnote, and endnote numbering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PageNumberFormat {
-    /// Decimal numbers (1, 2, 3, ...)
     Decimal,
-    /// Uppercase Roman numerals (I, II, III, ...)
     UpperRoman,
-    /// Lowercase Roman numerals (i, ii, iii, ...)
     LowerRoman,
-    /// Uppercase letters (A, B, C, ...)
     UpperLetter,
-    /// Lowercase letters (a, b, c, ...)
     LowerLetter,
 }
 
 impl PageNumberFormat {
-    pub(crate) fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Decimal => "decimal",
             Self::UpperRoman => "upperRoman",
             Self::LowerRoman => "lowerRoman",
             Self::UpperLetter => "upperLetter",
             Self::LowerLetter => "lowerLetter",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "decimal" => Ok(Self::Decimal),
+            "upperRoman" => Ok(Self::UpperRoman),
+            "lowerRoman" => Ok(Self::LowerRoman),
+            "upperLetter" => Ok(Self::UpperLetter),
+            "lowerLetter" => Ok(Self::LowerLetter),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "unsupported section numbering format '{value}'"
+            ))),
         }
     }
 }
@@ -33,96 +47,953 @@ pub enum PageOrientation {
 }
 
 impl PageOrientation {
-    /// Convert orientation to XML string representation.
-    #[allow(dead_code)]
-    pub(crate) fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Portrait => "portrait",
             Self::Landscape => "landscape",
         }
     }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "portrait" => Ok(Self::Portrait),
+            "landscape" => Ok(Self::Landscape),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid section page orientation '{value}'"
+            ))),
+        }
+    }
 }
 
-/// Section properties including page setup and margins.
+/// One header or footer relationship used by a section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionHeaderFooterReference {
+    pub kind: WdHeaderFooter,
+    /// Existing relationship ID. `None` binds a default reference to content
+    /// created through [`crate::docx::writer::MutableDocument::header`] or `footer`.
+    pub relationship_id: Option<String>,
+    /// New or replacement part owned by this section. References with the same
+    /// non-empty key are deliberately shared and must have identical XML.
+    pub part: Option<SectionHeaderFooterPart>,
+}
+
+/// Header/footer XML staged as a package part during save.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionHeaderFooterPart {
+    pub key: String,
+    pub xml: String,
+}
+
+impl SectionHeaderFooterReference {
+    pub fn existing(kind: WdHeaderFooter, relationship_id: impl Into<String>) -> Self {
+        Self {
+            kind,
+            relationship_id: Some(relationship_id.into()),
+            part: None,
+        }
+    }
+
+    pub fn owned(
+        kind: WdHeaderFooter,
+        key: impl Into<String>,
+        xml: impl Into<String>,
+    ) -> Self {
+        Self {
+            kind,
+            relationship_id: None,
+            part: Some(SectionHeaderFooterPart {
+                key: key.into(),
+                xml: xml.into(),
+            }),
+        }
+    }
+
+    pub fn managed_default(kind: WdHeaderFooter) -> Self {
+        Self {
+            kind,
+            relationship_id: None,
+            part: None,
+        }
+    }
+}
+
+/// Page-numbering settings for a section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionPageNumbering {
+    pub format: PageNumberFormat,
+    pub start: Option<u32>,
+    pub chapter_style: Option<u8>,
+    pub chapter_separator: Option<String>,
+}
+
+/// One explicitly sized newspaper-style column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SectionColumn {
+    pub width: u32,
+    pub space: Option<u32>,
+}
+
+/// Section column layout.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionColumns {
+    pub equal_width: bool,
+    pub count: u16,
+    pub space: Option<u32>,
+    pub separator: bool,
+    pub columns: Vec<SectionColumn>,
+}
+
+impl Default for SectionColumns {
+    fn default() -> Self {
+        Self {
+            equal_width: true,
+            count: 1,
+            space: None,
+            separator: false,
+            columns: Vec::new(),
+        }
+    }
+}
+
+/// Restart policy for note numbering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoteNumberRestart {
+    Continuous,
+    EachSection,
+    EachPage,
+}
+
+impl NoteNumberRestart {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Continuous => "continuous",
+            Self::EachSection => "eachSect",
+            Self::EachPage => "eachPage",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "continuous" => Ok(Self::Continuous),
+            "eachSect" => Ok(Self::EachSection),
+            "eachPage" => Ok(Self::EachPage),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid note-number restart '{value}'"
+            ))),
+        }
+    }
+}
+
+/// Footnote/endnote numbering options within a section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionNoteProperties {
+    pub format: PageNumberFormat,
+    pub start: Option<u32>,
+    pub restart: Option<NoteNumberRestart>,
+    /// Schema token such as `pageBottom`, `beneathText`, `sectEnd`, or `docEnd`.
+    pub position: Option<String>,
+}
+
+/// Text flow for a section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SectionTextDirection {
+    LeftToRightTopToBottom,
+    TopToBottomRightToLeft,
+    BottomToTopLeftToRight,
+    LeftToRightTopToBottomRotated,
+    TopToBottomRightToLeftRotated,
+    TopToBottomLeftToRightRotated,
+}
+
+impl SectionTextDirection {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::LeftToRightTopToBottom => "lrTb",
+            Self::TopToBottomRightToLeft => "tbRl",
+            Self::BottomToTopLeftToRight => "btLr",
+            Self::LeftToRightTopToBottomRotated => "lrTbV",
+            Self::TopToBottomRightToLeftRotated => "tbRlV",
+            Self::TopToBottomLeftToRightRotated => "tbLrV",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "lrTb" => Ok(Self::LeftToRightTopToBottom),
+            "tbRl" => Ok(Self::TopToBottomRightToLeft),
+            "btLr" => Ok(Self::BottomToTopLeftToRight),
+            "lrTbV" => Ok(Self::LeftToRightTopToBottomRotated),
+            "tbRlV" => Ok(Self::TopToBottomRightToLeftRotated),
+            "tbLrV" => Ok(Self::TopToBottomLeftToRightRotated),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid section text direction '{value}'"
+            ))),
+        }
+    }
+}
+
+/// Document-grid mode for East Asian layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocumentGridType {
+    Default,
+    Lines,
+    LinesAndChars,
+    SnapToChars,
+}
+
+impl DocumentGridType {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Lines => "lines",
+            Self::LinesAndChars => "linesAndChars",
+            Self::SnapToChars => "snapToChars",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "default" => Ok(Self::Default),
+            "lines" => Ok(Self::Lines),
+            "linesAndChars" => Ok(Self::LinesAndChars),
+            "snapToChars" => Ok(Self::SnapToChars),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid document grid type '{value}'"
+            ))),
+        }
+    }
+}
+
+/// Section document-grid settings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionDocumentGrid {
+    pub grid_type: DocumentGridType,
+    pub line_pitch: Option<u32>,
+    pub char_space: Option<i32>,
+}
+
+/// Typed WordprocessingML `sectPr` properties.
 #[derive(Debug, Clone)]
 pub struct SectionProperties {
-    /// Page width in twips (twentieth of a point, 1440 = 1 inch)
     pub page_width: u32,
-    /// Page height in twips
     pub page_height: u32,
-    /// Page orientation
     pub orientation: PageOrientation,
-    /// Top margin in twips
     pub margin_top: u32,
-    /// Bottom margin in twips
     pub margin_bottom: u32,
-    /// Left margin in twips
     pub margin_left: u32,
-    /// Right margin in twips
     pub margin_right: u32,
-    /// Header distance from top in twips
     pub header_distance: u32,
-    /// Footer distance from bottom in twips
     pub footer_distance: u32,
+    pub gutter: u32,
+    pub start_type: Option<WdSectionStart>,
+    pub headers: Vec<SectionHeaderFooterReference>,
+    pub footers: Vec<SectionHeaderFooterReference>,
+    pub page_numbering: Option<SectionPageNumbering>,
+    pub columns: Option<SectionColumns>,
+    pub footnotes: Option<SectionNoteProperties>,
+    pub endnotes: Option<SectionNoteProperties>,
+    pub text_direction: Option<SectionTextDirection>,
+    pub document_grid: Option<SectionDocumentGrid>,
+    pub form_protection: bool,
+    preserved_unknown_children: Vec<String>,
 }
 
 impl Default for SectionProperties {
     fn default() -> Self {
-        // US Letter size: 8.5" x 11" = 12240 x 15840 twips
         Self {
             page_width: 12240,
             page_height: 15840,
             orientation: PageOrientation::Portrait,
-            margin_top: 1440,     // 1 inch
-            margin_bottom: 1440,  // 1 inch
-            margin_left: 1440,    // 1 inch
-            margin_right: 1440,   // 1 inch
-            header_distance: 720, // 0.5 inch
-            footer_distance: 720, // 0.5 inch
+            margin_top: 1440,
+            margin_bottom: 1440,
+            margin_left: 1440,
+            margin_right: 1440,
+            header_distance: 720,
+            footer_distance: 720,
+            gutter: 0,
+            start_type: None,
+            headers: Vec::new(),
+            footers: Vec::new(),
+            page_numbering: None,
+            columns: None,
+            footnotes: None,
+            endnotes: None,
+            text_direction: None,
+            document_grid: None,
+            form_protection: false,
+            preserved_unknown_children: Vec::new(),
         }
     }
 }
 
 impl SectionProperties {
-    /// Create A4 page size (210mm x 297mm).
     pub fn a4() -> Self {
         Self {
-            page_width: 11906,  // 210mm = 8.27 inches
-            page_height: 16838, // 297mm = 11.69 inches
-            ..Default::default()
+            page_width: 11906,
+            page_height: 16838,
+            ..Self::default()
         }
     }
 
-    /// Create US Letter page size (8.5" x 11").
     pub fn letter() -> Self {
         Self::default()
     }
 
-    /// Create Legal page size (8.5" x 14").
     pub fn legal() -> Self {
         Self {
-            page_width: 12240,
-            page_height: 20160, // 14 inches
-            ..Default::default()
+            page_height: 20160,
+            ..Self::default()
         }
     }
 
-    /// Set page to landscape orientation.
     pub fn landscape(mut self) -> Self {
         self.orientation = PageOrientation::Landscape;
-        // Swap width and height for landscape
         std::mem::swap(&mut self.page_width, &mut self.page_height);
         self
     }
 
-    /// Set margins (all in inches).
     pub fn margins(mut self, top: f64, bottom: f64, left: f64, right: f64) -> Self {
-        self.margin_top = (top * 1440.0) as u32;
-        self.margin_bottom = (bottom * 1440.0) as u32;
-        self.margin_left = (left * 1440.0) as u32;
-        self.margin_right = (right * 1440.0) as u32;
+        self.margin_top = inches_to_twips(top);
+        self.margin_bottom = inches_to_twips(bottom);
+        self.margin_left = inches_to_twips(left);
+        self.margin_right = inches_to_twips(right);
         self
     }
+
+    pub fn with_start_type(mut self, start_type: WdSectionStart) -> Self {
+        self.start_type = Some(start_type);
+        self
+    }
+
+    /// Create or replace a section-owned header part of the selected kind.
+    pub fn set_header_part(
+        &mut self,
+        kind: WdHeaderFooter,
+        key: impl Into<String>,
+        xml: impl Into<String>,
+    ) -> Result<()> {
+        self.set_header_footer_part(true, kind, key.into(), xml.into())
+    }
+
+    /// Create or replace a section-owned footer part of the selected kind.
+    pub fn set_footer_part(
+        &mut self,
+        kind: WdHeaderFooter,
+        key: impl Into<String>,
+        xml: impl Into<String>,
+    ) -> Result<()> {
+        self.set_header_footer_part(false, kind, key.into(), xml.into())
+    }
+
+    /// Remove a header reference and any section-owned replacement of that kind.
+    pub fn remove_header(&mut self, kind: WdHeaderFooter) -> bool {
+        remove_reference(&mut self.headers, kind)
+    }
+
+    /// Remove a footer reference and any section-owned replacement of that kind.
+    pub fn remove_footer(&mut self, kind: WdHeaderFooter) -> bool {
+        remove_reference(&mut self.footers, kind)
+    }
+
+    fn set_header_footer_part(
+        &mut self,
+        header: bool,
+        kind: WdHeaderFooter,
+        key: String,
+        xml: String,
+    ) -> Result<()> {
+        validate_header_footer_xml(&xml, header)?;
+        if key.is_empty() {
+            return Err(OoxmlError::InvalidFormat(
+                "section header/footer part key is empty".to_string(),
+            ));
+        }
+        let references = if header {
+            &mut self.headers
+        } else {
+            &mut self.footers
+        };
+        remove_reference(references, kind);
+        references.push(SectionHeaderFooterReference::owned(kind, key, xml));
+        Ok(())
+    }
+
+    pub(crate) fn from_xml(xml: &str) -> Result<Self> {
+        let children = direct_children(xml)?;
+        let mut properties = Self::default();
+        let mut seen = std::collections::HashSet::new();
+        let mut last_rank = 0u8;
+        for (name, raw) in children {
+            if let Some(rank) = section_child_rank(&name) {
+                if rank < last_rank {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "section property '{name}' is out of schema order"
+                    )));
+                }
+                last_rank = rank;
+            }
+            if !seen.insert(name.clone())
+                && !matches!(name.as_str(), "headerReference" | "footerReference")
+            {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "section properties contain duplicate '{name}'"
+                )));
+            }
+            match name.as_str() {
+                "headerReference" => properties.headers.push(parse_header_footer(&raw)?),
+                "footerReference" => properties.footers.push(parse_header_footer(&raw)?),
+                "footnotePr" => properties.footnotes = Some(parse_note_properties(&raw)?),
+                "endnotePr" => properties.endnotes = Some(parse_note_properties(&raw)?),
+                "type" => {
+                    let value = required_attr(&raw, b"val")?;
+                    properties.start_type = Some(WdSectionStart::from_xml(&value).ok_or_else(|| {
+                        OoxmlError::InvalidFormat(format!("invalid section type '{value}'"))
+                    })?);
+                },
+                "pgSz" => {
+                    let attrs = attributes(&raw)?;
+                    if let Some(value) = attr(&attrs, "w") {
+                        properties.page_width = parse_u32(value, "page width")?;
+                    }
+                    if let Some(value) = attr(&attrs, "h") {
+                        properties.page_height = parse_u32(value, "page height")?;
+                    }
+                    if let Some(value) = attr(&attrs, "orient") {
+                        properties.orientation = PageOrientation::parse(value)?;
+                    }
+                },
+                "pgMar" => {
+                    let attrs = attributes(&raw)?;
+                    assign_u32(&attrs, "top", &mut properties.margin_top)?;
+                    assign_u32(&attrs, "bottom", &mut properties.margin_bottom)?;
+                    assign_u32(&attrs, "left", &mut properties.margin_left)?;
+                    assign_u32(&attrs, "right", &mut properties.margin_right)?;
+                    assign_u32(&attrs, "header", &mut properties.header_distance)?;
+                    assign_u32(&attrs, "footer", &mut properties.footer_distance)?;
+                    assign_u32(&attrs, "gutter", &mut properties.gutter)?;
+                },
+                "pgNumType" => properties.page_numbering = Some(parse_page_numbering(&raw)?),
+                "cols" => properties.columns = Some(parse_columns(&raw)?),
+                "formProt" => properties.form_protection = parse_on_off(&raw)?,
+                "textDirection" => {
+                    properties.text_direction = Some(SectionTextDirection::parse(&required_attr(
+                        &raw, b"val",
+                    )?)?);
+                },
+                "docGrid" => properties.document_grid = Some(parse_grid(&raw)?),
+                _ => properties.preserved_unknown_children.push(raw),
+            }
+        }
+        properties.validate()?;
+        Ok(properties)
+    }
+
+    pub(crate) fn validate(&self) -> Result<()> {
+        if self.page_width == 0 || self.page_height == 0 {
+            return Err(OoxmlError::InvalidFormat(
+                "section page dimensions must be nonzero".to_string(),
+            ));
+        }
+        for references in [&self.headers, &self.footers] {
+            let mut kinds = std::collections::HashSet::new();
+            for reference in references {
+                if !kinds.insert(reference.kind) {
+                    return Err(OoxmlError::InvalidFormat(
+                        "section has duplicate header/footer reference type".to_string(),
+                    ));
+                }
+                if reference.relationship_id.as_deref() == Some("") {
+                    return Err(OoxmlError::InvalidFormat(
+                        "section header/footer relationship ID is empty".to_string(),
+                    ));
+                }
+                if reference.relationship_id.is_some() && reference.part.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "section header/footer cannot be both existing and owned".to_string(),
+                    ));
+                }
+                if let Some(part) = &reference.part
+                    && (part.key.is_empty() || part.xml.is_empty())
+                {
+                    return Err(OoxmlError::InvalidFormat(
+                        "section header/footer part key and XML must be non-empty".to_string(),
+                    ));
+                }
+                if let Some(part) = &reference.part {
+                    validate_header_footer_xml(
+                        &part.xml,
+                        std::ptr::eq(references, &self.headers),
+                    )?;
+                }
+            }
+        }
+        if let Some(columns) = &self.columns {
+            if columns.count == 0 || columns.count > 45 {
+                return Err(OoxmlError::InvalidFormat(
+                    "section column count must be in 1..=45".to_string(),
+                ));
+            }
+            if !columns.equal_width && usize::from(columns.count) != columns.columns.len() {
+                return Err(OoxmlError::InvalidFormat(
+                    "unequal section columns require one width per column".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn write_xml(
+        &self,
+        xml: &mut String,
+        rels: Option<&super::relmap::RelationshipMapper>,
+    ) -> Result<()> {
+        self.validate()?;
+        xml.push_str("<w:sectPr>");
+        write_references(xml, "headerReference", &self.headers, rels, true)?;
+        write_references(xml, "footerReference", &self.footers, rels, false)?;
+        if let Some(note) = &self.footnotes {
+            write_note_properties(xml, "footnotePr", note)?;
+        } else if rels.is_some_and(|rels| rels.get_footnotes_id().is_some()) {
+            xml.push_str("<w:footnotePr><w:numFmt w:val=\"decimal\"/></w:footnotePr>");
+        }
+        if let Some(note) = &self.endnotes {
+            write_note_properties(xml, "endnotePr", note)?;
+        } else if rels.is_some_and(|rels| rels.get_endnotes_id().is_some()) {
+            xml.push_str("<w:endnotePr><w:numFmt w:val=\"decimal\"/></w:endnotePr>");
+        }
+        if let Some(start_type) = self.start_type {
+            write!(xml, "<w:type w:val=\"{}\"/>", start_type.to_xml())
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        }
+        write!(
+            xml,
+            "<w:pgSz w:w=\"{}\" w:h=\"{}\" w:orient=\"{}\"/>",
+            self.page_width,
+            self.page_height,
+            self.orientation.as_str()
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        write!(
+            xml,
+            "<w:pgMar w:top=\"{}\" w:right=\"{}\" w:bottom=\"{}\" w:left=\"{}\" w:header=\"{}\" w:footer=\"{}\" w:gutter=\"{}\"/>",
+            self.margin_top,
+            self.margin_right,
+            self.margin_bottom,
+            self.margin_left,
+            self.header_distance,
+            self.footer_distance,
+            self.gutter
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if let Some(numbering) = &self.page_numbering {
+            write_page_numbering(xml, numbering)?;
+        }
+        if let Some(columns) = &self.columns {
+            write_columns(xml, columns)?;
+        }
+        if self.form_protection {
+            xml.push_str("<w:formProt/>");
+        }
+        if let Some(direction) = self.text_direction {
+            write!(xml, "<w:textDirection w:val=\"{}\"/>", direction.as_str())
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        }
+        if let Some(grid) = &self.document_grid {
+            write_grid(xml, grid)?;
+        }
+        for child in &self.preserved_unknown_children {
+            xml.push_str(child);
+        }
+        xml.push_str("</w:sectPr>");
+        Ok(())
+    }
+}
+
+fn section_child_rank(name: &str) -> Option<u8> {
+    match name {
+        "headerReference" => Some(0),
+        "footerReference" => Some(1),
+        "footnotePr" => Some(2),
+        "endnotePr" => Some(3),
+        "type" => Some(4),
+        "pgSz" => Some(5),
+        "pgMar" => Some(6),
+        "pgNumType" => Some(7),
+        "cols" => Some(8),
+        "formProt" => Some(9),
+        "textDirection" => Some(10),
+        "docGrid" => Some(11),
+        _ => None,
+    }
+}
+
+fn remove_reference(
+    references: &mut Vec<SectionHeaderFooterReference>,
+    kind: WdHeaderFooter,
+) -> bool {
+    let length = references.len();
+    references.retain(|reference| reference.kind != kind);
+    references.len() != length
+}
+
+fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> {
+    use quick_xml::reader::NsReader;
+    let mut reader = NsReader::from_str(xml);
+    let mut depth = 0usize;
+    let mut root = false;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    let expected = if header { b"hdr".as_slice() } else { b"ftr".as_slice() };
+                    if root
+                        || !crate::docx::namespace::is_wordprocessing_namespace(&namespace)
+                        || element.local_name().as_ref() != expected
+                    {
+                        return Err(OoxmlError::InvalidFormat(
+                            "section header/footer XML has an invalid root".to_string(),
+                        ));
+                    }
+                    root = true;
+                }
+                depth += 1;
+            },
+            Event::Empty(element) if depth == 0 => {
+                let expected = if header { b"hdr".as_slice() } else { b"ftr".as_slice() };
+                if root
+                    || !crate::docx::namespace::is_wordprocessing_namespace(&namespace)
+                    || element.local_name().as_ref() != expected
+                {
+                    return Err(OoxmlError::InvalidFormat(
+                        "section header/footer XML has an invalid root".to_string(),
+                    ));
+                }
+                root = true;
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid header/footer XML nesting".to_string())
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if !root || depth != 0 {
+        return Err(OoxmlError::InvalidFormat(
+            "unterminated section header/footer XML".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn inches_to_twips(inches: f64) -> u32 {
+    (inches * 1440.0).round().max(0.0) as u32
+}
+
+fn escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('"', "&quot;")
+}
+
+fn direct_children(xml: &str) -> Result<Vec<(String, String)>> {
+    let mut reader = Reader::from_str(xml);
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut child: Option<(String, usize, usize)> = None;
+    let mut children = Vec::new();
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_| OoxmlError::InvalidFormat("section XML offset overflow".into()))?;
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_| OoxmlError::InvalidFormat("section XML offset overflow".into()))?;
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    if root_seen || element.local_name().as_ref() != b"sectPr" {
+                        return Err(OoxmlError::InvalidFormat(
+                            "section properties have an invalid root".into(),
+                        ));
+                    }
+                    root_seen = true;
+                } else if depth == 1 {
+                    child = Some((
+                        String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
+                        start,
+                        1,
+                    ));
+                } else if let Some((_, _, child_depth)) = child.as_mut() {
+                    *child_depth += 1;
+                }
+                depth += 1;
+            },
+            Event::Empty(element) if depth == 1 => {
+                let name = String::from_utf8_lossy(element.local_name().as_ref()).into_owned();
+                children.push((name, xml[start..end].to_string()));
+            },
+            Event::End(_) => {
+                if let Some((_, _, child_depth)) = child.as_mut() {
+                    *child_depth -= 1;
+                    if *child_depth == 0 {
+                        let (name, child_start, _) = child.take().expect("present");
+                        children.push((name, xml[child_start..end].to_string()));
+                    }
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid section XML nesting".into())
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if !root_seen || depth != 0 {
+        return Err(OoxmlError::InvalidFormat(
+            "unterminated section properties".into(),
+        ));
+    }
+    Ok(children)
+}
+
+fn attributes(xml: &str) -> Result<Vec<(String, String)>> {
+    let mut reader = Reader::from_str(xml);
+    let element = loop {
+        match reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        {
+            Event::Start(element) | Event::Empty(element) => break element,
+            Event::Eof => {
+                return Err(OoxmlError::InvalidFormat(
+                    "section property has no element".into(),
+                ));
+            },
+            _ => {},
+        }
+    };
+    let mut result = Vec::new();
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        let name = String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned();
+        if result.iter().any(|(candidate, _)| candidate == &name) {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "duplicate section property attribute '{name}'"
+            )));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        result.push((name, value));
+    }
+    Ok(result)
+}
+
+fn attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    attrs
+        .iter()
+        .find_map(|(candidate, value)| (candidate == name).then_some(value.as_str()))
+}
+
+fn required_attr(xml: &str, name: &[u8]) -> Result<String> {
+    let name = String::from_utf8_lossy(name);
+    let attrs = attributes(xml)?;
+    attr(&attrs, &name)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| OoxmlError::InvalidFormat(format!("missing section attribute '{name}'")))
+}
+
+fn parse_u32(value: &str, description: &str) -> Result<u32> {
+    value.parse().map_err(|_| {
+        OoxmlError::InvalidFormat(format!("invalid {description} value '{value}'"))
+    })
+}
+
+fn assign_u32(attrs: &[(String, String)], name: &str, slot: &mut u32) -> Result<()> {
+    if let Some(value) = attr(attrs, name) {
+        *slot = parse_u32(value, name)?;
+    }
+    Ok(())
+}
+
+fn parse_header_footer(xml: &str) -> Result<SectionHeaderFooterReference> {
+    let kind = WdHeaderFooter::from_xml(&required_attr(xml, b"type")?).ok_or_else(|| {
+        OoxmlError::InvalidFormat("invalid section header/footer type".to_string())
+    })?;
+    Ok(SectionHeaderFooterReference {
+        kind,
+        relationship_id: Some(required_attr(xml, b"id")?),
+        part: None,
+    })
+}
+
+fn parse_page_numbering(xml: &str) -> Result<SectionPageNumbering> {
+    let attrs = attributes(xml)?;
+    Ok(SectionPageNumbering {
+        format: attr(&attrs, "fmt")
+            .map(PageNumberFormat::parse)
+            .transpose()?
+            .unwrap_or(PageNumberFormat::Decimal),
+        start: attr(&attrs, "start")
+            .map(|value| parse_u32(value, "page number start"))
+            .transpose()?,
+        chapter_style: attr(&attrs, "chapStyle")
+            .map(|value| value.parse::<u8>().map_err(|_| OoxmlError::InvalidFormat("invalid chapter style".into())))
+            .transpose()?,
+        chapter_separator: attr(&attrs, "chapSep").map(ToOwned::to_owned),
+    })
+}
+
+fn parse_columns(xml: &str) -> Result<SectionColumns> {
+    let attrs = attributes(xml)?;
+    let mut columns = SectionColumns {
+        equal_width: attr(&attrs, "equalWidth").is_none_or(|value| value != "0" && value != "false"),
+        count: attr(&attrs, "num")
+            .map(|value| value.parse::<u16>().map_err(|_| OoxmlError::InvalidFormat("invalid section column count".into())))
+            .transpose()?
+            .unwrap_or(1),
+        space: attr(&attrs, "space")
+            .map(|value| parse_u32(value, "column space"))
+            .transpose()?,
+        separator: attr(&attrs, "sep").is_some_and(|value| value == "1" || value == "true"),
+        columns: Vec::new(),
+    };
+    for (name, raw) in direct_nested_children(xml)? {
+        if name != "col" {
+            return Err(OoxmlError::InvalidFormat(format!("invalid child '{name}' in section columns")));
+        }
+        let attrs = attributes(&raw)?;
+        columns.columns.push(SectionColumn {
+            width: parse_u32(attr(&attrs, "w").ok_or_else(|| OoxmlError::InvalidFormat("section column omits width".into()))?, "column width")?,
+            space: attr(&attrs, "space").map(|value| parse_u32(value, "column space")).transpose()?,
+        });
+    }
+    Ok(columns)
+}
+
+fn direct_nested_children(xml: &str) -> Result<Vec<(String, String)>> {
+    let open_end = xml.find('>').ok_or_else(|| OoxmlError::InvalidFormat("invalid section property".into()))?;
+    let close = xml.rfind("</").unwrap_or(xml.len());
+    if close <= open_end + 1 {
+        return Ok(Vec::new());
+    }
+    direct_children(&format!("<w:sectPr>{}</w:sectPr>", &xml[open_end + 1..close]))
+}
+
+fn parse_note_properties(xml: &str) -> Result<SectionNoteProperties> {
+    let mut result = SectionNoteProperties {
+        format: PageNumberFormat::Decimal,
+        start: None,
+        restart: None,
+        position: None,
+    };
+    for (name, raw) in direct_nested_children(xml)? {
+        let value = required_attr(&raw, b"val")?;
+        match name.as_str() {
+            "numFmt" => result.format = PageNumberFormat::parse(&value)?,
+            "numStart" => result.start = Some(parse_u32(&value, "note number start")?),
+            "numRestart" => result.restart = Some(NoteNumberRestart::parse(&value)?),
+            "pos" => result.position = Some(value),
+            _ => return Err(OoxmlError::InvalidFormat(format!("invalid note property '{name}'"))),
+        }
+    }
+    Ok(result)
+}
+
+fn parse_grid(xml: &str) -> Result<SectionDocumentGrid> {
+    let attrs = attributes(xml)?;
+    Ok(SectionDocumentGrid {
+        grid_type: attr(&attrs, "type")
+            .map(DocumentGridType::parse)
+            .transpose()?
+            .unwrap_or(DocumentGridType::Default),
+        line_pitch: attr(&attrs, "linePitch").map(|value| parse_u32(value, "grid line pitch")).transpose()?,
+        char_space: attr(&attrs, "charSpace")
+            .map(|value| value.parse::<i32>().map_err(|_| OoxmlError::InvalidFormat("invalid grid character space".into())))
+            .transpose()?,
+    })
+}
+
+fn parse_on_off(xml: &str) -> Result<bool> {
+    let attrs = attributes(xml)?;
+    Ok(attr(&attrs, "val").is_none_or(|value| matches!(value, "1" | "true" | "on")))
+}
+
+fn write_references(
+    xml: &mut String,
+    element: &str,
+    references: &[SectionHeaderFooterReference],
+    rels: Option<&super::relmap::RelationshipMapper>,
+    header: bool,
+) -> Result<()> {
+    if references.is_empty() {
+        let managed = rels.and_then(|rels| if header { rels.get_header_id() } else { rels.get_footer_id() });
+        if let Some(id) = managed {
+            write!(xml, "<w:{element} w:type=\"default\" r:id=\"{}\"/>", escape(id))
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        }
+        return Ok(());
+    }
+    for reference in references {
+        let managed = rels.and_then(|rels| if header { rels.get_header_id() } else { rels.get_footer_id() });
+        let owned = reference.part.as_ref().and_then(|part| rels.and_then(|rels| rels.get_section_header_footer_id(&part.key)));
+        let id = reference.relationship_id.as_deref().or(owned).or(managed).ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!("section {element} has no relationship ID"))
+        })?;
+        write!(xml, "<w:{element} w:type=\"{}\" r:id=\"{}\"/>", reference.kind.to_xml(), escape(id))
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    Ok(())
+}
+
+fn write_note_properties(xml: &mut String, element: &str, note: &SectionNoteProperties) -> Result<()> {
+    write!(xml, "<w:{element}><w:numFmt w:val=\"{}\"/>", note.format.as_str())
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(start) = note.start { write!(xml, "<w:numStart w:val=\"{start}\"/>").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    if let Some(restart) = note.restart { write!(xml, "<w:numRestart w:val=\"{}\"/>", restart.as_str()).map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    if let Some(position) = &note.position { write!(xml, "<w:pos w:val=\"{}\"/>", escape(position)).map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    write!(xml, "</w:{element}>").map_err(|error| OoxmlError::Xml(error.to_string()))
+}
+
+fn write_page_numbering(xml: &mut String, numbering: &SectionPageNumbering) -> Result<()> {
+    write!(xml, "<w:pgNumType w:fmt=\"{}\"", numbering.format.as_str()).map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(start) = numbering.start { write!(xml, " w:start=\"{start}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    if let Some(style) = numbering.chapter_style { write!(xml, " w:chapStyle=\"{style}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    if let Some(separator) = &numbering.chapter_separator { write!(xml, " w:chapSep=\"{}\"", escape(separator)).map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    xml.push_str("/>");
+    Ok(())
+}
+
+fn write_columns(xml: &mut String, columns: &SectionColumns) -> Result<()> {
+    write!(xml, "<w:cols w:equalWidth=\"{}\" w:num=\"{}\"", if columns.equal_width { 1 } else { 0 }, columns.count).map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(space) = columns.space { write!(xml, " w:space=\"{space}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    if columns.separator { xml.push_str(" w:sep=\"1\""); }
+    if columns.columns.is_empty() { xml.push_str("/>"); } else {
+        xml.push('>');
+        for column in &columns.columns {
+            write!(xml, "<w:col w:w=\"{}\"", column.width).map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            if let Some(space) = column.space { write!(xml, " w:space=\"{space}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+            xml.push_str("/>");
+        }
+        xml.push_str("</w:cols>");
+    }
+    Ok(())
+}
+
+fn write_grid(xml: &mut String, grid: &SectionDocumentGrid) -> Result<()> {
+    write!(xml, "<w:docGrid w:type=\"{}\"", grid.grid_type.as_str()).map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(pitch) = grid.line_pitch { write!(xml, " w:linePitch=\"{pitch}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    if let Some(space) = grid.char_space { write!(xml, " w:charSpace=\"{space}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    xml.push_str("/>");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -130,112 +1001,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_page_number_format_as_str() {
-        assert_eq!(PageNumberFormat::Decimal.as_str(), "decimal");
-        assert_eq!(PageNumberFormat::UpperRoman.as_str(), "upperRoman");
-        assert_eq!(PageNumberFormat::LowerRoman.as_str(), "lowerRoman");
-        assert_eq!(PageNumberFormat::UpperLetter.as_str(), "upperLetter");
-        assert_eq!(PageNumberFormat::LowerLetter.as_str(), "lowerLetter");
+    fn typed_section_round_trips_and_preserves_unknown_children() {
+        let xml = r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:test"><w:type w:val="continuous"/><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="100" w:right="200" w:bottom="300" w:left="400" w:header="500" w:footer="600" w:gutter="50"/><w:cols w:num="2" w:space="720"/><x:ext x:v="keep"/></w:sectPr>"#;
+        let mut section = SectionProperties::from_xml(xml).unwrap();
+        assert_eq!(section.start_type, Some(WdSectionStart::Continuous));
+        section.margin_left = 900;
+        let mut output = String::new();
+        section.write_xml(&mut output, None).unwrap();
+        assert!(output.contains("w:left=\"900\""));
+        assert!(output.contains("<x:ext x:v=\"keep\"/>"));
     }
 
     #[test]
-    fn test_page_orientation_as_str() {
-        assert_eq!(PageOrientation::Portrait.as_str(), "portrait");
-        assert_eq!(PageOrientation::Landscape.as_str(), "landscape");
-    }
-
-    #[test]
-    fn test_section_properties_default() {
-        let props = SectionProperties::default();
-        assert_eq!(props.page_width, 12240); // 8.5 inches
-        assert_eq!(props.page_height, 15840); // 11 inches
-        assert_eq!(props.margin_top, 1440); // 1 inch
-        assert_eq!(props.margin_bottom, 1440);
-        assert_eq!(props.margin_left, 1440);
-        assert_eq!(props.margin_right, 1440);
-        assert_eq!(props.header_distance, 720); // 0.5 inch
-        assert_eq!(props.footer_distance, 720);
-    }
-
-    #[test]
-    fn test_section_properties_a4() {
-        let props = SectionProperties::a4();
-        assert_eq!(props.page_width, 11906); // ~210mm
-        assert_eq!(props.page_height, 16838); // ~297mm
-        // Margins should still be default
-        assert_eq!(props.margin_top, 1440);
-    }
-
-    #[test]
-    fn test_section_properties_letter() {
-        let props = SectionProperties::letter();
-        assert_eq!(props.page_width, 12240);
-        assert_eq!(props.page_height, 15840);
-    }
-
-    #[test]
-    fn test_section_properties_legal() {
-        let props = SectionProperties::legal();
-        assert_eq!(props.page_width, 12240); // 8.5 inches
-        assert_eq!(props.page_height, 20160); // 14 inches
-    }
-
-    #[test]
-    fn test_section_properties_landscape() {
-        let props = SectionProperties::default().landscape();
-        assert_eq!(props.orientation, PageOrientation::Landscape);
-        // Width and height should be swapped
-        assert_eq!(props.page_width, 15840); // Was height
-        assert_eq!(props.page_height, 12240); // Was width
-    }
-
-    #[test]
-    fn test_section_properties_a4_landscape() {
-        let props = SectionProperties::a4().landscape();
-        assert_eq!(props.orientation, PageOrientation::Landscape);
-        // A4 dimensions swapped
-        assert_eq!(props.page_width, 16838);
-        assert_eq!(props.page_height, 11906);
-    }
-
-    #[test]
-    fn test_section_properties_margins() {
-        let props = SectionProperties::default().margins(1.5, 1.5, 1.0, 1.0);
-        assert_eq!(props.margin_top, 2160); // 1.5 * 1440
-        assert_eq!(props.margin_bottom, 2160);
-        assert_eq!(props.margin_left, 1440); // 1.0 * 1440
-        assert_eq!(props.margin_right, 1440);
-    }
-
-    #[test]
-    fn test_section_properties_chained() {
-        let props = SectionProperties::a4()
-            .landscape()
-            .margins(2.0, 2.0, 1.5, 1.5);
-        assert_eq!(props.orientation, PageOrientation::Landscape);
-        assert_eq!(props.margin_top, 2880); // 2.0 * 1440
-        assert_eq!(props.margin_left, 2160); // 1.5 * 1440
-    }
-
-    #[test]
-    fn test_page_number_format_debug() {
-        let format = PageNumberFormat::UpperRoman;
-        let debug_str = format!("{:?}", format);
-        assert!(debug_str.contains("UpperRoman"));
-    }
-
-    #[test]
-    fn test_page_orientation_debug() {
-        let orientation = PageOrientation::Landscape;
-        let debug_str = format!("{:?}", orientation);
-        assert!(debug_str.contains("Landscape"));
-    }
-
-    #[test]
-    fn test_section_properties_debug() {
-        let props = SectionProperties::default();
-        let debug_str = format!("{:?}", props);
-        assert!(debug_str.contains("12240"));
-        assert!(debug_str.contains("Portrait"));
+    fn rejects_duplicate_and_invalid_section_properties() {
+        assert!(SectionProperties::from_xml("<w:sectPr><w:type w:val=\"nextPage\"/><w:type w:val=\"continuous\"/></w:sectPr>").is_err());
+        let mut section = SectionProperties::default();
+        section.columns = Some(SectionColumns { count: 0, ..SectionColumns::default() });
+        assert!(section.validate().is_err());
     }
 }

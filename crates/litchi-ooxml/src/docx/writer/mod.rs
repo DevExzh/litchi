@@ -11,6 +11,7 @@ pub mod hyperlink;
 pub mod image;
 pub mod note;
 pub mod paragraph;
+pub mod revision;
 pub(crate) mod relmap;
 pub mod run;
 pub mod section;
@@ -28,7 +29,11 @@ pub use doc::{DocumentProtection, MutableDocument};
 pub use note::Note;
 
 // Re-export section types
-pub use section::{PageNumberFormat, PageOrientation, SectionProperties};
+pub use section::{
+    DocumentGridType, NoteNumberRestart, PageNumberFormat, PageOrientation, SectionColumn,
+    SectionColumns, SectionDocumentGrid, SectionHeaderFooterPart, SectionHeaderFooterReference,
+    SectionNoteProperties, SectionPageNumbering, SectionProperties, SectionTextDirection,
+};
 
 // Re-export smart-tag types
 pub use smart_tag::{MutableSmartTag, MutableSmartTagAttribute};
@@ -44,6 +49,10 @@ pub use paragraph::{ListType, MutableParagraph};
 
 // Re-export run types
 pub use run::{MutableRun, RunContent};
+pub use revision::{
+    CellRevisionKind, MutableRevision, RevisionContentControl, RevisionKind, RevisionMetadata,
+    RowRevisionKind, TableCellMergeRevisionState, TableRevisionKind,
+};
 
 // Re-export table types
 pub use table::{CellProperties, MutableCell, MutableRow, MutableTable, TableBorder, TableBorders};

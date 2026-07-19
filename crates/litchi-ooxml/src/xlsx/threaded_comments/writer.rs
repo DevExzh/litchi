@@ -8,7 +8,11 @@ use litchi_core::xml::escape_xml;
 
 use super::person::{Mention, Person, PersonList};
 use super::reader::validate_guid;
-use super::{ThreadedComment, ThreadedComments};
+use super::{
+    MAX_THREADED_COMMENTS, MAX_THREADED_IDENTITY_BYTES, MAX_THREADED_MENTIONS,
+    MAX_THREADED_PERSONS, MAX_THREADED_TEXT_UTF16, ThreadedComment, ThreadedComments,
+    validate_threaded_timestamp,
+};
 use crate::xlsx::Cell;
 
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
@@ -149,9 +153,18 @@ fn write_mentions(xml: &mut String, mentions: &[Mention]) -> SheetResult<()> {
 }
 
 fn validate_person_list(person_list: &PersonList) -> SheetResult<()> {
+    if person_list.persons.len() > MAX_THREADED_PERSONS {
+        return Err("persons list contains too many people".into());
+    }
     let mut ids = HashSet::with_capacity(person_list.persons.len());
     for person in &person_list.persons {
         validate_guid(&person.id, "person ID")?;
+        if person.display_name.len() > MAX_THREADED_IDENTITY_BYTES
+            || person.user_id.as_ref().is_some_and(|value| value.len() > MAX_THREADED_IDENTITY_BYTES)
+            || person.provider_id.as_ref().is_some_and(|value| value.len() > MAX_THREADED_IDENTITY_BYTES)
+        {
+            return Err(format!("person '{}' has oversized identity metadata", person.id).into());
+        }
         if !ids.insert(person.id.as_str()) {
             return Err(format!("duplicate person ID '{}'", person.id).into());
         }
@@ -160,12 +173,18 @@ fn validate_person_list(person_list: &PersonList) -> SheetResult<()> {
 }
 
 fn validate_threaded_comments(comments: &ThreadedComments) -> SheetResult<()> {
+    if comments.comments.len() > MAX_THREADED_COMMENTS {
+        return Err("threaded-comments list contains too many comments".into());
+    }
     let mut comment_ids = HashSet::with_capacity(comments.comments.len());
     let mention_count = comments
         .comments
         .iter()
         .map(|comment| comment.mentions.len())
         .sum();
+    if mention_count > MAX_THREADED_MENTIONS {
+        return Err("threaded-comments list contains too many mentions".into());
+    }
     let mut mention_ids = HashSet::with_capacity(mention_count);
 
     for comment in &comments.comments {
@@ -177,6 +196,7 @@ fn validate_threaded_comments(comments: &ThreadedComments) -> SheetResult<()> {
         if let Some(cell_ref) = comment.cell_ref.as_deref() {
             Cell::reference_to_coords(cell_ref)?;
         }
+        validate_threaded_timestamp(comment.date_time.as_deref())?;
         if !comment_ids.insert(comment.id.as_str()) {
             return Err(format!("duplicate threaded-comment ID '{}'", comment.id).into());
         }
@@ -189,6 +209,9 @@ fn validate_threaded_comments(comments: &ThreadedComments) -> SheetResult<()> {
                     .map_err(|_| "threaded-comment text is too long")
             })
             .transpose()?;
+        if text_len.is_some_and(|length| length as usize > MAX_THREADED_TEXT_UTF16) {
+            return Err(format!("threaded-comment text '{}' is too long", comment.id).into());
+        }
         for mention in &comment.mentions {
             validate_guid(&mention.mention_person_id, "mention person ID")?;
             validate_guid(&mention.mention_id, "mention ID")?;

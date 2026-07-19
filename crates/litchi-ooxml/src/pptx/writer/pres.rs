@@ -127,7 +127,15 @@ impl MutablePresentation {
 
     /// Add a new slide to the presentation.
     pub fn add_slide(&mut self) -> Result<&mut MutableSlide> {
-        let slide_id = (self.slides.len() + 256) as u32;
+        let slide_id = self
+            .slides
+            .iter()
+            .map(MutableSlide::slide_id)
+            .max()
+            .map_or(Ok(256), |id| {
+                id.checked_add(1)
+                    .ok_or_else(|| OoxmlError::InvalidFormat("presentation slide ID overflow".into()))
+            })?;
         let slide = MutableSlide::new(slide_id);
         self.slides.push(slide);
         self.modified = true;
@@ -206,7 +214,10 @@ impl MutablePresentation {
             )));
         }
 
+        let removed_id = self.slides[index].slide_id();
         self.slides.remove(index);
+        self.custom_shows.remove_slide_membership(removed_id);
+        self.sections.remove_slide_membership(removed_id);
         self.modified = true;
         Ok(())
     }
@@ -250,7 +261,13 @@ impl MutablePresentation {
         let mut new_slide = slide_to_duplicate.clone();
 
         // Assign a new slide ID
-        let new_slide_id = (self.slides.len() + 256) as u32;
+        let new_slide_id = self
+            .slides
+            .iter()
+            .map(MutableSlide::slide_id)
+            .max()
+            .and_then(|id| id.checked_add(1))
+            .ok_or_else(|| OoxmlError::InvalidFormat("presentation slide ID overflow".into()))?;
         new_slide.set_slide_id(new_slide_id);
 
         self.slides.push(new_slide);
@@ -305,6 +322,13 @@ impl MutablePresentation {
 
         let slide = self.slides.remove(from_index);
         self.slides.insert(to_index, slide);
+        self.sections.sort_slide_membership(
+            &self
+                .slides
+                .iter()
+                .map(MutableSlide::slide_id)
+                .collect::<Vec<_>>(),
+        );
         self.modified = true;
         Ok(())
     }

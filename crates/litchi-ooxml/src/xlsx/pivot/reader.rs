@@ -1747,17 +1747,14 @@ mod tests {
     #[test]
     fn rejects_external_and_wrong_content_type_pivot_parts() {
         let (mut package, worksheet_uri) = package_with_pivot_table();
-        let relationships = package
-            .get_part_mut(&worksheet_uri)
-            .unwrap()
-            .rels_mut();
+        let relationships = package.get_part_mut(&worksheet_uri).unwrap().rels_mut();
         relationships.remove("rId1").unwrap();
         relationships.add_relationship(
-                rt::STRICT_PIVOT_TABLE.to_string(),
-                "https://example.com/pivot.xml".to_string(),
-                "rId1".to_string(),
-                true,
-            );
+            rt::STRICT_PIVOT_TABLE.to_string(),
+            "https://example.com/pivot.xml".to_string(),
+            "rId1".to_string(),
+            true,
+        );
         assert!(read_pivot_tables(&package).is_err());
 
         let (mut package, _) = package_with_pivot_table();
@@ -1777,17 +1774,14 @@ mod tests {
         let records_uri = PackURI::new("/custom/cache/records.xml").unwrap();
 
         let (mut package, _) = package_with_pivot_table();
-        let relationships = package
-            .get_part_mut(&workbook_uri)
-            .unwrap()
-            .rels_mut();
+        let relationships = package.get_part_mut(&workbook_uri).unwrap().rels_mut();
         relationships.remove("rId3").unwrap();
         relationships.add_relationship(
-                rt::STRICT_PIVOT_CACHE_DEFINITION.to_string(),
-                "https://example.com/cache.xml".to_string(),
-                "rId3".to_string(),
-                true,
-            );
+            rt::STRICT_PIVOT_CACHE_DEFINITION.to_string(),
+            "https://example.com/cache.xml".to_string(),
+            "rId3".to_string(),
+            true,
+        );
         assert!(read_pivot_tables(&package).is_err());
 
         let (mut package, _) = package_with_pivot_table();
@@ -1831,17 +1825,14 @@ mod tests {
         assert!(read_pivot_tables(&package).is_err());
 
         let (mut package, _) = package_with_pivot_table();
-        let relationships = package
-            .get_part_mut(&cache_uri)
-            .unwrap()
-            .rels_mut();
+        let relationships = package.get_part_mut(&cache_uri).unwrap().rels_mut();
         relationships.remove("rId2").unwrap();
         relationships.add_relationship(
-                rt::STRICT_WORKSHEET.to_string(),
-                "https://example.com/source.xml".to_string(),
-                "rId2".to_string(),
-                true,
-            );
+            rt::STRICT_WORKSHEET.to_string(),
+            "https://example.com/source.xml".to_string(),
+            "rId2".to_string(),
+            true,
+        );
         assert!(read_pivot_tables(&package).is_err());
 
         let (mut package, _) = package_with_pivot_table();

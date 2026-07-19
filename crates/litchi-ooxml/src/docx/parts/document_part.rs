@@ -1,7 +1,7 @@
 //! DocumentPart - the main document.xml part of a Word document.
 
-use crate::docx::namespace::scan_word_element_ranges;
 use crate::docx::alt_chunk::{AltChunk, scan_alt_chunks};
+use crate::docx::namespace::scan_word_element_ranges;
 use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::docx::table::Table;
 use crate::error::Result;
@@ -32,7 +32,10 @@ impl<'a> DocumentPart<'a> {
     ///
     /// * `part` - The part containing the document.xml content
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let xml=match crate::common::mce::process_ooxml(part.blob())?{std::borrow::Cow::Borrowed(_)=>part.blob_arc(),std::borrow::Cow::Owned(v)=>Arc::new(v)};
+        let xml = match crate::common::mce::process_ooxml(part.blob())? {
+            std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+            std::borrow::Cow::Owned(v) => Arc::new(v),
+        };
         Ok(Self { part, xml })
     }
 
@@ -56,7 +59,7 @@ impl<'a> DocumentPart<'a> {
     /// # Performance
     ///
     /// Uses `quick-xml` for efficient streaming XML parsing with pre-allocated
-    /// buffer and unsafe string conversion for optimal performance.
+    /// buffers and validated text decoding.
     pub fn extract_text(&self) -> Result<String> {
         extract_word_text(self.xml_bytes())
     }

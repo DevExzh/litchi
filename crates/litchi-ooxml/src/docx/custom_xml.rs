@@ -2,8 +2,30 @@
 ///
 /// Custom XML parts allow storing arbitrary XML data within a Word document.
 use crate::error::Result;
+use crate::custom_xml_data::CustomXmlConformance;
+use litchi_opc::PackURI;
 use litchi_opc::part::Part;
 use std::collections::HashMap;
+
+/// High-level parameters for a DOCX Custom XML Data Storage item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewCustomXmlDataStore {
+    pub xml: Vec<u8>,
+    pub content_type: String,
+    pub item_id: String,
+    pub schema_references: Vec<String>,
+    pub conformance: CustomXmlConformance,
+}
+
+/// One validated SDT binding occurrence in a Word content-bearing part.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CustomXmlBinding {
+    pub source_part_name: PackURI,
+    pub content_control_id: u32,
+    pub xpath: String,
+    pub store_item_id: String,
+    pub prefix_mappings: Option<String>,
+}
 
 /// A custom XML part in a Word document.
 ///

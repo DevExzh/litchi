@@ -16,6 +16,75 @@ const TRANSITIONAL_RELATIONSHIP_NAMESPACE: &[u8] =
 const STRICT_RELATIONSHIP_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
+pub(crate) const STRICT_ALTERNATIVE_FORMAT_IMPORT: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/afChunk";
+
+/// Namespace family used when emitting a new alternative-format anchor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AltChunkNamespace {
+    #[default]
+    Transitional,
+    Strict,
+}
+
+/// Bytes and canonical content type for an internal alternative-format part.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AlternativeFormatData {
+    Html(Vec<u8>),
+    Rtf(Vec<u8>),
+    PlainText(Vec<u8>),
+    Xml(Vec<u8>),
+    WordprocessingMl(Vec<u8>),
+}
+
+impl AlternativeFormatData {
+    pub fn content_type(&self) -> &'static str {
+        match self {
+            Self::Html(_) => "text/html",
+            Self::Rtf(_) => "application/rtf",
+            Self::PlainText(_) => "text/plain",
+            Self::Xml(_) => "application/xml",
+            Self::WordprocessingMl(_) => {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+            },
+        }
+    }
+
+    pub fn extension(&self) -> &'static str {
+        match self {
+            Self::Html(_) => "html",
+            Self::Rtf(_) => "rtf",
+            Self::PlainText(_) => "txt",
+            Self::Xml(_) => "xml",
+            Self::WordprocessingMl(_) => "docx",
+        }
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Html(bytes)
+            | Self::Rtf(bytes)
+            | Self::PlainText(bytes)
+            | Self::Xml(bytes)
+            | Self::WordprocessingMl(bytes) => bytes,
+        }
+    }
+}
+
+/// Package target to create for an alternative-format import.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AlternativeFormatImport {
+    Internal(AlternativeFormatData),
+    /// The URI is preserved but never fetched or interpreted.
+    External(String),
+}
+
+/// Resolved target of an alternative-format anchor.
+pub enum AlternativeFormatTarget<'a> {
+    Internal(AlternativeFormatPart<'a>),
+    External(&'a str),
+}
+
 /// A block-level `<w:altChunk>` import anchor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AltChunk {
@@ -24,6 +93,25 @@ pub struct AltChunk {
 }
 
 impl AltChunk {
+    /// Create an anchor for an existing relationship ID.
+    pub fn new(relationship_id: impl Into<String>, match_source: Option<bool>) -> Result<Self> {
+        let relationship_id = relationship_id.into();
+        if relationship_id.is_empty()
+            || relationship_id.len() > 255
+            || !relationship_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.' | b':'))
+        {
+            return Err(OoxmlError::InvalidFormat(
+                "altChunk relationship ID is not a safe XML identifier".to_string(),
+            ));
+        }
+        Ok(Self {
+            relationship_id,
+            match_source,
+        })
+    }
+
     /// Relationship ID identifying the alternative-format import part.
     #[inline]
     pub fn relationship_id(&self) -> &str {
@@ -37,6 +125,30 @@ impl AltChunk {
     #[inline]
     pub fn match_source(&self) -> Option<bool> {
         self.match_source
+    }
+
+    pub(crate) fn to_xml(&self, namespace: AltChunkNamespace) -> String {
+        let (word_ns, relationship_ns) = match namespace {
+            AltChunkNamespace::Transitional => (
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            ),
+            AltChunkNamespace::Strict => (
+                "http://purl.oclc.org/ooxml/wordprocessingml/main",
+                "http://purl.oclc.org/ooxml/officeDocument/relationships",
+            ),
+        };
+        let opening = format!(
+            r#"<w:altChunk xmlns:w="{word_ns}" xmlns:r="{relationship_ns}" r:id="{}""#,
+            self.relationship_id
+        );
+        match self.match_source {
+            None => format!("{opening}/>"),
+            Some(value) => format!(
+                r#"{opening}><w:altChunkPr><w:matchSrc w:val="{}"/></w:altChunkPr></w:altChunk>"#,
+                u8::from(value)
+            ),
+        }
     }
 }
 
@@ -55,7 +167,12 @@ pub enum AlternativeFormatKind {
 
 impl AlternativeFormatKind {
     fn classify(content_type: &str) -> Self {
-        match content_type.split(';').next().unwrap_or(content_type).trim() {
+        match content_type
+            .split(';')
+            .next()
+            .unwrap_or(content_type)
+            .trim()
+        {
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml" => {
                 Self::WordprocessingMl
             },
@@ -114,6 +231,7 @@ pub(crate) fn is_alternative_format_relationship(value: &str) -> bool {
         value,
         relationship_type::ALTERNATIVE_FORMAT_IMPORT
             | relationship_type::MS_ALTERNATIVE_FORMAT_IMPORT
+            | STRICT_ALTERNATIVE_FORMAT_IMPORT
     )
 }
 
@@ -336,8 +454,7 @@ fn parse_on_off(
             continue;
         }
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
-        if !is_wordprocessing_namespace(&namespace)
-            && !matches!(namespace, ResolveResult::Unbound)
+        if !is_wordprocessing_namespace(&namespace) && !matches!(namespace, ResolveResult::Unbound)
         {
             continue;
         }
@@ -362,11 +479,7 @@ fn parse_on_off(
     }
 }
 
-fn insert_chunk(
-    chunks: &mut BTreeMap<u32, AltChunk>,
-    start: u32,
-    chunk: AltChunk,
-) -> Result<()> {
+fn insert_chunk(chunks: &mut BTreeMap<u32, AltChunk>, start: u32, chunk: AltChunk) -> Result<()> {
     if chunks.insert(start, chunk).is_some() {
         return Err(OoxmlError::InvalidFormat(
             "duplicate altChunk XML position".into(),
@@ -467,7 +580,10 @@ mod tests {
             r#"<w:altChunk r:id="x"><w:altChunkPr/><w:altChunkPr/></w:altChunk>"#,
             r#"<w:altChunk r:id="x"><w:altChunkPr><w:matchSrc w:val="maybe"/></w:altChunkPr></w:altChunk>"#,
         ] {
-            assert!(scan_alt_chunks(wrapper(anchor).as_bytes()).is_err(), "{anchor}");
+            assert!(
+                scan_alt_chunks(wrapper(anchor).as_bytes()).is_err(),
+                "{anchor}"
+            );
         }
     }
 
@@ -512,7 +628,12 @@ mod tests {
         );
         document.rels_mut().add_relationship(
             relationship.into(),
-            if external { "https://example.invalid/chunk" } else { "chunk.html" }.into(),
+            if external {
+                "https://example.invalid/chunk"
+            } else {
+                "chunk.html"
+            }
+            .into(),
             "chunk".into(),
             external,
         );

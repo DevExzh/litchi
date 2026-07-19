@@ -433,8 +433,7 @@ impl MutableWorkbookData {
         self.named_ranges.push(NamedRange {
             name: name.to_string(),
             reference: reference.to_string(),
-            comment: None,
-            local_sheet_id: None,
+            ..NamedRange::default()
         });
         self.modified = true;
     }
@@ -446,8 +445,8 @@ impl MutableWorkbookData {
         self.named_ranges.push(NamedRange {
             name: name.to_string(),
             reference: reference.to_string(),
-            comment: None,
             local_sheet_id: Some(sheet_id),
+            ..NamedRange::default()
         });
         self.modified = true;
     }
@@ -458,7 +457,7 @@ impl MutableWorkbookData {
             name: name.to_string(),
             reference: reference.to_string(),
             comment: Some(comment.to_string()),
-            local_sheet_id: None,
+            ..NamedRange::default()
         });
         self.modified = true;
     }
@@ -566,8 +565,8 @@ impl MutableWorkbookData {
                 new_ranges.push(NamedRange {
                     name: "_xlnm.Print_Area".to_string(),
                     reference,
-                    comment: None,
-                    local_sheet_id: Some(sheet_id),
+                    local_sheet_id: Some(sheet_id - 1),
+                    ..NamedRange::default()
                 });
             }
 
@@ -589,8 +588,8 @@ impl MutableWorkbookData {
                 new_ranges.push(NamedRange {
                     name: "_xlnm.Print_Titles".to_string(),
                     reference,
-                    comment: None,
-                    local_sheet_id: Some(sheet_id),
+                    local_sheet_id: Some(sheet_id - 1),
+                    ..NamedRange::default()
                 });
             }
         }
@@ -706,8 +705,12 @@ impl MutableWorkbookData {
         if !external_reference_ids.is_empty() {
             xml.push_str("<externalReferences>");
             for relationship_id in external_reference_ids {
-                write!(xml, r#"<externalReference r:id="{}"/>"#, escape_xml(relationship_id))
-                    .map_err(|e| format!("XML write error: {}", e))?;
+                write!(
+                    xml,
+                    r#"<externalReference r:id="{}"/>"#,
+                    escape_xml(relationship_id)
+                )
+                .map_err(|e| format!("XML write error: {}", e))?;
             }
             xml.push_str("</externalReferences>");
         }
@@ -722,7 +725,7 @@ impl MutableWorkbookData {
 
                 // Add localSheetId if it's a sheet-scoped name
                 if let Some(sheet_id) = named_range.local_sheet_id {
-                    write!(xml, " localSheetId=\"{}\"", sheet_id - 1)
+                    write!(xml, " localSheetId=\"{}\"", sheet_id)
                         .map_err(|e| format!("XML write error: {}", e))?;
                 }
 
@@ -731,6 +734,50 @@ impl MutableWorkbookData {
                     write!(xml, " comment=\"{}\"", escape_xml(comment))
                         .map_err(|e| format!("XML write error: {}", e))?;
                 }
+
+                write_optional_defined_name_attribute(
+                    &mut xml,
+                    "customMenu",
+                    named_range.custom_menu.as_deref(),
+                )?;
+                write_optional_defined_name_attribute(
+                    &mut xml,
+                    "description",
+                    named_range.description.as_deref(),
+                )?;
+                write_optional_defined_name_attribute(
+                    &mut xml,
+                    "help",
+                    named_range.help.as_deref(),
+                )?;
+                write_optional_defined_name_attribute(
+                    &mut xml,
+                    "statusBar",
+                    named_range.status_bar.as_deref(),
+                )?;
+                write_optional_defined_name_attribute(
+                    &mut xml,
+                    "shortcutKey",
+                    named_range.shortcut_key.as_deref(),
+                )?;
+                write_defined_name_bool(&mut xml, "hidden", named_range.hidden)?;
+                write_defined_name_bool(&mut xml, "function", named_range.function)?;
+                write_defined_name_bool(&mut xml, "vbProcedure", named_range.vb_procedure)?;
+                write_defined_name_bool(&mut xml, "xlm", named_range.xlm)?;
+                if let Some(function_group_id) = named_range.function_group_id {
+                    write!(xml, " functionGroupId=\"{}\"", function_group_id)
+                        .map_err(|e| format!("XML write error: {}", e))?;
+                }
+                write_defined_name_bool(
+                    &mut xml,
+                    "publishToServer",
+                    named_range.publish_to_server,
+                )?;
+                write_defined_name_bool(
+                    &mut xml,
+                    "workbookParameter",
+                    named_range.workbook_parameter,
+                )?;
 
                 xml.push('>');
                 xml.push_str(&escape_xml(&named_range.reference));
@@ -892,6 +939,25 @@ impl MutableWorkbookData {
     pub fn get_protection(&self) -> Option<&WorkbookProtection> {
         self.protection.as_ref()
     }
+}
+
+fn write_optional_defined_name_attribute(
+    xml: &mut String,
+    name: &str,
+    value: Option<&str>,
+) -> SheetResult<()> {
+    if let Some(value) = value {
+        write!(xml, " {name}=\"{}\"", escape_xml(value))
+            .map_err(|error| format!("XML write error: {error}"))?;
+    }
+    Ok(())
+}
+
+fn write_defined_name_bool(xml: &mut String, name: &str, value: bool) -> SheetResult<()> {
+    if value {
+        write!(xml, " {name}=\"1\"").map_err(|error| format!("XML write error: {error}"))?;
+    }
+    Ok(())
 }
 
 impl Default for MutableWorkbookData {
@@ -1729,8 +1795,8 @@ mod tests {
     fn test_generate_workbook_xml_with_defined_names() {
         let mut wb = MutableWorkbookData::new();
         wb.define_name("Range1", "Sheet1!$A$1:$B$10");
-        // local_sheet_id is 1-based (1 = first sheet), will be stored as 1 and output as 0
-        wb.define_name_local("LocalRange", "A1:C5", 1);
+        // local_sheet_id is the zero-based workbook sheet index used by OOXML.
+        wb.define_name_local("LocalRange", "A1:C5", 0);
 
         let xml = wb
             .generate_workbook_xml_with_external_rels(&["rId1".to_string()], &[], &[])

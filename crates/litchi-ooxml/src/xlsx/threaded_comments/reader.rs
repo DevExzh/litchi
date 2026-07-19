@@ -11,7 +11,11 @@ use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::person::{Mention, Person, PersonList};
-use super::{ThreadedComment, ThreadedComments};
+use super::{
+    MAX_THREADED_COMMENTS, MAX_THREADED_MENTIONS, MAX_THREADED_PART_BYTES,
+    MAX_THREADED_PERSONS, MAX_THREADED_TEXT_UTF16, ThreadedComment, ThreadedComments,
+    validate_threaded_timestamp,
+};
 use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::xlsx::Cell;
 
@@ -26,9 +30,16 @@ pub fn read_persons(package: &OpcPackage) -> SheetResult<Option<PersonList>> {
     };
     let persons_part = package.get_part(&persons_uri)?;
     require_content_type(&persons_uri, persons_part.content_type(), ct::SML_PERSONS)?;
+    if persons_part.blob().len() > MAX_THREADED_PART_BYTES {
+        return Err("persons part exceeds the configured resource bound".into());
+    }
     let bytes = crate::common::mce::process_part(persons_part)?;
     let xml = std::str::from_utf8(bytes.as_ref())?;
-    Ok(Some(parse_person_list(xml)?))
+    let persons = parse_person_list(xml)?;
+    if persons.persons.len() > MAX_THREADED_PERSONS {
+        return Err("persons part contains too many people".into());
+    }
+    Ok(Some(persons))
 }
 
 /// Read the threaded-comments part related to a worksheet.
@@ -51,9 +62,25 @@ pub fn read_threaded_comments(
         comments_part.content_type(),
         ct::SML_THREADED_COMMENTS,
     )?;
+    if comments_part.blob().len() > MAX_THREADED_PART_BYTES {
+        return Err("threaded-comments part exceeds the configured resource bound".into());
+    }
     let bytes = crate::common::mce::process_part(comments_part)?;
     let xml = std::str::from_utf8(bytes.as_ref())?;
-    Ok(Some(parse_threaded_comments(xml)?))
+    let comments = parse_threaded_comments(xml)?;
+    if comments.comments.len() > MAX_THREADED_COMMENTS {
+        return Err("threaded-comments part contains too many comments".into());
+    }
+    let mentions = comments.comments.iter().map(|comment| comment.mentions.len()).sum::<usize>();
+    if mentions > MAX_THREADED_MENTIONS {
+        return Err("threaded-comments part contains too many mentions".into());
+    }
+    if comments.comments.iter().any(|comment| {
+        comment.text.as_deref().is_some_and(|text| text.encode_utf16().count() > MAX_THREADED_TEXT_UTF16)
+    }) {
+        return Err("threaded-comment text exceeds the configured resource bound".into());
+    }
+    Ok(Some(comments))
 }
 
 fn related_part_uri(
@@ -446,13 +473,15 @@ fn parse_threaded_comment(
     if let Some(cell_ref) = cell_ref.as_deref() {
         Cell::reference_to_coords(cell_ref)?;
     }
+    let date_time = unqualified_attribute_value(element, b"dT", decoder)?;
+    validate_threaded_timestamp(date_time.as_deref())?;
     Ok(ThreadedComment {
         cell_ref,
         id: required_guid(element, b"id", decoder, "threaded-comment ID")?,
         parent_id: optional_guid(element, b"parentId", decoder, "threaded-comment parent ID")?,
         person_id: required_guid(element, b"personId", decoder, "threaded-comment person ID")?,
         text: None,
-        date_time: unqualified_attribute_value(element, b"dT", decoder)?,
+        date_time,
         done: optional_bool(element, b"done", decoder, "threaded-comment done flag")?,
         mentions: Vec::new(),
     })
@@ -714,17 +743,14 @@ mod tests {
     #[test]
     fn rejects_external_duplicate_and_wrong_content_type_relationships() {
         let (mut package, worksheet_uri) = package_with_threaded_parts();
-        let relationships = package
-            .get_part_mut(&worksheet_uri)
-            .unwrap()
-            .rels_mut();
+        let relationships = package.get_part_mut(&worksheet_uri).unwrap().rels_mut();
         relationships.remove("rId1").unwrap();
         relationships.add_relationship(
-                rt::THREADED_COMMENTS.to_string(),
-                "https://example.com/thread.xml".to_string(),
-                "rId1".to_string(),
-                true,
-            );
+            rt::THREADED_COMMENTS.to_string(),
+            "https://example.com/thread.xml".to_string(),
+            "rId1".to_string(),
+            true,
+        );
         assert!(read_threaded_comments(&package, &worksheet_uri).is_err());
 
         let (mut package, worksheet_uri) = package_with_threaded_parts();

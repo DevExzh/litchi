@@ -56,48 +56,85 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+mod animation_relationships;
 pub mod animations;
 pub mod backgrounds;
-pub mod customshow;
+pub mod changes_information;
 pub mod comments;
+pub mod customshow;
 pub mod embedded_fonts;
+pub mod extended_guides;
 pub mod format;
 pub mod handout;
 pub mod hyperlinks;
 pub mod media;
 pub mod media_parts;
-pub mod notes;
+pub mod modern_comment_authors;
+pub mod modern_comments;
 mod namespace;
+pub mod notes;
 pub mod package;
 pub mod parts;
 pub mod presentation;
+pub mod presentation_structure;
+pub mod presentation_properties;
 pub mod protection;
+pub mod revision_information;
 pub mod sections;
 pub mod shapes;
 pub mod slide;
-pub mod presentation_properties;
-pub mod view_properties;
 pub mod smartart;
 pub mod tags;
 pub mod template;
+pub mod tracks;
 pub mod transitions;
+pub mod view_properties;
 pub mod writer;
 
 pub use animations::{
     Animation, AnimationDirection, AnimationEffect, AnimationSequence, AnimationTrigger,
 };
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
-pub use customshow::{CustomShow, CustomShowList};
+pub use changes_information::{
+    CHANGES_INFORMATION_CONTENT_TYPE, CHANGES_INFORMATION_RELATIONSHIP_TYPE, ChangesData,
+    ChangesInformation, ChangesInformationPart, ChangesNamespaceDeclaration,
+    DocumentChangeDescriptor, DocumentChangeKind, DocumentChangesList, load_changes_information,
+    store_changes_information,
+};
 pub use comments::{
     PresentationComment, PresentationCommentAuthor, PresentationCommentConformance,
-    PresentationComments, SlideCommentList, load_presentation_comments,
-    parse_comment_authors, parse_slide_comments, store_presentation_comments,
-    write_comment_authors, write_slide_comments,
+    PresentationComments, SlideCommentList, add_presentation_comment,
+    add_presentation_comment_author, find_presentation_comment,
+    find_presentation_comment_author, load_presentation_comments, parse_comment_authors,
+    parse_slide_comments, remove_presentation_comment, remove_presentation_comment_author,
+    reorder_presentation_comment_authors, reorder_presentation_comments,
+    replace_presentation_comment, replace_presentation_comment_author,
+    store_presentation_comments, update_presentation_comment,
+    update_presentation_comment_author, write_comment_authors, write_slide_comments,
 };
+pub use modern_comment_authors::{
+    add_modern_comment_author, find_modern_comment_author, remove_modern_comment_author,
+    reorder_modern_comment_authors, replace_modern_comment_author,
+    update_modern_comment_author,
+};
+pub use modern_comments::{
+    add_modern_comment, add_modern_comment_reply, find_modern_comment,
+    find_modern_comment_reply, remove_modern_comment, remove_modern_comment_reply,
+    reorder_modern_comments, replace_modern_comment, replace_modern_comment_reply,
+    update_modern_comment, update_modern_comment_reply,
+};
+pub use customshow::{CustomShow, CustomShowList};
 pub use embedded_fonts::{
-    EmbeddedFont, EmbeddedFontConformance, EmbeddedFontFace, EmbeddedFontResource,
-    EmbeddedFontStyle, PresentationEmbeddedFonts, load_embedded_fonts, parse_embedded_fonts,
-    store_embedded_fonts, write_embedded_font_list,
+    EmbeddedFont, EmbeddedFontConformance, EmbeddedFontFace, EmbeddedFontLicensing,
+    EmbeddedFontResource, EmbeddedFontStyle, PresentationEmbeddedFonts, add_embedded_font,
+    deobfuscate_embedded_font_data, find_embedded_font, load_embedded_fonts,
+    obfuscate_embedded_font_data, parse_embedded_fonts, remove_embedded_font,
+    reorder_embedded_fonts, replace_embedded_font, store_embedded_fonts,
+    update_embedded_font, write_embedded_font_list,
+};
+pub use extended_guides::{
+    ExtendedGuide, ExtendedGuideColor, ExtendedGuideColorKind, ExtendedGuideList,
+    ExtendedGuideOrientation, PresentationExtendedGuides,
 };
 pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
@@ -105,27 +142,73 @@ pub use hyperlinks::Hyperlink;
 pub use media::{Media, MediaFormat, MediaType};
 pub use media_parts::{
     MediaBookmark, MediaFade, MediaResource, MediaTrim, OfficeMediaExtension,
-    SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture,
-    SlideMediaPoster, SlideMediaTransform, load_slide_media, parse_slide_media,
-    store_slide_media, write_slide_media_pictures,
+    SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture, SlideMediaPoster,
+    SlideMediaTransform, load_slide_media, parse_slide_media, store_slide_media,
+    write_slide_media_pictures,
 };
 pub use notes::{
-    PptxNotesConformance, PptxNotesGraph, PptxNotesMasterResource,
-    PptxNotesSlideResource, PptxNotesThemeResource, load_notes_graph, store_notes_graph,
+    PptxNotesConformance, PptxNotesGraph, PptxNotesMasterResource, PptxNotesSlideResource,
+    PptxNotesThemeResource, load_notes_graph, store_notes_graph,
 };
 pub use package::Package;
-pub use parts::{ChartData, ChartSeries, ChartType};
+pub use parts::{
+    CHART_COLOR_STYLE_CONTENT_TYPE, CHART_COLOR_STYLE_RELATIONSHIP_TYPE, CHART_STYLE_CONTENT_TYPE,
+    CHART_STYLE_RELATIONSHIP_TYPE, ChartColorStyleDocument, ChartColorStyleInfo,
+    ChartColorStyleMethod, ChartColorStylePart, ChartData, ChartExAxis, ChartExAxisScaling,
+    ChartExAxisTitle, ChartExAxisUnit, ChartExAxisUnits, ChartExAxisUnitsLabel, ChartExBinning,
+    ChartExBinningChoice, ChartExChart, ChartExChartSpaceFormatting, ChartExChartTitle,
+    ChartExClosedSide, ChartExColorKind, ChartExColorPosition, ChartExDataLabel,
+    ChartExDataLabelPosition, ChartExDataLabelVisibility, ChartExDataLabels, ChartExDataPoint,
+    ChartExDataSet, ChartExDimension, ChartExDocument, ChartExDoubleOrAutomatic,
+    ChartExDrawingPayload, ChartExElementVisibility, ChartExExternalData,
+    ChartExExternalDataTarget, ChartExFormatOverride, ChartExFormula, ChartExFormulaDirection,
+    ChartExGeoAddress, ChartExGeoCache, ChartExGeoCacheEntry, ChartExGeoChildEntitiesQuery,
+    ChartExGeoChildEntitiesQueryResult, ChartExGeoClear, ChartExGeoData, ChartExGeoDataEntityQuery,
+    ChartExGeoDataEntityQueryResult, ChartExGeoDataPointQuery, ChartExGeoDataPointToEntityQuery,
+    ChartExGeoDataPointToEntityQueryResult, ChartExGeoEntity, ChartExGeoEntityType,
+    ChartExGeoHierarchyEntity, ChartExGeoLocation, ChartExGeoLocationQuery,
+    ChartExGeoLocationQueryResult, ChartExGeoMappingLevel, ChartExGeoParentEntitiesQueryResult,
+    ChartExGeoPolygon, ChartExGeoProjection, ChartExGeography, ChartExGridlines,
+    ChartExHeaderFooter, ChartExInfo, ChartExLayoutProperties, ChartExLegend, ChartExNumberFormat,
+    ChartExNumericDimensionType, ChartExNumericLevel, ChartExNumericPoint, ChartExOffset,
+    ChartExPageMargins, ChartExPageOrientation, ChartExPageSetup, ChartExParentLabelLayout,
+    ChartExPart, ChartExPlotArea, ChartExPlotAreaRegion, ChartExPlotSurface,
+    ChartExPositionAlignment, ChartExPrintSettings, ChartExQuartileMethod,
+    ChartExRegionLabelLayout, ChartExSeriesDataReference, ChartExSeriesLayout, ChartExSidePosition,
+    ChartExSolidColor, ChartExStringDimensionType, ChartExStringLevel, ChartExStringPoint,
+    ChartExText, ChartExTickLabels, ChartExTickMarkType, ChartExTickMarks,
+    ChartExValueColorPositions, ChartExValueColors, ChartSeries, ChartStyleColor,
+    ChartStyleColorKind, ChartStyleColorTransform, ChartStyleColorTransformKind,
+    ChartStyleColorValue, ChartStyleDocument, ChartStyleEntry, ChartStyleEntryKind,
+    ChartStyleFontIndex, ChartStyleFontReference, ChartStyleInfo, ChartStyleMarkerLayout,
+    ChartStyleMarkerSymbol, ChartStylePart, ChartStylePayload, ChartStyleReference,
+    ChartStyleVariation, ChartType,
+};
 pub use presentation::Presentation;
+pub use presentation_structure::{
+    PresentationSlideReference, PresentationStructure, add_custom_show,
+    add_custom_show_slide, add_section, add_section_slide, find_custom_show, find_section,
+    load_presentation_structure, remove_custom_show, remove_custom_show_slide, remove_section,
+    remove_section_slide, reorder_custom_show_slides, reorder_custom_shows,
+    reorder_section_slides, reorder_sections, replace_custom_show, replace_section,
+    store_presentation_structure, synchronize_presentation_structure_after_slide_mutation,
+    update_custom_show, update_section,
+};
 pub use protection::{
     CryptoAlgorithm, OpenPasswordEncryption, PresentationProtection, ProtectionType,
     SlideProtection,
 };
+pub use revision_information::{
+    ClientRevision, REVISION_INFORMATION_CONTENT_TYPE, REVISION_INFORMATION_RELATIONSHIP_TYPE,
+    RevisionInformation, RevisionInformationPart, RevisionNamespaceDeclaration,
+    load_revision_information, store_revision_information,
+};
 pub use sections::{Section, SectionList};
 pub use slide::{Slide, SlideLayout, SlideMaster};
+pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use tags::{
     ProgrammableTag, SlideTagList, TagExtensionAttribute, TagList, TagListConformance,
     parse_tag_list, write_tag_list,
 };
-pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use transitions::{SlideTransition, TransitionDirection, TransitionSpeed, TransitionType};
 pub use writer::{MutablePresentation, MutableShape, MutableSlide};

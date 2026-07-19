@@ -4,11 +4,12 @@ use crate::xlsb::XlsbCell;
 use crate::xlsb::calculation::CalculationProperties;
 use crate::xlsb::error::XlsbResult;
 use crate::xlsb::formula::{
-    FormulaExternalBook, FormulaExternalSheet, FormulaResolutionContext, FormulaSupportingLink,
-    excel_name_eq,
+    FormulaExternalBook, FormulaExternalSheet, FormulaPivotViewDefinition,
+    FormulaResolutionContext, FormulaSupportingLink, FormulaTableDefinition, excel_name_eq,
 };
 use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
-use crate::xlsb::records::{XlsbRecordIter, record_types};
+use crate::xlsb::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
+use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
 use crate::xlsb::styles_table::{CellFormat, StylesTable};
 use crate::xlsb::worksheet::XlsbWorksheet;
@@ -16,7 +17,9 @@ use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
-use std::io::{BufReader, Cursor, Read, Seek};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BinaryHeap};
+use std::io::{BufReader, Cursor, Read, Seek, Write};
 
 /// XLSB workbook implementation
 #[allow(dead_code)]
@@ -43,6 +46,13 @@ struct ParsedWorkbookInfo {
     calculation_properties: Option<CalculationProperties>,
 }
 
+#[derive(Debug)]
+struct MergeBlockLayout {
+    ranges: Vec<MergedCell>,
+    block_span: Option<(usize, usize)>,
+    insertion_offset: usize,
+}
+
 impl std::fmt::Debug for XlsbWorkbook {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("XlsbWorkbook")
@@ -57,9 +67,59 @@ impl std::fmt::Debug for XlsbWorkbook {
 }
 
 impl XlsbWorkbook {
+    /// Get the underlying OPC package.
+    pub fn opc_package(&self) -> &OpcPackage {
+        &self.package
+    }
+
+    /// Get mutable OPC access, dropping signatures that would become stale.
+    pub fn opc_package_mut(&mut self) -> &mut OpcPackage {
+        let _ = self.package.clear_digital_signatures();
+        &mut self.package
+    }
+
+    /// Verify package signatures without making a PKI trust determination.
+    pub fn verify_digital_signatures(
+        &self,
+        policy: &litchi_opc::SignatureVerificationPolicy,
+    ) -> litchi_opc::signature::Result<Vec<litchi_opc::DigitalSignatureVerification>> {
+        self.package.verify_digital_signatures(policy)
+    }
+
+    /// Sign the current, fully materialized package while preserving valid signatures.
+    pub fn add_digital_signature(
+        &mut self,
+        signer: &litchi_opc::PackageSigner,
+    ) -> litchi_opc::signature::Result<litchi_opc::PackURI> {
+        self.package.add_digital_signature(signer)
+    }
+
+    /// Replace all package signatures with one new signature.
+    pub fn resign_digital_signature(
+        &mut self,
+        signer: &litchi_opc::PackageSigner,
+    ) -> litchi_opc::signature::Result<litchi_opc::PackURI> {
+        self.package.resign_digital_signature(signer)
+    }
+
+    /// Remove all package digital signatures.
+    pub fn clear_digital_signatures(&mut self) -> litchi_opc::signature::Result<()> {
+        self.package.clear_digital_signatures()
+    }
+
     /// Workbook and sheet-scoped defined names in `PtgName` index order.
     pub fn defined_names(&self) -> &[String] {
         &self.formula_context.defined_names
+    }
+
+    /// Structured-table definitions in workbook table-ID order of discovery.
+    pub fn tables(&self) -> &[FormulaTableDefinition] {
+        &self.formula_context.tables
+    }
+
+    /// PivotTable views available as hosts for calculated field/item formulas.
+    pub fn pivot_views(&self) -> &[FormulaPivotViewDefinition] {
+        &self.formula_context.pivot_views
     }
 
     /// Workbook style table loaded from `xl/styles.bin`.
@@ -81,6 +141,124 @@ impl XlsbWorkbook {
     /// Workbook formula calculation policy.
     pub fn calculation_properties(&self) -> &CalculationProperties {
         &self.calculation_properties
+    }
+
+    /// Save this parsed workbook, including atomic worksheet-stream mutations.
+    pub fn save<W: Write + Seek>(&self, writer: W) -> XlsbResult<()> {
+        self.package.to_stream(writer)?;
+        Ok(())
+    }
+
+    /// List merged ranges in a worksheet selected by zero-based index.
+    pub fn merged_cell_ranges(&self, worksheet_index: usize) -> XlsbResult<Vec<MergedCell>> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        let part = self.package.get_part(&uri)?;
+        Ok(Self::inspect_merge_block(part.blob())?.ranges)
+    }
+
+    /// List merged ranges in a worksheet selected by exact name.
+    pub fn merged_cell_ranges_by_name(&self, worksheet_name: &str) -> XlsbResult<Vec<MergedCell>> {
+        self.merged_cell_ranges(self.worksheet_index(worksheet_name)?)
+    }
+
+    /// Atomically replace all merged ranges in a worksheet selected by index.
+    pub fn set_merged_cell_ranges(
+        &mut self,
+        worksheet_index: usize,
+        ranges: &[MergedCell],
+    ) -> XlsbResult<()> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        let original = self.package.get_part(&uri)?.blob().to_vec();
+        let layout = Self::inspect_merge_block(&original)?;
+        let normalized = Self::normalize_merge_ranges(ranges)?;
+        let replacement = Self::serialize_merge_block(&normalized)?;
+        let (start, end) = layout
+            .block_span
+            .unwrap_or((layout.insertion_offset, layout.insertion_offset));
+        let capacity = original
+            .len()
+            .checked_sub(end - start)
+            .and_then(|value| value.checked_add(replacement.len()))
+            .ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidLength {
+                    expected: usize::MAX,
+                    found: original.len(),
+                }
+            })?;
+        let mut updated = Vec::with_capacity(capacity);
+        updated.extend_from_slice(&original[..start]);
+        updated.extend_from_slice(&replacement);
+        updated.extend_from_slice(&original[end..]);
+        Self::inspect_merge_block(&updated)?;
+        self.package.get_part_mut(&uri)?.set_blob(updated);
+        Ok(())
+    }
+
+    /// Atomically replace all merged ranges in a worksheet selected by name.
+    pub fn set_merged_cell_ranges_by_name(
+        &mut self,
+        worksheet_name: &str,
+        ranges: &[MergedCell],
+    ) -> XlsbResult<()> {
+        let index = self.worksheet_index(worksheet_name)?;
+        self.set_merged_cell_ranges(index, ranges)
+    }
+
+    /// Atomically add one merged range to a worksheet selected by index.
+    pub fn add_merged_cell_range(
+        &mut self,
+        worksheet_index: usize,
+        range: MergedCell,
+    ) -> XlsbResult<()> {
+        let mut ranges = self.merged_cell_ranges(worksheet_index)?;
+        ranges.push(range);
+        self.set_merged_cell_ranges(worksheet_index, &ranges)
+    }
+
+    /// Atomically add one merged range to a worksheet selected by name.
+    pub fn add_merged_cell_range_by_name(
+        &mut self,
+        worksheet_name: &str,
+        range: MergedCell,
+    ) -> XlsbResult<()> {
+        let index = self.worksheet_index(worksheet_name)?;
+        self.add_merged_cell_range(index, range)
+    }
+
+    /// Atomically remove an exact merged range from a worksheet by index.
+    pub fn remove_merged_cell_range(
+        &mut self,
+        worksheet_index: usize,
+        range: &MergedCell,
+    ) -> XlsbResult<bool> {
+        let mut ranges = self.merged_cell_ranges(worksheet_index)?;
+        let Some(index) = ranges.iter().position(|candidate| candidate == range) else {
+            return Ok(false);
+        };
+        ranges.remove(index);
+        self.set_merged_cell_ranges(worksheet_index, &ranges)?;
+        Ok(true)
+    }
+
+    /// Atomically remove an exact merged range from a worksheet by name.
+    pub fn remove_merged_cell_range_by_name(
+        &mut self,
+        worksheet_name: &str,
+        range: &MergedCell,
+    ) -> XlsbResult<bool> {
+        let index = self.worksheet_index(worksheet_name)?;
+        self.remove_merged_cell_range(index, range)
+    }
+
+    /// Atomically clear all merged ranges in a worksheet selected by index.
+    pub fn clear_merged_cell_ranges(&mut self, worksheet_index: usize) -> XlsbResult<()> {
+        self.set_merged_cell_ranges(worksheet_index, &[])
+    }
+
+    /// Atomically clear all merged ranges in a worksheet selected by name.
+    pub fn clear_merged_cell_ranges_by_name(&mut self, worksheet_name: &str) -> XlsbResult<()> {
+        let index = self.worksheet_index(worksheet_name)?;
+        self.clear_merged_cell_ranges(index)
     }
 
     /// Open an XLSB workbook from a reader
@@ -131,6 +309,295 @@ impl XlsbWorkbook {
         Ok(workbook)
     }
 
+    fn worksheet_index(&self, worksheet_name: &str) -> XlsbResult<usize> {
+        self.formula_context
+            .worksheet_names
+            .iter()
+            .position(|name| name == worksheet_name)
+            .ok_or_else(|| {
+                crate::xlsb::error::XlsbError::WorksheetNotFound(worksheet_name.to_string())
+            })
+    }
+
+    fn worksheet_uri(&self, index: usize) -> XlsbResult<litchi_opc::PackURI> {
+        let name = self
+            .formula_context
+            .worksheet_names
+            .get(index)
+            .ok_or_else(|| {
+                crate::error::OoxmlError::InvalidFormat(format!(
+                    "Worksheet index {index} out of bounds"
+                ))
+            })?;
+        let rel_id = self
+            .worksheet_rel_ids
+            .get(index)
+            .and_then(Option::as_deref)
+            .ok_or_else(|| {
+                crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                    "sheet {name:?} has no worksheet relationship"
+                ))
+            })?;
+        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
+        let workbook_part = self.package.get_part(&workbook_uri)?;
+        let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+            crate::xlsb::error::XlsbError::FileNotFound(format!(
+                "relationship {rel_id:?} for sheet {name:?}"
+            ))
+        })?;
+        if relationship.is_external() {
+            return Err(crate::xlsb::error::XlsbError::UnsupportedFeature(format!(
+                "sheet {name:?} has an external worksheet relationship"
+            )));
+        }
+        Ok(relationship.target_partname()?)
+    }
+
+    fn merge_range_key(range: &MergedCell) -> (u32, u32, u32, u32) {
+        (
+            range.row_first,
+            range.col_first,
+            range.row_last,
+            range.col_last,
+        )
+    }
+
+    fn normalize_merge_ranges(ranges: &[MergedCell]) -> XlsbResult<Vec<MergedCell>> {
+        if ranges.len() > MAX_MERGED_CELL_RANGES {
+            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                expected: MAX_MERGED_CELL_RANGES,
+                found: ranges.len(),
+            });
+        }
+        let mut normalized = ranges.to_vec();
+        for range in &normalized {
+            range.validate()?;
+        }
+        normalized.sort_unstable_by_key(Self::merge_range_key);
+        Self::validate_merge_range_collection(&normalized, false)?;
+        Ok(normalized)
+    }
+
+    fn validate_merge_range_collection(
+        ranges: &[MergedCell],
+        require_canonical_order: bool,
+    ) -> XlsbResult<()> {
+        if ranges.len() > MAX_MERGED_CELL_RANGES {
+            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                expected: MAX_MERGED_CELL_RANGES,
+                found: ranges.len(),
+            });
+        }
+        let mut active = BTreeMap::<u32, (u32, u32)>::new();
+        let mut expirations = BinaryHeap::<Reverse<(u32, u32)>>::new();
+        let mut previous = None;
+        for range in ranges {
+            range.validate()?;
+            let key = Self::merge_range_key(range);
+            if require_canonical_order && previous.is_some_and(|value| value >= key) {
+                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                    typ: "BrtMergeCell collection".to_string(),
+                    val: "duplicate or noncanonical range order".to_string(),
+                });
+            }
+            previous = Some(key);
+            while let Some(Reverse((row_last, col_first))) = expirations.peek().copied() {
+                if row_last >= range.row_first {
+                    break;
+                }
+                expirations.pop();
+                if active.get(&col_first).is_some_and(|entry| entry.1 == row_last) {
+                    active.remove(&col_first);
+                }
+            }
+            if let Some((&col_first, &(col_last, _))) = active.range(..=range.col_last).next_back() {
+                if col_last >= range.col_first {
+                    return Err(crate::xlsb::error::XlsbError::InvalidCellReference(format!(
+                        "merged range {} overlaps an existing range beginning in column {}",
+                        range.to_range_string(), col_first
+                    )));
+                }
+            }
+            active.insert(range.col_first, (range.col_last, range.row_last));
+            expirations.push(Reverse((range.row_last, range.col_first)));
+        }
+        Ok(())
+    }
+
+    fn is_post_merge_record(record_type: u16) -> bool {
+        matches!(
+            record_type,
+            record_types::PHONETIC_INFO
+                | record_types::H_LINK
+                | record_types::BEGIN_D_VALS
+                | record_types::BEGIN_D_VALS14
+                | record_types::BEGIN_COND_FORMATTING
+                | record_types::BEGIN_COND_FORMATTING14
+                | record_types::MARGINS
+                | record_types::PRINT_OPTIONS
+                | record_types::PAGE_SETUP
+                | record_types::BEGIN_HEADER_FOOTER
+                | record_types::DRAWING
+                | record_types::LEGACY_DRAWING
+                | record_types::LEGACY_DRAWING_HF
+        )
+    }
+
+    fn inspect_merge_block(data: &[u8]) -> XlsbResult<MergeBlockLayout> {
+        let mut cursor = Cursor::new(data);
+        let mut begin_offset = None;
+        let mut block_span = None;
+        let mut declared_count = None;
+        let mut ranges = Vec::new();
+        let mut in_block = false;
+        let mut saw_end_sheet_data = false;
+        let mut end_sheet_offset = None;
+        let mut first_post_merge_offset = None;
+        while (cursor.position() as usize) < data.len() {
+            let start = cursor.position() as usize;
+            let record = XlsbRecord::read(&mut cursor)?;
+            let end = cursor.position() as usize;
+            match record.header.record_type {
+                record_types::BEGIN_MERGE_CELLS => {
+                    if in_block || begin_offset.is_some() || !saw_end_sheet_data {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtBeginMergeCells".to_string(),
+                            val: "duplicate, nested, or out-of-order record".to_string(),
+                        });
+                    }
+                    if record.data.len() != 4 {
+                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                            expected: 4,
+                            found: record.data.len(),
+                        });
+                    }
+                    let count = binary::read_u32_le_at(&record.data, 0)? as usize;
+                    if count == 0 || count > MAX_MERGED_CELL_RANGES {
+                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                            expected: MAX_MERGED_CELL_RANGES,
+                            found: count,
+                        });
+                    }
+                    begin_offset = Some(start);
+                    declared_count = Some(count);
+                    in_block = true;
+                },
+                record_types::MERGE_CELL => {
+                    if !in_block {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtMergeCell".to_string(),
+                            val: "record occurs outside BrtBeginMergeCells".to_string(),
+                        });
+                    }
+                    ranges.push(MergedCell::parse(&record.data)?);
+                    if ranges.len() > declared_count.unwrap_or_default() {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtBeginMergeCells".to_string(),
+                            val: "declared count is smaller than the record collection".to_string(),
+                        });
+                    }
+                },
+                record_types::END_MERGE_CELLS => {
+                    if !in_block || !record.data.is_empty() {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtEndMergeCells".to_string(),
+                            val: "orphan, duplicate, or nonempty record".to_string(),
+                        });
+                    }
+                    if declared_count != Some(ranges.len()) {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtBeginMergeCells".to_string(),
+                            val: format!(
+                                "declared count {:?} disagrees with {} BrtMergeCell records",
+                                declared_count,
+                                ranges.len()
+                            ),
+                        });
+                    }
+                    block_span = Some((begin_offset.expect("merge begin offset"), end));
+                    in_block = false;
+                },
+                record_types::END_SHEET_DATA => {
+                    if in_block {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtMergeCells collection".to_string(),
+                            val: "noncontiguous record collection".to_string(),
+                        });
+                    }
+                    saw_end_sheet_data = true;
+                },
+                record_types::END_SHEET => {
+                    if in_block || end_sheet_offset.replace(start).is_some() {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtEndSheet".to_string(),
+                            val: "duplicate or embedded in merge collection".to_string(),
+                        });
+                    }
+                },
+                record_type => {
+                    if in_block {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtMergeCells collection".to_string(),
+                            val: format!("unexpected record 0x{record_type:04X}"),
+                        });
+                    }
+                    if saw_end_sheet_data
+                        && first_post_merge_offset.is_none()
+                        && Self::is_post_merge_record(record_type)
+                    {
+                        first_post_merge_offset = Some(start);
+                    }
+                },
+            }
+        }
+        if in_block || begin_offset.is_some() != block_span.is_some() {
+            return Err(crate::xlsb::error::XlsbError::UnexpectedEndOfStream(
+                "BrtMergeCells collection".to_string(),
+            ));
+        }
+        let end_sheet_offset = end_sheet_offset.ok_or_else(|| {
+            crate::xlsb::error::XlsbError::UnexpectedEndOfStream("BrtEndSheet".to_string())
+        })?;
+        if !saw_end_sheet_data {
+            return Err(crate::xlsb::error::XlsbError::UnexpectedEndOfStream(
+                "BrtEndSheetData".to_string(),
+            ));
+        }
+        if block_span.is_some() {
+            Self::validate_merge_range_collection(&ranges, true)?;
+            if first_post_merge_offset.is_some_and(|offset| {
+                block_span.is_some_and(|(begin, _)| offset < begin)
+            }) {
+                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                    typ: "BrtMergeCells collection".to_string(),
+                    val: "collection occurs after a later worksheet feature".to_string(),
+                });
+            }
+        }
+        Ok(MergeBlockLayout {
+            ranges,
+            block_span,
+            insertion_offset: first_post_merge_offset.unwrap_or(end_sheet_offset),
+        })
+    }
+
+    fn serialize_merge_block(ranges: &[MergedCell]) -> XlsbResult<Vec<u8>> {
+        if ranges.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut output = Vec::with_capacity(10 + ranges.len() * 19);
+        let mut writer = crate::xlsb::writer::RecordWriter::new(&mut output);
+        writer.write_record(
+            record_types::BEGIN_MERGE_CELLS,
+            &(ranges.len() as u32).to_le_bytes(),
+        )?;
+        for range in ranges {
+            writer.write_record(record_types::MERGE_CELL, &range.serialize())?;
+        }
+        writer.write_record(record_types::END_MERGE_CELLS, &[])?;
+        Ok(output)
+    }
+
     /// Load workbook information from workbook.bin
     fn load_workbook_info(&mut self) -> XlsbResult<()> {
         let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
@@ -160,12 +627,121 @@ impl XlsbWorkbook {
             .iter()
             .map(|uri| self.load_external_book(uri))
             .collect::<XlsbResult<Vec<_>>>()?;
+        let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob())?;
+        for (cache_id, rel_id) in &pivot_cache_ids {
+            let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "PivotCache {cache_id} relationship {rel_id:?} is missing"
+                ))
+            })?;
+            if relationship.is_external()
+                || !relationship
+                    .reltype()
+                    .to_ascii_lowercase()
+                    .ends_with("/pivotcachedefinition")
+            {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "PivotCache {cache_id} relationship is external or has the wrong type"
+                )));
+            }
+            self.package.get_part(&relationship.target_partname()?)?;
+        }
+
+        let mut tables = Vec::new();
+        let mut pivot_views = Vec::new();
+        for (sheet_index, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
+            let Some(rel_id) = rel_id else { continue };
+            let Some(sheet_relationship) = workbook_part.rels().get(rel_id) else {
+                continue;
+            };
+            if sheet_relationship.is_external() {
+                continue;
+            }
+            let sheet_part = self
+                .package
+                .get_part(&sheet_relationship.target_partname()?)?;
+            for relationship in sheet_part.rels().iter().filter(|relationship| {
+                matches!(
+                    relationship.reltype(),
+                    relationship_type::TABLE | relationship_type::STRICT_TABLE
+                ) || relationship.reltype()
+                    == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells"
+            }) {
+                if relationship.is_external() {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        "worksheet has an external table relationship".to_string(),
+                    ));
+                }
+                let part = self.package.get_part(&relationship.target_partname()?)?;
+                let table = Self::parse_table_definition(part.blob(), sheet_index)?;
+                if tables.iter().any(|existing: &FormulaTableDefinition| {
+                    existing.table_id() == table.table_id()
+                }) {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "duplicate workbook table ID {}",
+                        table.table_id()
+                    )));
+                }
+                if tables.iter().any(|existing: &FormulaTableDefinition| {
+                    excel_name_eq(existing.display_name(), table.display_name())
+                }) {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "duplicate workbook table display name {:?}",
+                        table.display_name()
+                    )));
+                }
+                tables.push(table);
+            }
+            for relationship in sheet_part.rels().iter().filter(|relationship| {
+                relationship
+                    .reltype()
+                    .to_ascii_lowercase()
+                    .ends_with("/pivottable")
+            }) {
+                if relationship.is_external() {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        "worksheet has an external PivotTable relationship".to_string(),
+                    ));
+                }
+                let part = self.package.get_part(&relationship.target_partname()?)?;
+                let view = Self::parse_pivot_view(part.blob(), sheet_index)?;
+                if !pivot_cache_ids
+                    .iter()
+                    .any(|(cache_id, _)| *cache_id == view.cache_id())
+                {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "PivotTable view {:?} references unknown cache {}",
+                        view.name(),
+                        view.cache_id()
+                    )));
+                }
+                if pivot_views
+                    .iter()
+                    .any(|existing: &FormulaPivotViewDefinition| {
+                        existing.cache_id() == view.cache_id()
+                            && existing.sheet_index() == view.sheet_index()
+                            && excel_name_eq(existing.name(), view.name())
+                    })
+                {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "duplicate PivotTable view {:?} for cache {} on sheet {sheet_index}",
+                        view.name(),
+                        view.cache_id()
+                    )));
+                }
+                pivot_views.push(view);
+            }
+        }
         self.formula_context = FormulaResolutionContext {
             worksheet_names: info.worksheet_names.into(),
             supporting_links: info.supporting_links.into(),
             external_sheets: info.external_sheets.into(),
             external_books: external_books.into(),
             defined_names: info.defined_names.into(),
+            tables: tables.into(),
+            pivot_views: pivot_views.into(),
+            pivot_name_scopes: Vec::new().into(),
+            active_pivot_scope: None,
             current_sheet: None,
         };
         self.worksheet_rel_ids = info.worksheet_rel_ids;
@@ -820,6 +1396,319 @@ impl XlsbWorkbook {
             let (value, consumed) = crate::xlsb::records::wide_str_with_len(data)?;
             Ok((Some(value), consumed))
         }
+    }
+
+    fn parse_pivot_cache_ids(data: &[u8]) -> XlsbResult<Vec<(u32, String)>> {
+        const BEGIN_PIVOT_CACHE_IDS: u16 = 384;
+        const END_PIVOT_CACHE_IDS: u16 = 385;
+        const BEGIN_PIVOT_CACHE_ID: u16 = 386;
+        const END_PIVOT_CACHE_ID: u16 = 387;
+
+        let mut in_collection = false;
+        let mut open_cache = false;
+        let mut ended = false;
+        let mut caches = Vec::new();
+        for record in XlsbRecordIter::new(data) {
+            let record = record?;
+            match record.header.record_type {
+                BEGIN_PIVOT_CACHE_IDS => {
+                    if in_collection || ended {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "duplicate BrtBeginPivotCacheIDs collection".to_string(),
+                        ));
+                    }
+                    in_collection = true;
+                },
+                BEGIN_PIVOT_CACHE_ID => {
+                    if !in_collection || open_cache || record.data.len() < 8 {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "malformed BrtBeginPivotCacheID nesting or payload".to_string(),
+                        ));
+                    }
+                    let cache_id = binary::read_u32_le_at(&record.data, 0)?;
+                    let (rel_id, consumed) =
+                        crate::xlsb::records::wide_str_with_len(&record.data[4..])?;
+                    if 4 + consumed != record.data.len()
+                        || rel_id.is_empty()
+                        || rel_id.encode_utf16().count() > 255
+                        || caches
+                            .iter()
+                            .any(|(existing, _): &(u32, String)| *existing == cache_id)
+                    {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                            "invalid or duplicate PivotCache ID {cache_id}"
+                        )));
+                    }
+                    caches.push((cache_id, rel_id));
+                    open_cache = true;
+                },
+                END_PIVOT_CACHE_ID => {
+                    if !open_cache || !record.data.is_empty() {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "unbalanced BrtEndPivotCacheID".to_string(),
+                        ));
+                    }
+                    open_cache = false;
+                },
+                END_PIVOT_CACHE_IDS => {
+                    if !in_collection || open_cache || !record.data.is_empty() {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "unbalanced BrtEndPivotCacheIDs".to_string(),
+                        ));
+                    }
+                    in_collection = false;
+                    ended = true;
+                },
+                _ => {},
+            }
+        }
+        if in_collection || open_cache {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                "unterminated PivotCache ID collection".to_string(),
+            ));
+        }
+        Ok(caches)
+    }
+
+    fn parse_pivot_view(data: &[u8], sheet_index: usize) -> XlsbResult<FormulaPivotViewDefinition> {
+        const BEGIN_SX_VIEW: u16 = 280;
+        let mut view = None;
+        for record in XlsbRecordIter::new(data) {
+            let record = record?;
+            if record.header.record_type != BEGIN_SX_VIEW {
+                continue;
+            }
+            if view.is_some() || record.data.len() < 36 {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    "PivotTable part has duplicate or truncated BrtBeginSXView".to_string(),
+                ));
+            }
+            let cache_id = binary::read_u32_le_at(&record.data, 28)?;
+            let (name, consumed) = crate::xlsb::records::wide_str_with_len(&record.data[32..])?;
+            if consumed > record.data.len() - 32 {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    "PivotTable view name overruns BrtBeginSXView".to_string(),
+                ));
+            }
+            view = Some(FormulaPivotViewDefinition::try_new(
+                cache_id,
+                sheet_index,
+                name,
+            )?);
+        }
+        view.ok_or_else(|| {
+            crate::xlsb::error::XlsbError::InvalidFormula(
+                "PivotTable part omits BrtBeginSXView".to_string(),
+            )
+        })
+    }
+
+    fn parse_table_definition(
+        data: &[u8],
+        sheet_index: usize,
+    ) -> XlsbResult<FormulaTableDefinition> {
+        const BEGIN_LIST: u16 = 343;
+        const END_LIST: u16 = 344;
+        const BEGIN_LIST_COLS: u16 = 345;
+        const END_LIST_COLS: u16 = 346;
+        const BEGIN_LIST_COL: u16 = 347;
+        const END_LIST_COL: u16 = 348;
+
+        let mut table_header: Option<(u32, String, usize)> = None;
+        let mut expected_columns = None;
+        let mut columns = Vec::new();
+        let mut in_column = false;
+        let mut ended_columns = false;
+        let mut ended_table = false;
+        let mut iter = XlsbRecordIter::new(data);
+        for record in iter.by_ref() {
+            let record = record?;
+            if ended_table {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    "XLSB table part contains records after BrtEndList".to_string(),
+                ));
+            }
+            match record.header.record_type {
+                BEGIN_LIST => {
+                    if table_header.is_some() {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "XLSB table part contains duplicate BrtBeginList".to_string(),
+                        ));
+                    }
+                    table_header = Some(Self::parse_table_header(&record.data)?);
+                },
+                BEGIN_LIST_COLS => {
+                    let (_, _, range_columns) = table_header.as_ref().ok_or_else(|| {
+                        crate::xlsb::error::XlsbError::InvalidFormula(
+                            "BrtBeginListCols precedes BrtBeginList".to_string(),
+                        )
+                    })?;
+                    if expected_columns.is_some() || record.data.len() != 4 {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "invalid or duplicate BrtBeginListCols".to_string(),
+                        ));
+                    }
+                    let count = usize::try_from(binary::read_u32_le_at(&record.data, 0)?).map_err(
+                        |_| {
+                            crate::xlsb::error::XlsbError::InvalidFormula(
+                                "table column count overflow".to_string(),
+                            )
+                        },
+                    )?;
+                    if count == 0 || count > 16_384 || count != *range_columns {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                            "table column count {count} disagrees with range width {range_columns}"
+                        )));
+                    }
+                    expected_columns = Some(count);
+                },
+                BEGIN_LIST_COL => {
+                    if expected_columns.is_none() || ended_columns || in_column {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "BrtBeginListCol occurs outside its column collection".to_string(),
+                        ));
+                    }
+                    columns.push(Self::parse_table_column(&record.data, columns.len())?);
+                    in_column = true;
+                },
+                END_LIST_COL => {
+                    if !in_column || !record.data.is_empty() {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "unmatched or nonempty BrtEndListCol".to_string(),
+                        ));
+                    }
+                    in_column = false;
+                },
+                END_LIST_COLS => {
+                    if expected_columns.is_none()
+                        || in_column
+                        || ended_columns
+                        || !record.data.is_empty()
+                    {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "invalid BrtEndListCols".to_string(),
+                        ));
+                    }
+                    ended_columns = true;
+                },
+                END_LIST => {
+                    if !ended_columns || in_column || !record.data.is_empty() {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "invalid BrtEndList".to_string(),
+                        ));
+                    }
+                    ended_table = true;
+                },
+                _ => {},
+            }
+        }
+        let (table_id, display_name, _) = table_header.ok_or_else(|| {
+            crate::xlsb::error::XlsbError::InvalidFormula(
+                "XLSB table part omits BrtBeginList".to_string(),
+            )
+        })?;
+        let expected = expected_columns.ok_or_else(|| {
+            crate::xlsb::error::XlsbError::InvalidFormula(
+                "XLSB table part omits BrtBeginListCols".to_string(),
+            )
+        })?;
+        if !ended_table || columns.len() != expected {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "XLSB table contains {} of {expected} declared columns or is unterminated",
+                columns.len()
+            )));
+        }
+        FormulaTableDefinition::try_new(table_id, sheet_index, display_name, columns)
+    }
+
+    fn parse_table_header(data: &[u8]) -> XlsbResult<(u32, String, usize)> {
+        if data.len() < 64 {
+            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                expected: 64,
+                found: data.len(),
+            });
+        }
+        let row_first = binary::read_u32_le_at(data, 0)?;
+        let row_last = binary::read_u32_le_at(data, 4)?;
+        let col_first = binary::read_u32_le_at(data, 8)?;
+        let col_last = binary::read_u32_le_at(data, 12)?;
+        if row_first > row_last
+            || row_last >= 1_048_576
+            || col_first > col_last
+            || col_last >= 16_384
+        {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                "BrtBeginList contains an invalid table range".to_string(),
+            ));
+        }
+        for offset in [24, 28] {
+            if binary::read_u32_le_at(data, offset)? > 1 {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    "BrtBeginList contains a non-Boolean row flag".to_string(),
+                ));
+            }
+        }
+        let table_id = binary::read_u32_le_at(data, 20)?;
+        let mut offset = 64;
+        let mut strings = Vec::with_capacity(6);
+        for _ in 0..6 {
+            let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..])?;
+            offset = offset.checked_add(consumed).ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidFormula(
+                    "BrtBeginList string size overflow".to_string(),
+                )
+            })?;
+            strings.push(value);
+        }
+        if offset != data.len() {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "BrtBeginList has {} trailing bytes",
+                data.len() - offset
+            )));
+        }
+        let display_name = strings[1].clone().ok_or_else(|| {
+            crate::xlsb::error::XlsbError::InvalidFormula(
+                "BrtBeginList has a NULL display name".to_string(),
+            )
+        })?;
+        Ok((
+            table_id,
+            display_name,
+            usize::try_from(col_last - col_first + 1).expect("bounded table width"),
+        ))
+    }
+
+    fn parse_table_column(data: &[u8], index: usize) -> XlsbResult<String> {
+        if data.len() < 24 || binary::read_u32_le_at(data, 0)? == 0 {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "BrtBeginListCol {index} has an invalid header"
+            )));
+        }
+        let mut offset = 24;
+        let mut strings = Vec::with_capacity(6);
+        for _ in 0..6 {
+            let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..])?;
+            offset = offset.checked_add(consumed).ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidFormula(
+                    "BrtBeginListCol string size overflow".to_string(),
+                )
+            })?;
+            strings.push(value);
+        }
+        if offset != data.len() {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "BrtBeginListCol has {} trailing bytes",
+                data.len() - offset
+            )));
+        }
+        strings[0]
+            .clone()
+            .or_else(|| strings[1].clone())
+            .ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "BrtBeginListCol {index} has neither a name nor caption"
+                ))
+            })
     }
 }
 

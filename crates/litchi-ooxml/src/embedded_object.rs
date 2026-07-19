@@ -273,15 +273,21 @@ mod tests {
     #[test]
     fn accepts_strict_relationships_and_returns_external_targets_inertly() {
         for (relationship, expected) in [
-            (relationship_type::STRICT_OLE_OBJECT, EmbeddedPartKind::OleObject),
+            (
+                relationship_type::STRICT_OLE_OBJECT,
+                EmbeddedPartKind::OleObject,
+            ),
             (relationship_type::STRICT_PACKAGE, EmbeddedPartKind::Package),
         ] {
-            let package = synthetic_package(relationship, true, true, content_type::WML_DOCUMENT_MAIN);
+            let package =
+                synthetic_package(relationship, true, true, content_type::WML_DOCUMENT_MAIN);
             let entries = discover_embedded_parts(&package).unwrap();
             assert_eq!(entries[0].kind(), expected);
             assert!(matches!(
                 entries[0].target(),
-                EmbeddedTarget::External { target: "https://example.invalid/payload" }
+                EmbeddedTarget::External {
+                    target: "https://example.invalid/payload"
+                }
             ));
         }
     }
@@ -317,13 +323,11 @@ mod tests {
     #[test]
     fn ignores_orphans_preserves_duplicate_occurrences_and_sorts_deterministically() {
         let mut orphan = OpcPackage::new();
-        orphan
-            .add_part(Box::new(payload_part("/word/embeddings/orphan.bin")));
+        orphan.add_part(Box::new(payload_part("/word/embeddings/orphan.bin")));
         assert!(discover_embedded_parts(&orphan).unwrap().is_empty());
 
         let mut package = OpcPackage::new();
-        package
-            .add_part(Box::new(payload_part("/word/embeddings/payload.bin")));
+        package.add_part(Box::new(payload_part("/word/embeddings/payload.bin")));
         let mut source = source_part("/word/document.xml", content_type::WML_DOCUMENT_MAIN);
         source.rels_mut().add_relationship(
             relationship_type::PACKAGE.into(),
@@ -404,7 +408,11 @@ mod tests {
                 .count(),
             packages
         );
-        assert!(entries.iter().all(|entry| matches!(entry.target(), EmbeddedTarget::Internal(_))));
+        assert!(
+            entries
+                .iter()
+                .all(|entry| matches!(entry.target(), EmbeddedTarget::Internal(_)))
+        );
     }
 
     fn synthetic_package(
@@ -428,8 +436,7 @@ mod tests {
         );
         package.add_part(Box::new(source));
         if include_target && !external {
-            package
-                .add_part(Box::new(payload_part("/word/embeddings/payload.bin")));
+            package.add_part(Box::new(payload_part("/word/embeddings/payload.bin")));
         }
         package
     }

@@ -41,7 +41,10 @@ impl<'a> PresentationPart<'a> {
     /// let pres_part = PresentationPart::from_part(opc_part)?;
     /// ```
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let xml=match crate::common::mce::process_ooxml(part.blob())?{std::borrow::Cow::Borrowed(_)=>part.blob_arc(),std::borrow::Cow::Owned(v)=>Arc::new(v)};
+        let xml = match crate::common::mce::process_ooxml(part.blob())? {
+            std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+            std::borrow::Cow::Owned(v) => Arc::new(v),
+        };
         Ok(Self { part, xml })
     }
 
@@ -133,6 +136,35 @@ impl<'a> PresentationPart<'a> {
             .into_iter()
             .map(|(_, relationship_id)| relationship_id)
             .collect())
+    }
+
+    /// Get PowerPoint 2010 slide sections and validate their slide membership.
+    ///
+    /// Section metadata contains slide IDs, not relationships. Unknown section
+    /// extensions remain inert and no targets are opened by this accessor.
+    pub fn sections(&self) -> Result<crate::pptx::sections::SectionList> {
+        let info = PresentationInfo::parse(self.xml_bytes())?;
+        let sections = crate::pptx::sections::SectionList::from_xml(self.xml_bytes())?;
+        for section in sections.sections() {
+            for slide_id in &section.slide_ids {
+                if !info.slides.iter().any(|(id, _)| id == slide_id) {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "PowerPoint section references undeclared slide ID {slide_id}"
+                    )));
+                }
+            }
+        }
+        Ok(sections)
+    }
+
+    /// Get typed PowerPoint 2013 slide and notes guide extensions.
+    ///
+    /// Guide metadata has no relationships. Unknown guide extensions remain
+    /// inert and this accessor never opens package or external targets.
+    pub fn extended_guides(
+        &self,
+    ) -> Result<crate::pptx::extended_guides::PresentationExtendedGuides> {
+        crate::pptx::extended_guides::PresentationExtendedGuides::from_xml(self.xml_bytes())
     }
 
     /// Get the underlying OPC part.

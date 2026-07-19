@@ -246,8 +246,9 @@ impl Parser {
     }
 
     fn parse(content: &str) -> Result<ParsedWorksheetData> {
-        let processed=crate::common::mce::process_ooxml(content.as_bytes())?;
-        let content=std::str::from_utf8(processed.as_ref()).map_err(|e|OoxmlError::Xml(e.to_string()))?;
+        let processed = crate::common::mce::process_ooxml(content.as_bytes())?;
+        let content =
+            std::str::from_utf8(processed.as_ref()).map_err(|e| OoxmlError::Xml(e.to_string()))?;
         let mut reader = NsReader::from_reader(content.as_bytes());
         let mut parser = Self::new();
         let mut stack = Vec::new();
@@ -1810,16 +1811,13 @@ impl Parser {
         if let Some(range) = formula_reference.as_deref() {
             validate_range(range, "worksheet formula range")?;
         }
-        let shared_formula_index = optional_u32(
-            element,
-            b"si",
-            decoder,
-            "worksheet shared formula index",
-        )?;
+        let shared_formula_index =
+            optional_u32(element, b"si", decoder, "worksheet shared formula index")?;
         if formula_type == "shared" {
-            cell.shared_formula_index = Some(shared_formula_index.ok_or_else(|| {
-                invalid("worksheet shared formula is missing required si")
-            })?);
+            cell.shared_formula_index = Some(
+                shared_formula_index
+                    .ok_or_else(|| invalid("worksheet shared formula is missing required si"))?,
+            );
             cell.shared_formula_reference = formula_reference;
         } else if formula_type == "array" {
             cell.array_range = formula_reference;
@@ -2392,7 +2390,12 @@ fn optional_remembered_zoom(
     name: &[u8],
     decoder: Decoder,
 ) -> Result<Option<u16>> {
-    let value = optional_u32(element, name, decoder, "worksheet sheet-view remembered zoom")?;
+    let value = optional_u32(
+        element,
+        name,
+        decoder,
+        "worksheet sheet-view remembered zoom",
+    )?;
     value
         .map(|value| {
             if value == 0 || (10..=400).contains(&value) {

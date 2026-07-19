@@ -199,7 +199,9 @@ impl From<crate::error::OoxmlError> for XlsbError {
             },
             crate::error::OoxmlError::InvalidFormat(msg) => XlsbError::Encoding(msg),
             crate::error::OoxmlError::Io(e) => XlsbError::Io(e),
-            crate::error::OoxmlError::MarkupCompatibility(err) => XlsbError::Encoding(err.to_string()),
+            crate::error::OoxmlError::MarkupCompatibility(err) => {
+                XlsbError::Encoding(err.to_string())
+            },
             crate::error::OoxmlError::Other(msg) => XlsbError::Encoding(msg),
         }
     }

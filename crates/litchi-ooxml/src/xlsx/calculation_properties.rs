@@ -67,20 +67,46 @@ pub struct WorkbookCalculationProperties {
 
 impl WorkbookCalculationProperties {
     /// Calculation-engine identifier. Excel's effective default is zero.
-    pub fn calculation_id(&self) -> u32 { self.calculation_id }
-    pub fn calculation_mode(&self) -> WorkbookCalculationMode { self.calculation_mode }
-    pub fn full_calculation_on_load(&self) -> bool { self.full_calculation_on_load }
-    pub fn reference_mode(&self) -> WorkbookReferenceMode { self.reference_mode }
-    pub fn iterative_calculation(&self) -> bool { self.iterative_calculation }
-    pub fn iteration_count(&self) -> u32 { self.iteration_count }
-    pub fn iteration_delta(&self) -> f64 { self.iteration_delta }
-    pub fn full_precision(&self) -> bool { self.full_precision }
-    pub fn calculation_completed(&self) -> bool { self.calculation_completed }
-    pub fn calculate_on_save(&self) -> bool { self.calculate_on_save }
-    pub fn concurrent_calculation(&self) -> bool { self.concurrent_calculation }
-    pub fn concurrent_manual_count(&self) -> Option<u32> { self.concurrent_manual_count }
+    pub fn calculation_id(&self) -> u32 {
+        self.calculation_id
+    }
+    pub fn calculation_mode(&self) -> WorkbookCalculationMode {
+        self.calculation_mode
+    }
+    pub fn full_calculation_on_load(&self) -> bool {
+        self.full_calculation_on_load
+    }
+    pub fn reference_mode(&self) -> WorkbookReferenceMode {
+        self.reference_mode
+    }
+    pub fn iterative_calculation(&self) -> bool {
+        self.iterative_calculation
+    }
+    pub fn iteration_count(&self) -> u32 {
+        self.iteration_count
+    }
+    pub fn iteration_delta(&self) -> f64 {
+        self.iteration_delta
+    }
+    pub fn full_precision(&self) -> bool {
+        self.full_precision
+    }
+    pub fn calculation_completed(&self) -> bool {
+        self.calculation_completed
+    }
+    pub fn calculate_on_save(&self) -> bool {
+        self.calculate_on_save
+    }
+    pub fn concurrent_calculation(&self) -> bool {
+        self.concurrent_calculation
+    }
+    pub fn concurrent_manual_count(&self) -> Option<u32> {
+        self.concurrent_manual_count
+    }
     /// Whether Excel should perform a full calculation on the next calculation cycle.
-    pub fn force_full_calculation(&self) -> bool { self.force_full_calculation }
+    pub fn force_full_calculation(&self) -> bool {
+        self.force_full_calculation
+    }
 }
 
 #[derive(Default)]
@@ -124,11 +150,8 @@ impl Builder {
 pub fn parse_workbook_calculation_properties(
     xml: &[u8],
 ) -> Result<Option<WorkbookCalculationProperties>> {
-    let processed = process_markup_compatibility(
-        xml,
-        &MceCapabilities::default(),
-        &MceLimits::default(),
-    )?;
+    let processed =
+        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -145,9 +168,7 @@ pub fn parse_workbook_calculation_properties(
         match event {
             Event::Start(element) => {
                 let local = element.local_name();
-                let core = is_spreadsheetml_name(
-                    &namespace, element.name(), local.as_ref(),
-                );
+                let core = is_spreadsheetml_name(&namespace, element.name(), local.as_ref());
                 if depth == 0 {
                     if root_seen || !core || local.as_ref() != b"workbook" {
                         return Err(invalid("calcPr parser requires a workbook root"));
@@ -162,14 +183,16 @@ pub fn parse_workbook_calculation_properties(
                     properties = Some(parse_attributes(&element, decoder, &resolver)?.finish());
                     leaf_depth = Some(depth + 1);
                 }
-                depth = depth.checked_add(1).ok_or_else(|| invalid("XML depth overflow"))?;
-            }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XML depth overflow"))?;
+            },
             Event::Empty(element) => {
                 let local = element.local_name();
-                let core = is_spreadsheetml_name(
-                    &namespace, element.name(), local.as_ref(),
-                );
-                if depth == 0 { return Err(invalid("workbook root cannot be empty")); }
+                let core = is_spreadsheetml_name(&namespace, element.name(), local.as_ref());
+                if depth == 0 {
+                    return Err(invalid("workbook root cannot be empty"));
+                }
                 if leaf_depth.is_some_and(|value| depth >= value) {
                     return Err(invalid("calcPr is a leaf element"));
                 }
@@ -179,22 +202,26 @@ pub fn parse_workbook_calculation_properties(
                     }
                     properties = Some(parse_attributes(&element, decoder, &resolver)?.finish());
                 }
-            }
+            },
             Event::End(_) => {
-                if depth == 0 { return Err(invalid("unexpected workbook end element")); }
-                if leaf_depth == Some(depth) { leaf_depth = None; }
+                if depth == 0 {
+                    return Err(invalid("unexpected workbook end element"));
+                }
+                if leaf_depth == Some(depth) {
+                    leaf_depth = None;
+                }
                 depth -= 1;
-            }
+            },
             Event::Text(text) if leaf_depth.is_some_and(|value| depth >= value) => {
                 if !text.decode().map_err(xml_error)?.trim().is_empty() {
                     return Err(invalid("calcPr cannot contain text"));
                 }
-            }
+            },
             Event::CData(_) if leaf_depth.is_some_and(|value| depth >= value) => {
                 return Err(invalid("calcPr cannot contain CDATA"));
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
     }
     if !root_seen || depth != 0 || leaf_depth.is_some() {
@@ -204,12 +231,16 @@ pub fn parse_workbook_calculation_properties(
 }
 
 fn parse_attributes(
-    element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceResolver,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
 ) -> Result<Builder> {
     let mut builder = Builder::default();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
-        if is_namespace_declaration(attribute.key.as_ref()) { continue; }
+        if is_namespace_declaration(attribute.key.as_ref()) {
+            continue;
+        }
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if !matches!(namespace, ResolveResult::Unbound) {
             return Err(invalid(format!(
@@ -221,35 +252,77 @@ fn parse_attributes(
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(xml_error)?;
         match local.as_ref() {
-            b"calcId" => set_once(&mut builder.calculation_id,
-                parse_u32(&value, "calcId")?, "calcId")?,
-            b"calcMode" => set_once(&mut builder.calculation_mode,
-                WorkbookCalculationMode::parse(&value)?, "calcMode")?,
-            b"fullCalcOnLoad" => set_once(&mut builder.full_calculation_on_load,
-                parse_bool(&value, "fullCalcOnLoad")?, "fullCalcOnLoad")?,
-            b"refMode" => set_once(&mut builder.reference_mode,
-                WorkbookReferenceMode::parse(&value)?, "refMode")?,
-            b"iterate" => set_once(&mut builder.iterative_calculation,
-                parse_bool(&value, "iterate")?, "iterate")?,
-            b"iterateCount" => set_once(&mut builder.iteration_count,
-                parse_u32(&value, "iterateCount")?, "iterateCount")?,
-            b"iterateDelta" => set_once(&mut builder.iteration_delta,
-                parse_delta(&value)?, "iterateDelta")?,
-            b"fullPrecision" => set_once(&mut builder.full_precision,
-                parse_bool(&value, "fullPrecision")?, "fullPrecision")?,
-            b"calcCompleted" => set_once(&mut builder.calculation_completed,
-                parse_bool(&value, "calcCompleted")?, "calcCompleted")?,
-            b"calcOnSave" => set_once(&mut builder.calculate_on_save,
-                parse_bool(&value, "calcOnSave")?, "calcOnSave")?,
-            b"concurrentCalc" => set_once(&mut builder.concurrent_calculation,
-                parse_bool(&value, "concurrentCalc")?, "concurrentCalc")?,
-            b"concurrentManualCount" => set_once(&mut builder.concurrent_manual_count,
-                parse_u32(&value, "concurrentManualCount")?, "concurrentManualCount")?,
-            b"forceFullCalc" => set_once(&mut builder.force_full_calculation,
-                parse_bool(&value, "forceFullCalc")?, "forceFullCalc")?,
-            name => return Err(invalid(format!(
-                "unknown calcPr attribute '{}'", String::from_utf8_lossy(name),
-            ))),
+            b"calcId" => set_once(
+                &mut builder.calculation_id,
+                parse_u32(&value, "calcId")?,
+                "calcId",
+            )?,
+            b"calcMode" => set_once(
+                &mut builder.calculation_mode,
+                WorkbookCalculationMode::parse(&value)?,
+                "calcMode",
+            )?,
+            b"fullCalcOnLoad" => set_once(
+                &mut builder.full_calculation_on_load,
+                parse_bool(&value, "fullCalcOnLoad")?,
+                "fullCalcOnLoad",
+            )?,
+            b"refMode" => set_once(
+                &mut builder.reference_mode,
+                WorkbookReferenceMode::parse(&value)?,
+                "refMode",
+            )?,
+            b"iterate" => set_once(
+                &mut builder.iterative_calculation,
+                parse_bool(&value, "iterate")?,
+                "iterate",
+            )?,
+            b"iterateCount" => set_once(
+                &mut builder.iteration_count,
+                parse_u32(&value, "iterateCount")?,
+                "iterateCount",
+            )?,
+            b"iterateDelta" => set_once(
+                &mut builder.iteration_delta,
+                parse_delta(&value)?,
+                "iterateDelta",
+            )?,
+            b"fullPrecision" => set_once(
+                &mut builder.full_precision,
+                parse_bool(&value, "fullPrecision")?,
+                "fullPrecision",
+            )?,
+            b"calcCompleted" => set_once(
+                &mut builder.calculation_completed,
+                parse_bool(&value, "calcCompleted")?,
+                "calcCompleted",
+            )?,
+            b"calcOnSave" => set_once(
+                &mut builder.calculate_on_save,
+                parse_bool(&value, "calcOnSave")?,
+                "calcOnSave",
+            )?,
+            b"concurrentCalc" => set_once(
+                &mut builder.concurrent_calculation,
+                parse_bool(&value, "concurrentCalc")?,
+                "concurrentCalc",
+            )?,
+            b"concurrentManualCount" => set_once(
+                &mut builder.concurrent_manual_count,
+                parse_u32(&value, "concurrentManualCount")?,
+                "concurrentManualCount",
+            )?,
+            b"forceFullCalc" => set_once(
+                &mut builder.force_full_calculation,
+                parse_bool(&value, "forceFullCalc")?,
+                "forceFullCalc",
+            )?,
+            name => {
+                return Err(invalid(format!(
+                    "unknown calcPr attribute '{}'",
+                    String::from_utf8_lossy(name),
+                )));
+            },
         }
     }
     Ok(builder)
@@ -260,7 +333,9 @@ fn is_namespace_declaration(name: &[u8]) -> bool {
 }
 
 fn set_once<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {
-    if slot.is_some() { return Err(invalid(format!("duplicate {name} attribute"))); }
+    if slot.is_some() {
+        return Err(invalid(format!("duplicate {name} attribute")));
+    }
     *slot = Some(value);
     Ok(())
 }
@@ -274,15 +349,19 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
 }
 
 fn parse_u32(value: &str, name: &str) -> Result<u32> {
-    value.parse::<u32>()
+    value
+        .parse::<u32>()
         .map_err(|_| invalid(format!("invalid calcPr {name} value '{value}'")))
 }
 
 fn parse_delta(value: &str) -> Result<f64> {
-    let parsed = value.parse::<f64>()
+    let parsed = value
+        .parse::<f64>()
         .map_err(|_| invalid(format!("invalid calcPr iterateDelta '{value}'")))?;
     if !parsed.is_finite() || parsed < 0.0 {
-        return Err(invalid("calcPr iterateDelta must be finite and non-negative"));
+        return Err(invalid(
+            "calcPr iterateDelta must be finite and non-negative",
+        ));
     }
     Ok(parsed)
 }
@@ -293,8 +372,7 @@ fn reject_unsafe_event(event: &Event<'_>) -> Result<()> {
     }
     if let Event::GeneralRef(reference) = event {
         let name = reference.decode().map_err(xml_error)?;
-        if !matches!(name.as_ref(), "amp" | "lt" | "gt" | "apos" | "quot")
-            && !name.starts_with('#')
+        if !matches!(name.as_ref(), "amp" | "lt" | "gt" | "apos" | "quot") && !name.starts_with('#')
         {
             return Err(invalid("custom XML entities are rejected"));
         }
@@ -330,9 +408,14 @@ mod tests {
             r#"refMode="R1C1" iterate="true" iterateCount="250" iterateDelta="1E-4" "#,
             r#"fullPrecision="0" calcCompleted="false" calcOnSave="0" concurrentCalc="false" "#,
             r#"concurrentManualCount="6" forceFullCalc="true"/>"#,
-        )).unwrap().unwrap();
+        ))
+        .unwrap()
+        .unwrap();
         assert_eq!(value.calculation_id(), 42);
-        assert_eq!(value.calculation_mode(), WorkbookCalculationMode::AutomaticExceptTables);
+        assert_eq!(
+            value.calculation_mode(),
+            WorkbookCalculationMode::AutomaticExceptTables
+        );
         assert!(value.full_calculation_on_load());
         assert_eq!(value.reference_mode(), WorkbookReferenceMode::R1C1);
         assert!(value.iterative_calculation());
@@ -347,7 +430,10 @@ mod tests {
 
         let defaults = parse("<calcPr/>").unwrap().unwrap();
         assert_eq!(defaults.calculation_id(), 0);
-        assert_eq!(defaults.calculation_mode(), WorkbookCalculationMode::Automatic);
+        assert_eq!(
+            defaults.calculation_mode(),
+            WorkbookCalculationMode::Automatic
+        );
         assert!(!defaults.full_calculation_on_load());
         assert_eq!(defaults.reference_mode(), WorkbookReferenceMode::A1);
         assert!(!defaults.iterative_calculation());
@@ -364,15 +450,28 @@ mod tests {
     #[test]
     fn supports_strict_namespace_and_mce_fallback() {
         let strict = br#"<workbook xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><calcPr calcMode="manual"/></workbook>"#;
-        assert_eq!(parse_workbook_calculation_properties(strict).unwrap().unwrap().calculation_mode(),
-            WorkbookCalculationMode::Manual);
-        let mce = format!(concat!(
-            r#"<workbook xmlns="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported">"#,
-            r#"<mc:AlternateContent><mc:Choice Requires="x"><x:calcPr/></mc:Choice><mc:Fallback>"#,
-            r#"<calcPr refMode="R1C1"/></mc:Fallback></mc:AlternateContent></workbook>"#,
-        ), NS);
-        assert_eq!(parse_workbook_calculation_properties(mce.as_bytes()).unwrap().unwrap().reference_mode(),
-            WorkbookReferenceMode::R1C1);
+        assert_eq!(
+            parse_workbook_calculation_properties(strict)
+                .unwrap()
+                .unwrap()
+                .calculation_mode(),
+            WorkbookCalculationMode::Manual
+        );
+        let mce = format!(
+            concat!(
+                r#"<workbook xmlns="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported">"#,
+                r#"<mc:AlternateContent><mc:Choice Requires="x"><x:calcPr/></mc:Choice><mc:Fallback>"#,
+                r#"<calcPr refMode="R1C1"/></mc:Fallback></mc:AlternateContent></workbook>"#,
+            ),
+            NS
+        );
+        assert_eq!(
+            parse_workbook_calculation_properties(mce.as_bytes())
+                .unwrap()
+                .unwrap()
+                .reference_mode(),
+            WorkbookReferenceMode::R1C1
+        );
     }
 
     #[test]
@@ -401,36 +500,53 @@ mod tests {
 
     fn fixture(bytes: &[u8]) -> WorkbookCalculationProperties {
         let package = OpcPackage::from_bytes(bytes).unwrap();
-        let part = package.get_part(&PackURI::new("/xl/workbook.xml").unwrap()).unwrap();
-        parse_workbook_calculation_properties(part.blob()).unwrap().unwrap()
+        let part = package
+            .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
+            .unwrap();
+        parse_workbook_calculation_properties(part.blob())
+            .unwrap()
+            .unwrap()
     }
 
     #[test]
     fn reads_poi_calculation_fixtures() {
-        let iterative = fixture(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/47889.xlsx")));
-        assert_eq!(iterative.calculation_mode(), WorkbookCalculationMode::Automatic);
+        let iterative = fixture(include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/47889.xlsx"
+        )));
+        assert_eq!(
+            iterative.calculation_mode(),
+            WorkbookCalculationMode::Automatic
+        );
         assert!(iterative.iterative_calculation());
         assert_eq!(iterative.iteration_count(), 100);
         assert_eq!(iterative.iteration_delta(), 0.001);
 
-        let no_save = fixture(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/58106.xlsx")));
+        let no_save = fixture(include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/58106.xlsx"
+        )));
         assert!(!no_save.calculate_on_save());
 
-        let recalculate = fixture(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/60289.xlsx")));
+        let recalculate = fixture(include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/poi/test-data/spreadsheet/60289.xlsx"
+        )));
         assert!(recalculate.full_calculation_on_load());
     }
 
     #[test]
     fn reads_libreoffice_calculation_fixtures() {
-        let displayed_precision = fixture(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx")));
+        let displayed_precision = fixture(include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx"
+        )));
         assert!(!displayed_precision.full_precision());
 
-        let r1c1 = fixture(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx")));
+        let r1c1 = fixture(include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx"
+        )));
         assert_eq!(r1c1.reference_mode(), WorkbookReferenceMode::R1C1);
         assert_eq!(r1c1.iteration_count(), 100);
         assert_eq!(r1c1.iteration_delta(), 0.001);

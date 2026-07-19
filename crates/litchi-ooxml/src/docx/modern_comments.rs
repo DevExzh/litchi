@@ -10,17 +10,16 @@ use chrono::DateTime;
 use litchi_opc::part::XmlPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::{Reader, XmlVersion};
+use quick_xml::{Reader, Writer, XmlVersion};
 use std::collections::{HashMap, HashSet};
 
 pub const WORD_2012_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2012/wordml";
-pub const COMMENTS_IDS_NAMESPACE: &str =
-    "http://schemas.microsoft.com/office/word/2016/wordml/cid";
+pub const COMMENTS_IDS_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2016/wordml/cid";
 pub const COMMENTS_EXTENSIBLE_NAMESPACE: &str =
     "http://schemas.microsoft.com/office/word/2018/wordml/cex";
 pub const WORD_2018_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2018/wordml";
-pub const REACTIONS_NAMESPACE: &str =
-    "http://schemas.microsoft.com/office/comments/2020/reactions";
+pub const REACTIONS_NAMESPACE: &str = "http://schemas.microsoft.com/office/comments/2020/reactions";
+pub const OFFICE_EXTENSION_LIST_NAMESPACE: &str = "http://schemas.microsoft.com/office/2019/extlst";
 pub const TRANSITIONAL_WORD_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 pub const STRICT_WORD_NAMESPACE: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -82,18 +81,85 @@ pub struct CommentReactionUser {
     pub user_id: String,
     pub user_name: String,
     pub user_provider: String,
+    pub extensions: Option<ModernCommentExtensionList>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentReactionInfo {
     pub date_utc: Option<String>,
     pub user: Option<CommentReactionUser>,
+    pub extensions: Option<ModernCommentExtensionList>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentReaction {
     pub reaction_type: u32,
     pub reactions: Vec<CommentReactionInfo>,
+    pub extensions: Option<ModernCommentExtensionList>,
+}
+
+/// One inert MS-OEXTXML extension with exactly one lax child element.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModernCommentExtension {
+    uri: Option<String>,
+    child_xml: String,
+}
+
+impl ModernCommentExtension {
+    pub fn new(uri: Option<String>, child_xml: impl Into<String>) -> Result<Self> {
+        let uri = uri.map(|value| normalize_xsd_token(&value));
+        let child_xml = canonical_extension_child(&child_xml.into())?;
+        Ok(Self { uri, child_xml })
+    }
+
+    pub fn uri(&self) -> Option<&str> {
+        self.uri.as_deref()
+    }
+
+    pub fn child_xml(&self) -> &str {
+        &self.child_xml
+    }
+
+    pub fn set_uri(&mut self, uri: Option<String>) {
+        self.uri = uri.map(|value| normalize_xsd_token(&value));
+    }
+
+    pub fn set_child_xml(&mut self, child_xml: impl Into<String>) -> Result<()> {
+        self.child_xml = canonical_extension_child(&child_xml.into())?;
+        Ok(())
+    }
+}
+
+/// Bounded ordered MS-OEXTXML extension list.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ModernCommentExtensionList {
+    extensions: Vec<ModernCommentExtension>,
+}
+
+impl ModernCommentExtensionList {
+    pub fn new(extensions: Vec<ModernCommentExtension>) -> Result<Self> {
+        enforce_count("modern comment extension", extensions.len())?;
+        let list = Self { extensions };
+        validate_extension_list(&list)?;
+        Ok(list)
+    }
+
+    pub fn extensions(&self) -> &[ModernCommentExtension] {
+        &self.extensions
+    }
+
+    pub fn push(&mut self, extension: ModernCommentExtension) -> Result<()> {
+        enforce_count(
+            "modern comment extension",
+            self.extensions.len().saturating_add(1),
+        )?;
+        self.extensions.push(extension);
+        Ok(())
+    }
+
+    pub fn remove(&mut self, index: usize) -> Option<ModernCommentExtension> {
+        (index < self.extensions.len()).then(|| self.extensions.remove(index))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,7 +219,10 @@ pub fn parse_comments_extended(xml: &[u8]) -> Result<Vec<CommentExtension>> {
         require_empty(child)?;
         let paragraph_id = required_hex(child, WORD_2012_NAMESPACE, "paraId")?;
         if !seen.insert(paragraph_id) {
-            return invalid(format!("duplicate commentEx paraId {}", format_hex(paragraph_id)));
+            return invalid(format!(
+                "duplicate commentEx paraId {}",
+                format_hex(paragraph_id)
+            ));
         }
         items.push(CommentExtension {
             paragraph_id,
@@ -228,7 +297,10 @@ pub fn parse_comments_extensible(xml: &[u8]) -> Result<Vec<ExtensibleComment>> {
         let durable_id = required_hex(child, COMMENTS_EXTENSIBLE_NAMESPACE, "durableId")?;
         validate_durable_id(durable_id)?;
         if !seen.insert(durable_id) {
-            return invalid(format!("duplicate extensible durableId {}", format_hex(durable_id)));
+            return invalid(format!(
+                "duplicate extensible durableId {}",
+                format_hex(durable_id)
+            ));
         }
         let date_utc = attr(child, COMMENTS_EXTENSIBLE_NAMESPACE, "dateUtc").map(str::to_owned);
         if let Some(date) = &date_utc {
@@ -339,6 +411,8 @@ pub fn write_comments_extensible(
     out.push_str(WORD_2018_NAMESPACE);
     out.push_str("\" xmlns:cr=\"");
     out.push_str(REACTIONS_NAMESPACE);
+    out.push_str("\" xmlns:oel=\"");
+    out.push_str(OFFICE_EXTENSION_LIST_NAMESPACE);
     out.push_str("\" xmlns:w=\"");
     out.push_str(conformance.word_namespace());
     out.push_str("\">");
@@ -371,17 +445,33 @@ pub fn write_comments_extensible(
                     escape_attr(&mut out, date);
                     out.push('"');
                 }
+                if info.user.is_none() && info.extensions.is_none() {
+                    out.push_str("/>");
+                    continue;
+                }
+                out.push('>');
                 if let Some(user) = &info.user {
-                    out.push_str("><cr:user userId=\"");
+                    out.push_str("<cr:user userId=\"");
                     escape_attr(&mut out, &user.user_id);
                     out.push_str("\" userName=\"");
                     escape_attr(&mut out, &user.user_name);
                     out.push_str("\" userProvider=\"");
                     escape_attr(&mut out, &user.user_provider);
-                    out.push_str("\"/></cr:reactionInfo>");
-                } else {
-                    out.push_str("/>");
+                    if let Some(extensions) = &user.extensions {
+                        out.push_str("\">");
+                        write_extension_list(&mut out, extensions);
+                        out.push_str("</cr:user>");
+                    } else {
+                        out.push_str("\"/>");
+                    }
                 }
+                if let Some(extensions) = &info.extensions {
+                    write_extension_list(&mut out, extensions);
+                }
+                out.push_str("</cr:reactionInfo>");
+            }
+            if let Some(extensions) = &reaction.extensions {
+                write_extension_list(&mut out, extensions);
             }
             out.push_str("</cr:reaction>");
         }
@@ -417,7 +507,10 @@ pub fn load_modern_comment_metadata(
 ) -> Result<ModernCommentMetadata> {
     reject_misplaced_relationships(package, document_part_name)?;
     let document = package.get_part(document_part_name).map_err(|error| {
-        OoxmlError::PartNotFound(format!("Word main document '{}': {error}", document_part_name.as_str()))
+        OoxmlError::PartNotFound(format!(
+            "Word main document '{}': {error}",
+            document_part_name.as_str()
+        ))
     })?;
     require_main_document_content_type(document.content_type())?;
     let metadata = ModernCommentMetadata {
@@ -463,33 +556,48 @@ pub fn store_modern_comment_metadata(
 ) -> Result<()> {
     validate_metadata(metadata)?;
     let document = package.get_part(document_part_name).map_err(|error| {
-        OoxmlError::PartNotFound(format!("Word main document '{}': {error}", document_part_name.as_str()))
+        OoxmlError::PartNotFound(format!(
+            "Word main document '{}': {error}",
+            document_part_name.as_str()
+        ))
     })?;
     require_main_document_content_type(document.content_type())?;
     let specs = [
         (
-            metadata.comments_extended.as_ref().map(|items| write_comments_extended(items, conformance)),
+            metadata
+                .comments_extended
+                .as_ref()
+                .map(|items| write_comments_extended(items, conformance)),
             relationship_ids.comments_extended.as_deref(),
             "/word/commentsExtended.xml",
             COMMENTS_EXTENDED_RELATIONSHIP,
             COMMENTS_EXTENDED_CONTENT_TYPE,
         ),
         (
-            metadata.comments_ids.as_ref().map(|items| write_comments_ids(items, conformance)),
+            metadata
+                .comments_ids
+                .as_ref()
+                .map(|items| write_comments_ids(items, conformance)),
             relationship_ids.comments_ids.as_deref(),
             "/word/commentsIds.xml",
             COMMENTS_IDS_RELATIONSHIP,
             COMMENTS_IDS_CONTENT_TYPE,
         ),
         (
-            metadata.comments_extensible.as_ref().map(|items| write_comments_extensible(items, conformance)),
+            metadata
+                .comments_extensible
+                .as_ref()
+                .map(|items| write_comments_extensible(items, conformance)),
             relationship_ids.comments_extensible.as_deref(),
             "/word/commentsExtensible.xml",
             COMMENTS_EXTENSIBLE_RELATIONSHIP,
             COMMENTS_EXTENSIBLE_CONTENT_TYPE,
         ),
         (
-            metadata.people.as_ref().map(|items| write_people(items, conformance)),
+            metadata
+                .people
+                .as_ref()
+                .map(|items| write_people(items, conformance)),
             relationship_ids.people.as_deref(),
             "/word/people.xml",
             PEOPLE_RELATIONSHIP,
@@ -502,21 +610,36 @@ pub fn store_modern_comment_metadata(
         match (xml, relationship_id) {
             (None, None) => continue,
             (Some(_), None) => return invalid(format!("missing relationship ID for {part_name}")),
-            (None, Some(_)) => return invalid(format!("relationship ID supplied without {part_name}")),
+            (None, Some(_)) => {
+                return invalid(format!("relationship ID supplied without {part_name}"));
+            },
             (Some(xml), Some(relationship_id)) => {
                 if relationship_id.is_empty() || !ids.insert(relationship_id) {
-                    return invalid("modern comment relationship IDs must be nonempty and unique".into());
+                    return invalid(
+                        "modern comment relationship IDs must be nonempty and unique".into(),
+                    );
                 }
                 let part_name = PackURI::new(part_name).map_err(OoxmlError::InvalidUri)?;
-                if package.iter_parts().any(|part| part.partname() == &part_name)
+                if package
+                    .iter_parts()
+                    .any(|part| part.partname() == &part_name)
                     || document.rels().iter().any(|relationship| {
                         relationship.r_id() == relationship_id
                             || relationship.reltype() == relationship_type
                     })
                 {
-                    return invalid(format!("modern comment part or relationship already exists: {}", part_name.as_str()));
+                    return invalid(format!(
+                        "modern comment part or relationship already exists: {}",
+                        part_name.as_str()
+                    ));
                 }
-                pending.push((part_name, xml?, relationship_id.to_owned(), relationship_type, content_type));
+                pending.push((
+                    part_name,
+                    xml?,
+                    relationship_id.to_owned(),
+                    relationship_type,
+                    content_type,
+                ));
             },
         }
     }
@@ -550,13 +673,19 @@ fn load_part<T>(
         return Ok(None);
     };
     if relationship.is_external() {
-        return invalid(format!("modern comment relationship '{}' must be internal", relationship.r_id()));
+        return invalid(format!(
+            "modern comment relationship '{}' must be internal",
+            relationship.r_id()
+        ));
     }
     let target = relationship.target_partname().map_err(|error| {
         OoxmlError::InvalidRelationship(format!("invalid modern comment target: {error}"))
     })?;
     let part = package.get_part(&target).map_err(|error| {
-        OoxmlError::PartNotFound(format!("modern comment part '{}': {error}", target.as_str()))
+        OoxmlError::PartNotFound(format!(
+            "modern comment part '{}': {error}",
+            target.as_str()
+        ))
     })?;
     if part.content_type() != content_type {
         return Err(OoxmlError::InvalidContentType {
@@ -565,7 +694,10 @@ fn load_part<T>(
         });
     }
     if part.rels().iter().next().is_some() {
-        return invalid(format!("modern comment part '{}' must not have relationships", target.as_str()));
+        return invalid(format!(
+            "modern comment part '{}' must not have relationships",
+            target.as_str()
+        ));
     }
     parser(part.blob()).map(Some).map_err(|error| {
         OoxmlError::InvalidFormat(format!(
@@ -576,14 +708,24 @@ fn load_part<T>(
 }
 
 fn reject_misplaced_relationships(package: &OpcPackage, document_name: &PackURI) -> Result<()> {
-    if package.rels().iter().any(|relationship| is_modern_relationship(relationship.reltype())) {
+    if package
+        .rels()
+        .iter()
+        .any(|relationship| is_modern_relationship(relationship.reltype()))
+    {
         return invalid("package root cannot source modern Word comment relationships".into());
     }
     for part in package.iter_parts() {
         if part.partname() != document_name
-            && part.rels().iter().any(|relationship| is_modern_relationship(relationship.reltype()))
+            && part
+                .rels()
+                .iter()
+                .any(|relationship| is_modern_relationship(relationship.reltype()))
         {
-            return invalid(format!("modern comment relationship has invalid source '{}'", part.partname().as_str()));
+            return invalid(format!(
+                "modern comment relationship has invalid source '{}'",
+                part.partname().as_str()
+            ));
         }
     }
     Ok(())
@@ -614,7 +756,10 @@ fn validate_metadata(metadata: &ModernCommentMetadata) -> Result<()> {
     }
     if let (Some(extended), Some(ids)) = (&metadata.comments_extended, &metadata.comments_ids) {
         let paragraphs: HashSet<_> = extended.iter().map(|item| item.paragraph_id).collect();
-        if ids.iter().any(|item| !paragraphs.contains(&item.paragraph_id)) {
+        if ids
+            .iter()
+            .any(|item| !paragraphs.contains(&item.paragraph_id))
+        {
             return invalid("commentsIds references a paraId absent from commentsExtended".into());
         }
         if extended
@@ -627,8 +772,13 @@ fn validate_metadata(metadata: &ModernCommentMetadata) -> Result<()> {
     }
     if let (Some(ids), Some(extensible)) = (&metadata.comments_ids, &metadata.comments_extensible) {
         let durable: HashSet<_> = ids.iter().map(|item| item.durable_id).collect();
-        if extensible.iter().any(|item| !durable.contains(&item.durable_id)) {
-            return invalid("commentsExtensible references a durableId absent from commentsIds".into());
+        if extensible
+            .iter()
+            .any(|item| !durable.contains(&item.durable_id))
+        {
+            return invalid(
+                "commentsExtensible references a durableId absent from commentsIds".into(),
+            );
         }
     }
     Ok(())
@@ -676,6 +826,9 @@ fn validate_extensible(items: &[ExtensibleComment]) -> Result<()> {
             if !kinds.insert(reaction.reaction_type) {
                 return invalid("duplicate reactionType on one comment".into());
             }
+            if let Some(extensions) = &reaction.extensions {
+                validate_extension_list(extensions)?;
+            }
             enforce_count("reactionInfo", reaction.reactions.len())?;
             let mut users = HashSet::new();
             for info in &reaction.reactions {
@@ -689,6 +842,12 @@ fn validate_extensible(items: &[ExtensibleComment]) -> Result<()> {
                     if !users.insert(user.user_id.clone()) {
                         return invalid("duplicate reaction userId for reactionType".into());
                     }
+                    if let Some(extensions) = &user.extensions {
+                        validate_extension_list(extensions)?;
+                    }
+                }
+                if let Some(extensions) = &info.extensions {
+                    validate_extension_list(extensions)?;
                 }
             }
         }
@@ -741,9 +900,18 @@ fn parse_comment_extensions(comment: &Node) -> Result<Vec<CommentReaction>> {
                 .parse::<u32>()
                 .map_err(|_| OoxmlError::InvalidFormat("invalid reactionType".into()))?;
             let mut infos = Vec::new();
-            for info in &reaction.children {
-                if info.local_name == "extLst" {
-                    return invalid("reaction extension lists are not supported".into());
+            let mut extensions = None;
+            for (index, info) in reaction.children.iter().enumerate() {
+                if info.namespace == OFFICE_EXTENSION_LIST_NAMESPACE && info.local_name == "extLst"
+                {
+                    if extensions.is_some() || index + 1 != reaction.children.len() {
+                        return invalid("reaction extLst must occur once at the end".into());
+                    }
+                    extensions = Some(parse_extension_list(info)?);
+                    continue;
+                }
+                if extensions.is_some() {
+                    return invalid("reactionInfo occurs after reaction extLst".into());
                 }
                 require_name(info, REACTIONS_NAMESPACE, "reactionInfo")?;
                 reject_attributes(info, &[("", "dateUtc")])?;
@@ -751,28 +919,36 @@ fn parse_comment_extensions(comment: &Node) -> Result<Vec<CommentReaction>> {
                 if let Some(date) = &date_utc {
                     validate_utc(date)?;
                 }
-                let user = match info.children.as_slice() {
-                    [] => None,
-                    [user] => {
-                        require_name(user, REACTIONS_NAMESPACE, "user")?;
-                        reject_attributes(
-                            user,
-                            &[("", "userId"), ("", "userName"), ("", "userProvider")],
-                        )?;
-                        require_empty(user)?;
-                        Some(CommentReactionUser {
-                            user_id: required_attr(user, "", "userId")?.into(),
-                            user_name: required_attr(user, "", "userName")?.into(),
-                            user_provider: required_attr(user, "", "userProvider")?.into(),
-                        })
-                    },
-                    _ => return invalid("reactionInfo permits at most one user".into()),
-                };
-                infos.push(CommentReactionInfo { date_utc, user });
+                let mut user = None;
+                let mut info_extensions = None;
+                for (child_index, child) in info.children.iter().enumerate() {
+                    if child.namespace == OFFICE_EXTENSION_LIST_NAMESPACE
+                        && child.local_name == "extLst"
+                    {
+                        if info_extensions.is_some() || child_index + 1 != info.children.len() {
+                            return invalid(
+                                "reactionInfo extLst must occur once at the end".into(),
+                            );
+                        }
+                        info_extensions = Some(parse_extension_list(child)?);
+                    } else if user.is_none() && info_extensions.is_none() {
+                        user = Some(parse_reaction_user(child)?);
+                    } else {
+                        return invalid(
+                            "reactionInfo permits one user followed by one extLst".into(),
+                        );
+                    }
+                }
+                infos.push(CommentReactionInfo {
+                    date_utc,
+                    user,
+                    extensions: info_extensions,
+                });
             }
             reactions.push(CommentReaction {
                 reaction_type,
                 reactions: infos,
+                extensions,
             });
         }
     }
@@ -783,6 +959,95 @@ fn parse_comment_extensions(comment: &Node) -> Result<Vec<CommentReaction>> {
         reactions: reactions.clone(),
     }])?;
     Ok(reactions)
+}
+
+fn parse_reaction_user(node: &Node) -> Result<CommentReactionUser> {
+    require_name(node, REACTIONS_NAMESPACE, "user")?;
+    reject_attributes(
+        node,
+        &[("", "userId"), ("", "userName"), ("", "userProvider")],
+    )?;
+    let extensions = match node.children.as_slice() {
+        [] => None,
+        [extensions] => Some(parse_extension_list(extensions)?),
+        _ => return invalid("reaction user permits at most one extLst".into()),
+    };
+    Ok(CommentReactionUser {
+        user_id: required_attr(node, "", "userId")?.into(),
+        user_name: required_attr(node, "", "userName")?.into(),
+        user_provider: required_attr(node, "", "userProvider")?.into(),
+        extensions,
+    })
+}
+
+fn parse_extension_list(node: &Node) -> Result<ModernCommentExtensionList> {
+    require_name(node, OFFICE_EXTENSION_LIST_NAMESPACE, "extLst")?;
+    reject_attributes(node, &[])?;
+    enforce_count("modern comment extension", node.children.len())?;
+    let mut extensions = Vec::with_capacity(node.children.len());
+    for extension in &node.children {
+        require_name(extension, OFFICE_EXTENSION_LIST_NAMESPACE, "ext")?;
+        reject_attributes(extension, &[("", "uri")])?;
+        if extension.has_non_whitespace_text || extension.children.len() != 1 {
+            return invalid("oel:ext requires exactly one lax child element".into());
+        }
+        extensions.push(ModernCommentExtension::new(
+            attr(extension, "", "uri").map(str::to_owned),
+            extension.children[0].raw_xml.clone(),
+        )?);
+    }
+    ModernCommentExtensionList::new(extensions)
+}
+
+fn write_extension_list(out: &mut String, list: &ModernCommentExtensionList) {
+    out.push_str("<oel:extLst>");
+    for extension in list.extensions() {
+        out.push_str("<oel:ext");
+        if let Some(uri) = extension.uri() {
+            out.push_str(" uri=\"");
+            escape_attr(out, uri);
+            out.push('"');
+        }
+        out.push('>');
+        out.push_str(extension.child_xml());
+        out.push_str("</oel:ext>");
+    }
+    out.push_str("</oel:extLst>");
+}
+
+fn validate_extension_list(list: &ModernCommentExtensionList) -> Result<()> {
+    enforce_count("modern comment extension", list.extensions.len())?;
+    for extension in &list.extensions {
+        if let Some(uri) = &extension.uri {
+            if uri != &normalize_xsd_token(uri) {
+                return invalid("extension uri is not a normalized xsd:token".into());
+            }
+        }
+        if extension.child_xml.len() > MAX_MODERN_COMMENT_PART_BYTES {
+            return invalid("extension child XML exceeds the part-size bound".into());
+        }
+        canonical_extension_child(&extension.child_xml)?;
+    }
+    Ok(())
+}
+
+fn normalize_xsd_token(value: &str) -> String {
+    value
+        .split(|character| matches!(character, ' ' | '\t' | '\r' | '\n'))
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn canonical_extension_child(value: &str) -> Result<String> {
+    if value.len() > MAX_MODERN_COMMENT_PART_BYTES {
+        return invalid("extension child XML exceeds the part-size bound".into());
+    }
+    if value.trim_start().starts_with("<?xml") {
+        return invalid("extension child XML cannot contain an XML declaration".into());
+    }
+    let document = build_dom(value.as_bytes())?;
+    Ok(document.root()?.raw_xml.clone())
 }
 
 fn xml_header(
@@ -807,7 +1072,9 @@ fn require_main_document_content_type(content_type: &str) -> Result<()> {
     ) {
         Ok(())
     } else {
-        invalid(format!("'{content_type}' is not a Word main-document content type"))
+        invalid(format!(
+            "'{content_type}' is not a Word main-document content type"
+        ))
     }
 }
 
@@ -901,6 +1168,8 @@ struct Node {
     local_name: String,
     attributes: Vec<Attribute>,
     children: Vec<Node>,
+    raw_xml: String,
+    has_non_whitespace_text: bool,
 }
 
 struct XmlDocument {
@@ -917,7 +1186,9 @@ impl XmlDocument {
 
 fn parse_document(xml: &[u8]) -> Result<XmlDocument> {
     if xml.len() > MAX_MODERN_COMMENT_PART_BYTES {
-        return invalid(format!("modern comment part exceeds {MAX_MODERN_COMMENT_PART_BYTES} bytes"));
+        return invalid(format!(
+            "modern comment part exceeds {MAX_MODERN_COMMENT_PART_BYTES} bytes"
+        ));
     }
     let mut capabilities = MceCapabilities::ooxml_baseline();
     for namespace in [
@@ -926,6 +1197,7 @@ fn parse_document(xml: &[u8]) -> Result<XmlDocument> {
         COMMENTS_EXTENSIBLE_NAMESPACE,
         WORD_2018_NAMESPACE,
         REACTIONS_NAMESPACE,
+        OFFICE_EXTENSION_LIST_NAMESPACE,
     ] {
         capabilities.understand_namespace(namespace);
     }
@@ -938,7 +1210,15 @@ fn parse_document(xml: &[u8]) -> Result<XmlDocument> {
         max_choices_per_alternate: 1024,
     };
     let processed = process_markup_compatibility(xml, &capabilities, &limits)?;
-    build_dom(processed.xml.as_ref())
+    let document = build_dom(processed.xml.as_ref())?;
+    validate_metadata_text(document.root()?, false)?;
+    Ok(document)
+}
+
+struct StackEntry {
+    node: Node,
+    namespaces: HashMap<String, String>,
+    raw: Vec<u8>,
 }
 
 fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
@@ -946,9 +1226,10 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut document = XmlDocument { root: None };
-    let mut stack: Vec<(Node, HashMap<String, String>)> = Vec::new();
+    let mut stack: Vec<StackEntry> = Vec::new();
     let mut version = XmlVersion::Implicit1_0;
     let mut string_bytes = 0usize;
+    let mut node_count = 0usize;
     loop {
         match reader.read_event_into(&mut buffer)? {
             Event::Decl(declaration) => version = declaration.xml_version()?,
@@ -959,6 +1240,7 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
                 &mut stack,
                 version,
                 &mut string_bytes,
+                &mut node_count,
                 false,
             )?,
             Event::Empty(element) => push_node(
@@ -968,22 +1250,72 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
                 &mut stack,
                 version,
                 &mut string_bytes,
+                &mut node_count,
                 true,
             )?,
             Event::End(_) if stack.is_empty() => return invalid("unexpected XML end tag".into()),
-            Event::End(_) => {
-                let (node, _) = stack.pop().expect("checked above");
-                attach_node(&mut document, &mut stack, node)?;
+            Event::End(end) => {
+                let mut entry = stack.pop().expect("checked above");
+                entry
+                    .raw
+                    .extend_from_slice(&serialize_event(Event::End(end.into_owned()))?);
+                entry.node.raw_xml = String::from_utf8(entry.raw.clone())
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                attach_node(&mut document, &mut stack, entry.node, entry.raw)?;
             },
             Event::DocType(_) => return invalid("DTD is forbidden in modern comment parts".into()),
-            Event::Text(text) if !is_whitespace(text.as_ref()) => {
-                return invalid("text is not permitted in modern comment metadata".into());
+            Event::Text(text) => {
+                let non_whitespace = !is_whitespace(text.as_ref());
+                let Some(entry) = stack.last_mut() else {
+                    if non_whitespace {
+                        return invalid("text outside the XML root".into());
+                    }
+                    buffer.clear();
+                    continue;
+                };
+                entry.node.has_non_whitespace_text |= non_whitespace;
+                entry
+                    .raw
+                    .extend_from_slice(&serialize_event(Event::Text(text.into_owned()))?);
             },
-            Event::CData(text) if !is_whitespace(text.as_ref()) => {
-                return invalid("CDATA is not permitted in modern comment metadata".into());
+            Event::CData(text) => {
+                let non_whitespace = !is_whitespace(text.as_ref());
+                let Some(entry) = stack.last_mut() else {
+                    if non_whitespace {
+                        return invalid("CDATA outside the XML root".into());
+                    }
+                    buffer.clear();
+                    continue;
+                };
+                entry.node.has_non_whitespace_text |= non_whitespace;
+                entry
+                    .raw
+                    .extend_from_slice(&serialize_event(Event::CData(text.into_owned()))?);
+            },
+            Event::Comment(comment) => {
+                if let Some(entry) = stack.last_mut() {
+                    entry
+                        .raw
+                        .extend_from_slice(&serialize_event(Event::Comment(comment.into_owned()))?);
+                }
+            },
+            Event::PI(instruction) => {
+                if let Some(entry) = stack.last_mut() {
+                    entry
+                        .raw
+                        .extend_from_slice(&serialize_event(Event::PI(instruction.into_owned()))?);
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if let Some(entry) = stack.last_mut() {
+                    entry
+                        .raw
+                        .extend_from_slice(&serialize_event(Event::GeneralRef(
+                            reference.into_owned(),
+                        ))?);
+                }
             },
             Event::Eof => break,
-            _ => {},
         }
         buffer.clear();
     }
@@ -997,15 +1329,27 @@ fn push_node(
     reader: &Reader<&[u8]>,
     element: &BytesStart<'_>,
     document: &mut XmlDocument,
-    stack: &mut Vec<(Node, HashMap<String, String>)>,
+    stack: &mut Vec<StackEntry>,
     version: XmlVersion,
     string_bytes: &mut usize,
+    node_count: &mut usize,
     empty: bool,
 ) -> Result<()> {
     if stack.len() >= MAX_MODERN_COMMENT_DEPTH {
-        return invalid(format!("modern comment XML depth exceeds {MAX_MODERN_COMMENT_DEPTH}"));
+        return invalid(format!(
+            "modern comment XML depth exceeds {MAX_MODERN_COMMENT_DEPTH}"
+        ));
     }
-    let mut namespaces = stack.last().map(|(_, map)| map.clone()).unwrap_or_default();
+    *node_count = node_count.saturating_add(1);
+    if *node_count > MAX_MODERN_COMMENT_ITEMS {
+        return invalid(format!(
+            "modern comment XML node count exceeds {MAX_MODERN_COMMENT_ITEMS}"
+        ));
+    }
+    let mut namespaces = stack
+        .last()
+        .map(|entry| entry.namespaces.clone())
+        .unwrap_or_default();
     namespaces.insert("xml".into(), "http://www.w3.org/XML/1998/namespace".into());
     let mut raw_attributes = Vec::new();
     for attribute in element.attributes() {
@@ -1030,19 +1374,20 @@ fn push_node(
         }
     }
     let qname = element.name();
-    let name = std::str::from_utf8(qname.as_ref())
-        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    let name =
+        std::str::from_utf8(qname.as_ref()).map_err(|error| OoxmlError::Xml(error.to_string()))?;
     let (prefix, local_name) = split_name(name);
     let namespace = if prefix.is_empty() {
         namespaces.get("").cloned().unwrap_or_default()
     } else {
-        namespaces.get(prefix).cloned().ok_or_else(|| {
-            OoxmlError::InvalidFormat(format!("unbound XML prefix '{prefix}'"))
-        })?
+        namespaces
+            .get(prefix)
+            .cloned()
+            .ok_or_else(|| OoxmlError::InvalidFormat(format!("unbound XML prefix '{prefix}'")))?
     };
     let mut attributes = Vec::with_capacity(raw_attributes.len());
     let mut seen = HashSet::new();
-    for (name, value) in raw_attributes {
+    for (name, value) in &raw_attributes {
         let (prefix, local_name) = split_name(&name);
         let namespace = if prefix.is_empty() {
             String::new()
@@ -1057,32 +1402,106 @@ fn push_node(
         attributes.push(Attribute {
             namespace,
             local_name: local_name.into(),
-            value,
+            value: value.clone(),
         });
     }
-    let node = Node {
+    let raw = canonical_element_start(name, &namespaces, &raw_attributes, empty)?;
+    let mut node = Node {
         namespace,
         local_name: local_name.into(),
         attributes,
         children: Vec::new(),
+        raw_xml: String::new(),
+        has_non_whitespace_text: false,
     };
     if empty {
-        attach_node(document, stack, node)
+        node.raw_xml =
+            String::from_utf8(raw.clone()).map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        attach_node(document, stack, node, raw)
     } else {
-        stack.push((node, namespaces));
+        stack.push(StackEntry {
+            node,
+            namespaces,
+            raw,
+        });
         Ok(())
     }
 }
 
 fn attach_node(
     document: &mut XmlDocument,
-    stack: &mut [(Node, HashMap<String, String>)],
+    stack: &mut [StackEntry],
     node: Node,
+    raw: Vec<u8>,
 ) -> Result<()> {
-    if let Some((parent, _)) = stack.last_mut() {
-        parent.children.push(node);
+    if let Some(parent) = stack.last_mut() {
+        parent.raw.extend_from_slice(&raw);
+        parent.node.children.push(node);
     } else if document.root.replace(node).is_some() {
         return invalid("modern comment XML has multiple roots".into());
+    }
+    Ok(())
+}
+
+fn canonical_element_start(
+    name: &str,
+    namespaces: &HashMap<String, String>,
+    attributes: &[(String, String)],
+    empty: bool,
+) -> Result<Vec<u8>> {
+    let mut element = BytesStart::new(name.to_owned());
+    let mut used_prefixes = HashSet::new();
+    used_prefixes.insert(split_name(name).0.to_string());
+    for (name, _) in attributes {
+        let prefix = split_name(name).0;
+        if !prefix.is_empty() {
+            used_prefixes.insert(prefix.to_string());
+        }
+    }
+    let mut declarations: Vec<_> = namespaces
+        .iter()
+        .filter(|(prefix, _)| prefix.as_str() != "xml" && used_prefixes.contains(*prefix))
+        .map(|(prefix, value)| {
+            (
+                if prefix.is_empty() {
+                    "xmlns".to_string()
+                } else {
+                    format!("xmlns:{prefix}")
+                },
+                value.clone(),
+            )
+        })
+        .collect();
+    declarations.sort_by(|left, right| left.0.cmp(&right.0));
+    for (name, value) in &declarations {
+        element.push_attribute((name.as_str(), value.as_str()));
+    }
+    for (name, value) in attributes {
+        element.push_attribute((name.as_str(), value.as_str()));
+    }
+    serialize_event(if empty {
+        Event::Empty(element)
+    } else {
+        Event::Start(element)
+    })
+}
+
+fn serialize_event(event: Event<'_>) -> Result<Vec<u8>> {
+    let mut writer = Writer::new(Vec::new());
+    writer
+        .write_event(event)
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    Ok(writer.into_inner())
+}
+
+fn validate_metadata_text(node: &Node, inside_lax_child: bool) -> Result<()> {
+    if node.has_non_whitespace_text && !inside_lax_child {
+        return invalid("text is not permitted in modern comment metadata".into());
+    }
+    let children_are_lax = inside_lax_child
+        || (node.namespace == OFFICE_EXTENSION_LIST_NAMESPACE && node.local_name == "ext");
+    for child in &node.children {
+        validate_metadata_text(child, children_are_lax)?;
     }
     Ok(())
 }
@@ -1141,7 +1560,9 @@ fn require_empty(node: &Node) -> Result<()> {
 }
 
 fn is_whitespace(value: &[u8]) -> bool {
-    value.iter().all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+    value
+        .iter()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
 }
 
 fn invalid<T>(message: String) -> Result<T> {
@@ -1173,11 +1594,9 @@ mod tests {
             assert_eq!(metadata.comments_extensible.as_ref().unwrap().len(), 1);
         }
         let package = OpcPackage::from_bytes(LO_DOCX).unwrap();
-        let metadata = load_modern_comment_metadata(
-            &package,
-            &PackURI::new("/word/document.xml").unwrap(),
-        )
-        .unwrap();
+        let metadata =
+            load_modern_comment_metadata(&package, &PackURI::new("/word/document.xml").unwrap())
+                .unwrap();
         assert_eq!(metadata.people.unwrap()[0].author, "Miklos Vajna");
     }
 
@@ -1197,14 +1616,39 @@ mod tests {
             )
             .unwrap()
         );
-        assert!(std::str::from_utf8(&extended).unwrap().contains(STRICT_WORD_NAMESPACE));
-        assert_eq!(parse_comments_extended(&extended).unwrap(), metadata.comments_extended.unwrap());
+        assert!(
+            std::str::from_utf8(&extended)
+                .unwrap()
+                .contains(STRICT_WORD_NAMESPACE)
+        );
+        assert_eq!(
+            parse_comments_extended(&extended).unwrap(),
+            metadata.comments_extended.unwrap()
+        );
 
-        let ids = write_comments_ids(metadata.comments_ids.as_ref().unwrap(), ModernCommentConformance::Strict).unwrap();
-        assert_eq!(parse_comments_ids(&ids).unwrap(), metadata.comments_ids.unwrap());
-        let extensible = write_comments_extensible(metadata.comments_extensible.as_ref().unwrap(), ModernCommentConformance::Strict).unwrap();
-        assert_eq!(parse_comments_extensible(&extensible).unwrap(), metadata.comments_extensible.unwrap());
-        let people = write_people(metadata.people.as_ref().unwrap(), ModernCommentConformance::Strict).unwrap();
+        let ids = write_comments_ids(
+            metadata.comments_ids.as_ref().unwrap(),
+            ModernCommentConformance::Strict,
+        )
+        .unwrap();
+        assert_eq!(
+            parse_comments_ids(&ids).unwrap(),
+            metadata.comments_ids.unwrap()
+        );
+        let extensible = write_comments_extensible(
+            metadata.comments_extensible.as_ref().unwrap(),
+            ModernCommentConformance::Strict,
+        )
+        .unwrap();
+        assert_eq!(
+            parse_comments_extensible(&extensible).unwrap(),
+            metadata.comments_extensible.unwrap()
+        );
+        let people = write_people(
+            metadata.people.as_ref().unwrap(),
+            ModernCommentConformance::Strict,
+        )
+        .unwrap();
         assert_eq!(parse_people(&people).unwrap(), metadata.people.unwrap());
     }
 
@@ -1213,7 +1657,10 @@ mod tests {
         let xml = format!(
             r#"<w15:commentsEx xmlns:w15="{WORD_2012_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><w15:commentEx w15:paraId="AAAAAAAA"/></mc:Choice><mc:Fallback><w15:commentEx w15:paraId="BBBBBBBB"/></mc:Fallback></mc:AlternateContent></w15:commentsEx>"#
         );
-        assert_eq!(parse_comments_extended(xml.as_bytes()).unwrap()[0].paragraph_id, 0xBBBB_BBBB);
+        assert_eq!(
+            parse_comments_extended(xml.as_bytes()).unwrap()[0].paragraph_id,
+            0xBBBB_BBBB
+        );
     }
 
     #[test]
@@ -1239,11 +1686,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            load_modern_comment_metadata(
-                &package,
-                &PackURI::new("/word/document.xml").unwrap()
-            )
-            .unwrap(),
+            load_modern_comment_metadata(&package, &PackURI::new("/word/document.xml").unwrap())
+                .unwrap(),
             metadata
         );
     }
@@ -1267,7 +1711,8 @@ mod tests {
         let mut package = OpcPackage::new();
         let mut document = BlobPart::new(
             PackURI::new("/word/document.xml").unwrap(),
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml".into(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+                .into(),
             b"<document/>".to_vec(),
         );
         document.rels_mut().add_relationship(
@@ -1277,17 +1722,20 @@ mod tests {
             true,
         );
         package.add_part(Box::new(document));
-        assert!(load_modern_comment_metadata(
-            &package,
-            &PackURI::new("/word/document.xml").unwrap()
-        )
-        .is_err());
+        assert!(
+            load_modern_comment_metadata(&package, &PackURI::new("/word/document.xml").unwrap())
+                .is_err()
+        );
     }
 
     #[test]
     fn enforces_size_depth_count_and_reaction_constraints() {
         assert!(parse_people(&vec![b' '; MAX_MODERN_COMMENT_PART_BYTES + 1]).is_err());
-        let deep = format!("{}{}", "<x>".repeat(MAX_MODERN_COMMENT_DEPTH + 1), "</x>".repeat(MAX_MODERN_COMMENT_DEPTH + 1));
+        let deep = format!(
+            "{}{}",
+            "<x>".repeat(MAX_MODERN_COMMENT_DEPTH + 1),
+            "</x>".repeat(MAX_MODERN_COMMENT_DEPTH + 1)
+        );
         assert!(parse_people(deep.as_bytes()).is_err());
         let mut metadata = sample_metadata();
         metadata.comments_extensible.as_mut().unwrap()[0].reactions[0].reaction_type = 0;
@@ -1317,8 +1765,11 @@ mod tests {
                             user_id: "alice@example.test".into(),
                             user_name: "Alice & Bob".into(),
                             user_provider: "O365".into(),
+                            extensions: None,
                         }),
+                        extensions: None,
                     }],
+                    extensions: None,
                 }],
             }]),
             people: Some(vec![Person {
@@ -1329,5 +1780,129 @@ mod tests {
                 }),
             }]),
         }
+    }
+}
+
+#[cfg(test)]
+mod reaction_extension_list_tests {
+    use super::*;
+
+    fn comments_with_reaction(reaction_body: &str) -> String {
+        format!(
+            r#"<w16cex:commentsExtensible xmlns:w16cex="{COMMENTS_EXTENSIBLE_NAMESPACE}" xmlns:w16="{WORD_2018_NAMESPACE}" xmlns:cr="{REACTIONS_NAMESPACE}" xmlns:oel="{OFFICE_EXTENSION_LIST_NAMESPACE}" xmlns:x="urn:example:unknown"><w16cex:commentExtensible w16cex:durableId="00000001"><w16cex:extLst><w16:ext w16:uri="{REACTIONS_EXTENSION_URI}"><cr:reactions><cr:reaction reactionType="1">{reaction_body}</cr:reaction></cr:reactions></w16:ext></w16cex:extLst></w16cex:commentExtensible></w16cex:commentsExtensible>"#
+        )
+    }
+
+    #[test]
+    fn official_extension_shape_round_trips_at_all_three_levels_and_mutates() {
+        let xml = comments_with_reaction(
+            r#"<cr:reactionInfo dateUtc="2026-07-17T01:00:00Z"><cr:user userId="alice" userName="Alice" userProvider="O365"><oel:extLst><oel:ext uri="  urn:user   metadata  "><x:userData x:flag="1">opaque &amp; <x:value>mixed</x:value></x:userData></oel:ext></oel:extLst></cr:user><oel:extLst><oel:ext><x:infoData><x:value>42</x:value></x:infoData></oel:ext></oel:extLst></cr:reactionInfo><oel:extLst><oel:ext uri="urn:reaction"><x:reactionData/></oel:ext></oel:extLst>"#,
+        );
+        let mut comments = parse_comments_extensible(xml.as_bytes()).unwrap();
+        let reaction = &comments[0].reactions[0];
+        assert_eq!(
+            reaction.extensions.as_ref().unwrap().extensions()[0].uri(),
+            Some("urn:reaction")
+        );
+        let info = &reaction.reactions[0];
+        assert_eq!(
+            info.extensions.as_ref().unwrap().extensions()[0].uri(),
+            None
+        );
+        let user_extension = &info
+            .user
+            .as_ref()
+            .unwrap()
+            .extensions
+            .as_ref()
+            .unwrap()
+            .extensions()[0];
+        assert_eq!(user_extension.uri(), Some("urn:user metadata"));
+        assert!(user_extension.child_xml().contains("opaque &amp;"));
+        assert!(
+            user_extension
+                .child_xml()
+                .contains("xmlns:x=\"urn:example:unknown\"")
+        );
+
+        let first =
+            write_comments_extensible(&comments, ModernCommentConformance::Transitional).unwrap();
+        let reparsed = parse_comments_extensible(&first).unwrap();
+        let second =
+            write_comments_extensible(&reparsed, ModernCommentConformance::Transitional).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(comments, reparsed);
+
+        let user_list = comments[0].reactions[0].reactions[0]
+            .user
+            .as_mut()
+            .unwrap()
+            .extensions
+            .as_mut()
+            .unwrap();
+        user_list.extensions[0].set_uri(Some("  urn:changed\tvalue ".into()));
+        user_list.extensions[0]
+            .set_child_xml(
+                r#"<z:data xmlns:z="urn:mutated">new <z:value>content</z:value></z:data>"#,
+            )
+            .unwrap();
+        user_list
+            .push(ModernCommentExtension::new(None, r#"<q:extra xmlns:q="urn:q"/>"#).unwrap())
+            .unwrap();
+        let removed = user_list.remove(1).unwrap();
+        assert_eq!(removed.uri(), None);
+        let mutated =
+            write_comments_extensible(&comments, ModernCommentConformance::Strict).unwrap();
+        let reparsed = parse_comments_extensible(&mutated).unwrap();
+        let extension = &reparsed[0].reactions[0].reactions[0]
+            .user
+            .as_ref()
+            .unwrap()
+            .extensions
+            .as_ref()
+            .unwrap()
+            .extensions()[0];
+        assert_eq!(extension.uri(), Some("urn:changed value"));
+        assert!(extension.child_xml().contains("urn:mutated"));
+    }
+
+    #[test]
+    fn rejects_namespace_sequence_cardinality_duplicate_and_resource_violations() {
+        for body in [
+            r#"<oel:extLst/><cr:reactionInfo/>"#,
+            r#"<oel:extLst/><oel:extLst/>"#,
+            r#"<cr:extLst/>"#,
+            r#"<oel:extLst><oel:ext/></oel:extLst>"#,
+            r#"<oel:extLst><oel:ext>text<x:a/></oel:ext></oel:extLst>"#,
+            r#"<oel:extLst><oel:ext><x:a/><x:b/></oel:ext></oel:extLst>"#,
+            r#"<oel:extLst><oel:ext oel:uri="urn:qualified"><x:a/></oel:ext></oel:extLst>"#,
+            r#"<cr:reactionInfo><oel:extLst/><cr:user userId="a" userName="A" userProvider="P"/></cr:reactionInfo>"#,
+            r#"<cr:reactionInfo><cr:user userId="a" userId="b" userName="A" userProvider="P"/></cr:reactionInfo>"#,
+        ] {
+            assert!(
+                parse_comments_extensible(comments_with_reaction(body).as_bytes()).is_err(),
+                "accepted {body}"
+            );
+        }
+
+        let extension = ModernCommentExtension::new(None, r#"<x:a xmlns:x="urn:x"/>"#).unwrap();
+        assert!(
+            ModernCommentExtensionList::new(vec![extension; MAX_MODERN_COMMENT_ITEMS + 1]).is_err()
+        );
+        let oversized = format!(
+            "<x:a xmlns:x=\"urn:x\">{}</x:a>",
+            "x".repeat(MAX_MODERN_COMMENT_PART_BYTES)
+        );
+        assert!(ModernCommentExtension::new(None, oversized).is_err());
+        let deep = format!(
+            "<x:a xmlns:x=\"urn:x\">{}{}</x:a>",
+            "<x:b>".repeat(MAX_MODERN_COMMENT_DEPTH),
+            "</x:b>".repeat(MAX_MODERN_COMMENT_DEPTH)
+        );
+        assert!(ModernCommentExtension::new(None, deep).is_err());
+        assert!(
+            ModernCommentExtension::new(None, "<?xml version=\"1.0\"?><x:a xmlns:x=\"urn:x\"/>")
+                .is_err()
+        );
     }
 }
