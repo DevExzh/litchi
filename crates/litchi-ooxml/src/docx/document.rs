@@ -9,9 +9,9 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
     BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
-    IndexEntryField, IndexField, LinkField, MacroButtonField, MailMergeCounterField, MergeField,
-    ReferencedDocumentField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
-    TableOfContentsField,
+    IndexEntryField, IndexField, LinkField, MacroButtonField, MailMergeCounterField,
+    MailMergeNextField, MergeField, ReferencedDocumentField, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesField, TableOfContentsField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1500,6 +1500,24 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert mail-merge counter fields in the main document.
     pub fn mail_merge_counter_count(&self) -> Result<usize> {
         Ok(self.mail_merge_counters()?.len())
+    }
+
+    /// Get typed, inert `NEXT` mail-merge control fields in document order.
+    ///
+    /// Returned values expose stored cached content and dirty/lock state only.
+    /// This method never advances a record, opens a data source, performs a
+    /// merge, or refreshes field results.
+    pub fn mail_merge_next_fields(&self) -> Result<Vec<MailMergeNextField>> {
+        self.fields()?
+            .iter()
+            .map(Field::mail_merge_next)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `NEXT` mail-merge control fields.
+    pub fn mail_merge_next_field_count(&self) -> Result<usize> {
+        Ok(self.mail_merge_next_fields()?.len())
     }
 
     /// Get all mail-merge fields in document order.

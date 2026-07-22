@@ -3384,6 +3384,27 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_mail_merge_next_fields_without_advancing_records() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        package.document_mut().unwrap().add_paragraph().add_field(
+            crate::docx::writer::MutableField::with_result(
+                "NEXT".to_string(),
+                "cached next".to_string(),
+            ),
+        );
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        assert!(reopened.mail_merge_settings().unwrap().is_none());
+        let document = reopened.document().unwrap();
+        let fields = document.mail_merge_next_fields().unwrap();
+        assert_eq!(document.mail_merge_next_field_count().unwrap(), 1);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].cached_result(), Some("cached next"));
+    }
+
+    #[test]
     fn writes_and_discovers_inert_macro_button_fields_without_execution() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

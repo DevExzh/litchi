@@ -77,7 +77,7 @@ conversion, fonts, and image conversion are optional.
 | Footnotes and endnotes | ✅ | ✅ | ✅ | Notes, separators, continuations, and references |
 | Hyperlinks | ✅ | ✅ | ✅ | Internal and external links |
 | Bookmarks | ✅ | ✅ | ✅ | Range and point bookmarks |
-| Fields | ✅ | ✅ | ✅ | Typed field delimiters/instructions plus inert `MACROBUTTON`, `DDE`/`DDEAUTO`, `LINK`, `RD`, `INCLUDETEXT`/`INCLUDEPICTURE` source/option metadata, `DOCVARIABLE`/`MERGEFIELD` name/switch/cached-result metadata, and `MERGEREC`/`MERGESEQ` kind/cached-result metadata; fields are not recalculated, macros are never resolved or executed, DDE never starts a conversation, `LINK` never activates OLE, document variables are never resolved, mail merge never opens data sources or runs, and external/referenced documents are never opened, resolved, or refreshed |
+| Fields | ✅ | ✅ | ✅ | Typed field delimiters/instructions plus inert `MACROBUTTON`, `DDE`/`DDEAUTO`, `LINK`, `RD`, `INCLUDETEXT`/`INCLUDEPICTURE` source/option metadata, `DOCVARIABLE`/`MERGEFIELD` name/switch/cached-result metadata, `MERGEREC`/`MERGESEQ` kind/cached-result metadata, and `NEXT` cached-result/state metadata; fields are not recalculated, macros are never resolved or executed, DDE never starts a conversation, `LINK` never activates OLE, document variables are never resolved, mail merge never opens data sources or runs, and external/referenced documents are never opened, resolved, or refreshed |
 | Document statistics | ✅ | ✅ | N/A | Word, character, paragraph, line, and page metadata where present |
 | Core, extended, and custom properties | ✅ | ✅ | ✅ | Typed package properties |
 

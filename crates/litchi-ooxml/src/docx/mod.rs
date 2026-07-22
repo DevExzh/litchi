@@ -115,9 +115,10 @@ pub use field::{
     BibliographyField, CitationField, DdeField, DdeFieldKind, DdeRepresentation,
     DocumentVariableField, ExternalIncludeField, ExternalIncludeOption, Field, FieldSwitch,
     IncludeFieldKind, IndexEntryField, IndexField, IndexSortOrder, LinkField, LinkFormatting,
-    LinkResultOption, MacroButtonField, MailMergeCounterField, MailMergeCounterKind, MergeField,
-    ReferencedDocumentField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
-    TableOfContentsField, TableOfContentsLevelRange, TableOfContentsSwitch,
+    LinkResultOption, MacroButtonField, MailMergeCounterField, MailMergeCounterKind,
+    MailMergeNextField, MergeField, ReferencedDocumentField, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesField, TableOfContentsField, TableOfContentsLevelRange,
+    TableOfContentsSwitch,
 };
 pub use font_table::{
     EmbeddedFont, EmbeddedFontLicensing, EmbeddedFontResource, EmbeddedFontStyle, Font,
