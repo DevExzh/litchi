@@ -163,6 +163,7 @@ conversion, fonts, and image conversion are optional.
 | OLE objects | ✅ | ✅ | ✅ | Worksheet object metadata, anchors, payload resources, and package graph |
 | ActiveX controls | 🟡 | ✅ | ❌ | Typed control/property discovery; no worksheet control authoring graph |
 | XML maps | 🟡 | ✅ | ✅ | Typed inert MapInfo/schema/data-binding package CRUD with strict/transitional relationships; mappings, schema locations, and bound files are never resolved or executed |
+| Volatile dependencies | 🟡 | ✅ | ✅ | Typed inert workbook-scoped RTD/OLAP dependency package CRUD; never contacts servers/connections or evaluates formulas |
 | Data model/custom data/XLDM | 🟡 | ✅ | ✅ | Inert model/custom-data package storage plus bounded XLDM inspection/writing |
 | Workbook revisions | ✅ | ✅ | ✅ | Revision headers, users, logs, and package storage; revisions are not replayed |
 | Calculation properties | ✅ | ✅ | ✅ | Calculation mode, IDs, iteration, precision, and reference mode |

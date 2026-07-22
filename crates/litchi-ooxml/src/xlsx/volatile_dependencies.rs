@@ -25,6 +25,28 @@ const MAX_SUBTOPICS: usize = 262_144;
 const MAX_REFERENCES: usize = 1_048_576;
 const MAX_TEXT_BYTES: usize = 1_048_576;
 
+/// Namespace family used for the volatile-dependencies XML and workbook relationship.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum VolatileDependenciesConformance {
+    #[default]
+    Transitional,
+    Strict,
+}
+
+impl VolatileDependenciesConformance {
+    const fn relationship_type(self) -> &'static str {
+        match self {
+            Self::Transitional => REL,
+            Self::Strict => STRICT_REL,
+        }
+    }
+
+    /// Whether this conformance uses ISO/IEC 29500 Strict namespace URIs.
+    pub const fn is_strict(self) -> bool {
+        matches!(self, Self::Strict)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VolatileDependencyType {
     RealTimeData,
@@ -164,15 +186,135 @@ impl VolatileDependencies {
 
 /// Loads the single volatile-dependencies part related to the package workbook.
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<VolatileDependencies>> {
-    let workbook = package.main_document_part()?;
-    let mut matches = workbook
-        .rels()
-        .iter()
-        .filter(|r| matches!(r.reltype(), REL | STRICT_REL));
-    let Some(relationship) = matches.next() else {
+    Ok(load_from_package_with_conformance(package)?.map(|(value, _)| value))
+}
+
+/// Load volatile-dependencies metadata with the XML/relationship namespace family.
+///
+/// Dependency records are metadata only: this never contacts RTD servers, opens
+/// OLAP connections, or evaluates/recalculates workbook formulas.
+pub fn load_from_package_with_conformance(
+    package: &OpcPackage,
+) -> Result<Option<(VolatileDependencies, VolatileDependenciesConformance)>> {
+    let workbook_uri = main_workbook_uri(package)?;
+    load_for_workbook(package, &workbook_uri)
+}
+
+/// Store caller-authored inert volatile-dependencies metadata in a SpreadsheetML package.
+///
+/// Existing invalid package graphs are rejected before mutation. The writer only
+/// persists the supplied dependency records and never performs RTD, cube, or
+/// formula evaluation work.
+pub fn store_in_package(
+    package: &mut OpcPackage,
+    value: &VolatileDependencies,
+    conformance: VolatileDependenciesConformance,
+) -> Result<()> {
+    let xml = value.to_xml(conformance.is_strict())?;
+    let workbook_uri = main_workbook_uri(package)?;
+    let existing = volatile_dependencies_relationship(package, &workbook_uri)?;
+
+    if let Some(existing) = existing {
+        validate_volatile_dependencies_graph(package, &workbook_uri, Some(&existing))?;
+        validate_volatile_dependencies_part(package, &existing.part_name)?;
+        package.get_part_mut(&existing.part_name)?.set_blob(xml);
+        if existing.conformance != conformance {
+            let workbook = package.get_part_mut(&workbook_uri)?;
+            workbook.rels_mut().remove(&existing.relationship_id);
+            workbook.rels_mut().add_relationship(
+                conformance.relationship_type().into(),
+                existing.target_reference,
+                existing.relationship_id,
+                false,
+            );
+        }
+    } else {
+        validate_volatile_dependencies_graph(package, &workbook_uri, None)?;
+        let part_name = next_volatile_dependencies_part_name(package)?;
+        let relationship_id = next_volatile_dependencies_relationship_id(package, &workbook_uri)?;
+        let target = part_name.relative_ref(workbook_uri.base_uri());
+        package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
+            part_name,
+            CONTENT_TYPE.into(),
+            xml,
+        )))?;
+        package
+            .get_part_mut(&workbook_uri)?
+            .rels_mut()
+            .add_relationship(
+                conformance.relationship_type().into(),
+                target,
+                relationship_id,
+                false,
+            );
+    }
+
+    let _ = package.clear_digital_signatures();
+    Ok(())
+}
+
+/// Remove the workbook volatile-dependencies relationship and its unreferenced part.
+///
+/// No RTD, cube, or formula work is performed. A target retained by another
+/// relationship is left in the package.
+pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
+    let workbook_uri = main_workbook_uri(package)?;
+    let Some(existing) = volatile_dependencies_relationship(package, &workbook_uri)? else {
+        validate_volatile_dependencies_graph(package, &workbook_uri, None)?;
+        return Ok(false);
+    };
+    validate_volatile_dependencies_graph(package, &workbook_uri, Some(&existing))?;
+    validate_volatile_dependencies_part(package, &existing.part_name)?;
+
+    package
+        .get_part_mut(&workbook_uri)?
+        .rels_mut()
+        .remove(&existing.relationship_id);
+    if !package_part_is_referenced(package, &existing.part_name) {
+        package.remove_part(&existing.part_name);
+    }
+    let _ = package.clear_digital_signatures();
+    Ok(true)
+}
+
+fn load_for_workbook(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+) -> Result<Option<(VolatileDependencies, VolatileDependenciesConformance)>> {
+    let Some(relationship) = volatile_dependencies_relationship(package, workbook_uri)? else {
+        validate_volatile_dependencies_graph(package, workbook_uri, None)?;
         return Ok(None);
     };
-    if matches.next().is_some() {
+    validate_volatile_dependencies_graph(package, workbook_uri, Some(&relationship))?;
+    validate_volatile_dependencies_part(package, &relationship.part_name)?;
+    let part = package.get_part(&relationship.part_name)?;
+    Ok(Some((
+        VolatileDependencies::parse(part.blob())?,
+        relationship.conformance,
+    )))
+}
+
+#[derive(Clone, Debug)]
+struct VolatileDependenciesRelationship {
+    relationship_id: String,
+    part_name: PackURI,
+    target_reference: String,
+    conformance: VolatileDependenciesConformance,
+}
+
+fn volatile_dependencies_relationship(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+) -> Result<Option<VolatileDependenciesRelationship>> {
+    let workbook = package.get_part(workbook_uri)?;
+    let mut relationships = workbook
+        .rels()
+        .iter()
+        .filter(|relationship| matches!(relationship.reltype(), REL | STRICT_REL));
+    let Some(relationship) = relationships.next() else {
+        return Ok(None);
+    };
+    if relationships.next().is_some() {
         return Err(invalid(
             "workbook has multiple volatile-dependencies relationships",
         ));
@@ -182,11 +324,24 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<VolatileDependen
             "volatile-dependencies relationship cannot be external",
         ));
     }
-    let uri: PackURI = relationship.target_partname()?;
-    let part = package.get_part(&uri)?;
+    let conformance = if relationship.reltype() == REL {
+        VolatileDependenciesConformance::Transitional
+    } else {
+        VolatileDependenciesConformance::Strict
+    };
+    Ok(Some(VolatileDependenciesRelationship {
+        relationship_id: relationship.r_id().to_string(),
+        part_name: relationship.target_partname()?,
+        target_reference: relationship.target_ref().to_string(),
+        conformance,
+    }))
+}
+
+fn validate_volatile_dependencies_part(package: &OpcPackage, part_name: &PackURI) -> Result<()> {
+    let part = package.get_part(part_name)?;
     if part.content_type() != CONTENT_TYPE {
         return Err(invalid(format!(
-            "volatile-dependencies part '{uri}' has invalid content type '{}'",
+            "volatile-dependencies part '{part_name}' has invalid content type '{}'",
             part.content_type()
         )));
     }
@@ -198,7 +353,158 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<VolatileDependen
     if part.blob().len() > MAX_PART_BYTES {
         return Err(invalid("volatile-dependencies part exceeds 8 MiB"));
     }
-    Ok(Some(VolatileDependencies::parse(part.blob())?))
+    Ok(())
+}
+
+fn validate_volatile_dependencies_graph(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+    expected: Option<&VolatileDependenciesRelationship>,
+) -> Result<()> {
+    validate_volatile_dependencies_part_set(package, expected.map(|value| &value.part_name))?;
+
+    let mut found = 0usize;
+    for part in package.iter_parts() {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| matches!(relationship.reltype(), REL | STRICT_REL))
+        {
+            if part.partname() != workbook_uri {
+                return Err(invalid(
+                    "volatile-dependencies relationships may only originate from the workbook",
+                ));
+            }
+            if relationship.is_external() {
+                return Err(invalid(
+                    "volatile-dependencies relationship cannot be external",
+                ));
+            }
+            let target = relationship.target_partname()?;
+            let Some(expected) = expected else {
+                return Err(invalid(
+                    "workbook has an unexpected volatile-dependencies relationship",
+                ));
+            };
+            if relationship.r_id() != expected.relationship_id || target != expected.part_name {
+                return Err(invalid(
+                    "volatile-dependencies relationship graph is inconsistent",
+                ));
+            }
+            found += 1;
+        }
+    }
+    if package
+        .rels()
+        .iter()
+        .any(|relationship| matches!(relationship.reltype(), REL | STRICT_REL))
+    {
+        return Err(invalid(
+            "volatile-dependencies relationships may not originate from the package root",
+        ));
+    }
+    match (expected, found) {
+        (None, 0) | (Some(_), 1) => Ok(()),
+        (None, _) => Err(invalid(
+            "workbook has an unexpected volatile-dependencies relationship",
+        )),
+        (Some(_), _) => Err(invalid(
+            "workbook volatile-dependencies relationship graph is incomplete",
+        )),
+    }
+}
+
+fn validate_volatile_dependencies_part_set(
+    package: &OpcPackage,
+    relationship_target: Option<&PackURI>,
+) -> Result<()> {
+    let part_names = package
+        .iter_parts()
+        .filter(|part| part.content_type() == CONTENT_TYPE)
+        .map(|part| part.partname().clone())
+        .collect::<Vec<_>>();
+    if part_names.len() > 1 {
+        return Err(invalid(
+            "package contains more than one volatile-dependencies part",
+        ));
+    }
+    match (relationship_target, part_names.as_slice()) {
+        (None, []) => Ok(()),
+        (None, _) => Err(invalid(
+            "package contains a volatile-dependencies part without a workbook relationship",
+        )),
+        (Some(_), []) => Err(invalid(
+            "workbook volatile-dependencies relationship targets a missing part",
+        )),
+        (Some(target), [part_name]) if part_name == target => Ok(()),
+        (Some(_), _) => Err(invalid(
+            "workbook volatile-dependencies relationship does not target the volatile-dependencies part",
+        )),
+    }
+}
+
+fn main_workbook_uri(package: &OpcPackage) -> Result<PackURI> {
+    use litchi_opc::constants::content_type as ct;
+
+    let workbook = package.main_document_part()?;
+    if !matches!(
+        workbook.content_type(),
+        ct::SML_SHEET_MAIN
+            | ct::SML_TEMPLATE_MAIN
+            | ct::SML_SHEET_MACRO_MAIN
+            | ct::SML_TEMPLATE_MACRO_MAIN
+    ) {
+        return Err(invalid(format!(
+            "main document part '{}' is not an XML workbook",
+            workbook.partname()
+        )));
+    }
+    Ok(workbook.partname().clone())
+}
+
+fn next_volatile_dependencies_part_name(package: &OpcPackage) -> Result<PackURI> {
+    for suffix in 0..=65_536u32 {
+        let name = if suffix == 0 {
+            "/xl/volatileDependencies.xml".to_string()
+        } else {
+            format!("/xl/volatileDependencies{suffix}.xml")
+        };
+        let candidate = PackURI::new(&name)?;
+        if package.get_part(&candidate).is_err() {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("no free volatile-dependencies part name"))
+}
+
+fn next_volatile_dependencies_relationship_id(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+) -> Result<String> {
+    let relationships = package.get_part(workbook_uri)?.rels();
+    for suffix in 1..=65_537u32 {
+        let candidate = format!("rIdVolatileDependencies{suffix}");
+        if relationships.get(&candidate).is_none() {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("no free volatile-dependencies relationship ID"))
+}
+
+fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
+    package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|part_name| part_name == *target)
+        })
+    }) || package.rels().iter().any(|relationship| {
+        !relationship.is_external()
+            && relationship
+                .target_partname()
+                .is_ok_and(|part_name| part_name == *target)
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -810,9 +1116,73 @@ fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sy
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, Part};
+
     fn sample(ns: &str) -> Vec<u8> {
         format!(r#"<volTypes xmlns="{ns}"><volType type="realTimeData"><main first="server.id"><tp t="s"><v>ready</v><stp>ticker</stp><tr r="$A$1" s="0"/></tp></main></volType><volType type="olapFunctions"><main first="cube"><tp t="n"><v>42.5</v><tr r="B2" s="1"/></tp></main></volType></volTypes>"#).into_bytes()
+    }
+
+    fn value() -> VolatileDependencies {
+        VolatileDependencies::parse(&sample(std::str::from_utf8(NS).unwrap())).unwrap()
+    }
+
+    fn workbook_package() -> OpcPackage {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
+        let workbook = BlobPart::new(
+            workbook_uri,
+            ct::SML_SHEET_MAIN.into(),
+            format!(
+                r#"<workbook xmlns="{}"><sheets/></workbook>"#,
+                std::str::from_utf8(NS).unwrap()
+            )
+            .into_bytes(),
+        );
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+        package.add_part(Box::new(workbook));
+        package
+    }
+
+    fn synthetic_package(
+        relationship_type: &str,
+        external: bool,
+        content_type: &str,
+        outbound: bool,
+    ) -> OpcPackage {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
+        let mut workbook = BlobPart::new(
+            workbook_uri.clone(),
+            ct::SML_SHEET_MAIN.into(),
+            format!(
+                r#"<workbook xmlns="{}"><sheets/></workbook>"#,
+                std::str::from_utf8(NS).unwrap()
+            )
+            .into_bytes(),
+        );
+        if external {
+            workbook.relate_to_ext(
+                "https://example.invalid/volatileDependencies.xml",
+                relationship_type,
+            );
+        } else {
+            workbook.relate_to("volatileDependencies.xml", relationship_type);
+        }
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+        package.add_part(Box::new(workbook));
+        if !external {
+            let mut dependencies = BlobPart::new(
+                PackURI::new("/xl/volatileDependencies.xml").unwrap(),
+                content_type.into(),
+                sample(std::str::from_utf8(NS).unwrap()),
+            );
+            if outbound {
+                dependencies.relate_to("worksheets/sheet1.xml", rt::WORKSHEET);
+            }
+            package.add_part(Box::new(dependencies));
+        }
+        package
     }
     #[test]
     fn parses_and_writes_transitional_and_strict() {
@@ -907,5 +1277,237 @@ mod tests {
             .unwrap()
             .relate_to("other.xml", "urn:forbidden");
         assert!(load_from_package(&package).is_err());
+    }
+
+    #[test]
+    fn stores_rewrites_and_removes_inert_volatile_dependencies_parts() {
+        let mut package = workbook_package();
+        let value = value();
+
+        store_in_package(
+            &mut package,
+            &value,
+            VolatileDependenciesConformance::Transitional,
+        )
+        .unwrap();
+        assert_eq!(load_from_package(&package).unwrap(), Some(value.clone()));
+        assert_eq!(
+            load_from_package_with_conformance(&package).unwrap(),
+            Some((value.clone(), VolatileDependenciesConformance::Transitional))
+        );
+
+        let workbook = package.main_document_part().unwrap();
+        let relationship = workbook
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == REL)
+            .unwrap();
+        let relationship_id = relationship.r_id().to_string();
+        let part_name = relationship.target_partname().unwrap();
+        assert_eq!(
+            part_name,
+            PackURI::new("/xl/volatileDependencies.xml").unwrap()
+        );
+        assert!(
+            std::str::from_utf8(package.get_part(&part_name).unwrap().blob())
+                .unwrap()
+                .contains(std::str::from_utf8(NS).unwrap())
+        );
+
+        let mut replacement = value.clone();
+        replacement.types[0].mains[0].first = "replacement.server".into();
+        store_in_package(
+            &mut package,
+            &replacement,
+            VolatileDependenciesConformance::Strict,
+        )
+        .unwrap();
+        let workbook = package.main_document_part().unwrap();
+        let relationship = workbook
+            .rels()
+            .iter()
+            .find(|relationship| relationship.r_id() == relationship_id)
+            .unwrap();
+        assert_eq!(relationship.reltype(), STRICT_REL);
+        assert_eq!(relationship.target_partname().unwrap(), part_name);
+        assert!(
+            std::str::from_utf8(package.get_part(&part_name).unwrap().blob())
+                .unwrap()
+                .contains(std::str::from_utf8(STRICT_NS).unwrap())
+        );
+        assert_eq!(
+            load_from_package_with_conformance(&package).unwrap(),
+            Some((replacement, VolatileDependenciesConformance::Strict))
+        );
+
+        assert!(remove_from_package(&mut package).unwrap());
+        assert!(package.get_part(&part_name).is_err());
+        assert_eq!(load_from_package(&package).unwrap(), None);
+        assert!(!remove_from_package(&mut package).unwrap());
+    }
+
+    #[test]
+    fn removal_retains_volatile_dependencies_part_referenced_elsewhere() {
+        let mut package = workbook_package();
+        let value = value();
+        store_in_package(
+            &mut package,
+            &value,
+            VolatileDependenciesConformance::Transitional,
+        )
+        .unwrap();
+
+        let part_name = PackURI::new("/xl/volatileDependencies.xml").unwrap();
+        let mut referring_part = BlobPart::new(
+            PackURI::new("/xl/retained-reference.xml").unwrap(),
+            ct::XML.into(),
+            b"<reference/>".to_vec(),
+        );
+        referring_part.relate_to(
+            "volatileDependencies.xml",
+            "urn:litchi:test:volatile-dependencies-reference",
+        );
+        package.add_part(Box::new(referring_part));
+
+        assert!(remove_from_package(&mut package).unwrap());
+        assert!(package.get_part(&part_name).is_ok());
+        assert!(load_from_package(&package).is_err());
+        assert!(
+            store_in_package(
+                &mut package,
+                &value,
+                VolatileDependenciesConformance::Transitional,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn workbook_volatile_dependencies_mutators_and_materialization_preserve_metadata() {
+        let mut workbook = crate::xlsx::Workbook::create().unwrap();
+        let value = value();
+        workbook
+            .set_volatile_dependencies(&value, VolatileDependenciesConformance::Strict)
+            .unwrap();
+        assert_eq!(
+            workbook.volatile_dependencies().unwrap(),
+            Some((value.clone(), VolatileDependenciesConformance::Strict))
+        );
+
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "materialized");
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory
+            .path()
+            .join("materialized-volatile-dependencies.xlsx");
+        workbook.save(&path).unwrap();
+        let reopened = crate::xlsx::Workbook::open(&path).unwrap();
+        assert_eq!(
+            reopened.volatile_dependencies().unwrap(),
+            Some((value.clone(), VolatileDependenciesConformance::Strict))
+        );
+
+        let mut reopened = reopened;
+        assert!(reopened.remove_volatile_dependencies().unwrap());
+        assert_eq!(reopened.volatile_dependencies().unwrap(), None);
+        assert!(!reopened.remove_volatile_dependencies().unwrap());
+    }
+
+    #[test]
+    fn package_volatile_dependencies_mutators_reject_invalid_existing_graphs() {
+        let value = value();
+        let mut wrong_content_type = synthetic_package(REL, false, ct::SML_STYLES, false);
+        let part_name = PackURI::new("/xl/volatileDependencies.xml").unwrap();
+        let original = wrong_content_type
+            .get_part(&part_name)
+            .unwrap()
+            .blob()
+            .to_vec();
+        assert!(
+            store_in_package(
+                &mut wrong_content_type,
+                &value,
+                VolatileDependenciesConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert_eq!(
+            wrong_content_type.get_part(&part_name).unwrap().blob(),
+            original
+        );
+        assert!(remove_from_package(&mut wrong_content_type).is_err());
+
+        let mut duplicate = synthetic_package(REL, false, CONTENT_TYPE, false);
+        duplicate
+            .get_part_mut(&PackURI::new("/xl/workbook.xml").unwrap())
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                REL.into(),
+                "volatileDependencies.xml".into(),
+                "rIdDuplicateVolatileDependencies".into(),
+                false,
+            );
+        assert!(
+            store_in_package(
+                &mut duplicate,
+                &value,
+                VolatileDependenciesConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert!(remove_from_package(&mut duplicate).is_err());
+
+        let mut duplicate_part = synthetic_package(REL, false, CONTENT_TYPE, false);
+        duplicate_part.add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/volatileDependenciesExtra.xml").unwrap(),
+            CONTENT_TYPE.into(),
+            sample(std::str::from_utf8(NS).unwrap()),
+        )));
+        assert!(load_from_package(&duplicate_part).is_err());
+        assert!(
+            store_in_package(
+                &mut duplicate_part,
+                &value,
+                VolatileDependenciesConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert!(remove_from_package(&mut duplicate_part).is_err());
+
+        let mut external = synthetic_package(REL, true, CONTENT_TYPE, false);
+        assert!(
+            store_in_package(
+                &mut external,
+                &value,
+                VolatileDependenciesConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert!(remove_from_package(&mut external).is_err());
+
+        let mut outbound = synthetic_package(REL, false, CONTENT_TYPE, true);
+        assert!(
+            store_in_package(
+                &mut outbound,
+                &value,
+                VolatileDependenciesConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert!(remove_from_package(&mut outbound).is_err());
+
+        let mut root_relationship = workbook_package();
+        root_relationship.relate_to("xl/volatileDependencies.xml", REL);
+        assert!(
+            store_in_package(
+                &mut root_relationship,
+                &value,
+                VolatileDependenciesConformance::Transitional,
+            )
+            .is_err()
+        );
     }
 }

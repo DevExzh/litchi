@@ -191,6 +191,14 @@ pub use xml_maps::{
     remove_from_package as remove_xml_maps_from_package,
     store_in_package as store_xml_maps_in_package,
 };
+pub use volatile_dependencies::{
+    VolatileDependencies, VolatileDependenciesConformance, VolatileDependencyType, VolatileMain,
+    VolatileReference, VolatileTopic, VolatileType, VolatileValue,
+    load_from_package as load_volatile_dependencies_from_package,
+    load_from_package_with_conformance as load_volatile_dependencies_from_package_with_conformance,
+    remove_from_package as remove_volatile_dependencies_from_package,
+    store_in_package as store_volatile_dependencies_in_package,
+};
 pub use ole_objects::{
     OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker, OleObjectProperties,
     OleObjectRelationshipKind, OleObjectResource, OleObjectTarget, OleObjectUpdate,

@@ -20,6 +20,12 @@ use crate::xlsx::xml_maps::{
     XmlMapConformance, XmlMapInfo, load_from_package_with_conformance as load_xml_maps,
     remove_from_package as remove_xml_maps, store_in_package as store_xml_maps,
 };
+use crate::xlsx::volatile_dependencies::{
+    VolatileDependencies, VolatileDependenciesConformance,
+    load_from_package_with_conformance as load_volatile_dependencies,
+    remove_from_package as remove_volatile_dependencies,
+    store_in_package as store_volatile_dependencies,
+};
 use crate::xlsx::external_links::{
     ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
     build_external_link_part_with_conformance, load_external_link,
@@ -546,6 +552,33 @@ impl Workbook {
     /// Remove Custom XML Maps metadata without changing worksheet cell data.
     pub fn remove_xml_maps(&mut self) -> SheetResult<bool> {
         remove_xml_maps(&mut self.package)
+    }
+
+    /// Load inert volatile-dependencies metadata and its namespace family.
+    ///
+    /// This never contacts RTD servers, opens OLAP connections, or evaluates
+    /// workbook formulas.
+    pub fn volatile_dependencies(
+        &self,
+    ) -> SheetResult<Option<(VolatileDependencies, VolatileDependenciesConformance)>> {
+        load_volatile_dependencies(&self.package)
+    }
+
+    /// Replace the workbook's inert volatile-dependencies metadata.
+    ///
+    /// The caller-provided records are serialized without RTD, cube, or formula
+    /// evaluation work.
+    pub fn set_volatile_dependencies(
+        &mut self,
+        value: &VolatileDependencies,
+        conformance: VolatileDependenciesConformance,
+    ) -> SheetResult<()> {
+        store_volatile_dependencies(&mut self.package, value, conformance)
+    }
+
+    /// Remove volatile-dependencies metadata without recalculating formulas.
+    pub fn remove_volatile_dependencies(&mut self) -> SheetResult<bool> {
+        remove_volatile_dependencies(&mut self.package)
     }
 
     /// Return passive `workbookProtection` metadata from the current `workbook.xml` part.
@@ -1596,15 +1629,20 @@ impl Workbook {
                 // collections. Detach inert companion parts first so old targets
                 // do not become orphaned, then restore them after materialization.
                 let named_sheet_views = self.detach_named_sheet_views_before_materialization()?;
+                let volatile_dependencies = load_volatile_dependencies(&self.package)?;
                 let xml_maps = load_xml_maps(&self.package)?;
                 if self.calculation_chain.is_some() {
                     remove_calculation_chain(&mut self.package)?;
+                }
+                if volatile_dependencies.is_some() {
+                    remove_volatile_dependencies(&mut self.package)?;
                 }
                 if xml_maps.is_some() {
                     remove_xml_maps(&mut self.package)?;
                 }
                 self.update_workbook_parts(&mut mutable_data)?;
                 self.restore_calculation_chain_after_materialization()?;
+                self.restore_volatile_dependencies_after_materialization(&volatile_dependencies)?;
                 self.restore_xml_maps_after_materialization(&xml_maps)?;
                 self.restore_named_sheet_views_after_materialization(&named_sheet_views)?;
                 self.mutable_data = Some(mutable_data);
@@ -1697,6 +1735,18 @@ impl Workbook {
             return Ok(());
         };
         store_xml_maps(&mut self.package, value, *conformance)
+    }
+
+    /// Restore volatile-dependencies metadata after the mutable writer rebuilds
+    /// the workbook relationship collection without refreshing any dependency.
+    fn restore_volatile_dependencies_after_materialization(
+        &mut self,
+        value: &Option<(VolatileDependencies, VolatileDependenciesConformance)>,
+    ) -> SheetResult<()> {
+        let Some((value, conformance)) = value else {
+            return Ok(());
+        };
+        store_volatile_dependencies(&mut self.package, value, *conformance)
     }
 
     /// Detach worksheet-scoped modern views before rebuilding worksheet parts.
