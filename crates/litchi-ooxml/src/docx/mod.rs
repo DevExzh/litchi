@@ -115,7 +115,7 @@ pub use field::{
     BibliographyField, CitationField, DdeField, DdeFieldKind, DdeRepresentation,
     DocumentVariableField, ExternalIncludeField, ExternalIncludeOption, Field, FieldSwitch,
     IncludeFieldKind, IndexEntryField, IndexField, IndexSortOrder, LinkField, LinkFormatting,
-    LinkResultOption, ReferencedDocumentField, TableOfAuthoritiesEntryField,
+    LinkResultOption, MacroButtonField, ReferencedDocumentField, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesField, TableOfContentsField, TableOfContentsLevelRange,
     TableOfContentsSwitch,
 };

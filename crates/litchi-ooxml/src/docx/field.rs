@@ -206,6 +206,24 @@ impl Field {
         DocumentVariableField::from_field(self)
     }
 
+    /// Check whether this is a `MACROBUTTON` field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never
+    /// resolves, loads, invokes, or otherwise executes a macro or command.
+    pub fn is_macro_button(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "MACROBUTTON").is_some()
+    }
+
+    /// Parse this field as inert typed macro-button metadata.
+    ///
+    /// Returns `Ok(None)` for non-`MACROBUTTON` fields. The result exposes
+    /// only the stored macro or command name, button text, cached content, and
+    /// dirty/lock state; it never resolves, loads, invokes, or executes the
+    /// named target.
+    pub fn macro_button(&self) -> Result<Option<MacroButtonField>> {
+        MacroButtonField::from_field(self)
+    }
+
     /// Check whether this is a legacy `LINK` field.
     ///
     /// Recognition is limited to the stored field instruction. It never
@@ -1583,6 +1601,74 @@ impl DocumentVariableField {
     }
 }
 
+/// A typed, inert Word `MACROBUTTON` field.
+///
+/// ECMA-376 Part 1 §17.16.5.34 defines two stored field arguments: a macro or
+/// command name and the text or graphic used as its button. This type exposes
+/// stored text only; it never resolves, loads, invokes, or otherwise executes
+/// the named target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MacroButtonField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    macro_name: String,
+    display_text: String,
+}
+
+impl MacroButtonField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((macro_name, display_text)) = parse_macro_button_operands(field.instruction())?
+        else {
+            return Ok(None);
+        };
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            macro_name,
+            display_text,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored macro or command name without resolving or invoking it.
+    pub fn macro_name(&self) -> &str {
+        &self.macro_name
+    }
+
+    /// Return the stored button text.
+    ///
+    /// This is source metadata, not a generated result.
+    pub fn display_text(&self) -> &str {
+        &self.display_text
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from the named target.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
 /// Backward-compatible name for a lexical switch exposed by a TOC field.
 pub type TableOfContentsSwitch = FieldSwitch;
 
@@ -2280,6 +2366,32 @@ fn parse_field_operand_and_switches(
     };
     let switches = parse_field_switches_from_characters(&mut characters, field_type)?;
     Ok(Some((operand, switches)))
+}
+
+fn parse_macro_button_operands(instruction: &str) -> Result<Option<(String, String)>> {
+    let Some(remainder) = field_instruction_remainder(instruction, "MACROBUTTON") else {
+        return Ok(None);
+    };
+    let mut characters = remainder.chars().peekable();
+    let macro_name = parse_next_field_argument(&mut characters, "MACROBUTTON")?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat(
+                "MACROBUTTON field is missing its macro or command name".to_string(),
+            )
+        })?;
+    let display_text = parse_next_field_argument(&mut characters, "MACROBUTTON")?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat("MACROBUTTON field is missing its button text".to_string())
+        })?;
+    skip_field_whitespace(&mut characters);
+    if characters.next().is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "MACROBUTTON field must contain exactly two arguments and no switches".to_string(),
+        ));
+    }
+    Ok(Some((macro_name, display_text)))
 }
 
 fn parse_link_operands_and_switches(
@@ -3229,6 +3341,70 @@ mod tests {
         let unexpected_operand =
             Field::new("DOCVARIABLE Customer unexpected".to_string(), None, false);
         assert!(unexpected_operand.document_variable().is_err());
+    }
+
+    #[test]
+    fn parses_macro_button_fields_without_resolving_or_executing_targets() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" MACROBUTTON &quot;Never Run&quot; &quot;Click here&quot; " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached button</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>MACROBUTTON NoMacro "Click again"</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached second button</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="MACROBUTTONS NeverRun Button"><w:r><w:t>not a macro button</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_macro_button());
+        assert!(fields[1].is_macro_button());
+        assert!(!fields[2].is_macro_button());
+
+        let first = fields[0].macro_button().unwrap().unwrap();
+        assert_eq!(first.macro_name(), "Never Run");
+        assert_eq!(first.display_text(), "Click here");
+        assert_eq!(first.cached_result(), Some("cached button"));
+        assert!(first.is_dirty());
+        assert!(first.is_locked());
+
+        let second = fields[1].macro_button().unwrap().unwrap();
+        assert_eq!(second.macro_name(), "NoMacro");
+        assert_eq!(second.display_text(), "Click again");
+        assert_eq!(second.cached_result(), Some("cached second button"));
+        assert!(second.is_dirty());
+        assert!(second.is_locked());
+        assert!(fields[2].macro_button().unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_macro_button_field_semantics() {
+        let missing_name = Field::new("MACROBUTTON".to_string(), None, false);
+        assert!(missing_name.macro_button().is_err());
+
+        let empty_name = Field::new(r#"MACROBUTTON "" Button"#.to_string(), None, false);
+        assert!(empty_name.macro_button().is_err());
+
+        let missing_button = Field::new("MACROBUTTON NeverRun".to_string(), None, false);
+        assert!(missing_button.macro_button().is_err());
+
+        let empty_button = Field::new(r#"MACROBUTTON NeverRun """#.to_string(), None, false);
+        assert!(empty_button.macro_button().is_err());
+
+        let extra_argument = Field::new(
+            "MACROBUTTON NeverRun Button unexpected".to_string(),
+            None,
+            false,
+        );
+        assert!(extra_argument.macro_button().is_err());
+
+        let unsupported_switch = Field::new(
+            r#"MACROBUTTON NeverRun Button \* MERGEFORMAT"#.to_string(),
+            None,
+            false,
+        );
+        assert!(unsupported_switch.macro_button().is_err());
     }
 
     #[test]

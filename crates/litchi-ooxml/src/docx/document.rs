@@ -9,8 +9,8 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
     BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
-    IndexEntryField, IndexField, LinkField, ReferencedDocumentField, TableOfAuthoritiesEntryField,
-    TableOfAuthoritiesField, TableOfContentsField,
+    IndexEntryField, IndexField, LinkField, MacroButtonField, ReferencedDocumentField,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1277,6 +1277,24 @@ impl<'a> Document<'a> {
     /// Get the number of document-variable fields in the main document.
     pub fn document_variable_field_count(&self) -> Result<usize> {
         Ok(self.document_variable_fields()?.len())
+    }
+
+    /// Get typed, inert `MACROBUTTON` fields in document order.
+    ///
+    /// Returned values expose only stored macro or command names, button text,
+    /// cached results, and dirty/lock state. This method never resolves, loads,
+    /// invokes, or otherwise executes a macro or command.
+    pub fn macro_button_fields(&self) -> Result<Vec<MacroButtonField>> {
+        self.fields()?
+            .iter()
+            .map(Field::macro_button)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `MACROBUTTON` fields in the main document.
+    pub fn macro_button_field_count(&self) -> Result<usize> {
+        Ok(self.macro_button_fields()?.len())
     }
 
     /// Get typed, inert `DDE` and `DDEAUTO` fields in document order.

@@ -3314,6 +3314,30 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_macro_button_fields_without_execution() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let paragraph = document.add_paragraph();
+            paragraph.add_field(crate::docx::writer::MutableField::with_result(
+                r#"MACROBUTTON NeverRun "Click here""#.to_string(),
+                "cached button".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let fields = document.macro_button_fields().unwrap();
+        assert_eq!(document.macro_button_field_count().unwrap(), 1);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].macro_name(), "NeverRun");
+        assert_eq!(fields[0].display_text(), "Click here");
+        assert_eq!(fields[0].cached_result(), Some("cached button"));
+    }
+
+    #[test]
     fn writes_and_discovers_typed_inert_dde_fields() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
