@@ -419,9 +419,9 @@ mod tests {
     use crate::archive::{ArchiveObject, RawMessage};
     use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
     use crate::numbers::{
-        FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocument,
-        NumbersDocumentBuilder, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
-        TableRowInsertion,
+        FormulaAxisReference, FormulaCachedValue, FormulaCellReference, FormulaExpression,
+        NumbersDocument, NumbersDocumentBuilder, TableColumnDeletion, TableColumnInsertion,
+        TableRowDeletion, TableRowInsertion,
     };
     use crate::pages::{PagesDocumentBuilder, PagesEditor};
     use crate::shapes::{DrawablePoint, DrawableSize};
@@ -450,6 +450,18 @@ mod tests {
                 right,
             }
         }
+    }
+
+    fn range_edge_coordinates(bounds: TestRangeBounds) -> (Vec<u32>, Vec<u32>) {
+        let mut rows = Vec::new();
+        let mut columns = Vec::new();
+        for row in bounds.top..=bounds.bottom {
+            for column in bounds.left..=bounds.right {
+                rows.push(row);
+                columns.push(column);
+            }
+        }
+        (rows, columns)
     }
 
     #[derive(Clone, Copy)]
@@ -953,6 +965,178 @@ mod tests {
             proxy,
             dependency_ids.source_owner_id,
             TestRangeBounds::new(1, 1, 1, 1),
+        );
+    }
+
+    #[test]
+    fn merged_cross_table_whole_row_anchor_rebases_expanded_edges_and_cache() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(5, 6)
+            .build()
+            .unwrap();
+        let source_table_id = editor.tables().unwrap()[0].object_id;
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let target_table = editor
+            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .unwrap();
+        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        editor
+            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .unwrap();
+        editor
+            .set_cell(target_table.object_id, 2, 0, CellValue::Number(3.0))
+            .unwrap();
+        editor
+            .set_formula_with_cached_value(
+                source_table_id,
+                region.row(),
+                region.column(),
+                FormulaExpression::function(
+                    "SUM",
+                    [FormulaExpression::table_rows(
+                        target_table.object_id,
+                        FormulaAxisReference::relative(1),
+                        FormulaAxisReference::relative(2),
+                    )],
+                ),
+                FormulaCachedValue::Number(10.0),
+            )
+            .unwrap();
+        editor.merge_cells(source_table_id, region).unwrap();
+
+        let mut package = editor.into_package();
+        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        let mut editor = NumbersEditor::from_package(package).unwrap();
+        let external_owner_id = formula_owner_at_host(&editor, 1, 1)
+            .cell_dependencies
+            .as_ref()
+            .unwrap()
+            .cell_record[0]
+            .expanded_edges
+            .as_ref()
+            .unwrap()
+            .internal_owner_id_for_edge[0];
+        let (initial_rows, initial_columns) =
+            range_edge_coordinates(TestRangeBounds::new(1, 0, 2, 5));
+        assert_formula_host_range_edges(
+            &editor,
+            external_owner_id,
+            &initial_rows,
+            &initial_columns,
+        );
+
+        editor
+            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .unwrap();
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula(
+                "=SUM(Sheet 1::Referenced::3:4)".to_owned()
+            ))
+        );
+        assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 3.0);
+        let (rebased_rows, rebased_columns) =
+            range_edge_coordinates(TestRangeBounds::new(2, 0, 3, 5));
+        assert_formula_host_range_edges(
+            &editor,
+            external_owner_id,
+            &rebased_rows,
+            &rebased_columns,
+        );
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_formula_host_range_edges(
+            &reopened,
+            external_owner_id,
+            &rebased_rows,
+            &rebased_columns,
+        );
+    }
+
+    #[test]
+    fn merged_cross_table_whole_column_anchor_rebases_native_range_records_and_cache() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(5, 6)
+            .build()
+            .unwrap();
+        let source_table_id = editor.tables().unwrap()[0].object_id;
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let target_table = editor
+            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .unwrap();
+        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        editor
+            .set_cell(target_table.object_id, 0, 1, CellValue::Number(7.0))
+            .unwrap();
+        editor
+            .set_cell(target_table.object_id, 0, 2, CellValue::Number(3.0))
+            .unwrap();
+        editor
+            .set_formula_with_cached_value(
+                source_table_id,
+                region.row(),
+                region.column(),
+                FormulaExpression::function(
+                    "SUM",
+                    [FormulaExpression::table_columns(
+                        target_table.object_id,
+                        FormulaAxisReference::relative(1),
+                        FormulaAxisReference::relative(2),
+                    )],
+                ),
+                FormulaCachedValue::Number(10.0),
+            )
+            .unwrap();
+        editor.merge_cells(source_table_id, region).unwrap();
+
+        let mut package = editor.into_package();
+        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        let dependency_ids = install_native_cross_table_range_dependencies(
+            &mut package,
+            region.row() as u32,
+            region.column() as u32,
+            TestRangeBounds::new(0, 1, 4, 2),
+        );
+        let proxy = install_native_merge_range_proxy(
+            &mut package,
+            dependency_ids.source_owner_id,
+            TestRangeBounds::new(1, 1, 2, 2),
+        );
+        let mut editor = NumbersEditor::from_package(package).unwrap();
+
+        editor
+            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula(
+                "=SUM(Sheet 1::Referenced::C:D)".to_owned()
+            ))
+        );
+        assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 3.0);
+        assert_formula_host_native_range_dependencies(
+            &editor,
+            dependency_ids.external_owner_id,
+            TestRangeBounds::new(0, 2, 4, 3),
+        );
+        assert_native_merge_range_proxy(
+            &editor,
+            proxy,
+            dependency_ids.source_owner_id,
+            TestRangeBounds::new(1, 1, 2, 1),
+        );
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_formula_host_native_range_dependencies(
+            &reopened,
+            dependency_ids.external_owner_id,
+            TestRangeBounds::new(0, 2, 4, 3),
+        );
+        assert_native_merge_range_proxy(
+            &reopened,
+            proxy,
+            dependency_ids.source_owner_id,
+            TestRangeBounds::new(1, 1, 2, 1),
         );
     }
 

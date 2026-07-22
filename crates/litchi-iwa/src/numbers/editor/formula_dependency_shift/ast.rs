@@ -2,6 +2,11 @@
 
 use super::*;
 
+// Numbers marks the perpendicular axis of a whole-row or whole-column
+// reference with these protocol sentinels rather than expanding the range.
+const WHOLE_ROW_COLUMN_SENTINEL: u32 = i16::MAX as u32;
+const WHOLE_COLUMN_ROW_SENTINEL: u32 = i32::MAX as u32;
+
 #[derive(Debug)]
 struct FormulaRewrite {
     row: u32,
@@ -443,14 +448,10 @@ fn cross_table_tract_precedent(
     host_column: u32,
     owner: ExternalFormulaOwner,
 ) -> Result<ExternalRangePrecedent> {
-    let (left, right) = single_cross_table_tract_interval(
-        tract_axis_intervals(tract, DependencyAxis::Column, host_column)?,
-        "column",
-    )?;
-    let (top, bottom) = single_cross_table_tract_interval(
-        tract_axis_intervals(tract, DependencyAxis::Row, host_row)?,
-        "row",
-    )?;
+    let (left, right) =
+        cross_table_tract_axis_interval(tract, DependencyAxis::Column, host_column, owner.columns)?;
+    let (top, bottom) =
+        cross_table_tract_axis_interval(tract, DependencyAxis::Row, host_row, owner.rows)?;
     if bottom >= owner.rows || right >= owner.columns {
         return Err(Error::ParseError(format!(
             "iWork cross-table formula range ({top}, {left})..({bottom}, {right}) is outside its {}x{} target table",
@@ -467,11 +468,52 @@ fn cross_table_tract_precedent(
     .validate()
 }
 
+fn cross_table_tract_axis_interval(
+    tract: &tsce::ast_node_array_archive::AstColonTractArchive,
+    axis: DependencyAxis,
+    host: u32,
+    table_axis_length: u32,
+) -> Result<(u32, u32)> {
+    if tract_represents_whole_axis(tract, axis) {
+        let end = table_axis_length.checked_sub(1).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork whole-{} formula reference targets an empty table axis",
+                axis.noun()
+            ))
+        })?;
+        return Ok((0, end));
+    }
+    single_cross_table_tract_interval(tract_axis_intervals(tract, axis, host)?, axis.noun())
+}
+
+fn tract_represents_whole_axis(
+    tract: &tsce::ast_node_array_archive::AstColonTractArchive,
+    axis: DependencyAxis,
+) -> bool {
+    let (relative, absolute, sentinel) = match axis {
+        DependencyAxis::Column => (
+            &tract.relative_column,
+            &tract.absolute_column,
+            WHOLE_ROW_COLUMN_SENTINEL,
+        ),
+        DependencyAxis::Row => (
+            &tract.relative_row,
+            &tract.absolute_row,
+            WHOLE_COLUMN_ROW_SENTINEL,
+        ),
+    };
+    relative.is_empty()
+        && matches!(absolute.as_slice(), [range] if range.range_begin == sentinel && range.range_end.is_none())
+}
+
 fn single_cross_table_tract_interval(intervals: Vec<(u32, u32)>, axis: &str) -> Result<(u32, u32)> {
     match intervals.as_slice() {
         [interval] => Ok(*interval),
+        [(begin, begin_end), (end, end_end)] if begin == begin_end && end == end_end => {
+            Ok(((*begin).min(*end), (*begin).max(*end)))
+        },
         [] => Err(Error::ParseError(format!(
-            "Cannot yet relocate a merged iWork formula anchor with a whole-{axis} cross-table range"
+            "Cannot relocate a merged iWork formula anchor with a missing cross-table {axis} range"
         ))),
         _ => Err(Error::ParseError(format!(
             "Cannot yet relocate a merged iWork formula anchor with multiple cross-table {axis} ranges"
@@ -1153,4 +1195,72 @@ fn formula_ast_rewrite_error(axis: DependencyAxis, mutation: DependencyMutation)
         mutation.verb(),
         axis.noun()
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type AbsoluteRange =
+        tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractAbsoluteRangeArchive;
+    type RelativeRange =
+        tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractRelativeRangeArchive;
+
+    fn absolute_range(range_begin: u32, range_end: Option<u32>) -> AbsoluteRange {
+        AbsoluteRange {
+            range_begin,
+            range_end,
+        }
+    }
+
+    fn relative_range(range_begin: i32, range_end: Option<i32>) -> RelativeRange {
+        RelativeRange {
+            range_begin,
+            range_end,
+        }
+    }
+
+    #[test]
+    fn cross_table_whole_axis_intervals_resolve_target_dimensions() {
+        let whole_rows = tsce::ast_node_array_archive::AstColonTractArchive {
+            relative_row: vec![relative_range(0, Some(1))],
+            absolute_column: vec![absolute_range(WHOLE_ROW_COLUMN_SENTINEL, None)],
+            ..Default::default()
+        };
+        assert_eq!(
+            cross_table_tract_axis_interval(&whole_rows, DependencyAxis::Column, 1, 6).unwrap(),
+            (0, 5)
+        );
+        assert_eq!(
+            cross_table_tract_axis_interval(&whole_rows, DependencyAxis::Row, 1, 5).unwrap(),
+            (1, 2)
+        );
+
+        let whole_columns = tsce::ast_node_array_archive::AstColonTractArchive {
+            relative_column: vec![relative_range(0, Some(1))],
+            absolute_row: vec![absolute_range(WHOLE_COLUMN_ROW_SENTINEL, None)],
+            ..Default::default()
+        };
+        assert_eq!(
+            cross_table_tract_axis_interval(&whole_columns, DependencyAxis::Column, 1, 6).unwrap(),
+            (1, 2)
+        );
+        assert_eq!(
+            cross_table_tract_axis_interval(&whole_columns, DependencyAxis::Row, 1, 5).unwrap(),
+            (0, 4)
+        );
+    }
+
+    #[test]
+    fn cross_table_mixed_axis_endpoints_form_one_interval() {
+        let tract = tsce::ast_node_array_archive::AstColonTractArchive {
+            relative_row: vec![relative_range(0, None)],
+            absolute_row: vec![absolute_range(2, None)],
+            ..Default::default()
+        };
+        assert_eq!(
+            cross_table_tract_axis_interval(&tract, DependencyAxis::Row, 1, 5).unwrap(),
+            (1, 2)
+        );
+    }
 }
