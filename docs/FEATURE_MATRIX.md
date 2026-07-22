@@ -166,7 +166,7 @@ conversion, fonts, and image conversion are optional.
 | Data model/custom data/XLDM | 🟡 | ✅ | ✅ | Inert model/custom-data package storage plus bounded XLDM inspection/writing |
 | Workbook revisions | ✅ | ✅ | ✅ | Revision headers, users, logs, and package storage; revisions are not replayed |
 | Calculation properties | ✅ | ✅ | ✅ | Calculation mode, IDs, iteration, precision, and reference mode |
-| Calculation chain | 🟡 | ✅ | ❌ | Typed chain parsing; writer does not rebuild a chain |
+| Calculation chain | 🟡 | ✅ | ✅ | Typed inert parse/store of caller-authored calculation order; no dependency rebuilding or formula evaluation |
 | Named sheet views | 🟡 | ✅ | ❌ | Typed filters/sorts/ranges parsing only |
 | Page setup, margins, and print options | ✅ | ✅ | ✅ | Orientation, paper, scaling, fit-to-page, margins, and options |
 | Print areas/titles | ✅ | ✅ | ✅ | Built-in defined names |

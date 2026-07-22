@@ -43,6 +43,13 @@ impl CalculationChainConformance {
             Self::Strict => STRICT_NS,
         }
     }
+
+    const fn relationship_type(self) -> &'static str {
+        match self {
+            Self::Transitional => RELATIONSHIP,
+            Self::Strict => STRICT_RELATIONSHIP,
+        }
+    }
 }
 
 /// An MCE-preserved, non-schema attribute retained without interpretation.
@@ -349,37 +356,272 @@ pub fn parse_calculation_chain(xml: &[u8]) -> Result<CalculationChain> {
     Ok(chain)
 }
 
+/// Load the optional inert calculation-chain part selected by the package workbook.
+///
+/// Formula cells are parsed as metadata only; no formula is evaluated.
+pub fn load_calculation_chain_from_package(
+    package: &OpcPackage,
+) -> Result<Option<CalculationChain>> {
+    let workbook_uri = main_workbook_uri(package)?;
+    load_calculation_chain_for_workbook(package, &workbook_uri)
+}
+
+/// Store a caller-authored inert calculation chain in a SpreadsheetML package.
+///
+/// The supplied order is serialized without recalculating formulas or inferring
+/// dependencies. Existing calculation-chain graph violations are rejected
+/// before any package part is changed. The requested conformance is applied to
+/// both the part XML and its workbook relationship.
+pub fn store_calculation_chain(
+    package: &mut OpcPackage,
+    chain: &CalculationChain,
+    conformance: CalculationChainConformance,
+) -> Result<()> {
+    let xml = chain.to_xml(conformance)?.into_bytes();
+    let workbook_uri = main_workbook_uri(package)?;
+    let existing = calculation_chain_relationship(package, &workbook_uri)?;
+
+    if let Some(existing) = existing {
+        validate_calculation_chain_part_set(package, Some(&existing.part_name))?;
+        validate_calculation_chain_part(package, &existing.part_name)?;
+        package.get_part_mut(&existing.part_name)?.set_blob(xml);
+        if existing.conformance != conformance {
+            let workbook = package.get_part_mut(&workbook_uri)?;
+            workbook.rels_mut().remove(&existing.relationship_id);
+            workbook.rels_mut().add_relationship(
+                conformance.relationship_type().into(),
+                existing.target_reference,
+                existing.relationship_id,
+                false,
+            );
+        }
+    } else {
+        validate_calculation_chain_part_set(package, None)?;
+        let part_name = next_calculation_chain_part_name(package)?;
+        let relationship_id = next_calculation_chain_relationship_id(package, &workbook_uri)?;
+        let target = part_name.relative_ref(workbook_uri.base_uri());
+        package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
+            part_name,
+            CONTENT_TYPE.into(),
+            xml,
+        )))?;
+        package
+            .get_part_mut(&workbook_uri)?
+            .rels_mut()
+            .add_relationship(
+                conformance.relationship_type().into(),
+                target,
+                relationship_id,
+                false,
+            );
+    }
+
+    let _ = package.clear_digital_signatures();
+    Ok(())
+}
+
+/// Remove the workbook's calculation-chain relationship and its unreferenced part.
+///
+/// No formulas are changed. A target that is also referenced elsewhere in the
+/// package is retained.
+pub fn remove_calculation_chain(package: &mut OpcPackage) -> Result<bool> {
+    let workbook_uri = main_workbook_uri(package)?;
+    let Some(existing) = calculation_chain_relationship(package, &workbook_uri)? else {
+        validate_calculation_chain_part_set(package, None)?;
+        return Ok(false);
+    };
+    validate_calculation_chain_part_set(package, Some(&existing.part_name))?;
+    validate_calculation_chain_part(package, &existing.part_name)?;
+
+    package
+        .get_part_mut(&workbook_uri)?
+        .rels_mut()
+        .remove(&existing.relationship_id);
+    if !package_part_is_referenced(package, &existing.part_name) {
+        package.remove_part(&existing.part_name);
+    }
+    let _ = package.clear_digital_signatures();
+    Ok(true)
+}
+
 pub(crate) fn load_calculation_chain(
     package: &OpcPackage,
     workbook_uri: &PackURI,
-) -> SheetResult<Option<CalculationChain>> {
+) -> SheetResult<Option<(CalculationChain, CalculationChainConformance)>> {
+    load_calculation_chain_with_conformance_for_workbook(package, workbook_uri).map_err(Into::into)
+}
+
+fn load_calculation_chain_for_workbook(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+) -> Result<Option<CalculationChain>> {
+    Ok(
+        load_calculation_chain_with_conformance_for_workbook(package, workbook_uri)?
+            .map(|(chain, _)| chain),
+    )
+}
+
+fn load_calculation_chain_with_conformance_for_workbook(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+) -> Result<Option<(CalculationChain, CalculationChainConformance)>> {
+    let Some(relationship) = calculation_chain_relationship(package, workbook_uri)? else {
+        validate_calculation_chain_part_set(package, None)?;
+        return Ok(None);
+    };
+    validate_calculation_chain_part_set(package, Some(&relationship.part_name))?;
+    validate_calculation_chain_part(package, &relationship.part_name)?;
+    let part = package.get_part(&relationship.part_name)?;
+    let xml = crate::common::mce::process_part(part)?;
+    Ok(Some((
+        parse_calculation_chain(xml.as_ref())?,
+        relationship.conformance,
+    )))
+}
+
+#[derive(Debug, Clone)]
+struct CalculationChainRelationship {
+    relationship_id: String,
+    part_name: PackURI,
+    target_reference: String,
+    conformance: CalculationChainConformance,
+}
+
+fn calculation_chain_relationship(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+) -> Result<Option<CalculationChainRelationship>> {
     let workbook = package.get_part(workbook_uri)?;
     let mut relationships = workbook.rels().iter().filter(|relationship| {
-        relationship.reltype() == RELATIONSHIP || relationship.reltype() == STRICT_RELATIONSHIP
+        matches!(relationship.reltype(), RELATIONSHIP | STRICT_RELATIONSHIP)
     });
     let Some(relationship) = relationships.next() else {
         return Ok(None);
     };
     if relationships.next().is_some() {
-        return Err("workbook has multiple calculation-chain relationships".into());
+        return Err(invalid(
+            "workbook has multiple calculation-chain relationships",
+        ));
     }
     if relationship.is_external() {
-        return Err("calculation-chain relationship cannot be external".into());
+        return Err(invalid("calculation-chain relationship cannot be external"));
     }
-    let uri = relationship.target_partname()?;
-    let part = package.get_part(&uri)?;
+    let conformance = if relationship.reltype() == RELATIONSHIP {
+        CalculationChainConformance::Transitional
+    } else {
+        CalculationChainConformance::Strict
+    };
+    Ok(Some(CalculationChainRelationship {
+        relationship_id: relationship.r_id().to_string(),
+        part_name: relationship.target_partname()?,
+        target_reference: relationship.target_ref().to_string(),
+        conformance,
+    }))
+}
+
+fn validate_calculation_chain_part(package: &OpcPackage, part_name: &PackURI) -> Result<()> {
+    let part = package.get_part(part_name)?;
     if part.content_type() != CONTENT_TYPE {
-        return Err(format!(
-            "calculation-chain part '{uri}' has invalid content type '{}'",
+        return Err(invalid(format!(
+            "calculation-chain part '{part_name}' has invalid content type '{}'",
             part.content_type()
-        )
-        .into());
+        )));
     }
     if part.rels().iter().next().is_some() {
-        return Err("calculation-chain part cannot have relationships".into());
+        return Err(invalid("calculation-chain part cannot have relationships"));
     }
-    let xml = crate::common::mce::process_part(part)?;
-    Ok(Some(parse_calculation_chain(xml.as_ref())?))
+    Ok(())
+}
+
+fn validate_calculation_chain_part_set(
+    package: &OpcPackage,
+    relationship_target: Option<&PackURI>,
+) -> Result<()> {
+    let part_names = package
+        .iter_parts()
+        .filter(|part| part.content_type() == CONTENT_TYPE)
+        .map(|part| part.partname().clone())
+        .collect::<Vec<_>>();
+    if part_names.len() > 1 {
+        return Err(invalid(
+            "package contains more than one calculation-chain part",
+        ));
+    }
+    match (relationship_target, part_names.as_slice()) {
+        (None, []) => Ok(()),
+        (None, _) => Err(invalid(
+            "package contains a calculation-chain part without a workbook relationship",
+        )),
+        (Some(_), []) => Ok(()),
+        (Some(target), [part_name]) if part_name == target => Ok(()),
+        (Some(_), _) => Err(invalid(
+            "workbook calculation-chain relationship does not target the calculation-chain part",
+        )),
+    }
+}
+
+fn main_workbook_uri(package: &OpcPackage) -> Result<PackURI> {
+    use litchi_opc::constants::content_type as ct;
+
+    let workbook = package.main_document_part()?;
+    if !matches!(
+        workbook.content_type(),
+        ct::SML_SHEET_MAIN
+            | ct::SML_TEMPLATE_MAIN
+            | ct::SML_SHEET_MACRO_MAIN
+            | ct::SML_TEMPLATE_MACRO_MAIN
+    ) {
+        return Err(invalid(format!(
+            "main document part '{}' is not an XML workbook",
+            workbook.partname()
+        )));
+    }
+    Ok(workbook.partname().clone())
+}
+
+fn next_calculation_chain_part_name(package: &OpcPackage) -> Result<PackURI> {
+    for suffix in 0..=65_536u32 {
+        let name = if suffix == 0 {
+            "/xl/calcChain.xml".to_string()
+        } else {
+            format!("/xl/calcChain{suffix}.xml")
+        };
+        let candidate = PackURI::new(&name).map_err(OoxmlError::InvalidUri)?;
+        if package.get_part(&candidate).is_err() {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("no free calculation-chain part name"))
+}
+
+fn next_calculation_chain_relationship_id(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+) -> Result<String> {
+    let relationships = package.get_part(workbook_uri)?.rels();
+    for suffix in 1..=65_537u32 {
+        let candidate = format!("rIdCalcChain{suffix}");
+        if relationships.get(&candidate).is_none() {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("no free calculation-chain relationship ID"))
+}
+
+fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
+    package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|name| name == *target)
+        })
+    }) || package.rels().iter().any(|relationship| {
+        !relationship.is_external()
+            && relationship
+                .target_partname()
+                .is_ok_and(|name| name == *target)
+    })
 }
 
 fn validate_root(
@@ -738,6 +980,243 @@ mod tests {
     }
 
     #[test]
+    fn stores_rewrites_and_removes_inert_calculation_chain_parts() {
+        let mut package = workbook_package();
+        let mut chain = CalculationChain::new();
+        chain
+            .push(
+                CalculationCell::new("B2")
+                    .unwrap()
+                    .set_sheet_id(Some(1))
+                    .set_starts_new_dependency_level(true)
+                    .clone(),
+            )
+            .unwrap();
+
+        store_calculation_chain(
+            &mut package,
+            &chain,
+            CalculationChainConformance::Transitional,
+        )
+        .unwrap();
+        assert_eq!(
+            load_calculation_chain_from_package(&package).unwrap(),
+            Some(chain.clone())
+        );
+
+        let workbook = package.main_document_part().unwrap();
+        let relationship = workbook
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == RELATIONSHIP)
+            .unwrap();
+        let relationship_id = relationship.r_id().to_string();
+        let part_name = relationship.target_partname().unwrap();
+        assert_eq!(part_name, PackURI::new("/xl/calcChain.xml").unwrap());
+        assert!(
+            std::str::from_utf8(package.get_part(&part_name).unwrap().blob())
+                .unwrap()
+                .contains(TRANSITIONAL_NS)
+        );
+
+        let mut replacement = CalculationChain::new();
+        replacement
+            .push(CalculationCell::new("C3").unwrap())
+            .unwrap();
+        store_calculation_chain(
+            &mut package,
+            &replacement,
+            CalculationChainConformance::Strict,
+        )
+        .unwrap();
+        let workbook = package.main_document_part().unwrap();
+        let relationship = workbook
+            .rels()
+            .iter()
+            .find(|relationship| relationship.r_id() == relationship_id)
+            .unwrap();
+        assert_eq!(relationship.reltype(), STRICT_RELATIONSHIP);
+        assert_eq!(relationship.target_partname().unwrap(), part_name);
+        assert!(
+            std::str::from_utf8(package.get_part(&part_name).unwrap().blob())
+                .unwrap()
+                .contains(STRICT_NS)
+        );
+        assert_eq!(
+            load_calculation_chain_from_package(&package).unwrap(),
+            Some(replacement)
+        );
+
+        assert!(remove_calculation_chain(&mut package).unwrap());
+        assert!(package.get_part(&part_name).is_err());
+        assert_eq!(load_calculation_chain_from_package(&package).unwrap(), None);
+        assert!(!remove_calculation_chain(&mut package).unwrap());
+    }
+
+    #[test]
+    fn removal_retains_a_calculation_chain_part_referenced_elsewhere() {
+        let mut package = workbook_package();
+        let mut chain = CalculationChain::new();
+        chain.push(CalculationCell::new("F6").unwrap()).unwrap();
+        store_calculation_chain(
+            &mut package,
+            &chain,
+            CalculationChainConformance::Transitional,
+        )
+        .unwrap();
+
+        let part_name = PackURI::new("/xl/calcChain.xml").unwrap();
+        let mut referring_part = BlobPart::new(
+            PackURI::new("/xl/retained-reference.xml").unwrap(),
+            ct::XML.into(),
+            b"<reference/>".to_vec(),
+        );
+        referring_part.relate_to("calcChain.xml", "urn:litchi:test:calc-chain-reference");
+        package.add_part(Box::new(referring_part));
+
+        assert!(remove_calculation_chain(&mut package).unwrap());
+        assert!(package.get_part(&part_name).is_ok());
+        assert!(load_calculation_chain_from_package(&package).is_err());
+        assert!(
+            store_calculation_chain(
+                &mut package,
+                &chain,
+                CalculationChainConformance::Transitional,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn workbook_calculation_chain_mutators_refresh_cached_metadata() {
+        let mut workbook = crate::xlsx::Workbook::new(workbook_package()).unwrap();
+        let mut chain = CalculationChain::new();
+        chain.push(CalculationCell::new("D4").unwrap()).unwrap();
+
+        workbook
+            .set_calculation_chain(chain.clone(), CalculationChainConformance::Strict)
+            .unwrap();
+        assert_eq!(workbook.calculation_chain(), Some(&chain));
+        assert_eq!(
+            workbook.calculation_chain_conformance(),
+            Some(CalculationChainConformance::Strict)
+        );
+        assert_eq!(
+            load_calculation_chain_from_package(workbook.opc_package()).unwrap(),
+            Some(chain)
+        );
+
+        assert!(workbook.remove_calculation_chain().unwrap());
+        assert_eq!(workbook.calculation_chain(), None);
+        assert!(!workbook.remove_calculation_chain().unwrap());
+    }
+
+    #[test]
+    fn workbook_calculation_chain_round_trips_through_xlsx_save() {
+        let mut workbook = crate::xlsx::Workbook::create().unwrap();
+        let mut chain = CalculationChain::new();
+        chain
+            .push(
+                CalculationCell::new("A1")
+                    .unwrap()
+                    .set_sheet_id(Some(1))
+                    .clone(),
+            )
+            .unwrap();
+        workbook
+            .set_calculation_chain(chain.clone(), CalculationChainConformance::Transitional)
+            .unwrap();
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("calculation-chain.xlsx");
+        workbook.save(&path).unwrap();
+        let reopened = crate::xlsx::Workbook::open(&path).unwrap();
+        assert_eq!(reopened.calculation_chain(), Some(&chain));
+        assert_eq!(
+            reopened.calculation_chain_conformance(),
+            Some(CalculationChainConformance::Transitional)
+        );
+        assert_eq!(
+            reopened
+                .opc_package()
+                .iter_parts()
+                .filter(|part| part.content_type() == CONTENT_TYPE)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn package_calculation_chain_mutators_reject_invalid_existing_graphs() {
+        let mut package = synthetic_package(RELATIONSHIP, false, ct::XML, false);
+        let chain_part = PackURI::new("/xl/calcChain.xml").unwrap();
+        let original = package.get_part(&chain_part).unwrap().blob().to_vec();
+        let mut chain = CalculationChain::new();
+        chain.push(CalculationCell::new("E5").unwrap()).unwrap();
+
+        assert!(
+            store_calculation_chain(
+                &mut package,
+                &chain,
+                CalculationChainConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert_eq!(package.get_part(&chain_part).unwrap().blob(), original);
+        assert!(remove_calculation_chain(&mut package).is_err());
+        assert!(package.get_part(&chain_part).is_ok());
+
+        let mut duplicate = synthetic_package(RELATIONSHIP, false, CONTENT_TYPE, false);
+        duplicate
+            .get_part_mut(&PackURI::new("/xl/workbook.xml").unwrap())
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                RELATIONSHIP.into(),
+                "calcChain.xml".into(),
+                "rIdDuplicateCalcChain".into(),
+                false,
+            );
+        assert!(
+            store_calculation_chain(
+                &mut duplicate,
+                &chain,
+                CalculationChainConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert!(remove_calculation_chain(&mut duplicate).is_err());
+
+        let mut duplicate_part = synthetic_package(RELATIONSHIP, false, CONTENT_TYPE, false);
+        duplicate_part.add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/calcChainExtra.xml").unwrap(),
+            CONTENT_TYPE.into(),
+            format!(r#"<calcChain xmlns="{TRANSITIONAL_NS}"><c r="F6"/></calcChain>"#).into_bytes(),
+        )));
+        assert!(load_calculation_chain_from_package(&duplicate_part).is_err());
+        assert!(
+            store_calculation_chain(
+                &mut duplicate_part,
+                &chain,
+                CalculationChainConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert!(remove_calculation_chain(&mut duplicate_part).is_err());
+
+        let mut external = synthetic_package(RELATIONSHIP, true, CONTENT_TYPE, false);
+        assert!(
+            store_calculation_chain(
+                &mut external,
+                &chain,
+                CalculationChainConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert!(remove_calculation_chain(&mut external).is_err());
+    }
+
+    #[test]
     fn loads_real_poi_and_synthetic_packages_and_validates_relationships() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..//3rdparty/poi/test-data/spreadsheet/62834.xlsx");
@@ -767,6 +1246,19 @@ mod tests {
             crate::xlsx::Workbook::new(synthetic_package(RELATIONSHIP, false, CONTENT_TYPE, true))
                 .is_err()
         );
+    }
+
+    fn workbook_package() -> OpcPackage {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
+        let workbook = BlobPart::new(
+            workbook_uri,
+            ct::SML_SHEET_MAIN.into(),
+            format!(r#"<workbook xmlns="{TRANSITIONAL_NS}"><sheets/></workbook>"#).into_bytes(),
+        );
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+        package.add_part(Box::new(workbook));
+        package
     }
 
     fn synthetic_package(

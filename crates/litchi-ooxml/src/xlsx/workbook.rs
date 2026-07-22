@@ -5,7 +5,10 @@
 
 use crate::common::DocumentProperties;
 use crate::pivot::PivotTable;
-use crate::xlsx::calculation_chain::{CalculationChain, load_calculation_chain};
+use crate::xlsx::calculation_chain::{
+    CalculationChain, CalculationChainConformance, load_calculation_chain,
+    remove_calculation_chain, store_calculation_chain,
+};
 use crate::xlsx::calculation_properties::{
     WorkbookCalculationProperties, parse_workbook_calculation_properties,
 };
@@ -67,6 +70,8 @@ pub struct Workbook {
     calculation_properties: Option<WorkbookCalculationProperties>,
     /// Inert workbook calculation order from `calcChain.xml`.
     calculation_chain: Option<CalculationChain>,
+    /// Namespace family of the cached calculation chain, retained on writer materialization.
+    calculation_chain_conformance: Option<CalculationChainConformance>,
     external_links: Vec<ExternalLinkEntry>,
     defined_names: Vec<NamedRange>,
     worksheet_protection_mutations: HashMap<usize, WorksheetProtectionMetadata>,
@@ -385,6 +390,7 @@ impl Workbook {
             is_1904_date_system: false,
             calculation_properties: None,
             calculation_chain: None,
+            calculation_chain_conformance: None,
             external_links: Vec::new(),
             defined_names: Vec::new(),
             worksheet_protection_mutations: HashMap::new(),
@@ -392,8 +398,12 @@ impl Workbook {
         };
 
         workbook.load_workbook_info()?;
-        workbook.calculation_chain =
-            load_calculation_chain(&workbook.package, &workbook.workbook_uri)?;
+        if let Some((chain, conformance)) =
+            load_calculation_chain(&workbook.package, &workbook.workbook_uri)?
+        {
+            workbook.calculation_chain = Some(chain);
+            workbook.calculation_chain_conformance = Some(conformance);
+        }
         workbook.load_external_links()?;
         workbook.load_shared_strings()?;
         workbook.load_styles()?;
@@ -474,6 +484,34 @@ impl Workbook {
     /// Return the optional inert calculation-chain metadata.
     pub fn calculation_chain(&self) -> Option<&CalculationChain> {
         self.calculation_chain.as_ref()
+    }
+
+    /// Return the XML and relationship namespace family of the calculation chain.
+    pub fn calculation_chain_conformance(&self) -> Option<CalculationChainConformance> {
+        self.calculation_chain_conformance
+    }
+
+    /// Replace the workbook's inert calculation-chain metadata.
+    ///
+    /// This serializes the caller-authored order only. It neither evaluates
+    /// formulas nor rebuilds dependencies from worksheet formulas.
+    pub fn set_calculation_chain(
+        &mut self,
+        chain: CalculationChain,
+        conformance: CalculationChainConformance,
+    ) -> SheetResult<()> {
+        store_calculation_chain(&mut self.package, &chain, conformance)?;
+        self.calculation_chain = Some(chain);
+        self.calculation_chain_conformance = Some(conformance);
+        Ok(())
+    }
+
+    /// Remove the optional calculation chain without changing worksheet formulas.
+    pub fn remove_calculation_chain(&mut self) -> SheetResult<bool> {
+        let removed = remove_calculation_chain(&mut self.package)?;
+        self.calculation_chain = None;
+        self.calculation_chain_conformance = None;
+        Ok(removed)
     }
 
     /// Return passive `workbookProtection` metadata from the current `workbook.xml` part.
@@ -1520,7 +1558,14 @@ impl Workbook {
         if should_update {
             // Take mutable_data temporarily to avoid borrow issues
             if let Some(mut mutable_data) = self.mutable_data.take() {
+                // The mutable writer rebuilds workbook relationships. Detach the
+                // optional cache first so an unreferenced old part is not left
+                // behind, then restore it after materialization.
+                if self.calculation_chain.is_some() {
+                    remove_calculation_chain(&mut self.package)?;
+                }
                 self.update_workbook_parts(&mut mutable_data)?;
+                self.restore_calculation_chain_after_materialization()?;
                 self.mutable_data = Some(mutable_data);
             }
         }
@@ -1585,6 +1630,20 @@ impl Workbook {
             staged.push((uri, original, replacement));
         }
         Ok(staged)
+    }
+
+    /// The writer rebuilds the workbook relationships; restore the optional
+    /// inert cache afterwards without recalculating formulas.
+    fn restore_calculation_chain_after_materialization(&mut self) -> SheetResult<()> {
+        let Some(chain) = self.calculation_chain.as_ref() else {
+            return Ok(());
+        };
+        store_calculation_chain(
+            &mut self.package,
+            chain,
+            self.calculation_chain_conformance.unwrap_or_default(),
+        )?;
+        Ok(())
     }
 
     /// Generate metadata.xml for threaded comments support.

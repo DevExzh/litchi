@@ -106,7 +106,8 @@ pub use auto_filter::{
 };
 pub use calculation_chain::{
     CalculationCell, CalculationChain, CalculationChainConformance,
-    CalculationChainExtensionAttribute, parse_calculation_chain,
+    CalculationChainExtensionAttribute, load_calculation_chain_from_package,
+    parse_calculation_chain, remove_calculation_chain, store_calculation_chain,
 };
 pub use calculation_properties::{
     WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
