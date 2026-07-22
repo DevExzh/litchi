@@ -168,8 +168,9 @@ pub use external_reference::{
 pub use field::{
     BodyStoryEvent, DdeField, DdeFieldKind, DdeRepresentation, EquationField, ExternalIncludeField,
     Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus, FieldSwitch, FieldType,
-    HyperlinkCode, IncludeFieldKind, MacroButtonField, PageBreak, ParsedFieldCode, ReferenceCode,
-    SectionBreak, StoryEvent, StoryField, parse_field_code,
+    HyperlinkCode, IncludeFieldKind, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
+    PageBreak, ParsedFieldCode, ReferenceCode, SectionBreak, StoryEvent, StoryField,
+    parse_field_code,
 };
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};

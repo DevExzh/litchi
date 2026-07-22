@@ -21,6 +21,7 @@ pub enum FieldType {
     MacroButton,
     Dde,
     DdeAuto,
+    Link,
     IncludeText,
     IncludePicture,
     Index,
@@ -285,6 +286,70 @@ pub struct DdeField<'a> {
     position: usize,
 }
 
+/// One stored result or storage switch for a `LINK` field.
+///
+/// These values describe the requested linked-object representation or whether
+/// its graphic data is stored. They never cause the source to be contacted,
+/// converted, embedded, or displayed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkResultOption {
+    /// The `\\b` switch requests a bitmap representation.
+    Bitmap,
+    /// The `\\d` switch omits graphic data from the document.
+    OmitGraphicData,
+    /// The `\\h` switch requests HTML-formatted text.
+    Html,
+    /// The `\\p` switch requests a picture representation.
+    Picture,
+    /// The `\\r` switch requests rich-text format.
+    RichText,
+    /// The `\\t` switch requests text-only format.
+    Text,
+    /// The `\\u` switch requests Unicode text.
+    UnicodeText,
+}
+
+/// One integral `LINK` `\\f` formatting mode.
+///
+/// Values marked unsupported by ECMA-376, and values outside its defined set,
+/// are preserved as `Unsupported` metadata. This crate does not format linked
+/// content or evaluate the mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkFormatting {
+    /// `0`: preserve formatting from the source file.
+    Source,
+    /// `2`: match formatting in the destination document.
+    Destination,
+    /// `4`: preserve source formatting for a SpreadsheetML workbook source.
+    SpreadsheetSource,
+    /// `5`: match destination formatting for a SpreadsheetML workbook source.
+    SpreadsheetDestination,
+    /// An ECMA-376-unsupported or otherwise unrecognized integral mode.
+    Unsupported(i64),
+}
+
+/// Inert metadata for a legacy RTF `LINK` field.
+///
+/// The application type, source, and item are exposed solely as stored field
+/// metadata. This crate never activates an OLE server, launches an application,
+/// opens a source, requests data, refreshes the field, converts content, or
+/// executes code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkField<'a> {
+    instruction: &'a str,
+    application_type: Cow<'a, str>,
+    source: Cow<'a, str>,
+    item: Option<Cow<'a, str>>,
+    automatic_updates: bool,
+    result_options: Vec<LinkResultOption>,
+    formatting_modes: Vec<LinkFormatting>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 /// The kind of external content referenced by an RTF include field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IncludeFieldKind {
@@ -333,6 +398,16 @@ struct DdeFieldParts<'a> {
     automatic_updates: bool,
     representation: Option<DdeRepresentation>,
     omit_graphic_data: bool,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct LinkFieldParts<'a> {
+    application_type: Cow<'a, str>,
+    source: Cow<'a, str>,
+    item: Option<Cow<'a, str>>,
+    automatic_updates: bool,
+    result_options: Vec<LinkResultOption>,
+    formatting_modes: Vec<LinkFormatting>,
     unknown_switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -514,6 +589,97 @@ impl<'a> DdeField<'a> {
     }
 }
 
+impl<'a> LinkField<'a> {
+    /// Return the complete stored `LINK` field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored linked-object application type.
+    ///
+    /// Word commonly stores an OLE Programmatic Identifier here. This method
+    /// returns it as metadata only and never looks up or activates the class.
+    pub fn application_type(&self) -> &str {
+        &self.application_type
+    }
+
+    /// Return the stored linked source identifier without opening or resolving it.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Return the optional stored source item, such as a cell range or bookmark.
+    pub fn item(&self) -> Option<&str> {
+        self.item.as_deref()
+    }
+
+    /// Whether the stored instruction requests automatic updates.
+    ///
+    /// This is metadata only. The crate never performs an update.
+    pub const fn requests_automatic_updates(&self) -> bool {
+        self.automatic_updates
+    }
+
+    /// Return recognized result and storage switches in stored source order.
+    ///
+    /// These values never trigger source access, conversion, or display. When
+    /// several are present, [`Self::effective_result_option`] reflects Word's
+    /// documented last-switch behavior.
+    pub fn result_options(&self) -> &[LinkResultOption] {
+        &self.result_options
+    }
+
+    /// Return the effective result or storage option under Word's documented
+    /// last-switch behavior, if one was stored.
+    ///
+    /// This reports metadata only and never contacts the linked source.
+    pub fn effective_result_option(&self) -> Option<LinkResultOption> {
+        self.result_options.last().copied()
+    }
+
+    /// Return integral `\\f` formatting modes in stored source order.
+    ///
+    /// This crate never updates or formats linked content.
+    pub fn formatting_modes(&self) -> &[LinkFormatting] {
+        &self.formatting_modes
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> ExternalIncludeField<'a> {
     /// Return the complete stored include-field instruction.
     pub fn instruction(&self) -> &'a str {
@@ -653,6 +819,9 @@ impl<'a> Field<'a> {
             {
                 FieldType::DdeAuto
             },
+            ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("LINK") => {
+                FieldType::Link
+            },
             ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("INCLUDETEXT") =>
             {
@@ -763,6 +932,32 @@ impl<'a> Field<'a> {
             automatic_updates: parts.automatic_updates,
             representation: parts.representation,
             omit_graphic_data: parts.omit_graphic_data,
+            unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed `LINK` field.
+    ///
+    /// The application type, source, and item are never activated, opened,
+    /// contacted, refreshed, converted, evaluated, or executed. Malformed
+    /// link instructions remain generic fields and return `None` here.
+    pub fn link_field(&self) -> Option<LinkField<'_>> {
+        if self.field_type != FieldType::Link {
+            return None;
+        }
+        let parts = link_field_parts(self.instruction.as_ref())?;
+        Some(LinkField {
+            instruction: self.instruction.as_ref(),
+            application_type: parts.application_type,
+            source: parts.source,
+            item: parts.item,
+            automatic_updates: parts.automatic_updates,
+            result_options: parts.result_options,
+            formatting_modes: parts.formatting_modes,
             unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
@@ -1076,6 +1271,109 @@ fn dde_field_parts(instruction: &str) -> Option<DdeFieldParts<'_>> {
         automatic_updates,
         representation,
         omit_graphic_data,
+        unknown_switches,
+    })
+}
+
+fn link_field_parts(instruction: &str) -> Option<LinkFieldParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("LINK") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let application_type = tokens.first()?.value.clone();
+    if application_type.is_empty() || switch_name(tokens.first()?).is_some() {
+        return None;
+    }
+    tokens.remove(0);
+
+    let source = tokens.first()?.value.clone();
+    if source.is_empty() || switch_name(tokens.first()?).is_some() {
+        return None;
+    }
+    tokens.remove(0);
+
+    let item = if tokens
+        .first()
+        .is_some_and(|token| switch_name(token).is_none())
+    {
+        Some(tokens.remove(0).value)
+    } else {
+        None
+    };
+
+    let mut automatic_updates = false;
+    let mut result_options = Vec::new();
+    let mut formatting_modes = Vec::new();
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let normalized_name = name.to_ascii_lowercase();
+        match normalized_name.as_str() {
+            "a" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                automatic_updates = true;
+                index += 1;
+            },
+            "f" => {
+                let value = switch_value(&tokens, index, name).ok()?;
+                let value = value.parse::<i64>().ok()?;
+                formatting_modes.push(match value {
+                    0 => LinkFormatting::Source,
+                    2 => LinkFormatting::Destination,
+                    4 => LinkFormatting::SpreadsheetSource,
+                    5 => LinkFormatting::SpreadsheetDestination,
+                    other => LinkFormatting::Unsupported(other),
+                });
+                index += 2;
+            },
+            "b" | "d" | "h" | "p" | "r" | "t" | "u" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                result_options.push(match normalized_name.as_str() {
+                    "b" => LinkResultOption::Bitmap,
+                    "d" => LinkResultOption::OmitGraphicData,
+                    "h" => LinkResultOption::Html,
+                    "p" => LinkResultOption::Picture,
+                    "r" => LinkResultOption::RichText,
+                    "t" => LinkResultOption::Text,
+                    "u" => LinkResultOption::UnicodeText,
+                    _ => unreachable!("LINK result option switch was matched above"),
+                });
+                index += 1;
+            },
+            _ => {
+                let value = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none());
+                unknown_switches.push(FieldSwitch {
+                    name: Cow::Owned(name.to_string()),
+                    value: value.map(|token| token.value.clone()),
+                });
+                index += 1 + usize::from(value.is_some());
+            },
+        }
+    }
+
+    Some(LinkFieldParts {
+        application_type,
+        source,
+        item,
+        automatic_updates,
+        result_options,
+        formatting_modes,
         unknown_switches,
     })
 }
@@ -1728,6 +2026,114 @@ mod tests {
     }
 
     #[test]
+    fn link_fields_expose_stored_metadata_without_activating_sources() {
+        let mut field = Field::parse_instruction(
+            r#"LINK Excel.Sheet.8 "C:\\no-contact\\source.xlsx" "Sheet1!R1C1:R4C4" \a \f 4 \p \d \* MERGEFORMAT"#,
+        );
+        field.result = Cow::Borrowed("cached LINK result");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::Link);
+        let link = field.link_field().unwrap();
+        assert_eq!(
+            link.instruction(),
+            r#"LINK Excel.Sheet.8 "C:\\no-contact\\source.xlsx" "Sheet1!R1C1:R4C4" \a \f 4 \p \d \* MERGEFORMAT"#
+        );
+        assert_eq!(link.application_type(), "Excel.Sheet.8");
+        assert_eq!(link.source(), r"C:\no-contact\source.xlsx");
+        assert_eq!(link.item(), Some("Sheet1!R1C1:R4C4"));
+        assert!(link.requests_automatic_updates());
+        assert_eq!(
+            link.result_options(),
+            &[LinkResultOption::Picture, LinkResultOption::OmitGraphicData]
+        );
+        assert_eq!(
+            link.effective_result_option(),
+            Some(LinkResultOption::OmitGraphicData)
+        );
+        assert_eq!(
+            link.formatting_modes(),
+            &[LinkFormatting::SpreadsheetSource]
+        );
+        assert_eq!(link.cached_result(), Some("cached LINK result"));
+        assert!(link.is_dirty());
+        assert!(link.is_locked());
+        assert_eq!(link.owner(), FieldOwner::Body);
+        assert_eq!(link.position(), 4);
+        assert_eq!(link.unknown_switches().len(), 1);
+        assert_eq!(link.unknown_switches()[0].name, "*");
+        assert_eq!(
+            link.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+
+        let destination =
+            Field::parse_instruction(r#"LINK Word.Document.8 "missing.docx" Bookmark \f 2 \t"#);
+        let destination = destination.link_field().unwrap();
+        assert!(!destination.requests_automatic_updates());
+        assert_eq!(
+            destination.formatting_modes(),
+            &[LinkFormatting::Destination]
+        );
+        assert_eq!(
+            destination.effective_result_option(),
+            Some(LinkResultOption::Text)
+        );
+
+        let unsupported = Field::parse_instruction(r"LINK Package source \f 1");
+        assert_eq!(
+            unsupported.link_field().unwrap().formatting_modes(),
+            &[LinkFormatting::Unsupported(1)]
+        );
+
+        let multiple_formatting = Field::parse_instruction(r"LINK Excel.Sheet.8 source \f 0 \f 2");
+        assert_eq!(
+            multiple_formatting.link_field().unwrap().formatting_modes(),
+            &[LinkFormatting::Source, LinkFormatting::Destination]
+        );
+
+        let repeated_updates = Field::parse_instruction(r"LINK Excel.Sheet.8 source \a \a");
+        assert!(
+            repeated_updates
+                .link_field()
+                .unwrap()
+                .requests_automatic_updates()
+        );
+
+        assert!(Field::parse_instruction("LINK").link_field().is_none());
+        assert!(
+            Field::parse_instruction(r"LINK Excel.Sheet.8 \p")
+                .link_field()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"LINK Excel.Sheet.8 source \f")
+                .link_field()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"LINK Excel.Sheet.8 source \f invalid")
+                .link_field()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"LINK Excel.Sheet.8 source \p unexpected")
+                .link_field()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction("LINKAGE Excel.Sheet.8 source").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
     fn external_include_fields_expose_stored_metadata_without_resolution() {
         let mut include_text = Field::parse_instruction(
             r#"INCLUDETEXT "missing source.docx" Summary \! \c Word8 \* MERGEFORMAT"#,
@@ -1835,6 +2241,41 @@ mod tests {
             Some(DdeRepresentation::Text)
         );
         assert_eq!(links[1].cached_result(), Some("cached auto"));
+        assert_eq!(document.text(), "Before Middle After");
+    }
+
+    #[test]
+    fn document_discovers_link_fields_without_activating_ole_servers() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst LINK Excel.Sheet.8 "missing.xlsx" "Sheet1!A1" \\a \\f 4 \\p}{\fldrslt cached LINK}}Middle {\field{\*\fldinst LINK Word.Document.8 "missing.docx" Bookmark \\t}{\fldrslt cached text}}After}"#,
+        )
+        .unwrap();
+
+        let links = document.link_fields();
+        assert_eq!(document.link_field_count(), 2);
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].application_type(), "Excel.Sheet.8");
+        assert_eq!(links[0].source(), "missing.xlsx");
+        assert_eq!(links[0].item(), Some("Sheet1!A1"));
+        assert!(links[0].requests_automatic_updates());
+        assert_eq!(
+            links[0].formatting_modes(),
+            &[LinkFormatting::SpreadsheetSource]
+        );
+        assert_eq!(
+            links[0].effective_result_option(),
+            Some(LinkResultOption::Picture)
+        );
+        assert_eq!(links[0].cached_result(), Some("cached LINK"));
+        assert!(links[0].is_dirty());
+        assert!(links[0].is_locked());
+        assert_eq!(links[1].application_type(), "Word.Document.8");
+        assert_eq!(links[1].item(), Some("Bookmark"));
+        assert_eq!(
+            links[1].effective_result_option(),
+            Some(LinkResultOption::Text)
+        );
+        assert_eq!(links[1].cached_result(), Some("cached text"));
         assert_eq!(document.text(), "Before Middle After");
     }
 

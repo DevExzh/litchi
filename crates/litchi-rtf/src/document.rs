@@ -960,6 +960,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `LINK` fields in document field order.
+    ///
+    /// Application type, source, item, result, and formatting metadata are
+    /// exposed solely as stored text. This method never activates an OLE
+    /// server, launches an application, opens a source, requests data,
+    /// refreshes, evaluates, converts, or executes anything.
+    pub fn link_fields(&self) -> Vec<crate::LinkField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::link_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `LINK` fields.
+    pub fn link_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.link_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert external include fields in document field order.
     ///
     /// Sources and converter names are exposed as stored metadata only. This
