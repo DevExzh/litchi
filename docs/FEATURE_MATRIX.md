@@ -177,7 +177,7 @@ conversion, fonts, and image conversion are optional.
 | Workbook protection | 🟡 | ✅ | ✅ | Passive reader preserves structure/window/revision locks and legacy/strong verifier metadata; writer remains structure/window focused, with no password checking or policy enforcement |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
-| VBA projects/XLSM macros | ❌ | ❌ | ❌ | No typed VBA project or code-module support |
+| VBA projects/XLSM macros | 🟡 | 🟡 | ❌ | The MS-OFFMACRO2 Workbook → VBA Project relationship graph is validated as inert metadata; payload contents are never inspected, parsed, or executed by this API, and no macro authoring exists |
 
 ## PowerPoint presentations (PPTX)
 

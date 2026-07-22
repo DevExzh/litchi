@@ -26,6 +26,7 @@ use crate::xlsx::volatile_dependencies::{
     remove_from_package as remove_volatile_dependencies,
     store_in_package as store_volatile_dependencies,
 };
+use crate::xlsx::vba_project::{VbaProject, discover_vba_project};
 use crate::xlsx::external_links::{
     ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
     build_external_link_part_with_conformance, load_external_link,
@@ -258,6 +259,16 @@ impl Workbook {
     /// Discover inert embedded-object and embedded-package relationships.
     pub fn embedded_parts(&self) -> crate::error::Result<Vec<crate::EmbeddedPart<'_>>> {
         crate::embedded_object::discover_embedded_parts(&self.package)
+    }
+
+    /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payload.
+    ///
+    /// This validates only the declared OPC relationship graph and content
+    /// type. It does not inspect, parse, decompress, or execute the binary
+    /// VBA project bytes.
+    pub fn vba_project(&self) -> crate::error::Result<Option<VbaProject>> {
+        let workbook = self.package.get_part(&self.workbook_uri)?;
+        discover_vba_project(&self.package, workbook)
     }
 
     /// Create a new empty workbook.

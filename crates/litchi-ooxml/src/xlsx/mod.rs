@@ -74,6 +74,7 @@ pub mod template;
 pub mod threaded_comments;
 pub mod views;
 pub mod volatile_dependencies;
+pub mod vba_project;
 pub mod workbook;
 pub mod workbook_metadata;
 pub mod workbook_protection;
@@ -276,6 +277,7 @@ pub use views::{
 };
 pub use workbook::Workbook;
 pub use workbook_protection::{WorkbookProtectionMetadata, parse_workbook_protection};
+pub use vba_project::VbaProject;
 pub use worksheet::{
     AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule, Hyperlink,
     PageBreak, PageSetup, RowInfo, Worksheet, WorksheetInfo,
