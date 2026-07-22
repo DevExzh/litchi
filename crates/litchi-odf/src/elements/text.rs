@@ -92,6 +92,27 @@ impl Paragraph {
         self.element.add_child(span.element);
     }
 
+    /// Append a validated `text:a` hyperlink to this paragraph.
+    ///
+    /// Hyperlinks are inline content, so this method can be combined with
+    /// spans and other supported paragraph children to form rich text.
+    pub fn add_hyperlink(&mut self, hyperlink: Hyperlink) -> Result<()> {
+        hyperlink.validate()?;
+        self.element.add_child(hyperlink.element);
+        Ok(())
+    }
+
+    /// Return direct `text:a` hyperlink children in document order.
+    pub fn hyperlinks(&self) -> Result<Vec<Hyperlink>> {
+        self.element
+            .children
+            .iter()
+            .filter(|child| child.tag_name() == "text:a")
+            .cloned()
+            .map(Hyperlink::from_element)
+            .collect()
+    }
+
     /// Check if this paragraph is a heading
     pub fn is_heading(&self) -> bool {
         false // Paragraphs are not headings
@@ -208,6 +229,54 @@ pub struct Hyperlink {
     element: Element,
 }
 
+/// Allowed `xlink:show` values for an ODF `text:a` hyperlink.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextHyperlinkShow {
+    /// Open the target in a new frame or window.
+    New,
+    /// Replace the current frame or window.
+    Replace,
+}
+
+impl TextHyperlinkShow {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::New => "new",
+            Self::Replace => "replace",
+        }
+    }
+
+    fn from_str(value: &str) -> Option<Self> {
+        match value {
+            "new" => Some(Self::New),
+            "replace" => Some(Self::Replace),
+            _ => None,
+        }
+    }
+}
+
+/// Allowed explicit `xlink:actuate` value for an ODF `text:a` hyperlink.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextHyperlinkActuate {
+    /// Activate the target only on an explicit user request.
+    OnRequest,
+}
+
+impl TextHyperlinkActuate {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::OnRequest => "onRequest",
+        }
+    }
+
+    fn from_str(value: &str) -> Option<Self> {
+        match value {
+            "onRequest" => Some(Self::OnRequest),
+            _ => None,
+        }
+    }
+}
+
 impl Default for Hyperlink {
     fn default() -> Self {
         Self::new()
@@ -215,14 +284,30 @@ impl Default for Hyperlink {
 }
 
 impl Hyperlink {
-    /// Create a new hyperlink
+    /// Create a new `text:a` hyperlink with its XLink type set to `simple`.
+    ///
+    /// Set a target with [`Self::set_href`] before inserting the hyperlink,
+    /// or use [`Self::with_href`] to create a fully valid link in one step.
     pub fn new() -> Self {
-        Self {
-            element: Element::new("text:a"),
-        }
+        let mut element = Element::new("text:a");
+        element.set_attribute("xlink:type", "simple");
+        Self { element }
     }
 
-    /// Create hyperlink from element
+    /// Create a validated simple hyperlink with visible text.
+    pub fn with_href(href: impl AsRef<str>, text: impl AsRef<str>) -> Result<Self> {
+        let href = href.as_ref();
+        validate_href(href)?;
+        let mut hyperlink = Self::new();
+        hyperlink.set_href(href);
+        hyperlink.set_text(text.as_ref());
+        Ok(hyperlink)
+    }
+
+    /// Create a hyperlink wrapper from an existing `text:a` element.
+    ///
+    /// This preserves parsed attributes without validating them. Call
+    /// [`Self::validate`] before reusing the element for authoring.
     pub fn from_element(element: Element) -> Result<Self> {
         if element.tag_name() != "text:a" {
             return Err(Error::InvalidFormat(
@@ -242,6 +327,37 @@ impl Hyperlink {
         self.element.set_attribute("xlink:href", href);
     }
 
+    /// Get the optional hyperlink name (`office:name`).
+    pub fn name(&self) -> Option<&str> {
+        self.element.get_attribute("office:name")
+    }
+
+    /// Set the optional hyperlink name (`office:name`).
+    pub fn set_name(&mut self, name: &str) {
+        self.element.set_attribute("office:name", name);
+    }
+
+    /// Get the optional hyperlink title (`office:title`).
+    pub fn title(&self) -> Option<&str> {
+        self.element.get_attribute("office:title")
+    }
+
+    /// Set the optional hyperlink title (`office:title`).
+    pub fn set_title(&mut self, title: &str) {
+        self.element.set_attribute("office:title", title);
+    }
+
+    /// Get the optional target frame (`office:target-frame-name`).
+    pub fn target_frame_name(&self) -> Option<&str> {
+        self.element.get_attribute("office:target-frame-name")
+    }
+
+    /// Set the optional target frame (`office:target-frame-name`).
+    pub fn set_target_frame_name(&mut self, target_frame_name: &str) {
+        self.element
+            .set_attribute("office:target-frame-name", target_frame_name);
+    }
+
     /// Get the link text content
     pub fn text(&self) -> Result<String> {
         Ok(self.element.get_text_recursive())
@@ -257,10 +373,147 @@ impl Hyperlink {
         self.element.get_attribute("xlink:type")
     }
 
+    /// Get the optional XLink display behavior (`xlink:show`).
+    ///
+    /// Returns `None` when the attribute is absent or malformed; use
+    /// [`Self::validate`] to distinguish those cases.
+    pub fn show(&self) -> Option<TextHyperlinkShow> {
+        self.element
+            .get_attribute("xlink:show")
+            .and_then(TextHyperlinkShow::from_str)
+    }
+
+    /// Set or omit the XLink display behavior (`xlink:show`).
+    pub fn set_show(&mut self, show: Option<TextHyperlinkShow>) {
+        match show {
+            Some(show) => self.element.set_attribute("xlink:show", show.as_str()),
+            None => self.element.remove_attribute("xlink:show"),
+        }
+    }
+
+    /// Get the optional explicit XLink activation behavior (`xlink:actuate`).
+    ///
+    /// Returns `None` when the attribute is absent or malformed; use
+    /// [`Self::validate`] to distinguish those cases.
+    pub fn actuate(&self) -> Option<TextHyperlinkActuate> {
+        self.element
+            .get_attribute("xlink:actuate")
+            .and_then(TextHyperlinkActuate::from_str)
+    }
+
+    /// Set or omit the explicit XLink activation behavior (`xlink:actuate`).
+    pub fn set_actuate(&mut self, actuate: Option<TextHyperlinkActuate>) {
+        match actuate {
+            Some(actuate) => self
+                .element
+                .set_attribute("xlink:actuate", actuate.as_str()),
+            None => self.element.remove_attribute("xlink:actuate"),
+        }
+    }
+
+    /// Get the unvisited link style name (`text:style-name`).
+    pub fn style_name(&self) -> Option<&str> {
+        self.element.get_attribute("text:style-name")
+    }
+
+    /// Set the unvisited link style name (`text:style-name`).
+    pub fn set_style_name(&mut self, style_name: &str) {
+        self.element.set_attribute("text:style-name", style_name);
+    }
+
     /// Get the visited style name
     pub fn visited_style_name(&self) -> Option<&str> {
         self.element.get_attribute("text:visited-style-name")
     }
+
+    /// Set the visited link style name (`text:visited-style-name`).
+    pub fn set_visited_style_name(&mut self, style_name: &str) {
+        self.element
+            .set_attribute("text:visited-style-name", style_name);
+    }
+
+    /// Validate attributes required for safe authoring of an ODF `text:a`.
+    pub fn validate(&self) -> Result<()> {
+        let href = self.href().ok_or_else(|| {
+            Error::InvalidFormat("text:a hyperlink requires xlink:href".to_string())
+        })?;
+        validate_href(href)?;
+        match self.link_type() {
+            Some("simple") => {},
+            None => {
+                return Err(Error::InvalidFormat(
+                    "text:a hyperlink requires xlink:type='simple'".to_string(),
+                ));
+            },
+            Some(value) => {
+                return Err(Error::InvalidFormat(format!(
+                    "text:a hyperlink xlink:type must be 'simple', got '{value}'"
+                )));
+            },
+        }
+        if self
+            .element
+            .get_attribute("xlink:show")
+            .is_some_and(|value| TextHyperlinkShow::from_str(value).is_none())
+        {
+            return Err(Error::InvalidFormat(
+                "text:a hyperlink xlink:show must be 'new' or 'replace'".to_string(),
+            ));
+        }
+        if self
+            .element
+            .get_attribute("xlink:actuate")
+            .is_some_and(|value| TextHyperlinkActuate::from_str(value).is_none())
+        {
+            return Err(Error::InvalidFormat(
+                "text:a hyperlink xlink:actuate must be 'onRequest'".to_string(),
+            ));
+        }
+        for (attribute, label) in [
+            ("office:name", "text:a hyperlink name"),
+            ("office:title", "text:a hyperlink title"),
+            (
+                "office:target-frame-name",
+                "text:a hyperlink target frame name",
+            ),
+            ("text:style-name", "text:a hyperlink style name"),
+            (
+                "text:visited-style-name",
+                "text:a hyperlink visited style name",
+            ),
+        ] {
+            if let Some(value) = self.element.get_attribute(attribute) {
+                validate_xml_string(value, label)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_href(href: &str) -> Result<()> {
+    if href.is_empty() {
+        return Err(Error::InvalidFormat(
+            "text:a hyperlink href must not be empty".to_string(),
+        ));
+    }
+    if href.chars().any(|character| character.is_control()) {
+        return Err(Error::InvalidFormat(
+            "text:a hyperlink href must not contain control characters".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_xml_string(value: &str, label: &str) -> Result<()> {
+    if value
+        .chars()
+        .any(|character| matches!(character, '\0'..='\x08' | '\x0B'..='\x0C' | '\x0E'..='\x1F'))
+    {
+        return Err(Error::InvalidFormat(format!(
+            "{label} must not contain XML control characters"
+        )));
+    }
+    Ok(())
 }
 
 impl From<Hyperlink> for Element {
@@ -1079,6 +1332,7 @@ mod tests {
     fn test_hyperlink_new() {
         let link = Hyperlink::new();
         assert_eq!(link.text().unwrap(), "");
+        assert_eq!(link.link_type(), Some("simple"));
     }
 
     #[test]
@@ -1095,6 +1349,77 @@ mod tests {
         let mut link = Hyperlink::new();
         link.set_text("Click here");
         assert_eq!(link.text().unwrap(), "Click here");
+    }
+
+    #[test]
+    fn hyperlink_metadata_and_paragraph_insertion_round_trip() {
+        let mut link =
+            Hyperlink::with_href("https://example.test/a?x=1&y=2", "Click here").unwrap();
+        link.set_name("example-link");
+        link.set_title("Example & more");
+        link.set_target_frame_name("_blank");
+        link.set_show(Some(TextHyperlinkShow::New));
+        link.set_actuate(Some(TextHyperlinkActuate::OnRequest));
+        link.set_style_name("Internet_20_link");
+        link.set_visited_style_name("Visited_20_Internet_20_link");
+        link.validate().unwrap();
+
+        let mut paragraph = Paragraph::new();
+        paragraph.add_hyperlink(link.clone()).unwrap();
+        assert_eq!(paragraph.text().unwrap(), "Click here");
+        let links = paragraph.hyperlinks().unwrap();
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].href(), link.href());
+        assert_eq!(links[0].name(), Some("example-link"));
+        assert_eq!(links[0].title(), Some("Example & more"));
+        assert_eq!(links[0].target_frame_name(), Some("_blank"));
+        assert_eq!(links[0].show(), Some(TextHyperlinkShow::New));
+        assert_eq!(links[0].actuate(), Some(TextHyperlinkActuate::OnRequest));
+        assert_eq!(links[0].style_name(), Some("Internet_20_link"));
+        assert_eq!(
+            links[0].visited_style_name(),
+            Some("Visited_20_Internet_20_link")
+        );
+    }
+
+    #[test]
+    fn hyperlink_insertion_rejects_missing_or_unsafe_targets() {
+        assert!(Hyperlink::with_href("", "empty").is_err());
+        assert!(Hyperlink::with_href("https://example.test/\nnext", "unsafe").is_err());
+
+        let mut paragraph = Paragraph::new();
+        assert!(paragraph.add_hyperlink(Hyperlink::new()).is_err());
+
+        let mut missing_type = Element::new("text:a");
+        missing_type.set_attribute("xlink:href", "https://example.test/");
+        assert!(
+            paragraph
+                .add_hyperlink(Hyperlink::from_element(missing_type).unwrap())
+                .is_err()
+        );
+
+        let mut invalid_type = Element::new("text:a");
+        invalid_type.set_attribute("xlink:type", "extended");
+        invalid_type.set_attribute("xlink:href", "https://example.test/");
+        assert!(
+            paragraph
+                .add_hyperlink(Hyperlink::from_element(invalid_type).unwrap())
+                .is_err()
+        );
+
+        let mut invalid_show = Element::new("text:a");
+        invalid_show.set_attribute("xlink:type", "simple");
+        invalid_show.set_attribute("xlink:href", "https://example.test/");
+        invalid_show.set_attribute("xlink:show", "embed");
+        assert!(
+            paragraph
+                .add_hyperlink(Hyperlink::from_element(invalid_show).unwrap())
+                .is_err()
+        );
+
+        let mut invalid_metadata = Hyperlink::with_href("#bookmark", "Bookmark").unwrap();
+        invalid_metadata.set_title("not\0valid");
+        assert!(paragraph.add_hyperlink(invalid_metadata).is_err());
     }
 
     // ========== Bookmark Tests ==========

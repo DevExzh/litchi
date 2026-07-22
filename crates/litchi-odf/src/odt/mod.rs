@@ -31,6 +31,7 @@
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
 //! - ✅ `DocumentBuilder::new()` - Create new documents
 //! - ✅ `add_paragraph()` - Add paragraphs with text
+//! - ✅ `add_hyperlink()` / `add_hyperlink_element()` - Add inert simple hyperlinks
 //! - ✅ `add_table()` - Add tables with rows/cells
 //! - ✅ `add_list()` - Add lists
 //! - ✅ `add_heading()` - Add headings with levels

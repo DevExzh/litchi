@@ -368,7 +368,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Sections | ✅ | ✅ | ✅ | Add, wrap, unwrap, replace, remove, and protected/linked metadata |
 | Styles and page layouts | ✅ | ✅ | ✅ | Paragraph/text/table styles, columns, drop caps, tab stops, and page properties |
 | Master pages, headers, and footers | ✅ | ✅ | ✅ | Master-page CRUD and header/footer content/properties |
-| Hyperlinks | 🟡 | ✅ | ❌ | Semantic extraction; no public general hyperlink insertion API |
+| Hyperlinks | ✅ | ✅ | ✅ | Typed inert `text:a` insertion with XLink target/show/actuate and office/text metadata; links are never followed |
 | Footnotes and endnotes | 🟡 | ✅ | 🟡 | Full semantic reading plus note configuration/separators; note-body CRUD is limited |
 | Bookmarks and reference marks | ✅ | ✅ | ✅ | Point/range targets and typed insertion/replacement/removal |
 | Comments/annotations | ✅ | ✅ | ✅ | Point/range annotations and package-aware CRUD |

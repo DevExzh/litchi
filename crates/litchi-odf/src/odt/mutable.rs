@@ -8,7 +8,7 @@ use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::elements::field::{FieldParser, OdfDynamicTextField};
 use crate::elements::parser::DocumentOrderElement;
 use crate::elements::table::Table;
-use crate::elements::text::{Heading, List, Paragraph};
+use crate::elements::text::{Heading, Hyperlink, List, Paragraph};
 use crate::odt::Document;
 use crate::odt::ReferenceMark;
 use crate::odt::TextIndex;
@@ -1787,6 +1787,23 @@ impl MutableDocument {
         Ok(())
     }
 
+    /// Append a paragraph containing one simple ODF hyperlink.
+    ///
+    /// The target is inert metadata and is never followed by the library.
+    pub fn add_hyperlink(&mut self, href: impl AsRef<str>, text: impl AsRef<str>) -> Result<()> {
+        let hyperlink = Hyperlink::with_href(href, text)?;
+        self.add_hyperlink_element(hyperlink)
+    }
+
+    /// Append a paragraph containing a fully configured ODF hyperlink.
+    pub fn add_hyperlink_element(&mut self, hyperlink: Hyperlink) -> Result<()> {
+        let mut paragraph = Paragraph::new();
+        paragraph.add_hyperlink(hyperlink)?;
+        self.invalidate_content_xml();
+        self.elements.push(DocumentElement::Paragraph(paragraph));
+        Ok(())
+    }
+
     /// Add a heading to the end of the document.
     pub fn add_heading(&mut self, text: &str, level: u8) -> Result<()> {
         if !(1..=6).contains(&level) {
@@ -2301,6 +2318,27 @@ mod tests {
         assert_eq!(mutable.headings()[0].text().unwrap(), "After table");
         assert_eq!(mutable.headings()[0].level(), Some(2));
         assert_eq!(mutable.lists()[0].items().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn mutable_hyperlink_authoring_round_trips_through_an_odt_package() {
+        let mut mutable = MutableDocument::new();
+        mutable
+            .add_hyperlink("https://example.test/", "External")
+            .unwrap();
+        let mut internal = crate::Hyperlink::with_href("#bookmark", "Internal").unwrap();
+        internal.set_name("bookmark-link");
+        mutable.add_hyperlink_element(internal).unwrap();
+
+        let document = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.hyperlinks().unwrap(),
+            vec![
+                ("External".to_string(), "https://example.test/".to_string()),
+                ("Internal".to_string(), "#bookmark".to_string()),
+            ]
+        );
+        assert_eq!(document.text().unwrap(), "External\nInternal");
     }
 
     #[test]

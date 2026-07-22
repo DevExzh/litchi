@@ -4,7 +4,7 @@
 
 use crate::core::PackageWriter;
 use crate::elements::table::Table;
-use crate::elements::text::{Heading, List, ListItem, Paragraph, Span};
+use crate::elements::text::{Heading, Hyperlink, List, ListItem, Paragraph, Span};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
@@ -462,6 +462,27 @@ impl DocumentBuilder {
         let mut para = Paragraph::new();
         para.set_text(text);
         self.elements.push(DocumentElement::Paragraph(para));
+        Ok(self)
+    }
+
+    /// Add a paragraph containing one simple ODF hyperlink.
+    ///
+    /// Hyperlink targets are serialized as inert `text:a` XLink attributes;
+    /// this library never follows or fetches them.
+    pub fn add_hyperlink(
+        &mut self,
+        href: impl AsRef<str>,
+        text: impl AsRef<str>,
+    ) -> Result<&mut Self> {
+        let hyperlink = Hyperlink::with_href(href, text)?;
+        self.add_hyperlink_element(hyperlink)
+    }
+
+    /// Add a paragraph containing a fully configured ODF hyperlink.
+    pub fn add_hyperlink_element(&mut self, hyperlink: Hyperlink) -> Result<&mut Self> {
+        let mut paragraph = Paragraph::new();
+        paragraph.add_hyperlink(hyperlink)?;
+        self.elements.push(DocumentElement::Paragraph(paragraph));
         Ok(self)
     }
 
@@ -1612,6 +1633,42 @@ mod tests {
         let mut builder = DocumentBuilder::new();
         builder.add_paragraph("Hello, World!").unwrap();
         assert_eq!(builder.elements.len(), 1);
+    }
+
+    #[test]
+    fn hyperlink_authoring_round_trips_through_an_odt_package() {
+        let mut builder = DocumentBuilder::new();
+        builder
+            .add_hyperlink("https://example.test/a?x=1&y=2", "Example & link")
+            .unwrap();
+        let mut configured = Hyperlink::with_href("#bookmark", "Jump").unwrap();
+        configured.set_target_frame_name("_self");
+        configured.set_show(Some(crate::TextHyperlinkShow::Replace));
+        configured.set_actuate(Some(crate::TextHyperlinkActuate::OnRequest));
+        configured.set_title("Jump to bookmark");
+        builder.add_hyperlink_element(configured).unwrap();
+
+        let document = crate::odt::Document::from_bytes(builder.build().unwrap()).unwrap();
+        assert_eq!(
+            document.hyperlinks().unwrap(),
+            vec![
+                (
+                    "Example & link".to_string(),
+                    "https://example.test/a?x=1&y=2".to_string(),
+                ),
+                ("Jump".to_string(), "#bookmark".to_string()),
+            ]
+        );
+        let content = String::from_utf8(document.get_file("content.xml").unwrap()).unwrap();
+        assert!(content.contains("xlink:type=\"simple\""));
+        assert!(content.contains("office:target-frame-name=\"_self\""));
+        assert!(content.contains("xlink:show=\"replace\""));
+        assert!(content.contains("xlink:actuate=\"onRequest\""));
+        assert!(content.contains("xlink:href=\"https://example.test/a?x=1&amp;y=2\""));
+
+        let mut invalid = DocumentBuilder::new();
+        assert!(invalid.add_hyperlink("", "missing target").is_err());
+        assert!(invalid.elements.is_empty());
     }
 
     #[test]

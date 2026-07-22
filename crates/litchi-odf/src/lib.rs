@@ -52,7 +52,7 @@
 //! - ✅ Heading hierarchy extraction
 //! - ✅ Style registry and style resolution
 //! - ✅ Metadata extraction
-//! - ✅ Hyperlink extraction
+//! - ✅ Hyperlink extraction and inert `text:a` authoring
 //! - ✅ Footnote and endnote support
 //! - ✅ Exact note citations, fixed labels, nested bodies, and note classes
 //! - ✅ Ruby base/pronunciation annotations without visible-text duplication
@@ -67,6 +67,7 @@
 //! ### Writing (`odt/builder.rs`, `odt/mutable.rs`)
 //! - ✅ DocumentBuilder for creating new ODT files
 //! - ✅ Add paragraphs with text and styling
+//! - ✅ Add inert simple hyperlinks with XLink metadata
 //! - ✅ Add tables with rows and cells
 //! - ✅ Add lists (ordered/unordered)
 //! - ✅ Add headings with levels
@@ -691,7 +692,9 @@ pub use odp::{Shape, Slide};
 // Re-export document element types for unified API (for ODT tables)
 pub use elements::table::{Table, TableCell as Cell, TableRow as Row};
 pub use elements::text::Span as Run;
-pub use elements::text::{Heading, List, ListItem, Paragraph}; // Span is equivalent to Run in ODF
+pub use elements::text::{
+    Heading, Hyperlink, List, ListItem, Paragraph, TextHyperlinkActuate, TextHyperlinkShow,
+}; // Span is equivalent to Run in ODF
 
 // Re-export parser types for document element iteration
 pub use elements::parser::{DocumentOrderElement, DocumentParser};
