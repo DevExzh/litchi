@@ -939,6 +939,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `DDE` and `DDEAUTO` fields in document field order.
+    ///
+    /// Application, source, item, representation, and storage metadata are
+    /// exposed solely as stored text. This method never launches an
+    /// application, initiates a DDE conversation, opens a source, requests
+    /// data, refreshes, evaluates, converts, or executes anything.
+    pub fn dde_links(&self) -> Vec<crate::DdeField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::dde_link)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `DDE` and `DDEAUTO` fields.
+    pub fn dde_link_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.dde_link().is_some())
+            .count()
+    }
+
     /// Return typed, inert external include fields in document field order.
     ///
     /// Sources and converter names are exposed as stored metadata only. This
