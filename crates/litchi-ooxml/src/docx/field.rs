@@ -566,7 +566,7 @@ pub struct CitationField {
 impl CitationField {
     fn from_field(field: &Field) -> Result<Option<Self>> {
         let Some((primary_source_tag, switches)) =
-            parse_field_operand_and_switches(field.instruction(), "CITATION")?
+            parse_citation_operand_and_switches(field.instruction())?
         else {
             return Ok(None);
         };
@@ -1413,8 +1413,56 @@ fn parse_field_operand_and_switches(
     Ok(Some((operand, switches)))
 }
 
+/// Parse a `CITATION` instruction while accepting Word's documented leading
+/// `\\l` locale switch. Other switches still follow the primary source tag or
+/// a preceding `\\m` source tag.
+fn parse_citation_operand_and_switches(
+    instruction: &str,
+) -> Result<Option<(Option<String>, Vec<FieldSwitch>)>> {
+    let Some(remainder) = field_instruction_remainder(instruction, "CITATION") else {
+        return Ok(None);
+    };
+    let mut characters = remainder.chars().peekable();
+    let mut switches = Vec::new();
+    skip_field_whitespace(&mut characters);
+    while characters
+        .peek()
+        .is_some_and(|character| *character == '\\')
+    {
+        let switch = parse_field_switch_from_characters(&mut characters, "CITATION")?;
+        if switch.name != 'l' {
+            return Err(OoxmlError::InvalidFormat(
+                "CITATION field requires its primary source tag before this switch".to_string(),
+            ));
+        }
+        if switches.len() >= MAX_FIELD_SWITCHES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "CITATION field exceeds {MAX_FIELD_SWITCHES} switches"
+            )));
+        }
+        switches.push(switch);
+        skip_field_whitespace(&mut characters);
+    }
+    let operand = match characters.peek().copied() {
+        None | Some('\\') => None,
+        Some('"') => {
+            characters.next();
+            Some(parse_field_quoted_argument(&mut characters, "CITATION")?)
+        },
+        Some(_) => Some(parse_field_unquoted_argument(&mut characters)),
+    };
+    let remaining = parse_field_switches_from_characters(&mut characters, "CITATION")?;
+    if switches.len() + remaining.len() > MAX_FIELD_SWITCHES {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "CITATION field exceeds {MAX_FIELD_SWITCHES} switches"
+        )));
+    }
+    switches.extend(remaining);
+    Ok(Some((operand, switches)))
+}
+
 fn parse_field_switches_from_characters(
-    mut characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
     field_type: &str,
 ) -> Result<Vec<FieldSwitch>> {
     let mut switches = Vec::new();
@@ -1428,34 +1476,56 @@ fn parse_field_switches_from_characters(
                 "{field_type} field contains text outside a field switch"
             )));
         }
-        let name = characters.next().ok_or_else(|| {
-            OoxmlError::InvalidFormat(format!("{field_type} field ends with a switch introducer"))
-        })?;
-        if name == '\\' || name.is_whitespace() {
-            return Err(OoxmlError::InvalidFormat(format!(
-                "{field_type} field has an invalid switch name"
-            )));
-        }
-        skip_field_whitespace(characters);
-        let argument = match characters.peek().copied() {
-            None | Some('\\') => None,
-            Some('"') => {
-                characters.next();
-                Some(parse_field_quoted_argument(&mut characters, field_type)?)
-            },
-            Some(_) => Some(parse_field_unquoted_argument(&mut characters)),
-        };
         if switches.len() >= MAX_FIELD_SWITCHES {
             return Err(OoxmlError::InvalidFormat(format!(
                 "{field_type} field exceeds {MAX_FIELD_SWITCHES} switches"
             )));
         }
-        switches.push(FieldSwitch {
-            name: name.to_ascii_lowercase(),
-            argument,
-        });
+        switches.push(parse_field_switch_after_intro(characters, field_type)?);
     }
     Ok(switches)
+}
+
+fn parse_field_switch_from_characters(
+    characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    field_type: &str,
+) -> Result<FieldSwitch> {
+    let introducer = characters.next().ok_or_else(|| {
+        OoxmlError::InvalidFormat(format!("{field_type} field ends with a switch introducer"))
+    })?;
+    if introducer != '\\' {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{field_type} field has an invalid switch introducer"
+        )));
+    }
+    parse_field_switch_after_intro(characters, field_type)
+}
+
+fn parse_field_switch_after_intro(
+    characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    field_type: &str,
+) -> Result<FieldSwitch> {
+    let name = characters.next().ok_or_else(|| {
+        OoxmlError::InvalidFormat(format!("{field_type} field ends with a switch introducer"))
+    })?;
+    if name == '\\' || name.is_whitespace() {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{field_type} field has an invalid switch name"
+        )));
+    }
+    skip_field_whitespace(characters);
+    let argument = match characters.peek().copied() {
+        None | Some('\\') => None,
+        Some('"') => {
+            characters.next();
+            Some(parse_field_quoted_argument(characters, field_type)?)
+        },
+        Some(_) => Some(parse_field_unquoted_argument(characters)),
+    };
+    Ok(FieldSwitch {
+        name: name.to_ascii_lowercase(),
+        argument,
+    })
 }
 
 fn skip_field_whitespace(characters: &mut std::iter::Peekable<std::str::Chars<'_>>) {
@@ -1768,6 +1838,17 @@ mod tests {
         assert_eq!(citation.switches()[0].argument(), Some("Smith 2025"));
         assert!(citation.has_switch('l'));
         assert!(citation.has_switch('p'));
+
+        let documented_order = Field::new(
+            r#"CITATION \l 1033 "Che 01" \v 3 \m Kra \v 2"#.to_string(),
+            None,
+            true,
+        );
+        let documented = documented_order.citation().unwrap().unwrap();
+        assert_eq!(documented.source_tags(), ["Che 01", "Kra"]);
+        assert_eq!(documented.switches()[0].name(), 'l');
+        assert_eq!(documented.switches()[0].argument(), Some("1033"));
+        assert!(documented.is_dirty());
 
         let bibliography = fields[1].bibliography().unwrap().unwrap();
         assert_eq!(bibliography.cached_result(), Some("Doe. Example work."));

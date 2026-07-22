@@ -64,7 +64,7 @@ pub use comment::MutableComment;
 pub use bookmark::MutableBookmark;
 
 // Re-export field types
-pub use field::MutableField;
+pub use field::{CitationFieldSpec, CitationSource, MutableField};
 
 // Re-export style types
 pub use style::{MutableStyle, generate_styles_xml};

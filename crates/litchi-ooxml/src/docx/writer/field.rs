@@ -1,8 +1,283 @@
-/// Field writer support for DOCX documents.
-use crate::error::Result;
+//! Field writer support for DOCX documents.
+
+use super::revision::RevisionTextMode;
+use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
-use super::revision::{RevisionTextMode};
+
+const MAX_CITATION_SOURCES: usize = 16;
+const MAX_CITATION_TEXT_BYTES: usize = 65_536;
+
+/// One source and its source-local options in an inert Word `CITATION` field.
+///
+/// Word applies volume, prefix, and suffix switches to the source tag that
+/// precedes them. This model preserves that order but never looks up the tag,
+/// reads bibliography XML, or formats a citation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CitationSource {
+    tag: String,
+    volume: Option<u32>,
+    prefix: Option<String>,
+    suffix: Option<String>,
+}
+
+impl CitationSource {
+    /// Create a source reference from its case-sensitive bibliography tag.
+    pub fn new(tag: impl Into<String>) -> Result<Self> {
+        let tag = tag.into();
+        validate_citation_instruction_text(&tag, "citation source tag", false)?;
+        Ok(Self {
+            tag,
+            volume: None,
+            prefix: None,
+            suffix: None,
+        })
+    }
+
+    /// Return the case-sensitive bibliography tag stored by this source.
+    pub fn tag(&self) -> &str {
+        &self.tag
+    }
+
+    /// Replace the bibliography tag.
+    pub fn set_tag(&mut self, tag: impl Into<String>) -> Result<()> {
+        let tag = tag.into();
+        validate_citation_instruction_text(&tag, "citation source tag", false)?;
+        self.tag = tag;
+        Ok(())
+    }
+
+    /// Return the optional source-local volume number.
+    pub fn volume(&self) -> Option<u32> {
+        self.volume
+    }
+
+    /// Set or clear the source-local volume number.
+    pub fn set_volume(&mut self, volume: Option<u32>) {
+        self.volume = volume;
+    }
+
+    /// Return the optional source-local citation prefix.
+    pub fn prefix(&self) -> Option<&str> {
+        self.prefix.as_deref()
+    }
+
+    /// Set or clear the source-local citation prefix.
+    pub fn set_prefix(&mut self, prefix: Option<String>) -> Result<()> {
+        if let Some(prefix) = &prefix {
+            validate_citation_instruction_text(prefix, "citation prefix", false)?;
+        }
+        self.prefix = prefix;
+        Ok(())
+    }
+
+    /// Return the optional source-local citation suffix.
+    pub fn suffix(&self) -> Option<&str> {
+        self.suffix.as_deref()
+    }
+
+    /// Set or clear the source-local citation suffix.
+    pub fn set_suffix(&mut self, suffix: Option<String>) -> Result<()> {
+        if let Some(suffix) = &suffix {
+            validate_citation_instruction_text(suffix, "citation suffix", false)?;
+        }
+        self.suffix = suffix;
+        Ok(())
+    }
+
+    fn validate(&self) -> Result<()> {
+        validate_citation_instruction_text(&self.tag, "citation source tag", false)?;
+        if let Some(prefix) = &self.prefix {
+            validate_citation_instruction_text(prefix, "citation prefix", false)?;
+        }
+        if let Some(suffix) = &self.suffix {
+            validate_citation_instruction_text(suffix, "citation suffix", false)?;
+        }
+        Ok(())
+    }
+
+    fn append_instruction(&self, instruction: &mut String, additional: bool) {
+        if additional {
+            instruction.push_str(" \\m ");
+        } else {
+            instruction.push(' ');
+        }
+        append_field_argument(instruction, &self.tag);
+        if let Some(volume) = self.volume {
+            instruction.push_str(" \\v ");
+            instruction.push_str(&volume.to_string());
+        }
+        if let Some(prefix) = &self.prefix {
+            instruction.push_str(" \\f ");
+            append_quoted_field_argument(instruction, prefix);
+        }
+        if let Some(suffix) = &self.suffix {
+            instruction.push_str(" \\s ");
+            append_quoted_field_argument(instruction, suffix);
+        }
+    }
+}
+
+/// Typed, inert authoring data for one Word `CITATION` field.
+///
+/// The serialized field instruction contains only caller-supplied source tags
+/// and documented switches. It never resolves source tags, accesses custom XML
+/// bibliography stores, applies a citation style, or refreshes the result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CitationFieldSpec {
+    sources: Vec<CitationSource>,
+    locale: Option<u32>,
+    cached_result: Option<String>,
+    dirty: bool,
+}
+
+impl CitationFieldSpec {
+    /// Create a dirty field with one required primary source.
+    pub fn new(primary_source: CitationSource) -> Self {
+        Self {
+            sources: vec![primary_source],
+            locale: None,
+            cached_result: None,
+            dirty: true,
+        }
+    }
+
+    /// Return the primary source tag and its source-local switches.
+    pub fn primary_source(&self) -> &CitationSource {
+        &self.sources[0]
+    }
+
+    /// Mutably access the primary source and its source-local switches.
+    pub fn primary_source_mut(&mut self) -> &mut CitationSource {
+        &mut self.sources[0]
+    }
+
+    /// Return every source in field-code order.
+    pub fn sources(&self) -> &[CitationSource] {
+        &self.sources
+    }
+
+    /// Return the optional locale identifier stored with the field.
+    pub fn locale(&self) -> Option<u32> {
+        self.locale
+    }
+
+    /// Set or clear the stored locale identifier.
+    pub fn set_locale(&mut self, locale: Option<u32>) {
+        self.locale = locale;
+    }
+
+    /// Add another source, serialized with a `\\m` switch.
+    pub fn add_source(&mut self, source: CitationSource) -> Result<()> {
+        source.validate()?;
+        if self.sources.len() >= MAX_CITATION_SOURCES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "CITATION field supports at most {MAX_CITATION_SOURCES} typed sources"
+            )));
+        }
+        self.sources.push(source);
+        Ok(())
+    }
+
+    /// Return the caller-supplied cached result, if any.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Set or clear a caller-supplied cached result without generating it.
+    pub fn set_cached_result(&mut self, result: Option<String>) -> Result<()> {
+        if let Some(result) = &result {
+            validate_citation_result_text(result)?;
+        }
+        self.cached_result = result;
+        Ok(())
+    }
+
+    /// Return whether the serialized field is marked stale for a word processor.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Set the persisted dirty marker without evaluating the field.
+    pub fn set_dirty(&mut self, dirty: bool) {
+        self.dirty = dirty;
+    }
+
+    /// Build a canonical `CITATION` instruction from the typed metadata.
+    pub fn to_instruction(&self) -> Result<String> {
+        self.validate()?;
+        let mut instruction = String::from("CITATION");
+        if let Some(locale) = self.locale {
+            instruction.push_str(" \\l ");
+            instruction.push_str(&locale.to_string());
+        }
+        for (index, source) in self.sources.iter().enumerate() {
+            source.append_instruction(&mut instruction, index != 0);
+        }
+        Ok(instruction)
+    }
+
+    fn validate(&self) -> Result<()> {
+        if self.sources.is_empty() || self.sources.len() > MAX_CITATION_SOURCES {
+            return Err(OoxmlError::InvalidFormat(
+                "CITATION field requires one through sixteen sources".to_string(),
+            ));
+        }
+        for source in &self.sources {
+            source.validate()?;
+        }
+        if let Some(result) = &self.cached_result {
+            validate_citation_result_text(result)?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_citation_instruction_text(value: &str, context: &str, allow_empty: bool) -> Result<()> {
+    if (!allow_empty && value.trim().is_empty())
+        || value.len() > MAX_CITATION_TEXT_BYTES
+        || value.chars().any(|character| character.is_control())
+    {
+        return Err(OoxmlError::InvalidFormat(format!("invalid {context}")));
+    }
+    Ok(())
+}
+
+fn validate_citation_result_text(value: &str) -> Result<()> {
+    if value.len() > MAX_CITATION_TEXT_BYTES
+        || value
+            .chars()
+            .any(|character| matches!(character, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}' | '\u{fffe}' | '\u{ffff}'))
+    {
+        return Err(OoxmlError::InvalidFormat(
+            "invalid cached citation result".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn append_field_argument(instruction: &mut String, value: &str) {
+    if !value.is_empty()
+        && value
+            .chars()
+            .all(|character| !character.is_whitespace() && character != '\\' && character != '"')
+    {
+        instruction.push_str(value);
+    } else {
+        append_quoted_field_argument(instruction, value);
+    }
+}
+
+fn append_quoted_field_argument(instruction: &mut String, value: &str) {
+    instruction.push('"');
+    for character in value.chars() {
+        if matches!(character, '\\' | '"') {
+            instruction.push('\\');
+        }
+        instruction.push(character);
+    }
+    instruction.push('"');
+}
 
 /// A mutable field in a Word document.
 ///
@@ -59,6 +334,19 @@ impl MutableField {
             result: Some(result),
             dirty: false,
         }
+    }
+
+    /// Create a typed, inert `CITATION` field.
+    ///
+    /// This serializes caller-supplied bibliography tags and switches only. It
+    /// does not access source stores, format a citation, or refresh the cached
+    /// result.
+    pub fn citation(spec: &CitationFieldSpec) -> Result<Self> {
+        Ok(Self::Complete {
+            instruction: spec.to_instruction()?,
+            result: spec.cached_result.clone(),
+            dirty: spec.dirty,
+        })
     }
 
     /// Create a field begin character.
@@ -313,6 +601,53 @@ mod tests {
 
         let ref_field = MutableField::reference("MyBookmark");
         assert!(ref_field.instruction().contains("REF MyBookmark"));
+    }
+
+    #[test]
+    fn typed_citation_serializes_documented_switches_without_evaluation() {
+        let mut primary = CitationSource::new("Doe2024").unwrap();
+        primary.set_volume(Some(3));
+        primary.set_prefix(Some("qtd. in".to_string())).unwrap();
+        primary.set_suffix(Some("in press".to_string())).unwrap();
+        let mut citation = CitationFieldSpec::new(primary);
+        citation.set_locale(Some(1033));
+        let mut additional = CitationSource::new("Smith 2025").unwrap();
+        additional.set_volume(Some(2));
+        citation.add_source(additional).unwrap();
+        citation
+            .set_cached_result(Some("caller supplied result".to_string()))
+            .unwrap();
+        citation.set_dirty(false);
+
+        let field = MutableField::citation(&citation).unwrap();
+        assert_eq!(
+            field.instruction(),
+            r#"CITATION \l 1033 Doe2024 \v 3 \f "qtd. in" \s "in press" \m "Smith 2025" \v 2"#
+        );
+        assert_eq!(field.result(), Some("caller supplied result"));
+        assert!(!field.is_dirty());
+
+        let parsed = crate::docx::Field::new(
+            field.instruction().to_string(),
+            field.result().map(str::to_string),
+            field.is_dirty(),
+        )
+        .citation()
+        .unwrap()
+        .unwrap();
+        assert_eq!(parsed.source_tags(), ["Doe2024", "Smith 2025"]);
+        assert_eq!(parsed.switches()[0].name(), 'l');
+        assert!(parsed.has_switch('v'));
+        assert!(parsed.has_switch('f'));
+        assert!(parsed.has_switch('s'));
+
+        assert!(CitationSource::new("source\nname").is_err());
+        assert!(
+            CitationSource::new("tag")
+                .unwrap()
+                .set_prefix(Some(String::new()))
+                .is_err()
+        );
     }
 
     #[test]

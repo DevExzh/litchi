@@ -3223,10 +3223,19 @@ mod tests {
         {
             let document = package.document_mut().unwrap();
             let citation = document.add_paragraph();
-            citation.add_field(crate::docx::writer::MutableField::with_result(
-                r#"CITATION Doe2024 \m "Smith2025" \l 1033 \p "14""#.to_string(),
-                "(Doe, 2024; Smith, 2025, p. 14)".to_string(),
-            ));
+            let mut primary = crate::docx::CitationSource::new("Doe2024").unwrap();
+            primary.set_prefix(Some("qtd. in".to_string())).unwrap();
+            let mut citation_spec = crate::docx::CitationFieldSpec::new(primary);
+            citation_spec.set_locale(Some(1033));
+            citation_spec
+                .add_source(crate::docx::CitationSource::new("Smith2025").unwrap())
+                .unwrap();
+            citation_spec
+                .set_cached_result(Some("(Doe, 2024; Smith, 2025)".to_string()))
+                .unwrap();
+            citation_spec.set_dirty(false);
+            citation
+                .add_field(crate::docx::writer::MutableField::citation(&citation_spec).unwrap());
             let bibliography = document.add_paragraph();
             bibliography.add_field(crate::docx::writer::MutableField::with_result(
                 r#"BIBLIOGRAPHY \l 1033 \f "References""#.to_string(),
@@ -3243,7 +3252,12 @@ mod tests {
         assert_eq!(citations[0].primary_source_tag(), "Doe2024");
         assert_eq!(citations[0].source_tags(), ["Doe2024", "Smith2025"]);
         assert!(citations[0].has_switch('l'));
-        assert!(citations[0].has_switch('p'));
+        assert!(citations[0].has_switch('f'));
+        assert!(!citations[0].is_dirty());
+        assert_eq!(
+            citations[0].cached_result(),
+            Some("(Doe, 2024; Smith, 2025)")
+        );
 
         let bibliographies = document.bibliographies().unwrap();
         assert_eq!(document.bibliography_count().unwrap(), 1);

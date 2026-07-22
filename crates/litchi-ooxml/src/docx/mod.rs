@@ -171,8 +171,9 @@ pub use web_settings::{
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 // Re-export writer types
 pub use writer::{
-    CellProperties, ColorScheme, ContentControlType, DocumentProtection, ListType, MutableBookmark,
-    MutableComment, MutableContentControl, MutableDocument, MutableField, MutableHyperlink,
+    CellProperties, CitationFieldSpec, CitationSource, ColorScheme, ContentControlType,
+    DocumentProtection, ListType, MutableBookmark, MutableComment, MutableContentControl,
+    MutableDocument, MutableField, MutableHyperlink,
     MutableInlineImage, MutableParagraph, MutableRevision, MutableRun, MutableSmartTag,
     MutableSmartTagAttribute, MutableStyle, MutableTable, MutableTheme, PageNumberFormat,
     PageOrientation, RevisionContentControl, RevisionKind, RevisionMetadata, RowRevisionKind,
