@@ -1022,6 +1022,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert TC entry fields in document field order.
+    ///
+    /// Stored entry text and options are exposed solely as metadata. This
+    /// method never changes hidden text, calculates page numbers, generates a
+    /// table of contents, or refreshes a field.
+    pub fn table_of_contents_entries(&self) -> Vec<crate::TableOfContentsEntryField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::table_of_contents_entry)
+            .collect()
+    }
+
+    /// Return the number of typed, inert TC entry fields in the document.
+    pub fn table_of_contents_entry_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.table_of_contents_entry().is_some())
+            .count()
+    }
+
     pub fn push_field(&mut self, field: super::field::Field<'a>) -> RtfResult<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
             return Err(RtfError::MalformedDocument(

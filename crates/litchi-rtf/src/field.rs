@@ -16,6 +16,7 @@ pub enum FieldType {
     Page,
     Date,
     Toc,
+    TocEntry,
     Bookmark,
     Equation,
     MacroButton,
@@ -458,6 +459,38 @@ pub struct TableOfContentsField<'a> {
     position: usize,
 }
 
+/// One recognized stored option of a TC field.
+///
+/// These values identify how an entry participates in a table of contents.
+/// They are inert metadata only: this crate never changes hidden text,
+/// calculates page numbers, or generates a table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableOfContentsEntryOption<'a> {
+    /// The \\f contents-list identifier.
+    ListIdentifier(Cow<'a, str>),
+    /// The \\l entry level.
+    Level(Cow<'a, str>),
+    /// The \\n switch omits the entry page number.
+    OmitPageNumber,
+}
+
+/// Inert metadata for a legacy RTF TC field.
+///
+/// This model retains a stored table-of-contents entry marker and its cached
+/// result only. It never updates the document, changes hidden text, calculates
+/// a page number, or generates a table of contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfContentsEntryField<'a> {
+    instruction: &'a str,
+    entry: Cow<'a, str>,
+    options: Vec<TableOfContentsEntryOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 struct ExternalIncludeParts<'a> {
     kind: IncludeFieldKind,
     source: Cow<'a, str>,
@@ -470,6 +503,12 @@ struct ExternalIncludeParts<'a> {
 
 struct TableOfContentsParts<'a> {
     options: Vec<TableOfContentsOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct TableOfContentsEntryParts<'a> {
+    entry: Cow<'a, str>,
+    options: Vec<TableOfContentsEntryOption<'a>>,
     unknown_switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -907,6 +946,61 @@ impl<'a> TableOfContentsField<'a> {
     }
 }
 
+impl<'a> TableOfContentsEntryField<'a> {
+    /// Return the complete stored TC field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored entry text without generating a table of contents.
+    pub fn entry(&self) -> &str {
+        &self.entry
+    }
+
+    /// Return recognized TC options in stored source order.
+    ///
+    /// These options are configuration metadata only. This method never
+    /// calculates page numbers, changes hidden text, or updates a TOC.
+    pub fn options(&self) -> &[TableOfContentsEntryOption<'a>] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> Field<'a> {
     #[inline]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
@@ -943,6 +1037,9 @@ impl<'a> Field<'a> {
             },
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("TOC") => {
                 FieldType::Toc
+            },
+            ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("TC") => {
+                FieldType::TocEntry
             },
             ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("BOOKMARK") =>
@@ -1154,6 +1251,28 @@ impl<'a> Field<'a> {
         let parts = table_of_contents_parts(self.instruction.as_ref())?;
         Some(TableOfContentsField {
             instruction: self.instruction.as_ref(),
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed TC entry field.
+    ///
+    /// The stored entry and cached result are never used to change hidden text,
+    /// calculate a page number, or generate a table of contents. Malformed TC
+    /// instructions remain generic fields and return None here.
+    pub fn table_of_contents_entry(&self) -> Option<TableOfContentsEntryField<'_>> {
+        if self.field_type != FieldType::TocEntry {
+            return None;
+        }
+        let parts = table_of_contents_entry_parts(self.instruction.as_ref())?;
+        Some(TableOfContentsEntryField {
+            instruction: self.instruction.as_ref(),
+            entry: parts.entry,
             options: parts.options,
             unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
@@ -1818,6 +1937,69 @@ fn table_of_contents_parts(instruction: &str) -> Option<TableOfContentsParts<'_>
     }
 
     Some(TableOfContentsParts {
+        options,
+        unknown_switches,
+    })
+}
+
+fn table_of_contents_entry_parts(instruction: &str) -> Option<TableOfContentsEntryParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("TC") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let entry = tokens.first()?.value.clone();
+    if entry.is_empty() || switch_name(tokens.first()?).is_some() {
+        return None;
+    }
+    tokens.remove(0);
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let normalized_name = name.to_ascii_lowercase();
+        match normalized_name.as_str() {
+            "f" => {
+                options.push(TableOfContentsEntryOption::ListIdentifier(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "l" => {
+                options.push(TableOfContentsEntryOption::Level(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "n" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(TableOfContentsEntryOption::OmitPageNumber);
+                index += 1;
+            },
+            _ => {
+                let value = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none());
+                unknown_switches.push(FieldSwitch {
+                    name: Cow::Owned(name.to_string()),
+                    value: value.map(|token| token.value.clone()),
+                });
+                index += 1 + usize::from(value.is_some());
+            },
+        }
+    }
+
+    Some(TableOfContentsEntryParts {
+        entry,
         options,
         unknown_switches,
     })
@@ -2664,6 +2846,69 @@ mod tests {
     }
 
     #[test]
+    fn table_of_contents_entry_fields_preserve_stored_metadata_without_generation() {
+        let mut field =
+            Field::parse_instruction(r#"TC "Illustration 1" \f i \l 4 \n \* MERGEFORMAT"#);
+        field.result = Cow::Borrowed("cached entry");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::TocEntry);
+        let entry = field.table_of_contents_entry().unwrap();
+        assert_eq!(entry.instruction(), field.instruction);
+        assert_eq!(entry.entry(), "Illustration 1");
+        assert_eq!(
+            entry.options(),
+            &[
+                TableOfContentsEntryOption::ListIdentifier(Cow::Borrowed("i")),
+                TableOfContentsEntryOption::Level(Cow::Borrowed("4")),
+                TableOfContentsEntryOption::OmitPageNumber,
+            ]
+        );
+        assert_eq!(entry.cached_result(), Some("cached entry"));
+        assert!(entry.is_dirty());
+        assert!(entry.is_locked());
+        assert_eq!(entry.owner(), FieldOwner::Body);
+        assert_eq!(entry.position(), 4);
+        assert_eq!(entry.unknown_switches().len(), 1);
+        assert_eq!(entry.unknown_switches()[0].name, "*");
+        assert_eq!(
+            entry.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+
+        assert!(
+            Field::parse_instruction("TC")
+                .table_of_contents_entry()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"TC \f i")
+                .table_of_contents_entry()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"TC entry unexpected")
+                .table_of_contents_entry()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"TC entry \n unexpected")
+                .table_of_contents_entry()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction("TCC entry").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
     fn document_discovers_eq_fields_without_calculating_them() {
         let document = crate::RtfDocument::parse(
             r#"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}"#,
@@ -2784,6 +3029,31 @@ mod tests {
                 TableOfContentsOption::HeadingStyleRange(Some(Cow::Borrowed("1-3"))),
                 TableOfContentsOption::Hyperlinks,
                 TableOfContentsOption::HidePageNumbersInWebView,
+            ]
+        );
+        assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_table_of_contents_entries_without_generating_a_table() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TC "Illustration 1" \\f i \\l 4 \\n}{\fldrslt cached entry}}After}"#,
+        )
+        .unwrap();
+
+        let entries = document.table_of_contents_entries();
+        assert_eq!(document.table_of_contents_entry_count(), 1);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].entry(), "Illustration 1");
+        assert_eq!(entries[0].cached_result(), Some("cached entry"));
+        assert!(entries[0].is_dirty());
+        assert!(entries[0].is_locked());
+        assert_eq!(
+            entries[0].options(),
+            &[
+                TableOfContentsEntryOption::ListIdentifier(Cow::Borrowed("i")),
+                TableOfContentsEntryOption::Level(Cow::Borrowed("4")),
+                TableOfContentsEntryOption::OmitPageNumber,
             ]
         );
         assert_eq!(document.text(), "Before After");

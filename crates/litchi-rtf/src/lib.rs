@@ -170,7 +170,8 @@ pub use field::{
     ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
     FieldSwitch, FieldType, HyperlinkCode, IncludeFieldKind, LinkField, LinkFormatting,
     LinkResultOption, MacroButtonField, PageBreak, ParsedFieldCode, ReferenceCode, SectionBreak,
-    StoryEvent, StoryField, TableOfContentsField, TableOfContentsOption, parse_field_code,
+    StoryEvent, StoryField, TableOfContentsEntryField, TableOfContentsEntryOption,
+    TableOfContentsField, TableOfContentsOption, parse_field_code,
 };
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};
