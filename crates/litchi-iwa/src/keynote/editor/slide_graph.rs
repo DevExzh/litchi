@@ -602,6 +602,22 @@ pub(super) fn remap_movie_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -
     Ok(data)
 }
 
+fn remap_chart_archive_wire(
+    data: &[u8],
+    recorded_references: &[u64],
+    remap: &HashMap<u64, u64>,
+) -> Result<Vec<u8>> {
+    let mut expected = crate::charts::IWorkChartArchive::decode(data)?;
+    expected.remap_references(remap, recorded_references)?;
+    let data = expected.encode()?;
+    if crate::charts::IWorkChartArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Keynote chart wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn remap_note_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     let mut expected = kn::NoteArchive::decode(data)?;
     remap_reference(&mut expected.contained_storage, remap);
@@ -656,6 +672,16 @@ pub(super) fn clone_slide_object(
         .zip(&source.archive_info.message_infos)
     {
         let data = match message.type_ {
+            crate::charts::source::CHART_MESSAGE_TYPE => {
+                remap_chart_archive_wire(&message.data, &info.object_references, remap)?
+            },
+            crate::charts::source::CHART_PRESET_MESSAGE_TYPE => {
+                crate::charts::source::remap_chart_preset_wire(
+                    &message.data,
+                    &info.object_references,
+                    remap,
+                )?
+            },
             5 => remap_slide_archive_wire(&message.data, remap)?,
             7 => remap_placeholder_archive_wire(&message.data, remap)?,
             15 => remap_note_archive_wire(&message.data, remap)?,

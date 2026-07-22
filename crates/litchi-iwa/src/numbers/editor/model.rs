@@ -467,6 +467,52 @@ fn remap_numbers_drawable_archive(drawable: &mut tsd::DrawableArchive, remap: &H
     remap_numbers_reference(&mut drawable.caption, remap);
 }
 
+fn remap_numbers_chart_wire(
+    data: &[u8],
+    recorded_references: &[u64],
+    remap: &HashMap<u64, u64>,
+) -> Result<Vec<u8>> {
+    let mut expected = crate::charts::IWorkChartArchive::decode(data)?;
+    expected.remap_references(remap, recorded_references)?;
+    let data = expected.encode()?;
+    if crate::charts::IWorkChartArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers chart wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+fn remap_numbers_chart_mediator_wire(
+    data: &[u8],
+    recorded_references: &[u64],
+    remap: &HashMap<u64, u64>,
+) -> Result<Vec<u8>> {
+    let mut expected = tn::ChartMediatorArchive::decode(data)?;
+    let known_reference = expected
+        .super_
+        .info
+        .as_ref()
+        .map(|reference| reference.identifier);
+    if let Some(identifier) = recorded_references
+        .iter()
+        .copied()
+        .find(|identifier| remap.contains_key(identifier) && Some(*identifier) != known_reference)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers chart mediator has an unrecognized private reference {identifier}"
+        )));
+    }
+    remap_numbers_reference(&mut expected.super_.info, remap);
+    let data = remap_numbers_reference_paths(data, &[&[1, 1]], remap)?;
+    if tn::ChartMediatorArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers chart mediator wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn remap_numbers_image_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const REFERENCE_PATHS: &[&[u32]] = &[
         &[1, 2],
@@ -564,6 +610,19 @@ pub(super) fn clone_numbers_drawable_graph_object(
         .zip(&source.archive_info.message_infos)
     {
         let data = match message.type_ {
+            crate::charts::source::CHART_MESSAGE_TYPE => {
+                remap_numbers_chart_wire(&message.data, &info.object_references, remap)?
+            },
+            crate::charts::source::CHART_PRESET_MESSAGE_TYPE => {
+                crate::charts::source::remap_chart_preset_wire(
+                    &message.data,
+                    &info.object_references,
+                    remap,
+                )?
+            },
+            crate::charts::source::CHART_MEDIATOR_MESSAGE_TYPE => {
+                remap_numbers_chart_mediator_wire(&message.data, &info.object_references, remap)?
+            },
             SHAPE_INFO_MESSAGE_TYPE => remap_numbers_shape_wire(&message.data, remap)?,
             IMAGE_MESSAGE_TYPE => remap_numbers_image_wire(&message.data, remap)?,
             MOVIE_MESSAGE_TYPE => remap_numbers_movie_wire(&message.data, remap)?,

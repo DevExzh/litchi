@@ -6,7 +6,7 @@ mod theme;
 use graph::chart_graph;
 use theme::{chart_theme_context, patch_theme_chart_preset};
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::*;
 use crate::IWorkThemeArchive;
@@ -20,7 +20,7 @@ use crate::charts::source::{
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
 use crate::protobuf::tsch;
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
 
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 
@@ -273,6 +273,127 @@ impl NumbersEditor {
         Ok(())
     }
 
+    /// Duplicate one sheet chart using Numbers' native placement.
+    ///
+    /// The clone receives fresh drawable, stand-in, mediator, style, preset,
+    /// and UUID identities while retaining editable inline data and opaque
+    /// protobuf fields. The source and clone have independent chart grids and
+    /// are both owned directly by the same sheet.
+    pub fn duplicate_sheet_chart(
+        &mut self,
+        sheet_id: u64,
+        source_drawable_object_id: u64,
+    ) -> Result<NumbersSheetChartInfo> {
+        let source = chart_graph(self, sheet_id, source_drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Numbers chart graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Numbers chart object {identifier} is missing"))
+                })?;
+                clone_numbers_drawable_graph_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat("Numbers chart clone has no drawable identifier".to_owned())
+        })?;
+        let geometry = offset_drawable_geometry(source.info.geometry, DRAWABLE_DUPLICATE_OFFSET)?;
+        update_chart_payload(
+            &mut staged,
+            &source.archive_name,
+            new_drawable_id,
+            |chart| {
+                let drawable = chart.drawable.super_.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers chart {new_drawable_id} has no drawable payload"
+                    ))
+                })?;
+                drawable.geometry = Some(geometry_archive(geometry)?);
+                Ok(())
+            },
+        )?;
+        patch_numbers_sheet_drawable_reference(
+            &mut staged,
+            &source.archive_name,
+            sheet_id,
+            None,
+            Some(new_drawable_id),
+        )?;
+        if let Some(source_preset_id) = source.private_preset_id {
+            let theme = chart_theme_context(&staged)?;
+            let new_preset_id = remap.get(&source_preset_id).copied().ok_or_else(|| {
+                Error::InvalidFormat("Numbers chart clone has no preset identifier".to_owned())
+            })?;
+            patch_theme_chart_preset(&mut staged, &theme, None, Some(new_preset_id))?;
+            if theme.component_id != source.component_id {
+                add_component_external_reference(
+                    &mut staged,
+                    theme.component_id,
+                    source.component_id,
+                    new_preset_id,
+                )?;
+            }
+        }
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Numbers chart graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers chart clone has no UUID identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let created = chart_graph(&verified, sheet_id, new_drawable_id)?;
+        let expected_object_ids = source
+            .object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers chart clone has no validated identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if created.info.kind != source.info.kind
+            || created.info.direction != source.info.direction
+            || created.info.data != source.info.data
+            || created.info.geometry != geometry
+            || created.object_ids != expected_object_ids
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers chart duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created.info)
+    }
+
     /// Remove a standalone chart and its private caption, title, and mediator objects.
     pub fn remove_sheet_chart(
         &mut self,
@@ -342,36 +463,50 @@ impl NumbersEditor {
     ) -> Result<()> {
         let source = chart_graph(self, sheet_id, drawable_object_id)?;
         let mut staged = self.package.clone();
-        staged.update_archive(&source.archive_name, |archive| {
-            let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Numbers chart {drawable_object_id} is missing"))
-            })?;
-            let message_indexes = object
-                .messages
-                .iter()
-                .enumerate()
-                .filter(|(_, message)| message.type_ == CHART_MESSAGE_TYPE)
-                .map(|(index, _)| index)
-                .collect::<Vec<_>>();
-            let [message_index] = message_indexes.as_slice() else {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers chart {drawable_object_id} must contain exactly one chart payload"
-                )));
-            };
-            let mut chart = IWorkChartArchive::decode(&object.messages[*message_index].data)?;
-            update(&mut chart)?;
-            object.replace_message(
-                *message_index,
-                RawMessage {
-                    type_: CHART_MESSAGE_TYPE,
-                    data: chart.encode()?,
-                },
-            )?;
-            Ok(())
-        })?;
+        update_chart_payload(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            update,
+        )?;
         *self = Self::from_bytes(&staged.to_bytes()?)?;
         Ok(())
     }
+}
+
+fn update_chart_payload(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    drawable_object_id: u64,
+    update: impl FnOnce(&mut IWorkChartArchive) -> Result<()>,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers chart {drawable_object_id} is missing"))
+        })?;
+        let message_indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == CHART_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [message_index] = message_indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers chart {drawable_object_id} must contain exactly one chart payload"
+            )));
+        };
+        let mut chart = IWorkChartArchive::decode(&object.messages[*message_index].data)?;
+        update(&mut chart)?;
+        object.replace_message(
+            *message_index,
+            RawMessage {
+                type_: CHART_MESSAGE_TYPE,
+                data: chart.encode()?,
+            },
+        )?;
+        Ok(())
+    })
 }
 
 #[cfg(test)]
@@ -528,5 +663,82 @@ mod tests {
             .remove_sheet_chart(sheet_id, second.drawable_object_id)
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn duplicate_sheet_chart_clones_the_private_graph_and_inline_data() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let source_graph = chart_graph(&editor, sheet_id, source.drawable_object_id).unwrap();
+        let baseline = editor.to_bytes().unwrap();
+        assert!(editor.duplicate_sheet_chart(sheet_id, u64::MAX).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        let duplicate_graph = chart_graph(&editor, sheet_id, duplicate.drawable_object_id).unwrap();
+        let expected_geometry =
+            offset_drawable_geometry(source.geometry, DRAWABLE_DUPLICATE_OFFSET).unwrap();
+
+        assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
+        assert_eq!(duplicate.kind, source.kind);
+        assert_eq!(duplicate.direction, source.direction);
+        assert_eq!(duplicate.data, source.data);
+        assert_eq!(duplicate.geometry, expected_geometry);
+        assert_eq!(
+            duplicate_graph.object_ids.len(),
+            source_graph.object_ids.len()
+        );
+        assert!(
+            source_graph
+                .object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.object_ids.contains(identifier))
+        );
+
+        let replacement = ChartData::new(
+            vec!["Revenue".to_owned()],
+            vec!["2026".to_owned(), "2027".to_owned()],
+            vec![vec![Some(30.0), Some(45.0)]],
+        )
+        .unwrap();
+        editor
+            .set_sheet_chart_data(sheet_id, duplicate.drawable_object_id, replacement.clone())
+            .unwrap();
+        assert_eq!(
+            chart_graph(&editor, sheet_id, source.drawable_object_id)
+                .unwrap()
+                .info
+                .data,
+            source.data
+        );
+        assert_eq!(
+            chart_graph(&editor, sheet_id, duplicate.drawable_object_id)
+                .unwrap()
+                .info
+                .data,
+            replacement
+        );
+
+        editor
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_charts(sheet_id)
+                .unwrap()
+                .iter()
+                .map(|chart| chart.drawable_object_id)
+                .collect::<Vec<_>>(),
+            vec![duplicate.drawable_object_id]
+        );
+        editor
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(editor.sheet_charts(sheet_id).unwrap().is_empty());
     }
 }

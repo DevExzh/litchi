@@ -1,5 +1,7 @@
 //! Shared construction and decoding primitives for source-built iWork charts.
 
+use std::collections::{HashMap, HashSet};
+
 mod build;
 mod data;
 mod ids;
@@ -17,7 +19,9 @@ use super::{ChartData, ChartKind, IWorkChartArchive};
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tn, tsch, tsd, tsk, tsp, tss};
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
-use crate::wire::append_length_delimited_field;
+use crate::wire::{
+    append_length_delimited_field, patch_varint_field, transform_length_delimited_fields_at_path,
+};
 use crate::{Error, Result};
 
 pub(crate) const CHART_MESSAGE_TYPE: u32 = 5_021;
@@ -84,6 +88,110 @@ impl ChartApplicationProfile {
 
     const fn owns_preset(self) -> bool {
         matches!(self, Self::Pages)
+    }
+}
+
+/// Remap a wire-preserved native chart style preset.
+///
+/// Style presets contain the private style-object references that accompany a
+/// chart clone. Unknown fields are retained verbatim, while metadata prevents
+/// silently retaining an unhandled private reference in an opaque extension.
+pub(crate) fn remap_chart_preset_wire(
+    data: &[u8],
+    recorded_references: &[u64],
+    remap: &HashMap<u64, u64>,
+) -> Result<Vec<u8>> {
+    const REFERENCE_FIELDS: &[u32] = &[1, 2, 3, 4, 5, 6];
+
+    let mut expected = tsch::ChartStylePreset::decode(data)?;
+    let mut typed_references = HashSet::new();
+    collect_optional_preset_reference(&mut typed_references, expected.chart_style.as_ref());
+    collect_optional_preset_reference(&mut typed_references, expected.legend_style.as_ref());
+    collect_preset_references(&mut typed_references, &expected.value_axis_styles);
+    collect_preset_references(&mut typed_references, &expected.category_axis_styles);
+    collect_preset_references(&mut typed_references, &expected.series_styles);
+    collect_preset_references(&mut typed_references, &expected.paragraph_styles);
+    if let Some(identifier) = recorded_references
+        .iter()
+        .copied()
+        .find(|identifier| remap.contains_key(identifier) && !typed_references.contains(identifier))
+    {
+        return Err(Error::InvalidFormat(format!(
+            "chart preset payload has an unrecognized private reference {identifier}"
+        )));
+    }
+
+    remap_optional_preset_reference(&mut expected.chart_style, remap);
+    remap_optional_preset_reference(&mut expected.legend_style, remap);
+    remap_preset_references(&mut expected.value_axis_styles, remap);
+    remap_preset_references(&mut expected.category_axis_styles, remap);
+    remap_preset_references(&mut expected.series_styles, remap);
+    remap_preset_references(&mut expected.paragraph_styles, remap);
+
+    let mut rewritten = data.to_vec();
+    for field in REFERENCE_FIELDS {
+        rewritten =
+            transform_length_delimited_fields_at_path(&rewritten, &[*field], |raw_reference| {
+                let reference = tsp::Reference::decode(raw_reference)?;
+                let Some(identifier) = remap.get(&reference.identifier).copied() else {
+                    return Ok(raw_reference.to_vec());
+                };
+                let rewritten = patch_varint_field(raw_reference, 1, true, Some(identifier))?;
+                if tsp::Reference::decode(rewritten.as_slice())?.identifier != identifier {
+                    return Err(Error::InvalidFormat(
+                        "chart preset reference wire remap failed validation".to_owned(),
+                    ));
+                }
+                Ok(rewritten)
+            })?;
+    }
+    if tsch::ChartStylePreset::decode(rewritten.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "chart preset wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(rewritten)
+}
+
+fn remap_preset_reference(reference: &mut tsp::Reference, remap: &HashMap<u64, u64>) {
+    if let Some(identifier) = remap.get(&reference.identifier) {
+        reference.identifier = *identifier;
+    }
+}
+
+fn remap_optional_preset_reference(
+    reference: &mut Option<tsp::Reference>,
+    remap: &HashMap<u64, u64>,
+) {
+    if let Some(reference) = reference {
+        remap_preset_reference(reference, remap);
+    }
+}
+
+fn remap_preset_references(references: &mut [tsp::Reference], remap: &HashMap<u64, u64>) {
+    for reference in references {
+        remap_preset_reference(reference, remap);
+    }
+}
+
+fn collect_preset_reference(identifiers: &mut HashSet<u64>, reference: &tsp::Reference) {
+    if reference.identifier != 0 {
+        identifiers.insert(reference.identifier);
+    }
+}
+
+fn collect_optional_preset_reference(
+    identifiers: &mut HashSet<u64>,
+    reference: Option<&tsp::Reference>,
+) {
+    if let Some(reference) = reference {
+        collect_preset_reference(identifiers, reference);
+    }
+}
+
+fn collect_preset_references(identifiers: &mut HashSet<u64>, references: &[tsp::Reference]) {
+    for reference in references {
+        collect_preset_reference(identifiers, reference);
     }
 }
 

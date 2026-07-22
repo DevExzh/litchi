@@ -140,3 +140,81 @@ fn removing_an_earlier_chart_preserves_later_chart_and_anchor() {
     assert!(editor.body_charts().unwrap().is_empty());
     assert_eq!(editor.body_text().unwrap(), "Body");
 }
+
+#[test]
+fn duplicate_body_chart_clones_the_private_graph_and_inline_data() {
+    let mut editor = PagesEditor::create_with_text("Body").unwrap();
+    let source = editor
+        .add_body_chart(4, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let source_graph = body_chart_graph(&editor, source.drawable_object_id).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    assert!(editor.duplicate_body_chart(u64::MAX, 5).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
+    let duplicate = editor
+        .duplicate_body_chart(source.drawable_object_id, duplicate_anchor)
+        .unwrap();
+    let duplicate_graph = body_chart_graph(&editor, duplicate.drawable_object_id).unwrap();
+    let expected_geometry =
+        offset_drawable_geometry(source.geometry, BODY_DRAWABLE_DUPLICATE_OFFSET).unwrap();
+
+    assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
+    assert_eq!(duplicate.anchor_character_index, duplicate_anchor as u32);
+    assert_eq!(duplicate.kind, source.kind);
+    assert_eq!(duplicate.direction, source.direction);
+    assert_eq!(duplicate.data, source.data);
+    assert_eq!(duplicate.geometry, expected_geometry);
+    assert_eq!(
+        duplicate_graph.object_ids.len(),
+        source_graph.object_ids.len()
+    );
+    assert!(
+        source_graph
+            .object_ids
+            .iter()
+            .all(|identifier| !duplicate_graph.object_ids.contains(identifier))
+    );
+    assert_eq!(editor.body_text().unwrap(), "Body\u{fffc}\u{fffc}");
+
+    let replacement = ChartData::new(
+        vec!["Revenue".to_owned()],
+        vec!["2026".to_owned(), "2027".to_owned()],
+        vec![vec![Some(30.0), Some(45.0)]],
+    )
+    .unwrap();
+    editor
+        .set_body_chart_data(duplicate.drawable_object_id, replacement.clone())
+        .unwrap();
+    assert_eq!(
+        body_chart_graph(&editor, source.drawable_object_id)
+            .unwrap()
+            .info
+            .data,
+        source.data
+    );
+    assert_eq!(
+        body_chart_graph(&editor, duplicate.drawable_object_id)
+            .unwrap()
+            .info
+            .data,
+        replacement
+    );
+
+    editor.remove_body_chart(source.drawable_object_id).unwrap();
+    assert_eq!(
+        editor
+            .body_charts()
+            .unwrap()
+            .iter()
+            .map(|chart| chart.drawable_object_id)
+            .collect::<Vec<_>>(),
+        vec![duplicate.drawable_object_id]
+    );
+    editor
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(editor.body_charts().unwrap().is_empty());
+    assert_eq!(editor.body_text().unwrap(), "Body");
+}

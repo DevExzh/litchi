@@ -3,6 +3,8 @@
 mod graph;
 mod theme;
 
+use std::collections::HashMap;
+
 use graph::chart_graph;
 use theme::{chart_theme_context, patch_theme_chart_preset};
 
@@ -18,7 +20,7 @@ use crate::charts::source::{
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
 use crate::protobuf::tsch;
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 
@@ -287,6 +289,129 @@ impl KeynoteEditor {
         Ok(())
     }
 
+    /// Duplicate one slide chart using Keynote's native placement.
+    ///
+    /// The clone receives fresh drawable, stand-in, style, preset, and UUID
+    /// identities while retaining editable inline data and opaque protobuf
+    /// fields. It is owned by the same slide but has an independent chart grid
+    /// and geometry.
+    pub fn duplicate_slide_chart(
+        &mut self,
+        slide_index: usize,
+        source_drawable_object_id: u64,
+    ) -> Result<KeynoteSlideChartInfo> {
+        let source = chart_graph(self, slide_index, source_drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Keynote chart graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Keynote chart object {identifier} is missing"))
+                })?;
+                clone_slide_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat("Keynote chart clone has no drawable identifier".to_owned())
+        })?;
+        let geometry = offset_drawable_geometry(source.info.geometry, DRAWABLE_DUPLICATE_OFFSET)?;
+        update_chart_payload(
+            &mut staged,
+            &source.archive_name,
+            new_drawable_id,
+            |chart| {
+                let drawable = chart.drawable.super_.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote chart {new_drawable_id} has no drawable payload"
+                    ))
+                })?;
+                drawable.geometry = Some(geometry_archive(geometry)?);
+                Ok(())
+            },
+        )?;
+        patch_slide_drawable_references(
+            &mut staged,
+            &source.archive_name,
+            source.info.slide_id,
+            None,
+            Some(new_drawable_id),
+        )?;
+        if let Some(source_preset_id) = source.private_preset_id {
+            let graph = ObjectGraph::read(&staged)?;
+            let context = text_box_create::text_box_context(&graph, slide_index)?;
+            let theme = chart_theme_context(&staged, &graph, context.theme_id)?;
+            let new_preset_id = remap.get(&source_preset_id).copied().ok_or_else(|| {
+                Error::InvalidFormat("Keynote chart clone has no preset identifier".to_owned())
+            })?;
+            patch_theme_chart_preset(&mut staged, &theme, None, Some(new_preset_id))?;
+            if theme.component_id != source.component_id {
+                add_component_external_reference(
+                    &mut staged,
+                    theme.component_id,
+                    source.component_id,
+                    new_preset_id,
+                )?;
+            }
+        }
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Keynote chart graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote chart clone has no UUID identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let created = chart_graph(&verified, slide_index, new_drawable_id)?;
+        let expected_object_ids = source
+            .object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote chart clone has no validated identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if created.info.kind != source.info.kind
+            || created.info.direction != source.info.direction
+            || created.info.data != source.info.data
+            || created.info.geometry != geometry
+            || created.object_ids != expected_object_ids
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote chart duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created.info)
+    }
+
     /// Remove a standalone slide chart and its private title, caption, and styles.
     pub fn remove_slide_chart(
         &mut self,
@@ -357,36 +482,50 @@ impl KeynoteEditor {
     ) -> Result<()> {
         let source = chart_graph(self, slide_index, drawable_object_id)?;
         let mut staged = self.package().clone();
-        staged.update_archive(&source.archive_name, |archive| {
-            let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Keynote chart {drawable_object_id} is missing"))
-            })?;
-            let message_indexes = object
-                .messages
-                .iter()
-                .enumerate()
-                .filter(|(_, message)| message.type_ == CHART_MESSAGE_TYPE)
-                .map(|(index, _)| index)
-                .collect::<Vec<_>>();
-            let [message_index] = message_indexes.as_slice() else {
-                return Err(Error::InvalidFormat(format!(
-                    "Keynote chart {drawable_object_id} must contain exactly one chart payload"
-                )));
-            };
-            let mut chart = IWorkChartArchive::decode(&object.messages[*message_index].data)?;
-            update(&mut chart)?;
-            object.replace_message(
-                *message_index,
-                RawMessage {
-                    type_: CHART_MESSAGE_TYPE,
-                    data: chart.encode()?,
-                },
-            )?;
-            Ok(())
-        })?;
+        update_chart_payload(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            update,
+        )?;
         *self = Self::from_bytes(&staged.to_bytes()?)?;
         Ok(())
     }
+}
+
+fn update_chart_payload(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    drawable_object_id: u64,
+    update: impl FnOnce(&mut IWorkChartArchive) -> Result<()>,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote chart {drawable_object_id} is missing"))
+        })?;
+        let message_indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == CHART_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [message_index] = message_indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote chart {drawable_object_id} must contain exactly one chart payload"
+            )));
+        };
+        let mut chart = IWorkChartArchive::decode(&object.messages[*message_index].data)?;
+        update(&mut chart)?;
+        object.replace_message(
+            *message_index,
+            RawMessage {
+                type_: CHART_MESSAGE_TYPE,
+                data: chart.encode()?,
+            },
+        )?;
+        Ok(())
+    })
 }
 
 #[cfg(test)]

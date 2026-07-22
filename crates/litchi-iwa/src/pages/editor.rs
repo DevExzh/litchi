@@ -2414,6 +2414,22 @@ fn remap_pages_drawable_archive(drawable: &mut tsd::DrawableArchive, remap: &Has
     remap_optional_pages_reference(&mut drawable.caption, remap);
 }
 
+fn remap_pages_chart_wire(
+    data: &[u8],
+    recorded_references: &[u64],
+    remap: &HashMap<u64, u64>,
+) -> Result<Vec<u8>> {
+    let mut expected = crate::charts::IWorkChartArchive::decode(data)?;
+    expected.remap_references(remap, recorded_references)?;
+    let data = expected.encode()?;
+    if crate::charts::IWorkChartArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Pages chart wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 fn remap_pages_image_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const REFERENCE_PATHS: &[&[u32]] = &[
         &[1, 2],
@@ -2520,6 +2536,16 @@ fn clone_pages_drawable_graph_object(
         .zip(&source.archive_info.message_infos)
     {
         let data = match message.type_ {
+            crate::charts::source::CHART_MESSAGE_TYPE => {
+                remap_pages_chart_wire(&message.data, &info.object_references, remap)?
+            },
+            crate::charts::source::CHART_PRESET_MESSAGE_TYPE => {
+                crate::charts::source::remap_chart_preset_wire(
+                    &message.data,
+                    &info.object_references,
+                    remap,
+                )?
+            },
             SHAPE_INFO_MESSAGE_TYPE => remap_pages_shape_wire(&message.data, remap)?,
             IMAGE_MESSAGE_TYPE => remap_pages_image_wire(&message.data, remap)?,
             MOVIE_MESSAGE_TYPE => remap_pages_movie_wire(&message.data, remap)?,

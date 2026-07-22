@@ -4,9 +4,11 @@
 //! `TSCH.ChartDrawableArchive`. `prost` does not expose proto2 extensions, so a
 //! direct decode of the generated drawable type loses the chart itself.
 
+use std::collections::{HashMap, HashSet};
+
 use prost::Message;
 
-use crate::protobuf::tsch;
+use crate::protobuf::{tsch, tsp};
 use crate::wire::{
     WireField, append_length_delimited_field, append_varint_field, parse_wire_fields,
 };
@@ -58,6 +60,85 @@ impl IWorkChartArchive {
         Ok(())
     }
 
+    /// Remap the chart's typed object references while retaining opaque fields.
+    ///
+    /// iWork records object references in both the protobuf payload and IWA
+    /// message metadata. An opaque chart extension could itself contain an
+    /// object reference that this codec cannot safely rewrite, so cloning is
+    /// rejected when metadata identifies a private reference outside the typed
+    /// fields handled here.
+    pub(crate) fn remap_references(
+        &mut self,
+        remap: &HashMap<u64, u64>,
+        recorded_references: &[u64],
+    ) -> Result<()> {
+        let typed_references = self.typed_reference_identifiers();
+        if let Some(identifier) = recorded_references.iter().copied().find(|identifier| {
+            remap.contains_key(identifier) && !typed_references.contains(identifier)
+        }) {
+            return Err(Error::InvalidFormat(format!(
+                "chart payload has an unrecognized private reference {identifier}"
+            )));
+        }
+
+        if let Some(drawable) = self.drawable.super_.as_mut() {
+            remap_optional_reference(&mut drawable.parent, remap);
+            remap_optional_reference(&mut drawable.comment, remap);
+            for reference in &mut drawable.pencil_annotations {
+                remap_reference(reference, remap);
+            }
+            remap_optional_reference(&mut drawable.title, remap);
+            remap_optional_reference(&mut drawable.caption, remap);
+        }
+        if let Some(chart) = self.chart.as_mut() {
+            remap_optional_reference(&mut chart.preset, remap);
+            remap_optional_reference(&mut chart.mediator, remap);
+            remap_optional_reference(&mut chart.chart_style, remap);
+            remap_optional_reference(&mut chart.chart_non_style, remap);
+            remap_optional_reference(&mut chart.legend_style, remap);
+            remap_optional_reference(&mut chart.legend_non_style, remap);
+            remap_references(&mut chart.value_axis_styles, remap);
+            remap_references(&mut chart.value_axis_nonstyles, remap);
+            remap_references(&mut chart.category_axis_styles, remap);
+            remap_references(&mut chart.category_axis_nonstyles, remap);
+            remap_references(&mut chart.series_theme_styles, remap);
+            remap_sparse_references(chart.series_private_styles.as_mut(), remap);
+            remap_sparse_references(chart.series_non_styles.as_mut(), remap);
+            remap_references(&mut chart.paragraph_styles, remap);
+            remap_optional_reference(&mut chart.owned_preset, remap);
+        }
+        Ok(())
+    }
+
+    fn typed_reference_identifiers(&self) -> HashSet<u64> {
+        let mut identifiers = HashSet::new();
+        if let Some(drawable) = self.drawable.super_.as_ref() {
+            collect_optional_reference(&mut identifiers, drawable.parent.as_ref());
+            collect_optional_reference(&mut identifiers, drawable.comment.as_ref());
+            collect_references(&mut identifiers, &drawable.pencil_annotations);
+            collect_optional_reference(&mut identifiers, drawable.title.as_ref());
+            collect_optional_reference(&mut identifiers, drawable.caption.as_ref());
+        }
+        if let Some(chart) = self.chart.as_ref() {
+            collect_optional_reference(&mut identifiers, chart.preset.as_ref());
+            collect_optional_reference(&mut identifiers, chart.mediator.as_ref());
+            collect_optional_reference(&mut identifiers, chart.chart_style.as_ref());
+            collect_optional_reference(&mut identifiers, chart.chart_non_style.as_ref());
+            collect_optional_reference(&mut identifiers, chart.legend_style.as_ref());
+            collect_optional_reference(&mut identifiers, chart.legend_non_style.as_ref());
+            collect_references(&mut identifiers, &chart.value_axis_styles);
+            collect_references(&mut identifiers, &chart.value_axis_nonstyles);
+            collect_references(&mut identifiers, &chart.category_axis_styles);
+            collect_references(&mut identifiers, &chart.category_axis_nonstyles);
+            collect_references(&mut identifiers, &chart.series_theme_styles);
+            collect_sparse_references(&mut identifiers, chart.series_private_styles.as_ref());
+            collect_sparse_references(&mut identifiers, chart.series_non_styles.as_ref());
+            collect_references(&mut identifiers, &chart.paragraph_styles);
+            collect_optional_reference(&mut identifiers, chart.owned_preset.as_ref());
+        }
+        identifiers
+    }
+
     /// Decode a chart drawable without discarding extensions or future fields.
     pub fn decode(data: &[u8]) -> Result<Self> {
         let fields = parse_wire_fields(data)?;
@@ -105,6 +186,64 @@ impl IWorkChartArchive {
             output.extend_from_slice(field);
         }
         Ok(output)
+    }
+}
+
+fn remap_reference(reference: &mut tsp::Reference, remap: &HashMap<u64, u64>) {
+    if let Some(identifier) = remap.get(&reference.identifier) {
+        reference.identifier = *identifier;
+    }
+}
+
+fn remap_optional_reference(reference: &mut Option<tsp::Reference>, remap: &HashMap<u64, u64>) {
+    if let Some(reference) = reference {
+        remap_reference(reference, remap);
+    }
+}
+
+fn remap_references(references: &mut [tsp::Reference], remap: &HashMap<u64, u64>) {
+    for reference in references {
+        remap_reference(reference, remap);
+    }
+}
+
+fn remap_sparse_references(
+    references: Option<&mut tsp::SparseReferenceArray>,
+    remap: &HashMap<u64, u64>,
+) {
+    if let Some(references) = references {
+        for entry in &mut references.entries {
+            remap_reference(&mut entry.reference, remap);
+        }
+    }
+}
+
+fn collect_reference(identifiers: &mut HashSet<u64>, reference: &tsp::Reference) {
+    if reference.identifier != 0 {
+        identifiers.insert(reference.identifier);
+    }
+}
+
+fn collect_optional_reference(identifiers: &mut HashSet<u64>, reference: Option<&tsp::Reference>) {
+    if let Some(reference) = reference {
+        collect_reference(identifiers, reference);
+    }
+}
+
+fn collect_references(identifiers: &mut HashSet<u64>, references: &[tsp::Reference]) {
+    for reference in references {
+        collect_reference(identifiers, reference);
+    }
+}
+
+fn collect_sparse_references(
+    identifiers: &mut HashSet<u64>,
+    references: Option<&tsp::SparseReferenceArray>,
+) {
+    if let Some(references) = references {
+        for entry in &references.entries {
+            collect_reference(identifiers, &entry.reference);
+        }
     }
 }
 
@@ -210,5 +349,102 @@ mod tests {
         .unwrap();
 
         assert!(IWorkChartArchive::decode(&encoded).is_err());
+    }
+
+    #[test]
+    fn remaps_all_typed_references_and_rejects_unknown_private_metadata() {
+        let mut archive = IWorkChartArchive::new(
+            tsch::ChartDrawableArchive {
+                super_: Some(tsd::DrawableArchive {
+                    parent: Some(reference(1)),
+                    comment: Some(reference(2)),
+                    pencil_annotations: vec![reference(3)],
+                    title: Some(reference(4)),
+                    caption: Some(reference(5)),
+                    ..Default::default()
+                }),
+            },
+            tsch::ChartArchive {
+                preset: Some(reference(6)),
+                mediator: Some(reference(7)),
+                chart_style: Some(reference(8)),
+                chart_non_style: Some(reference(9)),
+                legend_style: Some(reference(10)),
+                legend_non_style: Some(reference(11)),
+                value_axis_styles: vec![reference(12)],
+                value_axis_nonstyles: vec![reference(13)],
+                category_axis_styles: vec![reference(14)],
+                category_axis_nonstyles: vec![reference(15)],
+                series_theme_styles: vec![reference(16)],
+                series_private_styles: Some(tsp::SparseReferenceArray {
+                    count: 1,
+                    entries: vec![tsp::sparse_reference_array::Entry {
+                        index: 0,
+                        reference: reference(17),
+                    }],
+                }),
+                series_non_styles: Some(tsp::SparseReferenceArray {
+                    count: 1,
+                    entries: vec![tsp::sparse_reference_array::Entry {
+                        index: 0,
+                        reference: reference(18),
+                    }],
+                }),
+                paragraph_styles: vec![reference(19)],
+                owned_preset: Some(reference(20)),
+                ..Default::default()
+            },
+        );
+        let remap = (1_u64..=20)
+            .map(|identifier| (identifier, identifier + 100))
+            .collect::<HashMap<_, _>>();
+        let recorded_references = (1_u64..=20).collect::<Vec<_>>();
+
+        archive
+            .remap_references(&remap, &recorded_references)
+            .unwrap();
+        let drawable = archive.drawable.super_.as_ref().unwrap();
+        assert_eq!(drawable.parent.as_ref().unwrap().identifier, 101);
+        assert_eq!(drawable.comment.as_ref().unwrap().identifier, 102);
+        assert_eq!(drawable.pencil_annotations[0].identifier, 103);
+        assert_eq!(drawable.title.as_ref().unwrap().identifier, 104);
+        assert_eq!(drawable.caption.as_ref().unwrap().identifier, 105);
+        let chart = archive.chart.as_ref().unwrap();
+        assert_eq!(chart.preset.as_ref().unwrap().identifier, 106);
+        assert_eq!(chart.mediator.as_ref().unwrap().identifier, 107);
+        assert_eq!(chart.chart_style.as_ref().unwrap().identifier, 108);
+        assert_eq!(chart.chart_non_style.as_ref().unwrap().identifier, 109);
+        assert_eq!(chart.legend_style.as_ref().unwrap().identifier, 110);
+        assert_eq!(chart.legend_non_style.as_ref().unwrap().identifier, 111);
+        assert_eq!(chart.value_axis_styles[0].identifier, 112);
+        assert_eq!(chart.value_axis_nonstyles[0].identifier, 113);
+        assert_eq!(chart.category_axis_styles[0].identifier, 114);
+        assert_eq!(chart.category_axis_nonstyles[0].identifier, 115);
+        assert_eq!(chart.series_theme_styles[0].identifier, 116);
+        assert_eq!(
+            chart.series_private_styles.as_ref().unwrap().entries[0]
+                .reference
+                .identifier,
+            117
+        );
+        assert_eq!(
+            chart.series_non_styles.as_ref().unwrap().entries[0]
+                .reference
+                .identifier,
+            118
+        );
+        assert_eq!(chart.paragraph_styles[0].identifier, 119);
+        assert_eq!(chart.owned_preset.as_ref().unwrap().identifier, 120);
+        assert_eq!(
+            IWorkChartArchive::decode(&archive.encode().unwrap()).unwrap(),
+            archive
+        );
+
+        let mut unsupported = IWorkChartArchive::default();
+        assert!(
+            unsupported
+                .remap_references(&HashMap::from([(21, 121)]), &[21])
+                .is_err()
+        );
     }
 }

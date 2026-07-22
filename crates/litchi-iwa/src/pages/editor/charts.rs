@@ -20,7 +20,7 @@ use crate::charts::source::{
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
 use crate::protobuf::tsch;
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
 
 const PAGES_THEME_MESSAGE_TYPE: u32 = 10_001;
 
@@ -310,6 +310,158 @@ impl PagesEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Duplicate one body chart at a UTF-16 body position.
+    ///
+    /// The clone receives fresh drawable, stand-in, style, preset, attachment,
+    /// and UUID identities while retaining the source chart's editable inline
+    /// data and opaque protobuf fields. Its geometry and attachment are offset
+    /// using Pages' native duplicate placement, so both body charts remain
+    /// independently positioned and editable.
+    pub fn duplicate_body_chart(
+        &mut self,
+        source_drawable_object_id: u64,
+        anchor_character_index: usize,
+    ) -> Result<PagesBodyChartInfo> {
+        let source = body_chart_graph(self, source_drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Pages chart graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Pages chart object {identifier} is missing"))
+                })?;
+                clone_pages_drawable_graph_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat("Pages chart clone has no drawable identifier".to_owned())
+        })?;
+        let new_attachment_id = *remap.get(&source.attachment_id).ok_or_else(|| {
+            Error::InvalidFormat("Pages chart clone has no attachment identifier".to_owned())
+        })?;
+        let geometry =
+            offset_drawable_geometry(source.info.geometry, BODY_DRAWABLE_DUPLICATE_OFFSET)?;
+        let position = geometry.position.ok_or_else(|| {
+            Error::InvalidFormat("Pages chart clone geometry has no position".to_owned())
+        })?;
+        update_chart_payload(
+            &mut staged,
+            &source.archive_name,
+            new_drawable_id,
+            |chart| {
+                let drawable = chart.drawable.super_.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Pages chart {new_drawable_id} has no drawable payload"
+                    ))
+                })?;
+                drawable.geometry = Some(geometry_archive(geometry)?);
+                Ok(())
+            },
+        )?;
+        let left_margin = root_document(&staged)?.left_margin.unwrap_or_default();
+        set_chart_attachment_position(
+            &mut staged,
+            &source.archive_name,
+            new_attachment_id,
+            position,
+            left_margin,
+        )?;
+        let mut text_editor = IWorkTextEditor::from_package(staged);
+        text_editor.replace_text(
+            self.body_storage_id,
+            anchor_character_index..anchor_character_index,
+            "\u{fffc}",
+        )?;
+        staged = text_editor.into_package();
+        add_body_drawable_attachment(
+            &mut staged,
+            self.body_storage_id,
+            anchor_character_index,
+            new_attachment_id,
+        )?;
+        patch_pages_zorder(&mut staged, None, Some(new_drawable_id))?;
+        if let Some(source_preset_id) = source.private_preset_id {
+            let root = root_document(&staged)?;
+            let theme_id = root
+                .theme
+                .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
+                .identifier;
+            let theme = chart_theme_context(&staged, theme_id)?;
+            let new_preset_id = remap.get(&source_preset_id).copied().ok_or_else(|| {
+                Error::InvalidFormat("Pages chart clone has no preset identifier".to_owned())
+            })?;
+            patch_theme_chart_preset(&mut staged, &theme, None, Some(new_preset_id))?;
+            if theme.component_id != source.component_id {
+                add_component_external_reference(
+                    &mut staged,
+                    theme.component_id,
+                    source.component_id,
+                    new_preset_id,
+                )?;
+            }
+        }
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Pages chart graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Pages chart clone has no UUID identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let created = body_chart_graph(&verified, new_drawable_id)?;
+        let expected_anchor = u32::try_from(anchor_character_index)
+            .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".into()))?;
+        let expected_object_ids = source
+            .object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Pages chart clone has no validated identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if created.info.anchor_character_index != expected_anchor
+            || created.info.kind != source.info.kind
+            || created.info.direction != source.info.direction
+            || created.info.data != source.info.data
+            || created.info.geometry != geometry
+            || created.object_ids != expected_object_ids
+        {
+            return Err(Error::InvalidFormat(
+                "Pages chart duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created.info)
     }
 
     /// Remove a body chart, its attachment, and any crate-owned private styles.

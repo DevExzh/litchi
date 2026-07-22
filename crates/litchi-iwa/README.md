@@ -45,6 +45,9 @@ println!("{}", structured.summary());
 - Native-style ordinary shape duplication across Pages, Numbers, and Keynote
   with independent rich-text storage, fresh UUID mappings, preserved opaque
   fields, and app-specific selection offsets
+- Native Pages, Numbers, and Keynote chart CRUD, including source-built inline
+  data charts and duplicate operations with fresh private graphs, preserved
+  editable data, theme-preset registration, UUIDs, and native placement offsets
 - Typed copy-on-write text-box paragraph alignment, native line-spacing modes,
   atomic before/after spacing, first-line/left/right indentation, and ordered
   left/center/right/decimal tab stops with leaders across Pages, Numbers, and Keynote
@@ -90,6 +93,15 @@ println!("{}", structured.summary());
   copy-on-write threads, annotation authors, dates, and UUIDs
 
 ## Semantic editing
+
+Native charts can be created directly from typed `ChartData` with
+`add_body_chart`, `add_sheet_chart`, or `add_slide_chart`; no source table or
+template package is required. Their corresponding `duplicate_body_chart`,
+`duplicate_sheet_chart`, and `duplicate_slide_chart` methods retain the source
+data and opaque chart fields while giving the new chart independent inline data,
+private styles, preset registration, UUIDs, ownership, and native placement.
+See `create_*_chart` and `duplicate_*_chart` in `examples/` for runnable
+file-to-file workflows.
 
 ### Create Pages documents from scratch
 
