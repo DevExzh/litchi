@@ -1084,6 +1084,44 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert INDEX fields in document field order.
+    ///
+    /// Stored configuration and cached results are exposed solely as metadata.
+    /// This method never scans XE markers, follows bookmarks, calculates page
+    /// numbers, paginates the document, generates an index, or refreshes a
+    /// field.
+    pub fn indexes(&self) -> Vec<crate::IndexField<'_>> {
+        self.fields.iter().filter_map(crate::Field::index).collect()
+    }
+
+    /// Return the number of typed, inert INDEX fields in the document.
+    pub fn index_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.index().is_some())
+            .count()
+    }
+
+    /// Return typed, inert XE index-entry fields in document field order.
+    ///
+    /// Stored entry text and options are exposed solely as metadata. This
+    /// method never changes hidden text, follows bookmarks, calculates pages,
+    /// generates an index, or refreshes a field.
+    pub fn index_entries(&self) -> Vec<crate::IndexEntryField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::index_entry)
+            .collect()
+    }
+
+    /// Return the number of typed, inert XE index-entry fields in the document.
+    pub fn index_entry_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.index_entry().is_some())
+            .count()
+    }
+
     pub fn push_field(&mut self, field: super::field::Field<'a>) -> RtfResult<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
             return Err(RtfError::MalformedDocument(

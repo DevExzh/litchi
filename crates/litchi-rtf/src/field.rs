@@ -28,6 +28,7 @@ pub enum FieldType {
     IncludeText,
     IncludePicture,
     Index,
+    IndexEntry,
     Unknown,
 }
 
@@ -575,6 +576,97 @@ pub struct TableOfAuthoritiesField<'a> {
     position: usize,
 }
 
+/// One recognized stored option of an INDEX field.
+///
+/// These values describe how a producer configured an index. They are inert
+/// metadata only: this crate never scans XE markers, reads bookmarks,
+/// calculates page numbers, or generates an index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndexOption<'a> {
+    /// The \b bookmark that bounds included entries.
+    Bookmark(Cow<'a, str>),
+    /// The \c requested number of index columns.
+    Columns(Cow<'a, str>),
+    /// The \d separator between sequence and page numbers.
+    SequencePageSeparator(Cow<'a, str>),
+    /// The \e separator between an entry and its first page number.
+    EntryPageNumberSeparator(Cow<'a, str>),
+    /// The \f entry type that selects XE markers.
+    EntryType(Cow<'a, str>),
+    /// The \g separator between the start and end of a page range.
+    PageRangeSeparator(Cow<'a, str>),
+    /// The \h heading text for each index-letter set.
+    Heading(Cow<'a, str>),
+    /// The \k separator between an entry and its cross reference.
+    CrossReferenceSeparator(Cow<'a, str>),
+    /// The \l separator between page numbers in a page-number list.
+    PageNumberSeparator(Cow<'a, str>),
+    /// The \p range of entry initial letters to include.
+    LetterRange(Cow<'a, str>),
+    /// The \r switch runs subentries into their main-entry line.
+    RunIn,
+    /// The \s SEQ identifier whose number prefixes page numbers.
+    SequenceIdentifier(Cow<'a, str>),
+    /// The \y switch enables yomi text for index entries.
+    UseYomi,
+    /// The \z language identifier used to generate the index.
+    LanguageId(Cow<'a, str>),
+}
+
+/// Inert metadata for a legacy RTF INDEX field.
+///
+/// This model retains stored configuration and a cached result only. It never
+/// scans index-entry markers, follows bookmarks, calculates page numbers,
+/// paginates the document, generates an index, or refreshes the field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexField<'a> {
+    instruction: &'a str,
+    options: Vec<IndexOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+/// One recognized stored option of an XE index-entry field.
+///
+/// These values identify how an index marker participates in an INDEX field.
+/// They are inert metadata only: this crate never changes hidden text,
+/// calculates pages, follows bookmarks, or generates an index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndexEntryOption<'a> {
+    /// The \b switch toggles bold formatting for the entry's page number.
+    BoldPageNumber,
+    /// The \f entry type that selects this marker.
+    EntryType(Cow<'a, str>),
+    /// The \i switch toggles italic formatting for the entry's page number.
+    ItalicPageNumber,
+    /// The \r bookmark that marks a page range.
+    PageRangeBookmark(Cow<'a, str>),
+    /// The \t text that replaces a page number with a cross reference.
+    CrossReference(Cow<'a, str>),
+    /// The \y yomi sorting text.
+    Yomi(Cow<'a, str>),
+}
+
+/// Inert metadata for a legacy RTF XE index-entry field.
+///
+/// This model retains a stored index marker and cached result only. It never
+/// changes hidden text, resolves a bookmark, calculates pages, or generates
+/// an index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexEntryField<'a> {
+    instruction: &'a str,
+    entry: Cow<'a, str>,
+    options: Vec<IndexEntryOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 struct ExternalIncludeParts<'a> {
     kind: IncludeFieldKind,
     source: Cow<'a, str>,
@@ -603,6 +695,17 @@ struct TableOfAuthoritiesEntryParts<'a> {
 
 struct TableOfAuthoritiesParts<'a> {
     options: Vec<TableOfAuthoritiesOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct IndexParts<'a> {
+    options: Vec<IndexOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct IndexEntryParts<'a> {
+    entry: Cow<'a, str>,
+    options: Vec<IndexEntryOption<'a>>,
     unknown_switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -1197,6 +1300,115 @@ impl<'a> TableOfAuthoritiesField<'a> {
     }
 }
 
+impl<'a> IndexField<'a> {
+    /// Return the complete stored INDEX field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return recognized INDEX options in stored source order.
+    ///
+    /// These options are configuration metadata only. This method never scans
+    /// XE markers, reads bookmarks, calculates page numbers, or generates an
+    /// index.
+    pub fn options(&self) -> &[IndexOption<'a>] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
+impl<'a> IndexEntryField<'a> {
+    /// Return the complete stored XE field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored index-entry text without generating an index.
+    pub fn entry(&self) -> &str {
+        &self.entry
+    }
+
+    /// Return recognized XE options in stored source order.
+    ///
+    /// These options are marker metadata only. This method never changes
+    /// hidden text, follows bookmarks, calculates pages, or generates an
+    /// index.
+    pub fn options(&self) -> &[IndexEntryOption<'a>] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> Field<'a> {
     #[inline]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
@@ -1277,10 +1489,11 @@ impl<'a> Field<'a> {
             {
                 FieldType::IncludePicture
             },
-            ParsedFieldCode::Other { ref keyword, .. }
-                if keyword.eq_ignore_ascii_case("INDEX") || keyword.eq_ignore_ascii_case("XE") =>
-            {
+            ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("INDEX") => {
                 FieldType::Index
+            },
+            ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("XE") => {
+                FieldType::IndexEntry
             },
             _ => FieldType::Unknown,
         };
@@ -1519,6 +1732,50 @@ impl<'a> Field<'a> {
         let parts = table_of_authorities_parts(self.instruction.as_ref())?;
         Some(TableOfAuthoritiesField {
             instruction: self.instruction.as_ref(),
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed INDEX field.
+    ///
+    /// The stored configuration and cached result are never used to scan XE
+    /// markers, follow bookmarks, calculate page numbers, paginate the
+    /// document, or generate an index. Malformed INDEX instructions remain
+    /// generic fields and return None here.
+    pub fn index(&self) -> Option<IndexField<'_>> {
+        if self.field_type != FieldType::Index {
+            return None;
+        }
+        let parts = index_parts(self.instruction.as_ref())?;
+        Some(IndexField {
+            instruction: self.instruction.as_ref(),
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed XE index-entry field.
+    ///
+    /// The stored entry and cached result are never used to change hidden text,
+    /// resolve bookmarks, calculate page numbers, or generate an index.
+    /// Malformed XE instructions remain generic fields and return None here.
+    pub fn index_entry(&self) -> Option<IndexEntryField<'_>> {
+        if self.field_type != FieldType::IndexEntry {
+            return None;
+        }
+        let parts = index_entry_parts(self.instruction.as_ref())?;
+        Some(IndexEntryField {
+            instruction: self.instruction.as_ref(),
+            entry: parts.entry,
             options: parts.options,
             unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
@@ -2430,6 +2687,217 @@ fn table_of_authorities_parts(instruction: &str) -> Option<TableOfAuthoritiesPar
     }
 
     Some(TableOfAuthoritiesParts {
+        options,
+        unknown_switches,
+    })
+}
+
+fn index_parts(instruction: &str) -> Option<IndexParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("INDEX") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let normalized_name = name.to_ascii_lowercase();
+        match normalized_name.as_str() {
+            "b" => {
+                options.push(IndexOption::Bookmark(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "c" => {
+                options.push(IndexOption::Columns(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "d" => {
+                options.push(IndexOption::SequencePageSeparator(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "e" => {
+                options.push(IndexOption::EntryPageNumberSeparator(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "f" => {
+                options.push(IndexOption::EntryType(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "g" => {
+                options.push(IndexOption::PageRangeSeparator(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "h" => {
+                options.push(IndexOption::Heading(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "k" => {
+                options.push(IndexOption::CrossReferenceSeparator(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "l" => {
+                options.push(IndexOption::PageNumberSeparator(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "p" => {
+                options.push(IndexOption::LetterRange(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "r" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(IndexOption::RunIn);
+                index += 1;
+            },
+            "s" => {
+                options.push(IndexOption::SequenceIdentifier(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "y" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(IndexOption::UseYomi);
+                index += 1;
+            },
+            "z" => {
+                options.push(IndexOption::LanguageId(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            _ => {
+                let value = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none());
+                unknown_switches.push(FieldSwitch {
+                    name: Cow::Owned(name.to_string()),
+                    value: value.map(|token| token.value.clone()),
+                });
+                index += 1 + usize::from(value.is_some());
+            },
+        }
+    }
+
+    Some(IndexParts {
+        options,
+        unknown_switches,
+    })
+}
+
+fn index_entry_parts(instruction: &str) -> Option<IndexEntryParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("XE") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let entry = tokens.first()?.value.clone();
+    if entry.is_empty() || switch_name(tokens.first()?).is_some() {
+        return None;
+    }
+    tokens.remove(0);
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let normalized_name = name.to_ascii_lowercase();
+        match normalized_name.as_str() {
+            "b" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(IndexEntryOption::BoldPageNumber);
+                index += 1;
+            },
+            "f" => {
+                options.push(IndexEntryOption::EntryType(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "i" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(IndexEntryOption::ItalicPageNumber);
+                index += 1;
+            },
+            "r" => {
+                options.push(IndexEntryOption::PageRangeBookmark(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "t" => {
+                options.push(IndexEntryOption::CrossReference(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "y" => {
+                options.push(IndexEntryOption::Yomi(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            _ => {
+                let value = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none());
+                unknown_switches.push(FieldSwitch {
+                    name: Cow::Owned(name.to_string()),
+                    value: value.map(|token| token.value.clone()),
+                });
+                index += 1 + usize::from(value.is_some());
+            },
+        }
+    }
+
+    Some(IndexEntryParts {
+        entry,
         options,
         unknown_switches,
     })
@@ -3475,6 +3943,135 @@ mod tests {
     }
 
     #[test]
+    fn index_fields_preserve_stored_configuration_without_generation() {
+        let mut field = Field::parse_instruction(
+            r#"INDEX \b Scope \c 2 \d "-" \e ", " \f Intro \g "–" \h "A Entries" \k ". " \l "; " \p A-C \r \s Figure \y \z 1033 \* MERGEFORMAT"#,
+        );
+        field.result = Cow::Borrowed("cached index");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::Index);
+        let index = field.index().unwrap();
+        assert_eq!(index.instruction(), field.instruction);
+        assert_eq!(
+            index.options(),
+            &[
+                IndexOption::Bookmark(Cow::Borrowed("Scope")),
+                IndexOption::Columns(Cow::Borrowed("2")),
+                IndexOption::SequencePageSeparator(Cow::Borrowed("-")),
+                IndexOption::EntryPageNumberSeparator(Cow::Borrowed(", ")),
+                IndexOption::EntryType(Cow::Borrowed("Intro")),
+                IndexOption::PageRangeSeparator(Cow::Borrowed("–")),
+                IndexOption::Heading(Cow::Borrowed("A Entries")),
+                IndexOption::CrossReferenceSeparator(Cow::Borrowed(". ")),
+                IndexOption::PageNumberSeparator(Cow::Borrowed("; ")),
+                IndexOption::LetterRange(Cow::Borrowed("A-C")),
+                IndexOption::RunIn,
+                IndexOption::SequenceIdentifier(Cow::Borrowed("Figure")),
+                IndexOption::UseYomi,
+                IndexOption::LanguageId(Cow::Borrowed("1033")),
+            ]
+        );
+        assert_eq!(index.cached_result(), Some("cached index"));
+        assert!(index.is_dirty());
+        assert!(index.is_locked());
+        assert_eq!(index.owner(), FieldOwner::Body);
+        assert_eq!(index.position(), 4);
+        assert_eq!(index.unknown_switches().len(), 1);
+        assert_eq!(index.unknown_switches()[0].name, "*");
+        assert_eq!(
+            index.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+
+        assert!(Field::parse_instruction("INDEX").index().is_some());
+        assert!(Field::parse_instruction(r"INDEX \b").index().is_none());
+        assert!(
+            Field::parse_instruction(r"INDEX \r unexpected")
+                .index()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction("INDEX unexpected")
+                .index()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction(r"INDEXES \c 2").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
+    fn index_entry_fields_preserve_stored_metadata_without_generation() {
+        let mut field = Field::parse_instruction(
+            r#"XE "Office Open XML:Syntax" \b \f Intro \i \r PageRange \t "See syntax" \y "Office" \* MERGEFORMAT"#,
+        );
+        field.result = Cow::Borrowed("cached entry");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::IndexEntry);
+        let entry = field.index_entry().unwrap();
+        assert_eq!(entry.instruction(), field.instruction);
+        assert_eq!(entry.entry(), "Office Open XML:Syntax");
+        assert_eq!(
+            entry.options(),
+            &[
+                IndexEntryOption::BoldPageNumber,
+                IndexEntryOption::EntryType(Cow::Borrowed("Intro")),
+                IndexEntryOption::ItalicPageNumber,
+                IndexEntryOption::PageRangeBookmark(Cow::Borrowed("PageRange")),
+                IndexEntryOption::CrossReference(Cow::Borrowed("See syntax")),
+                IndexEntryOption::Yomi(Cow::Borrowed("Office")),
+            ]
+        );
+        assert_eq!(entry.cached_result(), Some("cached entry"));
+        assert!(entry.is_dirty());
+        assert!(entry.is_locked());
+        assert_eq!(entry.owner(), FieldOwner::Body);
+        assert_eq!(entry.position(), 4);
+        assert_eq!(entry.unknown_switches().len(), 1);
+        assert_eq!(entry.unknown_switches()[0].name, "*");
+        assert_eq!(
+            entry.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+
+        assert!(Field::parse_instruction("XE").index_entry().is_none());
+        assert!(
+            Field::parse_instruction(r"XE \f Intro")
+                .index_entry()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"XE entry unexpected")
+                .index_entry()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"XE entry \b unexpected")
+                .index_entry()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction(r"XER entry").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
     fn document_discovers_eq_fields_without_calculating_them() {
         let document = crate::RtfDocument::parse(
             r#"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}"#,
@@ -3673,6 +4270,44 @@ mod tests {
             ]
         );
         assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_index_fields_without_generating_an_index() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst INDEX \\f Intro \\r}{\fldrslt cached index}}Middle {\field\flddirty{\*\fldinst XE "syntax:fields" \\f Intro \\t "See references"}{\fldrslt cached entry}}After}"#,
+        )
+        .unwrap();
+
+        let indexes = document.indexes();
+        assert_eq!(document.index_count(), 1);
+        assert_eq!(indexes.len(), 1);
+        assert_eq!(indexes[0].cached_result(), Some("cached index"));
+        assert!(indexes[0].is_dirty());
+        assert!(indexes[0].is_locked());
+        assert_eq!(
+            indexes[0].options(),
+            &[
+                IndexOption::EntryType(Cow::Borrowed("Intro")),
+                IndexOption::RunIn,
+            ]
+        );
+
+        let entries = document.index_entries();
+        assert_eq!(document.index_entry_count(), 1);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].entry(), "syntax:fields");
+        assert_eq!(entries[0].cached_result(), Some("cached entry"));
+        assert!(entries[0].is_dirty());
+        assert!(!entries[0].is_locked());
+        assert_eq!(
+            entries[0].options(),
+            &[
+                IndexEntryOption::EntryType(Cow::Borrowed("Intro")),
+                IndexEntryOption::CrossReference(Cow::Borrowed("See references")),
+            ]
+        );
+        assert_eq!(document.text(), "Before Middle After");
     }
 
     #[test]
