@@ -3106,6 +3106,36 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_table_of_contents_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            document.add_heading("Overview", 1).unwrap();
+            document
+                .add_toc(
+                    crate::docx::TableOfContents::new()
+                        .heading_levels(1, 4)
+                        .hyperlinks(true),
+                )
+                .unwrap();
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let toc = document.table_of_contents().unwrap();
+        assert_eq!(document.table_of_contents_count().unwrap(), 1);
+        assert_eq!(toc.len(), 1);
+        assert!(toc[0].includes_hyperlinks());
+        assert!(toc[0].hides_page_numbers_in_web_layout());
+        assert_eq!(
+            toc[0].heading_style_levels().unwrap(),
+            vec![crate::docx::TableOfContentsLevelRange::new(1, 4).unwrap()]
+        );
+    }
+
+    #[test]
     fn body_edits_preserve_settings_part_byte_for_byte() {
         let mut package = Package::new().unwrap();
         let settings_uri = PackURI::new("/word/settings.xml").unwrap();

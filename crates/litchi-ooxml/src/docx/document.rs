@@ -7,7 +7,7 @@ use crate::docx::comment::Comment;
 use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
-use crate::docx::field::Field;
+use crate::docx::field::{Field, TableOfContentsField};
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
 use crate::docx::header_footer::HeaderFooter;
@@ -1221,6 +1221,25 @@ impl<'a> Document<'a> {
         Ok(self.fields()?.len())
     }
 
+    /// Get typed, inert table-of-contents fields in document order.
+    ///
+    /// Both simple (`w:fldSimple`) and complex (`w:fldChar`) TOC fields are
+    /// discovered. Returned values expose the stored instruction, switches,
+    /// cached result, and dirty/lock state; this method never paginates,
+    /// regenerates a table of contents, follows its links, or executes fields.
+    pub fn table_of_contents(&self) -> Result<Vec<TableOfContentsField>> {
+        self.fields()?
+            .iter()
+            .map(Field::table_of_contents)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of table-of-contents fields in the main document.
+    pub fn table_of_contents_count(&self) -> Result<usize> {
+        Ok(self.table_of_contents()?.len())
+    }
+
     /// Get all mail-merge fields in document order.
     ///
     /// This recognizes `MERGEFIELD` instructions represented by either
@@ -1672,9 +1691,9 @@ impl<'a> Document<'a> {
     // - Full support for insert, delete, move, and format revisions
     // - Includes author, date, and revision ID tracking
     //
-    // TODO: Table of contents (MS-DOCX Section 17.16.5)
-    // - Requires parsing w:sdt elements with w:docPartGallery="Table of Contents"
-    // - insert_toc(), update_toc(), remove_toc()
+    // ✅ Table of contents: table_of_contents(), table_of_contents_count()
+    // - Typed inert field discovery and cached results; no pagination,
+    //   automatic refresh, or structured-document-tag mutation
     //
     // ✅ Mail merge field discovery: merge_fields(), merge_field_names()
     // TODO: Mail merge mutation (MS-DOCX Section 17.16.5.35)

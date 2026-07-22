@@ -105,8 +105,8 @@ conversion, fonts, and image conversion are optional.
 | Web extensions/Office Add-ins | 🟡 | 🟡 | 🟡 | Bounded task-pane and web-extension parsing/serialization; add-ins are never executed |
 | Themes | ✅ | ✅ | ✅ | Theme colors, fonts, and related package parts |
 | Document protection | 🟡 | ✅ | ✅ | Protection settings and hashes; the library does not enforce editing policy |
-| Table of contents | 🟡 | ❌ | ✅ | TOC field/content authoring; no pagination or automatic refresh |
-| Watermarks | 🟡 | ❌ | ✅ | Writer support for generated watermark content |
+| Table of contents | 🟡 | ✅ | ✅ | Typed inert discovery of simple/complex TOC fields, switches, cached results, and dirty/lock state plus field/content authoring; no pagination or automatic refresh |
+| Watermarks | 🟡 | ✅ | ✅ | Typed VML text-watermark discovery in headers plus generated watermark authoring/removal; arbitrary and image watermark variants remain bounded |
 | Office Math equations in-document | ✅ | ✅ | ✅ | Exact OMML extraction plus validated inline/display equation and math-paragraph authoring; layout and equation evaluation remain renderer responsibilities |
 | SmartArt | ❌ | ❌ | ❌ | Diagram parts are not exposed as a DOCX semantic model |
 | DrawingML text boxes and WordArt | ❌ | ❌ | ❌ | No typed DOCX authoring model |

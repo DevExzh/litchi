@@ -8,6 +8,8 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
+const MAX_TOC_SWITCHES: usize = 64;
+
 /// A field in a Word document.
 ///
 /// Represents a field instruction like `PAGE`, `DATE`, `REF`, etc.
@@ -150,6 +152,23 @@ impl Field {
             .unwrap_or(remainder.len());
         let name = &remainder[..end];
         (!name.is_empty()).then_some(name)
+    }
+
+    /// Check whether this is a `TOC` (Table of Contents) field.
+    ///
+    /// The field's cached result remains data only; calling this method never
+    /// recalculates the table of contents or follows any hyperlinks in it.
+    pub fn is_table_of_contents(&self) -> bool {
+        toc_instruction_remainder(&self.instruction).is_some()
+    }
+
+    /// Parse this field as an inert typed table-of-contents field.
+    ///
+    /// Returns `Ok(None)` for non-`TOC` fields. The returned model preserves
+    /// the instruction, cached result, dirty/lock state, and field switches;
+    /// it never evaluates the field or refreshes its cached content.
+    pub fn table_of_contents(&self) -> Result<Option<TableOfContentsField>> {
+        TableOfContentsField::from_field(self)
     }
 
     /// Extract all fields from document XML bytes.
@@ -407,6 +426,295 @@ impl Field {
     }
 }
 
+/// One lexical switch in a `TOC` field instruction.
+///
+/// Switch names are normalized to ASCII lowercase. Quoted and unquoted
+/// arguments are decoded into their logical text, while the complete original
+/// instruction remains available through [`TableOfContentsField::instruction`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfContentsSwitch {
+    name: char,
+    argument: Option<String>,
+}
+
+impl TableOfContentsSwitch {
+    /// Return the switch character, without its leading backslash.
+    pub fn name(&self) -> char {
+        self.name
+    }
+
+    /// Return the optional argument supplied to this switch.
+    pub fn argument(&self) -> Option<&str> {
+        self.argument.as_deref()
+    }
+}
+
+/// An inclusive heading-level range selected by a `TOC \o` switch.
+///
+/// WordprocessingML heading levels are bounded to one through nine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TableOfContentsLevelRange {
+    start: u8,
+    end: u8,
+}
+
+impl TableOfContentsLevelRange {
+    /// Create a valid inclusive heading-level range.
+    pub fn new(start: u8, end: u8) -> Result<Self> {
+        if !(1..=9).contains(&start) || !(1..=9).contains(&end) || start > end {
+            return Err(OoxmlError::InvalidFormat(
+                "TOC heading levels must form an ascending range from 1 through 9".to_string(),
+            ));
+        }
+        Ok(Self { start, end })
+    }
+
+    /// Return the first included heading level.
+    pub fn start(&self) -> u8 {
+        self.start
+    }
+
+    /// Return the final included heading level.
+    pub fn end(&self) -> u8 {
+        self.end
+    }
+}
+
+/// A typed, inert Word table-of-contents field.
+///
+/// This represents the existing `TOC` field code and its cached result under
+/// OOXML's field model. It deliberately does not paginate, regenerate entries,
+/// resolve links, or execute field instructions. A `dirty` result simply means
+/// a word processor may choose to refresh it later.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfContentsField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    switches: Vec<TableOfContentsSwitch>,
+}
+
+impl TableOfContentsField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(switches) = parse_toc_switches(field.instruction())? else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            switches,
+        }))
+    }
+
+    /// Return the complete field instruction exactly as parsed.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached visible result, if one is stored in the document.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    pub fn switches(&self) -> &[TableOfContentsSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        self.switches
+            .iter()
+            .any(|switch| switch.name.eq_ignore_ascii_case(&name))
+    }
+
+    /// Return every built-in heading-style level range selected by `\o`.
+    ///
+    /// The OOXML TOC definition associates `\o` with the heading styles to
+    /// include. Multiple occurrences are retained in source order rather than
+    /// guessed at or collapsed.
+    pub fn heading_style_levels(&self) -> Result<Vec<TableOfContentsLevelRange>> {
+        self.switches
+            .iter()
+            .filter(|switch| switch.name == 'o')
+            .map(|switch| {
+                let value = switch.argument.as_deref().ok_or_else(|| {
+                    OoxmlError::InvalidFormat(
+                        "TOC \\o switch requires a heading-level range".to_string(),
+                    )
+                })?;
+                parse_toc_level_range(value)
+            })
+            .collect()
+    }
+
+    /// Whether the field asks Word to use applied paragraph outline levels.
+    pub fn uses_outline_levels(&self) -> bool {
+        self.has_switch('u')
+    }
+
+    /// Whether the field asks Word to emit hyperlinks for its entries.
+    pub fn includes_hyperlinks(&self) -> bool {
+        self.has_switch('h')
+    }
+
+    /// Whether the field hides page numbers in Web Layout view.
+    pub fn hides_page_numbers_in_web_layout(&self) -> bool {
+        self.has_switch('z')
+    }
+}
+
+fn toc_instruction_remainder(instruction: &str) -> Option<&str> {
+    let instruction = instruction.trim_start();
+    let field_type = instruction.get(..3)?;
+    let remainder = instruction.get(3..)?;
+    if !field_type.eq_ignore_ascii_case("TOC") {
+        return None;
+    }
+    match remainder.chars().next() {
+        None | Some('\\') => Some(remainder),
+        Some(character) if character.is_whitespace() => Some(remainder),
+        Some(_) => None,
+    }
+}
+
+fn parse_toc_switches(instruction: &str) -> Result<Option<Vec<TableOfContentsSwitch>>> {
+    let Some(remainder) = toc_instruction_remainder(instruction) else {
+        return Ok(None);
+    };
+    let mut characters = remainder.chars().peekable();
+    let mut switches = Vec::new();
+    loop {
+        while characters
+            .peek()
+            .is_some_and(|character| character.is_whitespace())
+        {
+            characters.next();
+        }
+        let Some(character) = characters.next() else {
+            break;
+        };
+        if character != '\\' {
+            return Err(OoxmlError::InvalidFormat(
+                "TOC field contains text outside a field switch".to_string(),
+            ));
+        }
+        let name = characters.next().ok_or_else(|| {
+            OoxmlError::InvalidFormat("TOC field ends with a switch introducer".to_string())
+        })?;
+        if name == '\\' || name.is_whitespace() {
+            return Err(OoxmlError::InvalidFormat(
+                "TOC field has an invalid switch name".to_string(),
+            ));
+        }
+        while characters
+            .peek()
+            .is_some_and(|character| character.is_whitespace())
+        {
+            characters.next();
+        }
+        let argument = match characters.peek().copied() {
+            None | Some('\\') => None,
+            Some('"') => {
+                characters.next();
+                Some(parse_toc_quoted_argument(&mut characters)?)
+            },
+            Some(_) => Some(parse_toc_unquoted_argument(&mut characters)),
+        };
+        if switches.len() >= MAX_TOC_SWITCHES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "TOC field exceeds {MAX_TOC_SWITCHES} switches"
+            )));
+        }
+        switches.push(TableOfContentsSwitch {
+            name: name.to_ascii_lowercase(),
+            argument,
+        });
+    }
+    Ok(Some(switches))
+}
+
+fn parse_toc_quoted_argument(
+    characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
+) -> Result<String> {
+    let mut argument = String::new();
+    let mut escaped = false;
+    while let Some(character) = characters.next() {
+        if escaped {
+            if character != '\\' && character != '"' {
+                argument.push('\\');
+            }
+            argument.push(character);
+            escaped = false;
+            continue;
+        }
+        match character {
+            '\\' => escaped = true,
+            '"' => {
+                if characters
+                    .peek()
+                    .is_some_and(|next| !next.is_whitespace() && *next != '\\')
+                {
+                    return Err(OoxmlError::InvalidFormat(
+                        "TOC quoted switch argument has trailing text".to_string(),
+                    ));
+                }
+                return Ok(argument);
+            },
+            _ => argument.push(character),
+        }
+    }
+    Err(OoxmlError::InvalidFormat(
+        "TOC field has an unterminated quoted switch argument".to_string(),
+    ))
+}
+
+fn parse_toc_unquoted_argument(
+    characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
+) -> String {
+    let mut argument = String::new();
+    while characters
+        .peek()
+        .is_some_and(|character| !character.is_whitespace() && *character != '\\')
+    {
+        argument.push(characters.next().expect("checked TOC argument character"));
+    }
+    argument
+}
+
+fn parse_toc_level_range(value: &str) -> Result<TableOfContentsLevelRange> {
+    let mut levels = value.split('-').map(str::trim);
+    let start = levels
+        .next()
+        .ok_or_else(|| OoxmlError::InvalidFormat("TOC level range is empty".to_string()))?
+        .parse::<u8>()
+        .map_err(|_| OoxmlError::InvalidFormat("invalid TOC start level".to_string()))?;
+    let end = levels
+        .next()
+        .ok_or_else(|| OoxmlError::InvalidFormat("TOC level range is incomplete".to_string()))?
+        .parse::<u8>()
+        .map_err(|_| OoxmlError::InvalidFormat("invalid TOC end level".to_string()))?;
+    if levels.next().is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "TOC level range contains too many separators".to_string(),
+        ));
+    }
+    TableOfContentsLevelRange::new(start, end)
+}
+
 struct PendingSimpleField {
     order: usize,
     instruction: String,
@@ -555,6 +863,72 @@ mod tests {
         assert!(fields[2].is_locked());
         assert_eq!(fields[3].instruction(), "NUMPAGES");
         assert_eq!(fields[3].result(), None);
+    }
+
+    #[test]
+    fn parses_toc_fields_and_standard_switches() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" TOC \o &quot;1-3&quot; \h \z \b &quot;Main Bookmark&quot; " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>Introduction</w:t><w:tab/><w:t>1</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+            <w:r><w:instrText>TOC\o&quot;2-4&quot;\u \n &quot;2-2&quot; \* MERGEFORMAT</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+            <w:r><w:t>Chapter</w:t><w:tab/><w:t>4</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="TOCENTRY \f ignored"><w:r><w:t>not a TOC</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_table_of_contents());
+        assert!(fields[1].is_table_of_contents());
+        assert!(!fields[2].is_table_of_contents());
+
+        let first = fields[0].table_of_contents().unwrap().unwrap();
+        assert_eq!(first.cached_result(), Some("Introduction\t1"));
+        assert!(first.is_dirty());
+        assert!(first.is_locked());
+        assert!(first.includes_hyperlinks());
+        assert!(first.hides_page_numbers_in_web_layout());
+        assert!(!first.uses_outline_levels());
+        assert_eq!(first.switches()[0].name(), 'o');
+        assert_eq!(first.switches()[0].argument(), Some("1-3"));
+        assert_eq!(first.switches()[3].argument(), Some("Main Bookmark"));
+        assert_eq!(
+            first.heading_style_levels().unwrap(),
+            vec![TableOfContentsLevelRange::new(1, 3).unwrap()]
+        );
+
+        let second = fields[1].table_of_contents().unwrap().unwrap();
+        assert_eq!(second.cached_result(), Some("Chapter\t4"));
+        assert!(second.uses_outline_levels());
+        assert!(!second.includes_hyperlinks());
+        assert_eq!(second.switches()[0].name(), 'o');
+        assert_eq!(second.switches()[0].argument(), Some("2-4"));
+        assert_eq!(second.switches()[3].name(), '*');
+        assert_eq!(second.switches()[3].argument(), Some("MERGEFORMAT"));
+        assert_eq!(
+            second.heading_style_levels().unwrap(),
+            vec![TableOfContentsLevelRange::new(2, 4).unwrap()]
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_toc_switches_and_level_ranges() {
+        let non_toc = Field::new("TOCENTRY \\f ignored".to_string(), None, false);
+        assert!(!non_toc.is_table_of_contents());
+        assert!(non_toc.table_of_contents().unwrap().is_none());
+
+        let dangling = Field::new("TOC \\".to_string(), None, false);
+        assert!(dangling.table_of_contents().is_err());
+        let unterminated = Field::new(r#"TOC \o "1-3"#.to_string(), None, false);
+        assert!(unterminated.table_of_contents().is_err());
+
+        let invalid_levels = Field::new(r#"TOC \o "3-1""#.to_string(), None, false);
+        let toc = invalid_levels.table_of_contents().unwrap().unwrap();
+        assert!(toc.heading_style_levels().is_err());
+        assert!(TableOfContentsLevelRange::new(0, 1).is_err());
+        assert!(TableOfContentsLevelRange::new(1, 10).is_err());
     }
 
     #[test]
