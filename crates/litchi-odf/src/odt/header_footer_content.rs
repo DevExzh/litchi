@@ -64,6 +64,15 @@ pub struct HeaderFooterField {
 pub enum HeaderFooterFieldKind {
     PageNumber,
     PageCount,
+    PageContinuation,
+    PageVariableSet,
+    PageVariableGet,
+    ParagraphCount,
+    WordCount,
+    CharacterCount,
+    TableCount,
+    ImageCount,
+    ObjectCount,
     Title,
     Subject,
     AuthorName,
@@ -551,6 +560,15 @@ fn field_kind(local: &[u8]) -> Option<HeaderFooterFieldKind> {
     Some(match local {
         b"page-number" => HeaderFooterFieldKind::PageNumber,
         b"page-count" => HeaderFooterFieldKind::PageCount,
+        b"page-continuation" => HeaderFooterFieldKind::PageContinuation,
+        b"page-variable-set" => HeaderFooterFieldKind::PageVariableSet,
+        b"page-variable-get" => HeaderFooterFieldKind::PageVariableGet,
+        b"paragraph-count" => HeaderFooterFieldKind::ParagraphCount,
+        b"word-count" => HeaderFooterFieldKind::WordCount,
+        b"character-count" => HeaderFooterFieldKind::CharacterCount,
+        b"table-count" => HeaderFooterFieldKind::TableCount,
+        b"image-count" => HeaderFooterFieldKind::ImageCount,
+        b"object-count" => HeaderFooterFieldKind::ObjectCount,
         b"title" => HeaderFooterFieldKind::Title,
         b"subject" => HeaderFooterFieldKind::Subject,
         b"author-name" => HeaderFooterFieldKind::AuthorName,
@@ -908,6 +926,52 @@ mod tests {
             fields[14]
                 .attributes
                 .contains(&("text:duration".into(), "PT1H".into()))
+        );
+    }
+
+    #[test]
+    fn classifies_cached_page_navigation_and_statistic_fields() {
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:page-continuation t:select-page="previous" t:string-value="Continued">Prev</t:page-continuation><t:page-variable-set t:active="true" t:page-adjust="2">3</t:page-variable-set><t:page-variable-get s:num-format="1">3</t:page-variable-get><t:paragraph-count>4</t:paragraph-count><t:word-count>5</t:word-count><t:character-count>6</t:character-count><t:table-count>7</t:table-count><t:image-count>8</t:image-count><t:object-count>9</t:object-count></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
+        let regions = parse_header_footer_blocks(xml).unwrap();
+        let blocks = &regions[&(String::from("A"), HeaderFooterKind::Footer)];
+        let fields: Vec<_> = blocks[0]
+            .content
+            .iter()
+            .filter_map(|inline| match inline {
+                HeaderFooterInline::Field(field) => Some(field),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
+            vec![
+                &HeaderFooterFieldKind::PageContinuation,
+                &HeaderFooterFieldKind::PageVariableSet,
+                &HeaderFooterFieldKind::PageVariableGet,
+                &HeaderFooterFieldKind::ParagraphCount,
+                &HeaderFooterFieldKind::WordCount,
+                &HeaderFooterFieldKind::CharacterCount,
+                &HeaderFooterFieldKind::TableCount,
+                &HeaderFooterFieldKind::ImageCount,
+                &HeaderFooterFieldKind::ObjectCount,
+            ]
+        );
+        assert_eq!(fields[0].displayed_text, "Prev");
+        assert!(
+            fields[0]
+                .attributes
+                .contains(&("text:string-value".into(), "Continued".into()))
+        );
+        assert!(
+            fields[1]
+                .attributes
+                .contains(&("text:page-adjust".into(), "2".into()))
+        );
+        assert!(
+            fields[2]
+                .attributes
+                .contains(&("style:num-format".into(), "1".into()))
         );
     }
 
