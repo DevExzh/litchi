@@ -3405,6 +3405,32 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_conditional_mail_merge_controls_without_merging() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        package.document_mut().unwrap().add_paragraph().add_field(
+            crate::docx::writer::MutableField::with_result(
+                r#"SKIPIF MERGEFIELD Order < 100"#.to_string(),
+                "cached skipif".to_string(),
+            ),
+        );
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        assert!(reopened.mail_merge_settings().unwrap().is_none());
+        let document = reopened.document().unwrap();
+        let controls = document.mail_merge_conditional_controls().unwrap();
+        assert_eq!(document.mail_merge_conditional_control_count().unwrap(), 1);
+        assert_eq!(controls.len(), 1);
+        assert_eq!(
+            controls[0].kind(),
+            crate::docx::MailMergeConditionalControlKind::SkipIf
+        );
+        assert_eq!(controls[0].comparison(), "MERGEFIELD Order < 100");
+        assert_eq!(controls[0].cached_result(), Some("cached skipif"));
+    }
+
+    #[test]
     fn writes_and_discovers_inert_macro_button_fields_without_execution() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
