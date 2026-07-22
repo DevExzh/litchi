@@ -73,6 +73,18 @@ pub enum HeaderFooterFieldKind {
     TableCount,
     ImageCount,
     ObjectCount,
+    Reference,
+    SequenceReference,
+    BookmarkReference,
+    NoteReference,
+    VariableSet,
+    VariableGet,
+    VariableInput,
+    UserFieldGet,
+    UserFieldInput,
+    Sequence,
+    Expression,
+    TextInput,
     Title,
     Subject,
     AuthorName,
@@ -569,6 +581,18 @@ fn field_kind(local: &[u8]) -> Option<HeaderFooterFieldKind> {
         b"table-count" => HeaderFooterFieldKind::TableCount,
         b"image-count" => HeaderFooterFieldKind::ImageCount,
         b"object-count" => HeaderFooterFieldKind::ObjectCount,
+        b"reference-ref" => HeaderFooterFieldKind::Reference,
+        b"sequence-ref" => HeaderFooterFieldKind::SequenceReference,
+        b"bookmark-ref" => HeaderFooterFieldKind::BookmarkReference,
+        b"note-ref" => HeaderFooterFieldKind::NoteReference,
+        b"variable-set" => HeaderFooterFieldKind::VariableSet,
+        b"variable-get" => HeaderFooterFieldKind::VariableGet,
+        b"variable-input" => HeaderFooterFieldKind::VariableInput,
+        b"user-field-get" => HeaderFooterFieldKind::UserFieldGet,
+        b"user-field-input" => HeaderFooterFieldKind::UserFieldInput,
+        b"sequence" => HeaderFooterFieldKind::Sequence,
+        b"expression" => HeaderFooterFieldKind::Expression,
+        b"text-input" => HeaderFooterFieldKind::TextInput,
         b"title" => HeaderFooterFieldKind::Title,
         b"subject" => HeaderFooterFieldKind::Subject,
         b"author-name" => HeaderFooterFieldKind::AuthorName,
@@ -972,6 +996,55 @@ mod tests {
             fields[2]
                 .attributes
                 .contains(&("style:num-format".into(), "1".into()))
+        );
+    }
+
+    #[test]
+    fn classifies_cached_reference_sequence_and_variable_fields() {
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:reference-ref t:ref-name="reference" t:reference-format="text">Reference</t:reference-ref><t:sequence-ref t:ref-name="sequence">Sequence reference</t:sequence-ref><t:bookmark-ref t:ref-name="bookmark">Bookmark</t:bookmark-ref><t:note-ref t:ref-name="note" t:note-class="footnote">Note</t:note-ref><t:variable-set t:name="variable" t:formula="of:=1+1">2</t:variable-set><t:variable-get t:name="variable">2</t:variable-get><t:variable-input t:name="input" t:description="Input">Input</t:variable-input><t:user-field-get t:name="user">User</t:user-field-get><t:user-field-input t:name="user-input" t:description="User input">User input</t:user-field-input><t:sequence t:name="Figure" t:formula="ooow:Figure+1">1</t:sequence><t:expression t:formula="of:=2+2">4</t:expression><t:text-input t:description="Prompt">Answer</t:text-input></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
+        let regions = parse_header_footer_blocks(xml).unwrap();
+        let blocks = &regions[&(String::from("A"), HeaderFooterKind::Footer)];
+        let fields: Vec<_> = blocks[0]
+            .content
+            .iter()
+            .filter_map(|inline| match inline {
+                HeaderFooterInline::Field(field) => Some(field),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
+            vec![
+                &HeaderFooterFieldKind::Reference,
+                &HeaderFooterFieldKind::SequenceReference,
+                &HeaderFooterFieldKind::BookmarkReference,
+                &HeaderFooterFieldKind::NoteReference,
+                &HeaderFooterFieldKind::VariableSet,
+                &HeaderFooterFieldKind::VariableGet,
+                &HeaderFooterFieldKind::VariableInput,
+                &HeaderFooterFieldKind::UserFieldGet,
+                &HeaderFooterFieldKind::UserFieldInput,
+                &HeaderFooterFieldKind::Sequence,
+                &HeaderFooterFieldKind::Expression,
+                &HeaderFooterFieldKind::TextInput,
+            ]
+        );
+        assert_eq!(fields[0].displayed_text, "Reference");
+        assert!(
+            fields[0]
+                .attributes
+                .contains(&("text:ref-name".into(), "reference".into()))
+        );
+        assert!(
+            fields[4]
+                .attributes
+                .contains(&("text:formula".into(), "of:=1+1".into()))
+        );
+        assert!(
+            fields[11]
+                .attributes
+                .contains(&("text:description".into(), "Prompt".into()))
         );
     }
 
