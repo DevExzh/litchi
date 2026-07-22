@@ -197,6 +197,66 @@ pub struct Field<'a> {
     pub range_end: usize,
 }
 
+/// Inert metadata for a legacy RTF `EQ` field.
+///
+/// The expression is retained exactly as field-instruction text after the
+/// `EQ` keyword. It is never parsed as an equation, evaluated, rendered, or
+/// sent to an external application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EquationField<'a> {
+    instruction: &'a str,
+    expression: &'a str,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+impl<'a> EquationField<'a> {
+    /// Return the complete stored `EQ` field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the opaque equation expression after the `EQ` keyword.
+    pub fn expression(&self) -> &'a str {
+        self.expression
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// RTF 1.9.1 examples normally use an empty result for `EQ` fields. This
+    /// value is metadata only and is never recalculated.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> Field<'a> {
     #[inline]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
@@ -262,6 +322,45 @@ impl<'a> Field<'a> {
             position: 0,
             range_end: 0,
         }
+    }
+
+    /// Construct an inert `EQ` field from caller-provided equation syntax.
+    ///
+    /// The expression is serialized as field text with RTF escaping. The
+    /// library never parses, calculates, formats, or renders that syntax.
+    pub fn new_equation(expression: impl Into<String>) -> crate::RtfResult<Field<'static>> {
+        let expression = expression.into();
+        let instruction = if expression.is_empty() {
+            "EQ".to_string()
+        } else {
+            format!("EQ {expression}")
+        };
+        if instruction.len() > MAX_INSTRUCTION_LEN {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF EQ field instruction exceeds the safety limit".to_string(),
+            ));
+        }
+        Ok(Field::new(
+            FieldType::Equation,
+            Cow::Owned(instruction),
+            Cow::Borrowed(""),
+        ))
+    }
+
+    /// Return typed inert metadata when this is an `EQ` field.
+    pub fn equation(&self) -> Option<EquationField<'_>> {
+        if self.field_type != FieldType::Equation {
+            return None;
+        }
+        let expression = equation_expression(self.instruction.as_ref())?;
+        Some(EquationField {
+            instruction: self.instruction.as_ref(),
+            expression,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
     }
 
     pub const fn status(&self) -> FieldStatus {
@@ -392,6 +491,18 @@ impl<'a> Field<'a> {
             &self.instruction
         }
     }
+}
+
+fn equation_expression(instruction: &str) -> Option<&str> {
+    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let keyword_len = instruction
+        .find(|value: char| value.is_ascii_whitespace())
+        .unwrap_or(instruction.len());
+    instruction[..keyword_len]
+        .eq_ignore_ascii_case("EQ")
+        .then(|| {
+            instruction[keyword_len..].trim_start_matches(|value: char| value.is_ascii_whitespace())
+        })
 }
 
 pub(crate) fn validate_story_events(
@@ -810,6 +921,47 @@ mod tests {
                 ParsedFieldCode::Malformed(_)
             ));
         }
+    }
+
+    #[test]
+    fn equation_fields_preserve_opaque_expression_metadata() {
+        let mut field = Field::parse_instruction(r"EQ \o\ac(\fs24 Q,\fs16 R)");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        let equation = field.equation().unwrap();
+        assert_eq!(equation.instruction(), r"EQ \o\ac(\fs24 Q,\fs16 R)");
+        assert_eq!(equation.expression(), r"\o\ac(\fs24 Q,\fs16 R)");
+        assert_eq!(equation.cached_result(), None);
+        assert!(equation.is_dirty());
+        assert!(equation.is_locked());
+        assert_eq!(equation.owner(), FieldOwner::Body);
+        assert_eq!(equation.position(), 4);
+
+        let authored = Field::new_equation(r"\f(1,2)").unwrap();
+        assert_eq!(authored.field_type, FieldType::Equation);
+        assert_eq!(authored.equation().unwrap().expression(), r"\f(1,2)");
+        assert!(Field::new_equation("x".repeat(MAX_INSTRUCTION_LEN)).is_err());
+    }
+
+    #[test]
+    fn document_discovers_eq_fields_without_calculating_them() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}"#,
+        )
+        .unwrap();
+
+        let equations = document.equations();
+        assert_eq!(document.equation_count(), 1);
+        assert_eq!(equations.len(), 1);
+        assert_eq!(equations[0].expression(), r"\f(1,2)");
+        assert_eq!(equations[0].cached_result(), None);
+        assert_eq!(document.text(), "Before After");
     }
 
     #[test]

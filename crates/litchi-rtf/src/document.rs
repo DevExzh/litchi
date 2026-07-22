@@ -901,6 +901,25 @@ impl<'a> RtfDocument<'a> {
         &self.fields
     }
 
+    /// Return typed, inert legacy `EQ` fields in document field order.
+    ///
+    /// Expressions and cached results are exposed as stored metadata only. This
+    /// method never parses, calculates, formats, or renders equations.
+    pub fn equations(&self) -> Vec<crate::EquationField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::equation)
+            .collect()
+    }
+
+    /// Return the number of typed inert `EQ` fields in the document.
+    pub fn equation_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.equation().is_some())
+            .count()
+    }
+
     pub fn push_field(&mut self, field: super::field::Field<'a>) -> RtfResult<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
             return Err(RtfError::MalformedDocument(

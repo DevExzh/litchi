@@ -7436,6 +7436,17 @@ impl<W: Write> RtfWriter<W> {
         self.write_field_with_fields(field, &[], 0)
     }
 
+    /// Write a caller-provided legacy `EQ` expression as an inert RTF field.
+    ///
+    /// The expression is escaped for the field instruction and emitted with
+    /// the empty cached-result group conventionally used for `EQ`. It is never
+    /// parsed, calculated, formatted, or rendered by this library.
+    pub fn write_equation(&mut self, expression: &str) -> io::Result<()> {
+        let field = Field::new_equation(expression)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_field(&field)
+    }
+
     fn write_field_with_fields(
         &mut self,
         field: &Field,
@@ -7471,7 +7482,13 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}}")?;
 
         // Field result
-        if !field.result.is_empty() || !field.result_events.is_empty() {
+        if field.field_type == FieldType::Equation
+            && field.result.is_empty()
+            && field.result_events.is_empty()
+        {
+            // RTF 1.9.1 examples write a null fldrslt group for EQ fields.
+            self.write_str("{\\fldrslt}")?;
+        } else if !field.result.is_empty() || !field.result_events.is_empty() {
             self.write_str("{\\fldrslt{")?;
             self.write_field_story(
                 field.result.as_ref(),
@@ -7831,6 +7848,47 @@ mod tests {
 
         let result = String::from_utf8(output).unwrap();
         assert_eq!(result, "\\test42\\flag");
+    }
+
+    #[test]
+    fn equation_writer_uses_an_empty_cached_result_without_evaluation() {
+        let mut output = Vec::new();
+        let mut writer = RtfWriter::new(&mut output);
+        writer.write_document_header().unwrap();
+        writer.write_equation(r"\f(1,2)").unwrap();
+        writer.write_str("}").unwrap();
+
+        let serialized = String::from_utf8(output).unwrap();
+        assert!(serialized.contains(r"EQ \\f(1,2)"));
+        assert!(serialized.contains(r"{\fldrslt}"));
+
+        let document = RtfDocument::parse(&serialized).unwrap();
+        let equations = document.equations();
+        assert_eq!(equations.len(), 1);
+        assert_eq!(equations[0].expression(), r"\f(1,2)");
+        assert_eq!(equations[0].cached_result(), None);
+    }
+
+    #[test]
+    fn document_writer_round_trips_caller_authored_eq_fields() {
+        let mut document = RtfDocument::parse(r"{\rtf1\ansi BeforeAfter}").unwrap();
+        let mut equation = Field::new_equation(r"\f(1,2)").unwrap();
+        equation.owner = FieldOwner::Body;
+        equation.position = "Before".len();
+        equation.range_end = equation.position;
+        document.push_field(equation).unwrap();
+
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+        let serialized = String::from_utf8(output).unwrap();
+        assert!(serialized.contains(r"{\fldrslt}"));
+
+        let reparsed = RtfDocument::parse(&serialized).unwrap();
+        assert_eq!(reparsed.text(), "BeforeAfter");
+        assert_eq!(reparsed.equation_count(), 1);
+        assert_eq!(reparsed.equations()[0].expression(), r"\f(1,2)");
     }
 
     #[test]
