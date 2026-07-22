@@ -341,6 +341,52 @@ impl MutableDocument {
         Ok(old)
     }
 
+    /// Return stored document line-numbering configuration from current styles.
+    ///
+    /// The result is presentation metadata only. It is never used to paginate
+    /// the document or generate line numbers.
+    pub fn line_numbering_configuration(
+        &self,
+    ) -> Result<Option<crate::OdfLineNumberingConfiguration>> {
+        self.styles_xml
+            .as_deref()
+            .map_or_else(|| Ok(None), crate::parse_line_numbering_configuration)
+    }
+
+    /// Insert or replace document line-numbering configuration.
+    ///
+    /// This updates stored style metadata only. It never calculates page or
+    /// line numbers.
+    pub fn set_line_numbering_configuration(
+        &mut self,
+        configuration: &crate::OdfLineNumberingConfiguration,
+    ) -> Result<Option<crate::OdfLineNumberingConfiguration>> {
+        configuration.validate()?;
+        let old = self.line_numbering_configuration()?;
+        let styles = self
+            .styles_xml
+            .clone()
+            .unwrap_or_else(OdfStructure::default_styles_xml);
+        self.styles_xml = Some(crate::line_numbering::set_line_numbering_configuration_xml(
+            &styles,
+            configuration,
+        )?);
+        Ok(old)
+    }
+
+    /// Remove document line-numbering configuration and return its old value.
+    pub fn clear_line_numbering_configuration(
+        &mut self,
+    ) -> Result<Option<crate::OdfLineNumberingConfiguration>> {
+        let old = self.line_numbering_configuration()?;
+        let Some(styles) = self.styles_xml.as_deref() else {
+            return Ok(None);
+        };
+        self.styles_xml =
+            Some(crate::line_numbering::remove_line_numbering_configuration_xml(styles)?);
+        Ok(old)
+    }
+
     /// Return generated indexes from the current authoritative content XML.
     pub fn text_indexes(&self) -> Result<Vec<TextIndex>> {
         self.with_content_xml(crate::odt::index::parse_text_indexes)
@@ -2623,6 +2669,62 @@ mod tests {
             document.ruby_annotations().unwrap().annotations,
             vec![annotation]
         );
+    }
+
+    #[test]
+    fn mutable_line_numbering_configuration_round_trips_without_generation() {
+        let first = crate::OdfLineNumberingConfiguration {
+            number_lines: Some(true),
+            number_format: Some(crate::OdfLineNumberFormat::LowerAlpha),
+            letter_sync: Some(true),
+            style_name: Some("LineNumbers".to_string()),
+            increment: Some(2),
+            number_position: Some(crate::OdfLineNumberPosition::Inner),
+            offset: Some(crate::OdfNonNegativeLength::new("0.2in").unwrap()),
+            count_empty_lines: Some(false),
+            count_in_text_boxes: Some(true),
+            restart_on_page: Some(false),
+            separator: Some(crate::OdfLineNumberingSeparator {
+                increment: Some(4),
+                text: " · ".to_string(),
+            }),
+        };
+        let replacement = crate::OdfLineNumberingConfiguration {
+            number_lines: Some(false),
+            number_format: Some(crate::OdfLineNumberFormat::UpperRoman),
+            increment: Some(1),
+            ..crate::OdfLineNumberingConfiguration::default()
+        };
+
+        let mut mutable = MutableDocument::new();
+        assert_eq!(mutable.line_numbering_configuration().unwrap(), None);
+        assert_eq!(
+            mutable.set_line_numbering_configuration(&first).unwrap(),
+            None
+        );
+        assert_eq!(
+            mutable.line_numbering_configuration().unwrap(),
+            Some(first.clone())
+        );
+        assert_eq!(
+            mutable
+                .set_line_numbering_configuration(&replacement)
+                .unwrap(),
+            Some(first)
+        );
+
+        let document = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.line_numbering_configuration().unwrap(),
+            Some(replacement.clone())
+        );
+        assert_eq!(
+            mutable.clear_line_numbering_configuration().unwrap(),
+            Some(replacement)
+        );
+        assert_eq!(mutable.line_numbering_configuration().unwrap(), None);
+        let document = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(document.line_numbering_configuration().unwrap(), None);
     }
 
     #[test]

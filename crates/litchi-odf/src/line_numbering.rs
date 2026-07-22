@@ -10,6 +10,8 @@ use quick_xml::{
     reader::NsReader,
 };
 
+use crate::{FlatOpenDocument, OpenDocumentPackage};
+
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -310,6 +312,180 @@ pub fn parse_line_numbering_configuration(
         buffer.clear();
     }
     Ok(result)
+}
+
+#[derive(Clone)]
+struct XmlSpan {
+    start: usize,
+    end: usize,
+}
+
+enum StylesSite {
+    Content(usize),
+    Empty(XmlSpan, String),
+}
+
+fn event_start(xml: &str, end: usize) -> Result<usize> {
+    xml[..end].rfind('<').ok_or_else(|| {
+        Error::InvalidFormat("invalid line-numbering XML event boundary".to_string())
+    })
+}
+
+fn locate_configuration(xml: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
+    parse_line_numbering_configuration(xml)?;
+
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut stack: Vec<(NamespaceKind, Vec<u8>)> = Vec::new();
+    let mut target = None;
+    let mut open_target = None::<(usize, usize)>;
+    let mut styles_site = None;
+    loop {
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(xml_error)?;
+        let namespace = namespace_kind(&resolved);
+        match event {
+            Event::Start(ref element) => {
+                let end = reader.buffer_position() as usize;
+                let start = event_start(xml, end)?;
+                let local = element.local_name().as_ref().to_vec();
+                let depth = stack.len() + 1;
+                if namespace == NamespaceKind::Text
+                    && local == b"linenumbering-configuration"
+                    && matches!(stack.last(), Some((NamespaceKind::Office, parent)) if parent == b"styles")
+                {
+                    open_target = Some((depth, start));
+                }
+                stack.push((namespace, local));
+            },
+            Event::Empty(ref element) => {
+                let end = reader.buffer_position() as usize;
+                let start = event_start(xml, end)?;
+                let local = element.local_name().as_ref().to_vec();
+                if namespace == NamespaceKind::Text
+                    && local == b"linenumbering-configuration"
+                    && matches!(stack.last(), Some((NamespaceKind::Office, parent)) if parent == b"styles")
+                {
+                    target = Some(XmlSpan { start, end });
+                }
+                if namespace == NamespaceKind::Office && local == b"styles" {
+                    if styles_site.is_some() {
+                        return invalid("multiple office:styles elements are not supported");
+                    }
+                    styles_site = Some(StylesSite::Empty(
+                        XmlSpan { start, end },
+                        std::str::from_utf8(element.name().as_ref())
+                            .map_err(|_| {
+                                Error::InvalidFormat("invalid office:styles QName".to_string())
+                            })?
+                            .to_string(),
+                    ));
+                }
+            },
+            Event::End(_) => {
+                let end = reader.buffer_position() as usize;
+                let start = event_start(xml, end)?;
+                let depth = stack.len();
+                if open_target.is_some_and(|(target_depth, _)| target_depth == depth) {
+                    let (_, target_start) = open_target.take().expect("target depth checked");
+                    target = Some(XmlSpan {
+                        start: target_start,
+                        end,
+                    });
+                }
+                if matches!(stack.last(), Some((NamespaceKind::Office, local)) if local == b"styles")
+                {
+                    if styles_site.is_some() {
+                        return invalid("multiple office:styles elements are not supported");
+                    }
+                    styles_site = Some(StylesSite::Content(start));
+                }
+                stack.pop();
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+
+    Ok((
+        target,
+        styles_site
+            .ok_or_else(|| Error::InvalidFormat("document has no office:styles".to_string()))?,
+    ))
+}
+
+/// Insert or replace the document line-numbering declaration without rewriting
+/// unrelated style XML.
+pub(crate) fn set_line_numbering_configuration_xml(
+    xml: &str,
+    configuration: &OdfLineNumberingConfiguration,
+) -> Result<String> {
+    configuration.validate()?;
+    let (target, site) = locate_configuration(xml)?;
+    let fragment = configuration.to_xml()?;
+    if let Some(span) = target {
+        return Ok(format!(
+            "{}{}{}",
+            &xml[..span.start],
+            fragment,
+            &xml[span.end..]
+        ));
+    }
+    match site {
+        StylesSite::Content(insertion) => Ok(format!(
+            "{}{}{}",
+            &xml[..insertion],
+            fragment,
+            &xml[insertion..]
+        )),
+        StylesSite::Empty(span, qname) => {
+            let raw = &xml[span.start..span.end];
+            let slash = raw
+                .rfind("/>")
+                .ok_or_else(|| Error::InvalidFormat("invalid empty office:styles".to_string()))?;
+            Ok(format!(
+                "{}{}>{}</{}>{}",
+                &xml[..span.start],
+                &raw[..slash],
+                fragment,
+                qname,
+                &xml[span.end..]
+            ))
+        },
+    }
+}
+
+/// Remove the document line-numbering declaration without rewriting unrelated
+/// style XML.
+pub(crate) fn remove_line_numbering_configuration_xml(xml: &str) -> Result<String> {
+    let (target, _) = locate_configuration(xml)?;
+    let Some(span) = target else {
+        return Ok(xml.to_string());
+    };
+    Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
+}
+
+impl OpenDocumentPackage {
+    /// Return stored document line-numbering configuration from styles XML.
+    ///
+    /// The declaration is presentation metadata only. It is never used to
+    /// paginate a document or generate line numbers.
+    pub fn line_numbering_configuration(&self) -> Result<Option<OdfLineNumberingConfiguration>> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(None), |xml| parse_line_numbering_configuration(&xml))
+    }
+}
+
+impl FlatOpenDocument {
+    /// Return stored document line-numbering configuration from flat ODF XML.
+    ///
+    /// The declaration is presentation metadata only. It is never used to
+    /// paginate a document or generate line numbers.
+    pub fn line_numbering_configuration(&self) -> Result<Option<OdfLineNumberingConfiguration>> {
+        parse_line_numbering_configuration(self.xml())
+    }
 }
 
 fn parse_attributes(
@@ -729,6 +905,60 @@ mod tests {
                 r#"<t:linenumbering-configuration/><t:linenumbering-configuration/>"#
             ))
             .is_err()
+        );
+    }
+
+    #[test]
+    fn replaces_inserts_and_removes_configuration_without_rewriting_other_styles() {
+        let original = styles(
+            r#"<s:style s:name="Preserved"/><t:linenumbering-configuration t:number-lines="false" s:num-format="1"/>"#,
+        );
+        let configuration = OdfLineNumberingConfiguration {
+            number_lines: Some(true),
+            number_format: Some(OdfLineNumberFormat::LowerAlpha),
+            letter_sync: Some(true),
+            style_name: Some("LineNumbers".to_string()),
+            increment: Some(3),
+            number_position: Some(OdfLineNumberPosition::Outer),
+            offset: Some(OdfNonNegativeLength::new("0.25in").unwrap()),
+            count_empty_lines: Some(true),
+            count_in_text_boxes: Some(false),
+            restart_on_page: Some(true),
+            separator: Some(OdfLineNumberingSeparator {
+                increment: Some(6),
+                text: " · ".to_string(),
+            }),
+        };
+
+        let replaced = set_line_numbering_configuration_xml(&original, &configuration).unwrap();
+        assert!(replaced.contains(r#"<s:style s:name="Preserved"/>"#));
+        assert_eq!(
+            parse_line_numbering_configuration(&replaced).unwrap(),
+            Some(configuration.clone())
+        );
+
+        let removed = remove_line_numbering_configuration_xml(&replaced).unwrap();
+        assert!(removed.contains(r#"<s:style s:name="Preserved"/>"#));
+        assert_eq!(parse_line_numbering_configuration(&removed).unwrap(), None);
+
+        let empty_styles = format!(
+            r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="{STYLE}"><o:styles/><o:automatic-styles/><o:master-styles/></o:document-styles>"#
+        );
+        let inserted = set_line_numbering_configuration_xml(&empty_styles, &configuration).unwrap();
+        assert!(inserted.contains("<o:styles>"));
+        assert_eq!(
+            parse_line_numbering_configuration(&inserted).unwrap(),
+            Some(configuration.clone())
+        );
+
+        let flat_xml = format!(
+            r#"<o:document xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="{STYLE}" o:mimetype="application/vnd.oasis.opendocument.text" o:version="1.3"><o:styles>{}</o:styles><o:body><o:text/></o:body></o:document>"#,
+            configuration.to_xml().unwrap()
+        );
+        let flat = FlatOpenDocument::from_bytes(flat_xml.into_bytes()).unwrap();
+        assert_eq!(
+            flat.line_numbering_configuration().unwrap(),
+            Some(configuration)
         );
     }
 }

@@ -88,6 +88,7 @@ pub struct DocumentBuilder {
         crate::HeaderFooterStyleProperties,
     )>,
     notes_configurations: crate::OdfNotesConfigurations,
+    line_numbering_configuration: Option<crate::OdfLineNumberingConfiguration>,
 }
 
 impl Default for DocumentBuilder {
@@ -142,6 +143,7 @@ impl DocumentBuilder {
             page_layout_footnote_separators: Vec::new(),
             page_layout_header_footer_properties: Vec::new(),
             notes_configurations: crate::OdfNotesConfigurations::default(),
+            line_numbering_configuration: None,
         }
     }
 
@@ -184,6 +186,33 @@ impl DocumentBuilder {
             crate::OdfNoteClass::Endnote => self.notes_configurations.endnote = Some(configuration),
         }
         Ok(self)
+    }
+
+    /// Return the optional document line-numbering configuration to emit.
+    ///
+    /// The configuration is serialized as style metadata only. Building a
+    /// document never calculates page or line numbers.
+    pub fn line_numbering_configuration(&self) -> Option<&crate::OdfLineNumberingConfiguration> {
+        self.line_numbering_configuration.as_ref()
+    }
+
+    /// Set the validated document line-numbering configuration to emit.
+    ///
+    /// This stores presentation metadata only. It never performs pagination or
+    /// generates line numbers.
+    pub fn set_line_numbering_configuration(
+        &mut self,
+        configuration: crate::OdfLineNumberingConfiguration,
+    ) -> Result<&mut Self> {
+        configuration.validate()?;
+        self.line_numbering_configuration = Some(configuration);
+        Ok(self)
+    }
+
+    /// Omit document line-numbering configuration from generated styles.
+    pub fn clear_line_numbering_configuration(&mut self) -> &mut Self {
+        self.line_numbering_configuration = None;
+        self
     }
 
     /// Add a named or default paragraph style carrying typed tab stops.
@@ -1565,6 +1594,13 @@ impl DocumentBuilder {
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
         }
+        if let Some(configuration) = &self.line_numbering_configuration {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragment = configuration
+                .to_xml()
+                .expect("validated line-numbering configuration");
+            xml.insert_str(insertion, &fragment);
+        }
         if self.notes_configurations.footnote.is_some()
             || self.notes_configurations.endnote.is_some()
         {
@@ -2062,6 +2098,50 @@ mod tests {
         let styles_xml = builder.generate_styles_xml();
         assert!(styles_xml.contains("office:document-styles"));
         assert!(styles_xml.contains("L1")); // Numbered list style
+    }
+
+    #[test]
+    fn line_numbering_configuration_round_trips_through_an_odt_package() {
+        let configuration = crate::OdfLineNumberingConfiguration {
+            number_lines: Some(true),
+            number_format: Some(crate::OdfLineNumberFormat::UpperAlpha),
+            letter_sync: Some(true),
+            style_name: Some("LineNumbers".to_string()),
+            increment: Some(5),
+            number_position: Some(crate::OdfLineNumberPosition::Outer),
+            offset: Some(crate::OdfNonNegativeLength::new("0.25in").unwrap()),
+            count_empty_lines: Some(true),
+            count_in_text_boxes: Some(false),
+            restart_on_page: Some(true),
+            separator: Some(crate::OdfLineNumberingSeparator {
+                increment: Some(10),
+                text: " / ".to_string(),
+            }),
+        };
+
+        let mut builder = DocumentBuilder::new();
+        assert!(builder.line_numbering_configuration().is_none());
+        builder
+            .set_line_numbering_configuration(configuration.clone())
+            .unwrap();
+        assert_eq!(builder.line_numbering_configuration(), Some(&configuration));
+        builder.clear_line_numbering_configuration();
+        assert!(builder.line_numbering_configuration().is_none());
+        builder
+            .set_line_numbering_configuration(configuration.clone())
+            .unwrap();
+
+        let bytes = builder.build().unwrap();
+        let document = crate::odt::Document::from_bytes(bytes.clone()).unwrap();
+        assert_eq!(
+            document.line_numbering_configuration().unwrap(),
+            Some(configuration.clone())
+        );
+        let package = crate::OpenDocumentPackage::from_bytes(bytes).unwrap();
+        assert_eq!(
+            package.line_numbering_configuration().unwrap(),
+            Some(configuration)
+        );
     }
 
     #[test]

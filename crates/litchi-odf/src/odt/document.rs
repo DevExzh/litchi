@@ -449,6 +449,19 @@ impl Document {
         )
     }
 
+    /// Return the stored document line-numbering configuration.
+    ///
+    /// This is presentation metadata from styles.xml only. It is never used to
+    /// paginate the document or generate line numbers.
+    pub fn line_numbering_configuration(
+        &self,
+    ) -> Result<Option<crate::OdfLineNumberingConfiguration>> {
+        self.styles.as_ref().map_or_else(
+            || Ok(None),
+            |styles| crate::parse_line_numbering_configuration(styles.xml_content()),
+        )
+    }
+
     /// Get resolved style properties for a given style name.
     ///
     /// This method resolves style inheritance to provide the complete set of
