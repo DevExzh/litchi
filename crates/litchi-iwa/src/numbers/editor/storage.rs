@@ -2667,6 +2667,10 @@ pub(super) fn update_tile(
                     return Ok(());
                 }
             },
+            EncodedValue::Raw(data) => {
+                BncCell::parse(&data)?;
+                cells[column] = Some(data);
+            },
             value => {
                 let mut cell = cells[column]
                     .as_deref()
@@ -2690,7 +2694,8 @@ pub(super) fn update_tile(
                     },
                     EncodedValue::Clear
                     | EncodedValue::ClearValuePreservingMetadata
-                    | EncodedValue::Comment(_) => unreachable!(),
+                    | EncodedValue::Comment(_)
+                    | EncodedValue::Raw(_) => unreachable!(),
                 }
                 cells[column] = Some(cell.encode());
             },

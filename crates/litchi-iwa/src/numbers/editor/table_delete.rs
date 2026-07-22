@@ -7,6 +7,10 @@ mod dimension;
 mod row;
 mod uid;
 
+use cell_merge::{
+    MergeAxis, merge_anchor_relocations_for_axis_deletion, regions_in_package,
+    shift_merges_for_axis_deletion,
+};
 use column::{delete_column_headers, delete_table_tile_column};
 use dimension::{set_stroke_dimensions, set_table_dimensions};
 use formula_dependency_shift::{DependencyAxis, delete_formula_dependencies};
@@ -87,8 +91,14 @@ pub(super) fn remove_attached_table_row(
         updated_header_settings,
     )?;
     let cells = stored_cells_on_axis(package, &locations, &descriptor.model, TableAxis::Row, row)?;
+    let relocated_cells = relocate_merge_anchors(package, table_id, MergeAxis::Row, row)?;
 
-    clear_stored_cells(package, table_id, &cells)?;
+    clear_stored_cells(
+        package,
+        table_id,
+        &without_relocated_cells(cells, &relocated_cells),
+    )?;
+    shift_merges_for_axis_deletion(package, table_id, MergeAxis::Row, row)?;
     delete_formula_dependencies(
         package,
         descriptor.table_info_id,
@@ -121,6 +131,7 @@ pub(super) fn remove_attached_table_row(
         set_attached_table_header_settings(package, table_id, settings)?;
     }
     verify_attached_dimensions(package, table_id, new_rows, columns_u32 as usize)?;
+    regions_in_package(package, table_id)?;
     Ok((new_rows, columns_u32 as usize))
 }
 
@@ -155,8 +166,14 @@ pub(super) fn remove_attached_table_column(
         TableAxis::Column,
         column,
     )?;
+    let relocated_cells = relocate_merge_anchors(package, table_id, MergeAxis::Column, column)?;
 
-    clear_stored_cells(package, table_id, &cells)?;
+    clear_stored_cells(
+        package,
+        table_id,
+        &without_relocated_cells(cells, &relocated_cells),
+    )?;
+    shift_merges_for_axis_deletion(package, table_id, MergeAxis::Column, column)?;
     delete_formula_dependencies(
         package,
         descriptor.table_info_id,
@@ -195,6 +212,7 @@ pub(super) fn remove_attached_table_column(
         set_attached_table_header_settings(package, table_id, settings)?;
     }
     verify_attached_dimensions(package, table_id, rows_u32 as usize, new_columns)?;
+    regions_in_package(package, table_id)?;
     Ok((rows_u32 as usize, new_columns))
 }
 
@@ -238,17 +256,11 @@ fn validate_deletion_features(
             .sort_order
             .as_ref()
             .is_some_and(|sort| !sort.rules.is_empty())
-        || model.merge_owner.as_ref().is_some_and(|owner| {
-            owner
-                .formula_store
-                .as_ref()
-                .is_some_and(|store| !store.formulas.is_empty())
-        })
         || filter_has_row_state(package, locations, model.row_filter_set_pre_pivot.as_ref())?
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(format!(
-            "Cannot yet delete a {} from a sorted, filtered, hidden, merged, grouped, pivot, or spill iWork table",
+            "Cannot yet delete a {} from a sorted, filtered, hidden, grouped, pivot, or spill iWork table",
             axis.noun()
         )));
     }
@@ -361,6 +373,62 @@ fn decremented_header_count(count: usize) -> Result<Option<NumbersTableHeaderCou
             "iWork header/footer deletion underflow".to_owned(),
         )),
     }
+}
+
+/// Move native merge anchors out of a deleted leading boundary before tile
+/// compaction removes their original cell storage.
+fn relocate_merge_anchors(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    axis: MergeAxis,
+    deletion: usize,
+) -> Result<HashSet<(usize, usize)>> {
+    let relocations =
+        merge_anchor_relocations_for_axis_deletion(package, table_id, axis, deletion)?;
+    let mut planned_sources = HashSet::with_capacity(relocations.len());
+    let mut planned_destinations = HashSet::with_capacity(relocations.len());
+    for relocation in &relocations {
+        let source = (relocation.source_row, relocation.source_column);
+        let destination = (relocation.destination_row, relocation.destination_column);
+        if !planned_sources.insert(source) || !planned_destinations.insert(destination) {
+            return Err(Error::InvalidFormat(
+                "iWork merged-cell deletion has overlapping anchor relocations".to_owned(),
+            ));
+        }
+    }
+    if planned_sources
+        .iter()
+        .any(|source| planned_destinations.contains(source))
+    {
+        return Err(Error::InvalidFormat(
+            "iWork merged-cell deletion relocates an anchor onto another anchor".to_owned(),
+        ));
+    }
+
+    let mut relocated_sources = HashSet::with_capacity(relocations.len());
+    for relocation in relocations {
+        if model::relocate_attached_cell_in_package(
+            package,
+            table_id,
+            relocation.source_row,
+            relocation.source_column,
+            relocation.destination_row,
+            relocation.destination_column,
+        )? {
+            relocated_sources.insert((relocation.source_row, relocation.source_column));
+        }
+    }
+    Ok(relocated_sources)
+}
+
+fn without_relocated_cells(
+    cells: Vec<(usize, usize, bool)>,
+    relocated: &HashSet<(usize, usize)>,
+) -> Vec<(usize, usize, bool)> {
+    cells
+        .into_iter()
+        .filter(|(row, column, _)| !relocated.contains(&(*row, *column)))
+        .collect()
 }
 
 fn stored_cells_on_axis(

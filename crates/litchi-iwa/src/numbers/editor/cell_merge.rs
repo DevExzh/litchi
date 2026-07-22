@@ -17,18 +17,21 @@ use formula::{
     merge_formula, parse_regions, parse_table_uuid, rewrite_formula_region, validate_region_bounds,
 };
 use wire::{
-    add_formula_store, add_merge_owner, append_formula, patch_table_model, remove_formula,
-    remove_merge_owner, rewrite_formulas, transform_formula_store, transform_merge_owner,
+    add_formula_store, add_merge_owner, append_formula, mutate_formulas, patch_table_model,
+    remove_formula, remove_merge_owner, transform_formula_store, transform_merge_owner,
 };
 
 pub(super) use axis::MergeAxis;
-use axis::region_after_insertion;
+use axis::{
+    MergeAnchorRelocation, MergeDeletion, anchor_relocation_after_deletion, region_after_deletion,
+    region_after_insertion,
+};
 
 #[derive(Debug)]
-struct MergeFormulaRewrite {
+struct MergeFormulaMutation {
     formula_index: u32,
     previous: tsce::FormulaArchive,
-    current: tsce::FormulaArchive,
+    current: Option<tsce::FormulaArchive>,
 }
 
 /// A validated rectangular region containing at least two table cells.
@@ -159,10 +162,10 @@ pub(super) fn shift_merges_for_axis_insertion(
     for (pair, region) in store.formulas.iter().zip(existing) {
         let updated = region_after_insertion(region, axis, insertion)?;
         if updated != region {
-            rewrites.push(MergeFormulaRewrite {
+            rewrites.push(MergeFormulaMutation {
                 formula_index: pair.formula_index,
                 previous: pair.formula.clone(),
-                current: rewrite_formula_region(&pair.formula, updated)?,
+                current: Some(rewrite_formula_region(&pair.formula, updated)?),
             });
         }
         expected.push(updated);
@@ -174,7 +177,7 @@ pub(super) fn shift_merges_for_axis_insertion(
     patch_table_model(package, table_id, |original| {
         transform_merge_owner(original, |owner_data| {
             transform_formula_store(owner_data, |store_data| {
-                rewrite_formulas(store_data, &rewrites)
+                mutate_formulas(store_data, &rewrites)
             })
         })
     })?;
@@ -182,6 +185,101 @@ pub(super) fn shift_merges_for_axis_insertion(
     if regions_in_package(package, table_id)? != expected {
         return Err(Error::InvalidFormat(
             "iWork merged-cell range insertion failed validation".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+/// Identify merge anchors that native iWork carries into the next surviving
+/// cell when a leading merge boundary is deleted.
+///
+/// Call this before physically compacting tiles. The returned source cells
+/// must be relocated without releasing their value or comment references.
+pub(super) fn merge_anchor_relocations_for_axis_deletion(
+    package: &IWorkPackage,
+    table_id: u64,
+    axis: MergeAxis,
+    deletion: usize,
+) -> Result<Vec<MergeAnchorRelocation>> {
+    let regions = parse_regions(&model::attached_table_descriptor(package, table_id)?.model)?;
+    let mut relocations = Vec::new();
+    for region in regions {
+        if let Some(relocation) = anchor_relocation_after_deletion(region, axis, deletion)? {
+            relocations.push(relocation);
+        }
+    }
+    Ok(relocations)
+}
+
+/// Shift, contract, or remove native merged-cell ranges after a physical
+/// table-axis deletion.
+///
+/// Call this before decreasing the table dimensions: a merge touching the
+/// deleted trailing edge is temporarily out of bounds only after that change.
+pub(super) fn shift_merges_for_axis_deletion(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    axis: MergeAxis,
+    deletion: usize,
+) -> Result<()> {
+    let descriptor = model::attached_table_descriptor(package, table_id)?;
+    let existing = parse_regions(&descriptor.model)?;
+    let Some(store) = descriptor
+        .model
+        .merge_owner
+        .as_ref()
+        .and_then(|owner| owner.formula_store.as_ref())
+    else {
+        return Ok(());
+    };
+    if store.formulas.is_empty() {
+        return Ok(());
+    }
+    if store.formulas.len() != existing.len() {
+        return Err(Error::InvalidFormat(
+            "iWork merge formula storage and region count disagree".to_owned(),
+        ));
+    }
+
+    let mut expected = Vec::with_capacity(existing.len());
+    let mut mutations = Vec::new();
+    for (pair, region) in store.formulas.iter().zip(existing) {
+        match region_after_deletion(region, axis, deletion)? {
+            MergeDeletion::Retain(updated) => {
+                if updated != region {
+                    mutations.push(MergeFormulaMutation {
+                        formula_index: pair.formula_index,
+                        previous: pair.formula.clone(),
+                        current: Some(rewrite_formula_region(&pair.formula, updated)?),
+                    });
+                }
+                expected.push(updated);
+            },
+            MergeDeletion::Remove => mutations.push(MergeFormulaMutation {
+                formula_index: pair.formula_index,
+                previous: pair.formula.clone(),
+                current: None,
+            }),
+        }
+    }
+    if mutations.is_empty() {
+        return Ok(());
+    }
+
+    patch_table_model(package, table_id, |original| {
+        if expected.is_empty() {
+            return remove_merge_owner(original);
+        }
+        transform_merge_owner(original, |owner_data| {
+            transform_formula_store(owner_data, |store_data| {
+                mutate_formulas(store_data, &mutations)
+            })
+        })
+    })?;
+
+    if regions_in_package(package, table_id)? != expected {
+        return Err(Error::InvalidFormat(
+            "iWork merged-cell range deletion failed validation".to_owned(),
         ));
     }
     Ok(())
@@ -321,7 +419,10 @@ mod tests {
     use super::*;
     use crate::archive::RawMessage;
     use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-    use crate::numbers::{NumbersDocumentBuilder, TableColumnInsertion, TableRowInsertion};
+    use crate::numbers::{
+        NumbersDocument, NumbersDocumentBuilder, TableColumnDeletion, TableColumnInsertion,
+        TableRowDeletion, TableRowInsertion,
+    };
     use crate::pages::{PagesDocumentBuilder, PagesEditor};
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::wire::{
@@ -424,6 +525,103 @@ mod tests {
         assert_eq!(editor.table_cell_merges(table_id).unwrap(), vec![expected]);
         assert_eq!(editor.tables().unwrap()[0].rows, 7);
         assert_eq!(editor.tables().unwrap()[0].columns, 8);
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_merges(table_id).unwrap(),
+            vec![expected]
+        );
+    }
+
+    #[test]
+    fn scratch_numbers_merged_table_axis_deletions_relocate_anchor_content() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(5, 6)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let region = IWorkTableCellRegion::new(1, 1, 3, 3).unwrap();
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Text("Merged".to_owned()))
+            .unwrap();
+        editor
+            .set_cell_comment(table_id, 1, 1, "Merged anchor")
+            .unwrap();
+        editor.merge_cells(table_id, region).unwrap();
+
+        editor
+            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_merges(table_id).unwrap(),
+            vec![IWorkTableCellRegion::new(1, 1, 2, 3).unwrap()]
+        );
+        assert_eq!(
+            editor
+                .cell_comment(table_id, 1, 1)
+                .unwrap()
+                .unwrap()
+                .comment
+                .text,
+            "Merged anchor"
+        );
+
+        editor
+            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_merges(table_id).unwrap(),
+            vec![IWorkTableCellRegion::new(1, 1, 2, 2).unwrap()]
+        );
+        editor
+            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_merges(table_id).unwrap(),
+            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+        );
+        editor
+            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        assert!(editor.table_cell_merges(table_id).unwrap().is_empty());
+        assert_eq!(editor.tables().unwrap()[0].rows, 3);
+        assert_eq!(editor.tables().unwrap()[0].columns, 4);
+
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Text("Merged".to_owned()))
+        );
+        assert_eq!(
+            editor
+                .cell_comment(table_id, 1, 1)
+                .unwrap()
+                .unwrap()
+                .comment
+                .text,
+            "Merged anchor"
+        );
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(reopened.table_cell_merges(table_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn merged_table_axis_deletion_removes_and_rewrites_formula_pairs_together() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(5, 6)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let collapsed = IWorkTableCellRegion::new(1, 1, 1, 2).unwrap();
+        let shifted = IWorkTableCellRegion::new(2, 2, 2, 2).unwrap();
+        editor.merge_cells(table_id, collapsed).unwrap();
+        editor.merge_cells(table_id, shifted).unwrap();
+
+        editor
+            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .unwrap();
+
+        let expected = IWorkTableCellRegion::new(2, 1, 2, 2).unwrap();
+        assert_eq!(editor.table_cell_merges(table_id).unwrap(), vec![expected]);
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_merges(table_id).unwrap(),
@@ -692,6 +890,106 @@ mod tests {
                 .slide_table_cell_merges(0, keynote_table.model_object_id)
                 .unwrap(),
             vec![keynote_expected]
+        );
+    }
+
+    #[test]
+    fn scratch_pages_and_keynote_merged_table_axis_deletions_relocate_anchor_content() {
+        let mut pages = PagesDocumentBuilder::new()
+            .body_text("Merged table\n")
+            .body_table("Merge", 4, 5)
+            .build()
+            .unwrap();
+        let pages_table_id = pages.tables().unwrap()[0].model_object_id;
+        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        pages
+            .set_table_cell(
+                pages_table_id,
+                region.row(),
+                region.column(),
+                CellValue::Text("Merged".to_owned()),
+            )
+            .unwrap();
+        pages.merge_table_cells(pages_table_id, region).unwrap();
+        pages
+            .remove_table_row(pages_table_id, TableRowDeletion::body(0))
+            .unwrap();
+        assert_eq!(
+            pages.table_cell_merges(pages_table_id).unwrap(),
+            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+        );
+        pages
+            .remove_table_column(pages_table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        assert!(pages.table_cell_merges(pages_table_id).unwrap().is_empty());
+        assert_eq!(
+            pages.table(pages_table_id).unwrap().get_cell(1, 1),
+            Some(&CellValue::Text("Merged".to_owned()))
+        );
+        let pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        assert!(pages.table_cell_merges(pages_table_id).unwrap().is_empty());
+
+        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let keynote_table = keynote
+            .add_slide_table(
+                0,
+                "Merge",
+                4,
+                5,
+                DrawablePoint { x: 100.0, y: 150.0 },
+                DrawableSize {
+                    width: 800.0,
+                    height: 400.0,
+                },
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell(
+                0,
+                keynote_table.model_object_id,
+                region.row(),
+                region.column(),
+                CellValue::Text("Merged".to_owned()),
+            )
+            .unwrap();
+        keynote
+            .merge_slide_table_cells(0, keynote_table.model_object_id, region)
+            .unwrap();
+        keynote
+            .remove_slide_table_row(0, keynote_table.model_object_id, TableRowDeletion::body(0))
+            .unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_cell_merges(0, keynote_table.model_object_id)
+                .unwrap(),
+            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+        );
+        keynote
+            .remove_slide_table_column(
+                0,
+                keynote_table.model_object_id,
+                TableColumnDeletion::body(0),
+            )
+            .unwrap();
+        assert!(
+            keynote
+                .slide_table_cell_merges(0, keynote_table.model_object_id)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            keynote
+                .slide_table(0, keynote_table.model_object_id)
+                .unwrap()
+                .get_cell(1, 1),
+            Some(&CellValue::Text("Merged".to_owned()))
+        );
+        let keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        assert!(
+            keynote
+                .slide_table_cell_merges(0, keynote_table.model_object_id)
+                .unwrap()
+                .is_empty()
         );
     }
 

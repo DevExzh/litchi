@@ -2039,6 +2039,9 @@ pub(super) fn pivot_group_label(node: &tst::group_by_archive::GroupNodeArchive) 
 pub(super) enum EncodedValue {
     Clear,
     ClearValuePreservingMetadata,
+    /// A previously validated BNC-v5 payload relocated without touching its
+    /// referenced string, rich-text, formula, or comment table entries.
+    Raw(Vec<u8>),
     Number(f64),
     Boolean(bool),
     Date(f64),
@@ -2419,6 +2422,104 @@ pub(super) fn set_attached_cell_in_package(
 ) -> Result<()> {
     let location = locate_attached_cell(package, table_id, row, column)?;
     set_cell_at_location(package, location, row, column, value)
+}
+
+/// Move one attached table cell's exact BNC payload without changing any
+/// referenced table-data-list entry counts.
+///
+/// This is used when a native merged-cell anchor survives a deletion by moving
+/// into the following row or column. Formula anchors are rejected: their
+/// dependency records require a dedicated host-coordinate rewrite.
+pub(super) fn relocate_attached_cell_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    source_row: usize,
+    source_column: usize,
+    destination_row: usize,
+    destination_column: usize,
+) -> Result<bool> {
+    let source = locate_attached_cell(package, table_id, source_row, source_column)?;
+    let Some(source_data) = read_tile_cell(
+        package,
+        &source.tile_archive,
+        source.tile_id,
+        source.tile_row,
+        source_column,
+    )?
+    else {
+        return Ok(false);
+    };
+    if matches!(
+        BncCell::parse(&source_data)?.stored_value(),
+        StoredValue::Formula(_)
+    ) {
+        return Err(Error::ParseError(format!(
+            "Cannot yet relocate formula cell ({source_row}, {source_column}) while deleting a merged iWork table axis"
+        )));
+    }
+
+    let destination = locate_attached_cell(package, table_id, destination_row, destination_column)?;
+    if read_tile_cell(
+        package,
+        &destination.tile_archive,
+        destination.tile_id,
+        destination.tile_row,
+        destination_column,
+    )?
+    .is_some()
+    {
+        if attached_cell_comment_in_package(package, table_id, destination_row, destination_column)?
+            .is_some()
+        {
+            clear_attached_cell_comment_in_package(
+                package,
+                table_id,
+                destination_row,
+                destination_column,
+            )?;
+        }
+        set_attached_cell_in_package(
+            package,
+            table_id,
+            destination_row,
+            destination_column,
+            CellValue::Empty,
+        )?;
+    }
+
+    let destination_count = update_tile(
+        package,
+        &destination.tile_archive,
+        destination.tile_id,
+        destination.tile_row,
+        destination_column,
+        destination.descriptor.model.number_of_columns as usize,
+        EncodedValue::Raw(source_data),
+    )?;
+    update_row_header(
+        package,
+        &destination.object_locations,
+        &destination.descriptor.model,
+        destination_row,
+        destination_count,
+    )?;
+    let source_count = update_tile(
+        package,
+        &source.tile_archive,
+        source.tile_id,
+        source.tile_row,
+        source_column,
+        source.descriptor.model.number_of_columns as usize,
+        EncodedValue::Clear,
+    )?;
+    update_row_header(
+        package,
+        &source.object_locations,
+        &source.descriptor.model,
+        source_row,
+        source_count,
+    )?;
+    Ok(true)
 }
 
 pub(super) fn set_cells_in_package(
