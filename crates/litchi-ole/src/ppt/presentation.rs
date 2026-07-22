@@ -353,30 +353,36 @@ impl Presentation {
         PowerPointOleStorage::parse(&record).map(Some)
     }
 
-    /// Return validated inert metadata for the document's VBA project storage.
+    /// Return a payload-free descriptor for the document's VBA project storage.
     ///
-    /// Macro bytes are not decompressed, interpreted, or executed. A non-empty
-    /// project must resolve to a persisted opaque VBA storage record.
-    pub fn vba_info(&self) -> Result<Option<crate::ppt::PowerPointVbaInfo>> {
+    /// Macro bytes are not returned, decompressed, interpreted, or executed.
+    /// A non-null persist reference must resolve to a `VbaProjectStg` record.
+    pub fn vba_project_storage(&self) -> Result<Option<crate::ppt::PowerPointVbaProjectStorage>> {
         let records = self.parser.find_records_ref();
         let Some(info) = crate::ppt::PowerPointVbaInfo::parse_records(&records)? else {
             return Ok(None);
         };
-        if info.has_macros {
+        let storage = if info.persist_id_ref == 0 {
+            None
+        } else {
             let Some(storage) = self.ole_storage(info.persist_id_ref)? else {
                 return Err(PptError::Corrupted(format!(
                     "VBAInfoAtom persist ID {} has no storage record",
                     info.persist_id_ref
                 )));
             };
-            if storage.kind != crate::ppt::PowerPointOleStorageKind::VbaProject {
-                return Err(PptError::Corrupted(format!(
-                    "VBAInfoAtom persist ID {} does not reference VBA project storage",
-                    info.persist_id_ref
-                )));
-            }
-        }
-        Ok(Some(info))
+            Some(storage)
+        };
+        crate::ppt::PowerPointVbaProjectStorage::from_info_and_storage(info, storage.as_ref())
+            .map(Some)
+    }
+
+    /// Return validated inert `VBAInfoAtom` metadata for the document.
+    ///
+    /// For richer outer-storage metadata without exposing VBA payload bytes,
+    /// use [`Self::vba_project_storage`].
+    pub fn vba_info(&self) -> Result<Option<crate::ppt::PowerPointVbaInfo>> {
+        Ok(self.vba_project_storage()?.map(|storage| storage.info()))
     }
 
     /// Return the PPT10 modify-password metadata without verifying it.
@@ -1065,6 +1071,49 @@ mod tests {
         }
     }
 
+    fn record_bytes(
+        version: u16,
+        instance: u16,
+        record_type: PptRecordType,
+        data: &[u8],
+    ) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(8 + data.len());
+        bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
+        bytes.extend_from_slice(&record_type.as_u16().to_le_bytes());
+        bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(data);
+        bytes
+    }
+
+    fn presentation_with_vba_storage() -> Presentation {
+        let mut atom_data = Vec::new();
+        atom_data.extend_from_slice(&41u32.to_le_bytes());
+        atom_data.extend_from_slice(&1u32.to_le_bytes());
+        atom_data.extend_from_slice(&2u32.to_le_bytes());
+        let atom = record_bytes(2, 0, PptRecordType::VBAInfoAtom, &atom_data);
+        let vba_info = record_bytes(0x0f, 1, PptRecordType::VBAInfo, &atom);
+
+        let mut storage_data = Vec::new();
+        storage_data.extend_from_slice(&4096u32.to_le_bytes());
+        storage_data.extend_from_slice(&[0x78, 0x9c, 1, 2, 3]);
+        let storage = record_bytes(0, 3, PptRecordType::ExternalOleObjectStg, &storage_data);
+        let storage_offset = vba_info.len() as u32;
+
+        let mut powerpoint_document = vba_info;
+        powerpoint_document.extend_from_slice(&storage);
+        let mut parser = PptRecordParser::new();
+        parser.parse_document(&powerpoint_document).unwrap();
+        let mut persist_mapping = PersistMapping::new();
+        persist_mapping.add_mapping(41, storage_offset);
+
+        Presentation {
+            powerpoint_document,
+            parser,
+            persist_mapping,
+            slide_directory: SlideDirectory::new_for_test(0),
+        }
+    }
+
     fn named_shows(children: Vec<PptRecord>) -> PptRecord {
         record(PptRecordType::NamedShows, Vec::new(), children)
     }
@@ -1132,5 +1181,25 @@ mod tests {
         let mut shows = Vec::new();
         Presentation::parse_named_shows(&container, &mut shows);
         assert!(shows.is_empty());
+    }
+
+    #[test]
+    fn vba_project_storage_returns_only_outer_metadata() {
+        let presentation = presentation_with_vba_storage();
+
+        let storage = presentation.vba_project_storage().unwrap().unwrap();
+        assert_eq!(storage.persist_id_ref(), 41);
+        assert!(storage.has_macros());
+        assert!(storage.has_persisted_storage());
+        assert_eq!(storage.stored_payload_len(), Some(5));
+        assert_eq!(storage.declared_uncompressed_len(), Some(4096));
+        assert_eq!(
+            storage.compression(),
+            Some(crate::ppt::PowerPointOleStorageCompression::Zlib {
+                uncompressed_len: 4096,
+            })
+        );
+        assert!(storage.may_contain_macro_code());
+        assert_eq!(presentation.vba_info().unwrap(), Some(storage.info()));
     }
 }

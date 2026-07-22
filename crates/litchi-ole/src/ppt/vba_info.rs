@@ -2,6 +2,9 @@
 
 use crate::consts::PptRecordType;
 
+use super::ole_storage::{
+    PowerPointOleStorage, PowerPointOleStorageCompression, PowerPointOleStorageKind,
+};
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 
@@ -18,6 +21,114 @@ pub struct PowerPointVbaInfo {
     pub has_macros: bool,
     /// VBA runtime version. MS-PPT requires this to be `2`.
     pub runtime_version: u32,
+}
+
+/// Payload-free metadata for a PowerPoint `VbaProjectStg` persist object.
+///
+/// This describes the outer MS-PPT storage record only. It deliberately does
+/// not expose, decompress, parse as CFB, inspect, or execute the embedded
+/// MS-OVBA project payload.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PowerPointVbaProjectStorage {
+    info: PowerPointVbaInfo,
+    compression: Option<PowerPointOleStorageCompression>,
+    stored_payload_len: Option<usize>,
+}
+
+impl PowerPointVbaProjectStorage {
+    pub(crate) fn from_info_and_storage(
+        info: PowerPointVbaInfo,
+        storage: Option<&PowerPointOleStorage>,
+    ) -> Result<Self> {
+        info.validate()?;
+        if info.persist_id_ref == 0 && storage.is_some() {
+            return Err(PptError::Corrupted(
+                "VBAInfoAtom has a null persist reference with storage metadata".to_string(),
+            ));
+        }
+        if info.persist_id_ref != 0 && storage.is_none() {
+            return Err(PptError::Corrupted(format!(
+                "VBAInfoAtom persist ID {} has no storage record",
+                info.persist_id_ref
+            )));
+        }
+        if let Some(storage) = storage
+            && storage.kind != PowerPointOleStorageKind::VbaProject
+        {
+            return Err(PptError::Corrupted(format!(
+                "VBAInfoAtom persist ID {} does not reference VBA project storage",
+                info.persist_id_ref
+            )));
+        }
+        Ok(Self {
+            info,
+            compression: storage.map(|storage| storage.compression),
+            stored_payload_len: storage.map(|storage| storage.data.len()),
+        })
+    }
+
+    /// Return the `VBAInfoAtom` metadata that points at this storage.
+    pub fn info(&self) -> PowerPointVbaInfo {
+        self.info
+    }
+
+    /// Return the persisted VBA storage identifier.
+    pub fn persist_id_ref(&self) -> u32 {
+        self.info.persist_id_ref
+    }
+
+    /// Whether `VBAInfoAtom` declares that the project storage has data.
+    pub fn has_macros(&self) -> bool {
+        self.info.has_macros
+    }
+
+    /// Return the VBA runtime version recorded by PowerPoint.
+    pub fn runtime_version(&self) -> u32 {
+        self.info.runtime_version
+    }
+
+    /// Whether a non-null VBA project storage record is present.
+    pub fn has_persisted_storage(&self) -> bool {
+        self.compression.is_some()
+    }
+
+    /// Return outer-record compression metadata without decompressing data.
+    pub fn compression(&self) -> Option<PowerPointOleStorageCompression> {
+        self.compression
+    }
+
+    /// Return the stored opaque payload length, excluding a compressed size prefix.
+    pub fn stored_payload_len(&self) -> Option<usize> {
+        self.stored_payload_len
+    }
+
+    /// Return the declared decompressed payload length, if the storage is compressed.
+    ///
+    /// This is metadata from the outer record. The library never attempts the
+    /// corresponding decompression.
+    pub fn declared_uncompressed_len(&self) -> Option<u32> {
+        match self.compression {
+            Some(PowerPointOleStorageCompression::Zlib { uncompressed_len }) => {
+                Some(uncompressed_len)
+            },
+            Some(PowerPointOleStorageCompression::Uncompressed) | None => None,
+        }
+    }
+
+    /// Whether outer metadata declares a compressed VBA project storage.
+    pub fn is_compressed(&self) -> bool {
+        matches!(
+            self.compression,
+            Some(PowerPointOleStorageCompression::Zlib { .. })
+        )
+    }
+
+    /// Whether persisted metadata conservatively indicates macro data.
+    ///
+    /// This does not inspect project, module, or source-code bytes.
+    pub fn may_contain_macro_code(&self) -> bool {
+        self.info.has_macros && self.has_persisted_storage()
+    }
 }
 
 impl PowerPointVbaInfo {
@@ -59,21 +170,13 @@ impl PowerPointVbaInfo {
             },
         };
         let runtime_version = u32::from_le_bytes(atom.data[8..12].try_into().unwrap());
-        if runtime_version != 2 {
-            return Err(PptError::Corrupted(
-                "VBAInfoAtom has an invalid runtime version".to_string(),
-            ));
-        }
-        if has_macros && persist_id_ref == 0 {
-            return Err(PptError::Corrupted(
-                "VBAInfoAtom declares macro data without a persist reference".to_string(),
-            ));
-        }
-        Ok(Self {
+        let result = Self {
             persist_id_ref,
             has_macros,
             runtime_version,
-        })
+        };
+        result.validate()?;
+        Ok(result)
     }
 
     /// Discover the single document-level VBA metadata container, if present.
@@ -95,11 +198,7 @@ impl PowerPointVbaInfo {
 
     /// Encode the exact container and atom headers required by MS-PPT.
     pub fn to_record(self) -> Result<PptRecord> {
-        if self.runtime_version != 2 || (self.has_macros && self.persist_id_ref == 0) {
-            return Err(PptError::Corrupted(
-                "VBA metadata cannot be represented by MS-PPT".to_string(),
-            ));
-        }
+        self.validate()?;
         let mut atom_data = Vec::with_capacity(12);
         atom_data.extend_from_slice(&self.persist_id_ref.to_le_bytes());
         atom_data.extend_from_slice(&u32::from(self.has_macros).to_le_bytes());
@@ -127,6 +226,20 @@ impl PowerPointVbaInfo {
             data,
             children: vec![atom],
         })
+    }
+
+    fn validate(self) -> Result<()> {
+        if self.runtime_version != 2 {
+            return Err(PptError::Corrupted(
+                "VBAInfoAtom has an invalid runtime version".to_string(),
+            ));
+        }
+        if self.has_macros && self.persist_id_ref == 0 {
+            return Err(PptError::Corrupted(
+                "VBAInfoAtom declares macro data without a persist reference".to_string(),
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -185,5 +298,60 @@ mod tests {
         .to_record()
         .unwrap();
         assert!(PowerPointVbaInfo::parse_records(&[&record, &record]).is_err());
+    }
+
+    #[test]
+    fn summarizes_vba_storage_without_exposing_or_decompressing_payload_data() {
+        let info = PowerPointVbaInfo {
+            persist_id_ref: 41,
+            has_macros: true,
+            runtime_version: 2,
+        };
+        let storage = PowerPointOleStorage {
+            kind: PowerPointOleStorageKind::VbaProject,
+            compression: PowerPointOleStorageCompression::Zlib {
+                uncompressed_len: 4096,
+            },
+            data: vec![0x78, 0x9c, 1, 2, 3],
+        };
+        let summary =
+            PowerPointVbaProjectStorage::from_info_and_storage(info, Some(&storage)).unwrap();
+
+        assert_eq!(summary.info(), info);
+        assert_eq!(summary.persist_id_ref(), 41);
+        assert!(summary.has_macros());
+        assert!(summary.has_persisted_storage());
+        assert!(summary.is_compressed());
+        assert_eq!(summary.stored_payload_len(), Some(5));
+        assert_eq!(summary.declared_uncompressed_len(), Some(4096));
+        assert!(summary.may_contain_macro_code());
+    }
+
+    #[test]
+    fn rejects_missing_or_wrong_vba_storage_without_touching_payload_contents() {
+        let info = PowerPointVbaInfo {
+            persist_id_ref: 41,
+            has_macros: false,
+            runtime_version: 2,
+        };
+        assert!(PowerPointVbaProjectStorage::from_info_and_storage(info, None).is_err());
+
+        let wrong_storage = PowerPointOleStorage {
+            kind: PowerPointOleStorageKind::OleObject,
+            compression: PowerPointOleStorageCompression::Uncompressed,
+            data: vec![0x01],
+        };
+        assert!(
+            PowerPointVbaProjectStorage::from_info_and_storage(info, Some(&wrong_storage)).is_err()
+        );
+
+        let empty = PowerPointVbaInfo {
+            persist_id_ref: 0,
+            has_macros: false,
+            runtime_version: 2,
+        };
+        let summary = PowerPointVbaProjectStorage::from_info_and_storage(empty, None).unwrap();
+        assert!(!summary.has_persisted_storage());
+        assert!(!summary.may_contain_macro_code());
     }
 }
