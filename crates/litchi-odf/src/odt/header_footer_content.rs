@@ -67,11 +67,26 @@ pub enum HeaderFooterFieldKind {
     Title,
     Subject,
     AuthorName,
+    AuthorInitials,
     Date,
     Time,
     FileName,
+    TemplateName,
+    SheetName,
     Chapter,
+    InitialCreator,
+    Description,
+    PrintedBy,
+    Keywords,
+    Creator,
+    CreationDate,
+    CreationTime,
     ModificationDate,
+    ModificationTime,
+    PrintDate,
+    PrintTime,
+    EditingCycles,
+    EditingDuration,
     UserDefined,
     /// A sender identity or contact field defined by ODF's `text:sender-*` elements.
     Sender(HeaderFooterSenderFieldKind),
@@ -539,11 +554,26 @@ fn field_kind(local: &[u8]) -> Option<HeaderFooterFieldKind> {
         b"title" => HeaderFooterFieldKind::Title,
         b"subject" => HeaderFooterFieldKind::Subject,
         b"author-name" => HeaderFooterFieldKind::AuthorName,
+        b"author-initials" => HeaderFooterFieldKind::AuthorInitials,
         b"date" => HeaderFooterFieldKind::Date,
         b"time" => HeaderFooterFieldKind::Time,
         b"file-name" => HeaderFooterFieldKind::FileName,
+        b"template-name" => HeaderFooterFieldKind::TemplateName,
+        b"sheet-name" => HeaderFooterFieldKind::SheetName,
         b"chapter" => HeaderFooterFieldKind::Chapter,
+        b"initial-creator" => HeaderFooterFieldKind::InitialCreator,
+        b"description" => HeaderFooterFieldKind::Description,
+        b"printed-by" => HeaderFooterFieldKind::PrintedBy,
+        b"keywords" => HeaderFooterFieldKind::Keywords,
+        b"creator" => HeaderFooterFieldKind::Creator,
+        b"creation-date" => HeaderFooterFieldKind::CreationDate,
+        b"creation-time" => HeaderFooterFieldKind::CreationTime,
         b"modification-date" => HeaderFooterFieldKind::ModificationDate,
+        b"modification-time" => HeaderFooterFieldKind::ModificationTime,
+        b"print-date" => HeaderFooterFieldKind::PrintDate,
+        b"print-time" => HeaderFooterFieldKind::PrintTime,
+        b"editing-cycles" => HeaderFooterFieldKind::EditingCycles,
+        b"editing-duration" => HeaderFooterFieldKind::EditingDuration,
         b"user-defined" => HeaderFooterFieldKind::UserDefined,
         b"sender-firstname" => {
             HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::FirstName)
@@ -834,6 +864,50 @@ mod tests {
             fields[1]
                 .attributes
                 .contains(&("text:name".into(), "Standard.Module1.Main".into()))
+        );
+    }
+
+    #[test]
+    fn classifies_cached_document_identity_and_revision_fields() {
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:author-initials>AI</t:author-initials><t:template-name>Letter</t:template-name><t:sheet-name>Sheet1</t:sheet-name><t:initial-creator>Initial</t:initial-creator><t:description>Summary</t:description><t:printed-by>Printer</t:printed-by><t:keywords>one,two</t:keywords><t:creator>Creator</t:creator><t:creation-date t:fixed="true" s:data-style-name="D1">2026-07-22</t:creation-date><t:creation-time>12:00</t:creation-time><t:modification-time>13:00</t:modification-time><t:print-date>2026-07-22</t:print-date><t:print-time>14:00</t:print-time><t:editing-cycles>3</t:editing-cycles><t:editing-duration t:duration="PT1H">1 hour</t:editing-duration></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
+        let regions = parse_header_footer_blocks(xml).unwrap();
+        let blocks = &regions[&(String::from("A"), HeaderFooterKind::Footer)];
+        let fields: Vec<_> = blocks[0]
+            .content
+            .iter()
+            .filter_map(|inline| match inline {
+                HeaderFooterInline::Field(field) => Some(field),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
+            vec![
+                &HeaderFooterFieldKind::AuthorInitials,
+                &HeaderFooterFieldKind::TemplateName,
+                &HeaderFooterFieldKind::SheetName,
+                &HeaderFooterFieldKind::InitialCreator,
+                &HeaderFooterFieldKind::Description,
+                &HeaderFooterFieldKind::PrintedBy,
+                &HeaderFooterFieldKind::Keywords,
+                &HeaderFooterFieldKind::Creator,
+                &HeaderFooterFieldKind::CreationDate,
+                &HeaderFooterFieldKind::CreationTime,
+                &HeaderFooterFieldKind::ModificationTime,
+                &HeaderFooterFieldKind::PrintDate,
+                &HeaderFooterFieldKind::PrintTime,
+                &HeaderFooterFieldKind::EditingCycles,
+                &HeaderFooterFieldKind::EditingDuration,
+            ]
+        );
+        assert_eq!(fields[8].displayed_text, "2026-07-22");
+        assert_eq!(fields[8].fixed, Some(true));
+        assert_eq!(fields[8].data_style_name.as_deref(), Some("D1"));
+        assert!(
+            fields[14]
+                .attributes
+                .contains(&("text:duration".into(), "PT1H".into()))
         );
     }
 
