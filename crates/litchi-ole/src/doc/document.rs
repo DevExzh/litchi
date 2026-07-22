@@ -14,8 +14,8 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    Field, FieldStory, FieldText, FieldsTable, MacroButtonField, MailMergeConditionalControlField,
-    MailMergeCounterField, MailMergeNextField, MergeField,
+    Field, FieldStory, FieldText, FieldsTable, IfField, MacroButtonField,
+    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField, MergeField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -660,6 +660,21 @@ impl Document {
     /// Get the number of typed, inert conditional mail-merge control fields.
     pub fn mail_merge_conditional_control_count(&self) -> Result<usize> {
         Ok(self.mail_merge_conditional_controls()?.len())
+    }
+
+    /// Get typed, inert `IF` fields in story and source order.
+    ///
+    /// Returned values expose only stored expression text, cached results, and
+    /// field state. This method never parses or evaluates an expression,
+    /// resolves field values, or refreshes a field result.
+    pub fn if_fields(&self) -> Result<Vec<IfField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::if_field).collect())
+    }
+
+    /// Get the number of typed, inert `IF` fields.
+    pub fn if_field_count(&self) -> Result<usize> {
+        Ok(self.if_fields()?.len())
     }
 
     /// Get stored instruction and cached-result text for one parsed field.
