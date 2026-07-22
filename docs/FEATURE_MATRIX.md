@@ -607,9 +607,11 @@ They do not override the per-feature limits above.
 | Excel BIFF | `.xls` | ✅ | ✅ | Reads BIFF2-BIFF8 and writes/edits BIFF8 |
 | PowerPoint binary | `.ppt` | ✅ | ✅ | Office 97-2003 OLE2; writer and targeted package editors |
 
-Macro-enabled OOXML packages are not listed as supported macro formats: generic package parts may be
-preserved by some workflows, but Litchi has no typed VBA project/code-module model for DOCM, XLSM,
-or PPTM.
+Macro-enabled OOXML variants (`.docm`, `.dotm`, `.xlsm`, `.xltm`, `.pptm`, `.ppsm`, and `.potm`)
+and macro-enabled XLSB workbooks have package-level support. Their published VBA APIs validate and
+report only inert relationship metadata (including declared XLSB signature-part metadata); binary
+project, signature, and code-module payloads remain opaque and are never executed. Litchi has no
+typed VBA code-module model or macro-authoring support.
 
 ### OpenDocument
 
