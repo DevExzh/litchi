@@ -3364,6 +3364,166 @@ fn grows_and_truncates_blank_table_edges_with_uid_maps() {
 }
 
 #[test]
+fn table_row_insertion_preserves_explicit_stroke_layers_on_original_cells() {
+    let mut package = test_package();
+    add_test_stroke_layer(&mut package, 50, TestStrokeLayerSide::Top, 1, &[(1, 1)]);
+    add_test_stroke_layer(&mut package, 51, TestStrokeLayerSide::Left, 1, &[(1, 3)]);
+
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor
+        .insert_table_row(10, TableRowInsertion::body(1))
+        .unwrap();
+
+    let sidecar = test_stroke_sidecar(editor.package());
+    assert_eq!(sidecar.row_count, Some(5));
+    assert_eq!(
+        sidecar
+            .top_row_stroke_layers
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        [50]
+    );
+    assert_eq!(
+        sidecar
+            .left_column_stroke_layers
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        [51]
+    );
+    assert_eq!(
+        test_stroke_layer(editor.package(), 50).row_column_index,
+        Some(2)
+    );
+    let left = test_stroke_layer(editor.package(), 51);
+    assert_eq!(left.stroke_runs[0].origin, Some(2));
+    assert_eq!(left.stroke_runs[0].length, Some(3));
+}
+
+#[test]
+fn table_row_insertion_splits_crossing_stroke_runs_without_normalizing_unknown_fields() {
+    let mut package = test_package();
+    add_test_stroke_layer(&mut package, 50, TestStrokeLayerSide::Left, 1, &[(1, 3)]);
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(50).unwrap();
+            let message = object.messages[0].clone();
+            let data = crate::wire::transform_length_delimited_fields_at_path(
+                &message.data,
+                &[2],
+                |run| {
+                    let mut run = run.to_vec();
+                    append_unknown_varint(&mut run, 99, 990);
+                    Ok(run)
+                },
+            )?;
+            object
+                .replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )
+                .map(|_| ())
+        })
+        .unwrap();
+
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor
+        .insert_table_row(10, TableRowInsertion::body(2))
+        .unwrap();
+
+    let layer = test_stroke_layer(editor.package(), 50);
+    assert_eq!(
+        layer
+            .stroke_runs
+            .iter()
+            .map(|run| (run.origin, run.length))
+            .collect::<Vec<_>>(),
+        [(Some(1), Some(1)), (Some(3), Some(2))]
+    );
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let raw_runs = crate::wire::repeated_length_delimited_payloads(
+        archive.object(50).unwrap().messages[0].data.as_slice(),
+        2,
+    )
+    .unwrap();
+    assert_eq!(raw_runs.len(), 2);
+    for run in raw_runs {
+        assert!(
+            crate::wire::parse_wire_fields(run)
+                .unwrap()
+                .iter()
+                .any(|field| field.number == 99)
+        );
+    }
+}
+
+#[test]
+fn table_row_deletion_removes_or_compacts_explicit_stroke_layers_and_metadata_references() {
+    let mut package = test_package();
+    add_test_stroke_layer(&mut package, 50, TestStrokeLayerSide::Top, 1, &[(1, 1)]);
+    add_test_stroke_layer(&mut package, 51, TestStrokeLayerSide::Left, 1, &[(1, 3)]);
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            archive.object_mut(41).unwrap().archive_info.message_infos[0]
+                .object_references
+                .push(999);
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::body(1))
+        .unwrap();
+
+    let sidecar = test_stroke_sidecar(editor.package());
+    assert_eq!(sidecar.row_count, Some(3));
+    assert!(sidecar.top_row_stroke_layers.is_empty());
+    assert_eq!(
+        sidecar
+            .left_column_stroke_layers
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        [51]
+    );
+    let left = test_stroke_layer(editor.package(), 51);
+    assert_eq!(left.stroke_runs[0].origin, Some(1));
+    assert_eq!(left.stroke_runs[0].length, Some(2));
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let references = &archive.object(41).unwrap().archive_info.message_infos[0].object_references;
+    assert!(!references.contains(&50));
+    assert!(references.contains(&51));
+    assert!(references.contains(&999));
+}
+
+#[test]
+fn table_column_insertion_preserves_explicit_stroke_layers_on_original_cells() {
+    let mut package = test_package();
+    add_test_stroke_layer(&mut package, 50, TestStrokeLayerSide::Left, 1, &[(1, 1)]);
+    add_test_stroke_layer(&mut package, 51, TestStrokeLayerSide::Top, 1, &[(1, 3)]);
+
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor
+        .insert_table_column(10, TableColumnInsertion::body(1))
+        .unwrap();
+
+    let sidecar = test_stroke_sidecar(editor.package());
+    assert_eq!(sidecar.column_count, Some(5));
+    assert_eq!(
+        test_stroke_layer(editor.package(), 50).row_column_index,
+        Some(2)
+    );
+    let top = test_stroke_layer(editor.package(), 51);
+    assert_eq!(top.stroke_runs[0].origin, Some(2));
+    assert_eq!(top.stroke_runs[0].length, Some(3));
+}
+
+#[test]
 fn inserts_blank_table_row_and_shifts_cells_uids_headers_and_formulas() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
     editor
@@ -6487,6 +6647,105 @@ fn test_package_with_text_box_metadata() -> IWorkPackage {
         )
         .unwrap();
     package
+}
+
+#[derive(Clone, Copy)]
+enum TestStrokeLayerSide {
+    Left,
+    Top,
+}
+
+impl TestStrokeLayerSide {
+    fn references_mut(self, sidecar: &mut tst::StrokeSidecarArchive) -> &mut Vec<Reference> {
+        match self {
+            Self::Left => &mut sidecar.left_column_stroke_layers,
+            Self::Top => &mut sidecar.top_row_stroke_layers,
+        }
+    }
+}
+
+fn add_test_stroke_layer(
+    package: &mut IWorkPackage,
+    identifier: u64,
+    side: TestStrokeLayerSide,
+    row_column_index: u32,
+    runs: &[(i32, u32)],
+) {
+    const STROKE_LAYER_MESSAGE_TYPE: u32 = 6_306;
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            {
+                let sidecar = archive.object_mut(41).unwrap();
+                let message_index = sidecar
+                    .messages
+                    .iter()
+                    .position(|message| {
+                        tst::StrokeSidecarArchive::decode(message.data.as_slice()).is_ok()
+                    })
+                    .unwrap();
+                let message = sidecar.messages[message_index].clone();
+                let mut payload =
+                    tst::StrokeSidecarArchive::decode(message.data.as_slice()).unwrap();
+                side.references_mut(&mut payload).push(Reference {
+                    identifier,
+                    ..Default::default()
+                });
+                sidecar.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: message.type_,
+                        data: payload.encode_to_vec(),
+                    },
+                )?;
+                sidecar.archive_info.message_infos[message_index]
+                    .object_references
+                    .push(identifier);
+            }
+            archive.insert_object(ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: STROKE_LAYER_MESSAGE_TYPE,
+                    data: tst::StrokeLayerArchive {
+                        row_column_index: Some(row_column_index),
+                        stroke_runs: runs
+                            .iter()
+                            .map(
+                                |&(origin, length)| tst::stroke_layer_archive::StrokeRunArchive {
+                                    origin: Some(origin),
+                                    length: Some(length),
+                                    order: Some(1),
+                                    ..Default::default()
+                                },
+                            )
+                            .collect(),
+                    }
+                    .encode_to_vec(),
+                }],
+            )?)
+        })
+        .unwrap();
+}
+
+fn test_stroke_sidecar(package: &IWorkPackage) -> tst::StrokeSidecarArchive {
+    let archive = package.archive("Index/Document.iwa").unwrap();
+    archive
+        .object(41)
+        .unwrap()
+        .messages
+        .iter()
+        .find_map(|message| tst::StrokeSidecarArchive::decode(message.data.as_slice()).ok())
+        .unwrap()
+}
+
+fn test_stroke_layer(package: &IWorkPackage, identifier: u64) -> tst::StrokeLayerArchive {
+    let archive = package.archive("Index/Document.iwa").unwrap();
+    archive
+        .object(identifier)
+        .unwrap()
+        .messages
+        .iter()
+        .find_map(|message| tst::StrokeLayerArchive::decode(message.data.as_slice()).ok())
+        .unwrap()
 }
 
 fn test_package() -> IWorkPackage {

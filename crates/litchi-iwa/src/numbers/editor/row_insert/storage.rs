@@ -383,53 +383,6 @@ pub(super) fn insert_row_uid(
     })
 }
 
-pub(super) fn insert_stroke_row(
-    package: &mut IWorkPackage,
-    locations: &HashMap<u64, String>,
-    identifier: u64,
-    rows: u32,
-) -> Result<()> {
-    let archive_name = locations.get(&identifier).ok_or_else(|| {
-        Error::InvalidFormat(format!("Numbers stroke sidecar {identifier} is missing"))
-    })?;
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers stroke sidecar {identifier} is missing"))
-        })?;
-        let message_index = object
-            .messages
-            .iter()
-            .position(|message| tst::StrokeSidecarArchive::decode(message.data.as_slice()).is_ok())
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!("Object {identifier} has no stroke sidecar payload"))
-            })?;
-        let original = object.messages[message_index].data.as_slice();
-        let previous = tst::StrokeSidecarArchive::decode(original)?;
-        if !previous.left_column_stroke_layers.is_empty()
-            || !previous.right_column_stroke_layers.is_empty()
-            || !previous.top_row_stroke_layers.is_empty()
-            || !previous.bottom_row_stroke_layers.is_empty()
-        {
-            return Err(Error::ParseError(
-                "Cannot yet insert a Numbers row into a table with explicit stroke layers"
-                    .to_owned(),
-            ));
-        }
-        let mut current = previous.clone();
-        current.row_count = Some(rows);
-        let message_type = object.messages[message_index].type_;
-        let data = rewrite_stroke_sidecar_wire(original, &previous, &current)?;
-        object.replace_message(
-            message_index,
-            RawMessage {
-                type_: message_type,
-                data,
-            },
-        )?;
-        Ok(())
-    })
-}
-
 pub(super) fn set_table_row_count(
     package: &mut IWorkPackage,
     locations: &HashMap<u64, String>,

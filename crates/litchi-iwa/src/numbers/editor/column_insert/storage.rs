@@ -260,53 +260,6 @@ pub(super) fn insert_column_uid(
     })
 }
 
-pub(super) fn insert_stroke_column(
-    package: &mut IWorkPackage,
-    locations: &HashMap<u64, String>,
-    identifier: u64,
-    columns: u32,
-) -> Result<()> {
-    let archive_name = locations.get(&identifier).ok_or_else(|| {
-        Error::InvalidFormat(format!("Numbers stroke sidecar {identifier} is missing"))
-    })?;
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers stroke sidecar {identifier} is missing"))
-        })?;
-        let message_index = object
-            .messages
-            .iter()
-            .position(|message| tst::StrokeSidecarArchive::decode(message.data.as_slice()).is_ok())
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!("Object {identifier} has no stroke sidecar payload"))
-            })?;
-        let original = object.messages[message_index].data.clone();
-        let previous = tst::StrokeSidecarArchive::decode(original.as_slice())?;
-        if !previous.left_column_stroke_layers.is_empty()
-            || !previous.right_column_stroke_layers.is_empty()
-            || !previous.top_row_stroke_layers.is_empty()
-            || !previous.bottom_row_stroke_layers.is_empty()
-        {
-            return Err(Error::ParseError(
-                "Cannot yet insert a Numbers column into a table with explicit stroke layers"
-                    .to_owned(),
-            ));
-        }
-        let mut current = previous.clone();
-        current.column_count = Some(columns);
-        let data = rewrite_stroke_sidecar_wire(&original, &previous, &current)?;
-        let message_type = object.messages[message_index].type_;
-        object.replace_message(
-            message_index,
-            RawMessage {
-                type_: message_type,
-                data,
-            },
-        )?;
-        Ok(())
-    })
-}
-
 pub(super) fn set_table_column_count(
     package: &mut IWorkPackage,
     locations: &HashMap<u64, String>,

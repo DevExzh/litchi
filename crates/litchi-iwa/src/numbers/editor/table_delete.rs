@@ -12,11 +12,12 @@ use cell_merge::{
     regions_in_package, shift_merges_for_axis_deletion,
 };
 use column::{delete_column_headers, delete_table_tile_column};
-use dimension::{set_stroke_dimensions, set_table_dimensions};
+use dimension::set_table_dimensions;
 use formula_dependency_shift::{
     DependencyAxis, FormulaHostCoordinate, delete_formula_dependencies,
 };
 use row::{delete_row_headers, delete_table_tile_row};
+use stroke_layers::{StrokeAxis, delete as delete_stroke_layers};
 use table_headers::set_attached_table_header_settings;
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
 use uid::{delete_column_uid, delete_row_uid};
@@ -125,11 +126,13 @@ pub(super) fn remove_attached_table_row(
         })?;
     delete_row_uid(package, &locations, uid.identifier, old_rows, row)?;
     if let Some(sidecar) = &descriptor.model.stroke_sidecar {
-        set_stroke_dimensions(
+        delete_stroke_layers(
             package,
             &locations,
             sidecar.identifier,
-            new_rows_u32,
+            StrokeAxis::Row,
+            row,
+            descriptor.model.number_of_rows,
             columns_u32,
         )?;
     }
@@ -211,12 +214,14 @@ pub(super) fn remove_attached_table_column(
         })?;
     delete_column_uid(package, &locations, uid.identifier, old_columns, column)?;
     if let Some(sidecar) = &descriptor.model.stroke_sidecar {
-        set_stroke_dimensions(
+        delete_stroke_layers(
             package,
             &locations,
             sidecar.identifier,
+            StrokeAxis::Column,
+            column,
             rows_u32,
-            new_columns_u32,
+            descriptor.model.number_of_columns,
         )?;
     }
     set_table_dimensions(package, &locations, table_id, rows_u32, new_columns_u32)?;

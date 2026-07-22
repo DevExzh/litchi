@@ -7,9 +7,9 @@ mod storage;
 use cell_merge::{MergeAxis, shift_merges_for_axis_insertion};
 use formula_dependency_shift::{DependencyAxis, FooterRangeInsertion, shift_formula_dependencies};
 use storage::{
-    insert_column_uid, insert_stroke_column, set_table_column_count, shift_column_headers,
-    shift_table_tile_columns,
+    insert_column_uid, set_table_column_count, shift_column_headers, shift_table_tile_columns,
 };
+use stroke_layers::{StrokeAxis, insert as insert_stroke_layers};
 use table_headers::set_attached_table_header_settings;
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
 
@@ -87,7 +87,15 @@ pub(super) fn insert_attached_table_column(
         )?;
     }
     if let Some(reference) = &descriptor.model.stroke_sidecar {
-        insert_stroke_column(package, &locations, reference.identifier, new_columns_u32)?;
+        insert_stroke_layers(
+            package,
+            &locations,
+            reference.identifier,
+            StrokeAxis::Column,
+            column,
+            descriptor.model.number_of_rows,
+            descriptor.model.number_of_columns,
+        )?;
     }
     set_table_column_count(package, &locations, descriptor.object_id, new_columns_u32)?;
     if let Some(settings) = resolved.updated_header_settings {

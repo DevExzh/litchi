@@ -3264,6 +3264,7 @@ mod sheet_images;
 mod sheet_movies;
 mod sheet_shapes;
 mod storage;
+mod stroke_layers;
 mod table_axis_deletion;
 mod table_axis_insertion;
 mod table_bootstrap;

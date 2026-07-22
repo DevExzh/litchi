@@ -192,6 +192,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             stroke.top_row_stroke_layers.len(),
                             stroke.bottom_row_stroke_layers.len()
                         );
+                        for (side, layers) in [
+                            ("left", &stroke.left_column_stroke_layers),
+                            ("right", &stroke.right_column_stroke_layers),
+                            ("top", &stroke.top_row_stroke_layers),
+                            ("bottom", &stroke.bottom_row_stroke_layers),
+                        ] {
+                            for layer in layers {
+                                let Some((layer_archive, layer_object)) =
+                                    objects.get(&layer.identifier)
+                                else {
+                                    println!(
+                                        "  stroke_layer side={side} id={} missing",
+                                        layer.identifier
+                                    );
+                                    continue;
+                                };
+                                for layer_message in &layer_object.messages {
+                                    let Ok(layer) = tst::StrokeLayerArchive::decode(
+                                        layer_message.data.as_slice(),
+                                    ) else {
+                                        continue;
+                                    };
+                                    println!(
+                                        "  stroke_layer side={side} id={} archive={} type={} index={:?} runs={:?}",
+                                        layer_object.archive_info.identifier.unwrap_or_default(),
+                                        layer_archive,
+                                        layer_message.type_,
+                                        layer.row_column_index,
+                                        layer
+                                            .stroke_runs
+                                            .iter()
+                                            .map(|run| (run.origin, run.length, run.order))
+                                            .collect::<Vec<_>>(),
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
             }

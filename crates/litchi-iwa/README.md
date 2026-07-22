@@ -1023,6 +1023,11 @@ each existing object is now mutated through bounded wire paths, including the
 unpacked UID index arrays and nested UUID records. Grow/shrink restoration is
 byte-exact while unknown fields remain attached to retained rows, headers,
 UUIDs, and stroke-layer references.
+Physical row and column insertion/deletion also maintains app-authored
+`StrokeLayerArchive` border overlays: fixed-axis layers move with their
+original cells, crossing runs split or compact around a blank inserted/deleted
+axis, and unreachable layer references are removed from the sidecar without
+normalizing unknown protobuf fields.
 Workbook sheet ordering and standard or form-sheet table ownership lists reuse
 the original raw `TSP.Reference` payloads, preserving extensions inside each
 reference; newly appended references are removed byte-exactly on rollback or
