@@ -20,7 +20,6 @@ const BUILD_MESSAGE_TYPE: u32 = 8;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const SLIDE_BUILDS_FIELD: u32 = 2;
 const SLIDE_BUILD_CHUNKS_FIELD: u32 = 43;
-const MOVIE_DUPLICATE_OFFSET: f32 = 10.0;
 const MOVIE_MEDIA_PLACEHOLDER_FLAG: u32 = 1;
 
 /// Semantic role of a movie drawable owned directly by a Keynote slide.
@@ -95,9 +94,9 @@ pub(in crate::keynote::editor) struct SlideMovieGraph {
     pub(in crate::keynote::editor) archive_name: String,
     pub(in crate::keynote::editor) info: KeynoteSlideMovieInfo,
     pub(in crate::keynote::editor) object_ids: Vec<u64>,
-    build_ids: Vec<u64>,
-    uuid_object_ids: Vec<u64>,
-    data_references: Vec<(u64, u64)>,
+    pub(in crate::keynote::editor) build_ids: Vec<u64>,
+    pub(in crate::keynote::editor) uuid_object_ids: Vec<u64>,
+    pub(in crate::keynote::editor) data_references: Vec<(u64, u64)>,
 }
 
 impl KeynoteEditor {
@@ -328,15 +327,29 @@ impl KeynoteEditor {
 
     /// Duplicate an ordinary file-backed movie using native shared-asset semantics.
     ///
-    /// The movie, stand-in title/caption objects, and chunkless automatic movie
-    /// builds receive fresh object identifiers and UUIDs. Embedded video and
-    /// poster data remain shared, exactly as with Keynote's Duplicate command.
+    /// The movie, stand-in title/caption objects, and automatic playback builds
+    /// receive fresh object identifiers and UUIDs. Embedded video and poster
+    /// data remain shared, exactly as with Keynote's Duplicate command.
     pub fn duplicate_slide_movie(
         &mut self,
         slide_index: usize,
         source_drawable_object_id: u64,
     ) -> Result<KeynoteSlideMovieInfo> {
-        let source = self.require_file_movie(slide_index, source_drawable_object_id)?;
+        self.duplicate_slide_media(
+            slide_index,
+            source_drawable_object_id,
+            KeynoteSlideMovieKind::File,
+        )
+    }
+
+    pub(in crate::keynote::editor) fn duplicate_slide_media(
+        &mut self,
+        slide_index: usize,
+        source_drawable_object_id: u64,
+        expected_kind: KeynoteSlideMovieKind,
+    ) -> Result<KeynoteSlideMovieInfo> {
+        let source =
+            self.require_slide_media_kind(slide_index, source_drawable_object_id, expected_kind)?;
         let builds = self
             .slide_builds(slide_index)?
             .into_iter()
@@ -424,7 +437,7 @@ impl KeynoteEditor {
             &mut staged,
             &source.archive_name,
             new_drawable_id,
-            MOVIE_DUPLICATE_OFFSET,
+            DRAWABLE_DUPLICATE_OFFSET,
         )?;
         patch_slide_drawable_references(
             &mut staged,
@@ -481,15 +494,18 @@ impl KeynoteEditor {
                 remap[&object_identifier],
             )?;
         }
-        set_package_last_object_identifier(&mut staged, next_identifier - 1)?;
+        let last_identifier = next_identifier.checked_sub(1).ok_or_else(|| {
+            Error::InvalidFormat("Keynote media clone has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         let created = verified
-            .slide_movies(slide_index)?
+            .slide_media_infos(slide_index)?
             .into_iter()
             .find(|movie| movie.drawable_object_id == new_drawable_id)
             .ok_or_else(|| {
-                Error::InvalidFormat("Keynote movie duplication failed validation".to_owned())
+                Error::InvalidFormat("Keynote media duplication failed validation".to_owned())
             })?;
         let expected_position =
             source
@@ -497,8 +513,8 @@ impl KeynoteEditor {
                 .geometry
                 .position
                 .map(|position| crate::shapes::DrawablePoint {
-                    x: position.x + MOVIE_DUPLICATE_OFFSET,
-                    y: position.y + MOVIE_DUPLICATE_OFFSET,
+                    x: position.x + DRAWABLE_DUPLICATE_OFFSET,
+                    y: position.y + DRAWABLE_DUPLICATE_OFFSET,
                 });
         let cloned_build_count = verified
             .slide_builds(slide_index)?
@@ -511,7 +527,7 @@ impl KeynoteEditor {
             .filter(|build| build.drawable_object_id == new_drawable_id)
             .map(|build| build.chunks.len())
             .sum::<usize>();
-        if created.kind != KeynoteSlideMovieKind::File
+        if created.kind != expected_kind
             || created.movie_data_identifier != source.info.movie_data_identifier
             || created.poster_image_data_identifier != source.info.poster_image_data_identifier
             || created.geometry.position != expected_position
@@ -519,7 +535,7 @@ impl KeynoteEditor {
             || cloned_chunk_count != chunk_ids.len()
         {
             return Err(Error::InvalidFormat(
-                "Keynote movie duplication produced an inconsistent graph".to_owned(),
+                "Keynote media duplication produced an inconsistent graph".to_owned(),
             ));
         }
         *self = verified;

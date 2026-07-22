@@ -322,7 +322,7 @@ use litchi_iwa::shapes::DrawablePoint;
 let body = "Interview notes";
 let audio = fs::read("interview.aiff")?;
 let mut pages = PagesEditor::create_with_text(body)?;
-pages.add_body_audio(
+let source = pages.add_body_audio(
     body.encode_utf16().count(),
     "interview.aiff",
     &audio,
@@ -331,9 +331,15 @@ pages.add_body_audio(
         Duration::from_secs(30),
     ),
 )?;
+let duplicate_anchor = pages.body_text()?.encode_utf16().count();
+let duplicate = pages.duplicate_body_audio(source.drawable_object_id, duplicate_anchor)?;
+assert_eq!(duplicate.audio_data_identifier, source.audio_data_identifier);
 pages.save("created-with-audio.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+`duplicate_body_audio` creates an independently positioned body attachment at
+Pages' native 30-point duplicate offset while sharing the audio asset.
 
 ### Create Numbers spreadsheets from scratch
 
@@ -502,7 +508,7 @@ use litchi_iwa::shapes::DrawablePoint;
 let audio = fs::read("interview.aiff")?;
 let mut numbers = NumbersDocumentBuilder::new().build()?;
 let sheet_id = numbers.sheets()?[0].object_id;
-numbers.add_sheet_audio(
+let source = numbers.add_sheet_audio(
     sheet_id,
     "interview.aiff",
     &audio,
@@ -511,9 +517,14 @@ numbers.add_sheet_audio(
         Duration::from_secs(30),
     ),
 )?;
+let duplicate = numbers.duplicate_sheet_audio(sheet_id, source.drawable_object_id)?;
+assert_eq!(duplicate.audio_data_identifier, source.audio_data_identifier);
 numbers.save("created-with-audio.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+`duplicate_sheet_audio` follows Numbers' native 10-point placement while
+keeping the duplicate's audio bytes shared with the source.
 
 ### Create Keynote presentations from scratch
 
@@ -721,7 +732,7 @@ use litchi_iwa::shapes::DrawablePoint;
 
 let audio = fs::read("narration.aiff")?;
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
-keynote.add_slide_audio(
+let source = keynote.add_slide_audio(
     0,
     "narration.aiff",
     &audio,
@@ -730,9 +741,14 @@ keynote.add_slide_audio(
         Duration::from_secs(12),
     ),
 )?;
+let duplicate = keynote.duplicate_slide_audio(0, source.drawable_object_id)?;
+assert_eq!(duplicate.audio_data_identifier, source.audio_data_identifier);
 keynote.save("created-with-audio.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+`duplicate_slide_audio` creates a separate audio graph and Start Audio build
+while sharing the embedded audio asset, mirroring Keynote's Duplicate command.
 
 ### Edit existing documents
 

@@ -189,7 +189,42 @@ impl KeynoteEditor {
         Ok(())
     }
 
+    /// Duplicate one slide audio control using Keynote's native placement.
+    ///
+    /// The audio, title/caption stand-ins, and automatic Start Audio build
+    /// receive fresh object identifiers and UUIDs. The clone shares its
+    /// embedded audio asset with the source, exactly as with Keynote's
+    /// Duplicate command.
+    pub fn duplicate_slide_audio(
+        &mut self,
+        slide_index: usize,
+        source_drawable_object_id: u64,
+    ) -> Result<KeynoteSlideAudioInfo> {
+        let source = require_audio(self, slide_index, source_drawable_object_id)?;
+        let media = self.duplicate_slide_media(
+            slide_index,
+            source_drawable_object_id,
+            KeynoteSlideMovieKind::Audio,
+        )?;
+        let created = require_audio(self, slide_index, media.drawable_object_id)?;
+        let media_position = media.geometry.position.ok_or_else(|| {
+            Error::InvalidFormat("Keynote audio clone has no position".to_owned())
+        })?;
+        if created.audio_data_identifier != source.audio_data_identifier
+            || created.position != media_position
+            || created.duration != source.duration
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote audio duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        Ok(created)
+    }
+
     /// Replace the bytes referenced by one slide-owned audio clip.
+    ///
+    /// Audio controls duplicated with [`Self::duplicate_slide_audio`] share
+    /// their embedded asset, matching Keynote's native Duplicate behavior.
     pub fn replace_slide_audio_data(
         &mut self,
         slide_index: usize,
@@ -374,9 +409,141 @@ mod tests {
     }
 
     #[test]
+    fn scratch_presentation_supports_native_audio_duplication() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Scratch audio")
+            .subtitle("No embedded package")
+            .build()
+            .unwrap();
+        let source = editor
+            .add_slide_audio(
+                0,
+                "audio.aiff",
+                AUDIO,
+                KeynoteSlideAudioOptions::new(POSITION, Duration::from_millis(1_375)),
+            )
+            .unwrap();
+
+        let duplicate = editor
+            .duplicate_slide_audio(0, source.drawable_object_id)
+            .unwrap();
+        assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
+        let source_graph = editor
+            .slide_movie_graph(0, source.drawable_object_id)
+            .unwrap();
+        let duplicate_graph = editor
+            .slide_movie_graph(0, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(
+            source_graph
+                .object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.object_ids.contains(identifier))
+        );
+        assert!(
+            source_graph
+                .uuid_object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.uuid_object_ids.contains(identifier))
+        );
+        assert_eq!(
+            duplicate.audio_data_identifier,
+            source.audio_data_identifier
+        );
+        assert_eq!(
+            duplicate.position,
+            DrawablePoint {
+                x: source.position.x + DRAWABLE_DUPLICATE_OFFSET,
+                y: source.position.y + DRAWABLE_DUPLICATE_OFFSET,
+            }
+        );
+        assert_eq!(duplicate.duration, source.duration);
+        let duplicate_builds = editor
+            .slide_builds(0)
+            .unwrap()
+            .into_iter()
+            .filter(|build| build.drawable_object_id == duplicate.drawable_object_id)
+            .collect::<Vec<_>>();
+        assert_eq!(duplicate_builds.len(), 1);
+        assert_eq!(
+            duplicate_builds[0].settings,
+            KeynoteBuildSettings::audio_start()
+        );
+        assert_eq!(duplicate_builds[0].chunks.len(), 1);
+
+        let moved_duplicate = DrawablePoint { x: 320.0, y: 240.0 };
+        editor
+            .set_slide_audio_position(0, duplicate.drawable_object_id, moved_duplicate)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_audio_position(0, source.drawable_object_id)
+                .unwrap(),
+            source.position
+        );
+        assert_eq!(
+            editor
+                .slide_audio_position(0, duplicate.drawable_object_id)
+                .unwrap(),
+            moved_duplicate
+        );
+        assert_eq!(
+            editor
+                .replace_slide_audio_data(0, duplicate.drawable_object_id, REPLACEMENT_AUDIO)
+                .unwrap(),
+            AUDIO
+        );
+        assert_eq!(
+            editor.extract_media(source.audio_data_identifier).unwrap(),
+            REPLACEMENT_AUDIO
+        );
+
+        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.slide_audio(0).unwrap().len(), 2);
+        assert_eq!(
+            reopened
+                .slide_audio(0)
+                .unwrap()
+                .into_iter()
+                .find(|audio| audio.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .position,
+            moved_duplicate
+        );
+        assert_eq!(
+            reopened
+                .slide_builds(0)
+                .unwrap()
+                .into_iter()
+                .filter(|build| build.drawable_object_id == duplicate.drawable_object_id)
+                .count(),
+            1
+        );
+
+        let removed_source = editor
+            .remove_slide_audio(0, source.drawable_object_id)
+            .unwrap();
+        assert!(removed_source.removed_data_identifiers.is_empty());
+        assert_eq!(editor.slide_audio(0).unwrap().len(), 1);
+        let removed_duplicate = editor
+            .remove_slide_audio(0, duplicate.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            removed_duplicate.removed_data_identifiers,
+            [source.audio_data_identifier]
+        );
+        assert!(editor.slide_audio(0).unwrap().is_empty());
+        assert!(editor.slide_builds(0).unwrap().is_empty());
+        assert!(editor.media_assets().unwrap().is_empty());
+        KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    }
+
+    #[test]
     fn invalid_slide_audio_creation_and_cross_type_edits_are_transactional() {
         let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();
+        assert!(editor.duplicate_slide_audio(0, 999).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
         for result in [
             editor.add_slide_audio(
                 0,

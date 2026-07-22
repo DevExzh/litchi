@@ -1,5 +1,6 @@
 //! Independently positioned audio-object CRUD for Numbers sheets.
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use super::sheet_movies::graph::{MovieObjectIds, movie_creation_context, set_movie_geometry};
@@ -7,7 +8,7 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
-use crate::shapes::{DrawableGeometry, DrawablePoint};
+use crate::shapes::{DrawableGeometry, DrawablePoint, offset_drawable_geometry};
 
 mod graph;
 
@@ -182,7 +183,129 @@ impl NumbersEditor {
         Ok(())
     }
 
+    /// Duplicate one sheet audio control using Numbers' native placement.
+    ///
+    /// The audio and title/caption stand-ins receive fresh identifiers and
+    /// UUIDs while retaining the source's style and unknown protobuf fields.
+    /// The clone is added to the same sheet and shares its embedded audio asset
+    /// with the source.
+    pub fn duplicate_sheet_audio(
+        &mut self,
+        sheet_id: u64,
+        source_drawable_object_id: u64,
+    ) -> Result<NumbersSheetAudioInfo> {
+        let source = audio_graph(self, sheet_id, source_drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Numbers audio graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Numbers audio object {identifier} is missing"))
+                })?;
+                clone_numbers_drawable_graph_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat("Numbers audio clone has no drawable identifier".to_owned())
+        })?;
+        let geometry = offset_drawable_geometry(source.geometry, DRAWABLE_DUPLICATE_OFFSET)?;
+        let expected_position = geometry.position.ok_or_else(|| {
+            Error::InvalidFormat("Numbers audio clone has no position".to_owned())
+        })?;
+        set_movie_geometry(&mut staged, &source.archive_name, new_drawable_id, geometry)?;
+        patch_numbers_sheet_drawable_reference(
+            &mut staged,
+            &source.archive_name,
+            source.sheet_id,
+            None,
+            Some(new_drawable_id),
+        )?;
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Numbers audio graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers audio clone has no UUID identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
+        for &(data_identifier, object_identifier) in &source.data_references {
+            let new_object_identifier =
+                remap.get(&object_identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers audio clone has no data-reference object for {object_identifier}"
+                    ))
+                })?;
+            add_component_data_reference(
+                &mut staged,
+                source.component_id,
+                data_identifier,
+                new_object_identifier,
+            )?;
+        }
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let created = verified
+            .sheet_audio(sheet_id)?
+            .into_iter()
+            .find(|audio| audio.drawable_object_id == new_drawable_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers audio duplication failed validation".to_owned())
+            })?;
+        let created_graph = audio_graph(&verified, sheet_id, new_drawable_id)?;
+        let expected_data_references = source
+            .data_references
+            .iter()
+            .map(|&(data_identifier, object_identifier)| {
+                let new_object_identifier = remap.get(&object_identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers audio clone has no validated data-reference object for {object_identifier}"
+                    ))
+                })?;
+                Ok((data_identifier, new_object_identifier))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if created.sheet_id != source.info.sheet_id
+            || created.audio_data_identifier != source.info.audio_data_identifier
+            || created.position != expected_position
+            || created.duration != source.info.duration
+            || created_graph.object_ids.len() != source.object_ids.len()
+            || created_graph.data_references != expected_data_references
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers audio duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created)
+    }
+
     /// Replace the bytes referenced by one sheet-owned audio clip.
+    ///
+    /// Audio controls duplicated with [`Self::duplicate_sheet_audio`] share
+    /// their embedded asset, matching Numbers' native Duplicate behavior.
     pub fn replace_sheet_audio_data(
         &mut self,
         sheet_id: u64,
@@ -362,10 +485,116 @@ mod tests {
     }
 
     #[test]
+    fn scratch_spreadsheet_supports_native_audio_duplication() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Audio")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_audio(sheet_id, "audio.aiff", AUDIO, options())
+            .unwrap();
+
+        let duplicate = editor
+            .duplicate_sheet_audio(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
+        let source_graph = audio_graph(&editor, sheet_id, source.drawable_object_id).unwrap();
+        let duplicate_graph = audio_graph(&editor, sheet_id, duplicate.drawable_object_id).unwrap();
+        assert!(
+            source_graph
+                .object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.object_ids.contains(identifier))
+        );
+        assert!(
+            source_graph
+                .uuid_object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.uuid_object_ids.contains(identifier))
+        );
+        assert_eq!(duplicate.sheet_id, sheet_id);
+        assert_eq!(
+            duplicate.audio_data_identifier,
+            source.audio_data_identifier
+        );
+        assert_eq!(
+            duplicate.position,
+            DrawablePoint {
+                x: source.position.x + DRAWABLE_DUPLICATE_OFFSET,
+                y: source.position.y + DRAWABLE_DUPLICATE_OFFSET,
+            }
+        );
+        assert_eq!(duplicate.duration, source.duration);
+
+        let moved_duplicate = DrawablePoint { x: 512.0, y: 288.0 };
+        editor
+            .set_sheet_audio_position(sheet_id, duplicate.drawable_object_id, moved_duplicate)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_audio_position(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            source.position
+        );
+        assert_eq!(
+            editor
+                .sheet_audio_position(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            moved_duplicate
+        );
+        assert_eq!(
+            editor
+                .replace_sheet_audio_data(
+                    sheet_id,
+                    duplicate.drawable_object_id,
+                    REPLACEMENT_AUDIO,
+                )
+                .unwrap(),
+            AUDIO
+        );
+        assert_eq!(
+            editor.extract_media(source.audio_data_identifier).unwrap(),
+            REPLACEMENT_AUDIO
+        );
+
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.sheet_audio(sheet_id).unwrap().len(), 2);
+        assert_eq!(
+            reopened
+                .sheet_audio(sheet_id)
+                .unwrap()
+                .into_iter()
+                .find(|audio| audio.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .position,
+            moved_duplicate
+        );
+
+        let removed_source = editor
+            .remove_sheet_audio(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert!(removed_source.removed_data_identifiers.is_empty());
+        assert_eq!(editor.sheet_audio(sheet_id).unwrap().len(), 1);
+        let removed_duplicate = editor
+            .remove_sheet_audio(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            removed_duplicate.removed_data_identifiers,
+            [source.audio_data_identifier]
+        );
+        assert!(editor.sheet_audio(sheet_id).unwrap().is_empty());
+        assert!(editor.media_assets().unwrap().is_empty());
+        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    }
+
+    #[test]
     fn invalid_audio_creation_and_cross_type_edits_are_transactional() {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
+        assert!(editor.duplicate_sheet_audio(sheet_id, 999).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
         for result in [
             editor.add_sheet_audio(sheet_id, "payload.bin", b"not audio", options()),
             editor.add_sheet_audio(
