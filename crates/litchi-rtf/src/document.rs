@@ -1001,6 +1001,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert TOC fields in document field order.
+    ///
+    /// Stored options and cached results are exposed solely as metadata. This
+    /// method never scans entries, reads bookmarks, resolves hyperlinks,
+    /// calculates page numbers, regenerates a table of contents, or refreshes
+    /// a field.
+    pub fn table_of_contents(&self) -> Vec<crate::TableOfContentsField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::table_of_contents)
+            .collect()
+    }
+
+    /// Return the number of typed, inert TOC fields in the document.
+    pub fn table_of_contents_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.table_of_contents().is_some())
+            .count()
+    }
+
     pub fn push_field(&mut self, field: super::field::Field<'a>) -> RtfResult<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
             return Err(RtfError::MalformedDocument(

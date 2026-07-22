@@ -401,6 +401,63 @@ pub struct ExternalIncludeField<'a> {
     position: usize,
 }
 
+/// One recognized stored option of a TOC field.
+///
+/// These values describe how a producer configured a table of contents. They
+/// are inert metadata only: this crate never scans entries, paginates,
+/// generates a table, follows its hyperlinks, or refreshes the field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableOfContentsOption<'a> {
+    /// The \\a caption label whose item labels and numbers are omitted.
+    CaptionWithoutLabel(Cow<'a, str>),
+    /// The \\b bookmark that bounds included entries.
+    Bookmark(Cow<'a, str>),
+    /// The \\c SEQ identifier for a table of captions.
+    CaptionSequence(Cow<'a, str>),
+    /// The \\d separator between sequence and page numbers.
+    SequencePageSeparator(Cow<'a, str>),
+    /// The \\f TC-field identifier that selects entries.
+    TableEntryIdentifier(Cow<'a, str>),
+    /// The \\h switch requests hyperlinks for entries.
+    Hyperlinks,
+    /// The \\l range of TC-field entry levels to include.
+    TableEntryLevels(Cow<'a, str>),
+    /// The \\n switch omits page numbers, optionally for an entry-level range.
+    OmitPageNumbers(Option<Cow<'a, str>>),
+    /// The \\o built-in heading-style range, or all used heading levels.
+    HeadingStyleRange(Option<Cow<'a, str>>),
+    /// The \\p separator between an entry and its page number.
+    EntryPageNumberSeparator(Cow<'a, str>),
+    /// The \\s SEQ identifier whose number prefixes page numbers.
+    SequenceIdentifier(Cow<'a, str>),
+    /// The \\t custom style-name/TOC-level mappings.
+    StyleMappings(Cow<'a, str>),
+    /// The \\u switch uses applied paragraph outline levels.
+    OutlineLevels,
+    /// The \\w switch preserves tab characters within entries.
+    PreserveTabs,
+    /// The \\x switch preserves newline characters within entries.
+    PreserveNewlines,
+    /// The \\z switch hides page numbers and leaders in web-page view.
+    HidePageNumbersInWebView,
+}
+
+/// Inert metadata for a legacy RTF TOC field.
+///
+/// This model retains the stored configuration and cached result only. It
+/// never searches for TC fields, reads bookmarks, resolves hyperlinks,
+/// calculates page numbers, or generates a table of contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfContentsField<'a> {
+    instruction: &'a str,
+    options: Vec<TableOfContentsOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 struct ExternalIncludeParts<'a> {
     kind: IncludeFieldKind,
     source: Cow<'a, str>,
@@ -408,6 +465,11 @@ struct ExternalIncludeParts<'a> {
     suppress_nested_field_updates: bool,
     omit_picture_data: bool,
     options: Vec<ExternalIncludeOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct TableOfContentsParts<'a> {
+    options: Vec<TableOfContentsOption<'a>>,
     unknown_switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -793,6 +855,58 @@ impl<'a> ExternalIncludeField<'a> {
     }
 }
 
+impl<'a> TableOfContentsField<'a> {
+    /// Return the complete stored TOC field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return recognized TOC options in stored source order.
+    ///
+    /// These options are configuration metadata only. This method never scans
+    /// entries, regenerates a table, follows links, or calculates page numbers.
+    pub fn options(&self) -> &[TableOfContentsOption<'a>] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> Field<'a> {
     #[inline]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
@@ -1018,6 +1132,28 @@ impl<'a> Field<'a> {
             bookmark: parts.bookmark,
             suppress_nested_field_updates: parts.suppress_nested_field_updates,
             omit_picture_data: parts.omit_picture_data,
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed TOC field.
+    ///
+    /// The stored configuration and cached result are never used to scan
+    /// entries, read bookmarks, resolve links, calculate page numbers, or
+    /// regenerate a table. Malformed TOC instructions remain generic fields
+    /// and return None here.
+    pub fn table_of_contents(&self) -> Option<TableOfContentsField<'_>> {
+        if self.field_type != FieldType::Toc {
+            return None;
+        }
+        let parts = table_of_contents_parts(self.instruction.as_ref())?;
+        Some(TableOfContentsField {
+            instruction: self.instruction.as_ref(),
             options: parts.options,
             unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
@@ -1520,6 +1656,168 @@ fn external_include_parts(instruction: &str) -> Option<ExternalIncludeParts<'_>>
         bookmark,
         suppress_nested_field_updates,
         omit_picture_data,
+        options,
+        unknown_switches,
+    })
+}
+
+fn table_of_contents_parts(instruction: &str) -> Option<TableOfContentsParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("TOC") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let normalized_name = name.to_ascii_lowercase();
+        match normalized_name.as_str() {
+            "a" => {
+                options.push(TableOfContentsOption::CaptionWithoutLabel(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "b" => {
+                options.push(TableOfContentsOption::Bookmark(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "c" => {
+                options.push(TableOfContentsOption::CaptionSequence(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "d" => {
+                options.push(TableOfContentsOption::SequencePageSeparator(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "f" => {
+                options.push(TableOfContentsOption::TableEntryIdentifier(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "h" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(TableOfContentsOption::Hyperlinks);
+                index += 1;
+            },
+            "l" => {
+                options.push(TableOfContentsOption::TableEntryLevels(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "n" => {
+                let range = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none())
+                    .map(|token| token.value.clone());
+                options.push(TableOfContentsOption::OmitPageNumbers(range));
+                index += 1 + usize::from(
+                    tokens
+                        .get(index + 1)
+                        .is_some_and(|token| switch_name(token).is_none()),
+                );
+            },
+            "o" => {
+                let range = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none())
+                    .map(|token| token.value.clone());
+                options.push(TableOfContentsOption::HeadingStyleRange(range));
+                index += 1 + usize::from(
+                    tokens
+                        .get(index + 1)
+                        .is_some_and(|token| switch_name(token).is_none()),
+                );
+            },
+            "p" => {
+                options.push(TableOfContentsOption::EntryPageNumberSeparator(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "s" => {
+                options.push(TableOfContentsOption::SequenceIdentifier(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "t" => {
+                options.push(TableOfContentsOption::StyleMappings(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "u" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(TableOfContentsOption::OutlineLevels);
+                index += 1;
+            },
+            "w" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(TableOfContentsOption::PreserveTabs);
+                index += 1;
+            },
+            "x" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(TableOfContentsOption::PreserveNewlines);
+                index += 1;
+            },
+            "z" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(TableOfContentsOption::HidePageNumbersInWebView);
+                index += 1;
+            },
+            _ => {
+                let value = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none());
+                unknown_switches.push(FieldSwitch {
+                    name: Cow::Owned(name.to_string()),
+                    value: value.map(|token| token.value.clone()),
+                });
+                index += 1 + usize::from(value.is_some());
+            },
+        }
+    }
+
+    Some(TableOfContentsParts {
         options,
         unknown_switches,
     })
@@ -2286,6 +2584,86 @@ mod tests {
     }
 
     #[test]
+    fn table_of_contents_fields_preserve_stored_configuration_without_generation() {
+        let mut field = Field::parse_instruction(
+            r#"TOC \a Figure \b "Scope Bookmark" \c Table \d "/" \f A \h \l 1-3 \n "2-3" \o "1-4" \p " — " \s Figure \t "Custom,1,Appendix,2" \u \w \x \z \* MERGEFORMAT"#,
+        );
+        field.result = Cow::Borrowed("cached TOC");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::Toc);
+        let toc = field.table_of_contents().unwrap();
+        assert_eq!(toc.instruction(), field.instruction);
+        assert_eq!(
+            toc.options(),
+            &[
+                TableOfContentsOption::CaptionWithoutLabel(Cow::Borrowed("Figure")),
+                TableOfContentsOption::Bookmark(Cow::Borrowed("Scope Bookmark")),
+                TableOfContentsOption::CaptionSequence(Cow::Borrowed("Table")),
+                TableOfContentsOption::SequencePageSeparator(Cow::Borrowed("/")),
+                TableOfContentsOption::TableEntryIdentifier(Cow::Borrowed("A")),
+                TableOfContentsOption::Hyperlinks,
+                TableOfContentsOption::TableEntryLevels(Cow::Borrowed("1-3")),
+                TableOfContentsOption::OmitPageNumbers(Some(Cow::Borrowed("2-3"))),
+                TableOfContentsOption::HeadingStyleRange(Some(Cow::Borrowed("1-4"))),
+                TableOfContentsOption::EntryPageNumberSeparator(Cow::Borrowed(" — ")),
+                TableOfContentsOption::SequenceIdentifier(Cow::Borrowed("Figure")),
+                TableOfContentsOption::StyleMappings(Cow::Borrowed("Custom,1,Appendix,2")),
+                TableOfContentsOption::OutlineLevels,
+                TableOfContentsOption::PreserveTabs,
+                TableOfContentsOption::PreserveNewlines,
+                TableOfContentsOption::HidePageNumbersInWebView,
+            ]
+        );
+        assert_eq!(toc.cached_result(), Some("cached TOC"));
+        assert!(toc.is_dirty());
+        assert!(toc.is_locked());
+        assert_eq!(toc.owner(), FieldOwner::Body);
+        assert_eq!(toc.position(), 4);
+        assert_eq!(toc.unknown_switches().len(), 1);
+        assert_eq!(toc.unknown_switches()[0].name, "*");
+        assert_eq!(
+            toc.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+
+        let all_levels = Field::parse_instruction(r"TOC \n \o");
+        assert_eq!(
+            all_levels.table_of_contents().unwrap().options(),
+            &[
+                TableOfContentsOption::OmitPageNumbers(None),
+                TableOfContentsOption::HeadingStyleRange(None),
+            ]
+        );
+
+        assert!(
+            Field::parse_instruction(r"TOC \a")
+                .table_of_contents()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"TOC \h unexpected")
+                .table_of_contents()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"TOC unexpected")
+                .table_of_contents()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction("TOCENTRIES").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
     fn document_discovers_eq_fields_without_calculating_them() {
         let document = crate::RtfDocument::parse(
             r#"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}"#,
@@ -2385,6 +2763,30 @@ mod tests {
         assert_eq!(includes[1].source(), "missing.gif");
         assert!(includes[1].omits_picture_data());
         assert_eq!(document.text(), "Before Middle After");
+    }
+
+    #[test]
+    fn document_discovers_table_of_contents_without_regenerating_it() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TOC \\o "1-3" \\h \\z}{\fldrslt cached TOC}}After}"#,
+        )
+        .unwrap();
+
+        let tables = document.table_of_contents();
+        assert_eq!(document.table_of_contents_count(), 1);
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].cached_result(), Some("cached TOC"));
+        assert!(tables[0].is_dirty());
+        assert!(tables[0].is_locked());
+        assert_eq!(
+            tables[0].options(),
+            &[
+                TableOfContentsOption::HeadingStyleRange(Some(Cow::Borrowed("1-3"))),
+                TableOfContentsOption::Hyperlinks,
+                TableOfContentsOption::HidePageNumbersInWebView,
+            ]
+        );
+        assert_eq!(document.text(), "Before After");
     }
 
     #[test]
