@@ -98,9 +98,17 @@ impl PagesEditor {
     /// change the section graph.
     pub fn replace_body_text(&mut self, range: Range<usize>, replacement: &str) -> Result<()> {
         self.validate_body_edit(&range, replacement)?;
+        let footnotes =
+            super::footnotes::body_footnote_graphs(self.package(), self.body_storage_id)?;
         let mut staged = self.text.clone();
         staged.replace_text(self.body_storage_id, range, replacement)?;
-        *self = Self::from_package(staged.into_package())?;
+        let mut package = staged.into_package();
+        super::footnotes::cleanup_removed_body_footnotes(
+            &mut package,
+            self.body_storage_id,
+            &footnotes,
+        )?;
+        *self = Self::from_package(package)?;
         Ok(())
     }
 
@@ -188,6 +196,11 @@ impl PagesEditor {
         if replacement.contains('\u{4}') {
             return Err(Error::ParseError(
                 "Pages section breaks must be changed through section CRUD APIs".to_owned(),
+            ));
+        }
+        if replacement.contains('\u{e}') {
+            return Err(Error::ParseError(
+                "Pages footnote anchors must be changed through footnote CRUD APIs".to_owned(),
             ));
         }
         let body = self.body_text()?;

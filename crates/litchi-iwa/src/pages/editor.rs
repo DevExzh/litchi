@@ -64,11 +64,12 @@ const TEXT_BOX_DUPLICATE_OFFSET: f32 = 12.0;
 
 pub use document_options::PagesDocumentOptions;
 pub use types::{
-    PagesDrawableTextInfo, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteKind,
-    PagesFootnoteNumbering, PagesFootnoteSettings, PagesHeaderFooterInfo, PagesHeaderFooterKind,
-    PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
-    PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings,
-    PagesSectionStart, PagesTemplateKind, RemovedPagesTextBox,
+    PagesDrawableTextInfo, PagesFootnote, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteId,
+    PagesFootnoteKind, PagesFootnoteNumbering, PagesFootnoteSettings, PagesHeaderFooterInfo,
+    PagesHeaderFooterKind, PagesPageLayout, PagesPageNumber, PagesPageOrientation,
+    PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground, PagesSectionInfo,
+    PagesSectionPageNumbering, PagesSectionSettings, PagesSectionStart, PagesTemplateKind,
+    RemovedPagesTextBox,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -3767,6 +3768,7 @@ mod charts;
 mod date_time_fields;
 mod document_options;
 mod footnote_settings;
+mod footnotes;
 mod images;
 mod movies;
 mod number_attachments;

@@ -1520,6 +1520,13 @@ fn adjust_storage_attributes(
     {
         storage.table_attachment = None;
     }
+    if storage
+        .table_footnote
+        .as_ref()
+        .is_some_and(|table| table.entries.is_empty())
+    {
+        storage.table_footnote = None;
+    }
     normalize_ranged_object_table(&mut storage.table_bookmark);
     adjust_object_table(
         &mut storage.table_smartfield,
@@ -1587,7 +1594,20 @@ fn patch_storage_text_wire(
             (!repeated_length_delimited_payloads(&adjusted, 1)?.is_empty()).then_some(adjusted);
         data = patch_length_delimited_field(&data, 9, true, replacement.as_deref())?;
     }
-    for field in [16, 18, 21, 22, 27] {
+    let footnote_tables = repeated_length_delimited_payloads(&data, 16)?;
+    if footnote_tables.len() > 1 {
+        return Err(Error::InvalidFormat(format!(
+            "singular TSWP storage table field 16 occurs {} times",
+            footnote_tables.len()
+        )));
+    }
+    if let Some(table) = footnote_tables.first() {
+        let adjusted = adjust_index_table_wire(table, range, replacement_units, false)?;
+        let replacement =
+            (!repeated_length_delimited_payloads(&adjusted, 1)?.is_empty()).then_some(adjusted);
+        data = patch_length_delimited_field(&data, 16, true, replacement.as_deref())?;
+    }
+    for field in [18, 21, 22, 27] {
         data = transform_optional_table(&data, field, |table| {
             adjust_index_table_wire(table, range, replacement_units, false)
         })?;
@@ -1936,7 +1956,7 @@ fn deduplicate_object_entries(
     entries.dedup_by_key(|entry| entry.character_index);
 }
 
-fn storage_object_references(storage: &StorageArchive) -> Vec<u64> {
+pub(crate) fn storage_object_references(storage: &StorageArchive) -> Vec<u64> {
     let mut references = Vec::new();
     if let Some(reference) = &storage.style_sheet {
         references.push(reference.identifier);
