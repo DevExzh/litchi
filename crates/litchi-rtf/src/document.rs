@@ -1061,6 +1061,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `MERGEFIELD` fields in document field order.
+    ///
+    /// Field names, switches, and cached results are exposed solely as stored
+    /// metadata. This method never opens a data source, resolves records,
+    /// performs a merge, or refreshes a field result.
+    pub fn merge_fields(&self) -> Vec<crate::MergeField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::merge_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `MERGEFIELD` fields in the document.
+    pub fn merge_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.merge_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert TOC fields in document field order.
     ///
     /// Stored options and cached results are exposed solely as metadata. This

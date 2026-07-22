@@ -171,7 +171,7 @@ pub use field::{
     ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
     FieldSwitch, FieldType, HyperlinkCode, IncludeFieldKind, IndexEntryField, IndexEntryOption,
     IndexField, IndexOption, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
-    PageBreak, ParsedFieldCode, ReferenceCode, SectionBreak, StoryEvent, StoryField,
+    MergeField, PageBreak, ParsedFieldCode, ReferenceCode, SectionBreak, StoryEvent, StoryField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesEntryOption, TableOfAuthoritiesField,
     TableOfAuthoritiesOption, TableOfContentsEntryField, TableOfContentsEntryOption,
     TableOfContentsField, TableOfContentsOption, parse_field_code,
