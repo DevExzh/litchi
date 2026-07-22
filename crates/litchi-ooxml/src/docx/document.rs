@@ -9,8 +9,9 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
     BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
-    IndexEntryField, IndexField, LinkField, MacroButtonField, MergeField, ReferencedDocumentField,
-    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+    IndexEntryField, IndexField, LinkField, MacroButtonField, MailMergeCounterField, MergeField,
+    ReferencedDocumentField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
+    TableOfContentsField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1483,6 +1484,24 @@ impl<'a> Document<'a> {
         Ok(self.typed_merge_fields()?.len())
     }
 
+    /// Get typed, inert `MERGEREC` and `MERGESEQ` fields in document order.
+    ///
+    /// Returned values expose stored kind, cached content, and dirty/lock state
+    /// only. This method never selects or counts records, opens a data source,
+    /// performs a merge, or refreshes field results.
+    pub fn mail_merge_counters(&self) -> Result<Vec<MailMergeCounterField>> {
+        self.fields()?
+            .iter()
+            .map(Field::mail_merge_counter)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert mail-merge counter fields in the main document.
+    pub fn mail_merge_counter_count(&self) -> Result<usize> {
+        Ok(self.mail_merge_counters()?.len())
+    }
+
     /// Get all mail-merge fields in document order.
     ///
     /// This recognizes `MERGEFIELD` instructions represented by either
@@ -1944,7 +1963,8 @@ impl<'a> Document<'a> {
     // ✅ Generated indexes: indexes(), index_entries()
     // - Typed inert INDEX/XE discovery; no marker search, sorting, pagination, or refresh
     //
-    // ✅ Mail merge field discovery: merge_fields(), merge_field_names(), typed_merge_fields()
+    // ✅ Mail merge field discovery: merge_fields(), merge_field_names(), typed_merge_fields(),
+    //    mail_merge_counters()
     // TODO: Mail merge mutation (MS-DOCX Section 17.16.5.35)
     // - execute_mail_merge()
     //

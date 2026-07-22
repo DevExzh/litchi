@@ -3345,6 +3345,45 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_inert_mail_merge_counters_without_merging() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            document
+                .add_paragraph()
+                .add_field(crate::docx::writer::MutableField::with_result(
+                    "MERGEREC".to_string(),
+                    "12".to_string(),
+                ));
+            document
+                .add_paragraph()
+                .add_field(crate::docx::writer::MutableField::with_result(
+                    "MERGESEQ".to_string(),
+                    "3".to_string(),
+                ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        assert!(reopened.mail_merge_settings().unwrap().is_none());
+        let document = reopened.document().unwrap();
+        let counters = document.mail_merge_counters().unwrap();
+        assert_eq!(document.mail_merge_counter_count().unwrap(), 2);
+        assert_eq!(counters.len(), 2);
+        assert_eq!(
+            counters[0].kind(),
+            crate::docx::MailMergeCounterKind::Record
+        );
+        assert_eq!(counters[0].cached_result(), Some("12"));
+        assert_eq!(
+            counters[1].kind(),
+            crate::docx::MailMergeCounterKind::Sequence
+        );
+        assert_eq!(counters[1].cached_result(), Some("3"));
+    }
+
+    #[test]
     fn writes_and_discovers_inert_macro_button_fields_without_execution() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
