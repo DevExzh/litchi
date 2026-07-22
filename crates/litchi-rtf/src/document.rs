@@ -1063,6 +1063,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert TOA fields in document field order.
+    ///
+    /// Stored options and cached results are exposed solely as metadata. This
+    /// method never finds citations, follows bookmarks, calculates page
+    /// numbers, paginates the document, generates a table of authorities, or
+    /// refreshes a field.
+    pub fn tables_of_authorities(&self) -> Vec<crate::TableOfAuthoritiesField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::table_of_authorities)
+            .collect()
+    }
+
+    /// Return the number of typed, inert TOA fields in the document.
+    pub fn table_of_authorities_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.table_of_authorities().is_some())
+            .count()
+    }
+
     pub fn push_field(&mut self, field: super::field::Field<'a>) -> RtfResult<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
             return Err(RtfError::MalformedDocument(

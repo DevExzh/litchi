@@ -171,8 +171,8 @@ pub use field::{
     FieldSwitch, FieldType, HyperlinkCode, IncludeFieldKind, LinkField, LinkFormatting,
     LinkResultOption, MacroButtonField, PageBreak, ParsedFieldCode, ReferenceCode, SectionBreak,
     StoryEvent, StoryField, TableOfAuthoritiesEntryField, TableOfAuthoritiesEntryOption,
-    TableOfContentsEntryField, TableOfContentsEntryOption, TableOfContentsField,
-    TableOfContentsOption, parse_field_code,
+    TableOfAuthoritiesField, TableOfAuthoritiesOption, TableOfContentsEntryField,
+    TableOfContentsEntryOption, TableOfContentsField, TableOfContentsOption, parse_field_code,
 };
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};

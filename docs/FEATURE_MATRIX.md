@@ -480,7 +480,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Fields and hyperlinks | ✅ | ✅ | ✅ | Parsed field codes, status, nested fields, URLs, bookmarks, page breaks, typed inert `MACROBUTTON` macro-name/display metadata, `DDE`/`DDEAUTO` application/source/item and representation/storage metadata, `LINK` application-type/source/item/result/formatting metadata, `INCLUDETEXT`/`INCLUDEPICTURE` source/converter/XML-option metadata, and `TOC`/`TC`/`TA` configuration/entry metadata; no field recalculation, macro lookup/execution, DDE contact, OLE activation, generated-content refresh, or external-source resolution |
+| Fields and hyperlinks | ✅ | ✅ | ✅ | Parsed field codes, status, nested fields, URLs, bookmarks, page breaks, typed inert `MACROBUTTON` macro-name/display metadata, `DDE`/`DDEAUTO` application/source/item and representation/storage metadata, `LINK` application-type/source/item/result/formatting metadata, `INCLUDETEXT`/`INCLUDEPICTURE` source/converter/XML-option metadata, and `TOC`/`TC`/`TA`/`TOA` configuration/entry metadata; no field recalculation, macro lookup/execution, DDE contact, OLE activation, generated-content refresh, or external-source resolution |
 | Bookmarks and navigation entries | ✅ | ✅ | ✅ | Bookmark ranges, index entries, TOC entries, and page references |
 | Footnotes/endnotes and separators | ✅ | ✅ | ✅ | Note bodies, numbering/options, section overrides, and separator stories |
 | Comments/annotations | ✅ | ✅ | ✅ | Point/range comments, identity, positions, and mutation |
