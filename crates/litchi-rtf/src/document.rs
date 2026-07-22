@@ -1081,6 +1081,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `MERGEREC` and `MERGESEQ` fields in document order.
+    ///
+    /// Stored kinds and cached results are exposed solely as metadata. This
+    /// method never selects or counts records, opens a data source, performs a
+    /// merge, or refreshes field results.
+    pub fn mail_merge_counters(&self) -> Vec<crate::MailMergeCounterField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::mail_merge_counter)
+            .collect()
+    }
+
+    /// Return the number of typed, inert mail-merge counter fields in the document.
+    pub fn mail_merge_counter_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.mail_merge_counter().is_some())
+            .count()
+    }
+
     /// Return typed, inert TOC fields in document field order.
     ///
     /// Stored options and cached results are exposed solely as metadata. This
