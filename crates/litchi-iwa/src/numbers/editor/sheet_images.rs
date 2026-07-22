@@ -6,7 +6,9 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
+};
 
 mod graph;
 
@@ -20,6 +22,8 @@ pub struct NumbersSheetImageInfo {
     pub image_data_identifier: u64,
     pub thumbnail_data_identifier: Option<u64>,
     pub geometry: DrawableGeometry,
+    /// Shared drawable metadata, including accessibility description and lock state.
+    pub properties: DrawableProperties,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
 }
@@ -154,6 +158,45 @@ impl NumbersEditor {
         if verified.sheet_image_geometry(sheet_id, drawable_object_id)? != geometry {
             return Err(Error::InvalidFormat(
                 "Numbers image geometry update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read shared drawable properties for one ordinary sheet image.
+    pub fn sheet_image_properties(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<DrawableProperties> {
+        Ok(image_graph(self, sheet_id, drawable_object_id)?
+            .info
+            .properties)
+    }
+
+    /// Update image accessibility, hyperlink, and lock properties.
+    ///
+    /// The typed update retains unknown native image fields and supports both
+    /// clearing a property with `None` and encoding explicit boolean defaults.
+    pub fn set_sheet_image_properties(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        properties: DrawableProperties,
+    ) -> Result<()> {
+        let source = image_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_image_properties(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            &properties,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_image_properties(sheet_id, drawable_object_id)? != properties {
+            return Err(Error::InvalidFormat(
+                "Numbers image properties update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -449,6 +492,39 @@ mod tests {
             changed_geometry
         );
 
+        let changed_properties = DrawableProperties {
+            hyperlink_url: Some("https://example.test/numbers-image".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(true),
+            accessibility_description: Some("Quarterly-results portrait".to_owned()),
+        };
+        editor
+            .set_sheet_image_properties(
+                sheet_id,
+                created.drawable_object_id,
+                changed_properties.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_image_properties(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            changed_properties
+        );
+        editor
+            .set_sheet_image_properties(
+                sheet_id,
+                created.drawable_object_id,
+                DrawableProperties::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_image_properties(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            DrawableProperties::default()
+        );
+
         let previous = editor
             .replace_sheet_image_data(sheet_id, created.drawable_object_id, &replacement)
             .unwrap();
@@ -494,6 +570,19 @@ mod tests {
         let source = editor
             .add_sheet_image(sheet_id, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
             .unwrap();
+        let source_properties = DrawableProperties {
+            hyperlink_url: Some("https://example.test/numbers-source".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(true),
+            accessibility_description: Some("Source portrait".to_owned()),
+        };
+        editor
+            .set_sheet_image_properties(
+                sheet_id,
+                source.drawable_object_id,
+                source_properties.clone(),
+            )
+            .unwrap();
 
         let duplicate = editor
             .duplicate_sheet_image(sheet_id, source.drawable_object_id)
@@ -522,6 +611,7 @@ mod tests {
             duplicate.thumbnail_data_identifier,
             source.thumbnail_data_identifier
         );
+        assert_eq!(duplicate.properties, source_properties);
         assert_eq!(
             duplicate.geometry.position,
             source.geometry.position.map(|position| DrawablePoint {
@@ -551,6 +641,30 @@ mod tests {
                 .sheet_image_geometry(sheet_id, duplicate.drawable_object_id)
                 .unwrap(),
             moved_duplicate
+        );
+
+        let duplicate_properties = DrawableProperties {
+            accessibility_description: Some("Independent portrait clone".to_owned()),
+            ..source_properties.clone()
+        };
+        editor
+            .set_sheet_image_properties(
+                sheet_id,
+                duplicate.drawable_object_id,
+                duplicate_properties.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_image_properties(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            source_properties
+        );
+        assert_eq!(
+            editor
+                .sheet_image_properties(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            duplicate_properties
         );
 
         assert_eq!(
@@ -624,6 +738,13 @@ mod tests {
         let created = editor
             .add_sheet_image(sheet_id, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
             .unwrap();
+        let before_properties = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_sheet_image_properties(sheet_id, 999, DrawableProperties::default())
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_properties);
         let before_geometry = editor.to_bytes().unwrap();
         assert!(
             editor

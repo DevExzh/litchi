@@ -35,6 +35,8 @@ println!("{}", structured.summary());
 - Text extraction across all iWork applications
 - Structured-data extraction: tables (with CSV export), slides, sections
 - Metadata-backed media discovery, extraction, replacement, and guarded cleanup
+- Typed cross-suite image-property read/write for hyperlinks, locking,
+  aspect-ratio locking, and accessibility descriptions with lossless unknown-field preservation
 - Metadata-preserving IWA object/message create, read, update, and delete operations
 - Snappy IWA serialization and deterministic package rewriting
 - Transactional package-entry and IWA-component updates with atomic saves
@@ -102,6 +104,13 @@ data and opaque chart fields while giving the new chart independent inline data,
 private styles, preset registration, UUIDs, ownership, and native placement.
 See `create_*_chart` and `duplicate_*_chart` in `examples/` for runnable
 file-to-file workflows.
+
+Source-built and existing file-backed images also expose typed shared drawable
+properties through `body_image_properties` / `set_body_image_properties`,
+`sheet_image_properties` / `set_sheet_image_properties`, and
+`slide_image_properties` / `set_slide_image_properties`. This makes image alt
+text, hyperlinks, and lock state editable without raw protobuf mutation; see
+the `create_*_image` examples.
 
 ### Create Pages documents from scratch
 

@@ -38,6 +38,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 512.0,
         },
     )?;
+    let mut properties = editor.slide_image_properties(0, created.drawable_object_id)?;
+    properties.accessibility_description = Some(format!("Embedded image: {preferred_filename}"));
+    editor.set_slide_image_properties(0, created.drawable_object_id, properties)?;
     editor.save(output)?;
     println!(
         "created Keynote image {} backed by data {}",

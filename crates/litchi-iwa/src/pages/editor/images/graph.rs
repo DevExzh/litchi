@@ -2,7 +2,10 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{geometry_from_drawable, patch_drawable_geometry};
+use crate::shapes::{
+    drawable_properties, geometry_from_drawable, patch_drawable_geometry,
+    patch_wrapped_drawable_properties,
+};
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
@@ -380,6 +383,7 @@ fn image_info(
         image_data_identifier,
         thumbnail_data_identifier: image.thumbnail_data.map(|reference| reference.identifier),
         geometry: geometry_from_drawable(&image.super_)?,
+        properties: drawable_properties(&image.super_),
         original_size: image.original_size.map(drawable_size),
         natural_size: image.natural_size.map(drawable_size),
     })
@@ -516,6 +520,48 @@ pub(super) fn set_image_geometry(
             1,
             |drawable| patch_drawable_geometry(drawable, geometry),
         )?;
+        object.replace_message(
+            *message_index,
+            RawMessage {
+                type_: IMAGE_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+pub(super) fn set_image_properties(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    image_id: u64,
+    properties: &DrawableProperties,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(image_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Pages image object {image_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == IMAGE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [message_index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Pages image {image_id} must have exactly one ImageArchive payload"
+            )));
+        };
+        let original = object.messages[*message_index].data.as_slice();
+        let current = drawable_properties(&tsd::ImageArchive::decode(original)?.super_);
+        let data = patch_wrapped_drawable_properties(original, &current, properties)?;
+        let verified = tsd::ImageArchive::decode(data.as_slice())?;
+        if drawable_properties(&verified.super_) != *properties {
+            return Err(Error::InvalidFormat(
+                "Pages image properties patch failed validation".to_owned(),
+            ));
+        }
         object.replace_message(
             *message_index,
             RawMessage {

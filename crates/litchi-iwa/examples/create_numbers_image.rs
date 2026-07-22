@@ -35,6 +35,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         IMAGE_POSITION,
         IMAGE_SIZE,
     )?;
+    let mut properties = editor.sheet_image_properties(sheet_id, created.drawable_object_id)?;
+    properties.accessibility_description = Some(format!("Embedded image: {preferred_filename}"));
+    editor.set_sheet_image_properties(sheet_id, created.drawable_object_id, properties)?;
     editor.save(output)?;
     println!(
         "created Numbers image {} backed by data {}",

@@ -51,7 +51,9 @@ pub use path::{
 };
 pub(crate) use path::{set_shape_preset, shape_path_kind, shape_path_source, shape_preset};
 pub use properties::DrawableProperties;
-pub(crate) use properties::{set_shape_properties, shape_properties};
+pub(crate) use properties::{
+    drawable_properties, patch_wrapped_drawable_properties, set_shape_properties, shape_properties,
+};
 pub use shadow::{
     ShapeContactShadow, ShapeCurvedShadow, ShapeDropShadow, ShapeShadow, ShapeShadowAngle,
     ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve, ShapeShadowOffset,
