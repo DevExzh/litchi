@@ -42,6 +42,9 @@ println!("{}", structured.summary());
   explicit password-protected document rejection
 - Semantic editors for Numbers sheets/tables/cells/formulas, Pages
   body/header/footer/text-box text, and Keynote slides/placeholders/text boxes/speaker notes
+- Native-style ordinary shape duplication across Pages, Numbers, and Keynote
+  with independent rich-text storage, fresh UUID mappings, preserved opaque
+  fields, and app-specific selection offsets
 - Typed copy-on-write text-box paragraph alignment, native line-spacing modes,
   atomic before/after spacing, first-line/left/right indentation, and ordered
   left/center/right/decimal tab stops with leaders across Pages, Numbers, and Keynote
@@ -195,6 +198,11 @@ let shape = pages.add_body_shape(
 )?;
 pages.set_body_shape_text(shape.drawable_object_id, "Updated")?;
 pages.set_body_shape_preset(shape.drawable_object_id, ShapePreset::DoubleArrow)?;
+let duplicate = pages.duplicate_body_shape(
+    shape.drawable_object_id,
+    pages.body_text()?.encode_utf16().count(),
+)?;
+pages.set_body_shape_text(duplicate.drawable_object_id, "Independent copy")?;
 pages.save("created-with-shape.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
@@ -355,6 +363,8 @@ let shape = numbers.add_sheet_shape(
 )?;
 numbers.set_sheet_shape_text(sheet_id, shape.drawable_object_id, "Updated")?;
 numbers.set_sheet_shape_preset(sheet_id, shape.drawable_object_id, ShapePreset::DoubleArrow)?;
+let duplicate = numbers.duplicate_sheet_shape(sheet_id, shape.drawable_object_id)?;
+numbers.set_sheet_shape_text(sheet_id, duplicate.drawable_object_id, "Independent copy")?;
 numbers.save("created-with-shape.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
@@ -561,6 +571,8 @@ let shape = keynote.add_slide_shape(
 )?;
 keynote.set_slide_shape_text(0, shape.drawable_object_id, "Updated")?;
 keynote.set_slide_shape_preset(0, shape.drawable_object_id, ShapePreset::DoubleArrow)?;
+let duplicate = keynote.duplicate_slide_shape(0, shape.drawable_object_id)?;
+keynote.set_slide_shape_text(0, duplicate.drawable_object_id, "Independent copy")?;
 keynote.save("created-with-shape.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```

@@ -20,7 +20,7 @@ impl NumbersEditor {
             source_drawable_object_id,
             sheet_id,
             text,
-            TEXT_BOX_DUPLICATE_OFFSET,
+            DRAWABLE_DUPLICATE_OFFSET,
         )
     }
 
@@ -68,7 +68,7 @@ impl NumbersEditor {
                 let source_object = archive.object(*identifier).ok_or_else(|| {
                     Error::InvalidFormat(format!("Numbers text-box object {identifier} is missing"))
                 })?;
-                clone_numbers_text_box_object(source_object, &remap)?
+                clone_numbers_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
                 archive.insert_object(cloned)
@@ -78,7 +78,12 @@ impl NumbersEditor {
         let new_drawable_id = remap[&source.drawable_id];
         let new_storage_id = remap[&source.storage_id];
         if offset != f32::default() {
-            offset_numbers_text_box(&mut staged, &source.archive_name, new_drawable_id, offset)?;
+            offset_numbers_drawable_clone(
+                &mut staged,
+                &source.archive_name,
+                new_drawable_id,
+                offset,
+            )?;
         }
         let mut text_editor = IWorkTextEditor::from_package(staged);
         text_editor.set_text(new_storage_id, text)?;

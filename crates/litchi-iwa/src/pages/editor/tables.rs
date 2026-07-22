@@ -828,7 +828,7 @@ fn clone_body_table_attachment(
         (source_attachment_id, new_attachment_id),
         (source_drawable_id, new_drawable_id),
     ]);
-    let cloned_attachment = clone_pages_text_box_object(attachment_object, &remap)?;
+    let cloned_attachment = clone_pages_drawable_graph_object(attachment_object, &remap)?;
     staged.update_archive(&attachment_archive_name, |archive| {
         archive.insert_object(cloned_attachment)
     })?;

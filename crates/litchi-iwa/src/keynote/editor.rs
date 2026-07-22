@@ -66,8 +66,8 @@ const SHIMMER_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.KLNShimmer";
 const SKID_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.KNBuildSkidByCharacter";
 const SWOOSH_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.BLTSwoosh";
 const TRACE_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.Trace";
-const TEXT_BOX_DUPLICATE_OFFSET: f32 = 10.0;
-const TABLE_DUPLICATE_OFFSET: f32 = TEXT_BOX_DUPLICATE_OFFSET;
+const DRAWABLE_DUPLICATE_OFFSET: f32 = 10.0;
+const TABLE_DUPLICATE_OFFSET: f32 = DRAWABLE_DUPLICATE_OFFSET;
 
 /// Writable text targets resolved from one slide in presentation order.
 #[derive(Debug, Clone, PartialEq)]
@@ -2638,11 +2638,11 @@ impl KeynoteEditor {
 
         let new_drawable_id = remap[&source.drawable_id];
         let new_storage_id = remap[&source.storage_id];
-        offset_keynote_text_box(
+        offset_keynote_drawable_clone(
             &mut staged,
             &source.archive_name,
             new_drawable_id,
-            TEXT_BOX_DUPLICATE_OFFSET,
+            DRAWABLE_DUPLICATE_OFFSET,
         )?;
         let mut text_editor = IWorkTextEditor::from_package(staged);
         text_editor.set_text(new_storage_id, text)?;

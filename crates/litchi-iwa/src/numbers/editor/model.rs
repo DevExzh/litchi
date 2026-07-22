@@ -477,12 +477,12 @@ pub(super) fn remap_numbers_storage_wire(
     Ok(data)
 }
 
-pub(super) fn clone_numbers_text_box_object(
+pub(super) fn clone_numbers_drawable_graph_object(
     source: &ArchiveObject,
     remap: &HashMap<u64, u64>,
 ) -> Result<ArchiveObject> {
     let old_identifier = source.archive_info.identifier.ok_or_else(|| {
-        Error::InvalidFormat("Numbers text-box object has no identifier".to_owned())
+        Error::InvalidFormat("Numbers drawable object has no identifier".to_owned())
     })?;
     let new_identifier = *remap.get(&old_identifier).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -506,7 +506,7 @@ pub(super) fn clone_numbers_text_box_object(
                     .any(|identifier| remap.contains_key(identifier))
                 {
                     return Err(Error::InvalidFormat(format!(
-                        "Cannot safely clone Numbers message type {} with private text-box references",
+                        "Cannot safely clone Numbers message type {} with private drawable-graph references",
                         message.type_
                     )));
                 }
@@ -634,7 +634,7 @@ pub(super) fn remap_numbers_storage(storage: &mut tswp::StorageArchive, remap: &
     }
 }
 
-pub(super) fn offset_numbers_text_box(
+pub(super) fn offset_numbers_drawable_clone(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
@@ -642,12 +642,12 @@ pub(super) fn offset_numbers_text_box(
 ) -> Result<()> {
     if !offset.is_finite() {
         return Err(Error::ParseError(
-            "Numbers text-box duplicate offset must be finite".to_owned(),
+            "Numbers drawable duplicate offset must be finite".to_owned(),
         ));
     }
     package.update_archive(archive_name, |archive| {
         let object = archive.object_mut(drawable_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers text box {drawable_id} is missing"))
+            Error::InvalidFormat(format!("Numbers drawable {drawable_id} is missing"))
         })?;
         let indexes = object
             .messages
@@ -658,7 +658,7 @@ pub(super) fn offset_numbers_text_box(
             .collect::<Vec<_>>();
         if indexes.len() != 1 {
             return Err(Error::InvalidFormat(format!(
-                "Numbers text box {drawable_id} must have exactly one shape payload"
+                "Numbers drawable {drawable_id} must have exactly one shape payload"
             )));
         }
         let message_index = indexes[0];
@@ -672,14 +672,14 @@ pub(super) fn offset_numbers_text_box(
             .and_then(|geometry| geometry.position.as_ref())
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
-                    "Numbers text box {drawable_id} has no positioned geometry"
+                    "Numbers drawable {drawable_id} has no positioned geometry"
                 ))
             })?;
         let x = position.x + offset;
         let y = position.y + offset;
         if !x.is_finite() || !y.is_finite() {
             return Err(Error::ParseError(
-                "Numbers text-box duplicate position overflow".to_owned(),
+                "Numbers drawable duplicate position overflow".to_owned(),
             ));
         }
         let data = patch_nested_fixed32_field(original, &[1, 1, 1, 1, 1], true, Some(x.to_bits()))?;
@@ -691,11 +691,11 @@ pub(super) fn offset_numbers_text_box(
             .geometry
             .and_then(|geometry| geometry.position)
             .ok_or_else(|| {
-                Error::InvalidFormat("Numbers text-box offset removed its position".to_owned())
+                Error::InvalidFormat("Numbers drawable offset removed its position".to_owned())
             })?;
         if verified_position.x != x || verified_position.y != y {
             return Err(Error::InvalidFormat(
-                "Numbers text-box offset failed validation".to_owned(),
+                "Numbers drawable offset failed validation".to_owned(),
             ));
         }
         object.replace_message(

@@ -810,6 +810,98 @@ impl NumbersEditor {
         self.set_sheet_shape_text(sheet_id, drawable_object_id, "")
     }
 
+    /// Duplicate an ordinary sheet shape with independent rich-text storage.
+    ///
+    /// The shape and its stand-in objects receive fresh identifiers and UUIDs
+    /// while retaining the source's styling and unknown protobuf fields. The
+    /// clone is added to the same sheet and offset using Numbers' native
+    /// duplicate placement so both objects remain independently selectable.
+    pub fn duplicate_sheet_shape(
+        &mut self,
+        sheet_id: u64,
+        source_drawable_object_id: u64,
+    ) -> Result<NumbersSheetShapeInfo> {
+        let source = shape_graph(self, sheet_id, source_drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Numbers shape graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Numbers shape object {identifier} is missing"))
+                })?;
+                clone_numbers_drawable_graph_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = remap[&source_drawable_object_id];
+        let new_storage_id = remap[&source.info.storage.object_id];
+        offset_numbers_drawable_clone(
+            &mut staged,
+            &source.archive_name,
+            new_drawable_id,
+            DRAWABLE_DUPLICATE_OFFSET,
+        )?;
+        patch_numbers_sheet_drawable_reference(
+            &mut staged,
+            &source.archive_name,
+            source.sheet_id,
+            None,
+            Some(new_drawable_id),
+        )?;
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Numbers shape graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| remap[identifier])
+            .collect::<Vec<_>>();
+        add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
+
+        let verified = Self::from_package(staged)?;
+        let created = verified
+            .sheet_shapes(sheet_id)?
+            .into_iter()
+            .find(|shape| shape.drawable_object_id == new_drawable_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers shape duplication failed validation".to_owned())
+            })?;
+        let created_graph = shape_graph(&verified, sheet_id, new_drawable_id)?;
+        if created.storage.object_id != new_storage_id
+            || created.storage.text != source.info.storage.text
+            || created.kind != source.info.kind
+            || created.preset != source.info.preset
+            || created.line_segment != source.info.line_segment
+            || created.line_endpoints != source.info.line_endpoints
+            || created.geometry.size != source.info.geometry.size
+            || created.geometry.flags != source.info.geometry.flags
+            || created.geometry.angle != source.info.geometry.angle
+            || created.properties != source.info.properties
+            || created_graph.object_ids.len() != source.object_ids.len()
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers shape duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        self.package = verified.package;
+        Ok(created)
+    }
+
     /// Remove an ordinary shape and its private text-bearing graph.
     pub fn remove_sheet_shape(
         &mut self,
@@ -1282,6 +1374,102 @@ mod tests {
             .unwrap();
         assert_eq!(removed.shape.drawable_object_id, created.drawable_object_id);
         assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_shape_duplication() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Shape clone")
+            .table_name("Source data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let created = editor
+            .add_sheet_shape(
+                sheet_id,
+                "Source shape",
+                POSITION,
+                SIZE,
+                ShapePreset::Rectangle,
+            )
+            .unwrap();
+        let fill =
+            ShapeFill::Solid(RgbaColor::new(0.35, 0.7, 0.25, 1.0, RgbColorSpace::Srgb).unwrap());
+        editor
+            .set_sheet_shape_fill(sheet_id, created.drawable_object_id, &fill)
+            .unwrap();
+        let properties = DrawableProperties {
+            hyperlink_url: Some("https://example.com/numbers-shape".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(false),
+            accessibility_description: Some("Source shape".to_owned()),
+        };
+        editor
+            .set_sheet_shape_properties(sheet_id, created.drawable_object_id, properties.clone())
+            .unwrap();
+        let source = editor
+            .sheet_shapes(sheet_id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        let duplicate = editor
+            .duplicate_sheet_shape(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
+        assert_ne!(duplicate.storage.object_id, source.storage.object_id);
+        assert_eq!(duplicate.storage.text, source.storage.text);
+        assert_eq!(duplicate.kind, source.kind);
+        assert_eq!(duplicate.preset, source.preset);
+        assert_eq!(duplicate.properties, properties);
+        assert_eq!(
+            duplicate.geometry.position,
+            source.geometry.position.map(|position| DrawablePoint {
+                x: position.x + DRAWABLE_DUPLICATE_OFFSET,
+                y: position.y + DRAWABLE_DUPLICATE_OFFSET,
+            })
+        );
+        assert_eq!(
+            editor
+                .sheet_shape_fill(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            fill
+        );
+
+        editor
+            .set_sheet_shape_text(sheet_id, duplicate.drawable_object_id, "Independent copy")
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_shapes(sheet_id)
+                .unwrap()
+                .into_iter()
+                .find(|shape| shape.drawable_object_id == source.drawable_object_id)
+                .unwrap()
+                .storage
+                .text,
+            "Source shape"
+        );
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_shapes(sheet_id)
+                .unwrap()
+                .into_iter()
+                .find(|shape| shape.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .storage
+                .text,
+            "Independent copy"
+        );
+        assert_eq!(reopened.sheet_shapes(sheet_id).unwrap().len(), 2);
+
+        let removed = editor
+            .remove_sheet_shape(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert_eq!(removed.shape.storage.text, "Independent copy");
+        assert_eq!(editor.sheet_shapes(sheet_id).unwrap().len(), 1);
     }
 
     #[test]

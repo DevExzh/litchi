@@ -127,7 +127,7 @@ impl ObjectGraph {
     }
 }
 
-pub(super) fn offset_keynote_text_box(
+pub(super) fn offset_keynote_drawable_clone(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
@@ -135,12 +135,12 @@ pub(super) fn offset_keynote_text_box(
 ) -> Result<()> {
     if !offset.is_finite() {
         return Err(Error::ParseError(
-            "Keynote text-box duplicate offset must be finite".to_owned(),
+            "Keynote drawable duplicate offset must be finite".to_owned(),
         ));
     }
     package.update_archive(archive_name, |archive| {
         let object = archive.object_mut(drawable_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Keynote text box {drawable_id} is missing"))
+            Error::InvalidFormat(format!("Keynote drawable {drawable_id} is missing"))
         })?;
         let indexes = object
             .messages
@@ -151,7 +151,7 @@ pub(super) fn offset_keynote_text_box(
             .collect::<Vec<_>>();
         if indexes.len() != 1 {
             return Err(Error::InvalidFormat(format!(
-                "Keynote text box {drawable_id} must have exactly one shape payload"
+                "Keynote drawable {drawable_id} must have exactly one shape payload"
             )));
         }
         let message_index = indexes[0];
@@ -165,14 +165,14 @@ pub(super) fn offset_keynote_text_box(
             .and_then(|geometry| geometry.position.as_ref())
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
-                    "Keynote text box {drawable_id} has no positioned geometry"
+                    "Keynote drawable {drawable_id} has no positioned geometry"
                 ))
             })?;
         let x = position.x + offset;
         let y = position.y + offset;
         if !x.is_finite() || !y.is_finite() {
             return Err(Error::ParseError(
-                "Keynote text-box duplicate position overflow".to_owned(),
+                "Keynote drawable duplicate position overflow".to_owned(),
             ));
         }
         let data = patch_nested_fixed32_field(original, &[1, 1, 1, 1, 1], true, Some(x.to_bits()))?;
@@ -184,11 +184,11 @@ pub(super) fn offset_keynote_text_box(
             .geometry
             .and_then(|geometry| geometry.position)
             .ok_or_else(|| {
-                Error::InvalidFormat("Keynote text-box offset removed its position".to_owned())
+                Error::InvalidFormat("Keynote drawable offset removed its position".to_owned())
             })?;
         if verified_position.x != x || verified_position.y != y {
             return Err(Error::InvalidFormat(
-                "Keynote text-box offset failed validation".to_owned(),
+                "Keynote drawable offset failed validation".to_owned(),
             ));
         }
         object.replace_message(

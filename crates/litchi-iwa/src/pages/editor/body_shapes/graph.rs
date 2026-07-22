@@ -12,6 +12,7 @@ const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
 pub(super) struct BodyShapeGraph {
     pub(super) archive_name: String,
     pub(super) info: PagesBodyShapeInfo,
+    pub(super) attachment_id: u64,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
 }
@@ -337,6 +338,7 @@ fn body_shape_graph_from_text(
             geometry,
             properties,
         },
+        attachment_id: *attachment_id,
         object_ids,
         uuid_object_ids,
     })

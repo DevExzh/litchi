@@ -1,6 +1,6 @@
 //! Body-anchored ordinary shape CRUD for Pages documents.
 
-use std::ops::Range;
+use std::{collections::HashMap, ops::Range};
 
 use super::*;
 use crate::package_metadata::{
@@ -738,6 +738,109 @@ impl PagesEditor {
         self.set_body_shape_text(drawable_object_id, "")
     }
 
+    /// Duplicate an ordinary body shape at a UTF-16 body position.
+    ///
+    /// The shape, rich-text storage, body attachment, and stand-in objects
+    /// receive fresh identifiers while retaining the source's styling and
+    /// unknown protobuf fields. The clone is offset using Pages' native
+    /// duplicate placement and its writable storage remains independent.
+    pub fn duplicate_body_shape(
+        &mut self,
+        source_drawable_object_id: u64,
+        anchor_character_index: usize,
+    ) -> Result<PagesBodyShapeInfo> {
+        let source = body_shape_graph(self, source_drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Pages shape graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Pages shape object {identifier} is missing"))
+                })?;
+                clone_pages_drawable_graph_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = remap[&source_drawable_object_id];
+        let new_storage_id = remap[&source.info.storage.object_id];
+        let new_attachment_id = remap[&source.attachment_id];
+        offset_pages_body_drawable_clone(
+            &mut staged,
+            new_drawable_id,
+            new_attachment_id,
+            BODY_DRAWABLE_DUPLICATE_OFFSET,
+        )?;
+        let mut text_editor = IWorkTextEditor::from_package(staged);
+        text_editor.replace_text(
+            self.body_storage_id,
+            anchor_character_index..anchor_character_index,
+            "\u{fffc}",
+        )?;
+        staged = text_editor.into_package();
+        add_body_drawable_attachment(
+            &mut staged,
+            self.body_storage_id,
+            anchor_character_index,
+            new_attachment_id,
+        )?;
+        patch_pages_zorder(&mut staged, None, Some(new_drawable_id))?;
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Pages shape graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| remap[identifier])
+            .collect::<Vec<_>>();
+        add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &new_uuid_object_ids)?;
+
+        let verified = Self::from_package(staged)?;
+        let created = verified
+            .body_shapes()?
+            .into_iter()
+            .find(|shape| shape.drawable_object_id == new_drawable_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Pages shape duplication failed validation".to_owned())
+            })?;
+        let created_graph = body_shape_graph(&verified, new_drawable_id)?;
+        let expected_anchor = u32::try_from(anchor_character_index)
+            .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
+        if created.anchor_character_index != expected_anchor
+            || created.storage.object_id != new_storage_id
+            || created.storage.text != source.info.storage.text
+            || created.kind != source.info.kind
+            || created.preset != source.info.preset
+            || created.line_segment != source.info.line_segment
+            || created.line_endpoints != source.info.line_endpoints
+            || created.geometry.size != source.info.geometry.size
+            || created.geometry.flags != source.info.geometry.flags
+            || created.geometry.angle != source.info.geometry.angle
+            || created.properties != source.info.properties
+            || created_graph.object_ids.len() != source.object_ids.len()
+        {
+            return Err(Error::InvalidFormat(
+                "Pages shape duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created)
+    }
+
     /// Remove an ordinary body shape and its private text-bearing graph.
     pub fn remove_body_shape(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyShape> {
         let graph = body_shape_graph(self, drawable_object_id)?;
@@ -911,6 +1014,88 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
+    }
+
+    #[test]
+    fn scratch_document_supports_native_shape_duplication() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let created = editor
+            .add_body_shape(4, "Source shape", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let fill =
+            ShapeFill::Solid(RgbaColor::new(0.2, 0.6, 0.9, 1.0, RgbColorSpace::Srgb).unwrap());
+        editor
+            .set_body_shape_fill(created.drawable_object_id, &fill)
+            .unwrap();
+        let properties = DrawableProperties {
+            hyperlink_url: Some("https://example.com/source-shape".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(false),
+            accessibility_description: Some("Source shape".to_owned()),
+        };
+        editor
+            .set_body_shape_properties(created.drawable_object_id, properties.clone())
+            .unwrap();
+        let source = editor.body_shapes().unwrap().into_iter().next().unwrap();
+        let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
+
+        let duplicate = editor
+            .duplicate_body_shape(source.drawable_object_id, duplicate_anchor)
+            .unwrap();
+        assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
+        assert_ne!(duplicate.storage.object_id, source.storage.object_id);
+        assert_eq!(duplicate.anchor_character_index, duplicate_anchor as u32);
+        assert_eq!(duplicate.storage.text, source.storage.text);
+        assert_eq!(duplicate.kind, source.kind);
+        assert_eq!(duplicate.preset, source.preset);
+        assert_eq!(duplicate.properties, properties);
+        assert_eq!(
+            duplicate.geometry.position,
+            source.geometry.position.map(|position| DrawablePoint {
+                x: position.x + BODY_DRAWABLE_DUPLICATE_OFFSET,
+                y: position.y + BODY_DRAWABLE_DUPLICATE_OFFSET,
+            })
+        );
+        assert_eq!(
+            editor
+                .body_shape_fill(duplicate.drawable_object_id)
+                .unwrap(),
+            fill
+        );
+
+        editor
+            .set_body_shape_text(duplicate.drawable_object_id, "Independent copy")
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_shapes()
+                .unwrap()
+                .into_iter()
+                .find(|shape| shape.drawable_object_id == source.drawable_object_id)
+                .unwrap()
+                .storage
+                .text,
+            "Source shape"
+        );
+        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body_shapes()
+                .unwrap()
+                .into_iter()
+                .find(|shape| shape.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .storage
+                .text,
+            "Independent copy"
+        );
+        assert_eq!(reopened.body_shapes().unwrap().len(), 2);
+
+        let removed = editor
+            .remove_body_shape(duplicate.drawable_object_id)
+            .unwrap();
+        assert_eq!(removed.shape.storage.text, "Independent copy");
+        assert_eq!(editor.body_shapes().unwrap().len(), 1);
     }
 
     #[test]

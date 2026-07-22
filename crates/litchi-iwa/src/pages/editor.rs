@@ -60,7 +60,7 @@ const PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2011;
 const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
-const TEXT_BOX_DUPLICATE_OFFSET: f32 = 12.0;
+const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
 
 pub use document_options::PagesDocumentOptions;
 pub use types::{
@@ -1411,7 +1411,7 @@ impl PagesEditor {
                 let source_object = archive.object(*identifier).ok_or_else(|| {
                     Error::InvalidFormat(format!("Pages text-box object {identifier} is missing"))
                 })?;
-                clone_pages_text_box_object(source_object, &remap)?
+                clone_pages_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&archive_name, |archive| archive.insert_object(cloned))?;
         }
@@ -1419,11 +1419,11 @@ impl PagesEditor {
         let new_drawable_id = remap[&source.drawable_id];
         let new_storage_id = remap[&source.storage_id];
         let new_attachment_id = remap[&source.attachment_id];
-        offset_text_box_clone(
+        offset_pages_body_drawable_clone(
             &mut staged,
             new_drawable_id,
             new_attachment_id,
-            TEXT_BOX_DUPLICATE_OFFSET,
+            BODY_DRAWABLE_DUPLICATE_OFFSET,
         )?;
         let mut text_editor = IWorkTextEditor::from_package(staged);
         text_editor.set_text(new_storage_id, text)?;
@@ -2433,12 +2433,12 @@ fn remap_pages_attachment_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result
     Ok(data)
 }
 
-fn clone_pages_text_box_object(
+fn clone_pages_drawable_graph_object(
     source: &ArchiveObject,
     remap: &HashMap<u64, u64>,
 ) -> Result<ArchiveObject> {
     let old_identifier = source.archive_info.identifier.ok_or_else(|| {
-        Error::InvalidFormat("Pages text-box object has no identifier".to_owned())
+        Error::InvalidFormat("Pages drawable object has no identifier".to_owned())
     })?;
     let new_identifier = *remap.get(&old_identifier).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -2463,7 +2463,7 @@ fn clone_pages_text_box_object(
                     .any(|identifier| remap.contains_key(identifier))
                 {
                     return Err(Error::InvalidFormat(format!(
-                        "Cannot safely clone Pages message type {} with private text-box references",
+                        "Cannot safely clone Pages message type {} with private drawable-graph references",
                         message.type_
                     )));
                 }
@@ -2514,7 +2514,7 @@ fn clone_pages_object_metadata(
     Ok(cloned)
 }
 
-fn offset_text_box_clone(
+fn offset_pages_body_drawable_clone(
     package: &mut IWorkPackage,
     drawable_id: u64,
     attachment_id: u64,
@@ -2522,7 +2522,7 @@ fn offset_text_box_clone(
 ) -> Result<()> {
     if !offset.is_finite() {
         return Err(Error::ParseError(
-            "Pages text-box duplicate offset must be finite".to_owned(),
+            "Pages drawable duplicate offset must be finite".to_owned(),
         ));
     }
     let shape: crate::protobuf::tswp::ShapeInfoArchive = decode_typed_package_object(
@@ -2552,7 +2552,7 @@ fn offset_text_box_clone(
     let drawable_archive = find_object_archive(package, drawable_id)?;
     package.update_archive(&drawable_archive, |archive| {
         let object = archive.object_mut(drawable_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Pages text-box drawable {drawable_id} is missing"))
+            Error::InvalidFormat(format!("Pages drawable {drawable_id} is missing"))
         })?;
         let indexes = object
             .messages
@@ -2563,7 +2563,7 @@ fn offset_text_box_clone(
             .collect::<Vec<_>>();
         if indexes.len() != 1 {
             return Err(Error::InvalidFormat(format!(
-                "Pages text-box drawable {drawable_id} must have exactly one shape payload"
+                "Pages drawable {drawable_id} must have exactly one shape payload"
             )));
         }
         let message_index = indexes[0];
@@ -2577,14 +2577,14 @@ fn offset_text_box_clone(
             .and_then(|geometry| geometry.position.as_ref())
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
-                    "Pages text-box drawable {drawable_id} has no positioned geometry"
+                    "Pages drawable {drawable_id} has no positioned geometry"
                 ))
             })?;
         let x = position.x + offset;
         let y = position.y + offset;
         if !x.is_finite() || !y.is_finite() {
             return Err(Error::ParseError(
-                "Pages text-box duplicate position overflow".to_owned(),
+                "Pages drawable duplicate position overflow".to_owned(),
             ));
         }
         let data = transform_length_delimited_fields_at_path(original, &[1, 1, 1, 1], |point| {
@@ -2598,11 +2598,11 @@ fn offset_text_box_clone(
             .geometry
             .and_then(|geometry| geometry.position)
             .ok_or_else(|| {
-                Error::InvalidFormat("Pages text-box geometry patch removed position".to_owned())
+                Error::InvalidFormat("Pages drawable geometry patch removed position".to_owned())
             })?;
         if verified_position.x != x || verified_position.y != y {
             return Err(Error::InvalidFormat(
-                "Pages text-box geometry offset failed validation".to_owned(),
+                "Pages drawable geometry offset failed validation".to_owned(),
             ));
         }
         object.replace_message(
@@ -2619,7 +2619,7 @@ fn offset_text_box_clone(
     package.update_archive(&attachment_archive, |archive| {
         let object = archive.object_mut(attachment_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "Pages text-box attachment {attachment_id} is missing"
+                "Pages drawable attachment {attachment_id} is missing"
             ))
         })?;
         let indexes = object
@@ -2631,7 +2631,7 @@ fn offset_text_box_clone(
             .collect::<Vec<_>>();
         if indexes.len() != 1 {
             return Err(Error::InvalidFormat(format!(
-                "Pages text-box attachment {attachment_id} must have exactly one payload"
+                "Pages drawable attachment {attachment_id} must have exactly one payload"
             )));
         }
         let message_index = indexes[0];
@@ -2639,17 +2639,17 @@ fn offset_text_box_clone(
         let attachment = DrawableAttachmentArchive::decode(original)?;
         let h_offset = attachment.h_offset.ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "Pages text-box attachment {attachment_id} has no horizontal offset"
+                "Pages drawable attachment {attachment_id} has no horizontal offset"
             ))
         })? + offset;
         let v_offset = attachment.v_offset.ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "Pages text-box attachment {attachment_id} has no vertical offset"
+                "Pages drawable attachment {attachment_id} has no vertical offset"
             ))
         })? + offset;
         if !h_offset.is_finite() || !v_offset.is_finite() {
             return Err(Error::ParseError(
-                "Pages text-box duplicate attachment offset overflow".to_owned(),
+                "Pages drawable duplicate attachment offset overflow".to_owned(),
             ));
         }
         let data = patch_fixed32_field(original, 3, true, Some(h_offset.to_bits()))?;
@@ -2657,7 +2657,7 @@ fn offset_text_box_clone(
         let verified = DrawableAttachmentArchive::decode(data.as_slice())?;
         if verified.h_offset != Some(h_offset) || verified.v_offset != Some(v_offset) {
             return Err(Error::InvalidFormat(
-                "Pages text-box attachment offset failed validation".to_owned(),
+                "Pages drawable attachment offset failed validation".to_owned(),
             ));
         }
         object.replace_message(

@@ -224,8 +224,8 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
     assert_eq!(
         clone_geometry.position,
         source_geometry.position.map(|position| DrawablePoint {
-            x: position.x + TEXT_BOX_DUPLICATE_OFFSET,
-            y: position.y + TEXT_BOX_DUPLICATE_OFFSET,
+            x: position.x + DRAWABLE_DUPLICATE_OFFSET,
+            y: position.y + DRAWABLE_DUPLICATE_OFFSET,
         })
     );
 
