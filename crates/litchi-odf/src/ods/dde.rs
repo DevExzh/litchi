@@ -160,7 +160,12 @@ impl DdeLink {
 
     /// Validate this link without contacting or executing its source.
     pub fn validate(&self) -> Result<()> {
-        self.source.validate()
+        self.source.validate()?;
+        self.cached_table
+            .rows
+            .iter()
+            .flat_map(|row| row.cells.iter())
+            .try_for_each(Cell::validate_hyperlinks)
     }
 
     pub(crate) fn has_formulas(&self) -> bool {
@@ -177,6 +182,14 @@ impl DdeLink {
             .iter()
             .flat_map(|row| &row.cells)
             .any(Cell::has_annotation)
+    }
+
+    pub(crate) fn has_hyperlinks(&self) -> bool {
+        self.cached_table
+            .rows
+            .iter()
+            .flat_map(|row| row.cells.iter())
+            .any(Cell::has_hyperlinks)
     }
 
     pub(crate) fn has_table_sources(&self) -> bool {
@@ -951,7 +964,7 @@ mod tests {
     #[test]
     fn round_trips_through_builder_and_mutable_packages() {
         let cached_table = OdsParser::parse_sheets(&format!(
-            r#"<o:spreadsheet xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TABLE_NAMESPACE}" xmlns:x="{TEXT_NAMESPACE}"><t:table t:name="Cache"><t:table-row><t:table-cell o:value-type="string"><x:p>stored</x:p></t:table-cell></t:table-row></t:table></o:spreadsheet>"#
+            r#"<o:spreadsheet xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TABLE_NAMESPACE}" xmlns:x="{TEXT_NAMESPACE}" xmlns:l="http://www.w3.org/1999/xlink"><t:table t:name="Cache"><t:table-row><t:table-cell o:value-type="string"><x:p><x:a l:href="https://example.test/">stored</x:a> cache</x:p></t:table-cell></t:table-row></t:table></o:spreadsheet>"#
         ))
         .unwrap()
         .remove(0);
@@ -966,10 +979,15 @@ mod tests {
         let bytes = builder.build().unwrap();
 
         let mut spreadsheet = crate::Spreadsheet::from_bytes(bytes).unwrap();
+        assert!(spreadsheet.content_xml().contains("xmlns:xlink="));
         assert_eq!(spreadsheet.dde_links().len(), 1);
         assert_eq!(
             spreadsheet.dde_links()[0].cached_table.rows[0].cells[0].text,
-            "stored"
+            "stored cache"
+        );
+        assert_eq!(
+            spreadsheet.dde_links()[0].cached_table.rows[0].cells[0].hyperlinks()[0].range(),
+            0.."stored".len()
         );
         assert_eq!(spreadsheet.sheets().unwrap().len(), 1);
 
@@ -979,7 +997,7 @@ mod tests {
         assert_eq!(reparsed.dde_links()[0].source.item, "updated");
         assert_eq!(
             reparsed.dde_links()[0].cached_table.rows[0].cells[0].text,
-            "stored"
+            "stored cache"
         );
     }
 }

@@ -401,7 +401,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Conditional cell styles | ✅ | ✅ | ✅ | ODF style-map conditions and ordered mutation; not the full Excel rule family |
 | Content validation | ✅ | ✅ | ✅ | Conditions, prompts, error messages, events, definitions, and cell bindings |
 | Comments/annotations | ✅ | ✅ | ✅ | Rich text/lists, creator/date, geometry, extensions, and CRUD |
-| Hyperlinks | 🟡 | ✅ | 🟡 | Typed inert full-cell `text:a` authoring with XLink and office/text metadata; mixed rich-text link ranges remain read-only |
+| Hyperlinks | 🟡 | ✅ | 🟡 | Typed inert `text:a` anchors preserve and author non-overlapping UTF-8 text ranges with XLink and office/text metadata; inline rich-text styling is flattened |
 | Images | ✅ | ✅ | ✅ | Sheet image resources, alternatives, and mutation |
 | General drawing shapes | 🟡 | ✅ | 🟡 | Semantic frames/shapes with bounded authoring compared with ODG/ODP |
 | Embedded charts | ✅ | ✅ | ✅ | Chart add, replace, and remove with package or inline storage |

@@ -42,7 +42,7 @@ use crate::ods::{
     },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
-use std::path::Path;
+use std::{ops::Range, path::Path};
 
 /// A mutable ODS spreadsheet that supports in-place modifications.
 ///
@@ -118,12 +118,13 @@ impl MutableSpreadsheet {
             || self.dde_links.iter().any(DdeLink::has_annotations)
     }
 
-    fn has_full_cell_hyperlinks(&self) -> bool {
+    fn has_hyperlinks(&self) -> bool {
         self.sheets
             .iter()
             .flat_map(|sheet| sheet.rows.iter())
             .flat_map(|row| row.cells.iter())
-            .any(|cell| cell.full_cell_hyperlink().is_some())
+            .any(Cell::has_hyperlinks)
+            || self.dde_links.iter().any(DdeLink::has_hyperlinks)
     }
 
     fn push_table_columns(out: &mut String, max_cols: usize) {
@@ -703,14 +704,13 @@ impl MutableSpreadsheet {
     }
 
     fn validate_hyperlinks(&self) -> Result<()> {
-        for hyperlink in self
+        for cell in self
             .sheets
             .iter()
             .flat_map(|sheet| sheet.rows.iter())
             .flat_map(|row| row.cells.iter())
-            .filter_map(Cell::full_cell_hyperlink)
         {
-            hyperlink.validate()?;
+            cell.validate_hyperlinks()?;
         }
         Ok(())
     }
@@ -973,6 +973,71 @@ impl MutableSpreadsheet {
             .set_hyperlink(hyperlink)
     }
 
+    /// Add an inert hyperlink around a UTF-8 byte range of an existing cell.
+    ///
+    /// The link's visible text is derived from the selected cell range. The
+    /// target is serialized as ODF `text:a` metadata and is never fetched or
+    /// followed by this library.
+    pub fn add_cell_hyperlink(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        range: Range<usize>,
+        href: impl Into<String>,
+    ) -> Result<()> {
+        let text = self
+            .sheets
+            .get(sheet_index)
+            .and_then(|sheet| sheet.rows.get(row))
+            .and_then(|row| row.cells.get(col))
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "cell at row {row}, column {col} does not exist"
+                ))
+            })?
+            .text
+            .get(range.clone())
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+                )
+            })?
+            .to_string();
+        self.add_cell_hyperlink_data(
+            sheet_index,
+            row,
+            col,
+            range,
+            CellHyperlink::with_text(href, text)?,
+        )
+    }
+
+    /// Add a configured inert hyperlink around an existing cell-text range.
+    ///
+    /// The link text must exactly match the selected range, and link ranges
+    /// must remain ordered and non-overlapping.
+    pub fn add_cell_hyperlink_data(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        range: Range<usize>,
+        hyperlink: CellHyperlink,
+    ) -> Result<()> {
+        let cell = self
+            .sheets
+            .get_mut(sheet_index)
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "cell at row {row}, column {col} does not exist"
+                ))
+            })?;
+        cell.add_hyperlink(range, hyperlink)
+    }
+
     /// Remove every hyperlink from a cell while preserving its displayed text.
     pub fn remove_cell_hyperlinks(
         &mut self,
@@ -989,6 +1054,24 @@ impl MutableSpreadsheet {
             .and_then(|row| row.cells.get_mut(col))
             .map(Cell::clear_hyperlinks)
             .unwrap_or_default())
+    }
+
+    /// Remove one hyperlink by document-order index while preserving cell text.
+    pub fn remove_cell_hyperlink(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        hyperlink_index: usize,
+    ) -> Result<Option<CellHyperlink>> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(sheet
+            .rows
+            .get_mut(row)
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(|cell| cell.remove_hyperlink(hyperlink_index)))
     }
 
     /// Attach or replace an annotation on a cell.
@@ -1920,7 +2003,7 @@ impl MutableSpreadsheet {
         );
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
-        let has_full_cell_hyperlinks = self.has_full_cell_hyperlinks();
+        let has_hyperlinks = self.has_hyperlinks();
         let has_sheet_images = self.sheets.iter().any(|sheet| !sheet.images.is_empty());
         let has_validation_event_listeners = self.has_validation_event_listeners();
         let has_table_sources = self.sheets.iter().any(|sheet| {
@@ -1951,7 +2034,7 @@ impl MutableSpreadsheet {
         if has_validation_event_listeners {
             out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
         }
-        if (has_validation_event_listeners || has_table_sources || has_full_cell_hyperlinks)
+        if (has_validation_event_listeners || has_table_sources || has_hyperlinks)
             && !has_annotations
             && !has_sheet_images
         {
@@ -1977,7 +2060,7 @@ impl MutableSpreadsheet {
             if has_validation_event_listeners {
                 declared.extend(["script", "presentation"]);
             }
-            if (has_validation_event_listeners || has_table_sources || has_full_cell_hyperlinks)
+            if (has_validation_event_listeners || has_table_sources || has_hyperlinks)
                 && !has_annotations
                 && !has_sheet_images
             {
@@ -2423,6 +2506,32 @@ mod tests {
                 .is_err()
         );
         assert!(invalid.sheets()[0].rows.is_empty());
+    }
+
+    #[test]
+    fn mutable_spreadsheet_authors_and_removes_mixed_text_hyperlinks() {
+        let text = "α docs β";
+        let docs = text.find("docs").unwrap();
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Links").unwrap();
+        mutable
+            .set_cell(0, 0, 0, CellValue::Text(text.to_string()))
+            .unwrap();
+        mutable
+            .add_cell_hyperlink(0, 0, 0, docs..docs + "docs".len(), "https://docs.example/")
+            .unwrap();
+
+        let mut spreadsheet = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let cell = &spreadsheet.sheets().unwrap()[0].rows[0].cells[0];
+        assert_eq!(cell.text, text);
+        assert_eq!(cell.hyperlinks()[0].range(), docs..docs + "docs".len());
+
+        let removed = mutable.remove_cell_hyperlink(0, 0, 0, 0).unwrap().unwrap();
+        assert_eq!(removed.text(), "docs");
+        spreadsheet = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let cell = &spreadsheet.sheets().unwrap()[0].rows[0].cells[0];
+        assert_eq!(cell.text, text);
+        assert!(!cell.has_hyperlinks());
     }
 
     #[test]

@@ -40,7 +40,7 @@ use crate::ods::{
     },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
-use std::{collections::HashSet, path::Path};
+use std::{collections::HashSet, ops::Range, path::Path};
 
 /// Builder for creating new ODS spreadsheets.
 ///
@@ -554,14 +554,13 @@ impl SpreadsheetBuilder {
     }
 
     fn validate_hyperlinks(&self) -> Result<()> {
-        for hyperlink in self
+        for cell in self
             .sheets
             .iter()
             .flat_map(|sheet| sheet.rows.iter())
             .flat_map(|row| row.cells.iter())
-            .filter_map(Cell::full_cell_hyperlink)
         {
-            hyperlink.validate()?;
+            cell.validate_hyperlinks()?;
         }
         Ok(())
     }
@@ -999,6 +998,64 @@ impl SpreadsheetBuilder {
         Ok(self)
     }
 
+    /// Add an inert hyperlink around a UTF-8 byte range of an existing cell.
+    ///
+    /// The link's visible text is derived from the selected cell range. The
+    /// target is serialized as ODF `text:a` metadata and is never fetched or
+    /// followed by this library.
+    pub fn add_cell_hyperlink(
+        &mut self,
+        row: usize,
+        col: usize,
+        range: Range<usize>,
+        href: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let text = self
+            .sheets
+            .last()
+            .and_then(|sheet| sheet.rows.get(row))
+            .and_then(|row| row.cells.get(col))
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "cell at row {row}, column {col} does not exist"
+                ))
+            })?
+            .text
+            .get(range.clone())
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+                )
+            })?
+            .to_string();
+        self.add_cell_hyperlink_data(row, col, range, CellHyperlink::with_text(href, text)?)
+    }
+
+    /// Add a configured inert hyperlink around an existing cell-text range.
+    ///
+    /// The link text must exactly match the selected range, and link ranges
+    /// must remain ordered and non-overlapping.
+    pub fn add_cell_hyperlink_data(
+        &mut self,
+        row: usize,
+        col: usize,
+        range: Range<usize>,
+        hyperlink: CellHyperlink,
+    ) -> Result<&mut Self> {
+        let cell = self
+            .sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "cell at row {row}, column {col} does not exist"
+                ))
+            })?;
+        cell.add_hyperlink(range, hyperlink)?;
+        Ok(self)
+    }
+
     /// Remove every hyperlink from a cell in the current sheet.
     pub fn remove_cell_hyperlinks(&mut self, row: usize, col: usize) -> Result<Vec<CellHyperlink>> {
         Ok(self
@@ -1008,6 +1065,21 @@ impl SpreadsheetBuilder {
             .and_then(|row| row.cells.get_mut(col))
             .map(Cell::clear_hyperlinks)
             .unwrap_or_default())
+    }
+
+    /// Remove one hyperlink by document-order index while preserving cell text.
+    pub fn remove_cell_hyperlink(
+        &mut self,
+        row: usize,
+        col: usize,
+        hyperlink_index: usize,
+    ) -> Result<Option<CellHyperlink>> {
+        Ok(self
+            .sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(|cell| cell.remove_hyperlink(hyperlink_index)))
     }
 
     /// Set a cell formula at a specific position in the current sheet
@@ -1859,12 +1931,13 @@ impl SpreadsheetBuilder {
             || self.dde_links.iter().any(DdeLink::has_annotations)
     }
 
-    fn has_full_cell_hyperlinks(&self) -> bool {
+    fn has_hyperlinks(&self) -> bool {
         self.sheets
             .iter()
             .flat_map(|sheet| sheet.rows.iter())
             .flat_map(|row| row.cells.iter())
-            .any(|cell| cell.full_cell_hyperlink().is_some())
+            .any(Cell::has_hyperlinks)
+            || self.dde_links.iter().any(DdeLink::has_hyperlinks)
     }
 
     fn push_table_start(out: &mut String, sheet: &Sheet) -> Result<()> {
@@ -2019,7 +2092,7 @@ impl SpreadsheetBuilder {
         );
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
-        let has_full_cell_hyperlinks = self.has_full_cell_hyperlinks();
+        let has_hyperlinks = self.has_hyperlinks();
         let has_sheet_images = self.sheets.iter().any(|sheet| !sheet.images.is_empty());
         let has_validation_event_listeners = self.has_validation_event_listeners();
         let has_table_sources = self.sheets.iter().any(|sheet| {
@@ -2047,7 +2120,7 @@ impl SpreadsheetBuilder {
         if has_validation_event_listeners {
             out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
         }
-        if (has_validation_event_listeners || has_table_sources || has_full_cell_hyperlinks)
+        if (has_validation_event_listeners || has_table_sources || has_hyperlinks)
             && !has_annotations
             && !has_sheet_images
         {
@@ -2536,6 +2609,57 @@ mod tests {
                 .is_err()
         );
         assert!(invalid.sheets.is_empty());
+    }
+
+    #[test]
+    fn builder_authors_mixed_text_hyperlinks_and_round_trips_ranges() {
+        let text = "Visit docs & issues";
+        let docs = text.find("docs").unwrap();
+        let issues = text.find("issues").unwrap();
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .add_sheet("Links")
+            .unwrap()
+            .set_cell(0, 0, CellValue::Text(text.to_string()))
+            .unwrap()
+            .add_cell_hyperlink(0, 0, docs..docs + "docs".len(), "https://docs.example/")
+            .unwrap();
+
+        let mut issue_link = CellHyperlink::with_text("#Issues.A1", "issues").unwrap();
+        issue_link.title = Some("Open issues".to_string());
+        builder
+            .add_cell_hyperlink_data(0, 0, issues..issues + "issues".len(), issue_link)
+            .unwrap();
+
+        let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let cell = &spreadsheet.sheets().unwrap()[0].rows[0].cells[0];
+        assert_eq!(cell.text, text);
+        assert_eq!(cell.hyperlinks().len(), 2);
+        assert_eq!(cell.hyperlinks()[0].range(), docs..docs + "docs".len());
+        assert_eq!(
+            cell.hyperlinks()[1].range(),
+            issues..issues + "issues".len()
+        );
+        assert_eq!(cell.hyperlinks()[1].title.as_deref(), Some("Open issues"));
+        assert!(spreadsheet.content_xml().contains("xmlns:xlink="));
+        assert!(spreadsheet.content_xml().contains("Visit <text:a"));
+
+        let mut invalid = SpreadsheetBuilder::new();
+        invalid
+            .add_sheet("Invalid")
+            .unwrap()
+            .set_cell(0, 0, CellValue::Text(text.to_string()))
+            .unwrap();
+        assert!(
+            invalid
+                .add_cell_hyperlink_data(
+                    0,
+                    0,
+                    docs..docs + "docs".len(),
+                    CellHyperlink::with_text("https://bad.example/", "mismatch").unwrap(),
+                )
+                .is_err()
+        );
     }
 
     #[test]

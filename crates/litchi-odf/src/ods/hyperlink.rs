@@ -7,6 +7,7 @@
 
 use crate::elements::text::{TextHyperlinkActuate, TextHyperlinkShow};
 use litchi_core::{Error, Result, xml::escape_xml};
+use std::ops::Range;
 
 /// An inert hyperlink represented by a `text:a` element inside cell content.
 ///
@@ -18,6 +19,12 @@ pub struct CellHyperlink {
     pub href: String,
     /// Plain text of the link (character content of the `text:a` subtree).
     pub text: String,
+    /// UTF-8 byte range occupied by this anchor in its parent cell's text.
+    ///
+    /// The range is assigned by a cell when the hyperlink is parsed or
+    /// authored. It remains private so it cannot become detached from the
+    /// cell text without the cell's validation path.
+    pub(crate) range: Range<usize>,
     /// Optional `office:name` attribute naming the hyperlink.
     pub name: Option<String>,
     /// Optional `office:title` attribute with a short accessible title.
@@ -40,6 +47,7 @@ impl CellHyperlink {
         Self {
             href: href.into(),
             text: String::new(),
+            range: 0..0,
             name: None,
             title: None,
             target_frame_name: None,
@@ -54,6 +62,7 @@ impl CellHyperlink {
     pub fn with_text(href: impl Into<String>, text: impl Into<String>) -> Result<Self> {
         let mut hyperlink = Self::new(href);
         hyperlink.text = text.into();
+        hyperlink.range = 0..hyperlink.text.len();
         hyperlink.validate()?;
         Ok(hyperlink)
     }
@@ -66,6 +75,19 @@ impl CellHyperlink {
     /// The visible plain-text content of the hyperlink.
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// Return the UTF-8 byte range this anchor occupies in its parent cell.
+    ///
+    /// A range can be empty for a zero-width `text:a` anchor. The range is
+    /// meaningful together with [`Cell::text`](super::Cell::text), not as an
+    /// offset into the hyperlink's own text.
+    pub fn range(&self) -> Range<usize> {
+        self.range.clone()
+    }
+
+    pub(crate) fn set_range(&mut self, range: Range<usize>) {
+        self.range = range;
     }
 
     /// Validate data before it is serialized as an ODF `text:a` element.
@@ -171,6 +193,7 @@ mod tests {
         let link = CellHyperlink::new("https://example.com/");
         assert_eq!(link.href(), "https://example.com/");
         assert_eq!(link.text(), "");
+        assert_eq!(link.range(), 0..0);
         assert!(link.name.is_none());
         assert!(link.title.is_none());
         assert!(link.target_frame_name.is_none());
@@ -201,6 +224,12 @@ mod tests {
         assert!(xml.contains("office:title=\"Example &amp; more\""));
         assert!(xml.ends_with(">A &amp; B</text:a>"));
 
+        assert_eq!(
+            CellHyperlink::with_text("https://example.test/", "A & B")
+                .unwrap()
+                .range(),
+            0..5
+        );
         assert!(CellHyperlink::with_text("", "missing target").is_err());
         assert!(CellHyperlink::with_text("https://example.test/\nnext", "unsafe").is_err());
     }

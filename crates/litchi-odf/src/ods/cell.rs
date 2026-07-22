@@ -2,7 +2,7 @@
 
 use super::{CellAnnotation, CellDetective, CellHyperlink, CellRangeSource, Row};
 use litchi_core::{Result, xml::escape_xml};
-use std::num::NonZeroUsize;
+use std::{num::NonZeroUsize, ops::Range};
 
 /// Cell data types supported by ODF spreadsheets.
 ///
@@ -211,11 +211,9 @@ impl Cell {
 
     /// Replace this cell's displayed content with one validated hyperlink.
     ///
-    /// ODS allows links to appear amid arbitrary rich text, but this compact
-    /// cell model only authors a link that owns the complete displayed value.
-    /// This prevents a target from being accidentally applied to unrelated
-    /// plain text. The operation clears a formula and stores a string value.
-    pub fn set_hyperlink(&mut self, hyperlink: CellHyperlink) -> Result<()> {
+    /// The operation clears a formula and stores a string value. To retain
+    /// existing plain text outside an anchor, use [`Self::add_hyperlink`].
+    pub fn set_hyperlink(&mut self, mut hyperlink: CellHyperlink) -> Result<()> {
         if self.merge == CellMerge::Covered {
             return Err(litchi_core::Error::InvalidFormat(
                 "cannot author a hyperlink in a covered cell".to_string(),
@@ -223,9 +221,50 @@ impl Cell {
         }
         hyperlink.validate()?;
         self.text = hyperlink.text.clone();
+        hyperlink.set_range(0..self.text.len());
         self.value = CellValue::Text(self.text.clone());
         self.formula = None;
         self.hyperlinks = vec![hyperlink];
+        Ok(())
+    }
+
+    /// Add a hyperlink around a UTF-8 byte range of this cell's existing text.
+    ///
+    /// The supplied link text must exactly match `self.text[range]`. Hyperlink
+    /// ranges are kept in document order and may not overlap, so unrelated
+    /// text cannot accidentally acquire a target. Hyperlink targets are inert
+    /// metadata and are never followed by this crate.
+    pub fn add_hyperlink(
+        &mut self,
+        range: Range<usize>,
+        mut hyperlink: CellHyperlink,
+    ) -> Result<()> {
+        if self.merge == CellMerge::Covered {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cannot author a hyperlink in a covered cell".to_string(),
+            ));
+        }
+        hyperlink.validate()?;
+        let Some(anchor) = self.text.get(range.clone()) else {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+            ));
+        };
+        if hyperlink.text != anchor {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cell hyperlink text must match its cell range".to_string(),
+            ));
+        }
+
+        hyperlink.set_range(range);
+        let mut hyperlinks = self.hyperlinks.clone();
+        hyperlinks.push(hyperlink);
+        hyperlinks.sort_by_key(|candidate| {
+            let range = candidate.range();
+            (range.start, range.start != range.end)
+        });
+        validate_hyperlink_ranges(&self.text, &hyperlinks)?;
+        self.hyperlinks = hyperlinks;
         Ok(())
     }
 
@@ -234,12 +273,13 @@ impl Cell {
         std::mem::take(&mut self.hyperlinks)
     }
 
-    /// Return a hyperlink that can be represented without losing plain text.
-    pub(crate) fn full_cell_hyperlink(&self) -> Option<&CellHyperlink> {
-        let [hyperlink] = self.hyperlinks.as_slice() else {
-            return None;
-        };
-        (hyperlink.text == self.text).then_some(hyperlink)
+    /// Remove and return one hyperlink by its document-order index.
+    pub fn remove_hyperlink(&mut self, index: usize) -> Option<CellHyperlink> {
+        (index < self.hyperlinks.len()).then(|| self.hyperlinks.remove(index))
+    }
+
+    pub(crate) fn validate_hyperlinks(&self) -> Result<()> {
+        validate_hyperlink_ranges(&self.text, &self.hyperlinks)
     }
 
     /// Return inert external-range metadata without accessing its URI.
@@ -663,7 +703,7 @@ pub(crate) fn unmerge_cell_range(rows: &mut [Row], start_row: usize, start_col: 
 }
 
 pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
-    let full_cell_hyperlink = cell.full_cell_hyperlink();
+    let has_hyperlinks = cell.has_hyperlinks();
     output.push_str(match cell.merge {
         CellMerge::Covered => "<table:covered-table-cell",
         CellMerge::None | CellMerge::Span { .. } => "<table:table-cell",
@@ -718,7 +758,8 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         && cell.range_source.is_none()
         && cell.annotation.is_none()
         && cell.detective.is_none()
-        && full_cell_hyperlink.is_none()
+        && !has_hyperlinks
+        && cell.text.is_empty()
     {
         output.push_str("/>");
         return;
@@ -734,6 +775,11 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         }
         if let Some(detective) = &cell.detective {
             super::detective::write_detective(output, detective);
+        }
+        if has_hyperlinks || !cell.text.is_empty() {
+            output.push_str("<text:p>");
+            write_cell_text_with_hyperlinks(output, cell);
+            output.push_str("</text:p>");
         }
         output.push_str("</table:covered-table-cell>");
         return;
@@ -777,7 +823,7 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
             if cell.annotation.is_none()
                 && cell.range_source.is_none()
                 && cell.detective.is_none()
-                && full_cell_hyperlink.is_none() =>
+                && !has_hyperlinks =>
         {
             output.push_str("/>");
             return;
@@ -795,9 +841,9 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
     if let Some(detective) = &cell.detective {
         super::detective::write_detective(output, detective);
     }
-    if let Some(hyperlink) = full_cell_hyperlink {
+    if has_hyperlinks {
         output.push_str("<text:p>");
-        hyperlink.write_xml(output);
+        write_cell_text_with_hyperlinks(output, cell);
         output.push_str("</text:p>");
     } else if !matches!(cell.value, CellValue::Empty) {
         output.push_str("<text:p>");
@@ -805,6 +851,47 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         output.push_str("</text:p>");
     }
     output.push_str("</table:table-cell>");
+}
+
+fn validate_hyperlink_ranges(text: &str, hyperlinks: &[CellHyperlink]) -> Result<()> {
+    let mut previous_end = 0usize;
+    for hyperlink in hyperlinks {
+        hyperlink.validate()?;
+        let range = hyperlink.range();
+        if range.start > range.end {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cell hyperlink range starts after it ends".to_string(),
+            ));
+        }
+        if range.start < previous_end {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cell hyperlink ranges must be ordered and non-overlapping".to_string(),
+            ));
+        }
+        let Some(anchor) = text.get(range.clone()) else {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+            ));
+        };
+        if anchor != hyperlink.text {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cell hyperlink text must match its cell range".to_string(),
+            ));
+        }
+        previous_end = range.end;
+    }
+    Ok(())
+}
+
+fn write_cell_text_with_hyperlinks(output: &mut String, cell: &Cell) {
+    let mut cursor = 0usize;
+    for hyperlink in cell.hyperlinks() {
+        let range = hyperlink.range();
+        output.push_str(&escape_xml(&cell.text[cursor..range.start]));
+        hyperlink.write_xml(output);
+        cursor = range.end;
+    }
+    output.push_str(&escape_xml(&cell.text[cursor..]));
 }
 
 #[cfg(test)]
@@ -834,9 +921,58 @@ mod tests {
         assert_eq!(cell.value, CellValue::Text("Example".to_string()));
         assert_eq!(cell.text, "Example");
         assert!(cell.formula.is_none());
-        assert_eq!(cell.full_cell_hyperlink(), Some(&hyperlink));
+        assert_eq!(cell.hyperlinks(), &[hyperlink.clone()]);
+        assert_eq!(cell.hyperlinks()[0].range(), 0.."Example".len());
         assert_eq!(cell.clear_hyperlinks(), vec![hyperlink]);
         assert!(!cell.has_hyperlinks());
+    }
+
+    #[test]
+    fn mixed_text_hyperlinks_are_ordered_validated_and_serialized() {
+        let text = "Before link & 第二";
+        let mut cell = Cell::new(CellValue::Text(text.to_string()), text, 0, 0);
+        let link_start = text.find("link").unwrap();
+        let link_range = link_start..link_start + "link".len();
+        let second_start = text.find("第二").unwrap();
+        let second_range = second_start..text.len();
+
+        cell.add_hyperlink(
+            second_range.clone(),
+            CellHyperlink::with_text("#Sheet2.B10", "第二").unwrap(),
+        )
+        .unwrap();
+        cell.add_hyperlink(
+            link_range.clone(),
+            CellHyperlink::with_text("https://example.test/", "link").unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(cell.hyperlinks().len(), 2);
+        assert_eq!(cell.hyperlinks()[0].range(), link_range);
+        assert_eq!(cell.hyperlinks()[1].range(), second_range);
+
+        let mut xml = String::new();
+        write_cell_xml(&mut xml, &cell);
+        assert!(xml.contains(
+            r##"<text:p>Before <text:a xlink:type="simple" xlink:href="https://example.test/">link</text:a> &amp; <text:a xlink:type="simple" xlink:href="#Sheet2.B10">第二</text:a></text:p>"##
+        ));
+
+        assert!(
+            cell.add_hyperlink(
+                link_start + 1..link_start + 2,
+                CellHyperlink::with_text("https://overlap.example/", "i").unwrap(),
+            )
+            .is_err()
+        );
+        let mut unicode = Cell::new(CellValue::Text("é".to_string()), "é", 0, 0);
+        assert!(
+            unicode
+                .add_hyperlink(
+                    1..2,
+                    CellHyperlink::with_text("https://example.test/", "").unwrap(),
+                )
+                .is_err()
+        );
     }
 
     #[test]
@@ -951,7 +1087,7 @@ mod tests {
         write_cell_xml(&mut xml, &cell);
         assert_eq!(
             xml,
-            r#"<table:covered-table-cell table:number-matrix-rows-spanned="4" table:number-matrix-columns-spanned="2" table:style-name="Merged"/>"#
+            r#"<table:covered-table-cell table:number-matrix-rows-spanned="4" table:number-matrix-columns-spanned="2" table:style-name="Merged"><text:p>anchor</text:p></table:covered-table-cell>"#
         );
     }
 

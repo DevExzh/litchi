@@ -504,6 +504,9 @@ impl OdsParser {
                             }
                             let link =
                                 Self::parse_hyperlink(e, reader.decoder(), &document_namespaces)?;
+                            let mut link = link;
+                            let position = text_content.len();
+                            link.set_range(position..position);
                             if let Some(cell) = current_cell.as_mut() {
                                 cell.hyperlinks.push(link);
                             }
@@ -850,10 +853,12 @@ impl OdsParser {
                                 .take()
                                 .expect("pending hyperlink was checked");
                             let mut link = pending.link;
+                            let range = pending.text_start..text_content.len();
                             link.text = text_content
-                                .get(pending.text_start..)
+                                .get(range.clone())
                                 .unwrap_or_default()
                                 .to_string();
+                            link.set_range(range);
                             if let Some(cell) = current_cell.as_mut() {
                                 cell.hyperlinks.push(link);
                             }
@@ -1700,6 +1705,7 @@ impl OdsParser {
         Ok(CellHyperlink {
             href,
             text: String::new(),
+            range: 0..0,
             name,
             title,
             target_frame_name,
@@ -3840,7 +3846,8 @@ mod tests {
         xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
         xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
         xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
-        xmlns:xlink="http://www.w3.org/1999/xlink">
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0">
       <office:body><office:spreadsheet>
         <table:table table:name="Links"><table:table-row>"#;
     const HYPERLINK_DOCUMENT_SUFFIX: &str = "</table:table-row></table:table></office:spreadsheet></office:body></office:document-content>";
@@ -3877,6 +3884,7 @@ mod tests {
         let first = cell.hyperlink().unwrap();
         assert_eq!(first.href(), "https://example.com/");
         assert_eq!(first.text(), "the example site");
+        assert_eq!(first.range(), 4..20);
         assert_eq!(first.name.as_deref(), Some("Example"));
         assert_eq!(first.title.as_deref(), Some("Example site"));
         assert_eq!(first.target_frame_name.as_deref(), Some("_blank"));
@@ -3891,6 +3899,7 @@ mod tests {
         let second = &cell.hyperlinks()[1];
         assert_eq!(second.href, "#Sheet2.B10");
         assert_eq!(second.text, "an internal target");
+        assert_eq!(second.range(), 25..43);
         assert!(second.name.is_none());
         assert!(second.target_frame_name.is_none());
         assert!(second.show.is_none());
@@ -3935,6 +3944,41 @@ mod tests {
         assert_eq!(cell.hyperlinks().len(), 1);
         assert_eq!(cell.hyperlinks()[0].href, "https://example.com/");
         assert_eq!(cell.hyperlinks()[0].text, "");
+        assert_eq!(cell.hyperlinks()[0].range(), 7..7);
+    }
+
+    #[test]
+    fn preserves_mixed_text_anchor_range_from_libreoffice_fods() {
+        let source = include_str!(
+            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/functions/text/fods/encodeurl.fods"
+        );
+        let anchor = r#"<text:a xlink:href="http://www.test/libreOffice" xlink:type="simple">"#;
+        let anchor_start = source.find(anchor).unwrap();
+        let cell_start = source[..anchor_start].rfind("<table:table-cell").unwrap();
+        let cell_end = anchor_start
+            + source[anchor_start..].find("</table:table-cell>").unwrap()
+            + "</table:table-cell>".len();
+        let sheets =
+            OdsParser::parse_sheets(&hyperlink_document(&source[cell_start..cell_end])).unwrap();
+        let cell = sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+            .find(|cell| {
+                cell.hyperlinks()
+                    .iter()
+                    .any(|link| link.href() == "http://www.test/libreOffice")
+            })
+            .unwrap();
+        let link = cell
+            .hyperlinks()
+            .iter()
+            .find(|link| link.href() == "http://www.test/libreOffice")
+            .unwrap();
+
+        assert_eq!(link.range(), 0..link.text().len());
+        assert!(cell.text.starts_with(link.text()));
+        assert!(cell.text.ends_with("agJohn01Czech Republic"));
     }
 
     #[test]
