@@ -3237,10 +3237,18 @@ mod tests {
             citation
                 .add_field(crate::docx::writer::MutableField::citation(&citation_spec).unwrap());
             let bibliography = document.add_paragraph();
-            bibliography.add_field(crate::docx::writer::MutableField::with_result(
-                r#"BIBLIOGRAPHY \l 1033 \f "References""#.to_string(),
-                "Doe. Example work.".to_string(),
-            ));
+            let mut bibliography_spec = crate::docx::BibliographyFieldSpec::new();
+            bibliography_spec.set_locale(Some(1033));
+            bibliography_spec.set_filter(Some(crate::docx::BibliographyFilter::Locale(1036)));
+            bibliography_spec.add_source_tag("Doe2024").unwrap();
+            bibliography_spec.add_source_tag("Smith2025").unwrap();
+            bibliography_spec
+                .set_cached_result(Some("Doe. Example work.".to_string()))
+                .unwrap();
+            bibliography_spec.set_dirty(false);
+            bibliography.add_field(
+                crate::docx::writer::MutableField::bibliography(&bibliography_spec).unwrap(),
+            );
         }
         package.save(file.path()).unwrap();
 
@@ -3268,6 +3276,10 @@ mod tests {
         );
         assert!(bibliographies[0].has_switch('l'));
         assert!(bibliographies[0].has_switch('f'));
+        assert!(bibliographies[0].has_switch('m'));
+        assert!(!bibliographies[0].is_dirty());
+        assert_eq!(bibliographies[0].switches()[0].argument(), Some("1033"));
+        assert_eq!(bibliographies[0].switches()[1].argument(), Some("1036"));
     }
 
     #[test]

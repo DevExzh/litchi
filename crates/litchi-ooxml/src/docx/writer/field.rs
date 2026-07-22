@@ -6,7 +6,9 @@ use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 const MAX_CITATION_SOURCES: usize = 16;
-const MAX_CITATION_TEXT_BYTES: usize = 65_536;
+const MAX_BIBLIOGRAPHY_SOURCES: usize = 64;
+const MAX_TYPED_FIELD_SWITCHES: usize = 64;
+const MAX_TYPED_FIELD_TEXT_BYTES: usize = 65_536;
 
 /// One source and its source-local options in an inert Word `CITATION` field.
 ///
@@ -25,7 +27,7 @@ impl CitationSource {
     /// Create a source reference from its case-sensitive bibliography tag.
     pub fn new(tag: impl Into<String>) -> Result<Self> {
         let tag = tag.into();
-        validate_citation_instruction_text(&tag, "citation source tag", false)?;
+        validate_typed_field_instruction_text(&tag, "citation source tag", false)?;
         Ok(Self {
             tag,
             volume: None,
@@ -42,7 +44,7 @@ impl CitationSource {
     /// Replace the bibliography tag.
     pub fn set_tag(&mut self, tag: impl Into<String>) -> Result<()> {
         let tag = tag.into();
-        validate_citation_instruction_text(&tag, "citation source tag", false)?;
+        validate_typed_field_instruction_text(&tag, "citation source tag", false)?;
         self.tag = tag;
         Ok(())
     }
@@ -65,7 +67,7 @@ impl CitationSource {
     /// Set or clear the source-local citation prefix.
     pub fn set_prefix(&mut self, prefix: Option<String>) -> Result<()> {
         if let Some(prefix) = &prefix {
-            validate_citation_instruction_text(prefix, "citation prefix", false)?;
+            validate_typed_field_instruction_text(prefix, "citation prefix", false)?;
         }
         self.prefix = prefix;
         Ok(())
@@ -79,19 +81,19 @@ impl CitationSource {
     /// Set or clear the source-local citation suffix.
     pub fn set_suffix(&mut self, suffix: Option<String>) -> Result<()> {
         if let Some(suffix) = &suffix {
-            validate_citation_instruction_text(suffix, "citation suffix", false)?;
+            validate_typed_field_instruction_text(suffix, "citation suffix", false)?;
         }
         self.suffix = suffix;
         Ok(())
     }
 
     fn validate(&self) -> Result<()> {
-        validate_citation_instruction_text(&self.tag, "citation source tag", false)?;
+        validate_typed_field_instruction_text(&self.tag, "citation source tag", false)?;
         if let Some(prefix) = &self.prefix {
-            validate_citation_instruction_text(prefix, "citation prefix", false)?;
+            validate_typed_field_instruction_text(prefix, "citation prefix", false)?;
         }
         if let Some(suffix) = &self.suffix {
-            validate_citation_instruction_text(suffix, "citation suffix", false)?;
+            validate_typed_field_instruction_text(suffix, "citation suffix", false)?;
         }
         Ok(())
     }
@@ -187,7 +189,7 @@ impl CitationFieldSpec {
     /// Set or clear a caller-supplied cached result without generating it.
     pub fn set_cached_result(&mut self, result: Option<String>) -> Result<()> {
         if let Some(result) = &result {
-            validate_citation_result_text(result)?;
+            validate_typed_field_result_text(result)?;
         }
         self.cached_result = result;
         Ok(())
@@ -227,15 +229,174 @@ impl CitationFieldSpec {
             source.validate()?;
         }
         if let Some(result) = &self.cached_result {
-            validate_citation_result_text(result)?;
+            validate_typed_field_result_text(result)?;
         }
         Ok(())
     }
 }
 
-fn validate_citation_instruction_text(value: &str, context: &str, allow_empty: bool) -> Result<()> {
+/// A source-language filter stored by a Word `BIBLIOGRAPHY` field.
+///
+/// This is field metadata only. It does not inspect source XML or decide which
+/// sources are included in a rendered bibliography.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BibliographyFilter {
+    /// Serialize a bare `\\f` switch.
+    ///
+    /// Word uses the `\\l` locale when one is stored; behavior without `\\l`
+    /// is producer-defined, so this API does not infer a fallback locale.
+    InheritLocale,
+    /// Serialize `\\f` with the supplied locale identifier.
+    Locale(u32),
+}
+
+/// Typed, inert authoring data for one Word `BIBLIOGRAPHY` field.
+///
+/// The serialized instruction retains caller-supplied locales and source tags.
+/// It never reads bibliography source stores, applies a bibliography style,
+/// filters source XML, creates entries, or refreshes the cached result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BibliographyFieldSpec {
+    locale: Option<u32>,
+    filter: Option<BibliographyFilter>,
+    source_tags: Vec<String>,
+    cached_result: Option<String>,
+    dirty: bool,
+}
+
+impl BibliographyFieldSpec {
+    /// Create a dirty bibliography field without an explicit source selection.
+    pub fn new() -> Self {
+        Self {
+            locale: None,
+            filter: None,
+            source_tags: Vec::new(),
+            cached_result: None,
+            dirty: true,
+        }
+    }
+
+    /// Return the optional display locale identifier stored with the field.
+    pub fn locale(&self) -> Option<u32> {
+        self.locale
+    }
+
+    /// Set or clear the stored display locale identifier.
+    pub fn set_locale(&mut self, locale: Option<u32>) {
+        self.locale = locale;
+    }
+
+    /// Return the optional source-language filter stored with the field.
+    pub fn filter(&self) -> Option<BibliographyFilter> {
+        self.filter
+    }
+
+    /// Set or clear the stored source-language filter.
+    pub fn set_filter(&mut self, filter: Option<BibliographyFilter>) {
+        self.filter = filter;
+    }
+
+    /// Return source tags selected by repeatable `\\m` switches in order.
+    pub fn source_tags(&self) -> &[String] {
+        &self.source_tags
+    }
+
+    /// Select one additional source tag with a `\\m` switch.
+    pub fn add_source_tag(&mut self, tag: impl Into<String>) -> Result<()> {
+        if self.source_tags.len() >= MAX_BIBLIOGRAPHY_SOURCES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "BIBLIOGRAPHY field supports at most {MAX_BIBLIOGRAPHY_SOURCES} typed source tags"
+            )));
+        }
+        let tag = tag.into();
+        validate_typed_field_instruction_text(&tag, "bibliography source tag", false)?;
+        self.source_tags.push(tag);
+        Ok(())
+    }
+
+    /// Return the caller-supplied cached bibliography result, if any.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Set or clear a caller-supplied cached result without generating it.
+    pub fn set_cached_result(&mut self, result: Option<String>) -> Result<()> {
+        if let Some(result) = &result {
+            validate_typed_field_result_text(result)?;
+        }
+        self.cached_result = result;
+        Ok(())
+    }
+
+    /// Return whether the serialized field is marked stale for a word processor.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Set the persisted dirty marker without evaluating the field.
+    pub fn set_dirty(&mut self, dirty: bool) {
+        self.dirty = dirty;
+    }
+
+    /// Build a canonical `BIBLIOGRAPHY` instruction from the typed metadata.
+    pub fn to_instruction(&self) -> Result<String> {
+        self.validate()?;
+        let mut instruction = String::from("BIBLIOGRAPHY");
+        if let Some(locale) = self.locale {
+            instruction.push_str(" \\l ");
+            instruction.push_str(&locale.to_string());
+        }
+        if let Some(filter) = self.filter {
+            instruction.push_str(" \\f");
+            if let BibliographyFilter::Locale(locale) = filter {
+                instruction.push(' ');
+                instruction.push_str(&locale.to_string());
+            }
+        }
+        for tag in &self.source_tags {
+            instruction.push_str(" \\m ");
+            append_field_argument(&mut instruction, tag);
+        }
+        Ok(instruction)
+    }
+
+    fn validate(&self) -> Result<()> {
+        if self.source_tags.len() > MAX_BIBLIOGRAPHY_SOURCES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "BIBLIOGRAPHY field supports at most {MAX_BIBLIOGRAPHY_SOURCES} typed source tags"
+            )));
+        }
+        let switch_count = self.source_tags.len()
+            + usize::from(self.locale.is_some())
+            + usize::from(self.filter.is_some());
+        if switch_count > MAX_TYPED_FIELD_SWITCHES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "BIBLIOGRAPHY field exceeds {MAX_TYPED_FIELD_SWITCHES} switches"
+            )));
+        }
+        for tag in &self.source_tags {
+            validate_typed_field_instruction_text(tag, "bibliography source tag", false)?;
+        }
+        if let Some(result) = &self.cached_result {
+            validate_typed_field_result_text(result)?;
+        }
+        Ok(())
+    }
+}
+
+impl Default for BibliographyFieldSpec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn validate_typed_field_instruction_text(
+    value: &str,
+    context: &str,
+    allow_empty: bool,
+) -> Result<()> {
     if (!allow_empty && value.trim().is_empty())
-        || value.len() > MAX_CITATION_TEXT_BYTES
+        || value.len() > MAX_TYPED_FIELD_TEXT_BYTES
         || value.chars().any(|character| character.is_control())
     {
         return Err(OoxmlError::InvalidFormat(format!("invalid {context}")));
@@ -243,14 +404,14 @@ fn validate_citation_instruction_text(value: &str, context: &str, allow_empty: b
     Ok(())
 }
 
-fn validate_citation_result_text(value: &str) -> Result<()> {
-    if value.len() > MAX_CITATION_TEXT_BYTES
+fn validate_typed_field_result_text(value: &str) -> Result<()> {
+    if value.len() > MAX_TYPED_FIELD_TEXT_BYTES
         || value
             .chars()
             .any(|character| matches!(character, '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}' | '\u{fffe}' | '\u{ffff}'))
     {
         return Err(OoxmlError::InvalidFormat(
-            "invalid cached citation result".to_string(),
+            "invalid cached field result".to_string(),
         ));
     }
     Ok(())
@@ -342,6 +503,19 @@ impl MutableField {
     /// does not access source stores, format a citation, or refresh the cached
     /// result.
     pub fn citation(spec: &CitationFieldSpec) -> Result<Self> {
+        Ok(Self::Complete {
+            instruction: spec.to_instruction()?,
+            result: spec.cached_result.clone(),
+            dirty: spec.dirty,
+        })
+    }
+
+    /// Create a typed, inert `BIBLIOGRAPHY` field.
+    ///
+    /// This serializes caller-supplied locale metadata and source tags only. It
+    /// does not read source stores, format a bibliography, filter sources, or
+    /// refresh the cached result.
+    pub fn bibliography(spec: &BibliographyFieldSpec) -> Result<Self> {
         Ok(Self::Complete {
             instruction: spec.to_instruction()?,
             result: spec.cached_result.clone(),
@@ -648,6 +822,64 @@ mod tests {
                 .set_prefix(Some(String::new()))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn typed_bibliography_serializes_documented_switches_without_evaluation() {
+        let mut bibliography = BibliographyFieldSpec::new();
+        bibliography.set_locale(Some(1033));
+        bibliography.set_filter(Some(BibliographyFilter::Locale(1036)));
+        bibliography.add_source_tag("Doe2024").unwrap();
+        bibliography.add_source_tag("Smith 2025").unwrap();
+        bibliography
+            .set_cached_result(Some("caller supplied bibliography".to_string()))
+            .unwrap();
+        bibliography.set_dirty(false);
+
+        let field = MutableField::bibliography(&bibliography).unwrap();
+        assert_eq!(
+            field.instruction(),
+            r#"BIBLIOGRAPHY \l 1033 \f 1036 \m Doe2024 \m "Smith 2025""#
+        );
+        assert_eq!(field.result(), Some("caller supplied bibliography"));
+        assert!(!field.is_dirty());
+
+        let parsed = crate::docx::Field::new(
+            field.instruction().to_string(),
+            field.result().map(str::to_string),
+            field.is_dirty(),
+        )
+        .bibliography()
+        .unwrap()
+        .unwrap();
+        assert_eq!(parsed.switches()[0].name(), 'l');
+        assert_eq!(parsed.switches()[0].argument(), Some("1033"));
+        assert_eq!(parsed.switches()[1].name(), 'f');
+        assert_eq!(parsed.switches()[1].argument(), Some("1036"));
+        assert_eq!(parsed.switches()[2].name(), 'm');
+        assert_eq!(parsed.switches()[2].argument(), Some("Doe2024"));
+        assert_eq!(parsed.switches()[3].name(), 'm');
+        assert_eq!(parsed.switches()[3].argument(), Some("Smith 2025"));
+
+        bibliography.set_filter(Some(BibliographyFilter::InheritLocale));
+        assert_eq!(
+            bibliography.to_instruction().unwrap(),
+            "BIBLIOGRAPHY \\l 1033 \\f \\m Doe2024 \\m \"Smith 2025\""
+        );
+        assert!(bibliography.add_source_tag("source\nname").is_err());
+        assert!(bibliography
+            .set_cached_result(Some("bad\0result".to_string()))
+            .is_err());
+
+        let mut too_many_switches = BibliographyFieldSpec::new();
+        too_many_switches.set_locale(Some(1033));
+        too_many_switches.set_filter(Some(BibliographyFilter::Locale(1036)));
+        for index in 0..63 {
+            too_many_switches
+                .add_source_tag(format!("Tag{index}"))
+                .unwrap();
+        }
+        assert!(too_many_switches.to_instruction().is_err());
     }
 
     #[test]

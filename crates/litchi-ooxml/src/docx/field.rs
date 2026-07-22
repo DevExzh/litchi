@@ -1811,7 +1811,7 @@ mod tests {
                 <w:r><w:t>(Doe, 2024; Smith, 2025, p. 14)</w:t></w:r>
             </w:fldSimple>
             <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
-            <w:r><w:instrText>BIBLIOGRAPHY \l 1033 \f &quot;References&quot;</w:instrText></w:r>
+            <w:r><w:instrText>BIBLIOGRAPHY \l 1033 \f 1036 \m Doe2024 \m Smith2025</w:instrText></w:r>
             <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
             <w:r><w:t>Doe. Example work.</w:t></w:r>
             <w:r><w:fldChar w:fldCharType="end"/></w:r>
@@ -1857,6 +1857,9 @@ mod tests {
         assert_eq!(bibliography.switches()[0].name(), 'l');
         assert_eq!(bibliography.switches()[0].argument(), Some("1033"));
         assert!(bibliography.has_switch('f'));
+        assert_eq!(bibliography.switches()[1].argument(), Some("1036"));
+        assert_eq!(bibliography.switches()[2].argument(), Some("Doe2024"));
+        assert_eq!(bibliography.switches()[3].argument(), Some("Smith2025"));
     }
 
     #[test]
