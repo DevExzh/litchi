@@ -3376,6 +3376,44 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_inert_referenced_document_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let relative = document.add_paragraph();
+            relative.add_field(crate::docx::writer::MutableField::with_result(
+                r#"RD "C:\\Manual\\Chapters\\Chapter 1.docx" \p"#.to_string(),
+                "cached relative reference".to_string(),
+            ));
+            let absolute = document.add_paragraph();
+            absolute.add_field(crate::docx::writer::MutableField::with_result(
+                r#"RD "file:///no-contact/appendix.docx""#.to_string(),
+                "cached absolute reference".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let references = document.referenced_documents().unwrap();
+        assert_eq!(document.referenced_document_count().unwrap(), 2);
+        assert_eq!(references.len(), 2);
+        assert_eq!(references[0].source(), r"C:\Manual\Chapters\Chapter 1.docx");
+        assert!(references[0].uses_relative_path());
+        assert_eq!(
+            references[0].cached_result(),
+            Some("cached relative reference")
+        );
+        assert_eq!(references[1].source(), "file:///no-contact/appendix.docx");
+        assert!(!references[1].uses_relative_path());
+        assert_eq!(
+            references[1].cached_result(),
+            Some("cached absolute reference")
+        );
+    }
+
+    #[test]
     fn writes_and_discovers_typed_inert_link_fields() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

@@ -260,6 +260,24 @@ impl Field {
         ExternalIncludeField::from_field(self)
     }
 
+    /// Check whether this is an RD referenced-document field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never opens,
+    /// resolves, reads, imports, or refreshes the referenced document.
+    pub fn is_referenced_document(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "RD").is_some()
+    }
+
+    /// Parse this field as inert referenced-document metadata.
+    ///
+    /// Returns Ok(None) for non-RD fields. The result exposes only the stored
+    /// path, relative-path request, switches, cached content, and dirty/lock
+    /// state; it never opens, resolves, imports, evaluates, or executes
+    /// anything.
+    pub fn referenced_document(&self) -> Result<Option<ReferencedDocumentField>> {
+        ReferencedDocumentField::from_field(self)
+    }
+
     /// Check whether this is a `TOC` (Table of Contents) field.
     ///
     /// The field's cached result remains data only; calling this method never
@@ -983,6 +1001,100 @@ impl ExternalIncludeField {
     /// opens a source, runs XSLT, or evaluates XPath.
     pub fn options(&self) -> &[ExternalIncludeOption] {
         &self.options
+    }
+
+    /// Return all stored field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+}
+
+/// Typed, inert metadata for an RD referenced-document field.
+///
+/// Source identifiers, relative-path settings, switches, and cached results
+/// are retained as stored field data. This type never opens, resolves, reads,
+/// imports, refreshes, evaluates, or executes the referenced document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReferencedDocumentField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    source: String,
+    relative_path: bool,
+    switches: Vec<FieldSwitch>,
+}
+
+impl ReferencedDocumentField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((source, switches)) = parse_field_operand_and_switches(field.instruction(), "RD")?
+        else {
+            return Ok(None);
+        };
+        let source = source.filter(|value| !value.is_empty()).ok_or_else(|| {
+            OoxmlError::InvalidFormat(
+                "RD field is missing its referenced document path".to_string(),
+            )
+        })?;
+
+        let mut relative_path = false;
+        for switch in &switches {
+            if switch.name == 'p' {
+                if switch.argument.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "RD \\\\p switch does not take an argument".to_string(),
+                    ));
+                }
+                if relative_path {
+                    return Err(OoxmlError::InvalidFormat(
+                        "RD \\\\p switch cannot be repeated".to_string(),
+                    ));
+                }
+                relative_path = true;
+            }
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            source,
+            relative_path,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached field result, if one was stored.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the stored referenced-document path without opening it.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Whether the stored RD instruction requests a path relative to this document.
+    ///
+    /// This is metadata only. The API never resolves the path.
+    pub fn uses_relative_path(&self) -> bool {
+        self.relative_path
     }
 
     /// Return all stored field switches in source order.
@@ -2714,6 +2826,55 @@ mod tests {
         assert!(!not_dde.is_dde());
         assert!(!not_dde.is_dde_auto());
         assert!(not_dde.dde_link().unwrap().is_none());
+    }
+
+    #[test]
+    fn parses_inert_referenced_document_fields_without_opening_sources() {
+        let field = Field::with_flags(
+            r#"RD "C:\\Manual\\Chapters\\Chapter 1.docx" \p \* MERGEFORMAT"#.to_string(),
+            Some("cached RD result".to_string()),
+            true,
+            true,
+        );
+        assert!(field.is_referenced_document());
+        let reference = field.referenced_document().unwrap().unwrap();
+        assert_eq!(reference.source(), r"C:\Manual\Chapters\Chapter 1.docx");
+        assert!(reference.uses_relative_path());
+        assert_eq!(reference.cached_result(), Some("cached RD result"));
+        assert!(reference.is_dirty());
+        assert!(reference.is_locked());
+        assert_eq!(reference.switches().len(), 2);
+        assert_eq!(reference.switches()[0].name(), 'p');
+        assert_eq!(reference.switches()[1].name(), '*');
+        assert_eq!(reference.switches()[1].argument(), Some("MERGEFORMAT"));
+
+        let absolute = Field::new(
+            r#"RD "file:///no-contact/appendix.docx""#.to_string(),
+            None,
+            false,
+        );
+        let absolute = absolute.referenced_document().unwrap().unwrap();
+        assert_eq!(absolute.source(), "file:///no-contact/appendix.docx");
+        assert!(!absolute.uses_relative_path());
+
+        assert!(
+            Field::new("RD".to_string(), None, false)
+                .referenced_document()
+                .is_err()
+        );
+        assert!(
+            Field::new(r#"RD "chapter.docx" \p relative"#.to_string(), None, false)
+                .referenced_document()
+                .is_err()
+        );
+        assert!(
+            Field::new(r#"RD "chapter.docx" \p \p"#.to_string(), None, false)
+                .referenced_document()
+                .is_err()
+        );
+        let not_rd = Field::new(r#"RDX "chapter.docx""#.to_string(), None, false);
+        assert!(!not_rd.is_referenced_document());
+        assert!(not_rd.referenced_document().unwrap().is_none());
     }
 
     #[test]

@@ -9,8 +9,8 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
     BibliographyField, CitationField, DdeField, ExternalIncludeField, Field, IndexEntryField,
-    IndexField, LinkField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
-    TableOfContentsField,
+    IndexField, LinkField, ReferencedDocumentField, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesField, TableOfContentsField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1297,6 +1297,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert external-include fields in the main document.
     pub fn external_include_count(&self) -> Result<usize> {
         Ok(self.external_includes()?.len())
+    }
+
+    /// Get typed, inert RD referenced-document fields in document order.
+    ///
+    /// Returned fields expose stored paths, relative-path requests, switches,
+    /// cached content, and dirty/lock metadata only. This method never opens,
+    /// resolves, reads, imports, refreshes, evaluates, or executes a referenced
+    /// document.
+    pub fn referenced_documents(&self) -> Result<Vec<ReferencedDocumentField>> {
+        self.fields()?
+            .iter()
+            .map(Field::referenced_document)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert referenced-document fields in the main document.
+    pub fn referenced_document_count(&self) -> Result<usize> {
+        Ok(self.referenced_documents()?.len())
     }
 
     /// Get typed, inert `LINK` fields in document order.
