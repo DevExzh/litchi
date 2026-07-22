@@ -42,6 +42,8 @@ pub struct DocumentBuilder {
     text_index_marks: Vec<(usize, crate::TextIndexMark)>,
     reference_marks: Vec<(usize, crate::ReferenceMark)>,
     bookmark_targets: Vec<(usize, crate::BookmarkTarget)>,
+    ruby_annotations: Vec<(usize, crate::RubyAnnotation)>,
+    ruby_styles: Vec<crate::RubyStyle>,
     property_forms: Vec<crate::OdfPropertyForm>,
     control_forms: Vec<crate::OdfControlForm>,
     interactive_forms: Vec<crate::OdfInteractiveForm>,
@@ -97,6 +99,8 @@ impl DocumentBuilder {
             text_index_marks: Vec::new(),
             reference_marks: Vec::new(),
             bookmark_targets: Vec::new(),
+            ruby_annotations: Vec::new(),
+            ruby_styles: Vec::new(),
             property_forms: Vec::new(),
             control_forms: Vec::new(),
             interactive_forms: Vec::new(),
@@ -853,6 +857,45 @@ impl DocumentBuilder {
         Ok(self)
     }
 
+    /// Append a typed ruby annotation to one `text:p` paragraph.
+    ///
+    /// The annotation is inserted at the end of the paragraph selected in
+    /// document order, including paragraphs nested in lists and table cells.
+    /// Its base may contain validated inline content, while its pronunciation
+    /// is plain text as required by ODF `text:ruby`.
+    pub fn add_ruby_annotation(
+        &mut self,
+        paragraph_index: usize,
+        annotation: &crate::RubyAnnotation,
+    ) -> Result<&mut Self> {
+        annotation.validate()?;
+        let body = self.generate_content_body();
+        let xml = format!(
+            r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{body}</office:text>"#
+        );
+        crate::insert_ruby_annotation_xml(&xml, paragraph_index, annotation)?;
+        self.ruby_annotations
+            .push((paragraph_index, annotation.clone()));
+        Ok(self)
+    }
+
+    /// Add a named ODF ruby style definition to `styles.xml`.
+    pub fn add_ruby_style(&mut self, style: crate::RubyStyle) -> Result<&mut Self> {
+        style.validate()?;
+        if self
+            .ruby_styles
+            .iter()
+            .any(|existing| existing.name == style.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate ruby style name '{}'",
+                style.name
+            )));
+        }
+        self.ruby_styles.push(style);
+        Ok(self)
+    }
+
     /// Add a minimal inert form containing typed custom properties.
     pub fn add_property_form(&mut self, form: &crate::OdfPropertyForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
@@ -1279,6 +1322,17 @@ impl DocumentBuilder {
             body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
         }
 
+        if !self.ruby_annotations.is_empty() {
+            let prefix = r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#;
+            let suffix = "</office:text>";
+            let mut wrapped = format!("{prefix}{body}{suffix}");
+            for (paragraph_index, annotation) in &self.ruby_annotations {
+                wrapped = crate::insert_ruby_annotation_xml(&wrapped, *paragraph_index, annotation)
+                    .expect("validated builder ruby annotation");
+            }
+            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
+        }
+
         body
     }
 
@@ -1430,6 +1484,15 @@ impl DocumentBuilder {
                 .notes_configurations
                 .to_xml_fragment()
                 .expect("validated notes configurations");
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.ruby_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .ruby_styles
+                .iter()
+                .map(|style| style.to_xml_fragment().expect("validated ruby style"))
+                .collect::<String>();
             xml.insert_str(insertion, &fragments);
         }
         if !self.page_layout_columns.is_empty()
@@ -1668,6 +1731,46 @@ mod tests {
 
         let mut invalid = DocumentBuilder::new();
         assert!(invalid.add_hyperlink("", "missing target").is_err());
+        assert!(invalid.elements.is_empty());
+    }
+
+    #[test]
+    fn ruby_annotation_authoring_round_trips_through_an_odt_package() {
+        let style = crate::RubyStyle::new(
+            "RubyAbove",
+            Some(crate::RubyProperties {
+                position: Some(crate::RubyPosition::Above),
+                alignment: Some(crate::RubyAlignment::Center),
+            }),
+        )
+        .unwrap();
+        let annotation = crate::RubyAnnotation::new(
+            Some(style.name.clone()),
+            crate::RubyBase::from_text("漢").unwrap(),
+            "かん",
+            None,
+        )
+        .unwrap();
+
+        let mut builder = DocumentBuilder::new();
+        builder.add_paragraph("Read ").unwrap();
+        builder.add_ruby_style(style.clone()).unwrap();
+        assert!(builder.add_ruby_style(style.clone()).is_err());
+        builder.add_ruby_annotation(0, &annotation).unwrap();
+
+        let document = crate::odt::Document::from_bytes(builder.build().unwrap()).unwrap();
+        assert_eq!(document.ruby_styles().unwrap().styles, vec![style]);
+        assert_eq!(
+            document.ruby_annotations().unwrap().annotations,
+            vec![annotation.clone()]
+        );
+        let rubies = document.rubies().unwrap();
+        let ruby = rubies.first().unwrap();
+        assert_eq!(ruby.base(), "漢");
+        assert_eq!(ruby.text(), "かん");
+
+        let mut invalid = DocumentBuilder::new();
+        assert!(invalid.add_ruby_annotation(0, &annotation).is_err());
         assert!(invalid.elements.is_empty());
     }
 

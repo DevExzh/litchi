@@ -55,7 +55,7 @@
 //! - ✅ Hyperlink extraction and inert `text:a` authoring
 //! - ✅ Footnote and endnote support
 //! - ✅ Exact note citations, fixed labels, nested bodies, and note classes
-//! - ✅ Ruby base/pronunciation annotations without visible-text duplication
+//! - ✅ Structure-preserving ruby base/pronunciation annotations and styles
 //! - ✅ Bookmark and reference tracking
 //! - ✅ Comment and change tracking parsing
 //! - ✅ Section parsing
@@ -68,6 +68,7 @@
 //! - ✅ DocumentBuilder for creating new ODT files
 //! - ✅ Add paragraphs with text and styling
 //! - ✅ Add inert simple hyperlinks with XLink metadata
+//! - ✅ Add typed ruby annotations/styles and mutate them with CRUD APIs
 //! - ✅ Add tables with rows and cells
 //! - ✅ Add lists (ordered/unordered)
 //! - ✅ Add headings with levels

@@ -425,6 +425,14 @@ impl Document {
         &self.style_registry
     }
 
+    /// Get typed named ruby style definitions from `styles.xml`.
+    pub fn ruby_styles(&self) -> Result<crate::RubyStyles> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::parse_ruby_styles(styles.xml_content()),
+        )
+    }
+
     /// Parse master pages and their losslessly retained headers and footers.
     pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
         self.styles.as_ref().map_or_else(
@@ -593,7 +601,12 @@ impl Document {
             .collect())
     }
 
-    /// Get all ruby base/pronunciation pairs in document order.
+    /// Get structure-preserving ruby annotations in document order.
+    pub fn ruby_annotations(&self) -> Result<crate::RubyAnnotations> {
+        crate::parse_ruby_annotations(self.content.xml_content())
+    }
+
+    /// Get simplified ruby base/pronunciation pairs in document order.
     pub fn rubies(&self) -> Result<Vec<super::Ruby>> {
         super::ruby::parse_rubies(self.content.xml_content())
     }

@@ -160,6 +160,104 @@ impl MutableDocument {
         self.with_content_xml(FieldParser::parse_dynamic_text_fields)
     }
 
+    /// Return structure-preserving ruby annotations from the current content XML.
+    pub fn ruby_annotations(&self) -> Result<crate::RubyAnnotations> {
+        self.with_content_xml(crate::parse_ruby_annotations)
+    }
+
+    /// Append a validated ruby annotation to one `text:p` paragraph.
+    ///
+    /// The annotation is inserted at the end of the paragraph selected in
+    /// document order. It is purely document metadata and never triggers any
+    /// external lookup or code execution.
+    pub fn insert_ruby_annotation(
+        &mut self,
+        paragraph_index: usize,
+        annotation: &crate::RubyAnnotation,
+    ) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            crate::insert_ruby_annotation_xml(xml, paragraph_index, annotation)
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+
+    /// Replace a ruby annotation selected in document order and return its old value.
+    pub fn replace_ruby_annotation(
+        &mut self,
+        annotation_index: usize,
+        replacement: &crate::RubyAnnotation,
+    ) -> Result<crate::RubyAnnotation> {
+        let old = self
+            .ruby_annotations()?
+            .annotations
+            .get(annotation_index)
+            .cloned()
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "ruby annotation index {annotation_index} is out of bounds"
+                ))
+            })?;
+        let updated = self.with_content_xml(|xml| {
+            crate::replace_ruby_annotation_xml(xml, annotation_index, replacement)
+        })?;
+        self.content_xml = Some(updated);
+        Ok(old)
+    }
+
+    /// Remove a ruby annotation selected in document order and return its old value.
+    pub fn remove_ruby_annotation(
+        &mut self,
+        annotation_index: usize,
+    ) -> Result<crate::RubyAnnotation> {
+        let old = self
+            .ruby_annotations()?
+            .annotations
+            .get(annotation_index)
+            .cloned()
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "ruby annotation index {annotation_index} is out of bounds"
+                ))
+            })?;
+        let updated =
+            self.with_content_xml(|xml| crate::remove_ruby_annotation_xml(xml, annotation_index))?;
+        self.content_xml = Some(updated);
+        Ok(old)
+    }
+
+    /// Return typed named ruby styles from the current `styles.xml`.
+    pub fn ruby_styles(&self) -> Result<crate::RubyStyles> {
+        self.styles_xml
+            .as_deref()
+            .map_or_else(|| Ok(Default::default()), crate::parse_ruby_styles)
+    }
+
+    /// Insert or replace one named ruby style definition and return the old value.
+    pub fn set_ruby_style(&mut self, style: &crate::RubyStyle) -> Result<Option<crate::RubyStyle>> {
+        style.validate()?;
+        let old = self.ruby_styles()?.get(&style.name).cloned();
+        let styles = self
+            .styles_xml
+            .clone()
+            .unwrap_or_else(OdfStructure::default_styles_xml);
+        self.styles_xml = Some(crate::set_ruby_style_xml(&styles, style)?);
+        Ok(old)
+    }
+
+    /// Remove one named ruby style definition and return the old value.
+    ///
+    /// Existing `text:ruby` style references are preserved verbatim, so callers
+    /// can intentionally manage their lifecycle separately.
+    pub fn remove_ruby_style(&mut self, name: &str) -> Result<Option<crate::RubyStyle>> {
+        let old = self.ruby_styles()?.get(name).cloned();
+        let Some(styles) = self.styles_xml.as_deref() else {
+            return Ok(None);
+        };
+        self.styles_xml = Some(crate::remove_ruby_style_xml(styles, name)?);
+        Ok(old)
+    }
+
     /// Return generated indexes from the current authoritative content XML.
     pub fn text_indexes(&self) -> Result<Vec<TextIndex>> {
         self.with_content_xml(crate::odt::index::parse_text_indexes)
@@ -2339,6 +2437,65 @@ mod tests {
             ]
         );
         assert_eq!(document.text().unwrap(), "External\nInternal");
+    }
+
+    #[test]
+    fn mutable_ruby_annotation_and_style_crud_round_trip_through_an_odt_package() {
+        let first_style = crate::RubyStyle::new(
+            "RubyAbove",
+            Some(crate::RubyProperties {
+                position: Some(crate::RubyPosition::Above),
+                alignment: Some(crate::RubyAlignment::Center),
+            }),
+        )
+        .unwrap();
+        let second_style = crate::RubyStyle::new(
+            "RubyAbove",
+            Some(crate::RubyProperties {
+                position: Some(crate::RubyPosition::Below),
+                alignment: Some(crate::RubyAlignment::DistributeLetter),
+            }),
+        )
+        .unwrap();
+        let first = crate::RubyAnnotation::new(
+            Some(first_style.name.clone()),
+            crate::RubyBase::from_text("語").unwrap(),
+            "ご",
+            None,
+        )
+        .unwrap();
+        let replacement = crate::RubyAnnotation::new(
+            Some(first_style.name.clone()),
+            crate::RubyBase::from_text("文").unwrap(),
+            "ぶん",
+            None,
+        )
+        .unwrap();
+
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("Read ").unwrap();
+        assert_eq!(mutable.set_ruby_style(&first_style).unwrap(), None);
+        assert_eq!(
+            mutable.set_ruby_style(&second_style).unwrap(),
+            Some(first_style)
+        );
+        mutable.insert_ruby_annotation(0, &first).unwrap();
+        assert_eq!(
+            mutable.replace_ruby_annotation(0, &replacement).unwrap(),
+            first
+        );
+
+        let document = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(document.ruby_styles().unwrap().styles, vec![second_style]);
+        assert_eq!(
+            document.ruby_annotations().unwrap().annotations,
+            vec![replacement.clone()]
+        );
+
+        assert_eq!(mutable.remove_ruby_annotation(0).unwrap(), replacement);
+        assert!(mutable.ruby_annotations().unwrap().annotations.is_empty());
+        assert!(mutable.remove_ruby_style("RubyAbove").unwrap().is_some());
+        assert!(mutable.ruby_styles().unwrap().styles.is_empty());
     }
 
     #[test]

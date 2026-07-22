@@ -25,13 +25,14 @@
 //! - ✅ `text_indexes()` - Parse all generated index sources and cached bodies
 //! - ✅ `text_index_marks()` - Parse TOC, user, alphabetical, and bibliography marks
 //! - ✅ `reference_marks()` - Parse point/range cross-reference targets
-//! - ✅ `rubies()` - Parse ruby base/pronunciation pairs and styles
+//! - ✅ `ruby_annotations()` / `rubies()` - Parse structure-preserving and simplified ruby pairs
 //! - ✅ Style parsing and resolution with registry
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
 //! - ✅ `DocumentBuilder::new()` - Create new documents
 //! - ✅ `add_paragraph()` - Add paragraphs with text
 //! - ✅ `add_hyperlink()` / `add_hyperlink_element()` - Add inert simple hyperlinks
+//! - ✅ `add_ruby_annotation()` / `add_ruby_style()` - Author typed ruby annotations and styles
 //! - ✅ `add_table()` - Add tables with rows/cells
 //! - ✅ `add_list()` - Add lists
 //! - ✅ `add_heading()` - Add headings with levels
