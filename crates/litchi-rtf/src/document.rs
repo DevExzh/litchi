@@ -1101,6 +1101,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `NEXT` mail-merge control fields in document order.
+    ///
+    /// Stored cached results and field state are exposed solely as metadata.
+    /// This method never advances a record, opens a data source, performs a
+    /// merge, or refreshes field results.
+    pub fn mail_merge_next_fields(&self) -> Vec<crate::MailMergeNextField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::mail_merge_next)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `NEXT` mail-merge control fields.
+    pub fn mail_merge_next_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.mail_merge_next().is_some())
+            .count()
+    }
+
     /// Return typed, inert TOC fields in document field order.
     ///
     /// Stored options and cached results are exposed solely as metadata. This
