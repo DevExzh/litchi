@@ -338,6 +338,68 @@ impl KeynoteMotionPath {
     }
 }
 
+/// Editable normalized timing curve used by a custom Keynote action acceleration.
+///
+/// The path starts at `(0, 0)` and ends at `(1, 1)`. Its coordinates express
+/// elapsed time on the horizontal axis and animation progress on the vertical
+/// axis, matching Keynote's native custom-curve payload.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeynoteBuildTimingCurve {
+    pub path: KeynoteMotionPath,
+}
+
+impl KeynoteBuildTimingCurve {
+    /// Construct a one-segment cubic Bézier timing curve.
+    ///
+    /// The control points are normalized to the timing-curve coordinate space;
+    /// callers can use [`Self::from_path`] for a multi-segment curve.
+    pub fn cubic(
+        first_control_point: KeynoteMotionPathPoint,
+        second_control_point: KeynoteMotionPathPoint,
+    ) -> Self {
+        let origin = KeynoteMotionPathPoint::new(0.0, 0.0);
+        let destination = KeynoteMotionPathPoint::new(1.0, 1.0);
+        Self {
+            path: KeynoteMotionPath {
+                subpaths: vec![KeynoteMotionSubpath {
+                    nodes: vec![
+                        KeynoteMotionPathNode {
+                            in_control_point: origin,
+                            point: origin,
+                            out_control_point: first_control_point,
+                            node_type: KeynoteMotionPathNodeType::Bezier,
+                        },
+                        KeynoteMotionPathNode {
+                            in_control_point: second_control_point,
+                            point: destination,
+                            out_control_point: destination,
+                            node_type: KeynoteMotionPathNodeType::Bezier,
+                        },
+                    ],
+                    closed: false,
+                }],
+                natural_width: 1.0,
+                natural_height: 1.0,
+                horizontal_flip: false,
+                vertical_flip: false,
+            },
+        }
+    }
+
+    /// Construct a linear timing curve.
+    pub fn linear() -> Self {
+        Self::cubic(
+            KeynoteMotionPathPoint::new(0.0, 0.0),
+            KeynoteMotionPathPoint::new(1.0, 1.0),
+        )
+    }
+
+    /// Wrap an explicitly constructed native-compatible timing path.
+    pub fn from_path(path: KeynoteMotionPath) -> Self {
+        Self { path }
+    }
+}
+
 /// Typed parameters for Keynote's object Move action.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeynoteMoveAction {
@@ -488,6 +550,12 @@ pub struct KeynoteBuildSettings {
     pub keyboard: Option<KeynoteKeyboardBuild>,
     /// Present for typed Shimmer, Skid, Swoosh, and Trace builds.
     pub object_effect: Option<KeynoteObjectBuildEffect>,
+    /// Inline curve for a typed action whose acceleration is
+    /// [`KeynoteBuildAcceleration::Custom`].
+    ///
+    /// `None` preserves an opaque app-native custom curve while updating an
+    /// existing build. New custom-curve actions require `Some`.
+    pub timing_curve: Option<KeynoteBuildTimingCurve>,
     /// Raw parameters for native effects without a dedicated typed model.
     pub custom_parameters: KeynoteBuildCustomParameters,
 }
@@ -541,6 +609,7 @@ impl KeynoteBuildSettings {
             emphasis: None,
             keyboard: None,
             object_effect: None,
+            timing_curve: None,
             custom_parameters: KeynoteBuildCustomParameters::default(),
         }
     }
@@ -683,6 +752,44 @@ impl KeynoteBuildSettings {
             }),
             ..Self::appear_in()
         }
+    }
+
+    /// Attach a custom timing curve to a typed action.
+    ///
+    /// This changes the action's acceleration to
+    /// [`KeynoteBuildAcceleration::Custom`]. It returns an error when this is
+    /// not a Rotate, Scale, Opacity, or Move action.
+    pub fn with_custom_timing_curve(
+        mut self,
+        timing_curve: KeynoteBuildTimingCurve,
+    ) -> Result<Self> {
+        self.set_custom_timing_curve(timing_curve)?;
+        Ok(self)
+    }
+
+    /// Replace the custom timing curve of a typed action.
+    ///
+    /// This changes the action's acceleration to
+    /// [`KeynoteBuildAcceleration::Custom`]. It returns an error when this is
+    /// not a Rotate, Scale, Opacity, or Move action.
+    pub fn set_custom_timing_curve(&mut self, timing_curve: KeynoteBuildTimingCurve) -> Result<()> {
+        validate_timing_curve(&timing_curve)?;
+        let acceleration = if let Some(action) = self.rotation.as_mut() {
+            &mut action.acceleration
+        } else if let Some(action) = self.scale.as_mut() {
+            &mut action.acceleration
+        } else if let Some(action) = self.opacity.as_mut() {
+            &mut action.acceleration
+        } else if let Some(action) = self.move_action.as_mut() {
+            &mut action.acceleration
+        } else {
+            return Err(Error::ParseError(
+                "Keynote custom timing curves require a typed action".to_owned(),
+            ));
+        };
+        *acceleration = KeynoteBuildAcceleration::Custom;
+        self.timing_curve = Some(timing_curve);
+        Ok(())
     }
 
     /// Native-compatible Blink emphasis action.
@@ -2969,9 +3076,11 @@ impl KeynoteEditor {
         settings: KeynoteBuildSettings,
     ) -> Result<KeynoteBuildInfo> {
         validate_build_settings(&settings)?;
-        if typed_action_acceleration(&settings) == Some(KeynoteBuildAcceleration::Custom) {
+        if typed_action_acceleration(&settings) == Some(KeynoteBuildAcceleration::Custom)
+            && settings.timing_curve.is_none()
+        {
             return Err(Error::ParseError(
-                "Creating a custom-curve Keynote action is not yet supported".to_owned(),
+                "Creating a custom-curve Keynote action requires a timing curve".to_owned(),
             ));
         }
         if settings.animation_type == "Action" && !is_typed_action_effect(&settings.effect) {
@@ -3076,9 +3185,10 @@ impl KeynoteEditor {
             })?;
         if typed_action_acceleration(&settings) == Some(KeynoteBuildAcceleration::Custom)
             && typed_action_acceleration(&build.settings) != Some(KeynoteBuildAcceleration::Custom)
+            && settings.timing_curve.is_none()
         {
             return Err(Error::ParseError(
-                "Changing a Keynote action to a custom curve requires native curve data".to_owned(),
+                "Changing a Keynote action to a custom curve requires a timing curve".to_owned(),
             ));
         }
         if build.settings.animation_type == "Action"

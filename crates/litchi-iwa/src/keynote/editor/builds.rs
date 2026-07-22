@@ -50,6 +50,14 @@ pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result
             "Keynote typed effects cannot contain unrelated raw custom parameters".to_owned(),
         ));
     }
+    if let Some(curve) = &settings.timing_curve {
+        validate_timing_curve(curve)?;
+        if typed_action_acceleration(settings) != Some(KeynoteBuildAcceleration::Custom) {
+            return Err(Error::ParseError(
+                "Keynote timing curves require custom action acceleration".to_owned(),
+            ));
+        }
+    }
     let typed_action_count = usize::from(settings.rotation.is_some())
         + usize::from(settings.scale.is_some())
         + usize::from(settings.opacity.is_some())
@@ -369,6 +377,41 @@ pub(super) fn validate_motion_path(path: &KeynoteMotionPath) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn validate_timing_curve(curve: &KeynoteBuildTimingCurve) -> Result<()> {
+    let path = &curve.path;
+    validate_motion_path(path).map_err(|error| match error {
+        Error::ParseError(message) => {
+            Error::ParseError(message.replace("Keynote Move", "Keynote timing curve"))
+        },
+        error => error,
+    })?;
+    if path.horizontal_flip || path.vertical_flip {
+        return Err(Error::ParseError(
+            "Keynote timing curves cannot be flipped".to_owned(),
+        ));
+    }
+    if path.subpaths.len() != 1 || path.subpaths[0].closed {
+        return Err(Error::ParseError(
+            "Keynote timing curves require one open path".to_owned(),
+        ));
+    }
+    let end = path.subpaths[0]
+        .nodes
+        .last()
+        .ok_or_else(|| {
+            Error::InvalidFormat(
+                "Keynote timing curve validation accepted an empty path".to_owned(),
+            )
+        })?
+        .point;
+    if end.x != 1.0 || end.y != 1.0 {
+        return Err(Error::ParseError(
+            "Keynote timing curves must end at normalized point (1, 1)".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 pub(super) fn native_motion_node_type(node_type: KeynoteMotionPathNodeType) -> i32 {
     use tsd::editable_bezier_path_source_archive::NodeType;
     match node_type {
@@ -472,6 +515,14 @@ pub(super) fn native_motion_path(path: &KeynoteMotionPath) -> tsd::PathSourceArc
         }),
         ..Default::default()
     }
+}
+
+pub(super) fn timing_curve_from_native(
+    source: &tsd::PathSourceArchive,
+) -> Option<KeynoteBuildTimingCurve> {
+    let curve = KeynoteBuildTimingCurve::from_path(motion_path_from_native(source)?);
+    validate_timing_curve(&curve).ok()?;
+    Some(curve)
 }
 
 pub(super) fn native_rotation_direction(direction: KeynoteRotationDirection) -> i32 {
@@ -1289,6 +1340,18 @@ pub(super) fn build_settings(
     } else {
         None
     };
+    let timing_curve = (is_typed_action_effect(&effect)
+        && build
+            .attributes
+            .action_acceleration
+            .and_then(build_acceleration_from_native)
+            == Some(KeynoteBuildAcceleration::Custom))
+    .then(|| {
+        animation
+            .and_then(|attributes| attributes.custom_effect_timing_curve_1.as_ref())
+            .and_then(timing_curve_from_native)
+    })
+    .flatten();
     KeynoteBuildSettings {
         delivery: build.delivery.clone(),
         animation_type,
@@ -1332,6 +1395,7 @@ pub(super) fn build_settings(
         emphasis,
         keyboard,
         object_effect,
+        timing_curve,
         custom_parameters: KeynoteBuildCustomParameters {
             bounce: build.attributes.custom_bounce,
             motion_blur: build.attributes.custom_motion_blur,
@@ -1378,6 +1442,10 @@ pub(super) fn new_build_archive(
                 duration: Some(settings.duration),
                 direction: settings.direction,
                 delay: Some(settings.delay),
+                custom_effect_timing_curve_1: settings
+                    .timing_curve
+                    .as_ref()
+                    .map(|curve| native_motion_path(&curve.path)),
                 random_number_seed: Some(random_number_seed),
                 writing_direction_is_rtl: Some(false),
                 ..Default::default()
@@ -1856,12 +1924,54 @@ pub(super) fn patch_build_settings_wire(
                 animation.direction.is_some(),
                 settings.direction.map(u64::from),
             )?;
-            patch_fixed64_field(
+            animation_data = patch_fixed64_field(
                 &animation_data,
                 5,
                 animation.delay.is_some(),
                 Some(settings.delay.to_bits()),
-            )
+            )?;
+            if typed_action_acceleration(settings) == Some(KeynoteBuildAcceleration::Custom) {
+                if let Some(curve) = &settings.timing_curve {
+                    let replacement = native_motion_path(&curve.path).encode_to_vec();
+                    animation_data = if animation
+                        .custom_effect_timing_curve_1
+                        .as_ref()
+                        .and_then(timing_curve_from_native)
+                        .is_some()
+                    {
+                        transform_length_delimited_field(&animation_data, 8, |path_source| {
+                            patch_motion_path_source_wire(path_source, &curve.path)
+                        })?
+                    } else {
+                        patch_length_delimited_field(
+                            &animation_data,
+                            8,
+                            animation.custom_effect_timing_curve_1.is_some(),
+                            Some(&replacement),
+                        )?
+                    };
+                    animation_data = patch_length_delimited_field(
+                        &animation_data,
+                        13,
+                        animation.custom_effect_timing_curve_theme_name_1.is_some(),
+                        None,
+                    )?;
+                }
+            } else {
+                animation_data = patch_length_delimited_field(
+                    &animation_data,
+                    8,
+                    animation.custom_effect_timing_curve_1.is_some(),
+                    None,
+                )?;
+                animation_data = patch_length_delimited_field(
+                    &animation_data,
+                    13,
+                    animation.custom_effect_timing_curve_theme_name_1.is_some(),
+                    None,
+                )?;
+            }
+            Ok(animation_data)
         })
     })?;
     let verified = kn::BuildArchive::decode(data.as_slice())?;

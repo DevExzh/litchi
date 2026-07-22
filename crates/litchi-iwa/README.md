@@ -71,7 +71,7 @@ println!("{}", structured.summary());
   placeholder ownership and z-order invariants
 - Native Keynote build-in/build-out object CRUD with typed On Click / After Transition /
   With Previous / After Previous timing, typed Rotate / Scale / Opacity / Move actions,
-  editable Bézier motion paths, typed Blink / Bounce / Flip / Jiggle / Pop / Pulse
+  editable Bézier motion paths and custom timing curves, typed Blink / Bounce / Flip / Jiggle / Pop / Pulse
   emphasis actions, typed Keyboard / Shimmer / Skid / Swoosh / Trace build-in/build-out
   effects with native direction models, wire-preserving
   move/reorder operations, validated raw CRUD for unmapped native build parameters,
@@ -492,6 +492,30 @@ keynote.save("created-with-slide-numbers.key")?;
 ```
 
 See `create_keynote_slide_numbers` for a complete source-free example.
+
+Source-free presentations can also create typed action builds with an editable
+custom speed curve. A cubic curve is normalized from `(0, 0)` to `(1, 1)`, and
+the same model reads, updates, and removes the native curve payload:
+
+```rust
+use litchi_iwa::keynote::{
+    KeynoteBuildSettings, KeynoteBuildTimingCurve, KeynoteDocumentBuilder,
+    KeynoteMotionPathPoint, KeynoteRotationDirection,
+};
+
+let mut keynote = KeynoteDocumentBuilder::new().title("Custom timing").build()?;
+let drawable = keynote.slide_drawables(0)?.into_iter().next().ok_or("slide has no drawable")?;
+let settings = KeynoteBuildSettings::rotate_action(720.0, KeynoteRotationDirection::Clockwise)
+    .with_custom_timing_curve(KeynoteBuildTimingCurve::cubic(
+        KeynoteMotionPathPoint::new(0.18, 0.04),
+        KeynoteMotionPathPoint::new(0.82, 0.96),
+    ))?;
+keynote.add_slide_build(0, drawable.object_id, settings)?;
+keynote.save("created-with-custom-timing.key")?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+See `create_keynote_custom_timing_curve` for a complete source-free example.
 
 Scratch-created presentations can add ordinary text boxes directly to any
 slide. The shape, text storage, stand-ins, ownership, z-order, and metadata are

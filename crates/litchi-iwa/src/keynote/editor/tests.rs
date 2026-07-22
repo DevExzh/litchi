@@ -863,6 +863,224 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
 }
 
 #[test]
+fn slide_custom_timing_curve_actions_create_update_and_clear_natively() {
+    use kn::build_attributes_archive::BuildAttributesAcceleration;
+
+    let curve = KeynoteBuildTimingCurve::cubic(
+        KeynoteMotionPathPoint::new(0.18, 0.04),
+        KeynoteMotionPathPoint::new(0.82, 0.96),
+    );
+    let settings = KeynoteBuildSettings::rotate_action(720.0, KeynoteRotationDirection::Clockwise)
+        .with_custom_timing_curve(curve.clone())
+        .unwrap();
+
+    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
+    assert_eq!(created.settings, settings);
+
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let native: kn::BuildArchive = graph
+        .decode_type(created.object_id, BUILD_MESSAGE_TYPE, "KN.BuildArchive")
+        .unwrap();
+    assert_eq!(
+        native.attributes.action_acceleration,
+        Some(BuildAttributesAcceleration::KCustom as i32)
+    );
+    let animation = native.attributes.animation_attributes.as_ref().unwrap();
+    let stored =
+        timing_curve_from_native(animation.custom_effect_timing_curve_1.as_ref().unwrap()).unwrap();
+    assert_eq!(stored, curve);
+    assert_eq!(animation.custom_effect_timing_curve_theme_name_1, None);
+    drop(graph);
+
+    let updated_curve = KeynoteBuildTimingCurve::cubic(
+        KeynoteMotionPathPoint::new(0.11, 0.77),
+        KeynoteMotionPathPoint::new(0.91, 0.21),
+    );
+    let mut updated = settings.clone();
+    updated
+        .set_custom_timing_curve(updated_curve.clone())
+        .unwrap();
+    editor
+        .set_slide_build(0, created.object_id, updated.clone())
+        .unwrap();
+    assert_eq!(editor.slide_builds(0).unwrap()[0].settings, updated);
+
+    let mut builtin = updated;
+    builtin.rotation.as_mut().unwrap().acceleration = KeynoteBuildAcceleration::EaseOut;
+    builtin.timing_curve = None;
+    editor
+        .set_slide_build(0, created.object_id, builtin.clone())
+        .unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let native: kn::BuildArchive = graph
+        .decode_type(created.object_id, BUILD_MESSAGE_TYPE, "KN.BuildArchive")
+        .unwrap();
+    let animation = native.attributes.animation_attributes.as_ref().unwrap();
+    assert_eq!(animation.custom_effect_timing_curve_1, None);
+    assert_eq!(animation.custom_effect_timing_curve_theme_name_1, None);
+    drop(graph);
+    assert_eq!(editor.slide_builds(0).unwrap()[0].settings, builtin);
+
+    let restored = builtin.with_custom_timing_curve(updated_curve).unwrap();
+    editor
+        .set_slide_build(0, created.object_id, restored.clone())
+        .unwrap();
+    assert_eq!(editor.slide_builds(0).unwrap()[0].settings, restored);
+}
+
+#[test]
+fn slide_custom_timing_curve_rejects_invalid_pairing_and_shape_transactionally() {
+    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let settings =
+        KeynoteBuildSettings::rotate_action(90.0, KeynoteRotationDirection::Counterclockwise);
+    let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    let mut builtin_curve = settings.clone();
+    builtin_curve.timing_curve = Some(KeynoteBuildTimingCurve::linear());
+    assert!(
+        editor
+            .set_slide_build(0, created.object_id, builtin_curve)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let mut invalid_curve = KeynoteBuildTimingCurve::linear();
+    invalid_curve.path.subpaths[0].nodes[1].point.y = 0.9;
+    let mut invalid_setter = settings.clone();
+    assert!(
+        invalid_setter
+            .set_custom_timing_curve(invalid_curve.clone())
+            .is_err()
+    );
+    assert_eq!(invalid_setter, settings);
+    assert!(
+        settings
+            .clone()
+            .with_custom_timing_curve(invalid_curve.clone())
+            .is_err()
+    );
+    let mut invalid = settings.clone();
+    invalid.rotation.as_mut().unwrap().acceleration = KeynoteBuildAcceleration::Custom;
+    invalid.timing_curve = Some(invalid_curve);
+    assert!(
+        editor
+            .set_slide_build(0, created.object_id, invalid)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    assert!(
+        KeynoteBuildSettings::appear_in()
+            .with_custom_timing_curve(KeynoteBuildTimingCurve::linear())
+            .is_err()
+    );
+}
+
+#[test]
+fn slide_custom_timing_curve_updates_preserve_deep_unknown_path_wire() {
+    let settings = KeynoteBuildSettings::rotate_action(360.0, KeynoteRotationDirection::Clockwise)
+        .with_custom_timing_curve(KeynoteBuildTimingCurve::cubic(
+            KeynoteMotionPathPoint::new(0.15, 0.1),
+            KeynoteMotionPathPoint::new(0.85, 0.9),
+        ))
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let created = editor.add_slide_build(0, 5, settings).unwrap();
+    let mut package = editor.into_package();
+    let suffixes = [
+        unknown_varint(99, 990),
+        unknown_varint(98, 980),
+        unknown_varint(97, 970),
+        unknown_varint(96, 960),
+        unknown_varint(95, 950),
+    ];
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let build = archive.object_mut(created.object_id).unwrap();
+            let message = build.messages[0].clone();
+            let data = transform_length_delimited_field(&message.data, 4, |attributes| {
+                transform_length_delimited_field(attributes, 18, |animation| {
+                    transform_length_delimited_field(animation, 8, |path_source| {
+                        let mut path_source =
+                            transform_length_delimited_field(path_source, 8, |editable| {
+                                let mut editable = transform_length_delimited_fields_at_path(
+                                    editable,
+                                    &[1],
+                                    |subpath| {
+                                        let mut subpath =
+                                            transform_length_delimited_fields_at_path(
+                                                subpath,
+                                                &[1],
+                                                |node| {
+                                                    let mut node =
+                                                        transform_length_delimited_field(
+                                                            node,
+                                                            2,
+                                                            |point| {
+                                                                let mut point = point.to_vec();
+                                                                point.extend_from_slice(
+                                                                    &suffixes[4],
+                                                                );
+                                                                Ok(point)
+                                                            },
+                                                        )?;
+                                                    node.extend_from_slice(&suffixes[3]);
+                                                    Ok(node)
+                                                },
+                                            )?;
+                                        subpath.extend_from_slice(&suffixes[2]);
+                                        Ok(subpath)
+                                    },
+                                )?;
+                                editable.extend_from_slice(&suffixes[1]);
+                                Ok(editable)
+                            })?;
+                        path_source.extend_from_slice(&suffixes[0]);
+                        Ok(path_source)
+                    })
+                })
+            })?;
+            build.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut settings = editor.slide_builds(0).unwrap()[0].settings.clone();
+    settings.timing_curve.as_mut().unwrap().path.subpaths[0].nodes[0]
+        .out_control_point
+        .x = 0.22;
+    editor
+        .set_slide_build(0, created.object_id, settings)
+        .unwrap();
+
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let build = graph
+        .message_data_type(created.object_id, BUILD_MESSAGE_TYPE, "KN.BuildArchive")
+        .unwrap();
+    let attributes = repeated_length_delimited_payloads(build, 4).unwrap()[0];
+    let animation = repeated_length_delimited_payloads(attributes, 18).unwrap()[0];
+    let path_source = repeated_length_delimited_payloads(animation, 8).unwrap()[0];
+    assert!(path_source.ends_with(&suffixes[0]));
+    let editable = repeated_length_delimited_payloads(path_source, 8).unwrap()[0];
+    assert!(editable.ends_with(&suffixes[1]));
+    let subpath = repeated_length_delimited_payloads(editable, 1).unwrap()[0];
+    assert!(subpath.ends_with(&suffixes[2]));
+    let node = repeated_length_delimited_payloads(subpath, 1).unwrap()[0];
+    assert!(node.ends_with(&suffixes[3]));
+    let point = repeated_length_delimited_payloads(node, 2).unwrap()[0];
+    assert!(point.ends_with(&suffixes[4]));
+}
+
+#[test]
 fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let settings =
