@@ -3186,6 +3186,46 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_citation_and_bibliography_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let citation = document.add_paragraph();
+            citation.add_field(crate::docx::writer::MutableField::with_result(
+                r#"CITATION Doe2024 \m "Smith2025" \l 1033 \p "14""#.to_string(),
+                "(Doe, 2024; Smith, 2025, p. 14)".to_string(),
+            ));
+            let bibliography = document.add_paragraph();
+            bibliography.add_field(crate::docx::writer::MutableField::with_result(
+                r#"BIBLIOGRAPHY \l 1033 \f "References""#.to_string(),
+                "Doe. Example work.".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let citations = document.citations().unwrap();
+        assert_eq!(document.citation_count().unwrap(), 1);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0].primary_source_tag(), "Doe2024");
+        assert_eq!(citations[0].source_tags(), ["Doe2024", "Smith2025"]);
+        assert!(citations[0].has_switch('l'));
+        assert!(citations[0].has_switch('p'));
+
+        let bibliographies = document.bibliographies().unwrap();
+        assert_eq!(document.bibliography_count().unwrap(), 1);
+        assert_eq!(bibliographies.len(), 1);
+        assert_eq!(
+            bibliographies[0].cached_result(),
+            Some("Doe. Example work.")
+        );
+        assert!(bibliographies[0].has_switch('l'));
+        assert!(bibliographies[0].has_switch('f'));
+    }
+
+    #[test]
     fn writes_and_discovers_typed_index_fields() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

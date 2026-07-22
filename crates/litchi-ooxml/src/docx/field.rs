@@ -154,6 +154,40 @@ impl Field {
         (!name.is_empty()).then_some(name)
     }
 
+    /// Check whether this is a `CITATION` bibliography field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never looks
+    /// up bibliography sources, formats a citation, follows a data-store
+    /// reference, or refreshes the cached result.
+    pub fn is_citation(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "CITATION").is_some()
+    }
+
+    /// Parse this field as an inert typed bibliography citation.
+    ///
+    /// Returns `Ok(None)` for non-`CITATION` fields. The result exposes only
+    /// stored source tags, switches, cached content, and dirty/lock state; it
+    /// never resolves sources or formats a citation.
+    pub fn citation(&self) -> Result<Option<CitationField>> {
+        CitationField::from_field(self)
+    }
+
+    /// Check whether this is a `BIBLIOGRAPHY` field.
+    ///
+    /// This recognizes persisted configuration only. It does not enumerate
+    /// sources, sort them, or generate bibliography text.
+    pub fn is_bibliography(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "BIBLIOGRAPHY").is_some()
+    }
+
+    /// Parse this field as an inert typed bibliography field.
+    ///
+    /// Returns `Ok(None)` for non-`BIBLIOGRAPHY` fields. Stored switches and
+    /// cached visible content remain data only; no bibliography is generated.
+    pub fn bibliography(&self) -> Result<Option<BibliographyField>> {
+        BibliographyField::from_field(self)
+    }
+
     /// Check whether this is a `TOC` (Table of Contents) field.
     ///
     /// The field's cached result remains data only; calling this method never
@@ -510,6 +544,173 @@ impl FieldSwitch {
     /// Return the optional argument supplied to this switch.
     pub fn argument(&self) -> Option<&str> {
         self.argument.as_deref()
+    }
+}
+
+/// A typed, inert Word `CITATION` field.
+///
+/// The field stores one primary bibliography-source tag plus zero or more
+/// multi-source tags introduced by `\m`. This model preserves that metadata
+/// and cached display text only. It never accesses bibliography source XML,
+/// formats citations, resolves locales, or executes field instructions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CitationField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    source_tags: Vec<String>,
+    switches: Vec<FieldSwitch>,
+}
+
+impl CitationField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((primary_source_tag, switches)) =
+            parse_field_operand_and_switches(field.instruction(), "CITATION")?
+        else {
+            return Ok(None);
+        };
+        let primary_source_tag = primary_source_tag.ok_or_else(|| {
+            OoxmlError::InvalidFormat("CITATION field is missing its source tag".to_string())
+        })?;
+        if primary_source_tag.is_empty() {
+            return Err(OoxmlError::InvalidFormat(
+                "CITATION field source tag is empty".to_string(),
+            ));
+        }
+
+        let mut source_tags = vec![primary_source_tag];
+        for switch in &switches {
+            if switch.name != 'm' {
+                continue;
+            }
+            let source_tag = switch.argument.as_deref().ok_or_else(|| {
+                OoxmlError::InvalidFormat("CITATION \\m switch requires a source tag".to_string())
+            })?;
+            if source_tag.is_empty() {
+                return Err(OoxmlError::InvalidFormat(
+                    "CITATION \\m source tag is empty".to_string(),
+                ));
+            }
+            source_tags.push(source_tag.to_string());
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            source_tags,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached formatted citation, if present.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the primary source tag stored directly after `CITATION`.
+    pub fn primary_source_tag(&self) -> &str {
+        &self.source_tags[0]
+    }
+
+    /// Return primary and `\m` multi-source tags in instruction order.
+    pub fn source_tags(&self) -> &[String] {
+        &self.source_tags
+    }
+
+    /// Return the additional source tags introduced by `\m` switches.
+    pub fn additional_source_tags(&self) -> &[String] {
+        &self.source_tags[1..]
+    }
+
+    /// Return all stored switches in source order.
+    ///
+    /// Switch semantics can apply to the primary or a preceding `\m` source,
+    /// so callers that need producer-specific interpretation should retain this
+    /// source order instead of assuming a global setting.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+}
+
+/// A typed, inert Word `BIBLIOGRAPHY` field.
+///
+/// This preserves only the stored field instruction, switches, and cached
+/// result. It does not discover bibliography sources, apply a style, sort
+/// entries, or generate a bibliography.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BibliographyField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    switches: Vec<FieldSwitch>,
+}
+
+impl BibliographyField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(switches) = parse_field_switches(field.instruction(), "BIBLIOGRAPHY")? else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached visible bibliography result, if present.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
     }
 }
 
@@ -1534,6 +1735,50 @@ mod tests {
     }
 
     #[test]
+    fn parses_citation_and_bibliography_fields() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" CITATION Doe2024 \m &quot;Smith 2025&quot; \l 1033 \p &quot;14&quot; " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>(Doe, 2024; Smith, 2025, p. 14)</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>BIBLIOGRAPHY \l 1033 \f &quot;References&quot;</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>Doe. Example work.</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="CITATIONEXTRA ignored"><w:r><w:t>not a citation</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_citation());
+        assert!(fields[1].is_bibliography());
+        assert!(!fields[2].is_citation());
+        assert!(!fields[2].is_bibliography());
+
+        let citation = fields[0].citation().unwrap().unwrap();
+        assert_eq!(
+            citation.cached_result(),
+            Some("(Doe, 2024; Smith, 2025, p. 14)")
+        );
+        assert!(citation.is_dirty());
+        assert!(citation.is_locked());
+        assert_eq!(citation.primary_source_tag(), "Doe2024");
+        assert_eq!(citation.source_tags(), ["Doe2024", "Smith 2025"]);
+        assert_eq!(citation.additional_source_tags(), ["Smith 2025"]);
+        assert_eq!(citation.switches()[0].name(), 'm');
+        assert_eq!(citation.switches()[0].argument(), Some("Smith 2025"));
+        assert!(citation.has_switch('l'));
+        assert!(citation.has_switch('p'));
+
+        let bibliography = fields[1].bibliography().unwrap().unwrap();
+        assert_eq!(bibliography.cached_result(), Some("Doe. Example work."));
+        assert!(bibliography.is_dirty());
+        assert!(bibliography.is_locked());
+        assert_eq!(bibliography.switches()[0].name(), 'l');
+        assert_eq!(bibliography.switches()[0].argument(), Some("1033"));
+        assert!(bibliography.has_switch('f'));
+    }
+
+    #[test]
     fn parses_table_of_authorities_and_entry_fields() {
         let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
             <w:fldSimple w:instr=" TOA \c 0 \b &quot;Authorities&quot; \p \f \d &quot;-&quot; \s &quot;Chapter&quot; \e &quot;, &quot; \g &quot;&#x2013;&quot; \h \l &quot;, &quot; " w:dirty="true" w:fldLock="on">
@@ -1648,6 +1893,26 @@ mod tests {
         let duplicate = Field::new(r#"TOA \b "a" \b "b""#.to_string(), None, false);
         let toa = duplicate.table_of_authorities().unwrap().unwrap();
         assert!(toa.bookmark().is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_citation_and_bibliography_field_semantics() {
+        let missing_source = Field::new("CITATION \\l 1033".to_string(), None, false);
+        assert!(missing_source.citation().is_err());
+
+        let empty_source = Field::new(r#"CITATION ""#.to_string(), None, false);
+        assert!(empty_source.citation().is_err());
+
+        let missing_multisource_tag =
+            Field::new("CITATION Doe2024 \\m \\l 1033".to_string(), None, false);
+        assert!(missing_multisource_tag.citation().is_err());
+
+        let empty_multisource_tag =
+            Field::new(r#"CITATION Doe2024 \m """#.to_string(), None, false);
+        assert!(empty_multisource_tag.citation().is_err());
+
+        let malformed_bibliography = Field::new("BIBLIOGRAPHY unexpected".to_string(), None, false);
+        assert!(malformed_bibliography.bibliography().is_err());
     }
 
     #[test]

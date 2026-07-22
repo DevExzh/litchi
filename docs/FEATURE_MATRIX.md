@@ -110,7 +110,7 @@ conversion, fonts, and image conversion are optional.
 | Office Math equations in-document | ✅ | ✅ | ✅ | Exact OMML extraction plus validated inline/display equation and math-paragraph authoring; layout and equation evaluation remain renderer responsibilities |
 | SmartArt | ❌ | ❌ | ❌ | Diagram parts are not exposed as a DOCX semantic model |
 | DrawingML text boxes and WordArt | ❌ | ❌ | ❌ | No typed DOCX authoring model |
-| Citations, bibliography, index, and TOA | 🟡 | 🟡 | ❌ | Typed inert TOA/TA and INDEX/XE discovery exposes stored authority/index categories, entry text, switches, cached results, and dirty/lock state; bibliography and `CITATION` field models plus semantic authoring remain unexposed, and no table/index generation or refresh occurs |
+| Citations, bibliography, index, and TOA | 🟡 | 🟡 | ❌ | Typed inert `CITATION` source-tag/multi-source and `BIBLIOGRAPHY` field discovery plus TOA/TA and INDEX/XE metadata expose stored switches, cached results, and dirty/lock state; bibliography source XML and semantic authoring remain unexposed, and no citation/table/index generation or refresh occurs |
 | IRM/Rights Management | ❌ | ❌ | ❌ | Not implemented |
 | RibbonX customization | ❌ | ❌ | ❌ | Not implemented |
 | VBA projects/DOCM macros | 🟡 | 🟡 | ❌ | DOCM/DOTM main parts and the MS-OFFMACRO2 VBA Project → Word Supplemental Data relationship graph are validated as inert metadata; payload contents are never inspected, parsed, or executed by this API, and no macro authoring exists |

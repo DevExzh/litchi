@@ -8,8 +8,8 @@ use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
-    Field, IndexEntryField, IndexField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
-    TableOfContentsField,
+    BibliographyField, CitationField, Field, IndexEntryField, IndexField,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1222,6 +1222,42 @@ impl<'a> Document<'a> {
     /// ```
     pub fn field_count(&self) -> Result<usize> {
         Ok(self.fields()?.len())
+    }
+
+    /// Get typed, inert bibliography citation (`CITATION`) fields in document order.
+    ///
+    /// Returned values expose stored source tags, switches, cached content, and
+    /// dirty/lock state only. This method never looks up bibliography sources,
+    /// formats citations, or refreshes fields.
+    pub fn citations(&self) -> Result<Vec<CitationField>> {
+        self.fields()?
+            .iter()
+            .map(Field::citation)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of bibliography citation fields in the main document.
+    pub fn citation_count(&self) -> Result<usize> {
+        Ok(self.citations()?.len())
+    }
+
+    /// Get typed, inert `BIBLIOGRAPHY` fields in document order.
+    ///
+    /// Returned values expose stored switches and cached content only. This
+    /// method never loads source XML, sorts sources, or regenerates a
+    /// bibliography.
+    pub fn bibliographies(&self) -> Result<Vec<BibliographyField>> {
+        self.fields()?
+            .iter()
+            .map(Field::bibliography)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of bibliography fields in the main document.
+    pub fn bibliography_count(&self) -> Result<usize> {
+        Ok(self.bibliographies()?.len())
     }
 
     /// Get typed, inert table-of-contents fields in document order.
