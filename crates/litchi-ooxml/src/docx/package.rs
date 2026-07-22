@@ -9,6 +9,9 @@ use crate::docx::alt_chunk::{
     AltChunk, AltChunkNamespace, AlternativeFormatImport, STRICT_ALTERNATIVE_FORMAT_IMPORT,
     is_alternative_format_relationship,
 };
+use crate::docx::bibliography::{
+    BibliographySource, BibliographySourceStore, discover_bibliography_source_stores,
+};
 use crate::docx::document::Document;
 use crate::docx::mail_merge::{
     MailMergeConformance, MailMergeRecipients, MailMergeSettings, MailMergeSource,
@@ -1021,6 +1024,34 @@ impl Package {
     /// Discover every validated Custom XML Data Storage relationship occurrence.
     pub fn custom_xml_data_stores(&self) -> Result<Vec<CustomXmlDataItem>> {
         discover_custom_xml_data(&self.opc)
+    }
+
+    /// Discover typed, inert bibliography source stores from Custom XML.
+    ///
+    /// Word stores its current bibliography source list in a document Custom
+    /// XML data store. This method exposes stored source values and style
+    /// metadata only. It never matches source tags to citations, resolves
+    /// schemas or styles, runs transforms, refreshes fields, or changes data.
+    pub fn bibliography_source_stores(&self) -> Result<Vec<BibliographySourceStore>> {
+        let items = discover_custom_xml_data(&self.opc)?;
+        discover_bibliography_source_stores(&items)
+    }
+
+    /// Discover typed, inert bibliography sources in package and XML order.
+    ///
+    /// This flattens [`Self::bibliography_source_stores`] without resolving
+    /// `CITATION` fields or applying bibliography style rules.
+    pub fn bibliography_sources(&self) -> Result<Vec<BibliographySource>> {
+        let stores = self.bibliography_source_stores()?;
+        Ok(stores
+            .iter()
+            .flat_map(|store| store.sources().iter().cloned())
+            .collect())
+    }
+
+    /// Return the number of typed, inert bibliography sources.
+    pub fn bibliography_source_count(&self) -> Result<usize> {
+        Ok(self.bibliography_sources()?.len())
     }
 
     /// Find a Custom XML data store by its case-insensitive datastore item GUID.
@@ -3223,6 +3254,43 @@ mod tests {
         );
         assert!(bibliographies[0].has_switch('l'));
         assert!(bibliographies[0].has_switch('f'));
+    }
+
+    #[test]
+    fn saves_and_discovers_typed_inert_bibliography_source_stores() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        package
+            .add_custom_xml_data_store(NewCustomXmlDataStore {
+                xml: br#"<b:Sources xmlns:b="http://schemas.openxmlformats.org/officeDocument/2006/bibliography" SelectedStyle="/APA.XSL" StyleName="APA"><b:Source><b:Tag>Doe2024</b:Tag><b:SourceType>Book</b:SourceType><b:Title>Stored source</b:Title></b:Source></b:Sources>"#.to_vec(),
+                content_type: "application/xml".to_string(),
+                item_id: "{22222222-2222-2222-2222-222222222222}".to_string(),
+                schema_references: vec![
+                    crate::docx::OOXML_BIBLIOGRAPHY_NAMESPACE.to_string(),
+                ],
+                conformance: crate::custom_xml_data::CustomXmlConformance::Transitional,
+            })
+            .unwrap();
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let stores = reopened.bibliography_source_stores().unwrap();
+        assert_eq!(stores.len(), 1);
+        assert_eq!(
+            stores[0].data_store_item_id(),
+            Some("{22222222-2222-2222-2222-222222222222}")
+        );
+        assert_eq!(stores[0].selected_style(), Some("/APA.XSL"));
+        assert_eq!(stores[0].style_name(), Some("APA"));
+        assert_eq!(stores[0].source_count(), 1);
+        assert_eq!(stores[0].sources()[0].tag(), Some("Doe2024"));
+        assert_eq!(stores[0].sources()[0].source_type(), Some("Book"));
+        assert_eq!(stores[0].sources()[0].title(), Some("Stored source"));
+
+        let sources = reopened.bibliography_sources().unwrap();
+        assert_eq!(reopened.bibliography_source_count().unwrap(), 1);
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].tag(), Some("Doe2024"));
     }
 
     #[test]

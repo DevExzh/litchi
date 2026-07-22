@@ -50,6 +50,7 @@
 //! ```
 
 pub mod alt_chunk;
+pub mod bibliography;
 pub mod bookmark;
 pub mod chart;
 pub mod comment;
@@ -92,6 +93,11 @@ pub mod writer;
 pub use alt_chunk::{
     AltChunk, AltChunkNamespace, AlternativeFormatData, AlternativeFormatImport,
     AlternativeFormatKind, AlternativeFormatPart, AlternativeFormatTarget,
+};
+pub use bibliography::{
+    BibliographySource, BibliographySourceStore, BibliographySourceValue,
+    LEGACY_WORD_BIBLIOGRAPHY_NAMESPACE, OOXML_BIBLIOGRAPHY_NAMESPACE,
+    STRICT_OOXML_BIBLIOGRAPHY_NAMESPACE,
 };
 pub use bookmark::Bookmark;
 pub use chart::{
