@@ -1159,11 +1159,17 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
     pub fn vba_metadata(&self) -> crate::xls::vba::XlsVbaMetadata {
         let mut metadata = self.vba_metadata.clone();
-        metadata.set_project_storage_present(self.ole_file.list_streams().iter().any(|path| {
-            path.first()
-                .is_some_and(|name| name.eq_ignore_ascii_case("_VBA_PROJECT_CUR"))
-        }));
+        metadata.set_project_storage_present(self.vba_project_storage().is_some());
         metadata
+    }
+
+    /// Discover the MS-XLS `_VBA_PROJECT_CUR` storage without opening macro streams.
+    ///
+    /// This validates directory names defined by MS-XLS and MS-OVBA only. It
+    /// never opens, decompresses, parses, or executes `PROJECT`, `dir`,
+    /// `_VBA_PROJECT`, SRP, or module-stream bytes.
+    pub fn vba_project_storage(&self) -> Option<crate::xls::XlsVbaProjectStorage> {
+        crate::xls::vba::discover_vba_project_storage(&self.ole_file.list_streams())
     }
 
     pub fn environment(&self) -> &crate::xls::environment::XlsWorkbookEnvironment {

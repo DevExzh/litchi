@@ -281,7 +281,7 @@ conversion, fonts, and image conversion are optional.
 | Calculation, scenarios, and consolidation | ✅ | ✅ | ✅ | Typed settings and inert scenario/consolidation metadata |
 | Codepage handling | 🟡 | ✅ | 🟡 | Reader honors BIFF codepages; writer is centered on BIFF8/Windows-1252 |
 | Password encryption | ✅ | ✅ | ✅ | XOR and supported RC4/CryptoAPI profiles |
-| VBA project metadata | 🟡 | ✅ | ✅ | Passive project/security markers only; no code-module model or execution |
+| VBA project metadata | 🟡 | ✅ | 🟡 | Inert BIFF markers/code names plus directory-only MS-XLS `_VBA_PROJECT_CUR` → MS-OVBA topology discovery; no macro stream is opened, decompressed, parsed, or executed, and writing is limited to a module-free metadata scaffold |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral CFB verification and signing |
 
 ## Excel binary OOXML workbooks (XLSB)

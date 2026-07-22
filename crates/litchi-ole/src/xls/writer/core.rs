@@ -3315,7 +3315,7 @@ impl XlsWriter {
         Ok(())
     }
 
-    /// Enable a module-free VBA project scaffold without executable content.
+    /// Enable a module-free VBA metadata scaffold without executable content.
     pub fn enable_empty_vba_project(&mut self, workbook_code_name: &str) -> XlsResult<()> {
         crate::xls::vba::validate_code_name(workbook_code_name)?;
         self.vba_metadata = Some(XlsVbaWriteMetadata {

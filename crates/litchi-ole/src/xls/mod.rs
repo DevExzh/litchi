@@ -255,7 +255,7 @@ pub use table_styles::{
     XlsDifferentialFormatId, XlsTableStyle, XlsTableStyleElement, XlsTableStyleRegion,
     XlsTableStyles,
 };
-pub use vba::XlsVbaMetadata;
+pub use vba::{XlsVbaMetadata, XlsVbaProjectStorage};
 pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
 pub use workbook::{XlsOpenOptions, XlsWorkbook};
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};

@@ -42,6 +42,219 @@ impl XlsVbaMetadata {
     }
 }
 
+/// Directory-only topology for the MS-XLS `_VBA_PROJECT_CUR` storage.
+///
+/// MS-XLS permits at most one storage with this name and delegates its
+/// contents to MS-OVBA. This model examines CFB directory names only: it
+/// never opens, decompresses, parses, or executes the `PROJECT`, `dir`,
+/// `_VBA_PROJECT`, SRP, or candidate module streams.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsVbaProjectStorage {
+    root_storage_path: Vec<String>,
+    vba_storage_path: Option<Vec<String>>,
+    has_project_stream: bool,
+    has_project_wm_stream: bool,
+    has_project_lk_stream: bool,
+    has_vba_project_stream: bool,
+    has_dir_stream: bool,
+    candidate_module_stream_names: Vec<String>,
+    srp_stream_names: Vec<String>,
+}
+
+impl XlsVbaProjectStorage {
+    /// Return the CFB path of the `_VBA_PROJECT_CUR` root storage.
+    pub fn root_storage_path(&self) -> &[String] {
+        &self.root_storage_path
+    }
+
+    /// Return the CFB path of the nested MS-OVBA `VBA` storage, when visible.
+    ///
+    /// CFB directory enumeration exposes stream paths, so an entirely empty
+    /// nested storage has no observable path and is reported as absent.
+    pub fn vba_storage_path(&self) -> Option<&[String]> {
+        self.vba_storage_path.as_deref()
+    }
+
+    /// Whether directory metadata shows a nested `VBA` storage.
+    pub fn has_vba_storage(&self) -> bool {
+        self.vba_storage_path.is_some()
+    }
+
+    /// Whether the root has the required MS-OVBA `PROJECT` stream.
+    pub fn has_project_stream(&self) -> bool {
+        self.has_project_stream
+    }
+
+    /// Whether the root has the optional MS-OVBA `PROJECTwm` stream.
+    pub fn has_project_wm_stream(&self) -> bool {
+        self.has_project_wm_stream
+    }
+
+    /// Whether the root has the optional MS-OVBA `PROJECTlk` stream.
+    pub fn has_project_lk_stream(&self) -> bool {
+        self.has_project_lk_stream
+    }
+
+    /// Whether the nested `VBA` storage has the required `_VBA_PROJECT` stream.
+    pub fn has_vba_project_stream(&self) -> bool {
+        self.has_vba_project_stream
+    }
+
+    /// Whether the nested `VBA` storage has the required compressed `dir` stream.
+    pub fn has_dir_stream(&self) -> bool {
+        self.has_dir_stream
+    }
+
+    /// Return direct `VBA` child streams that might be module streams.
+    ///
+    /// `_VBA_PROJECT`, `dir`, and optional `__SRP_*` streams are excluded.
+    /// Names are directory metadata only; no source bytes are read or
+    /// interpreted.
+    pub fn candidate_module_stream_names(&self) -> &[String] {
+        &self.candidate_module_stream_names
+    }
+
+    /// Return optional `__SRP_*` streams observed in the `VBA` storage.
+    ///
+    /// MS-OVBA requires these streams to be ignored. This accessor returns
+    /// names only and never reads their contents.
+    pub fn srp_stream_names(&self) -> &[String] {
+        &self.srp_stream_names
+    }
+
+    /// Whether both streams required inside the nested `VBA` storage exist.
+    pub fn has_required_vba_streams(&self) -> bool {
+        self.has_vba_project_stream && self.has_dir_stream
+    }
+
+    /// Whether the observed directory names meet the required MS-XLS/MS-OVBA
+    /// topology.
+    ///
+    /// This is directory validation only. It does not validate stream bytes or
+    /// parse any VBA source code.
+    pub fn is_structurally_complete(&self) -> bool {
+        self.has_vba_storage() && self.has_project_stream && self.has_required_vba_streams()
+    }
+
+    /// Whether directory metadata conservatively suggests candidate macro code.
+    ///
+    /// This is not code analysis and does not override BIFF's `ObNoMacros`
+    /// marker. Candidate module stream contents are never opened,
+    /// decompressed, parsed, or executed.
+    pub fn may_contain_macro_code(&self) -> bool {
+        self.is_structurally_complete() && !self.candidate_module_stream_names.is_empty()
+    }
+}
+
+/// Discover the one MS-XLS `_VBA_PROJECT_CUR` storage from CFB directory names.
+///
+/// The storage name is fixed by MS-XLS, and all names defined by MS-OVBA are
+/// case-insensitive. No stream content is opened by this function.
+pub(crate) fn discover_vba_project_storage(
+    stream_paths: &[Vec<String>],
+) -> Option<XlsVbaProjectStorage> {
+    let root_name = stream_paths
+        .iter()
+        .filter_map(|path| path.first())
+        .find(|name| name.eq_ignore_ascii_case("_VBA_PROJECT_CUR"))?
+        .clone();
+    let root_storage_path = vec![root_name];
+
+    let vba_storage_path = stream_paths
+        .iter()
+        .filter(|path| {
+            path.len() >= 3
+                && path_prefix_eq_ignore_ascii_case(path, &root_storage_path)
+                && path[1].eq_ignore_ascii_case("VBA")
+        })
+        .map(|path| path[1].clone())
+        .min_by(|left, right| compare_case_insensitively(left, right))
+        .map(|name| vec![root_storage_path[0].clone(), name]);
+
+    let mut vba_children = vba_storage_path
+        .as_ref()
+        .map(|path| direct_child_stream_names(stream_paths, path))
+        .unwrap_or_default();
+    sort_case_insensitively(&mut vba_children);
+    vba_children.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+
+    let has_project_stream = has_direct_stream(stream_paths, &root_storage_path, "PROJECT");
+    let has_project_wm_stream = has_direct_stream(stream_paths, &root_storage_path, "PROJECTwm");
+    let has_project_lk_stream = has_direct_stream(stream_paths, &root_storage_path, "PROJECTlk");
+    let has_vba_project_stream = vba_children
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case("_VBA_PROJECT"));
+    let has_dir_stream = vba_children
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case("dir"));
+    let srp_stream_names = vba_children
+        .iter()
+        .filter(|name| is_srp_stream(name))
+        .cloned()
+        .collect();
+    let candidate_module_stream_names = vba_children
+        .into_iter()
+        .filter(|name| {
+            !name.eq_ignore_ascii_case("_VBA_PROJECT")
+                && !name.eq_ignore_ascii_case("dir")
+                && !is_srp_stream(name)
+        })
+        .collect();
+
+    Some(XlsVbaProjectStorage {
+        root_storage_path,
+        vba_storage_path,
+        has_project_stream,
+        has_project_wm_stream,
+        has_project_lk_stream,
+        has_vba_project_stream,
+        has_dir_stream,
+        candidate_module_stream_names,
+        srp_stream_names,
+    })
+}
+
+fn has_direct_stream(stream_paths: &[Vec<String>], parent: &[String], name: &str) -> bool {
+    stream_paths.iter().any(|path| {
+        path.len() == parent.len() + 1
+            && path_prefix_eq_ignore_ascii_case(path, parent)
+            && path
+                .last()
+                .is_some_and(|component| component.eq_ignore_ascii_case(name))
+    })
+}
+
+fn direct_child_stream_names(stream_paths: &[Vec<String>], parent: &[String]) -> Vec<String> {
+    stream_paths
+        .iter()
+        .filter(|path| path.len() == parent.len() + 1)
+        .filter(|path| path_prefix_eq_ignore_ascii_case(path, parent))
+        .filter_map(|path| path.last())
+        .cloned()
+        .collect()
+}
+
+fn path_prefix_eq_ignore_ascii_case(path: &[String], prefix: &[String]) -> bool {
+    path.iter()
+        .zip(prefix)
+        .all(|(component, expected)| component.eq_ignore_ascii_case(expected))
+}
+
+fn is_srp_stream(name: &str) -> bool {
+    name.get(..6)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("__SRP_"))
+}
+
+fn sort_case_insensitively(names: &mut [String]) {
+    names.sort_by(|left, right| compare_case_insensitively(left, right));
+}
+
+fn compare_case_insensitively(left: &str, right: &str) -> std::cmp::Ordering {
+    left.to_ascii_lowercase()
+        .cmp(&right.to_ascii_lowercase())
+        .then_with(|| left.cmp(right))
+}
+
 pub(crate) struct WorkbookVbaCollector {
     metadata: XlsVbaMetadata,
     last_rank: Option<u8>,
@@ -236,6 +449,10 @@ fn invalid_data<T>(message: impl Into<String>) -> XlsResult<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xls::{XlsWorkbook, XlsWriter};
+    use crate::{OleFile, OleWriter};
+    use std::io::Cursor;
+
     #[test]
     fn parses_strict_code_names() {
         assert_eq!(
@@ -269,5 +486,116 @@ mod tests {
         assert!(metadata.has_project_marker());
         assert!(metadata.has_no_macros_marker());
         assert!(!metadata.may_contain_executable_code());
+    }
+
+    #[test]
+    fn discovers_xls_vba_storage_topology_from_directory_names_only() {
+        let stream_paths = vec![
+            vec!["Workbook".to_string()],
+            vec!["_VBA_PROJECT_CUR".to_string(), "PROJECT".to_string()],
+            vec!["_VBA_PROJECT_CUR".to_string(), "PROJECTwm".to_string()],
+            vec!["_VBA_PROJECT_CUR".to_string(), "PROJECTlk".to_string()],
+            vec![
+                "_VBA_PROJECT_CUR".to_string(),
+                "vBa".to_string(),
+                "_vba_project".to_string(),
+            ],
+            vec![
+                "_VBA_PROJECT_CUR".to_string(),
+                "vBa".to_string(),
+                "DIR".to_string(),
+            ],
+            vec![
+                "_VBA_PROJECT_CUR".to_string(),
+                "vBa".to_string(),
+                "ThisWorkbook".to_string(),
+            ],
+            vec![
+                "_VBA_PROJECT_CUR".to_string(),
+                "vBa".to_string(),
+                "Module1".to_string(),
+            ],
+            vec![
+                "_VBA_PROJECT_CUR".to_string(),
+                "vBa".to_string(),
+                "__sRp_0".to_string(),
+            ],
+        ];
+
+        let storage = discover_vba_project_storage(&stream_paths).unwrap();
+        assert_eq!(storage.root_storage_path(), ["_VBA_PROJECT_CUR"]);
+        assert_eq!(
+            storage.vba_storage_path().unwrap(),
+            ["_VBA_PROJECT_CUR", "vBa"]
+        );
+        assert!(storage.has_project_stream());
+        assert!(storage.has_project_wm_stream());
+        assert!(storage.has_project_lk_stream());
+        assert!(storage.has_required_vba_streams());
+        assert!(storage.is_structurally_complete());
+        assert!(storage.may_contain_macro_code());
+        assert_eq!(
+            storage.candidate_module_stream_names(),
+            ["Module1", "ThisWorkbook"]
+        );
+        assert_eq!(storage.srp_stream_names(), ["__sRp_0"]);
+    }
+
+    #[test]
+    fn parsed_xls_workbook_discovers_invalid_vba_payloads_as_inert_metadata() {
+        let mut source_writer = XlsWriter::new();
+        source_writer.add_worksheet("Sheet1").unwrap();
+        let mut source_bytes = Cursor::new(Vec::new());
+        source_writer.write_to(&mut source_bytes).unwrap();
+        let mut source = OleFile::open(Cursor::new(source_bytes.into_inner())).unwrap();
+        let workbook_stream = source.open_stream(&["Workbook"]).unwrap();
+
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["Workbook"], &workbook_stream)
+            .unwrap();
+        writer.create_storage(&["_VBA_PROJECT_CUR"]).unwrap();
+        writer
+            .create_stream(
+                &["_VBA_PROJECT_CUR", "PROJECT"],
+                b"intentionally invalid PROJECT bytes",
+            )
+            .unwrap();
+        writer.create_storage(&["_VBA_PROJECT_CUR", "VBA"]).unwrap();
+        writer
+            .create_stream(
+                &["_VBA_PROJECT_CUR", "VBA", "_VBA_PROJECT"],
+                b"intentionally invalid version data",
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &["_VBA_PROJECT_CUR", "VBA", "dir"],
+                b"intentionally not an OVBA compressed container",
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &["_VBA_PROJECT_CUR", "VBA", "Module1"],
+                b"intentionally not a module stream",
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &["_VBA_PROJECT_CUR", "VBA", "__SRP_0"],
+                b"intentionally ignored",
+            )
+            .unwrap();
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+
+        let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+        let storage = workbook.vba_project_storage().unwrap();
+        assert!(storage.is_structurally_complete());
+        assert!(storage.may_contain_macro_code());
+        assert_eq!(storage.candidate_module_stream_names(), ["Module1"]);
+        assert_eq!(storage.srp_stream_names(), ["__SRP_0"]);
+        assert!(workbook.vba_metadata().has_project_storage());
+        assert!(!workbook.vba_metadata().has_project_marker());
     }
 }
