@@ -4,7 +4,9 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, geometry_from_drawable};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, geometry_from_drawable,
+};
 use std::time::Duration;
 
 mod builds;
@@ -44,6 +46,8 @@ pub struct KeynoteSlideMovieInfo {
     pub movie_data_identifier: Option<u64>,
     pub poster_image_data_identifier: Option<u64>,
     pub geometry: DrawableGeometry,
+    /// Shared drawable metadata, including accessibility description and lock state.
+    pub properties: DrawableProperties,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
 }
@@ -284,6 +288,46 @@ impl KeynoteEditor {
         if verified.slide_movie_geometry(slide_index, drawable_object_id)? != geometry {
             return Err(Error::InvalidFormat(
                 "Keynote movie geometry update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read shared drawable properties for one ordinary file-backed slide movie.
+    pub fn slide_movie_properties(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<DrawableProperties> {
+        Ok(self
+            .require_file_movie(slide_index, drawable_object_id)?
+            .info
+            .properties)
+    }
+
+    /// Update movie accessibility, hyperlink, and lock properties.
+    ///
+    /// The typed update retains unknown native movie fields and supports both
+    /// clearing a property with `None` and encoding explicit boolean defaults.
+    pub fn set_slide_movie_properties(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        properties: DrawableProperties,
+    ) -> Result<()> {
+        let source = self.require_file_movie(slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_movie_properties(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            &properties,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_movie_properties(slide_index, drawable_object_id)? != properties {
+            return Err(Error::InvalidFormat(
+                "Keynote movie properties update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -806,6 +850,7 @@ fn movie_info(
             .poster_image_data
             .map(|reference| reference.identifier),
         geometry: geometry_from_drawable(&movie.super_)?,
+        properties: crate::shapes::drawable_properties(&movie.super_),
         original_size: movie.original_size.map(drawable_size),
         natural_size: movie.natural_size.map(drawable_size),
     })
@@ -850,6 +895,15 @@ mod tests {
             .with_natural_size(NATURAL_SIZE)
     }
 
+    fn properties(description: &str) -> DrawableProperties {
+        DrawableProperties {
+            hyperlink_url: Some("https://example.test/keynote-movie".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(false),
+            accessibility_description: Some(description.to_owned()),
+        }
+    }
+
     #[test]
     fn scratch_presentation_supports_movie_crud_without_a_source_drawable() {
         let mut editor = KeynoteDocumentBuilder::new()
@@ -887,6 +941,30 @@ mod tests {
             std::slice::from_ref(&created)
         );
 
+        let changed_properties = properties("Accessible Keynote movie");
+        editor
+            .set_slide_movie_properties(0, created.drawable_object_id, changed_properties.clone())
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_movie_properties(0, created.drawable_object_id)
+                .unwrap(),
+            changed_properties
+        );
+        editor
+            .set_slide_movie_properties(
+                0,
+                created.drawable_object_id,
+                DrawableProperties::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_movie_properties(0, created.drawable_object_id)
+                .unwrap(),
+            DrawableProperties::default()
+        );
+
         let changed_geometry = DrawableGeometry {
             position: Some(DrawablePoint { x: 48.0, y: 72.0 }),
             size: Some(DrawableSize {
@@ -918,6 +996,11 @@ mod tests {
             POSTER
         );
 
+        let duplicate_properties = properties("Duplicated Keynote movie");
+        editor
+            .set_slide_movie_properties(0, created.drawable_object_id, duplicate_properties.clone())
+            .unwrap();
+
         let duplicate = editor
             .duplicate_slide_movie(0, created.drawable_object_id)
             .unwrap();
@@ -929,6 +1012,7 @@ mod tests {
             duplicate.poster_image_data_identifier,
             created.poster_image_data_identifier
         );
+        assert_eq!(duplicate.properties, duplicate_properties);
         let removed_original = editor
             .remove_slide_movie(0, created.drawable_object_id)
             .unwrap();

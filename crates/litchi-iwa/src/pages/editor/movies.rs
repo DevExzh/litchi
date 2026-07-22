@@ -8,7 +8,9 @@ use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
+};
 
 mod graph;
 
@@ -23,6 +25,8 @@ pub struct PagesMovieInfo {
     pub movie_data_identifier: u64,
     pub poster_image_data_identifier: u64,
     pub geometry: DrawableGeometry,
+    /// Shared drawable metadata, including accessibility description and lock state.
+    pub properties: DrawableProperties,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
     pub duration: Duration,
@@ -243,6 +247,38 @@ impl PagesEditor {
         if verified.body_movie_geometry(drawable_object_id)? != geometry {
             return Err(Error::InvalidFormat(
                 "Pages movie geometry update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read shared drawable properties for one body-anchored movie.
+    pub fn body_movie_properties(&self, drawable_object_id: u64) -> Result<DrawableProperties> {
+        Ok(body_movie_graph(self, drawable_object_id)?.info.properties)
+    }
+
+    /// Update movie accessibility, hyperlink, and lock properties.
+    ///
+    /// The typed update retains unknown native movie fields and supports both
+    /// clearing a property with `None` and encoding explicit boolean defaults.
+    pub fn set_body_movie_properties(
+        &mut self,
+        drawable_object_id: u64,
+        properties: DrawableProperties,
+    ) -> Result<()> {
+        let source = body_movie_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_movie_properties(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            &properties,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_movie_properties(drawable_object_id)? != properties {
+            return Err(Error::InvalidFormat(
+                "Pages movie properties update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -512,6 +548,15 @@ mod tests {
         PagesMovieOptions::new(POSITION, SIZE, Duration::from_secs(8))
     }
 
+    fn properties(description: &str) -> DrawableProperties {
+        DrawableProperties {
+            hyperlink_url: Some("https://example.test/pages-movie".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(false),
+            accessibility_description: Some(description.to_owned()),
+        }
+    }
+
     #[test]
     fn scratch_document_supports_movie_crud_without_a_source_package() {
         let mut editor = PagesEditor::create_with_text("Quarterly report").unwrap();
@@ -544,6 +589,26 @@ mod tests {
         assert_eq!(
             roundtripped.body_movies().unwrap(),
             std::slice::from_ref(&created)
+        );
+
+        let changed_properties = properties("Accessible Pages movie");
+        editor
+            .set_body_movie_properties(created.drawable_object_id, changed_properties.clone())
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_movie_properties(created.drawable_object_id)
+                .unwrap(),
+            changed_properties
+        );
+        editor
+            .set_body_movie_properties(created.drawable_object_id, DrawableProperties::default())
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_movie_properties(created.drawable_object_id)
+                .unwrap(),
+            DrawableProperties::default()
         );
 
         let changed_geometry = DrawableGeometry {
@@ -610,6 +675,10 @@ mod tests {
                 options(),
             )
             .unwrap();
+        let source_properties = properties("Duplicated Pages movie");
+        editor
+            .set_body_movie_properties(source.drawable_object_id, source_properties.clone())
+            .unwrap();
         let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
 
         let duplicate = editor
@@ -652,6 +721,7 @@ mod tests {
         assert_eq!(duplicate.original_size, source.original_size);
         assert_eq!(duplicate.natural_size, source.natural_size);
         assert_eq!(duplicate.duration, source.duration);
+        assert_eq!(duplicate.properties, source_properties);
 
         let moved_duplicate = DrawableGeometry {
             position: Some(DrawablePoint { x: 312.0, y: 264.0 }),
@@ -762,6 +832,12 @@ mod tests {
         assert!(
             editor
                 .replace_body_movie_data(image.drawable_object_id, MOVIE)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+        assert!(
+            editor
+                .set_body_movie_properties(image.drawable_object_id, DrawableProperties::default())
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

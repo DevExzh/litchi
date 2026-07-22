@@ -50,6 +50,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Duration::try_from_secs_f64(duration_seconds)?,
         ),
     )?;
+    let mut properties = editor.slide_movie_properties(0, created.drawable_object_id)?;
+    properties.accessibility_description = Some(format!("Embedded movie: {movie_filename}"));
+    editor.set_slide_movie_properties(0, created.drawable_object_id, properties)?;
     editor.save(output)?;
     println!(
         "created Keynote movie {} backed by video {:?} and poster {:?}",

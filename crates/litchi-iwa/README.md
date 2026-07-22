@@ -35,8 +35,9 @@ println!("{}", structured.summary());
 - Text extraction across all iWork applications
 - Structured-data extraction: tables (with CSV export), slides, sections
 - Metadata-backed media discovery, extraction, replacement, and guarded cleanup
-- Typed cross-suite image-property read/write for hyperlinks, locking,
-  aspect-ratio locking, and accessibility descriptions with lossless unknown-field preservation
+- Typed cross-suite image, movie, and audio-property read/write for hyperlinks,
+  locking, aspect-ratio locking, and accessibility descriptions with lossless
+  unknown-field preservation
 - Metadata-preserving IWA object/message create, read, update, and delete operations
 - Snappy IWA serialization and deterministic package rewriting
 - Transactional package-entry and IWA-component updates with atomic saves
@@ -770,6 +771,15 @@ keynote.save("created-with-audio.key")?;
 
 `duplicate_slide_audio` creates a separate audio graph and Start Audio build
 while sharing the embedded audio asset, mirroring Keynote's Duplicate command.
+
+All source-built media exposes its shared `DrawableProperties` without
+normalizing unrelated native fields. Read the current value, update only the
+field you need, then write it back—for example,
+`body_movie_properties`/`set_body_movie_properties`,
+`sheet_audio_properties`/`set_sheet_audio_properties`, or
+`slide_movie_properties`/`set_slide_movie_properties`. The paired Pages,
+Numbers, and Keynote movie/audio APIs preserve unknown movie-archive fields and
+carry the properties through native-style duplication.
 
 ### Edit existing documents
 

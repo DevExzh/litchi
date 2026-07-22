@@ -4,7 +4,10 @@ use std::time::Duration;
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{geometry_from_drawable, patch_drawable_geometry};
+use crate::shapes::{
+    DrawableProperties, drawable_properties, geometry_from_drawable, patch_drawable_geometry,
+    patch_wrapped_drawable_properties,
+};
 
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
@@ -443,6 +446,7 @@ fn movie_info(
         movie_data_identifier,
         poster_image_data_identifier,
         geometry: geometry_from_drawable(&movie.super_)?,
+        properties: drawable_properties(&movie.super_),
         original_size: movie.original_size.map(drawable_size),
         natural_size: movie.natural_size.map(drawable_size),
         duration,
@@ -579,6 +583,48 @@ pub(in crate::numbers::editor) fn set_movie_geometry(
             1,
             |drawable| patch_drawable_geometry(drawable, geometry),
         )?;
+        object.replace_message(
+            *message_index,
+            RawMessage {
+                type_: MOVIE_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+pub(in crate::numbers::editor) fn set_movie_properties(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    movie_id: u64,
+    properties: &DrawableProperties,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(movie_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers movie object {movie_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == MOVIE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [message_index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers movie {movie_id} must have exactly one MovieArchive payload"
+            )));
+        };
+        let original = object.messages[*message_index].data.as_slice();
+        let current = drawable_properties(&tsd::MovieArchive::decode(original)?.super_);
+        let data = patch_wrapped_drawable_properties(original, &current, properties)?;
+        let verified = tsd::MovieArchive::decode(data.as_slice())?;
+        if drawable_properties(&verified.super_) != *properties {
+            return Err(Error::InvalidFormat(
+                "Numbers movie properties patch failed validation".to_owned(),
+            ));
+        }
         object.replace_message(
             *message_index,
             RawMessage {

@@ -5,7 +5,8 @@ use std::time::Duration;
 use super::*;
 use crate::IWorkThemeArchive;
 use crate::shapes::{
-    DrawableGeometry, DrawableSize, geometry_from_drawable, patch_drawable_geometry,
+    DrawableGeometry, DrawableProperties, DrawableSize, drawable_properties,
+    geometry_from_drawable, patch_drawable_geometry, patch_wrapped_drawable_properties,
 };
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
@@ -518,6 +519,7 @@ fn audio_info(
         anchor_character_index,
         audio_data_identifier,
         position,
+        properties: drawable_properties(&audio.super_),
         duration,
     })
 }
@@ -664,6 +666,48 @@ pub(super) fn set_audio_geometry(
             AUDIO_DRAWABLE_FIELD,
             |drawable| patch_drawable_geometry(drawable, geometry),
         )?;
+        object.replace_message(
+            *message_index,
+            RawMessage {
+                type_: AUDIO_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+pub(super) fn set_audio_properties(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    audio_id: u64,
+    properties: &DrawableProperties,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(audio_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Pages audio object {audio_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == AUDIO_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [message_index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Pages audio {audio_id} must have exactly one MovieArchive payload"
+            )));
+        };
+        let original = object.messages[*message_index].data.as_slice();
+        let current = drawable_properties(&tsd::MovieArchive::decode(original)?.super_);
+        let data = patch_wrapped_drawable_properties(original, &current, properties)?;
+        let verified = tsd::MovieArchive::decode(data.as_slice())?;
+        if drawable_properties(&verified.super_) != *properties {
+            return Err(Error::InvalidFormat(
+                "Pages audio properties patch failed validation".to_owned(),
+            ));
+        }
         object.replace_message(
             *message_index,
             RawMessage {

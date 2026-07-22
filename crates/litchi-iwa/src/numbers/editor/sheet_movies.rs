@@ -7,7 +7,9 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
+};
 
 pub(super) mod graph;
 
@@ -21,6 +23,8 @@ pub struct NumbersSheetMovieInfo {
     pub movie_data_identifier: u64,
     pub poster_image_data_identifier: u64,
     pub geometry: DrawableGeometry,
+    /// Shared drawable metadata, including accessibility description and lock state.
+    pub properties: DrawableProperties,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
     pub duration: Duration,
@@ -206,6 +210,45 @@ impl NumbersEditor {
         if verified.sheet_movie_geometry(sheet_id, drawable_object_id)? != geometry {
             return Err(Error::InvalidFormat(
                 "Numbers movie geometry update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read shared drawable properties for one ordinary sheet movie.
+    pub fn sheet_movie_properties(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<DrawableProperties> {
+        Ok(movie_graph(self, sheet_id, drawable_object_id)?
+            .info
+            .properties)
+    }
+
+    /// Update movie accessibility, hyperlink, and lock properties.
+    ///
+    /// The typed update retains unknown native movie fields and supports both
+    /// clearing a property with `None` and encoding explicit boolean defaults.
+    pub fn set_sheet_movie_properties(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        properties: DrawableProperties,
+    ) -> Result<()> {
+        let source = movie_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_movie_properties(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            &properties,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_movie_properties(sheet_id, drawable_object_id)? != properties {
+            return Err(Error::InvalidFormat(
+                "Numbers movie properties update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -471,6 +514,15 @@ mod tests {
         NumbersSheetMovieOptions::new(POSITION, SIZE, Duration::from_secs(8))
     }
 
+    fn properties(description: &str) -> DrawableProperties {
+        DrawableProperties {
+            hyperlink_url: Some("https://example.test/numbers-movie".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(false),
+            accessibility_description: Some(description.to_owned()),
+        }
+    }
+
     #[test]
     fn scratch_spreadsheet_supports_movie_crud_without_a_source_package() {
         let mut editor = NumbersDocumentBuilder::new()
@@ -512,6 +564,34 @@ mod tests {
         assert_eq!(
             roundtripped.sheet_movies(sheet_id).unwrap(),
             std::slice::from_ref(&created)
+        );
+
+        let changed_properties = properties("Accessible Numbers movie");
+        editor
+            .set_sheet_movie_properties(
+                sheet_id,
+                created.drawable_object_id,
+                changed_properties.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_movie_properties(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            changed_properties
+        );
+        editor
+            .set_sheet_movie_properties(
+                sheet_id,
+                created.drawable_object_id,
+                DrawableProperties::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_movie_properties(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            DrawableProperties::default()
         );
 
         let changed_geometry = DrawableGeometry {
@@ -589,6 +669,14 @@ mod tests {
                 options(),
             )
             .unwrap();
+        let source_properties = properties("Duplicated Numbers movie");
+        editor
+            .set_sheet_movie_properties(
+                sheet_id,
+                source.drawable_object_id,
+                source_properties.clone(),
+            )
+            .unwrap();
 
         let duplicate = editor
             .duplicate_sheet_movie(sheet_id, source.drawable_object_id)
@@ -630,6 +718,7 @@ mod tests {
         assert_eq!(duplicate.original_size, source.original_size);
         assert_eq!(duplicate.natural_size, source.natural_size);
         assert_eq!(duplicate.duration, source.duration);
+        assert_eq!(duplicate.properties, source_properties);
 
         let moved_duplicate = DrawableGeometry {
             position: Some(DrawablePoint { x: 512.0, y: 288.0 }),

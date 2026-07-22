@@ -8,7 +8,7 @@ use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
-use crate::shapes::{DrawablePoint, offset_drawable_geometry};
+use crate::shapes::{DrawablePoint, DrawableProperties, offset_drawable_geometry};
 
 mod graph;
 
@@ -26,6 +26,8 @@ pub struct PagesAudioInfo {
     pub audio_data_identifier: u64,
     /// Center point of Pages' zero-size audio control, in document points.
     pub position: DrawablePoint,
+    /// Shared drawable metadata, including accessibility description and lock state.
+    pub properties: DrawableProperties,
     pub duration: Duration,
 }
 
@@ -212,6 +214,38 @@ impl PagesEditor {
         if verified.body_audio_position(drawable_object_id)? != position {
             return Err(Error::InvalidFormat(
                 "Pages audio position update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read shared drawable properties for one body-anchored audio control.
+    pub fn body_audio_properties(&self, drawable_object_id: u64) -> Result<DrawableProperties> {
+        Ok(body_audio_graph(self, drawable_object_id)?.info.properties)
+    }
+
+    /// Update audio accessibility, hyperlink, and lock properties.
+    ///
+    /// The typed update retains unknown native media fields and supports both
+    /// clearing a property with `None` and encoding explicit boolean defaults.
+    pub fn set_body_audio_properties(
+        &mut self,
+        drawable_object_id: u64,
+        properties: DrawableProperties,
+    ) -> Result<()> {
+        let source = body_audio_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_audio_properties(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            &properties,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_audio_properties(drawable_object_id)? != properties {
+            return Err(Error::InvalidFormat(
+                "Pages audio properties update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -460,6 +494,15 @@ mod tests {
         PagesAudioOptions::new(POSITION, Duration::from_millis(1_375))
     }
 
+    fn properties(description: &str) -> DrawableProperties {
+        DrawableProperties {
+            hyperlink_url: Some("https://example.test/pages-audio".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(true),
+            accessibility_description: Some(description.to_owned()),
+        }
+    }
+
     #[test]
     fn scratch_document_supports_audio_crud_without_a_source_package() {
         let mut editor = PagesEditor::create_with_text("Audio notes").unwrap();
@@ -484,6 +527,26 @@ mod tests {
         assert_eq!(
             roundtripped.body_audio().unwrap(),
             std::slice::from_ref(&created)
+        );
+
+        let changed_properties = properties("Accessible Pages audio");
+        editor
+            .set_body_audio_properties(created.drawable_object_id, changed_properties.clone())
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_audio_properties(created.drawable_object_id)
+                .unwrap(),
+            changed_properties
+        );
+        editor
+            .set_body_audio_properties(created.drawable_object_id, DrawableProperties::default())
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_audio_properties(created.drawable_object_id)
+                .unwrap(),
+            DrawableProperties::default()
         );
 
         let moved = DrawablePoint { x: 300.0, y: 360.0 };
@@ -531,6 +594,10 @@ mod tests {
                 options(),
             )
             .unwrap();
+        let source_properties = properties("Duplicated Pages audio");
+        editor
+            .set_body_audio_properties(source.drawable_object_id, source_properties.clone())
+            .unwrap();
         let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
 
         let duplicate = editor
@@ -564,6 +631,7 @@ mod tests {
             }
         );
         assert_eq!(duplicate.duration, source.duration);
+        assert_eq!(duplicate.properties, source_properties);
 
         let moved_duplicate = DrawablePoint { x: 312.0, y: 264.0 };
         editor

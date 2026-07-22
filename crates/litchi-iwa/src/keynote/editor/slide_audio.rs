@@ -2,13 +2,15 @@
 
 use std::time::Duration;
 
-use super::slide_movies::geometry::set_movie_geometry;
+use super::slide_movies::geometry::{set_movie_geometry, set_movie_properties};
 use super::slide_movies::graph::{
     MovieObjectIds, audio_creation_values, audio_objects, movie_creation_context,
 };
 use super::*;
 use crate::data_reference_registry::add_component_data_reference;
-use crate::shapes::{DrawablePoint, geometry_from_drawable};
+use crate::shapes::{
+    DrawablePoint, DrawableProperties, drawable_properties, geometry_from_drawable,
+};
 
 const AUDIO_ARCHIVE_MESSAGE_TYPE: u32 = 3_007;
 
@@ -19,6 +21,8 @@ pub struct KeynoteSlideAudioInfo {
     pub drawable_object_id: u64,
     pub audio_data_identifier: u64,
     pub position: DrawablePoint,
+    /// Shared drawable metadata, including accessibility description and lock state.
+    pub properties: DrawableProperties,
     pub duration: Duration,
 }
 
@@ -189,6 +193,49 @@ impl KeynoteEditor {
         Ok(())
     }
 
+    /// Read shared drawable properties for one slide-owned audio control.
+    pub fn slide_audio_properties(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<DrawableProperties> {
+        Ok(require_audio(self, slide_index, drawable_object_id)?.properties)
+    }
+
+    /// Update audio accessibility, hyperlink, and lock properties.
+    ///
+    /// The typed update retains unknown native media fields and supports both
+    /// clearing a property with `None` and encoding explicit boolean defaults.
+    pub fn set_slide_audio_properties(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        properties: DrawableProperties,
+    ) -> Result<()> {
+        let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
+        if source.info.kind != KeynoteSlideMovieKind::Audio {
+            return Err(Error::ParseError(format!(
+                "Keynote media {drawable_object_id} is {:?}, not slide audio",
+                source.info.kind
+            )));
+        }
+        let mut staged = self.package().clone();
+        set_movie_properties(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            &properties,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_audio_properties(slide_index, drawable_object_id)? != properties {
+            return Err(Error::InvalidFormat(
+                "Keynote audio properties update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// Duplicate one slide audio control using Keynote's native placement.
     ///
     /// The audio, title/caption stand-ins, and automatic Start Audio build
@@ -310,6 +357,7 @@ fn audio_info(
         drawable_object_id,
         audio_data_identifier,
         position,
+        properties: drawable_properties(&audio.super_),
         duration: audio_duration(drawable_object_id, &audio)?,
     })
 }
@@ -338,6 +386,15 @@ mod tests {
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-audio";
     const POSITION: DrawablePoint = DrawablePoint { x: 960.0, y: 540.0 };
+
+    fn properties(description: &str) -> DrawableProperties {
+        DrawableProperties {
+            hyperlink_url: Some("https://example.test/keynote-audio".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(true),
+            accessibility_description: Some(description.to_owned()),
+        }
+    }
 
     #[test]
     fn scratch_presentation_supports_slide_audio_crud() {
@@ -371,6 +428,30 @@ mod tests {
         assert_eq!(
             roundtripped.slide_audio(0).unwrap(),
             std::slice::from_ref(&created)
+        );
+
+        let changed_properties = properties("Accessible Keynote audio");
+        editor
+            .set_slide_audio_properties(0, created.drawable_object_id, changed_properties.clone())
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_audio_properties(0, created.drawable_object_id)
+                .unwrap(),
+            changed_properties
+        );
+        editor
+            .set_slide_audio_properties(
+                0,
+                created.drawable_object_id,
+                DrawableProperties::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_audio_properties(0, created.drawable_object_id)
+                .unwrap(),
+            DrawableProperties::default()
         );
 
         let moved = DrawablePoint { x: 320.0, y: 240.0 };
@@ -423,6 +504,10 @@ mod tests {
                 KeynoteSlideAudioOptions::new(POSITION, Duration::from_millis(1_375)),
             )
             .unwrap();
+        let source_properties = properties("Duplicated Keynote audio");
+        editor
+            .set_slide_audio_properties(0, source.drawable_object_id, source_properties.clone())
+            .unwrap();
 
         let duplicate = editor
             .duplicate_slide_audio(0, source.drawable_object_id)
@@ -458,6 +543,7 @@ mod tests {
             }
         );
         assert_eq!(duplicate.duration, source.duration);
+        assert_eq!(duplicate.properties, source_properties);
         let duplicate_builds = editor
             .slide_builds(0)
             .unwrap()

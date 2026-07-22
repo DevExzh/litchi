@@ -59,6 +59,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             duration,
         ),
     )?;
+    let mut properties = editor.sheet_movie_properties(sheet_id, created.drawable_object_id)?;
+    properties.accessibility_description = Some(format!("Embedded movie: {movie_filename}"));
+    editor.set_sheet_movie_properties(sheet_id, created.drawable_object_id, properties)?;
     editor.save(output)?;
     println!(
         "sheet={sheet_id} drawable={} movie_data={} poster_data={} duration={:?}",

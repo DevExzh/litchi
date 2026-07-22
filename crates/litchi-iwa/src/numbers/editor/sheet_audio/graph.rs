@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use super::*;
-use crate::shapes::{DrawableSize, geometry_from_drawable};
+use crate::shapes::{DrawableSize, drawable_properties, geometry_from_drawable};
 
 const AUDIO_MESSAGE_TYPE: u32 = 3_007;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
@@ -361,6 +361,7 @@ fn audio_info(
         drawable_object_id: identifier,
         audio_data_identifier,
         position,
+        properties: drawable_properties(&audio.super_),
         duration,
     })
 }

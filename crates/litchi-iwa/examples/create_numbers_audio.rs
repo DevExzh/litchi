@@ -40,6 +40,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &audio,
         NumbersSheetAudioOptions::new(DrawablePoint { x: 420.0, y: 180.0 }, duration),
     )?;
+    let mut properties = editor.sheet_audio_properties(sheet_id, created.drawable_object_id)?;
+    properties.accessibility_description = Some(format!("Embedded audio: {preferred_filename}"));
+    editor.set_sheet_audio_properties(sheet_id, created.drawable_object_id, properties)?;
     editor.save(output)?;
     println!(
         "sheet={sheet_id} drawable={} audio_data={} duration={:?}",

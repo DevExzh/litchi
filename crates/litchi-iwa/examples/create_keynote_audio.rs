@@ -36,6 +36,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &audio,
         KeynoteSlideAudioOptions::new(SLIDE_CENTER, Duration::try_from_secs_f64(duration_seconds)?),
     )?;
+    let mut properties = editor.slide_audio_properties(0, created.drawable_object_id)?;
+    properties.accessibility_description = Some(format!("Embedded audio: {preferred_filename}"));
+    editor.set_slide_audio_properties(0, created.drawable_object_id, properties)?;
     editor.save(output)?;
     println!(
         "created Keynote audio {} backed by data {}",

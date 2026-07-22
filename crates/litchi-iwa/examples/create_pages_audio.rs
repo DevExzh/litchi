@@ -38,6 +38,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &audio,
         PagesAudioOptions::new(DrawablePoint { x: 180.0, y: 240.0 }, duration),
     )?;
+    let mut properties = editor.body_audio_properties(created.drawable_object_id)?;
+    properties.accessibility_description = Some(format!("Embedded audio: {preferred_filename}"));
+    editor.set_body_audio_properties(created.drawable_object_id, properties)?;
     editor.save(output)?;
     println!(
         "anchor={} drawable={} audio_data={} duration={:?}",

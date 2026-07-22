@@ -57,6 +57,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             duration,
         ),
     )?;
+    let mut properties = editor.body_movie_properties(created.drawable_object_id)?;
+    properties.accessibility_description = Some(format!("Embedded movie: {movie_filename}"));
+    editor.set_body_movie_properties(created.drawable_object_id, properties)?;
     editor.save(output)?;
     println!(
         "anchor={} drawable={} movie_data={} poster_data={} duration={:?}",

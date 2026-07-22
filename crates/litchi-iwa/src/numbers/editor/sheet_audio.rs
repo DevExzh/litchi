@@ -3,12 +3,16 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use super::sheet_movies::graph::{MovieObjectIds, movie_creation_context, set_movie_geometry};
+use super::sheet_movies::graph::{
+    MovieObjectIds, movie_creation_context, set_movie_geometry, set_movie_properties,
+};
 use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
-use crate::shapes::{DrawableGeometry, DrawablePoint, offset_drawable_geometry};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableProperties, offset_drawable_geometry,
+};
 
 mod graph;
 
@@ -22,6 +26,8 @@ pub struct NumbersSheetAudioInfo {
     pub audio_data_identifier: u64,
     /// Center point of Numbers' zero-size audio control, in sheet points.
     pub position: DrawablePoint,
+    /// Shared drawable metadata, including accessibility description and lock state.
+    pub properties: DrawableProperties,
     pub duration: Duration,
 }
 
@@ -177,6 +183,45 @@ impl NumbersEditor {
         if verified.sheet_audio_position(sheet_id, drawable_object_id)? != position {
             return Err(Error::InvalidFormat(
                 "Numbers audio position update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read shared drawable properties for one sheet-owned audio control.
+    pub fn sheet_audio_properties(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<DrawableProperties> {
+        Ok(audio_graph(self, sheet_id, drawable_object_id)?
+            .info
+            .properties)
+    }
+
+    /// Update audio accessibility, hyperlink, and lock properties.
+    ///
+    /// The typed update retains unknown native media fields and supports both
+    /// clearing a property with `None` and encoding explicit boolean defaults.
+    pub fn set_sheet_audio_properties(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        properties: DrawableProperties,
+    ) -> Result<()> {
+        let source = audio_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_movie_properties(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            &properties,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_audio_properties(sheet_id, drawable_object_id)? != properties {
+            return Err(Error::InvalidFormat(
+                "Numbers audio properties update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -423,6 +468,15 @@ mod tests {
         NumbersSheetAudioOptions::new(POSITION, Duration::from_millis(1_375))
     }
 
+    fn properties(description: &str) -> DrawableProperties {
+        DrawableProperties {
+            hyperlink_url: Some("https://example.test/numbers-audio".to_owned()),
+            locked: Some(true),
+            aspect_ratio_locked: Some(true),
+            accessibility_description: Some(description.to_owned()),
+        }
+    }
+
     #[test]
     fn scratch_spreadsheet_supports_audio_crud_without_a_source_package() {
         let mut editor = NumbersDocumentBuilder::new()
@@ -449,6 +503,34 @@ mod tests {
         assert_eq!(
             roundtripped.sheet_audio(sheet_id).unwrap(),
             std::slice::from_ref(&created)
+        );
+
+        let changed_properties = properties("Accessible Numbers audio");
+        editor
+            .set_sheet_audio_properties(
+                sheet_id,
+                created.drawable_object_id,
+                changed_properties.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_audio_properties(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            changed_properties
+        );
+        editor
+            .set_sheet_audio_properties(
+                sheet_id,
+                created.drawable_object_id,
+                DrawableProperties::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_audio_properties(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            DrawableProperties::default()
         );
 
         let moved = DrawablePoint { x: 64.0, y: 96.0 };
@@ -494,6 +576,14 @@ mod tests {
         let source = editor
             .add_sheet_audio(sheet_id, "audio.aiff", AUDIO, options())
             .unwrap();
+        let source_properties = properties("Duplicated Numbers audio");
+        editor
+            .set_sheet_audio_properties(
+                sheet_id,
+                source.drawable_object_id,
+                source_properties.clone(),
+            )
+            .unwrap();
 
         let duplicate = editor
             .duplicate_sheet_audio(sheet_id, source.drawable_object_id)
@@ -526,6 +616,7 @@ mod tests {
             }
         );
         assert_eq!(duplicate.duration, source.duration);
+        assert_eq!(duplicate.properties, source_properties);
 
         let moved_duplicate = DrawablePoint { x: 512.0, y: 288.0 };
         editor
