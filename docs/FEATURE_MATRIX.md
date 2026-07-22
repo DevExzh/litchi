@@ -210,7 +210,7 @@ conversion, fonts, and image conversion are optional.
 | Tags, changes, and revision information | 🟡 | ✅ | 🟡 | Inert programmable tags and revision/change package parts; package integration varies by part |
 | Web extensions/Office Add-ins | 🟡 | 🟡 | 🟡 | Bounded task-pane parsing/serialization; add-ins are never executed |
 | Ink annotations | ❌ | ❌ | ❌ | Not implemented |
-| VBA projects/PPTM macros | ❌ | ❌ | ❌ | No typed VBA project or code-module support |
+| VBA projects/PPTM macros | 🟡 | 🟡 | ❌ | PPTM/PPSM/POTM main parts and the MS-OFFMACRO2 Presentation → VBA Project relationship graph are validated as inert metadata; payload contents are never inspected, parsed, or executed by this API, and no macro authoring exists |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
 

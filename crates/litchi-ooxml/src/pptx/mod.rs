@@ -88,6 +88,7 @@ pub mod tags;
 pub mod template;
 pub mod tracks;
 pub mod transitions;
+pub mod vba_project;
 pub mod view_properties;
 pub mod writer;
 
@@ -151,6 +152,7 @@ pub use notes::{
     PptxNotesThemeResource, load_notes_graph, store_notes_graph,
 };
 pub use package::Package;
+pub use vba_project::VbaProject;
 pub use parts::{
     CHART_COLOR_STYLE_CONTENT_TYPE, CHART_COLOR_STYLE_RELATIONSHIP_TYPE, CHART_STYLE_CONTENT_TYPE,
     CHART_STYLE_RELATIONSHIP_TYPE, ChartColorStyleDocument, ChartColorStyleInfo,

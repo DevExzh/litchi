@@ -3,6 +3,7 @@ use crate::common::DocumentProperties;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
 use crate::pptx::presentation::Presentation;
+use crate::pptx::vba_project::{VbaProject, discover_vba_project};
 use crate::pptx::writer::MutablePresentation;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
@@ -26,7 +27,30 @@ const DEFAULT_MEDIA_POSTER: &[u8] = &[
     0xAE, 0x42, 0x60, 0x82, // CRC
 ];
 
-/// A PowerPoint (.pptx) package.
+fn validate_presentation_main_content_type(content_type: &str) -> Result<()> {
+    if matches!(
+        content_type,
+        ct::PML_PRESENTATION_MAIN
+            | ct::PML_PRES_MACRO_MAIN
+            | ct::PML_SLIDESHOW_MACRO_MAIN
+            | ct::PML_TEMPLATE_MACRO_MAIN
+    ) {
+        return Ok(());
+    }
+
+    Err(OoxmlError::InvalidContentType {
+        expected: format!(
+            "{}, {}, {}, or {}",
+            ct::PML_PRESENTATION_MAIN,
+            ct::PML_PRES_MACRO_MAIN,
+            ct::PML_SLIDESHOW_MACRO_MAIN,
+            ct::PML_TEMPLATE_MACRO_MAIN,
+        ),
+        got: content_type.to_string(),
+    })
+}
+
+/// A PowerPoint (.pptx, .pptm, .ppsm, or .potm) package.
 ///
 /// This is the main entry point for working with PowerPoint presentations.
 /// It wraps an OPC package and provides PowerPoint-specific functionality.
@@ -354,7 +378,7 @@ impl Package {
         })
     }
 
-    /// Open a .pptx package from a file path.
+    /// Open a .pptx, .pptm, .ppsm, or .potm package from a file path.
     ///
     /// # Arguments
     ///
@@ -376,18 +400,7 @@ impl Package {
             .main_document_part()
             .map_err(|e| OoxmlError::PartNotFound(format!("main presentation part: {}", e)))?;
 
-        let content_type = main_part.content_type();
-        // Support both regular and macro-enabled presentations
-        if content_type != ct::PML_PRESENTATION_MAIN && content_type != ct::PML_PRES_MACRO_MAIN {
-            return Err(OoxmlError::InvalidContentType {
-                expected: format!(
-                    "{} or {}",
-                    ct::PML_PRESENTATION_MAIN,
-                    ct::PML_PRES_MACRO_MAIN
-                ),
-                got: content_type.to_string(),
-            });
-        }
+        validate_presentation_main_content_type(main_part.content_type())?;
 
         Ok(Self {
             opc,
@@ -430,18 +443,7 @@ impl Package {
             .main_document_part()
             .map_err(|e| OoxmlError::PartNotFound(format!("main presentation part: {}", e)))?;
 
-        let content_type = main_part.content_type();
-        // Support both regular and macro-enabled presentations
-        if content_type != ct::PML_PRESENTATION_MAIN && content_type != ct::PML_PRES_MACRO_MAIN {
-            return Err(OoxmlError::InvalidContentType {
-                expected: format!(
-                    "{} or {}",
-                    ct::PML_PRESENTATION_MAIN,
-                    ct::PML_PRES_MACRO_MAIN
-                ),
-                got: content_type.to_string(),
-            });
-        }
+        validate_presentation_main_content_type(main_part.content_type())?;
 
         Ok(Self {
             opc,
@@ -450,7 +452,7 @@ impl Package {
         })
     }
 
-    /// Create a .pptx package from a reader.
+    /// Create a .pptx, .pptm, .ppsm, or .potm package from a reader.
     ///
     /// # Arguments
     ///
@@ -475,18 +477,7 @@ impl Package {
             .main_document_part()
             .map_err(|e| OoxmlError::PartNotFound(format!("main presentation part: {}", e)))?;
 
-        let content_type = main_part.content_type();
-        // Support both regular and macro-enabled presentations
-        if content_type != ct::PML_PRESENTATION_MAIN && content_type != ct::PML_PRES_MACRO_MAIN {
-            return Err(OoxmlError::InvalidContentType {
-                expected: format!(
-                    "{} or {}",
-                    ct::PML_PRESENTATION_MAIN,
-                    ct::PML_PRES_MACRO_MAIN
-                ),
-                got: content_type.to_string(),
-            });
-        }
+        validate_presentation_main_content_type(main_part.content_type())?;
 
         Ok(Self {
             opc,
@@ -525,6 +516,16 @@ impl Package {
 
         // Create and return Presentation
         Ok(Presentation::new(pres_part, &self.opc))
+    }
+
+    /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payload.
+    ///
+    /// This validates only the declared OPC relationship graph and content
+    /// type. It does not inspect, parse, decompress, or execute the binary
+    /// VBA project bytes.
+    pub fn vba_project(&self) -> Result<Option<VbaProject>> {
+        let presentation = self.opc.main_document_part()?;
+        discover_vba_project(&self.opc, presentation)
     }
 
     /// Get the underlying OPC package.

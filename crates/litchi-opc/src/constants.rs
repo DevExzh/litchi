@@ -132,6 +132,12 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
     pub const PML_PRES_MACRO_MAIN: &str =
         "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml";
+    /// MS-OFFMACRO2 macro-enabled PowerPoint slideshow main-part content type.
+    pub const PML_SLIDESHOW_MACRO_MAIN: &str =
+        "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml";
+    /// MS-OFFMACRO2 macro-enabled PowerPoint template main-part content type.
+    pub const PML_TEMPLATE_MACRO_MAIN: &str =
+        "application/vnd.ms-powerpoint.template.macroEnabled.main+xml";
     pub const PML_SLIDE: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.slide+xml";
     pub const PML_SLIDE_LAYOUT: &str =
