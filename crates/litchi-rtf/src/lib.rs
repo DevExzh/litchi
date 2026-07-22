@@ -171,11 +171,12 @@ pub use field::{
     ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
     FieldSwitch, FieldType, HyperlinkCode, IncludeFieldKind, IndexEntryField, IndexEntryOption,
     IndexField, IndexOption, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
-    MailMergeCounterField, MailMergeCounterKind, MailMergeNextField, MergeField, PageBreak,
-    ParsedFieldCode, ReferenceCode, SectionBreak, StoryEvent, StoryField,
-    TableOfAuthoritiesEntryField, TableOfAuthoritiesEntryOption, TableOfAuthoritiesField,
-    TableOfAuthoritiesOption, TableOfContentsEntryField, TableOfContentsEntryOption,
-    TableOfContentsField, TableOfContentsOption, parse_field_code,
+    MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
+    MailMergeCounterKind, MailMergeNextField, MergeField, PageBreak, ParsedFieldCode,
+    ReferenceCode, SectionBreak, StoryEvent, StoryField, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesEntryOption, TableOfAuthoritiesField, TableOfAuthoritiesOption,
+    TableOfContentsEntryField, TableOfContentsEntryOption, TableOfContentsField,
+    TableOfContentsOption, parse_field_code,
 };
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};

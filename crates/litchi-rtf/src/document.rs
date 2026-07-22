@@ -1121,6 +1121,29 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `NEXTIF` and `SKIPIF` fields in document order.
+    ///
+    /// Stored comparison text, cached results, and field state are exposed
+    /// solely as metadata. This method never evaluates a comparison, changes
+    /// record selection, opens a data source, performs a merge, or refreshes
+    /// field results.
+    pub fn mail_merge_conditional_controls(
+        &self,
+    ) -> Vec<crate::MailMergeConditionalControlField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::mail_merge_conditional_control)
+            .collect()
+    }
+
+    /// Return the number of typed, inert conditional mail-merge control fields.
+    pub fn mail_merge_conditional_control_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.mail_merge_conditional_control().is_some())
+            .count()
+    }
+
     /// Return typed, inert TOC fields in document field order.
     ///
     /// Stored options and cached results are exposed solely as metadata. This
