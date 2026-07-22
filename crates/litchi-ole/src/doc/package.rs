@@ -227,6 +227,15 @@ impl<R: Read + Seek> Package<R> {
         &mut self.ole
     }
 
+    /// Discover candidate MS-OVBA project storages without opening macro streams.
+    ///
+    /// This inspects CFB directory names only. It never opens, decompresses,
+    /// parses, or executes the `PROJECT`, `dir`, `_VBA_PROJECT`, `__SRP_*`,
+    /// or candidate module streams.
+    pub fn vba_project_storages(&self) -> Vec<super::vba::VbaProjectStorage> {
+        super::vba::discover_vba_project_storages(&self.ole.list_streams())
+    }
+
     pub fn summary_information(&mut self) -> Result<Option<litchi_cfb::PropertySetStream>> {
         match self.ole.property_set_stream(&["\u{0005}SummaryInformation"]) {
             Ok(value) => Ok(Some(value)),

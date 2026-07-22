@@ -65,6 +65,7 @@ pub mod section;
 pub mod shapes;
 pub mod table;
 pub mod tracked_revision;
+pub mod vba;
 
 /// DOC file writing
 pub mod writer;
@@ -147,6 +148,7 @@ pub use tracked_revision::{
     DocTrackedRevision, DocTrackedRevisionEditor, DocTrackedRevisionKind,
     DocTrackedRevisionMetadata,
 };
+pub use vba::VbaProjectStorage;
 pub use writer::{
     AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,
     DocStyleDefinition, DocStyleRevision, DocWriteError, DocWriter, DropCap, DropCapType,

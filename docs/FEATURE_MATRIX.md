@@ -249,7 +249,7 @@ conversion, fonts, and image conversion are optional.
 | Document protection settings | 🟡 | ✅ | ✅ | Typed settings/hashes; policy is not enforced |
 | Password encryption | ✅ | ✅ | ✅ | Supported DOC encryption profiles and encrypted writer output |
 | Macro-security metadata | ✅ | ✅ | ✅ | Passive DOP metadata only; macros are never executed |
-| VBA project/code modules | ❌ | ❌ | ❌ | No typed VBA storage or code model |
+| VBA project/code modules | 🟡 | 🟡 | ❌ | Directory-only inert MS-OVBA project-storage topology discovery; candidate module names are reported, but module/source bytes are never opened, decompressed, parsed, or executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral CFB verification and signing |
 
 ## Excel binary workbooks (XLS)
