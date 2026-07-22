@@ -4330,13 +4330,13 @@ pub use slide_movies::{
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellComment, KeynoteTableCellCommentInfo,
-    KeynoteTableCellCommentReplyInfo, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableColumnDeletion, KeynoteTableColumnInsertion, KeynoteTableDimension,
-    KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
-    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
-    KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
-    KeynoteTablePoints, KeynoteTableRowDeletion, KeynoteTableRowInsertion,
-    KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
+    KeynoteTableCellCommentReplyInfo, KeynoteTableCellRegion, KeynoteTableCellUpdate,
+    KeynoteTableCellValue, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
+    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
+    KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
+    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
+    KeynoteTableHeaderSettings, KeynoteTablePoints, KeynoteTableRowDeletion,
+    KeynoteTableRowInsertion, KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;

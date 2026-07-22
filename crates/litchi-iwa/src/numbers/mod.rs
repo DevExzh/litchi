@@ -46,15 +46,16 @@ pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue, TableCellUp
 pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
-    ChartSeriesDirection, NumbersCellCommentInfo, NumbersCellCommentReplyInfo, NumbersEditor,
-    NumbersPivotCategoryInfo, NumbersSheetAudioInfo, NumbersSheetAudioOptions,
-    NumbersSheetChartInfo, NumbersSheetImageInfo, NumbersSheetInfo, NumbersSheetMovieInfo,
-    NumbersSheetMovieOptions, NumbersSheetShapeInfo, NumbersSheetShapeKind, NumbersTableDimension,
-    NumbersTableDimensionSize, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-    NumbersTableInfo, NumbersTablePoints, NumbersTableTitleSettings, NumbersTextBoxInfo,
-    RemovedNumbersSheetAudio, RemovedNumbersSheetChart, RemovedNumbersSheetImage,
-    RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox, TableColumnDeletion,
-    TableColumnInsertion, TableRowDeletion, TableRowInsertion,
+    ChartSeriesDirection, IWorkTableCellRegion, NumbersCellCommentInfo,
+    NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
+    NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo, NumbersSheetInfo,
+    NumbersSheetMovieInfo, NumbersSheetMovieOptions, NumbersSheetShapeInfo, NumbersSheetShapeKind,
+    NumbersTableDimension, NumbersTableDimensionSize, NumbersTableHeaderCount,
+    NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints, NumbersTableTitleSettings,
+    NumbersTextBoxInfo, RemovedNumbersSheetAudio, RemovedNumbersSheetChart,
+    RemovedNumbersSheetImage, RemovedNumbersSheetMovie, RemovedNumbersSheetShape,
+    RemovedNumbersTextBox, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
+    TableRowInsertion,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

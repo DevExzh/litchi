@@ -44,6 +44,8 @@ pub type KeynoteTableColumnDeletion = crate::numbers::TableColumnDeletion;
 pub type KeynoteTableRowInsertion = crate::numbers::TableRowInsertion;
 /// Section-relative column insertion shared by native iWork tables.
 pub type KeynoteTableColumnInsertion = crate::numbers::TableColumnInsertion;
+/// A validated native merged-cell rectangle.
+pub type KeynoteTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
 /// Lossless header/footer configuration shared by native iWork tables.
@@ -75,6 +77,8 @@ pub struct KeynoteSlideTable {
     pub cells: HashMap<(usize, usize), KeynoteTableCellValue>,
     /// Comments indexed independently from cell values by `(row, column)`.
     pub comments: HashMap<(usize, usize), KeynoteTableCellComment>,
+    /// Native merged-cell rectangles in formula-store order.
+    pub merges: Vec<KeynoteTableCellRegion>,
 }
 
 impl KeynoteSlideTable {
@@ -151,7 +155,76 @@ impl KeynoteEditor {
             info,
             cells: table.cells,
             comments: table.comments,
+            merges: crate::numbers::editor::table_cell_merges_in_package(
+                self.package(),
+                model_object_id,
+            )?,
         })
+    }
+
+    /// List native merged-cell rectangles in one slide-owned table.
+    pub fn slide_table_cell_merges(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+    ) -> Result<Vec<KeynoteTableCellRegion>> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_merges_in_package(self.package(), model_object_id)
+    }
+
+    /// Merge one non-overlapping slide-table rectangle transactionally.
+    pub fn merge_slide_table_cells(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        region: KeynoteTableCellRegion,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::merge_table_cells_in_package(&mut staged, model_object_id, region)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if !verified
+            .slide_table_cell_merges(slide_index, model_object_id)?
+            .contains(&region)
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell merge failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove one exact slide-table merge, returning whether it existed.
+    pub fn unmerge_slide_table_cells(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        region: KeynoteTableCellRegion,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::unmerge_table_cells_in_package(
+            &mut staged,
+            model_object_id,
+            region,
+        )?;
+        if !changed {
+            return Ok(false);
+        }
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified
+            .slide_table_cell_merges(slide_index, model_object_id)?
+            .contains(&region)
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell unmerge failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(true)
     }
 
     /// Add an independently editable native table directly to a slide.

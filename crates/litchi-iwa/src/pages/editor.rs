@@ -3785,12 +3785,12 @@ pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
     PagesCellValue, PagesTable, PagesTableCellComment, PagesTableCellCommentInfo,
-    PagesTableCellCommentReplyInfo, PagesTableCellUpdate, PagesTableColumnDeletion,
-    PagesTableColumnInsertion, PagesTableDimension, PagesTableDimensionSize,
-    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
-    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
-    PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints, PagesTableRowDeletion,
-    PagesTableRowInsertion, PagesTableTitleSettings,
+    PagesTableCellCommentReplyInfo, PagesTableCellRegion, PagesTableCellUpdate,
+    PagesTableColumnDeletion, PagesTableColumnInsertion, PagesTableDimension,
+    PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
+    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
+    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
+    PagesTableRowDeletion, PagesTableRowInsertion, PagesTableTitleSettings,
 };
 
 #[cfg(test)]

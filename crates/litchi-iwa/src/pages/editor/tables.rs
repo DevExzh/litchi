@@ -45,6 +45,8 @@ pub type PagesTableColumnDeletion = crate::numbers::TableColumnDeletion;
 pub type PagesTableRowInsertion = crate::numbers::TableRowInsertion;
 /// Section-relative column insertion shared by native iWork tables.
 pub type PagesTableColumnInsertion = crate::numbers::TableColumnInsertion;
+/// A validated native merged-cell rectangle.
+pub type PagesTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +74,8 @@ pub struct PagesTable {
     pub cells: HashMap<(usize, usize), PagesCellValue>,
     /// Comments indexed independently from cell values by `(row, column)`.
     pub comments: HashMap<(usize, usize), PagesTableCellComment>,
+    /// Native merged-cell rectangles in formula-store order.
+    pub merges: Vec<PagesTableCellRegion>,
 }
 
 impl PagesTable {
@@ -132,6 +136,10 @@ impl PagesEditor {
             info,
             cells: table.cells,
             comments: table.comments,
+            merges: crate::numbers::editor::table_cell_merges_in_package(
+                self.package(),
+                model_object_id,
+            )?,
         })
     }
 
@@ -198,6 +206,65 @@ impl PagesEditor {
         column: usize,
     ) -> Result<()> {
         self.set_table_cell(model_object_id, row, column, PagesCellValue::Empty)
+    }
+
+    /// List native merged-cell rectangles in one reachable body table.
+    pub fn table_cell_merges(&self, model_object_id: u64) -> Result<Vec<PagesTableCellRegion>> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_merges_in_package(self.package(), model_object_id)
+    }
+
+    /// Merge one non-overlapping body-table rectangle transactionally.
+    pub fn merge_table_cells(
+        &mut self,
+        model_object_id: u64,
+        region: PagesTableCellRegion,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::merge_table_cells_in_package(&mut staged, model_object_id, region)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if !verified
+            .table_cell_merges(model_object_id)?
+            .contains(&region)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell merge failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove one exact body-table merge, returning whether it existed.
+    pub fn unmerge_table_cells(
+        &mut self,
+        model_object_id: u64,
+        region: PagesTableCellRegion,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::unmerge_table_cells_in_package(
+            &mut staged,
+            model_object_id,
+            region,
+        )?;
+        if !changed {
+            return Ok(false);
+        }
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified
+            .table_cell_merges(model_object_id)?
+            .contains(&region)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell unmerge failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(true)
     }
 
     /// Rename a reachable body table transactionally.

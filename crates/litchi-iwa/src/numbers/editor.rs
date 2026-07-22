@@ -1932,6 +1932,42 @@ impl NumbersEditor {
         self.set_cell(table_id, row, column, CellValue::Empty)
     }
 
+    /// List every native merged-cell rectangle in one attached table.
+    pub fn table_cell_merges(&self, table_id: u64) -> Result<Vec<IWorkTableCellRegion>> {
+        cell_merge::regions_in_package(&self.package, table_id)
+    }
+
+    /// Merge one non-overlapping rectangular cell region transactionally.
+    pub fn merge_cells(&mut self, table_id: u64, region: IWorkTableCellRegion) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_merge::merge_in_package(&mut staged, table_id, region)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if !verified.table_cell_merges(table_id)?.contains(&region) {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell merge failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove one exact merged-cell rectangle, returning whether it existed.
+    pub fn unmerge_cells(&mut self, table_id: u64, region: IWorkTableCellRegion) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_merge::unmerge_in_package(&mut staged, table_id, region)?;
+        if !changed {
+            return Ok(false);
+        }
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_merges(table_id)?.contains(&region) {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell unmerge failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(true)
+    }
+
     /// Read the comment attached to a writable BNC cell.
     pub fn cell_comment(
         &self,
@@ -2925,6 +2961,29 @@ pub(crate) fn set_table_cell_in_package(
     Ok(())
 }
 
+pub(crate) fn table_cell_merges_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<Vec<IWorkTableCellRegion>> {
+    cell_merge::regions_in_package(package, table_id)
+}
+
+pub(crate) fn merge_table_cells_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    region: IWorkTableCellRegion,
+) -> Result<()> {
+    cell_merge::merge_in_package(package, table_id, region)
+}
+
+pub(crate) fn unmerge_table_cells_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    region: IWorkTableCellRegion,
+) -> Result<bool> {
+    cell_merge::unmerge_in_package(package, table_id, region)
+}
+
 pub(crate) fn table_cell_comment_in_package(
     package: &IWorkPackage,
     table_id: u64,
@@ -3190,6 +3249,7 @@ pub(crate) fn create_empty_table_graph_in_package(
     Ok((graph.info_object_id, graph.model_object_id))
 }
 
+mod cell_merge;
 mod column_insert;
 mod date_time_fields;
 mod formula_cache;
@@ -3221,6 +3281,7 @@ mod text_box_create;
 mod text_box_duplicate;
 
 pub use crate::charts::ChartSeriesDirection;
+pub use cell_merge::IWorkTableCellRegion;
 use model::*;
 pub use sheet_audio::{NumbersSheetAudioInfo, NumbersSheetAudioOptions, RemovedNumbersSheetAudio};
 pub use sheet_charts::{NumbersSheetChartInfo, RemovedNumbersSheetChart};
