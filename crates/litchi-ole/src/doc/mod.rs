@@ -109,6 +109,7 @@ pub use parts::fields::{
     FieldStory, FieldStoryTable, FieldText, FieldType, FieldsTable, IfField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
     MailMergeCounterKind, MailMergeNextField, MergeField, MergeFieldSwitch,
+    PromptField, PromptFieldKind,
 };
 pub use parts::glossary::{
     GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,

@@ -16,6 +16,7 @@ use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     Field, FieldStory, FieldText, FieldsTable, IfField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField, MergeField,
+    PromptField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -675,6 +676,22 @@ impl Document {
     /// Get the number of typed, inert `IF` fields.
     pub fn if_field_count(&self) -> Result<usize> {
         Ok(self.if_fields()?.len())
+    }
+
+    /// Get typed, inert `ASK` and `FILLIN` fields in story and source order.
+    ///
+    /// Returned values expose only stored prompt, bookmark, default-response,
+    /// cached-result, and field-state metadata. This method never displays a
+    /// prompt, captures a response, creates or updates a bookmark, performs a
+    /// merge, or refreshes a field result.
+    pub fn prompt_fields(&self) -> Result<Vec<PromptField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::prompt_field).collect())
+    }
+
+    /// Get the number of typed, inert `ASK` and `FILLIN` fields.
+    pub fn prompt_field_count(&self) -> Result<usize> {
+        Ok(self.prompt_fields()?.len())
     }
 
     /// Get stored instruction and cached-result text for one parsed field.
