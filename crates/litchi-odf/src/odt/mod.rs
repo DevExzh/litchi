@@ -88,6 +88,7 @@ pub use header_footer::{
 #[allow(unused_imports)] // Library public API
 pub use header_footer_content::{
     HeaderFooterBlock, HeaderFooterField, HeaderFooterFieldKind, HeaderFooterInline,
+    HeaderFooterSenderFieldKind,
 };
 pub use index::{
     AlphabeticalIndexSource, BibliographyIndexSource, IllustrationIndexSource, ObjectIndexSource,

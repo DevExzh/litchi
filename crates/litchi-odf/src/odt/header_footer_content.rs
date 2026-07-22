@@ -55,7 +55,11 @@ pub struct HeaderFooterField {
     pub attributes: Vec<(String, String)>,
 }
 
-/// Supported field semantics. Unknown text-namespace fields remain typed and lossless.
+/// Supported field semantics. Fields are read as cached document metadata only.
+///
+/// The parser never evaluates formulas, resolves DDE connections, loads external
+/// content, or invokes macros. Unknown text-namespace fields remain typed and
+/// lossless.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HeaderFooterFieldKind {
     PageNumber,
@@ -69,10 +73,55 @@ pub enum HeaderFooterFieldKind {
     Chapter,
     ModificationDate,
     UserDefined,
+    /// A sender identity or contact field defined by ODF's `text:sender-*` elements.
+    Sender(HeaderFooterSenderFieldKind),
     Unknown {
         namespace: String,
         local_name: String,
     },
+}
+
+/// One of the ODF sender identity/contact fields available in header/footer content.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HeaderFooterSenderFieldKind {
+    FirstName,
+    LastName,
+    Initials,
+    Title,
+    Position,
+    Email,
+    PrivatePhone,
+    Fax,
+    Company,
+    WorkPhone,
+    Street,
+    City,
+    PostalCode,
+    Country,
+    StateOrProvince,
+}
+
+impl HeaderFooterSenderFieldKind {
+    /// The local name of the corresponding ODF `text:sender-*` element.
+    pub const fn element_name(self) -> &'static str {
+        match self {
+            Self::FirstName => "sender-firstname",
+            Self::LastName => "sender-lastname",
+            Self::Initials => "sender-initials",
+            Self::Title => "sender-title",
+            Self::Position => "sender-position",
+            Self::Email => "sender-email",
+            Self::PrivatePhone => "sender-phone-private",
+            Self::Fax => "sender-fax",
+            Self::Company => "sender-company",
+            Self::WorkPhone => "sender-phone-work",
+            Self::Street => "sender-street",
+            Self::City => "sender-city",
+            Self::PostalCode => "sender-postal-code",
+            Self::Country => "sender-country",
+            Self::StateOrProvince => "sender-state-or-province",
+        }
+    }
 }
 
 struct Master {
@@ -492,6 +541,31 @@ fn field_kind(local: &[u8]) -> Option<HeaderFooterFieldKind> {
         b"chapter" => HeaderFooterFieldKind::Chapter,
         b"modification-date" => HeaderFooterFieldKind::ModificationDate,
         b"user-defined" => HeaderFooterFieldKind::UserDefined,
+        b"sender-firstname" => {
+            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::FirstName)
+        },
+        b"sender-lastname" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::LastName),
+        b"sender-initials" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Initials),
+        b"sender-title" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Title),
+        b"sender-position" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Position),
+        b"sender-email" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Email),
+        b"sender-phone-private" => {
+            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::PrivatePhone)
+        },
+        b"sender-fax" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Fax),
+        b"sender-company" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Company),
+        b"sender-phone-work" => {
+            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::WorkPhone)
+        },
+        b"sender-street" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Street),
+        b"sender-city" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::City),
+        b"sender-postal-code" => {
+            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::PostalCode)
+        },
+        b"sender-country" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Country),
+        b"sender-state-or-province" => {
+            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::StateOrProvince)
+        },
         _ => return None,
     })
 }
@@ -651,7 +725,7 @@ mod tests {
 
     #[test]
     fn parses_ordered_blocks_controls_and_fields_with_arbitrary_prefixes() {
-        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:header><t:p t:style-name="Header">Page <t:page-number t:select-page="current" t:page-adjust="2" t:fixed="false" s:data-style-name="N1">7</t:page-number><t:s t:c="2"/><t:tab/><t:line-break/><t:sender-company>Example</t:sender-company></t:p><t:h>Heading</t:h></s:header></s:master-page></o:master-styles></o:document-styles>"#;
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:header><t:p t:style-name="Header">Page <t:page-number t:select-page="current" t:page-adjust="2" t:fixed="false" s:data-style-name="N1">7</t:page-number><t:s t:c="2"/><t:tab/><t:line-break/><t:sender-company t:fixed="true">Example</t:sender-company></t:p><t:h>Heading</t:h></s:header></s:master-page></o:master-styles></o:document-styles>"#;
         let regions = parse_header_footer_blocks(xml).unwrap();
         let blocks = &regions[&(String::from("A"), HeaderFooterKind::Header)];
         assert_eq!(blocks.len(), 2);
@@ -674,18 +748,57 @@ mod tests {
         assert_eq!(blocks[0].content[2], HeaderFooterInline::Space { count: 2 });
         assert_eq!(blocks[0].content[3], HeaderFooterInline::Tab);
         assert_eq!(blocks[0].content[4], HeaderFooterInline::LineBreak);
-        let HeaderFooterInline::Field(unknown) = &blocks[0].content[5] else {
-            panic!("expected unknown field");
+        let HeaderFooterInline::Field(sender) = &blocks[0].content[5] else {
+            panic!("expected sender field");
         };
-        assert!(matches!(
-            unknown.kind,
-            HeaderFooterFieldKind::Unknown { .. }
-        ));
-        assert_eq!(unknown.displayed_text, "Example");
+        assert_eq!(
+            sender.kind,
+            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Company)
+        );
+        assert_eq!(sender.displayed_text, "Example");
+        assert_eq!(sender.fixed, Some(true));
         assert_eq!(
             blocks[1].content,
             vec![HeaderFooterInline::Text("Heading".into())]
         );
+    }
+
+    #[test]
+    fn classifies_all_standard_sender_field_names() {
+        let cases = [
+            ("sender-firstname", HeaderFooterSenderFieldKind::FirstName),
+            ("sender-lastname", HeaderFooterSenderFieldKind::LastName),
+            ("sender-initials", HeaderFooterSenderFieldKind::Initials),
+            ("sender-title", HeaderFooterSenderFieldKind::Title),
+            ("sender-position", HeaderFooterSenderFieldKind::Position),
+            ("sender-email", HeaderFooterSenderFieldKind::Email),
+            (
+                "sender-phone-private",
+                HeaderFooterSenderFieldKind::PrivatePhone,
+            ),
+            ("sender-fax", HeaderFooterSenderFieldKind::Fax),
+            ("sender-company", HeaderFooterSenderFieldKind::Company),
+            ("sender-phone-work", HeaderFooterSenderFieldKind::WorkPhone),
+            ("sender-street", HeaderFooterSenderFieldKind::Street),
+            ("sender-city", HeaderFooterSenderFieldKind::City),
+            (
+                "sender-postal-code",
+                HeaderFooterSenderFieldKind::PostalCode,
+            ),
+            ("sender-country", HeaderFooterSenderFieldKind::Country),
+            (
+                "sender-state-or-province",
+                HeaderFooterSenderFieldKind::StateOrProvince,
+            ),
+        ];
+
+        for (local_name, sender_kind) in cases {
+            assert_eq!(
+                field_kind(local_name.as_bytes()),
+                Some(HeaderFooterFieldKind::Sender(sender_kind))
+            );
+            assert_eq!(sender_kind.element_name(), local_name);
+        }
     }
 
     #[test]
