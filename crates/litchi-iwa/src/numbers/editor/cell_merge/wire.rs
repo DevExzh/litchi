@@ -2,6 +2,7 @@
 
 use prost::Message;
 
+use super::super::formula_dependency_shift::rewrite_formula_archive_wire;
 use super::*;
 
 const TABLE_MODEL_MERGE_OWNER_FIELD: u32 = 47;
@@ -9,6 +10,7 @@ const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const MERGE_OWNER_FORMULA_STORE_FIELD: u32 = 2;
 const FORMULA_STORE_NEXT_INDEX_FIELD: u32 = 2;
 const FORMULA_STORE_FORMULAS_FIELD: u32 = 3;
+const FORMULA_STORE_PAIR_FORMULA_FIELD: u32 = 2;
 
 pub(super) fn append_formula(
     store_data: &[u8],
@@ -49,6 +51,74 @@ pub(super) fn remove_formula(store_data: &[u8], remove_index: u32) -> Result<Vec
         return Err(Error::InvalidFormat(format!(
             "iWork merge formula {remove_index} is missing from wire storage"
         )));
+    }
+    rewrite_repeated_length_delimited_fields(store_data, FORMULA_STORE_FORMULAS_FIELD, &formulas)
+}
+
+/// Rewrite selected formula-pair payloads while preserving every untouched
+/// formula, pair field, and unknown protobuf field byte-for-byte.
+pub(super) fn rewrite_formulas(
+    store_data: &[u8],
+    rewrites: &[MergeFormulaRewrite],
+) -> Result<Vec<u8>> {
+    let mut by_index = std::collections::HashMap::with_capacity(rewrites.len());
+    for rewrite in rewrites {
+        if by_index.insert(rewrite.formula_index, rewrite).is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork merge formula {} is rewritten more than once",
+                rewrite.formula_index
+            )));
+        }
+    }
+
+    let payloads = repeated_length_delimited_payloads(store_data, FORMULA_STORE_FORMULAS_FIELD)?;
+    let mut applied = 0usize;
+    let mut formulas = Vec::with_capacity(payloads.len());
+    for payload in payloads {
+        let pair = tst::formula_store_archive::FormulaStorePair::decode(payload)?;
+        let Some(rewrite) = by_index.get(&pair.formula_index) else {
+            formulas.push(payload.to_vec());
+            continue;
+        };
+        if pair.formula != rewrite.previous {
+            return Err(Error::InvalidFormat(format!(
+                "iWork merge formula {} changed before its coordinate rewrite",
+                pair.formula_index
+            )));
+        }
+        let rewritten = transform_length_delimited_field(
+            payload,
+            FORMULA_STORE_PAIR_FORMULA_FIELD,
+            |formula_data| {
+                let previous = tsce::FormulaArchive::decode(formula_data)?;
+                if previous != rewrite.previous {
+                    return Err(Error::InvalidFormat(format!(
+                        "iWork merge formula {} has inconsistent wire storage",
+                        pair.formula_index
+                    )));
+                }
+                rewrite_formula_archive_wire(formula_data, &rewrite.previous, &rewrite.current)
+            },
+        )?;
+        let mut expected_pair = pair;
+        expected_pair.formula = rewrite.current.clone();
+        if tst::formula_store_archive::FormulaStorePair::decode(rewritten.as_slice())?
+            != expected_pair
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork merge formula {} failed wire validation",
+                rewrite.formula_index
+            )));
+        }
+        formulas.push(rewritten);
+        applied = applied
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("iWork merge rewrite count overflow".to_owned()))?;
+    }
+    if applied != rewrites.len() {
+        return Err(Error::InvalidFormat(
+            "iWork merge formula rewrite target is missing".to_owned(),
+        ));
     }
     rewrite_repeated_length_delimited_fields(store_data, FORMULA_STORE_FORMULAS_FIELD, &formulas)
 }

@@ -7,8 +7,8 @@ impl PagesEditor {
     /// Insert one blank row at a section-relative position.
     ///
     /// Cell storage, formulas, dimension overrides, and stable row identities
-    /// move together. Unsupported merged, filtered, grouped, pivot, spill, or
-    /// hidden topology is rejected without changing the editor.
+    /// move together. Unsupported filtered, grouped, pivot, spill, or hidden
+    /// topology is rejected without changing the editor.
     pub fn insert_table_row(
         &mut self,
         model_object_id: u64,

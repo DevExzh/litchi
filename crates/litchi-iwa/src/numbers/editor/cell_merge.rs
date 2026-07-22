@@ -7,16 +7,29 @@ use prost::Message;
 use super::*;
 use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid};
 
+mod axis;
 mod formula;
 mod wire;
 
 #[cfg(test)]
 use formula::parse_merge_formula;
-use formula::{merge_formula, parse_regions, parse_table_uuid, validate_region_bounds};
+use formula::{
+    merge_formula, parse_regions, parse_table_uuid, rewrite_formula_region, validate_region_bounds,
+};
 use wire::{
     add_formula_store, add_merge_owner, append_formula, patch_table_model, remove_formula,
-    remove_merge_owner, transform_formula_store, transform_merge_owner,
+    remove_merge_owner, rewrite_formulas, transform_formula_store, transform_merge_owner,
 };
+
+pub(super) use axis::MergeAxis;
+use axis::region_after_insertion;
+
+#[derive(Debug)]
+struct MergeFormulaRewrite {
+    formula_index: u32,
+    previous: tsce::FormulaArchive,
+    current: tsce::FormulaArchive,
+}
 
 /// A validated rectangular region containing at least two table cells.
 ///
@@ -109,6 +122,69 @@ pub(crate) fn regions_in_package(
 ) -> Result<Vec<IWorkTableCellRegion>> {
     let descriptor = model::attached_table_descriptor(package, table_id)?;
     parse_regions(&descriptor.model)
+}
+
+/// Move or expand native merged-cell ranges after a physical table-axis
+/// insertion.
+///
+/// Call this after the table's dimension has grown so a merge expanded at the
+/// former trailing boundary remains within the model bounds during validation.
+pub(super) fn shift_merges_for_axis_insertion(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    axis: MergeAxis,
+    insertion: usize,
+) -> Result<()> {
+    let descriptor = model::attached_table_descriptor(package, table_id)?;
+    let existing = parse_regions(&descriptor.model)?;
+    let Some(store) = descriptor
+        .model
+        .merge_owner
+        .as_ref()
+        .and_then(|owner| owner.formula_store.as_ref())
+    else {
+        return Ok(());
+    };
+    if store.formulas.is_empty() {
+        return Ok(());
+    }
+    if store.formulas.len() != existing.len() {
+        return Err(Error::InvalidFormat(
+            "iWork merge formula storage and region count disagree".to_owned(),
+        ));
+    }
+
+    let mut expected = Vec::with_capacity(existing.len());
+    let mut rewrites = Vec::new();
+    for (pair, region) in store.formulas.iter().zip(existing) {
+        let updated = region_after_insertion(region, axis, insertion)?;
+        if updated != region {
+            rewrites.push(MergeFormulaRewrite {
+                formula_index: pair.formula_index,
+                previous: pair.formula.clone(),
+                current: rewrite_formula_region(&pair.formula, updated)?,
+            });
+        }
+        expected.push(updated);
+    }
+    if rewrites.is_empty() {
+        return Ok(());
+    }
+
+    patch_table_model(package, table_id, |original| {
+        transform_merge_owner(original, |owner_data| {
+            transform_formula_store(owner_data, |store_data| {
+                rewrite_formulas(store_data, &rewrites)
+            })
+        })
+    })?;
+
+    if regions_in_package(package, table_id)? != expected {
+        return Err(Error::InvalidFormat(
+            "iWork merged-cell range insertion failed validation".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn merge_in_package(
@@ -243,10 +319,14 @@ fn fresh_merge_owner_id() -> tsp::CfuuidArchive {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::RawMessage;
     use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers::{NumbersDocumentBuilder, TableColumnInsertion, TableRowInsertion};
     use crate::pages::{PagesDocumentBuilder, PagesEditor};
     use crate::shapes::{DrawablePoint, DrawableSize};
+    use crate::wire::{
+        repeated_length_delimited_payloads, transform_length_delimited_fields_at_path,
+    };
 
     #[test]
     fn region_validates_shape_overflow_and_overlap() {
@@ -314,6 +394,212 @@ mod tests {
     }
 
     #[test]
+    fn scratch_numbers_merged_table_axis_insertions_follow_native_semantics() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(5, 6)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let original = IWorkTableCellRegion::new(1, 1, 2, 3).unwrap();
+
+        editor.merge_cells(table_id, original).unwrap();
+        editor
+            .insert_table_row(table_id, TableRowInsertion::body(0))
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_merges(table_id).unwrap(),
+            vec![IWorkTableCellRegion::new(2, 1, 2, 3).unwrap()]
+        );
+        editor
+            .insert_table_row(table_id, TableRowInsertion::body(2))
+            .unwrap();
+        editor
+            .insert_table_column(table_id, TableColumnInsertion::body(0))
+            .unwrap();
+        editor
+            .insert_table_column(table_id, TableColumnInsertion::body(2))
+            .unwrap();
+
+        let expected = IWorkTableCellRegion::new(2, 2, 3, 4).unwrap();
+        assert_eq!(editor.table_cell_merges(table_id).unwrap(), vec![expected]);
+        assert_eq!(editor.tables().unwrap()[0].rows, 7);
+        assert_eq!(editor.tables().unwrap()[0].columns, 8);
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_merges(table_id).unwrap(),
+            vec![expected]
+        );
+    }
+
+    #[test]
+    fn merged_table_axis_insertion_preserves_unknown_formula_wire() {
+        const MERGE_OWNER_FIELD: u32 = 47;
+        const FORMULA_STORE_FIELD: u32 = 2;
+        const FORMULAS_FIELD: u32 = 3;
+        const FORMULA_FIELD: u32 = 2;
+        const AST_ARRAY_FIELD: u32 = 1;
+        const AST_NODES_FIELD: u32 = 1;
+        const COLON_TRACT_FIELD: u32 = 40;
+        const ABSOLUTE_ROWS_FIELD: u32 = 4;
+        const PAIR_UNKNOWN_FIELD: u32 = 90;
+        const FORMULA_UNKNOWN_FIELD: u32 = 89;
+        const NODE_UNKNOWN_FIELD: u32 = 88;
+        const TRACT_UNKNOWN_FIELD: u32 = 87;
+        const RANGE_UNKNOWN_FIELD: u32 = 86;
+        const PAIR_UNKNOWN_VALUE: u64 = 900;
+        const FORMULA_UNKNOWN_VALUE: u64 = 890;
+        const NODE_UNKNOWN_VALUE: u64 = 880;
+        const TRACT_UNKNOWN_VALUE: u64 = 870;
+        const RANGE_UNKNOWN_VALUE: u64 = 860;
+
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(4, 4)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        editor
+            .merge_cells(table_id, IWorkTableCellRegion::new(1, 1, 2, 2).unwrap())
+            .unwrap();
+        let mut package = editor.into_package();
+        let archive_name = super::super::object_locations(&package)
+            .unwrap()
+            .remove(&table_id)
+            .unwrap();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(table_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| matches!(message.type_, 6_000 | 6_001))
+                    .unwrap();
+                let message = object.messages[message_index].clone();
+                let mut data = message.data;
+                for (path, field, value) in [
+                    (
+                        &[MERGE_OWNER_FIELD, FORMULA_STORE_FIELD, FORMULAS_FIELD][..],
+                        PAIR_UNKNOWN_FIELD,
+                        PAIR_UNKNOWN_VALUE,
+                    ),
+                    (
+                        &[
+                            MERGE_OWNER_FIELD,
+                            FORMULA_STORE_FIELD,
+                            FORMULAS_FIELD,
+                            FORMULA_FIELD,
+                        ][..],
+                        FORMULA_UNKNOWN_FIELD,
+                        FORMULA_UNKNOWN_VALUE,
+                    ),
+                    (
+                        &[
+                            MERGE_OWNER_FIELD,
+                            FORMULA_STORE_FIELD,
+                            FORMULAS_FIELD,
+                            FORMULA_FIELD,
+                            AST_ARRAY_FIELD,
+                            AST_NODES_FIELD,
+                        ][..],
+                        NODE_UNKNOWN_FIELD,
+                        NODE_UNKNOWN_VALUE,
+                    ),
+                    (
+                        &[
+                            MERGE_OWNER_FIELD,
+                            FORMULA_STORE_FIELD,
+                            FORMULAS_FIELD,
+                            FORMULA_FIELD,
+                            AST_ARRAY_FIELD,
+                            AST_NODES_FIELD,
+                            COLON_TRACT_FIELD,
+                        ][..],
+                        TRACT_UNKNOWN_FIELD,
+                        TRACT_UNKNOWN_VALUE,
+                    ),
+                    (
+                        &[
+                            MERGE_OWNER_FIELD,
+                            FORMULA_STORE_FIELD,
+                            FORMULAS_FIELD,
+                            FORMULA_FIELD,
+                            AST_ARRAY_FIELD,
+                            AST_NODES_FIELD,
+                            COLON_TRACT_FIELD,
+                            ABSOLUTE_ROWS_FIELD,
+                        ][..],
+                        RANGE_UNKNOWN_FIELD,
+                        RANGE_UNKNOWN_VALUE,
+                    ),
+                ] {
+                    data = transform_length_delimited_fields_at_path(&data, path, |payload| {
+                        let mut payload = payload.to_vec();
+                        append_unknown_varint(&mut payload, field, value);
+                        Ok(payload)
+                    })?;
+                }
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let mut editor = NumbersEditor::from_package(package).unwrap();
+
+        editor
+            .insert_table_row(table_id, TableRowInsertion::body(1))
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_merges(table_id).unwrap(),
+            vec![IWorkTableCellRegion::new(1, 1, 3, 2).unwrap()]
+        );
+
+        let archive = editor.package().archive(&archive_name).unwrap();
+        let object = archive.object(table_id).unwrap();
+        let message = object
+            .messages
+            .iter()
+            .find(|message| matches!(message.type_, 6_000 | 6_001))
+            .unwrap();
+        let merge_owner = repeated_length_delimited_payloads(&message.data, MERGE_OWNER_FIELD)
+            .unwrap()
+            .remove(0);
+        let formula_store = repeated_length_delimited_payloads(merge_owner, FORMULA_STORE_FIELD)
+            .unwrap()
+            .remove(0);
+        let pair = repeated_length_delimited_payloads(formula_store, FORMULAS_FIELD)
+            .unwrap()
+            .remove(0);
+        let formula = repeated_length_delimited_payloads(pair, FORMULA_FIELD)
+            .unwrap()
+            .remove(0);
+        let ast_array = repeated_length_delimited_payloads(formula, AST_ARRAY_FIELD)
+            .unwrap()
+            .remove(0);
+        let range_node = repeated_length_delimited_payloads(ast_array, AST_NODES_FIELD)
+            .unwrap()
+            .remove(0);
+        let tract = repeated_length_delimited_payloads(range_node, COLON_TRACT_FIELD)
+            .unwrap()
+            .remove(0);
+        let row_range = repeated_length_delimited_payloads(tract, ABSOLUTE_ROWS_FIELD)
+            .unwrap()
+            .remove(0);
+
+        assert!(pair.ends_with(&unknown_suffix(PAIR_UNKNOWN_FIELD, PAIR_UNKNOWN_VALUE)));
+        assert!(formula.ends_with(&unknown_suffix(
+            FORMULA_UNKNOWN_FIELD,
+            FORMULA_UNKNOWN_VALUE
+        )));
+        assert!(range_node.ends_with(&unknown_suffix(NODE_UNKNOWN_FIELD, NODE_UNKNOWN_VALUE)));
+        assert!(tract.ends_with(&unknown_suffix(TRACT_UNKNOWN_FIELD, TRACT_UNKNOWN_VALUE)));
+        assert!(row_range.ends_with(&unknown_suffix(RANGE_UNKNOWN_FIELD, RANGE_UNKNOWN_VALUE)));
+    }
+
+    #[test]
     fn scratch_pages_table_merge_crud_round_trips() {
         let mut editor = PagesDocumentBuilder::new()
             .body_text("Merged table\n")
@@ -329,6 +615,84 @@ mod tests {
         assert_eq!(reopened.table_cell_merges(table_id).unwrap(), vec![region]);
         assert!(reopened.unmerge_table_cells(table_id, region).unwrap());
         assert!(reopened.table_cell_merges(table_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_pages_and_keynote_merged_table_axis_insertions_round_trip() {
+        let mut pages = PagesDocumentBuilder::new()
+            .body_text("Merged table\n")
+            .body_table("Merge", 4, 5)
+            .build()
+            .unwrap();
+        let pages_table_id = pages.tables().unwrap()[0].model_object_id;
+        pages
+            .merge_table_cells(
+                pages_table_id,
+                IWorkTableCellRegion::new(1, 1, 2, 2).unwrap(),
+            )
+            .unwrap();
+        pages
+            .insert_table_row(pages_table_id, TableRowInsertion::body(1))
+            .unwrap();
+        pages
+            .insert_table_column(pages_table_id, TableColumnInsertion::body(0))
+            .unwrap();
+        let pages_expected = IWorkTableCellRegion::new(1, 2, 3, 2).unwrap();
+        assert_eq!(
+            pages.table_cell_merges(pages_table_id).unwrap(),
+            vec![pages_expected]
+        );
+        let pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            pages.table_cell_merges(pages_table_id).unwrap(),
+            vec![pages_expected]
+        );
+
+        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let keynote_table = keynote
+            .add_slide_table(
+                0,
+                "Merge",
+                4,
+                5,
+                DrawablePoint { x: 100.0, y: 150.0 },
+                DrawableSize {
+                    width: 800.0,
+                    height: 400.0,
+                },
+            )
+            .unwrap();
+        keynote
+            .merge_slide_table_cells(
+                0,
+                keynote_table.model_object_id,
+                IWorkTableCellRegion::new(1, 1, 2, 2).unwrap(),
+            )
+            .unwrap();
+        keynote
+            .insert_slide_table_row(0, keynote_table.model_object_id, TableRowInsertion::body(1))
+            .unwrap();
+        keynote
+            .insert_slide_table_column(
+                0,
+                keynote_table.model_object_id,
+                TableColumnInsertion::body(0),
+            )
+            .unwrap();
+        let keynote_expected = IWorkTableCellRegion::new(1, 2, 3, 2).unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_cell_merges(0, keynote_table.model_object_id)
+                .unwrap(),
+            vec![keynote_expected]
+        );
+        let keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_cell_merges(0, keynote_table.model_object_id)
+                .unwrap(),
+            vec![keynote_expected]
+        );
     }
 
     #[test]
@@ -368,5 +732,16 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    fn append_unknown_varint(data: &mut Vec<u8>, field: u32, value: u64) {
+        data.extend(crate::varint::encode_varint(u64::from(field) << 3));
+        data.extend(crate::varint::encode_varint(value));
+    }
+
+    fn unknown_suffix(field: u32, value: u64) -> Vec<u8> {
+        let mut suffix = Vec::new();
+        append_unknown_varint(&mut suffix, field, value);
+        suffix
     }
 }

@@ -619,7 +619,7 @@ fn relative_tract_coordinate(coordinate: u32, host: u32) -> Result<i32> {
         .map_err(|_| Error::ParseError("iWork formula tract exceeds i32".to_owned()))
 }
 
-fn rewrite_formula_archive_wire(
+pub(super) fn rewrite_formula_archive_wire(
     data: &[u8],
     previous: &tsce::FormulaArchive,
     current: &tsce::FormulaArchive,

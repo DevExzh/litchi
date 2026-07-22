@@ -167,6 +167,63 @@ pub(super) fn merge_formula(
     })
 }
 
+/// Retarget an already-validated merge formula without changing its unrelated
+/// semantic fields or optional-field presence.
+///
+/// The matching wire rewrite updates only these changed coordinates, retaining
+/// unknown protobuf fields in native formulas byte-for-byte.
+pub(super) fn rewrite_formula_region(
+    formula: &tsce::FormulaArchive,
+    region: IWorkTableCellRegion,
+) -> Result<tsce::FormulaArchive> {
+    let begin_row = merge_coordinate(region.row(), "row")?;
+    let end_row = merge_coordinate(region.end_row(), "row")?;
+    let begin_column = merge_coordinate(region.column(), "column")?;
+    let end_column = merge_coordinate(region.end_column(), "column")?;
+    let mut rewritten = formula.clone();
+    let range_node = rewritten
+        .ast_node_array
+        .ast_node
+        .first_mut()
+        .ok_or_else(unsupported_merge_formula)?;
+    let tract = range_node
+        .ast_colon_tract
+        .as_mut()
+        .ok_or_else(unsupported_merge_formula)?;
+    rewrite_absolute_range(&mut tract.absolute_row, begin_row, end_row, "row")?;
+    rewrite_absolute_range(
+        &mut tract.absolute_column,
+        begin_column,
+        end_column,
+        "column",
+    )?;
+    Ok(rewritten)
+}
+
+fn merge_coordinate(value: usize, axis: &str) -> Result<u32> {
+    u32::try_from(value)
+        .map_err(|_| Error::ParseError(format!("Table-cell merge {axis} exceeds u32")))
+}
+
+fn rewrite_absolute_range(
+    ranges: &mut [
+        tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractAbsoluteRangeArchive
+    ],
+    begin: u32,
+    end: u32,
+    axis: &str,
+) -> Result<()> {
+    let [range] = ranges else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork merge formula has unsupported absolute {axis} ranges"
+        )));
+    };
+    let had_explicit_end = range.range_end.is_some();
+    range.range_begin = begin;
+    range.range_end = (had_explicit_end || begin != end).then_some(end);
+    Ok(())
+}
+
 pub(super) fn validate_region_bounds(
     model: &TableModelArchive,
     region: IWorkTableCellRegion,

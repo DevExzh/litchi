@@ -3,7 +3,10 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::{CellValue, IWorkTableCellRegion, NumbersDocumentBuilder};
+use litchi_iwa::numbers::{
+    CellValue, IWorkTableCellRegion, NumbersDocumentBuilder, TableColumnInsertion,
+    TableRowInsertion,
+};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -43,6 +46,10 @@ fn create_numbers(
     editor.save(output.join("merged-cells.numbers"))?;
     editor.unmerge_cells(table_id, region)?;
     editor.save(output.join("unmerged-cells.numbers"))?;
+    editor.merge_cells(table_id, region)?;
+    editor.insert_table_row(table_id, TableRowInsertion::body(1))?;
+    editor.insert_table_column(table_id, TableColumnInsertion::body(0))?;
+    editor.save(output.join("merged-cells-after-axis-insertions.numbers"))?;
     Ok(())
 }
 
@@ -65,6 +72,10 @@ fn create_pages(
     editor.save(output.join("merged-cells.pages"))?;
     editor.unmerge_table_cells(table_id, region)?;
     editor.save(output.join("unmerged-cells.pages"))?;
+    editor.merge_table_cells(table_id, region)?;
+    editor.insert_table_row(table_id, TableRowInsertion::body(1))?;
+    editor.insert_table_column(table_id, TableColumnInsertion::body(0))?;
+    editor.save(output.join("merged-cells-after-axis-insertions.pages"))?;
     Ok(())
 }
 
@@ -97,5 +108,9 @@ fn create_keynote(
     editor.save(output.join("merged-cells.key"))?;
     editor.unmerge_slide_table_cells(0, table.model_object_id, region)?;
     editor.save(output.join("unmerged-cells.key"))?;
+    editor.merge_slide_table_cells(0, table.model_object_id, region)?;
+    editor.insert_slide_table_row(0, table.model_object_id, TableRowInsertion::body(1))?;
+    editor.insert_slide_table_column(0, table.model_object_id, TableColumnInsertion::body(0))?;
+    editor.save(output.join("merged-cells-after-axis-insertions.key"))?;
     Ok(())
 }

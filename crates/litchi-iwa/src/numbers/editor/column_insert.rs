@@ -4,6 +4,7 @@ use super::*;
 
 mod storage;
 
+use cell_merge::{MergeAxis, shift_merges_for_axis_insertion};
 use formula_dependency_shift::{DependencyAxis, FooterRangeInsertion, shift_formula_dependencies};
 use storage::{
     insert_column_uid, insert_stroke_column, set_table_column_count, shift_column_headers,
@@ -92,6 +93,7 @@ pub(super) fn insert_attached_table_column(
     if let Some(settings) = resolved.updated_header_settings {
         set_attached_table_header_settings(package, table_id, settings)?;
     }
+    shift_merges_for_axis_insertion(package, table_id, MergeAxis::Column, column)?;
     if attached_table_descriptor(package, table_id)?
         .model
         .number_of_columns
@@ -160,17 +162,11 @@ fn validate_column_insertion_features(
             .sort_order
             .as_ref()
             .is_some_and(|sort| !sort.rules.is_empty())
-        || model.merge_owner.as_ref().is_some_and(|owner| {
-            owner
-                .formula_store
-                .as_ref()
-                .is_some_and(|store| !store.formulas.is_empty())
-        })
         || filter_has_row_state(package, locations, model.row_filter_set_pre_pivot.as_ref())?
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(
-            "Cannot yet insert a column into a sorted, filtered, hidden, merged, grouped, pivot, or spill iWork table"
+            "Cannot yet insert a column into a sorted, filtered, hidden, grouped, pivot, or spill iWork table"
                 .to_owned(),
         ));
     }

@@ -11,6 +11,21 @@ use wire::{
     rewrite_shifted_range_tile_wire,
 };
 
+/// Rewrite only the coordinate-bearing AST fields in an already-validated
+/// formula archive while retaining unknown protobuf fields byte-for-byte.
+///
+/// Merge formulas are stored outside the ordinary calculation-engine formula
+/// table, but use the same AST wire representation. Keeping this primitive
+/// here prevents the merge implementation from duplicating the delicate
+/// lossless AST rewrite logic.
+pub(super) fn rewrite_formula_archive_wire(
+    data: &[u8],
+    previous: &tsce::FormulaArchive,
+    current: &tsce::FormulaArchive,
+) -> Result<Vec<u8>> {
+    ast::rewrite_formula_archive_wire(data, previous, current)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum DependencyAxis {
     Column,
