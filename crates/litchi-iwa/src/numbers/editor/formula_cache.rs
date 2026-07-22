@@ -555,7 +555,8 @@ fn downstream_formula_hosts(
     let mut queue = seeds.iter().copied().collect::<VecDeque<_>>();
     while let Some(precedent) = queue.pop_front() {
         for dependent in graph.dependents_of(precedent) {
-            if impacted.insert(dependent) {
+            if graph.owner_to_table.contains_key(&dependent.owner_id) && impacted.insert(dependent)
+            {
                 queue.push_back(dependent);
             }
         }

@@ -12,6 +12,10 @@ use wire::{
     rewrite_shifted_range_tile_wire,
 };
 
+const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
+const CELL_DEPENDENCY_TILE_MESSAGE_TYPE: u32 = 4_009;
+const RANGE_DEPENDENCY_TILE_MESSAGE_TYPE: u32 = 4_010;
+
 /// Rewrite only the coordinate-bearing AST fields in an already-validated
 /// formula archive while retaining unknown protobuf fields byte-for-byte.
 ///
@@ -206,16 +210,278 @@ impl LocalPrecedentAdjustments {
     }
 }
 
-/// Exact direct cross-table precedents before and after an AST rewrite.
+/// One explicit cross-table calculation-engine precedent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct ExternalCellPrecedent {
+    owner_id: u32,
+    row: u32,
+    column: u32,
+}
+
+/// One normalized rectangular cross-table calculation-engine precedent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ExternalRangePrecedent {
+    owner_id: u32,
+    top: u32,
+    left: u32,
+    bottom: u32,
+    right: u32,
+}
+
+impl ExternalRangePrecedent {
+    fn from_range_coordinate(owner_id: u32, range: &tsce::RangeCoordinateArchive) -> Result<Self> {
+        let range = Self {
+            owner_id,
+            top: range.top_left_row,
+            left: range.top_left_column,
+            bottom: range.bottom_right_row,
+            right: range.bottom_right_column,
+        };
+        range.validate()
+    }
+
+    fn from_cell_rect(owner_id: u32, rect: &tsce::CellRectArchive) -> Result<Self> {
+        let (top, left) = explicit_cell_coordinate(&rect.origin, "cross-table range origin")?;
+        let rows = rect.size.num_rows.unwrap_or(1);
+        let columns = rect.size.num_columns.unwrap_or(1);
+        if rows == 0 || columns == 0 {
+            return Err(Error::InvalidFormat(
+                "iWork cross-table range has an empty rectangle".to_owned(),
+            ));
+        }
+        let range = Self {
+            owner_id,
+            top,
+            left,
+            bottom: top.checked_add(rows - 1).ok_or_else(|| {
+                Error::ParseError("iWork cross-table range row overflow".to_owned())
+            })?,
+            right: left.checked_add(columns - 1).ok_or_else(|| {
+                Error::ParseError("iWork cross-table range column overflow".to_owned())
+            })?,
+        };
+        range.validate()
+    }
+
+    fn validate(self) -> Result<Self> {
+        if self.top > self.bottom || self.left > self.right {
+            return Err(Error::InvalidFormat(
+                "iWork cross-table range is inverted".to_owned(),
+            ));
+        }
+        Ok(self)
+    }
+
+    fn write_range_coordinate(self, range: &mut tsce::RangeCoordinateArchive) {
+        range.top_left_column = self.left;
+        range.top_left_row = self.top;
+        range.bottom_right_column = self.right;
+        range.bottom_right_row = self.bottom;
+    }
+
+    fn write_cell_rect(self, rect: &mut tsce::CellRectArchive) -> Result<()> {
+        let columns = self
+            .right
+            .checked_sub(self.left)
+            .and_then(|width| width.checked_add(1))
+            .ok_or_else(|| {
+                Error::InvalidFormat("iWork cross-table range is inverted".to_owned())
+            })?;
+        let rows = self
+            .bottom
+            .checked_sub(self.top)
+            .and_then(|height| height.checked_add(1))
+            .ok_or_else(|| {
+                Error::InvalidFormat("iWork cross-table range is inverted".to_owned())
+            })?;
+        rect.origin.column = Some(self.left);
+        rect.origin.row = Some(self.top);
+        rect.size.num_columns = (columns != 1).then_some(columns);
+        rect.size.num_rows = (rows != 1).then_some(rows);
+        Ok(())
+    }
+
+    fn insert_cells(self, cells: &mut BTreeSet<ExternalCellPrecedent>) {
+        for row in self.top..=self.bottom {
+            for column in self.left..=self.right {
+                cells.insert(ExternalCellPrecedent {
+                    owner_id: self.owner_id,
+                    row,
+                    column,
+                });
+            }
+        }
+    }
+}
+
+/// Cross-table precedents resolved from one formula AST.
+#[derive(Debug, Default)]
+struct CrossTablePrecedents {
+    direct: BTreeSet<ExternalCellPrecedent>,
+    ranges: Vec<ExternalRangePrecedent>,
+}
+
+impl CrossTablePrecedents {
+    fn expanded(&self) -> BTreeSet<ExternalCellPrecedent> {
+        let mut cells = self.direct.clone();
+        for range in &self.ranges {
+            range.insert_cells(&mut cells);
+        }
+        cells
+    }
+}
+
+/// A rebased external range and its exact source representation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ExternalRangeAdjustment {
+    previous: ExternalRangePrecedent,
+    current: ExternalRangePrecedent,
+}
+
+/// Exact cross-table precedents before and after an AST rewrite.
 ///
-/// The CalculationEngine stores these separately from the formula AST. A
-/// retained merged anchor can intentionally rebase a relative external
-/// reference, so its edge list must follow the rewritten AST rather than the
-/// physical source-table compaction alone.
+/// Native Numbers packages represent cross-table ranges as dedicated range
+/// records, while new documents may store the same cells as expanded edges.
+/// Retained merge anchors need both representations to follow the rewritten
+/// AST atomically.
 #[derive(Debug)]
 struct ExternalPrecedentAdjustments {
-    previous: BTreeSet<(u32, u32, u32)>,
-    current: BTreeSet<(u32, u32, u32)>,
+    direct_previous: BTreeSet<ExternalCellPrecedent>,
+    direct_current: BTreeSet<ExternalCellPrecedent>,
+    ranges: Vec<ExternalRangeAdjustment>,
+}
+
+impl ExternalPrecedentAdjustments {
+    fn new(previous: CrossTablePrecedents, current: CrossTablePrecedents) -> Result<Self> {
+        let CrossTablePrecedents {
+            direct: direct_previous,
+            ranges: previous_ranges,
+        } = previous;
+        let CrossTablePrecedents {
+            direct: direct_current,
+            ranges: current_ranges,
+        } = current;
+        if previous_ranges.len() != current_ranges.len() {
+            return Err(Error::InvalidFormat(
+                "iWork cross-table formula range count changed during coordinate mutation"
+                    .to_owned(),
+            ));
+        }
+        let mut ranges = Vec::with_capacity(previous_ranges.len());
+        for (previous, current) in previous_ranges.into_iter().zip(current_ranges) {
+            if previous.owner_id != current.owner_id {
+                return Err(Error::InvalidFormat(
+                    "iWork cross-table formula range owner changed during coordinate mutation"
+                        .to_owned(),
+                ));
+            }
+            ranges.push(ExternalRangeAdjustment { previous, current });
+        }
+        Ok(Self {
+            direct_previous,
+            direct_current,
+            ranges,
+        })
+    }
+
+    fn changed(&self) -> bool {
+        self.direct_previous != self.direct_current
+            || self
+                .ranges
+                .iter()
+                .any(|adjustment| adjustment.previous != adjustment.current)
+    }
+
+    fn has_direct_rewrite(&self) -> bool {
+        self.direct_previous != self.direct_current
+    }
+
+    fn replacement_for_range(
+        &self,
+        previous: ExternalRangePrecedent,
+    ) -> Result<Option<ExternalRangePrecedent>> {
+        let mut matches = self
+            .ranges
+            .iter()
+            .filter(|adjustment| adjustment.previous == previous)
+            .map(|adjustment| adjustment.current);
+        let Some(current) = matches.next() else {
+            return Ok(None);
+        };
+        if matches.any(|candidate| candidate != current) {
+            return Err(Error::InvalidFormat(
+                "iWork cross-table range dependency has ambiguous AST replacements".to_owned(),
+            ));
+        }
+        Ok(Some(current))
+    }
+
+    fn rewrite_expanded_edges(
+        &self,
+        edges: &mut tsce::ExpandedEdgesArchive,
+        previous_host: (u32, u32),
+    ) -> Result<()> {
+        let existing = edges
+            .internal_owner_id_for_edge
+            .iter()
+            .copied()
+            .zip(edges.edge_with_owner_rows.iter().copied())
+            .zip(edges.edge_with_owner_columns.iter().copied())
+            .map(|((owner_id, row), column)| ExternalCellPrecedent {
+                owner_id,
+                row,
+                column,
+            })
+            .collect::<BTreeSet<_>>();
+        if existing == self.direct_previous {
+            return Self::write_external_edges(edges, &self.direct_current, previous_host);
+        }
+        let expanded_previous = CrossTablePrecedents {
+            direct: self.direct_previous.clone(),
+            ranges: self
+                .ranges
+                .iter()
+                .map(|adjustment| adjustment.previous)
+                .collect(),
+        }
+        .expanded();
+        if existing != expanded_previous {
+            return Err(Error::InvalidFormat(format!(
+                "iWork formula host ({}, {}) has cross-table dependency edges that do not match its AST",
+                previous_host.0, previous_host.1
+            )));
+        }
+        let expanded_current = CrossTablePrecedents {
+            direct: self.direct_current.clone(),
+            ranges: self
+                .ranges
+                .iter()
+                .map(|adjustment| adjustment.current)
+                .collect(),
+        }
+        .expanded();
+        Self::write_external_edges(edges, &expanded_current, previous_host)
+    }
+
+    fn write_external_edges(
+        edges: &mut tsce::ExpandedEdgesArchive,
+        current: &BTreeSet<ExternalCellPrecedent>,
+        previous_host: (u32, u32),
+    ) -> Result<()> {
+        let expected_owners = current
+            .iter()
+            .map(|precedent| precedent.owner_id)
+            .collect::<Vec<_>>();
+        if edges.internal_owner_id_for_edge != expected_owners {
+            return Err(Error::ParseError(format!(
+                "Cannot relocate iWork formula host ({}, {}) because its cross-table dependency owner sequence would change",
+                previous_host.0, previous_host.1
+            )));
+        }
+        edges.edge_with_owner_rows = current.iter().map(|precedent| precedent.row).collect();
+        edges.edge_with_owner_columns = current.iter().map(|precedent| precedent.column).collect();
+        Ok(())
+    }
 }
 
 /// Calculation-engine identity and bounds for one table addressable from a
@@ -314,7 +580,7 @@ fn mutate_formula_dependencies(
     package.update_archive(&component, |archive| {
         let Some((owner_id, message_index)) = archive.objects.iter().find_map(|object| {
             object.messages.iter().enumerate().find_map(|(index, message)| {
-                if message.type_ != 4008 {
+                if message.type_ != FORMULA_OWNER_MESSAGE_TYPE {
                     return None;
                 }
                 let owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())
@@ -335,13 +601,15 @@ fn mutate_formula_dependencies(
         let previous = tsce::FormulaOwnerDependenciesArchive::decode(original.as_slice())?;
         validate_shiftable_formula_owner(&previous, axis, mutation)?;
         let internal_owner_id = previous.internal_formula_owner_id;
-        reject_incoming_dependencies(
+        mutate_incoming_range_dependencies(
             archive,
             owner_id,
             internal_owner_id,
             &previous.formula_owner_uid,
             axis,
+            position,
             mutation,
+            retained_hosts,
         )?;
         let range_dependency_hosts = range_dependency_hosts(archive, &previous)?;
         let mut current = previous.clone();
@@ -406,7 +674,7 @@ fn mutate_formula_dependencies(
             let tile_message_index = object
                 .messages
                 .iter()
-                .position(|message| message.type_ == 4009)
+                .position(|message| message.type_ == CELL_DEPENDENCY_TILE_MESSAGE_TYPE)
                 .ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Numbers formula dependency tile {tile_id} has no payload"
@@ -460,7 +728,7 @@ fn mutate_formula_dependencies(
             object.replace_message(
                 tile_message_index,
                 RawMessage {
-                    type_: 4009,
+                    type_: CELL_DEPENDENCY_TILE_MESSAGE_TYPE,
                     data,
                 },
             )?;
@@ -486,7 +754,7 @@ fn mutate_formula_dependencies(
             let message_index = object
                 .messages
                 .iter()
-                .position(|message| message.type_ == 4010)
+                .position(|message| message.type_ == RANGE_DEPENDENCY_TILE_MESSAGE_TYPE)
                 .ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Numbers range dependency tile {tile_id} has no payload"
@@ -583,7 +851,7 @@ fn range_dependency_hosts(
         let message = object
             .messages
             .iter()
-            .find(|message| message.type_ == 4010)
+            .find(|message| message.type_ == RANGE_DEPENDENCY_TILE_MESSAGE_TYPE)
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers range dependency tile {} has no payload",
@@ -616,6 +884,7 @@ fn mutate_range_dependencies(
     for dependency in &mut dependencies.back_dependency {
         let host = (dependency.cell_coord_row, dependency.cell_coord_column);
         let local_adjustments = adjustments.local_precedents.get(&host);
+        let external_adjustment = adjustments.external_precedents.get(&host);
         let (row, column) = retained_hosts.shifted_host(
             dependency.cell_coord_row,
             dependency.cell_coord_column,
@@ -641,6 +910,15 @@ fn mutate_range_dependencies(
                 mutation,
                 local_adjustments,
             )?;
+        } else if let Some(reference) = &mut dependency.internal_range_reference
+            && let Some(adjustment) = external_adjustment
+            && let Some(replacement) =
+                adjustment.replacement_for_range(ExternalRangePrecedent::from_range_coordinate(
+                    reference.owner_id,
+                    &reference.range,
+                )?)?
+        {
+            replacement.write_range_coordinate(&mut reference.range);
         }
     }
     Ok(())
@@ -658,6 +936,7 @@ fn mutate_range_tile(
     for dependency in &mut tile.from_to_range {
         let host = explicit_cell_coordinate(&dependency.from_coord, "range-tile host")?;
         let local_adjustments = adjustments.local_precedents.get(&host);
+        let external_adjustment = adjustments.external_precedents.get(&host);
         let (row, column) = retained_hosts.shifted_host(
             host.0,
             host.1,
@@ -676,6 +955,14 @@ fn mutate_range_tile(
                 mutation,
                 local_adjustments,
             )?;
+        } else if let Some(adjustment) = external_adjustment
+            && let Some(replacement) =
+                adjustment.replacement_for_range(ExternalRangePrecedent::from_cell_rect(
+                    tile.to_owner_id,
+                    &dependency.refers_to_rect,
+                )?)?
+        {
+            replacement.write_cell_rect(&mut dependency.refers_to_rect)?;
         }
     }
     Ok(())
@@ -941,17 +1228,29 @@ fn explicit_cell_coordinate(
     ))
 }
 
-fn reject_incoming_dependencies(
-    archive: &Archive,
+/// Rebase native range-proxy owners that point into a merged formula anchor.
+///
+/// Native Numbers represents merged formula geometry with detached calculation
+/// owners whose ranges point back at the visible table. Those are not user
+/// formulas, so they have no formula AST to rewrite. When a retained merge
+/// anchor survives a deletion, its proxy range must contract around the
+/// retained host in the same archive transaction. Ordinary cross-table
+/// formulas remain deliberately rejected here because their AST lives in a
+/// different table and needs a separate rewrite operation.
+fn mutate_incoming_range_dependencies(
+    archive: &mut Archive,
     target_object_id: u64,
     target_internal_owner_id: u32,
     target_owner_uid: &tsp::Uuid,
     axis: DependencyAxis,
+    position: u32,
     mutation: DependencyMutation,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
+    let mut incoming_owners = Vec::new();
     for object in &archive.objects {
         for message in &object.messages {
-            if message.type_ != 4008 {
+            if message.type_ != FORMULA_OWNER_MESSAGE_TYPE {
                 continue;
             }
             let owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
@@ -975,13 +1274,10 @@ fn reject_incoming_dependencies(
                 .range_dependencies
                 .as_ref()
                 .is_some_and(|dependencies| {
-                    dependencies.back_dependency.iter().any(|dependency| {
-                        dependency
-                            .internal_range_reference
-                            .as_ref()
-                            .is_some_and(|reference| reference.owner_id == target_internal_owner_id)
-                            || dependency.range_reference.is_some()
-                    })
+                    dependencies
+                        .back_dependency
+                        .iter()
+                        .any(|dependency| dependency.range_reference.is_some())
                 })
                 || uuid_references_owner(&owner.uuid_references, target_owner_uid)
             {
@@ -1002,7 +1298,7 @@ fn reject_incoming_dependencies(
                 let tile_message = tile_object
                     .messages
                     .iter()
-                    .find(|message| message.type_ == 4009)
+                    .find(|message| message.type_ == CELL_DEPENDENCY_TILE_MESSAGE_TYPE)
                     .ok_or_else(|| {
                         Error::InvalidFormat(format!(
                             "Numbers formula dependency tile {} has no payload",
@@ -1018,6 +1314,7 @@ fn reject_incoming_dependencies(
                     return Err(incoming_dependency_error(axis, mutation));
                 }
             }
+            let mut incoming_range_tiles = Vec::new();
             for reference in owner
                 .tiled_range_dependencies
                 .as_ref()
@@ -1033,7 +1330,7 @@ fn reject_incoming_dependencies(
                 let tile_message = tile_object
                     .messages
                     .iter()
-                    .find(|message| message.type_ == 4010)
+                    .find(|message| message.type_ == RANGE_DEPENDENCY_TILE_MESSAGE_TYPE)
                     .ok_or_else(|| {
                         Error::InvalidFormat(format!(
                             "Numbers range dependency tile {} has no payload",
@@ -1042,11 +1339,241 @@ fn reject_incoming_dependencies(
                     })?;
                 let tile = tsce::RangePrecedentsTileArchive::decode(tile_message.data.as_slice())?;
                 if tile.to_owner_id == target_internal_owner_id && !tile.from_to_range.is_empty() {
-                    return Err(incoming_dependency_error(axis, mutation));
+                    incoming_range_tiles.push(reference.identifier);
+                }
+            }
+            let has_incoming_range =
+                owner
+                    .range_dependencies
+                    .as_ref()
+                    .is_some_and(|dependencies| {
+                        dependencies.back_dependency.iter().any(|dependency| {
+                            dependency
+                                .internal_range_reference
+                                .as_ref()
+                                .is_some_and(|reference| {
+                                    reference.owner_id == target_internal_owner_id
+                                })
+                        })
+                    })
+                    || !incoming_range_tiles.is_empty();
+            if !has_incoming_range {
+                continue;
+            }
+            if owner.formula_owner.is_some() {
+                return Err(incoming_dependency_error(axis, mutation));
+            }
+            incoming_owners.push((
+                object.archive_info.identifier.ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "Numbers incoming range-proxy owner is missing its object ID".to_owned(),
+                    )
+                })?,
+                owner,
+                incoming_range_tiles,
+            ));
+        }
+    }
+
+    let mut rewritten_range_tiles = BTreeSet::new();
+    for (object_id, previous, range_tile_ids) in incoming_owners {
+        let mut current = previous.clone();
+        if let Some(dependencies) = &mut current.range_dependencies {
+            for dependency in &mut dependencies.back_dependency {
+                if let Some(reference) = &mut dependency.internal_range_reference
+                    && reference.owner_id == target_internal_owner_id
+                {
+                    mutate_incoming_target_range_coordinate(
+                        &mut reference.range,
+                        axis,
+                        position,
+                        mutation,
+                        retained_hosts,
+                    )?;
                 }
             }
         }
+        let source_object = archive.object(object_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers incoming range-proxy owner {object_id} is missing"
+            ))
+        })?;
+        let message_index = source_object
+            .messages
+            .iter()
+            .position(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers incoming range-proxy owner {object_id} has no payload"
+                ))
+            })?;
+        let original = source_object.messages[message_index].data.clone();
+        let data = rewrite_shifted_formula_owner_wire(&original, &previous, &current, axis)?;
+        let source_object = archive.object_mut(object_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers incoming range-proxy owner {object_id} disappeared"
+            ))
+        })?;
+        let message_type = source_object.messages[message_index].type_;
+        source_object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+        )?;
+
+        for tile_id in range_tile_ids {
+            if !rewritten_range_tiles.insert(tile_id) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers incoming range-proxy owners share range tile {tile_id}"
+                )));
+            }
+            let tile_object = archive.object_mut(tile_id).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers incoming range dependency tile {tile_id} is missing"
+                ))
+            })?;
+            let message_index = tile_object
+                .messages
+                .iter()
+                .position(|message| message.type_ == RANGE_DEPENDENCY_TILE_MESSAGE_TYPE)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers incoming range dependency tile {tile_id} has no payload"
+                    ))
+                })?;
+            let original = tile_object.messages[message_index].data.clone();
+            let previous_tile = tsce::RangePrecedentsTileArchive::decode(original.as_slice())?;
+            if previous_tile.to_owner_id != target_internal_owner_id {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers incoming range dependency tile {tile_id} has an unexpected target owner"
+                )));
+            }
+            let mut current_tile = previous_tile.clone();
+            for dependency in &mut current_tile.from_to_range {
+                mutate_incoming_target_cell_rect(
+                    &mut dependency.refers_to_rect,
+                    axis,
+                    position,
+                    mutation,
+                    retained_hosts,
+                )?;
+            }
+            let data = rewrite_shifted_range_tile_wire(&original, &previous_tile, &current_tile)?;
+            let message_type = tile_object.messages[message_index].type_;
+            tile_object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+            )?;
+        }
     }
+    Ok(())
+}
+
+fn mutate_incoming_target_range_coordinate(
+    range: &mut tsce::RangeCoordinateArchive,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+    retained_hosts: &FormulaHostRetentions,
+) -> Result<()> {
+    let retains_deleted_coordinate = mutation == DependencyMutation::Delete
+        && range_contains_retained_host(range, axis, position, retained_hosts);
+    let mutate_coordinate = |coordinate: u32, what: &str| {
+        if retains_deleted_coordinate && coordinate == position {
+            Ok(position)
+        } else {
+            mutation.coordinate(coordinate, position, what)
+        }
+    };
+    match axis {
+        DependencyAxis::Column => {
+            range.top_left_column = mutate_coordinate(range.top_left_column, "range start column")?;
+            range.bottom_right_column =
+                mutate_coordinate(range.bottom_right_column, "range end column")?;
+        },
+        DependencyAxis::Row => {
+            range.top_left_row = mutate_coordinate(range.top_left_row, "range start row")?;
+            range.bottom_right_row = mutate_coordinate(range.bottom_right_row, "range end row")?;
+        },
+    }
+    if range.top_left_row > range.bottom_right_row
+        || range.top_left_column > range.bottom_right_column
+    {
+        return Err(Error::InvalidFormat(
+            "Numbers incoming range-proxy target became inverted".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn range_contains_retained_host(
+    range: &tsce::RangeCoordinateArchive,
+    axis: DependencyAxis,
+    position: u32,
+    retained_hosts: &FormulaHostRetentions,
+) -> bool {
+    let contains_deleted_axis = match axis {
+        DependencyAxis::Column => {
+            (range.top_left_column..=range.bottom_right_column).contains(&position)
+        },
+        DependencyAxis::Row => (range.top_left_row..=range.bottom_right_row).contains(&position),
+    };
+    contains_deleted_axis
+        && retained_hosts.hosts.iter().any(|host| {
+            (range.top_left_row..=range.bottom_right_row).contains(&host.row)
+                && (range.top_left_column..=range.bottom_right_column).contains(&host.column)
+        })
+}
+
+fn mutate_incoming_target_cell_rect(
+    rect: &mut tsce::CellRectArchive,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+    retained_hosts: &FormulaHostRetentions,
+) -> Result<()> {
+    let (top, left) = explicit_cell_coordinate(&rect.origin, "incoming range origin")?;
+    let rows = rect.size.num_rows.unwrap_or(1);
+    let columns = rect.size.num_columns.unwrap_or(1);
+    if rows == 0 || columns == 0 {
+        return Err(Error::InvalidFormat(
+            "Numbers incoming range-proxy tile has an empty rectangle".to_owned(),
+        ));
+    }
+    let mut range = tsce::RangeCoordinateArchive {
+        top_left_column: left,
+        top_left_row: top,
+        bottom_right_column: left.checked_add(columns - 1).ok_or_else(|| {
+            Error::ParseError("Numbers incoming range-proxy column overflow".to_owned())
+        })?,
+        bottom_right_row: top.checked_add(rows - 1).ok_or_else(|| {
+            Error::ParseError("Numbers incoming range-proxy row overflow".to_owned())
+        })?,
+    };
+    mutate_incoming_target_range_coordinate(&mut range, axis, position, mutation, retained_hosts)?;
+    rect.origin.column = Some(range.top_left_column);
+    rect.origin.row = Some(range.top_left_row);
+    let columns = range
+        .bottom_right_column
+        .checked_sub(range.top_left_column)
+        .and_then(|width| width.checked_add(1))
+        .ok_or_else(|| {
+            Error::InvalidFormat("Numbers incoming range-proxy is inverted".to_owned())
+        })?;
+    let rows = range
+        .bottom_right_row
+        .checked_sub(range.top_left_row)
+        .and_then(|height| height.checked_add(1))
+        .ok_or_else(|| {
+            Error::InvalidFormat("Numbers incoming range-proxy is inverted".to_owned())
+        })?;
+    rect.size.num_columns = (columns != 1).then_some(columns);
+    rect.size.num_rows = (rows != 1).then_some(rows);
     Ok(())
 }
 
@@ -1212,7 +1739,7 @@ fn mutate_dependency_record(
     record.row = row;
     record.column = column;
     let Some(edges) = &mut record.expanded_edges else {
-        if external_adjustment.is_some() {
+        if external_adjustment.is_some_and(ExternalPrecedentAdjustments::has_direct_rewrite) {
             return Err(Error::InvalidFormat(format!(
                 "iWork formula host ({}, {}) has cross-table references but no dependency edges",
                 previous_host.0, previous_host.1
@@ -1312,37 +1839,7 @@ fn mutate_dependency_record(
         }
     }
     if let Some(adjustment) = external_adjustment {
-        let existing = edges
-            .internal_owner_id_for_edge
-            .iter()
-            .copied()
-            .zip(edges.edge_with_owner_rows.iter().copied())
-            .zip(edges.edge_with_owner_columns.iter().copied())
-            .map(|((owner, row), column)| (owner, row, column))
-            .collect::<BTreeSet<_>>();
-        if existing != adjustment.previous {
-            return Err(Error::InvalidFormat(format!(
-                "iWork formula host ({}, {}) has cross-table dependency edges that do not match its AST",
-                previous_host.0, previous_host.1
-            )));
-        }
-        let expected_owners = adjustment
-            .current
-            .iter()
-            .map(|(owner, _, _)| *owner)
-            .collect::<Vec<_>>();
-        if edges.internal_owner_id_for_edge != expected_owners {
-            return Err(Error::ParseError(format!(
-                "Cannot relocate iWork formula host ({}, {}) because its cross-table dependency owner sequence would change",
-                previous_host.0, previous_host.1
-            )));
-        }
-        edges.edge_with_owner_rows = adjustment.current.iter().map(|(_, row, _)| *row).collect();
-        edges.edge_with_owner_columns = adjustment
-            .current
-            .iter()
-            .map(|(_, _, column)| *column)
-            .collect();
+        adjustment.rewrite_expanded_edges(edges, previous_host)?;
     }
     Ok(())
 }

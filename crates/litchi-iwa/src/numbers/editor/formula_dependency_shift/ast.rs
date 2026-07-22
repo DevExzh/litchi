@@ -176,26 +176,16 @@ pub(super) fn rewrite_formula_asts(
                     "A retained iWork formula host has no cross-table owner map".to_owned(),
                 )
             })?;
-            let previous_precedents = direct_cross_table_precedents(
-                &previous.ast_node_array,
-                row,
-                column,
-                external_owners,
-            )?;
-            let current_precedents = direct_cross_table_precedents(
-                &current.ast_node_array,
-                row,
-                column,
-                external_owners,
-            )?;
-            if previous_precedents != current_precedents {
-                dependency_adjustments.external_precedents.insert(
-                    (row, column),
-                    ExternalPrecedentAdjustments {
-                        previous: previous_precedents,
-                        current: current_precedents,
-                    },
-                );
+            let previous_precedents =
+                cross_table_precedents(&previous.ast_node_array, row, column, external_owners)?;
+            let current_precedents =
+                cross_table_precedents(&current.ast_node_array, row, column, external_owners)?;
+            let adjustment =
+                ExternalPrecedentAdjustments::new(previous_precedents, current_precedents)?;
+            if adjustment.changed() {
+                dependency_adjustments
+                    .external_precedents
+                    .insert((row, column), adjustment);
             }
         }
         rewrites
@@ -364,46 +354,31 @@ fn local_cell_coordinate(
     )))
 }
 
-/// Resolve every direct cross-table cell reference in a formula AST.
+/// Resolve every cross-table precedent in a formula AST.
 ///
-/// Retained merge anchors may rebase relative cross-table references. Their
-/// direct dependency edges therefore need an exact before/after set. Native
-/// cross-table range dependencies have separate range records, so they remain
-/// deliberately unsupported here until those records can be rebased in the
-/// same transaction.
-fn direct_cross_table_precedents(
+/// Cross-table cells and rectangular ranges are intentionally kept separate:
+/// freshly created workbooks can encode a range as expanded cell edges, while
+/// native Numbers files use dedicated range records.
+fn cross_table_precedents(
     array: &tsce::AstNodeArrayArchive,
     host_row: u32,
     host_column: u32,
     owners: &HashMap<(u64, u64), ExternalFormulaOwner>,
-) -> Result<BTreeSet<(u32, u32, u32)>> {
-    let mut precedents = BTreeSet::new();
-    collect_direct_cross_table_precedents(array, host_row, host_column, owners, &mut precedents)?;
+) -> Result<CrossTablePrecedents> {
+    let mut precedents = CrossTablePrecedents::default();
+    collect_cross_table_precedents(array, host_row, host_column, owners, &mut precedents)?;
     Ok(precedents)
 }
 
-fn collect_direct_cross_table_precedents(
+fn collect_cross_table_precedents(
     array: &tsce::AstNodeArrayArchive,
     host_row: u32,
     host_column: u32,
     owners: &HashMap<(u64, u64), ExternalFormulaOwner>,
-    precedents: &mut BTreeSet<(u32, u32, u32)>,
+    precedents: &mut CrossTablePrecedents,
 ) -> Result<()> {
     for node in &array.ast_node {
         if let Some(reference) = &node.ast_cross_table_reference_extra_info {
-            if node.ast_colon_tract.is_some() {
-                return Err(Error::ParseError(
-                    "Cannot yet relocate a merged iWork formula anchor with cross-table range dependencies"
-                        .to_owned(),
-                ));
-            }
-            let (Some(row), Some(column)) = (node.ast_row.as_ref(), node.ast_column.as_ref())
-            else {
-                return Err(Error::ParseError(
-                    "Cannot yet relocate a merged iWork formula anchor with an unsupported cross-table reference"
-                        .to_owned(),
-                ));
-            };
             let key = cfuuid_key(&reference.table_id).ok_or_else(|| {
                 Error::InvalidFormat(
                     "iWork cross-table formula reference has an invalid owner UUID".to_owned(),
@@ -415,37 +390,93 @@ fn collect_direct_cross_table_precedents(
                         .to_owned(),
                 )
             })?;
-            let target_row = resolve_cross_table_coordinate(
-                row.row,
-                row.absolute.unwrap_or(false),
-                host_row,
-                "row",
-            )?;
-            let target_column = resolve_cross_table_coordinate(
-                column.column,
-                column.absolute.unwrap_or(false),
-                host_column,
-                "column",
-            )?;
-            if target_row >= owner.rows || target_column >= owner.columns {
-                return Err(Error::ParseError(format!(
-                    "iWork cross-table formula reference ({target_row}, {target_column}) is outside its {}x{} target table",
-                    owner.rows, owner.columns
-                )));
+            if let Some(tract) = &node.ast_colon_tract {
+                precedents.ranges.push(cross_table_tract_precedent(
+                    tract,
+                    host_row,
+                    host_column,
+                    *owner,
+                )?);
+            } else {
+                let (Some(row), Some(column)) = (node.ast_row.as_ref(), node.ast_column.as_ref())
+                else {
+                    return Err(Error::ParseError(
+                        "Cannot yet relocate a merged iWork formula anchor with an unsupported cross-table reference"
+                            .to_owned(),
+                    ));
+                };
+                let target_row = resolve_cross_table_coordinate(
+                    row.row,
+                    row.absolute.unwrap_or(false),
+                    host_row,
+                    "row",
+                )?;
+                let target_column = resolve_cross_table_coordinate(
+                    column.column,
+                    column.absolute.unwrap_or(false),
+                    host_column,
+                    "column",
+                )?;
+                if target_row >= owner.rows || target_column >= owner.columns {
+                    return Err(Error::ParseError(format!(
+                        "iWork cross-table formula reference ({target_row}, {target_column}) is outside its {}x{} target table",
+                        owner.rows, owner.columns
+                    )));
+                }
+                precedents.direct.insert(ExternalCellPrecedent {
+                    owner_id: owner.internal_owner_id,
+                    row: target_row,
+                    column: target_column,
+                });
             }
-            precedents.insert((owner.internal_owner_id, target_row, target_column));
         }
         if let Some(nested) = &node.ast_thunk_node_array {
-            collect_direct_cross_table_precedents(
-                nested,
-                host_row,
-                host_column,
-                owners,
-                precedents,
-            )?;
+            collect_cross_table_precedents(nested, host_row, host_column, owners, precedents)?;
         }
     }
     Ok(())
+}
+
+fn cross_table_tract_precedent(
+    tract: &tsce::ast_node_array_archive::AstColonTractArchive,
+    host_row: u32,
+    host_column: u32,
+    owner: ExternalFormulaOwner,
+) -> Result<ExternalRangePrecedent> {
+    let (left, right) = single_cross_table_tract_interval(
+        tract_axis_intervals(tract, DependencyAxis::Column, host_column)?,
+        "column",
+    )?;
+    let (top, bottom) = single_cross_table_tract_interval(
+        tract_axis_intervals(tract, DependencyAxis::Row, host_row)?,
+        "row",
+    )?;
+    if bottom >= owner.rows || right >= owner.columns {
+        return Err(Error::ParseError(format!(
+            "iWork cross-table formula range ({top}, {left})..({bottom}, {right}) is outside its {}x{} target table",
+            owner.rows, owner.columns
+        )));
+    }
+    ExternalRangePrecedent {
+        owner_id: owner.internal_owner_id,
+        top,
+        left,
+        bottom,
+        right,
+    }
+    .validate()
+}
+
+fn single_cross_table_tract_interval(intervals: Vec<(u32, u32)>, axis: &str) -> Result<(u32, u32)> {
+    match intervals.as_slice() {
+        [interval] => Ok(*interval),
+        [] => Err(Error::ParseError(format!(
+            "Cannot yet relocate a merged iWork formula anchor with a whole-{axis} cross-table range"
+        ))),
+        _ => Err(Error::ParseError(format!(
+            "Cannot yet relocate a merged iWork formula anchor with multiple cross-table {axis} ranges"
+        ))),
+    }
 }
 
 fn formula_contains_cross_table_reference(array: &tsce::AstNodeArrayArchive) -> bool {

@@ -416,7 +416,7 @@ fn fresh_merge_owner_id() -> tsp::CfuuidArchive {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::archive::RawMessage;
+    use crate::archive::{ArchiveObject, RawMessage};
     use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
     use crate::numbers::{
         FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocument,
@@ -428,6 +428,42 @@ mod tests {
     use crate::wire::{
         repeated_length_delimited_payloads, transform_length_delimited_fields_at_path,
     };
+
+    const RANGE_PROXY_OWNER_KIND: u32 = 5;
+    const RANGE_PROXY_UUID_LOWER: u64 = 0x4d45_5247_4550_524f;
+    const RANGE_PROXY_UUID_UPPER: u64 = 0x5859_5445_5354_0001;
+
+    #[derive(Clone, Copy)]
+    struct TestRangeBounds {
+        top: u32,
+        left: u32,
+        bottom: u32,
+        right: u32,
+    }
+
+    impl TestRangeBounds {
+        const fn new(top: u32, left: u32, bottom: u32, right: u32) -> Self {
+            Self {
+                top,
+                left,
+                bottom,
+                right,
+            }
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct NativeRangeDependencyIds {
+        source_owner_id: u32,
+        external_owner_id: u32,
+    }
+
+    #[derive(Clone, Copy)]
+    struct NativeMergeRangeProxyIds {
+        object_id: u64,
+        range_tile_id: u64,
+        internal_owner_id: u32,
+    }
 
     #[test]
     fn region_validates_shape_overflow_and_overlap() {
@@ -734,7 +770,7 @@ mod tests {
     }
 
     #[test]
-    fn merged_cross_table_range_anchor_deletion_is_transactional() {
+    fn merged_cross_table_range_anchor_rebases_expanded_edges_and_cache() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(5, 6)
             .build()
@@ -749,6 +785,9 @@ mod tests {
             .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
             .unwrap();
         editor
+            .set_cell(target_table.object_id, 2, 0, CellValue::Number(3.0))
+            .unwrap();
+        editor
             .set_formula_with_cached_value(
                 source_table_id,
                 region.row(),
@@ -758,21 +797,163 @@ mod tests {
                     [FormulaExpression::table_range(
                         target_table.object_id,
                         FormulaCellReference::relative(1, 0),
-                        FormulaCellReference::relative(1, 0),
+                        FormulaCellReference::relative(2, 0),
                     )],
                 ),
-                FormulaCachedValue::Number(7.0),
+                FormulaCachedValue::Number(10.0),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
-        let baseline = editor.to_bytes().unwrap();
+        let mut package = editor.into_package();
+        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        let mut editor = NumbersEditor::from_package(package).unwrap();
+        let external_owner_id = formula_owner_at_host(&editor, 1, 1)
+            .cell_dependencies
+            .as_ref()
+            .unwrap()
+            .cell_record[0]
+            .expanded_edges
+            .as_ref()
+            .unwrap()
+            .internal_owner_id_for_edge[0];
 
-        assert!(
-            editor
-                .remove_table_row(source_table_id, TableRowDeletion::body(0))
-                .is_err()
+        editor
+            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .unwrap();
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula(
+                "=SUM(Sheet 1::Referenced::A3:A4)".to_owned()
+            ))
         );
-        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 3.0);
+        assert_formula_host_range_edges(&editor, external_owner_id, &[2, 3], &[0, 0]);
+
+        editor
+            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula(
+                "=SUM(Sheet 1::Referenced::B3:B4)".to_owned()
+            ))
+        );
+        assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 0.0);
+        assert_formula_host_range_edges(&editor, external_owner_id, &[2, 3], &[1, 1]);
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_formula_host_range_edges(&reopened, external_owner_id, &[2, 3], &[1, 1]);
+    }
+
+    #[test]
+    fn merged_cross_table_range_anchor_rebases_native_range_records_and_cache() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(5, 6)
+            .build()
+            .unwrap();
+        let source_table_id = editor.tables().unwrap()[0].object_id;
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let target_table = editor
+            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .unwrap();
+        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        editor
+            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .unwrap();
+        editor
+            .set_cell(target_table.object_id, 2, 0, CellValue::Number(3.0))
+            .unwrap();
+        editor
+            .set_formula_with_cached_value(
+                source_table_id,
+                region.row(),
+                region.column(),
+                FormulaExpression::function(
+                    "SUM",
+                    [FormulaExpression::table_range(
+                        target_table.object_id,
+                        FormulaCellReference::relative(1, 0),
+                        FormulaCellReference::relative(2, 0),
+                    )],
+                ),
+                FormulaCachedValue::Number(10.0),
+            )
+            .unwrap();
+        editor.merge_cells(source_table_id, region).unwrap();
+
+        let mut package = editor.into_package();
+        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        let dependency_ids = install_native_cross_table_range_dependencies(
+            &mut package,
+            region.row() as u32,
+            region.column() as u32,
+            TestRangeBounds::new(1, 0, 2, 0),
+        );
+        let proxy = install_native_merge_range_proxy(
+            &mut package,
+            dependency_ids.source_owner_id,
+            TestRangeBounds::new(1, 1, 2, 2),
+        );
+        let mut editor = NumbersEditor::from_package(package).unwrap();
+
+        editor
+            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .unwrap();
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula(
+                "=SUM(Sheet 1::Referenced::A3:A4)".to_owned()
+            ))
+        );
+        assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 3.0);
+        assert_formula_host_native_range_dependencies(
+            &editor,
+            dependency_ids.external_owner_id,
+            TestRangeBounds::new(2, 0, 3, 0),
+        );
+        assert_native_merge_range_proxy(
+            &editor,
+            proxy,
+            dependency_ids.source_owner_id,
+            TestRangeBounds::new(1, 1, 1, 2),
+        );
+
+        editor
+            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula(
+                "=SUM(Sheet 1::Referenced::B3:B4)".to_owned()
+            ))
+        );
+        assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 0.0);
+        assert_formula_host_native_range_dependencies(
+            &editor,
+            dependency_ids.external_owner_id,
+            TestRangeBounds::new(2, 1, 3, 1),
+        );
+        assert_native_merge_range_proxy(
+            &editor,
+            proxy,
+            dependency_ids.source_owner_id,
+            TestRangeBounds::new(1, 1, 1, 1),
+        );
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_formula_host_native_range_dependencies(
+            &reopened,
+            dependency_ids.external_owner_id,
+            TestRangeBounds::new(2, 1, 3, 1),
+        );
+        assert_native_merge_range_proxy(
+            &reopened,
+            proxy,
+            dependency_ids.source_owner_id,
+            TestRangeBounds::new(1, 1, 1, 1),
+        );
     }
 
     #[test]
@@ -1385,6 +1566,378 @@ mod tests {
             .unwrap();
     }
 
+    fn install_native_cross_table_range_dependencies(
+        package: &mut IWorkPackage,
+        row: u32,
+        column: u32,
+        bounds: TestRangeBounds,
+    ) -> NativeRangeDependencyIds {
+        let component = package
+            .calculation_engine_entry_name()
+            .unwrap()
+            .unwrap()
+            .to_owned();
+        let mut dependency_ids = None;
+        package
+            .update_archive(&component, |archive| {
+                let range_tile_id = archive
+                    .objects
+                    .iter()
+                    .filter_map(|object| object.archive_info.identifier)
+                    .max()
+                    .and_then(|identifier| identifier.checked_add(1))
+                    .ok_or_else(|| {
+                        Error::ParseError(
+                            "Test CalculationEngine cannot allocate a range tile identifier"
+                                .to_owned(),
+                        )
+                    })?;
+                let mut source = None;
+                for object in &archive.objects {
+                    let Some(object_id) = object.archive_info.identifier else {
+                        continue;
+                    };
+                    for (message_index, message) in object.messages.iter().enumerate() {
+                        if message.type_ != 4_008 {
+                            continue;
+                        }
+                        let owner =
+                            tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+                        let contains_host =
+                            owner
+                                .cell_dependencies
+                                .as_ref()
+                                .is_some_and(|dependencies| {
+                                    dependencies
+                                        .cell_record
+                                        .iter()
+                                        .any(|record| record.row == row && record.column == column)
+                                });
+                        if contains_host {
+                            source = Some((object_id, message_index, owner));
+                            break;
+                        }
+                    }
+                    if source.is_some() {
+                        break;
+                    }
+                }
+                let Some((source_object_id, message_index, mut owner)) = source else {
+                    return Err(Error::InvalidFormat(
+                        "Test formula owner has no matching range host".to_owned(),
+                    ));
+                };
+                let host = owner
+                    .cell_dependencies
+                    .as_ref()
+                    .and_then(|dependencies| {
+                        dependencies
+                            .cell_record
+                            .iter()
+                            .find(|record| record.row == row && record.column == column)
+                    })
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "Test formula owner has no matching dependency record".to_owned(),
+                        )
+                    })?;
+                let edges = host.expanded_edges.as_ref().ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "Test formula host has no expanded dependency edges".to_owned(),
+                    )
+                })?;
+                let target_owner_id = edges
+                    .internal_owner_id_for_edge
+                    .first()
+                    .copied()
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "Test formula host has no cross-table dependency owner".to_owned(),
+                        )
+                    })?;
+                if edges
+                    .internal_owner_id_for_edge
+                    .iter()
+                    .any(|owner_id| *owner_id != target_owner_id)
+                {
+                    return Err(Error::InvalidFormat(
+                        "Test formula host has mixed cross-table dependency owners".to_owned(),
+                    ));
+                }
+                let cell_tile_ids = owner
+                    .tiled_cell_dependencies
+                    .as_ref()
+                    .map(|dependencies| {
+                        dependencies
+                            .cell_record_tiles
+                            .iter()
+                            .map(|reference| reference.identifier)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                let host_record = owner
+                    .cell_dependencies
+                    .as_mut()
+                    .and_then(|dependencies| {
+                        dependencies
+                            .cell_record
+                            .iter_mut()
+                            .find(|record| record.row == row && record.column == column)
+                    })
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "Test formula owner has no mutable dependency record".to_owned(),
+                        )
+                    })?;
+                host_record.expanded_edges = Some(tsce::ExpandedEdgesArchive::default());
+                owner.range_dependencies = Some(tsce::RangeDependenciesArchive {
+                    back_dependency: vec![tsce::RangeBackDependencyArchive {
+                        cell_coord_row: row,
+                        cell_coord_column: column,
+                        internal_range_reference: Some(tsce::InternalRangeReferenceArchive {
+                            owner_id: target_owner_id,
+                            range: tsce::RangeCoordinateArchive {
+                                top_left_column: bounds.left,
+                                top_left_row: bounds.top,
+                                bottom_right_column: bounds.right,
+                                bottom_right_row: bounds.bottom,
+                            },
+                        }),
+                        ..Default::default()
+                    }],
+                });
+                owner.tiled_range_dependencies = Some(tsce::RangeDependenciesTiledArchive {
+                    range_precedents_tile: vec![tsp::Reference {
+                        identifier: range_tile_id,
+                        ..Default::default()
+                    }],
+                });
+                let source_object = archive.object_mut(source_object_id).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "Test formula owner object is missing during range setup".to_owned(),
+                    )
+                })?;
+                let message_type = source_object.messages[message_index].type_;
+                source_object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: message_type,
+                        data: owner.encode_to_vec(),
+                    },
+                )?;
+                source_object.archive_info.message_infos[message_index]
+                    .object_references
+                    .push(range_tile_id);
+
+                let mut found_tiled_host = false;
+                for tile_id in cell_tile_ids {
+                    let tile_object = archive.object_mut(tile_id).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Test formula dependency tile {tile_id} is missing"
+                        ))
+                    })?;
+                    let tile_message_index = tile_object
+                        .messages
+                        .iter()
+                        .position(|message| message.type_ == 4_009)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "Test formula dependency tile {tile_id} has no payload"
+                            ))
+                        })?;
+                    let message = tile_object.messages[tile_message_index].clone();
+                    let mut tile = tsce::CellRecordTileArchive::decode(message.data.as_slice())?;
+                    for record in &mut tile.cell_records {
+                        if record.row == row && record.column == column {
+                            record.expanded_edges = Some(tsce::ExpandedEdgesArchive::default());
+                            found_tiled_host = true;
+                        }
+                    }
+                    tile_object.replace_message(
+                        tile_message_index,
+                        RawMessage {
+                            type_: message.type_,
+                            data: tile.encode_to_vec(),
+                        },
+                    )?;
+                }
+                if !found_tiled_host {
+                    return Err(Error::InvalidFormat(
+                        "Test formula host is absent from its dependency tiles".to_owned(),
+                    ));
+                }
+                archive.insert_object(ArchiveObject::new(
+                    range_tile_id,
+                    vec![RawMessage {
+                        type_: 4_010,
+                        data: tsce::RangePrecedentsTileArchive {
+                            to_owner_id: target_owner_id,
+                            from_to_range: vec![
+                                tsce::range_precedents_tile_archive::FromToRangeArchive {
+                                    from_coord: tsce::CellCoordinateArchive {
+                                        column: Some(column),
+                                        row: Some(row),
+                                        ..Default::default()
+                                    },
+                                    refers_to_rect: tsce::CellRectArchive {
+                                        origin: tsce::CellCoordinateArchive {
+                                            column: Some(bounds.left),
+                                            row: Some(bounds.top),
+                                            ..Default::default()
+                                        },
+                                        size: tsce::ColumnRowSize {
+                                            num_columns: (bounds.right != bounds.left)
+                                                .then_some(bounds.right - bounds.left + 1),
+                                            num_rows: (bounds.bottom != bounds.top)
+                                                .then_some(bounds.bottom - bounds.top + 1),
+                                        },
+                                    },
+                                },
+                            ],
+                        }
+                        .encode_to_vec(),
+                    }],
+                )?)?;
+                dependency_ids = Some(NativeRangeDependencyIds {
+                    source_owner_id: owner.internal_formula_owner_id,
+                    external_owner_id: target_owner_id,
+                });
+                Ok(())
+            })
+            .unwrap();
+        dependency_ids.unwrap()
+    }
+
+    fn install_native_merge_range_proxy(
+        package: &mut IWorkPackage,
+        source_owner_id: u32,
+        bounds: TestRangeBounds,
+    ) -> NativeMergeRangeProxyIds {
+        let component = package
+            .calculation_engine_entry_name()
+            .unwrap()
+            .unwrap()
+            .to_owned();
+        let mut proxy_ids = None;
+        package
+            .update_archive(&component, |archive| {
+                let first_object_id = archive
+                    .objects
+                    .iter()
+                    .filter_map(|object| object.archive_info.identifier)
+                    .max()
+                    .and_then(|identifier| identifier.checked_add(1))
+                    .ok_or_else(|| {
+                        Error::ParseError(
+                            "Test CalculationEngine cannot allocate a range-proxy object ID"
+                                .to_owned(),
+                        )
+                    })?;
+                let range_tile_id = first_object_id.checked_add(1).ok_or_else(|| {
+                    Error::ParseError(
+                        "Test CalculationEngine cannot allocate a range-proxy tile ID".to_owned(),
+                    )
+                })?;
+                let internal_owner_id = archive
+                    .objects
+                    .iter()
+                    .flat_map(|object| &object.messages)
+                    .filter(|message| message.type_ == 4_008)
+                    .map(|message| {
+                        Ok::<_, Error>(
+                            tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?
+                                .internal_formula_owner_id,
+                        )
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .into_iter()
+                    .max()
+                    .and_then(|identifier| identifier.checked_add(1))
+                    .ok_or_else(|| {
+                        Error::ParseError(
+                            "Test CalculationEngine cannot allocate a range-proxy owner ID"
+                                .to_owned(),
+                        )
+                    })?;
+                let owner = tsce::FormulaOwnerDependenciesArchive {
+                    formula_owner_uid: tsp::Uuid {
+                        lower: RANGE_PROXY_UUID_LOWER,
+                        upper: RANGE_PROXY_UUID_UPPER,
+                    },
+                    internal_formula_owner_id: internal_owner_id,
+                    owner_kind: Some(RANGE_PROXY_OWNER_KIND),
+                    range_dependencies: Some(tsce::RangeDependenciesArchive {
+                        back_dependency: vec![tsce::RangeBackDependencyArchive {
+                            cell_coord_row: 0,
+                            cell_coord_column: 0,
+                            internal_range_reference: Some(tsce::InternalRangeReferenceArchive {
+                                owner_id: source_owner_id,
+                                range: tsce::RangeCoordinateArchive {
+                                    top_left_column: bounds.left,
+                                    top_left_row: bounds.top,
+                                    bottom_right_column: bounds.right,
+                                    bottom_right_row: bounds.bottom,
+                                },
+                            }),
+                            ..Default::default()
+                        }],
+                    }),
+                    tiled_range_dependencies: Some(tsce::RangeDependenciesTiledArchive {
+                        range_precedents_tile: vec![tsp::Reference {
+                            identifier: range_tile_id,
+                            ..Default::default()
+                        }],
+                    }),
+                    ..Default::default()
+                };
+                let range_tile = tsce::RangePrecedentsTileArchive {
+                    to_owner_id: source_owner_id,
+                    from_to_range: vec![tsce::range_precedents_tile_archive::FromToRangeArchive {
+                        from_coord: tsce::CellCoordinateArchive {
+                            column: Some(0),
+                            row: Some(0),
+                            ..Default::default()
+                        },
+                        refers_to_rect: tsce::CellRectArchive {
+                            origin: tsce::CellCoordinateArchive {
+                                column: Some(bounds.left),
+                                row: Some(bounds.top),
+                                ..Default::default()
+                            },
+                            size: tsce::ColumnRowSize {
+                                num_columns: (bounds.right != bounds.left)
+                                    .then_some(bounds.right - bounds.left + 1),
+                                num_rows: (bounds.bottom != bounds.top)
+                                    .then_some(bounds.bottom - bounds.top + 1),
+                            },
+                        },
+                    }],
+                };
+                archive.insert_object(ArchiveObject::new(
+                    first_object_id,
+                    vec![RawMessage {
+                        type_: 4_008,
+                        data: owner.encode_to_vec(),
+                    }],
+                )?)?;
+                archive.insert_object(ArchiveObject::new(
+                    range_tile_id,
+                    vec![RawMessage {
+                        type_: 4_010,
+                        data: range_tile.encode_to_vec(),
+                    }],
+                )?)?;
+                proxy_ids = Some(NativeMergeRangeProxyIds {
+                    object_id: first_object_id,
+                    range_tile_id,
+                    internal_owner_id,
+                });
+                Ok(())
+            })
+            .unwrap();
+        proxy_ids.unwrap()
+    }
+
     fn uuid_host_coordinate_set(row: u32, column: u32) -> tsce::CellCoordSetArchive {
         tsce::CellCoordSetArchive {
             column_entries: vec![tsce::cell_coord_set_archive::ColumnEntry {
@@ -1454,6 +2007,185 @@ mod tests {
                 .unwrap(),
             1,
             1,
+        );
+    }
+
+    fn assert_formula_host_range_edges(
+        editor: &NumbersEditor,
+        external_owner_id: u32,
+        target_rows: &[u32],
+        target_columns: &[u32],
+    ) {
+        assert_eq!(target_rows.len(), target_columns.len());
+        let owner = formula_owner_at_host(editor, 1, 1);
+        let record = &owner.cell_dependencies.as_ref().unwrap().cell_record[0];
+        assert_eq!((record.row, record.column), (1, 1));
+        let edges = record.expanded_edges.as_ref().unwrap();
+        assert_eq!(
+            edges.internal_owner_id_for_edge,
+            vec![external_owner_id; target_rows.len()]
+        );
+        assert_eq!(edges.edge_with_owner_rows, target_rows);
+        assert_eq!(edges.edge_with_owner_columns, target_columns);
+        let references = owner.uuid_references.as_ref().unwrap();
+        assert_uuid_host_coordinate(references.table_refs[0].coord_set.as_ref().unwrap(), 1, 1);
+        assert_uuid_host_coordinate(
+            references.table_uuid_refs[0].uuid_refs[0]
+                .coord_set
+                .as_ref()
+                .unwrap(),
+            1,
+            1,
+        );
+    }
+
+    fn assert_formula_host_native_range_dependencies(
+        editor: &NumbersEditor,
+        external_owner_id: u32,
+        bounds: TestRangeBounds,
+    ) {
+        let owner = formula_owner_at_host(editor, 1, 1);
+        let record = &owner.cell_dependencies.as_ref().unwrap().cell_record[0];
+        assert_eq!((record.row, record.column), (1, 1));
+        assert_eq!(
+            record
+                .expanded_edges
+                .as_ref()
+                .unwrap()
+                .internal_owner_id_for_edge,
+            []
+        );
+        let dependency = &owner.range_dependencies.as_ref().unwrap().back_dependency[0];
+        assert_eq!(
+            (dependency.cell_coord_row, dependency.cell_coord_column),
+            (1, 1)
+        );
+        let reference = dependency.internal_range_reference.as_ref().unwrap();
+        assert_eq!(reference.owner_id, external_owner_id);
+        assert_eq!(
+            (
+                reference.range.top_left_row,
+                reference.range.top_left_column,
+                reference.range.bottom_right_row,
+                reference.range.bottom_right_column,
+            ),
+            (bounds.top, bounds.left, bounds.bottom, bounds.right)
+        );
+        let component = editor
+            .package()
+            .calculation_engine_entry_name()
+            .unwrap()
+            .unwrap();
+        let archive = editor.package().archive(component).unwrap();
+        let tile_id = owner
+            .tiled_range_dependencies
+            .as_ref()
+            .unwrap()
+            .range_precedents_tile[0]
+            .identifier;
+        let tile = archive.object(tile_id).unwrap();
+        let tile = tsce::RangePrecedentsTileArchive::decode(
+            tile.messages
+                .iter()
+                .find(|message| message.type_ == 4_010)
+                .unwrap()
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        assert_eq!(tile.to_owner_id, external_owner_id);
+        let range = &tile.from_to_range[0];
+        assert_eq!(
+            (range.from_coord.row, range.from_coord.column),
+            (Some(1), Some(1))
+        );
+        assert_eq!(
+            (
+                range.refers_to_rect.origin.row,
+                range.refers_to_rect.origin.column
+            ),
+            (Some(bounds.top), Some(bounds.left))
+        );
+        assert_eq!(
+            range.refers_to_rect.size.num_rows,
+            (bounds.bottom != bounds.top).then_some(bounds.bottom - bounds.top + 1)
+        );
+        assert_eq!(
+            range.refers_to_rect.size.num_columns,
+            (bounds.right != bounds.left).then_some(bounds.right - bounds.left + 1)
+        );
+        let references = owner.uuid_references.as_ref().unwrap();
+        assert_uuid_host_coordinate(references.table_refs[0].coord_set.as_ref().unwrap(), 1, 1);
+        assert_uuid_host_coordinate(
+            references.table_uuid_refs[0].uuid_refs[0]
+                .coord_set
+                .as_ref()
+                .unwrap(),
+            1,
+            1,
+        );
+    }
+
+    fn assert_native_merge_range_proxy(
+        editor: &NumbersEditor,
+        proxy: NativeMergeRangeProxyIds,
+        source_owner_id: u32,
+        bounds: TestRangeBounds,
+    ) {
+        let component = editor
+            .package()
+            .calculation_engine_entry_name()
+            .unwrap()
+            .unwrap();
+        let archive = editor.package().archive(component).unwrap();
+        let object = archive.object(proxy.object_id).unwrap();
+        let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+            object
+                .messages
+                .iter()
+                .find(|message| message.type_ == 4_008)
+                .unwrap()
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        assert_eq!(owner.internal_formula_owner_id, proxy.internal_owner_id);
+        assert_eq!(owner.formula_owner, None);
+        let dependency = &owner.range_dependencies.as_ref().unwrap().back_dependency[0];
+        let reference = dependency.internal_range_reference.as_ref().unwrap();
+        assert_eq!(reference.owner_id, source_owner_id);
+        assert_eq!(
+            (
+                reference.range.top_left_row,
+                reference.range.top_left_column,
+                reference.range.bottom_right_row,
+                reference.range.bottom_right_column,
+            ),
+            (bounds.top, bounds.left, bounds.bottom, bounds.right)
+        );
+        let tile = archive.object(proxy.range_tile_id).unwrap();
+        let tile = tsce::RangePrecedentsTileArchive::decode(
+            tile.messages
+                .iter()
+                .find(|message| message.type_ == 4_010)
+                .unwrap()
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        assert_eq!(tile.to_owner_id, source_owner_id);
+        let range = &tile.from_to_range[0].refers_to_rect;
+        assert_eq!(
+            (range.origin.row, range.origin.column),
+            (Some(bounds.top), Some(bounds.left))
+        );
+        assert_eq!(
+            range.size.num_rows,
+            (bounds.bottom != bounds.top).then_some(bounds.bottom - bounds.top + 1)
+        );
+        assert_eq!(
+            range.size.num_columns,
+            (bounds.right != bounds.left).then_some(bounds.right - bounds.left + 1)
         );
     }
 
