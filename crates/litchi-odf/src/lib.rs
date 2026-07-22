@@ -575,7 +575,7 @@ pub use ruby_family::{
     RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
     RubyStyle, RubyStyles, insert_ruby_annotation_xml, parse_ruby_annotations, parse_ruby_styles,
     remove_ruby_annotation_xml, remove_ruby_style_xml, replace_ruby_annotation_xml,
-    set_ruby_style_xml,
+    set_ruby_style_xml, wrap_ruby_annotation_xml,
 };
 pub use rdf_package::{OdfRdfGraph, OdfRdfObject, OdfRdfSubject, OdfRdfTriple};
 pub use settings::{

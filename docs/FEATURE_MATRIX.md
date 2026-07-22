@@ -376,7 +376,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Track changes | ✅ | ✅ | ✅ | Change metadata, regions, policy, and mutation APIs |
 | Dynamic/database fields | ✅ | ✅ | ✅ | Date/time/page/user/variable/database families; no external query execution |
 | Variables and declarations | ✅ | ✅ | ✅ | Typed declarations and mutation |
-| Ruby annotations | 🟡 | ✅ | 🟡 | Typed `text:ruby` insertion, named ruby styles, and mutable CRUD; insertion appends to a selected paragraph |
+| Ruby annotations | 🟡 | ✅ | 🟡 | Typed `text:ruby` insertion, named ruby styles, and mutable CRUD; append or validate a UTF-8 range wholly inside one text/CDATA/entity node without splitting surrounding markup |
 | TOC, indexes, and source marks | 🟡 | ✅ | ✅ | Typed structures and cached-body authoring; no pagination or automatic regeneration |
 | Bibliography records | 🟡 | ✅ | ✅ | Inert bibliography configuration/records and source marks |
 | Images and drawing frames | 🟡 | ✅ | 🟡 | Semantic discovery and resource replacement/removal; arbitrary drawing authoring is limited |

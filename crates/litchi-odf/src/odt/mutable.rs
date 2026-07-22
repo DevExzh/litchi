@@ -24,7 +24,7 @@ use crate::{
     OdfVariableScope,
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
-use std::path::Path;
+use std::{ops::Range, path::Path};
 
 /// Document element type for tracking insertion order
 #[derive(Debug, Clone)]
@@ -240,6 +240,26 @@ impl MutableDocument {
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_ruby_annotation_xml(xml, paragraph_index, annotation)
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+
+    /// Wrap one UTF-8 text-node range in a selected paragraph with ruby.
+    ///
+    /// The range uses the structural coordinate space accepted by
+    /// `wrap_ruby_annotation_xml`: it must be non-empty, wholly within one
+    /// text/CDATA/entity node, and equal the annotation's plain-text base.
+    /// Existing inline markup is never split. Ruby insertion is inert and
+    /// does not execute scripts, macros, links, or external content.
+    pub fn wrap_ruby_annotation(
+        &mut self,
+        paragraph_index: usize,
+        range: Range<usize>,
+        annotation: &crate::RubyAnnotation,
+    ) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            crate::wrap_ruby_annotation_xml(xml, paragraph_index, range, annotation)
         })?;
         self.content_xml = Some(updated);
         Ok(())
@@ -2584,6 +2604,25 @@ mod tests {
         assert!(mutable.ruby_annotations().unwrap().annotations.is_empty());
         assert!(mutable.remove_ruby_style("RubyAbove").unwrap().is_some());
         assert!(mutable.ruby_styles().unwrap().styles.is_empty());
+    }
+
+    #[test]
+    fn mutable_ruby_range_wrapping_round_trips_through_an_odt_package() {
+        let annotation =
+            crate::RubyAnnotation::new(None, crate::RubyBase::from_text("字").unwrap(), "じ", None)
+                .unwrap();
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("Read 漢字").unwrap();
+        let start = "Read 漢".len();
+        mutable
+            .wrap_ruby_annotation(0, start..start + "字".len(), &annotation)
+            .unwrap();
+
+        let document = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.ruby_annotations().unwrap().annotations,
+            vec![annotation]
+        );
     }
 
     #[test]
