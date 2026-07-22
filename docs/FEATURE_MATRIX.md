@@ -44,7 +44,7 @@ conversion, fonts, and image conversion are optional.
 | Unified document facade | 🟡 | ✅ | ❌ | Common text/metadata access for DOC, DOCX, RTF, Pages, and ODT; authoring remains format-specific |
 | Unified presentation facade | 🟡 | ✅ | ❌ | Common access for PPT, PPTX, Keynote, and ODP; authoring remains format-specific |
 | Unified workbook facade | ✅ | ✅ | ❌ | Common sheet names/count, text, and metadata for XLS, XLSX, XLSB, ODS, and Numbers |
-| Workbook trait API | 🟡 | ✅ | ❌ | Implemented by XLS, XLSX, XLSB, and text workbooks; ODS and Numbers use the unified facade |
+| Workbook trait API | 🟡 | ✅ | ❌ | Implemented by XLS, XLSX, XLSB, text workbooks, and immutable ODS evaluation snapshots; Numbers uses the unified facade |
 | OOXML OPC package editing | ✅ | ✅ | ✅ | Parts, relationships, content types, strict/transitional XML, and transactional graph updates |
 | OLE/CFB package editing | ✅ | ✅ | ✅ | Streams, storages, property sets, and package-preserving editors |
 | ODF package editing | ✅ | ✅ | ✅ | ZIP package, manifest, metadata, styles, settings, resources, and MIME validation |
@@ -394,7 +394,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Sheets, rows, columns, and cells | ✅ | ✅ | ✅ | Add/remove sheets, range access, insert/delete rows/columns, and typed values |
 | Cell value types | ✅ | ✅ | ✅ | String, number, boolean, date/time, duration, percentage, currency, and error-like values |
 | Formula strings and references | ✅ | ✅ | ✅ | OpenFormula text and cached values |
-| Formula evaluation | ❌ | ❌ | N/A | ODS does not yet implement the workbook trait required by the shared evaluator |
+| Formula evaluation | 🟡 | ✅ | N/A | Immutable ODS snapshots implement the shared workbook trait; common OpenFormula A1 references and semicolon arguments are normalized for the evaluator, while unsupported grammar remains an explicit formula error |
 | Repeated and merged cells/rows | ✅ | ✅ | ✅ | Semantic expansion and deterministic serialization |
 | Styles and full cell formatting | ✅ | ✅ | ✅ | Text, alignment, borders, backgrounds, number/data styles, and protection styles |
 | Conditional cell styles | ✅ | ✅ | ✅ | ODF style-map conditions and ordered mutation; not the full Excel rule family |

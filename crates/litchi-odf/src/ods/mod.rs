@@ -34,7 +34,7 @@
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
 //! - ✅ Basic formula parsing
-//! - ⚠️ Formula evaluation (not implemented)
+//! - ✅ Immutable `WorkbookTrait` adapter for shared formula evaluation
 //! - ⚠️ Formula dependency tracking
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
@@ -81,6 +81,7 @@ mod data_validation;
 pub(crate) mod database_range;
 mod dde;
 mod detective;
+mod evaluation;
 /// OpenFormula parsing and support
 pub mod formula;
 mod hyperlink;
@@ -131,6 +132,7 @@ pub use detective::{
     CellDetective, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
     DetectiveOperationKind,
 };
+pub use evaluation::{OdsWorkbook, normalize_open_formula};
 pub use hyperlink::CellHyperlink;
 pub use label_range::{LabelRange, LabelRangeOrientation};
 pub use mutable::MutableSpreadsheet;

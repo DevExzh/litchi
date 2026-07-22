@@ -738,9 +738,6 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
             output.push_str(if *value { "true" } else { "false" });
             output.push('"');
         },
-        CellValue::Empty if cell.formula.is_some() => {
-            output.push_str(" office:value-type=\"float\" office:value=\"0\"");
-        },
         CellValue::Empty
             if cell.annotation.is_none()
                 && cell.range_source.is_none()
@@ -762,11 +759,7 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
     if let Some(detective) = &cell.detective {
         super::detective::write_detective(output, detective);
     }
-    if matches!(cell.value, CellValue::Empty) {
-        if cell.formula.is_some() {
-            output.push_str("<text:p>0</text:p>");
-        }
-    } else {
+    if !matches!(cell.value, CellValue::Empty) {
         output.push_str("<text:p>");
         output.push_str(&escape_xml(&cell.text));
         output.push_str("</text:p>");
@@ -929,6 +922,19 @@ mod tests {
         assert!(xml.contains("<table:cell-range-source"));
         assert!(xml.ends_with("</table:covered-table-cell>"));
         assert_eq!(cell.take_range_source(), Some(source));
+    }
+
+    #[test]
+    fn leaves_an_uncached_formula_without_a_fabricated_zero_result() {
+        let mut cell = Cell::new(CellValue::Empty, "", 0, 0);
+        cell.formula = Some("of:=SUM([.A1:.B1])".to_string());
+
+        let mut xml = String::new();
+        write_cell_xml(&mut xml, &cell);
+
+        assert!(xml.contains("table:formula=\"of:=SUM([.A1:.B1])\""));
+        assert!(!xml.contains("office:value=\"0\""));
+        assert!(!xml.contains("<text:p>0</text:p>"));
     }
 
     #[test]

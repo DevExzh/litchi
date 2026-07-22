@@ -2752,8 +2752,10 @@ mod tests {
         builder.set_cell_formula(0, 0, "=IF(TRUE,1,0)").unwrap();
 
         let xml = builder.generate_content_xml().unwrap();
-        // Empty cell with formula should have value type
-        assert!(xml.contains("office:value-type="));
+        // An unevaluated formula must not pretend that zero is its cached value.
+        assert!(xml.contains(r#"table:formula="=IF(TRUE,1,0)""#));
+        assert!(!xml.contains("office:value-type="));
+        assert!(!xml.contains("<text:p>0</text:p>"));
     }
 
     #[test]

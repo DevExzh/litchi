@@ -644,7 +644,7 @@ pub use ods::{
     LabelRange, LabelRangeOrientation, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
     NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet,
     SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetStyle,
-    SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet, SpreadsheetBuilder,
+    SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet, SpreadsheetBuilder, OdsWorkbook,
     TableCellProtectionStyle,
     SpreadsheetCellContentChange, SpreadsheetChangeAcceptance, SpreadsheetChangeCutOff,
     SpreadsheetChangeDimension, SpreadsheetChangeInfo, SpreadsheetChangeMetadata,
@@ -656,7 +656,7 @@ pub use ods::{
     TableTemplateStyle, TableVisibility, ValidationDisplayList, ValidationErrorMacro,
     ValidationErrorMessage, ValidationEventListener, ValidationMessage, ValidationMessageType,
     ValidationPresentationEventListener, ValidationPresentationSound,
-    ValidationScriptEventListener,
+    ValidationScriptEventListener, normalize_open_formula,
 };
 pub use odt::{
     AlphabeticalIndexSource, BibliographyIndexSource, ChangeType, Document, DocumentBuilder,

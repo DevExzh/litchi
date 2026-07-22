@@ -492,6 +492,24 @@ impl Spreadsheet {
         Ok(sheets)
     }
 
+    /// Create an immutable snapshot for the shared spreadsheet trait API.
+    ///
+    /// This parses the worksheet content once and keeps the resulting values
+    /// in an owned read-only model.  Use it with consumers such as
+    /// `litchi_eval::FormulaEvaluator` without repeatedly reparsing the ODS
+    /// package.  The original `Spreadsheet` remains usable for package edits.
+    pub fn evaluation_workbook(&mut self) -> Result<super::OdsWorkbook> {
+        super::OdsWorkbook::from_sheets(self.sheets()?)
+    }
+
+    /// Consume this spreadsheet into an immutable shared-workbook snapshot.
+    ///
+    /// Unlike [`Self::evaluation_workbook`], this avoids retaining the ODS
+    /// package after its sheets have been materialized.
+    pub fn into_evaluation_workbook(mut self) -> Result<super::OdsWorkbook> {
+        super::OdsWorkbook::from_sheets(self.sheets()?)
+    }
+
     /// Return all named ranges and expressions in document order.
     pub fn named_definitions(&self) -> &[NamedDefinition] {
         &self.named_definitions
