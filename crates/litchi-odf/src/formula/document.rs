@@ -1,6 +1,6 @@
 //! Inert, namespace-aware MathML access for OpenDocument Formula packages.
 
-use crate::{OdfMetadata, OpenDocumentFamily, OpenDocumentPackage};
+use crate::{OdfMetadata, OpenDocumentFamily, OpenDocumentPackage, PackageWriter, constants};
 use litchi_core::{Error, Metadata, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart, Event};
@@ -223,6 +223,32 @@ pub struct FormulaDocument {
 }
 
 impl FormulaDocument {
+    /// Create a standard OpenDocument Formula package from validated MathML.
+    ///
+    /// The supplied XML must have a MathML `math` root. Its markup and any
+    /// annotations are stored as inert document data and are never evaluated.
+    pub fn create(mathml: impl AsRef<str>) -> Result<Self> {
+        Self::create_with_mimetype(mathml.as_ref(), constants::ODF_FORMULA)
+    }
+
+    /// Create an OpenDocument Formula template package from validated MathML.
+    ///
+    /// This is equivalent to [`Self::create`] but emits the standard formula
+    /// template MIME type used by `.otf` files. Formula markup remains inert.
+    pub fn create_template(mathml: impl AsRef<str>) -> Result<Self> {
+        Self::create_with_mimetype(mathml.as_ref(), constants::ODF_FORMULA_TEMPLATE)
+    }
+
+    fn create_with_mimetype(mathml: &str, mimetype: &str) -> Result<Self> {
+        // Validate before emitting any package data so malformed MathML never
+        // becomes a partially authored formula package.
+        parse_mathml(mathml)?;
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(mimetype)?;
+        writer.add_file(constants::ODF_CONTENT, mathml.as_bytes())?;
+        Self::from_bytes(writer.finish_to_bytes()?)
+    }
+
     /// Open a formula package from a path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
@@ -621,6 +647,30 @@ mod tests {
         assert!(document.is_template());
         assert!(document.math().content().is_empty());
         assert_eq!(document.into_bytes(), bytes);
+    }
+
+    #[test]
+    fn creates_formula_and_template_packages_from_validated_mathml() {
+        let formula = FormulaDocument::create(formula_xml()).unwrap();
+        assert!(!formula.is_template());
+        assert_eq!(formula.mimetype(), constants::ODF_FORMULA);
+        assert_eq!(formula.math().kind(), MathElementKind::Math);
+        let package = crate::OpenDocumentPackage::from_bytes(formula.to_bytes()).unwrap();
+        assert_eq!(package.content_xml().unwrap(), formula_xml());
+
+        let template = FormulaDocument::create_template(
+            r#"<m:math xmlns:m="http://www.w3.org/1998/Math/MathML"><m:mi>x</m:mi></m:math>"#,
+        )
+        .unwrap();
+        assert!(template.is_template());
+        assert_eq!(template.mimetype(), constants::ODF_FORMULA_TEMPLATE);
+        assert_eq!(
+            template.math().children().next().unwrap().kind(),
+            MathElementKind::Identifier
+        );
+
+        assert!(FormulaDocument::create("<math/>").is_err());
+        assert!(FormulaDocument::create_template("not XML").is_err());
     }
 
     #[test]

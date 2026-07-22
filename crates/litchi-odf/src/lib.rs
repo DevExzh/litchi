@@ -180,9 +180,10 @@
 //! - ✅ Embedded cached tables and vendor extension elements
 //! - ✅ Metadata and lossless exact original-byte saving
 //!
-//! ## ✅ ODF - Formula Documents (READ-ONLY SEMANTIC MODEL)
+//! ## ✅ ODF - Formula Documents (SEMANTIC MODEL AND VALIDATED PACKAGE CONSTRUCTION)
 //!
 //! - ✅ Open formulas and formula templates from paths, readers, or bytes
+//! - ✅ Create formula and formula-template packages from validated MathML roots
 //! - ✅ Namespace-aware direct MathML root and complete mixed-content subtree
 //! - ✅ Expanded attributes, common presentation element kinds, and vendor elements
 //! - ✅ MathML annotations and inert StarMath source extraction

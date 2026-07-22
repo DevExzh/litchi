@@ -449,7 +449,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 |--------|------------|--------|------|-------|-------|
 | Drawing | `.odg`, `.otg` | ✅ | ✅ | ✅ | Pages, layers, standard 2D shapes, groups, text, geometry, metadata, resources, builder, and mutable CRUD |
 | Standalone chart | `.odc`, `.otc` | ✅ | ✅ | ✅ | Titles, legends, plot areas, axes, series, data points, analytics nodes, cached tables, and semantic mutation |
-| Formula document | `.odf`, `.otf` | 🟡 | ✅ | 🟡 | MathML mixed-content model, annotations, and exact lossless save; no semantic authoring/evaluation |
+| Formula document | `.odf`, `.otf` | 🟡 | ✅ | 🟡 | MathML mixed-content model, annotations, lossless source save, and validated formula/template package construction from direct MathML roots; no typed MathML-tree editor or evaluation |
 | Image document | `.odi`, `.oti` | 🟡 | ✅ | 🟡 | Frames, linked/package/base64 images, text boxes, objects, tables, maps, and exact lossless save |
 | Master document | `.odm`, `.otm` | ✅ | ✅ | ✅ | Paragraphs, linked sections/subdocuments, indexes, styles, encryption, signing, builder, and mutable CRUD |
 | Web template | `.oth` | 🟡 | ✅ | 🟡 | Text semantic reader and exact lossless save; no dedicated authoring model |
@@ -620,7 +620,7 @@ or PPTM.
 | Presentation/template | `.odp`, `.otp` | ✅ | ✅ | Semantic reader, builder, and mutable presentation |
 | Drawing/template | `.odg`, `.otg` | ✅ | ✅ | Semantic reader, builder, and mutable drawing |
 | Standalone chart/template | `.odc`, `.otc` | ✅ | ✅ | Semantic chart model and bounded mutation |
-| Formula/template | `.odf`, `.otf` | ✅ | 🟡 | Semantic MathML reader and lossless save |
+| Formula/template | `.odf`, `.otf` | ✅ | 🟡 | Semantic MathML reader, lossless source save, and validated formula/template package construction |
 | Image/template | `.odi`, `.oti` | ✅ | 🟡 | Semantic reader and lossless save |
 | Master document/template | `.odm`, `.otm` | ✅ | ✅ | Semantic reader, builder, and mutable master document |
 | Web template | `.oth` | ✅ | 🟡 | Text-compatible reader and lossless save |
