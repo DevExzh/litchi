@@ -105,11 +105,11 @@ pub use parts::document_properties_2003::{
     DocumentProtectionMode, DocumentStateToolbars, Dop2003, ReadingModePageLock,
 };
 pub use parts::fields::{
-    Field, FieldBoundary, FieldDescriptor, FieldEndFlags, FieldMarker, FieldMarkerValue,
-    FieldStory, FieldStoryTable, FieldText, FieldType, FieldsTable, IfField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
-    MailMergeCounterKind, MailMergeNextField, MergeField, MergeFieldSwitch,
-    PromptField, PromptFieldKind,
+    AddressBlockCountryInclusion, Field, FieldBoundary, FieldDescriptor, FieldEndFlags,
+    FieldMarker, FieldMarkerValue, FieldStory, FieldStoryTable, FieldText, FieldType, FieldsTable,
+    IfField, MacroButtonField, MailMergeConditionalControlField, MailMergeConditionalControlKind,
+    MailMergeCounterField, MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField,
+    MailMergeRecipientFieldKind, MergeField, MergeFieldSwitch, PromptField, PromptFieldKind,
 };
 pub use parts::glossary::{
     GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,

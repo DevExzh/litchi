@@ -15,8 +15,8 @@ use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     Field, FieldStory, FieldText, FieldsTable, IfField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField, MergeField,
-    PromptField,
+    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
+    MailMergeRecipientField, MergeField, PromptField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -692,6 +692,26 @@ impl Document {
     /// Get the number of typed, inert `ASK` and `FILLIN` fields.
     pub fn prompt_field_count(&self) -> Result<usize> {
         Ok(self.prompt_fields()?.len())
+    }
+
+    /// Get typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields in story and source
+    /// order.
+    ///
+    /// Returned values expose stored recipient layout, locale, country, fallback,
+    /// cached-result, and field-state metadata only. This method never opens a
+    /// data source, selects a record, performs a merge, expands placeholders,
+    /// generates text, or refreshes a field result.
+    pub fn mail_merge_recipient_fields(&self) -> Result<Vec<MailMergeRecipientField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::mail_merge_recipient_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields.
+    pub fn mail_merge_recipient_field_count(&self) -> Result<usize> {
+        Ok(self.mail_merge_recipient_fields()?.len())
     }
 
     /// Get stored instruction and cached-result text for one parsed field.
