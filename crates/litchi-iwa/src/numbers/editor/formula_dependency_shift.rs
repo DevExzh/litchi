@@ -32,6 +32,92 @@ pub(super) enum DependencyAxis {
     Row,
 }
 
+/// A formula host retained at its current post-deletion coordinate even though
+/// its source cell lies in the deleted table band.
+///
+/// Native merged cells carry their leading formula anchor into the next
+/// physical cell before compacting the axis. After compaction, that formula
+/// remains at this coordinate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct FormulaHostCoordinate {
+    row: u32,
+    column: u32,
+}
+
+impl FormulaHostCoordinate {
+    pub(super) fn from_table_coordinates(row: usize, column: usize) -> Result<Self> {
+        Ok(Self {
+            row: u32::try_from(row)
+                .map_err(|_| Error::ParseError("Numbers formula row exceeds u32".to_owned()))?,
+            column: u32::try_from(column)
+                .map_err(|_| Error::ParseError("Numbers formula column exceeds u32".to_owned()))?,
+        })
+    }
+
+    const fn coordinate(self, axis: DependencyAxis) -> u32 {
+        match axis {
+            DependencyAxis::Column => self.column,
+            DependencyAxis::Row => self.row,
+        }
+    }
+}
+
+/// Validated formula hosts carried out of a deleted axis by merged-cell
+/// anchor relocation.
+#[derive(Debug, Default)]
+struct FormulaHostRetentions {
+    hosts: Vec<FormulaHostCoordinate>,
+}
+
+impl FormulaHostRetentions {
+    fn new(
+        mut hosts: Vec<FormulaHostCoordinate>,
+        axis: DependencyAxis,
+        deletion: u32,
+    ) -> Result<Self> {
+        if hosts.iter().any(|host| host.coordinate(axis) != deletion) {
+            return Err(Error::InvalidFormat(
+                "A retained iWork formula host does not lie in the deleted table axis".to_owned(),
+            ));
+        }
+        hosts.sort_unstable();
+        if hosts.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(Error::InvalidFormat(
+                "An iWork formula host is retained more than once".to_owned(),
+            ));
+        }
+        Ok(Self { hosts })
+    }
+
+    fn contains(&self, row: u32, column: u32) -> bool {
+        self.hosts
+            .binary_search(&FormulaHostCoordinate { row, column })
+            .is_ok()
+    }
+
+    fn shifted_host(
+        &self,
+        row: u32,
+        column: u32,
+        axis: DependencyAxis,
+        position: u32,
+        mutation: DependencyMutation,
+        what: &str,
+    ) -> Result<(u32, u32)> {
+        if self.contains(row, column) {
+            return Ok((row, column));
+        }
+        match axis {
+            DependencyAxis::Column => Ok((row, mutation.coordinate(column, position, what)?)),
+            DependencyAxis::Row => Ok((mutation.coordinate(row, position, what)?, column)),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.hosts.is_empty()
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum FooterRangeInsertion {
     Body,
@@ -114,6 +200,7 @@ pub(super) fn shift_formula_dependencies(
     insertion: u32,
     footer_range_insertion: FooterRangeInsertion,
 ) -> Result<()> {
+    let retained_hosts = FormulaHostRetentions::default();
     mutate_formula_dependencies(
         package,
         table_info_id,
@@ -121,6 +208,7 @@ pub(super) fn shift_formula_dependencies(
         insertion,
         DependencyMutation::Insert,
         footer_range_insertion.expands_footer_ranges(),
+        &retained_hosts,
     )
 }
 
@@ -129,7 +217,9 @@ pub(super) fn delete_formula_dependencies(
     table_info_id: u64,
     axis: DependencyAxis,
     deletion: u32,
+    retained_hosts: Vec<FormulaHostCoordinate>,
 ) -> Result<()> {
+    let retained_hosts = FormulaHostRetentions::new(retained_hosts, axis, deletion)?;
     mutate_formula_dependencies(
         package,
         table_info_id,
@@ -137,6 +227,7 @@ pub(super) fn delete_formula_dependencies(
         deletion,
         DependencyMutation::Delete,
         false,
+        &retained_hosts,
     )
 }
 
@@ -147,6 +238,7 @@ fn mutate_formula_dependencies(
     position: u32,
     mutation: DependencyMutation,
     expand_footer_ranges: bool,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
     let Some(component) = package.calculation_engine_entry_name()?.map(str::to_owned) else {
         return Ok(());
@@ -159,6 +251,7 @@ fn mutate_formula_dependencies(
         position,
         mutation,
         expand_footer_ranges,
+        retained_hosts,
     )?;
     package.update_archive(&component, |archive| {
         let Some((owner_id, message_index)) = archive.objects.iter().find_map(|object| {
@@ -211,12 +304,14 @@ fn mutate_formula_dependencies(
             internal_owner_id,
             mutation,
             &adjustments,
+            retained_hosts,
         )?;
         mutate_uuid_references(
             &mut current.uuid_references,
             axis,
             position,
             mutation,
+            retained_hosts,
         )?;
         if let Some(dependencies) = &mut current.cell_dependencies {
             for record in &mut dependencies.cell_record {
@@ -228,6 +323,7 @@ fn mutate_formula_dependencies(
                     mutation,
                     &adjustments,
                     &range_dependency_hosts,
+                    retained_hosts,
                 )?;
             }
         }
@@ -275,6 +371,7 @@ fn mutate_formula_dependencies(
                     mutation,
                     &adjustments,
                     &range_dependency_hosts,
+                    retained_hosts,
                 )?;
                 let (coordinate, tile_begin, tile_size) = match axis {
                     DependencyAxis::Column => (
@@ -348,6 +445,7 @@ fn mutate_formula_dependencies(
                 internal_owner_id,
                 mutation,
                 &adjustments,
+                retained_hosts,
             )?;
             let data = rewrite_shifted_range_tile_wire(
                 &original,
@@ -425,6 +523,7 @@ fn mutate_range_dependencies(
     internal_owner_id: u32,
     mutation: DependencyMutation,
     adjustments: &FormulaDependencyAdjustments,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
     let Some(dependencies) = dependencies else {
         return Ok(());
@@ -432,22 +531,16 @@ fn mutate_range_dependencies(
     for dependency in &mut dependencies.back_dependency {
         let host = (dependency.cell_coord_row, dependency.cell_coord_column);
         let local_adjustments = adjustments.local_precedents.get(&host);
-        match axis {
-            DependencyAxis::Column => {
-                dependency.cell_coord_column = mutation.coordinate(
-                    dependency.cell_coord_column,
-                    position,
-                    "range dependency host column",
-                )?;
-            },
-            DependencyAxis::Row => {
-                dependency.cell_coord_row = mutation.coordinate(
-                    dependency.cell_coord_row,
-                    position,
-                    "range dependency host row",
-                )?;
-            },
-        }
+        let (row, column) = retained_hosts.shifted_host(
+            dependency.cell_coord_row,
+            dependency.cell_coord_column,
+            axis,
+            position,
+            mutation,
+            "range dependency host",
+        )?;
+        dependency.cell_coord_row = row;
+        dependency.cell_coord_column = column;
         if dependency.range_reference.is_some() && dependency.internal_range_reference.is_some() {
             return Err(Error::InvalidFormat(
                 "iWork range dependency has both external and internal references".to_owned(),
@@ -475,17 +568,21 @@ fn mutate_range_tile(
     internal_owner_id: u32,
     mutation: DependencyMutation,
     adjustments: &FormulaDependencyAdjustments,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
     for dependency in &mut tile.from_to_range {
         let host = explicit_cell_coordinate(&dependency.from_coord, "range-tile host")?;
         let local_adjustments = adjustments.local_precedents.get(&host);
-        mutate_cell_coordinate(
-            &mut dependency.from_coord,
+        let (row, column) = retained_hosts.shifted_host(
+            host.0,
+            host.1,
             axis,
             position,
             mutation,
             "range-tile host",
         )?;
+        dependency.from_coord.row = Some(row);
+        dependency.from_coord.column = Some(column);
         if tile.to_owner_id == internal_owner_id {
             mutate_cell_rect(
                 &mut dependency.refers_to_rect,
@@ -595,10 +692,19 @@ fn mutate_uuid_references(
     axis: DependencyAxis,
     position: u32,
     mutation: DependencyMutation,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
     let Some(references) = references else {
         return Ok(());
     };
+    if !retained_hosts.is_empty()
+        && (!references.table_refs.is_empty() || !references.table_uuid_refs.is_empty())
+    {
+        return Err(Error::ParseError(
+            "Cannot yet relocate a merged iWork formula anchor with UUID-reference dependencies"
+                .to_owned(),
+        ));
+    }
     for reference in &mut references.table_refs {
         if let Some(coordinates) = &mut reference.coord_set {
             mutate_cell_coord_set(coordinates, axis, position, mutation)?;
@@ -684,25 +790,6 @@ fn explicit_cell_coordinate(
             .column
             .ok_or_else(|| Error::InvalidFormat(format!("iWork {what} column is missing")))?,
     ))
-}
-
-fn mutate_cell_coordinate(
-    coordinate: &mut tsce::CellCoordinateArchive,
-    axis: DependencyAxis,
-    position: u32,
-    mutation: DependencyMutation,
-    what: &str,
-) -> Result<()> {
-    let (row, column) = explicit_cell_coordinate(coordinate, what)?;
-    match axis {
-        DependencyAxis::Column => {
-            coordinate.column = Some(mutation.coordinate(column, position, what)?);
-        },
-        DependencyAxis::Row => {
-            coordinate.row = Some(mutation.coordinate(row, position, what)?);
-        },
-    }
-    Ok(())
 }
 
 fn reject_incoming_dependencies(
@@ -961,16 +1048,19 @@ fn mutate_dependency_record(
     mutation: DependencyMutation,
     adjustments: &FormulaDependencyAdjustments,
     range_dependency_hosts: &HashSet<(u32, u32)>,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
     let previous_host = (record.row, record.column);
-    match axis {
-        DependencyAxis::Column => {
-            record.column = mutation.coordinate(record.column, position, "formula column")?;
-        },
-        DependencyAxis::Row => {
-            record.row = mutation.coordinate(record.row, position, "formula row")?;
-        },
-    }
+    let (row, column) = retained_hosts.shifted_host(
+        record.row,
+        record.column,
+        axis,
+        position,
+        mutation,
+        "formula host",
+    )?;
+    record.row = row;
+    record.column = column;
     let Some(edges) = &mut record.expanded_edges else {
         return Ok(());
     };

@@ -4,14 +4,15 @@ use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::{
-    CellValue, IWorkTableCellRegion, NumbersDocumentBuilder, TableColumnDeletion,
-    TableColumnInsertion, TableRowDeletion, TableRowInsertion,
+    FormulaCachedValue, FormulaExpression, IWorkTableCellRegion, NumbersDocumentBuilder,
+    TableColumnDeletion, TableColumnInsertion, TableRowDeletion, TableRowInsertion,
 };
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 5;
+const MERGED_FORMULA_RESULT: f64 = 3.0;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -36,11 +37,12 @@ fn create_numbers(
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
-    editor.set_cell(
+    editor.set_formula_with_cached_value(
         table_id,
         region.row(),
         region.column(),
-        CellValue::Text("Merged".into()),
+        FormulaExpression::Number(MERGED_FORMULA_RESULT),
+        FormulaCachedValue::Number(MERGED_FORMULA_RESULT),
     )?;
     editor.merge_cells(table_id, region)?;
     editor.save(output.join("merged-cells.numbers"))?;
@@ -65,11 +67,12 @@ fn create_pages(
         .body_table("Merged Cells", TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
-    editor.set_table_cell(
+    editor.set_table_formula(
         table_id,
         region.row(),
         region.column(),
-        CellValue::Text("Merged".into()),
+        FormulaExpression::Number(MERGED_FORMULA_RESULT),
+        FormulaCachedValue::Number(MERGED_FORMULA_RESULT),
     )?;
     editor.merge_table_cells(table_id, region)?;
     editor.save(output.join("merged-cells.pages"))?;
@@ -103,12 +106,13 @@ fn create_keynote(
             height: 480.0,
         },
     )?;
-    editor.set_slide_table_cell(
+    editor.set_slide_table_formula(
         0,
         table.model_object_id,
         region.row(),
         region.column(),
-        CellValue::Text("Merged".into()),
+        FormulaExpression::Number(MERGED_FORMULA_RESULT),
+        FormulaCachedValue::Number(MERGED_FORMULA_RESULT),
     )?;
     editor.merge_slide_table_cells(0, table.model_object_id, region)?;
     editor.save(output.join("merged-cells.key"))?;

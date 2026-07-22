@@ -21,10 +21,9 @@ use wire::{
     remove_formula, remove_merge_owner, transform_formula_store, transform_merge_owner,
 };
 
-pub(super) use axis::MergeAxis;
+pub(crate) use axis::{MergeAnchorRelocation, MergeAxis};
 use axis::{
-    MergeAnchorRelocation, MergeDeletion, anchor_relocation_after_deletion, region_after_deletion,
-    region_after_insertion,
+    MergeDeletion, anchor_relocation_after_deletion, region_after_deletion, region_after_insertion,
 };
 
 #[derive(Debug)]
@@ -420,8 +419,9 @@ mod tests {
     use crate::archive::RawMessage;
     use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
     use crate::numbers::{
-        NumbersDocument, NumbersDocumentBuilder, TableColumnDeletion, TableColumnInsertion,
-        TableRowDeletion, TableRowInsertion,
+        FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocument,
+        NumbersDocumentBuilder, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
+        TableRowInsertion,
     };
     use crate::pages::{PagesDocumentBuilder, PagesEditor};
     use crate::shapes::{DrawablePoint, DrawableSize};
@@ -600,6 +600,58 @@ mod tests {
                 .text,
             "Merged anchor"
         );
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(reopened.table_cell_merges(table_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_numbers_merged_formula_anchor_survives_axis_deletions() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(5, 6)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        editor
+            .set_cell(table_id, 3, 4, CellValue::Number(7.0))
+            .unwrap();
+        editor
+            .set_formula_with_cached_value(
+                table_id,
+                region.row(),
+                region.column(),
+                FormulaExpression::cell(FormulaCellReference::relative(3, 4)),
+                FormulaCachedValue::Number(7.0),
+            )
+            .unwrap();
+        editor.merge_cells(table_id, region).unwrap();
+
+        editor
+            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_merges(table_id).unwrap(),
+            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+        );
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula("=E3".to_owned()))
+        );
+
+        editor
+            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        assert!(editor.table_cell_merges(table_id).unwrap().is_empty());
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula("=D3".to_owned()))
+        );
+        editor
+            .set_cell(table_id, 2, 3, CellValue::Number(11.0))
+            .unwrap();
+        assert_eq!(cached_formula_number(&editor, table_id, 1, 1), 11.0);
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(reopened.table_cell_merges(table_id).unwrap().is_empty());
     }
@@ -994,6 +1046,122 @@ mod tests {
     }
 
     #[test]
+    fn scratch_pages_and_keynote_merged_formula_anchors_survive_axis_deletions() {
+        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+
+        let mut pages = PagesDocumentBuilder::new()
+            .body_table("Merge Formula", 5, 6)
+            .build()
+            .unwrap();
+        let pages_table_id = pages.tables().unwrap()[0].model_object_id;
+        pages
+            .set_table_cell(pages_table_id, 3, 4, CellValue::Number(7.0))
+            .unwrap();
+        pages
+            .set_table_formula(
+                pages_table_id,
+                region.row(),
+                region.column(),
+                FormulaExpression::cell(FormulaCellReference::relative(3, 4)),
+                FormulaCachedValue::Number(7.0),
+            )
+            .unwrap();
+        pages.merge_table_cells(pages_table_id, region).unwrap();
+        pages
+            .remove_table_row(pages_table_id, TableRowDeletion::body(0))
+            .unwrap();
+        assert_eq!(
+            pages.table_formula(pages_table_id, 1, 1).unwrap(),
+            Some("=E3".to_owned())
+        );
+        pages
+            .remove_table_column(pages_table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        assert!(pages.table_cell_merges(pages_table_id).unwrap().is_empty());
+        assert_eq!(
+            pages.table_formula(pages_table_id, 1, 1).unwrap(),
+            Some("=D3".to_owned())
+        );
+        let pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            pages.table_formula(pages_table_id, 1, 1).unwrap(),
+            Some("=D3".to_owned())
+        );
+
+        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let keynote_table = keynote
+            .add_slide_table(
+                0,
+                "Merge Formula",
+                5,
+                6,
+                DrawablePoint { x: 100.0, y: 150.0 },
+                DrawableSize {
+                    width: 800.0,
+                    height: 400.0,
+                },
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell(
+                0,
+                keynote_table.model_object_id,
+                3,
+                4,
+                CellValue::Number(7.0),
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_formula(
+                0,
+                keynote_table.model_object_id,
+                region.row(),
+                region.column(),
+                FormulaExpression::cell(FormulaCellReference::relative(3, 4)),
+                FormulaCachedValue::Number(7.0),
+            )
+            .unwrap();
+        keynote
+            .merge_slide_table_cells(0, keynote_table.model_object_id, region)
+            .unwrap();
+        keynote
+            .remove_slide_table_row(0, keynote_table.model_object_id, TableRowDeletion::body(0))
+            .unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_formula(0, keynote_table.model_object_id, 1, 1)
+                .unwrap(),
+            Some("=E3".to_owned())
+        );
+        keynote
+            .remove_slide_table_column(
+                0,
+                keynote_table.model_object_id,
+                TableColumnDeletion::body(0),
+            )
+            .unwrap();
+        assert!(
+            keynote
+                .slide_table_cell_merges(0, keynote_table.model_object_id)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            keynote
+                .slide_table_formula(0, keynote_table.model_object_id, 1, 1)
+                .unwrap(),
+            Some("=D3".to_owned())
+        );
+        let keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_formula(0, keynote_table.model_object_id, 1, 1)
+                .unwrap(),
+            Some("=D3".to_owned())
+        );
+    }
+
+    #[test]
     fn scratch_keynote_table_merge_crud_round_trips() {
         let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         let table = editor
@@ -1035,6 +1203,28 @@ mod tests {
     fn append_unknown_varint(data: &mut Vec<u8>, field: u32, value: u64) {
         data.extend(crate::varint::encode_varint(u64::from(field) << 3));
         data.extend(crate::varint::encode_varint(value));
+    }
+
+    fn cached_formula_number(
+        editor: &NumbersEditor,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> f64 {
+        let location = locate_attached_cell(editor.package(), table_id, row, column).unwrap();
+        let data = read_tile_cell(
+            editor.package(),
+            &location.tile_archive,
+            location.tile_id,
+            location.tile_row,
+            column,
+        )
+        .unwrap()
+        .unwrap();
+        match BncCell::parse(&data).unwrap().cached_scalar().unwrap() {
+            Some(crate::numbers::bnc::CachedScalar::Number(value)) => value,
+            value => panic!("Expected numeric formula cache, found {value:?}"),
+        }
     }
 
     fn unknown_suffix(field: u32, value: u64) -> Vec<u8> {

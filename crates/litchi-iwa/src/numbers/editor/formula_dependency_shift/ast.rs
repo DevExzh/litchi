@@ -18,6 +18,7 @@ pub(super) fn rewrite_formula_asts(
     position: u32,
     mutation: DependencyMutation,
     expand_footer_ranges: bool,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<FormulaDependencyAdjustments> {
     let descriptor = attached_table_descriptors(package)?
         .into_iter()
@@ -154,6 +155,7 @@ pub(super) fn rewrite_formula_asts(
             mutation,
             footer,
             &mut local_adjustments,
+            retained_hosts,
         )?;
         local_adjustments.normalize();
         if !local_adjustments.is_empty() {
@@ -336,12 +338,24 @@ fn rewrite_formula_nodes(
     mutation: DependencyMutation,
     footer: Option<FooterFormulaContext>,
     dependency_adjustments: &mut LocalPrecedentAdjustments,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
     let host = match axis {
         DependencyAxis::Row => host_row,
         DependencyAxis::Column => host_column,
     };
-    let shifted_host = mutation.coordinate(host, position, "formula host coordinate")?;
+    let (shifted_row, shifted_column) = retained_hosts.shifted_host(
+        host_row,
+        host_column,
+        axis,
+        position,
+        mutation,
+        "formula host coordinate",
+    )?;
+    let shifted_host = match axis {
+        DependencyAxis::Row => shifted_row,
+        DependencyAxis::Column => shifted_column,
+    };
     let footer_overrides = footer_range_overrides(
         array,
         host_row,
@@ -365,6 +379,7 @@ fn rewrite_formula_nodes(
             mutation,
             footer,
             dependency_adjustments,
+            retained_hosts,
         )?;
         if let Some(nested) = &mut node.ast_thunk_node_array {
             rewrite_formula_nodes(
@@ -376,6 +391,7 @@ fn rewrite_formula_nodes(
                 mutation,
                 footer,
                 dependency_adjustments,
+                retained_hosts,
             )?;
         }
         let (encoded, absolute) = match axis {
@@ -461,6 +477,7 @@ fn rewrite_colon_tract(
     mutation: DependencyMutation,
     footer: Option<FooterFormulaContext>,
     dependency_adjustments: &mut LocalPrecedentAdjustments,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
     let cross_table = node.ast_cross_table_reference_extra_info.is_some();
     let Some(tract) = &mut node.ast_colon_tract else {
@@ -475,7 +492,18 @@ fn rewrite_colon_tract(
         ),
         DependencyAxis::Row => (&mut tract.relative_row, &mut tract.absolute_row, host_row),
     };
-    let shifted_host = mutation.coordinate(host, position, "formula host coordinate")?;
+    let (shifted_row, shifted_column) = retained_hosts.shifted_host(
+        host_row,
+        host_column,
+        axis,
+        position,
+        mutation,
+        "formula host coordinate",
+    )?;
+    let shifted_host = match axis {
+        DependencyAxis::Column => shifted_column,
+        DependencyAxis::Row => shifted_row,
+    };
     for range in relative {
         let begin = resolve_relative_tract_coordinate(host, range.range_begin)?;
         let end = range

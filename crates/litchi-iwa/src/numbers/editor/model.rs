@@ -2424,12 +2424,36 @@ pub(super) fn set_attached_cell_in_package(
     set_cell_at_location(package, location, row, column, value)
 }
 
+/// Return whether an attached table cell stores a native formula reference.
+pub(super) fn attached_cell_is_formula(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    let Some(data) = read_tile_cell(
+        package,
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
+        column,
+    )?
+    else {
+        return Ok(false);
+    };
+    Ok(matches!(
+        BncCell::parse(&data)?.stored_value(),
+        StoredValue::Formula(_)
+    ))
+}
+
 /// Move one attached table cell's exact BNC payload without changing any
 /// referenced table-data-list entry counts.
 ///
 /// This is used when a native merged-cell anchor survives a deletion by moving
-/// into the following row or column. Formula anchors are rejected: their
-/// dependency records require a dedicated host-coordinate rewrite.
+/// into the following row or column. Formula dependency coordinates must be
+/// updated before invoking this operation.
 pub(super) fn relocate_attached_cell_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -2449,14 +2473,6 @@ pub(super) fn relocate_attached_cell_in_package(
     else {
         return Ok(false);
     };
-    if matches!(
-        BncCell::parse(&source_data)?.stored_value(),
-        StoredValue::Formula(_)
-    ) {
-        return Err(Error::ParseError(format!(
-            "Cannot yet relocate formula cell ({source_row}, {source_column}) while deleting a merged iWork table axis"
-        )));
-    }
 
     let destination = locate_attached_cell(package, table_id, destination_row, destination_column)?;
     if read_tile_cell(

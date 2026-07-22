@@ -8,12 +8,14 @@ mod row;
 mod uid;
 
 use cell_merge::{
-    MergeAxis, merge_anchor_relocations_for_axis_deletion, regions_in_package,
-    shift_merges_for_axis_deletion,
+    MergeAnchorRelocation, MergeAxis, merge_anchor_relocations_for_axis_deletion,
+    regions_in_package, shift_merges_for_axis_deletion,
 };
 use column::{delete_column_headers, delete_table_tile_column};
 use dimension::{set_stroke_dimensions, set_table_dimensions};
-use formula_dependency_shift::{DependencyAxis, delete_formula_dependencies};
+use formula_dependency_shift::{
+    DependencyAxis, FormulaHostCoordinate, delete_formula_dependencies,
+};
 use row::{delete_row_headers, delete_table_tile_row};
 use table_headers::set_attached_table_header_settings;
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
@@ -91,20 +93,25 @@ pub(super) fn remove_attached_table_row(
         updated_header_settings,
     )?;
     let cells = stored_cells_on_axis(package, &locations, &descriptor.model, TableAxis::Row, row)?;
-    let relocated_cells = relocate_merge_anchors(package, table_id, MergeAxis::Row, row)?;
+    let relocations =
+        merge_anchor_relocations_for_axis_deletion(package, table_id, MergeAxis::Row, row)?;
+    let relocated_sources = validated_merge_anchor_sources(&relocations)?;
+    let retained_formula_hosts = merge_anchor_formula_hosts(package, table_id, &relocations)?;
 
     clear_stored_cells(
         package,
         table_id,
-        &without_relocated_cells(cells, &relocated_cells),
+        &without_relocated_cells(cells, &relocated_sources),
     )?;
-    shift_merges_for_axis_deletion(package, table_id, MergeAxis::Row, row)?;
     delete_formula_dependencies(
         package,
         descriptor.table_info_id,
         DependencyAxis::Row,
         u32::try_from(row).map_err(|_| Error::ParseError("iWork row exceeds u32".to_owned()))?,
+        retained_formula_hosts,
     )?;
+    relocate_merge_anchors(package, table_id, &relocations)?;
+    shift_merges_for_axis_deletion(package, table_id, MergeAxis::Row, row)?;
     delete_table_tile_row(package, &locations, &descriptor.model, row)?;
     delete_row_headers(package, &locations, &descriptor.model, row)?;
     let uid = descriptor
@@ -166,21 +173,26 @@ pub(super) fn remove_attached_table_column(
         TableAxis::Column,
         column,
     )?;
-    let relocated_cells = relocate_merge_anchors(package, table_id, MergeAxis::Column, column)?;
+    let relocations =
+        merge_anchor_relocations_for_axis_deletion(package, table_id, MergeAxis::Column, column)?;
+    let relocated_sources = validated_merge_anchor_sources(&relocations)?;
+    let retained_formula_hosts = merge_anchor_formula_hosts(package, table_id, &relocations)?;
 
     clear_stored_cells(
         package,
         table_id,
-        &without_relocated_cells(cells, &relocated_cells),
+        &without_relocated_cells(cells, &relocated_sources),
     )?;
-    shift_merges_for_axis_deletion(package, table_id, MergeAxis::Column, column)?;
     delete_formula_dependencies(
         package,
         descriptor.table_info_id,
         DependencyAxis::Column,
         u32::try_from(column)
             .map_err(|_| Error::ParseError("iWork column exceeds u32".to_owned()))?,
+        retained_formula_hosts,
     )?;
+    relocate_merge_anchors(package, table_id, &relocations)?;
+    shift_merges_for_axis_deletion(package, table_id, MergeAxis::Column, column)?;
     delete_table_tile_column(package, &locations, &descriptor.model, column)?;
     delete_column_headers(
         package,
@@ -380,14 +392,29 @@ fn decremented_header_count(count: usize) -> Result<Option<NumbersTableHeaderCou
 fn relocate_merge_anchors(
     package: &mut IWorkPackage,
     table_id: u64,
-    axis: MergeAxis,
-    deletion: usize,
+    relocations: &[MergeAnchorRelocation],
+) -> Result<()> {
+    for relocation in relocations {
+        model::relocate_attached_cell_in_package(
+            package,
+            table_id,
+            relocation.source_row,
+            relocation.source_column,
+            relocation.destination_row,
+            relocation.destination_column,
+        )?;
+    }
+    Ok(())
+}
+
+/// Validate a non-overlapping merge-anchor relocation plan and return every
+/// source cell that must not be cleared before it moves.
+fn validated_merge_anchor_sources(
+    relocations: &[MergeAnchorRelocation],
 ) -> Result<HashSet<(usize, usize)>> {
-    let relocations =
-        merge_anchor_relocations_for_axis_deletion(package, table_id, axis, deletion)?;
     let mut planned_sources = HashSet::with_capacity(relocations.len());
     let mut planned_destinations = HashSet::with_capacity(relocations.len());
-    for relocation in &relocations {
+    for relocation in relocations {
         let source = (relocation.source_row, relocation.source_column);
         let destination = (relocation.destination_row, relocation.destination_column);
         if !planned_sources.insert(source) || !planned_destinations.insert(destination) {
@@ -404,21 +431,31 @@ fn relocate_merge_anchors(
             "iWork merged-cell deletion relocates an anchor onto another anchor".to_owned(),
         ));
     }
+    Ok(planned_sources)
+}
 
-    let mut relocated_sources = HashSet::with_capacity(relocations.len());
+/// Identify formula anchors whose dependency hosts must survive the deleted
+/// table axis until their exact cell payload is relocated.
+fn merge_anchor_formula_hosts(
+    package: &IWorkPackage,
+    table_id: u64,
+    relocations: &[MergeAnchorRelocation],
+) -> Result<Vec<FormulaHostCoordinate>> {
+    let mut hosts = Vec::new();
     for relocation in relocations {
-        if model::relocate_attached_cell_in_package(
+        if model::attached_cell_is_formula(
             package,
             table_id,
             relocation.source_row,
             relocation.source_column,
-            relocation.destination_row,
-            relocation.destination_column,
         )? {
-            relocated_sources.insert((relocation.source_row, relocation.source_column));
+            hosts.push(FormulaHostCoordinate::from_table_coordinates(
+                relocation.source_row,
+                relocation.source_column,
+            )?);
         }
     }
-    Ok(relocated_sources)
+    Ok(hosts)
 }
 
 fn without_relocated_cells(
