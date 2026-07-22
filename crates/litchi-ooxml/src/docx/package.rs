@@ -3314,6 +3314,37 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_inert_merge_fields_without_merging() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let paragraph = document.add_paragraph();
+            paragraph.add_field(crate::docx::writer::MutableField::with_result(
+                r#"MERGEFIELD "Customer Region" \b "Dear " \f "!" \m \v \* MERGEFORMAT"#
+                    .to_string(),
+                "cached customer".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        assert!(reopened.mail_merge_settings().unwrap().is_none());
+        let document = reopened.document().unwrap();
+        let fields = document.typed_merge_fields().unwrap();
+        assert_eq!(document.typed_merge_field_count().unwrap(), 1);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].field_name(), "Customer Region");
+        assert_eq!(fields[0].cached_result(), Some("cached customer"));
+        assert!(fields[0].has_switch('b'));
+        assert!(fields[0].has_switch('f'));
+        assert!(fields[0].has_switch('m'));
+        assert!(fields[0].has_switch('v'));
+        assert_eq!(fields[0].switches()[0].argument(), Some("Dear "));
+        assert_eq!(fields[0].switches()[1].argument(), Some("!"));
+    }
+
+    #[test]
     fn writes_and_discovers_inert_macro_button_fields_without_execution() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

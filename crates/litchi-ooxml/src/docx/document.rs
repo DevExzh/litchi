@@ -9,7 +9,7 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
     BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
-    IndexEntryField, IndexField, LinkField, MacroButtonField, ReferencedDocumentField,
+    IndexEntryField, IndexField, LinkField, MacroButtonField, MergeField, ReferencedDocumentField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
 };
 use crate::docx::footnote::Note;
@@ -1462,6 +1462,27 @@ impl<'a> Document<'a> {
         Ok(self.index_entries()?.len())
     }
 
+    /// Get typed, inert `MERGEFIELD` fields in document order.
+    ///
+    /// Returned values expose stored data-column names, switches, cached
+    /// content, and dirty/lock state only. This method never opens a data
+    /// source, resolves records, performs a merge, or refreshes field results.
+    ///
+    /// For backward-compatible access to the raw fields, use
+    /// [`Self::merge_fields`].
+    pub fn typed_merge_fields(&self) -> Result<Vec<MergeField>> {
+        self.fields()?
+            .iter()
+            .map(Field::merge_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `MERGEFIELD` fields in the main document.
+    pub fn typed_merge_field_count(&self) -> Result<usize> {
+        Ok(self.typed_merge_fields()?.len())
+    }
+
     /// Get all mail-merge fields in document order.
     ///
     /// This recognizes `MERGEFIELD` instructions represented by either
@@ -1923,7 +1944,7 @@ impl<'a> Document<'a> {
     // ✅ Generated indexes: indexes(), index_entries()
     // - Typed inert INDEX/XE discovery; no marker search, sorting, pagination, or refresh
     //
-    // ✅ Mail merge field discovery: merge_fields(), merge_field_names()
+    // ✅ Mail merge field discovery: merge_fields(), merge_field_names(), typed_merge_fields()
     // TODO: Mail merge mutation (MS-DOCX Section 17.16.5.35)
     // - execute_mail_merge()
     //
