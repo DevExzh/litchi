@@ -43,6 +43,11 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.themeOverride+xml";
     /// MS-OFFMACRO2 VBA Project binary-part content type.
     pub const OFC_VBA_PROJECT: &str = "application/vnd.ms-office.vbaProject";
+    /// MS-XLSB legacy VBA Project Signature part content type.
+    pub const OFC_VBA_PROJECT_SIGNATURE: &str = "application/vnd.ms-office.vbaProjectSignature";
+    /// MS-XLSB Agile VBA Project Signature part content type.
+    pub const OFC_VBA_PROJECT_SIGNATURE_AGILE: &str =
+        "application/vnd.ms-office.vbaProjectSignatureAgile";
     pub const OFC_VML_DRAWING: &str = "application/vnd.openxmlformats-officedocument.vmlDrawing";
 
     // OPC core content types
@@ -343,6 +348,10 @@ pub mod relationship_type {
     // Office macro-enabled package relationships (MS-OFFMACRO2)
     pub const VBA_PROJECT: &str =
         "http://schemas.microsoft.com/office/2006/relationships/vbaProject";
+    pub const VBA_PROJECT_SIGNATURE: &str =
+        "http://schemas.microsoft.com/office/2006/relationships/vbaProjectSignature";
+    pub const VBA_PROJECT_SIGNATURE_AGILE: &str =
+        "http://schemas.microsoft.com/office/2006/relationships/vbaProjectSignatureAgile";
     pub const WORD_VBA_DATA: &str =
         "http://schemas.microsoft.com/office/2006/relationships/wordVbaData";
 

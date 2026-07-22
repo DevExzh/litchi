@@ -306,7 +306,7 @@ conversion, fonts, and image conversion are optional.
 | Charts and drawings | ❌ | ❌ | ❌ | No typed XLSB chart/drawing model |
 | Structured tables | ❌ | ❌ | ❌ | No ListObject model |
 | External links and connections | ❌ | ❌ | ❌ | No typed model |
-| VBA project/code modules | ❌ | ❌ | ❌ | No typed macro model |
+| VBA project/code modules | 🟡 | 🟡 | ❌ | Inert MS-XLSB Workbook → VBA Project topology plus declared legacy/Agile signature-part metadata; project/signature payload contents are never inspected, parsed, verified, or executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
 

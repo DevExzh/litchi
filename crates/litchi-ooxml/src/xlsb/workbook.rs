@@ -12,6 +12,7 @@ use crate::xlsb::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
 use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
 use crate::xlsb::styles_table::{CellFormat, StylesTable};
+use crate::xlsb::vba_project::{VbaProject, discover_vba_project};
 use crate::xlsb::worksheet::XlsbWorksheet;
 use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
@@ -105,6 +106,16 @@ impl XlsbWorkbook {
     /// Remove all package digital signatures.
     pub fn clear_digital_signatures(&mut self) -> litchi_opc::signature::Result<()> {
         self.package.clear_digital_signatures()
+    }
+
+    /// Discover the attached MS-XLSB VBA project and declared signatures.
+    ///
+    /// This validates only the declared OPC relationship graph and content
+    /// types. It does not inspect, parse, verify, or execute VBA project or
+    /// signature bytes.
+    pub fn vba_project(&self) -> crate::error::Result<Option<VbaProject>> {
+        let workbook = self.package.main_document_part()?;
+        discover_vba_project(&self.package, workbook)
     }
 
     /// Workbook and sheet-scoped defined names in `PtgName` index order.

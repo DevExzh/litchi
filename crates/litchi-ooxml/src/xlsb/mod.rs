@@ -126,6 +126,7 @@ mod shared_strings;
 /// Styles parsing (fonts, fills, borders, number formats)
 mod styles;
 mod styles_table;
+pub mod vba_project;
 
 /// Date and time utilities
 pub mod date_utils;
@@ -166,6 +167,7 @@ pub use styles::{
 };
 pub use styles_table::{CellFormat, Fill, Font, StylesTable};
 pub use workbook::XlsbWorkbook;
+pub use vba_project::{VbaProject, VbaProjectSignature, VbaProjectSignatureKind};
 pub use worksheet::{
     XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection, XlsbStrongProtection,
     XlsbWorksheet,
