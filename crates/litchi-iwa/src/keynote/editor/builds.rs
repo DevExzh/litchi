@@ -200,7 +200,11 @@ pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result
                 ));
             }
         },
-        SHIMMER_BUILD_EFFECT | SKID_BUILD_EFFECT | SWOOSH_BUILD_EFFECT | TRACE_BUILD_EFFECT => {
+        DISSOLVE_BUILD_EFFECT
+        | SHIMMER_BUILD_EFFECT
+        | SKID_BUILD_EFFECT
+        | SWOOSH_BUILD_EFFECT
+        | TRACE_BUILD_EFFECT => {
             let object_effect = settings.object_effect.ok_or_else(|| {
                 Error::ParseError("Keynote object build is missing its typed parameters".to_owned())
             })?;
@@ -255,7 +259,11 @@ pub(super) fn is_typed_build_effect(effect: &str) -> bool {
 pub(super) fn is_object_build_effect(effect: &str) -> bool {
     matches!(
         effect,
-        SHIMMER_BUILD_EFFECT | SKID_BUILD_EFFECT | SWOOSH_BUILD_EFFECT | TRACE_BUILD_EFFECT
+        DISSOLVE_BUILD_EFFECT
+            | SHIMMER_BUILD_EFFECT
+            | SKID_BUILD_EFFECT
+            | SWOOSH_BUILD_EFFECT
+            | TRACE_BUILD_EFFECT
     )
 }
 
@@ -567,6 +575,7 @@ pub(super) fn keyboard_direction_from_native(value: u32) -> Option<KeynoteKeyboa
 
 pub(super) fn object_build_effect_identifier(effect: KeynoteObjectBuildEffect) -> &'static str {
     match effect {
+        KeynoteObjectBuildEffect::Dissolve => DISSOLVE_BUILD_EFFECT,
         KeynoteObjectBuildEffect::Shimmer => SHIMMER_BUILD_EFFECT,
         KeynoteObjectBuildEffect::Skid { .. } => SKID_BUILD_EFFECT,
         KeynoteObjectBuildEffect::Swoosh { .. } => SWOOSH_BUILD_EFFECT,
@@ -576,7 +585,8 @@ pub(super) fn object_build_effect_identifier(effect: KeynoteObjectBuildEffect) -
 
 pub(super) fn native_object_build_direction(effect: KeynoteObjectBuildEffect) -> Option<u32> {
     match effect {
-        KeynoteObjectBuildEffect::Shimmer
+        KeynoteObjectBuildEffect::Dissolve
+        | KeynoteObjectBuildEffect::Shimmer
         | KeynoteObjectBuildEffect::Swoosh {
             direction: KeynoteSwooshDirection::Center,
         } => None,
@@ -606,6 +616,7 @@ pub(super) fn object_build_effect_from_native(
     direction: Option<u32>,
 ) -> Option<KeynoteObjectBuildEffect> {
     match (effect, direction) {
+        (DISSOLVE_BUILD_EFFECT, None) => Some(KeynoteObjectBuildEffect::Dissolve),
         (SHIMMER_BUILD_EFFECT, None) => Some(KeynoteObjectBuildEffect::Shimmer),
         (SKID_BUILD_EFFECT, None | Some(11)) => Some(KeynoteObjectBuildEffect::Skid {
             direction: KeynoteHorizontalBuildDirection::LeftToRight,

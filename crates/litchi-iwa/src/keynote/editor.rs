@@ -61,6 +61,7 @@ const JIGGLE_ACTION_EFFECT: &str = "apple:action-jiggle";
 const POP_ACTION_EFFECT: &str = "apple:action-pop";
 const PULSE_ACTION_EFFECT: &str = "apple:action-pulse";
 const KEYBOARD_BUILD_EFFECT: &str = "apple:keyboard";
+const DISSOLVE_BUILD_EFFECT: &str = "apple:dissolve character";
 const SHIMMER_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.KLNShimmer";
 const SKID_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.KNBuildSkidByCharacter";
 const SWOOSH_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.BLTSwoosh";
@@ -482,6 +483,7 @@ pub enum KeynoteSwooshDirection {
 /// Typed native Build In / Build Out effects with no opaque parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KeynoteObjectBuildEffect {
+    Dissolve,
     Shimmer,
     Skid {
         direction: KeynoteHorizontalBuildDirection,
@@ -548,7 +550,7 @@ pub struct KeynoteBuildSettings {
     pub emphasis: Option<KeynoteEmphasisAction>,
     /// Present for Keynote's native `apple:keyboard` build-in/build-out effect.
     pub keyboard: Option<KeynoteKeyboardBuild>,
-    /// Present for typed Shimmer, Skid, Swoosh, and Trace builds.
+    /// Present for typed Dissolve, Shimmer, Skid, Swoosh, and Trace builds.
     pub object_effect: Option<KeynoteObjectBuildEffect>,
     /// Inline curve for a typed action whose acceleration is
     /// [`KeynoteBuildAcceleration::Custom`].
@@ -622,17 +624,37 @@ impl KeynoteBuildSettings {
         }
     }
 
-    fn object_build(animation_type: &str, effect: KeynoteObjectBuildEffect, duration: f64) -> Self {
+    fn text_object_build(
+        animation_type: &str,
+        effect: KeynoteObjectBuildEffect,
+        duration: f64,
+    ) -> Self {
         Self {
             animation_type: animation_type.to_owned(),
             effect: object_build_effect_identifier(effect).to_owned(),
             duration,
             direction: native_object_build_direction(effect),
-            text_delivery: None,
-            delivery_option: None,
             object_effect: Some(effect),
             ..Self::appear_in()
         }
+    }
+
+    fn object_build(animation_type: &str, effect: KeynoteObjectBuildEffect, duration: f64) -> Self {
+        Self {
+            text_delivery: None,
+            delivery_option: None,
+            ..Self::text_object_build(animation_type, effect, duration)
+        }
+    }
+
+    /// Native-compatible Dissolve Build In.
+    pub fn dissolve_in() -> Self {
+        Self::text_object_build("In", KeynoteObjectBuildEffect::Dissolve, 1.0)
+    }
+
+    /// Native-compatible Dissolve Build Out.
+    pub fn dissolve_out() -> Self {
+        Self::text_object_build("Out", KeynoteObjectBuildEffect::Dissolve, 1.0)
     }
 
     /// Native-compatible Shimmer Build In.

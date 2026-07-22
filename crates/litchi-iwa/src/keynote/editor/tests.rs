@@ -736,8 +736,7 @@ fn slide_build_crud_is_transactional_and_updates_native_caches() {
     assert_eq!(node.has_explicit_builds, Some(true));
     assert_eq!(node.has_explicit_builds_cache_version, Some(2));
 
-    let mut updated = settings;
-    updated.effect = "apple:dissolve character".to_owned();
+    let mut updated = KeynoteBuildSettings::dissolve_in();
     updated.duration = 2.5;
     updated.delay = 0.25;
     updated.start = KeynoteBuildStart::AfterTransition;
@@ -1650,6 +1649,66 @@ fn slide_keyboard_build_rejects_missing_duplicate_and_cross_effect_fields() {
         );
         assert_eq!(malformed.to_bytes().unwrap(), before);
     }
+}
+
+#[test]
+fn slide_dissolve_build_crud_uses_native_text_delivery_defaults() {
+    use kn::build_attributes_archive::{
+        BuildAttributesDeliveryOption, BuildAttributesTextDelivery,
+    };
+
+    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let build_in = KeynoteBuildSettings::dissolve_in();
+    let created = editor.add_slide_build(0, 5, build_in.clone()).unwrap();
+    assert_eq!(created.settings, build_in);
+    assert_eq!(
+        editor.slide_builds(0).unwrap()[0].settings,
+        KeynoteBuildSettings::dissolve_in()
+    );
+
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let native: kn::BuildArchive = graph
+        .decode_type(created.object_id, BUILD_MESSAGE_TYPE, "KN.BuildArchive")
+        .unwrap();
+    let animation = native.attributes.animation_attributes.as_ref().unwrap();
+    assert_eq!(animation.animation_type.as_deref(), Some("In"));
+    assert_eq!(animation.effect.as_deref(), Some(DISSOLVE_BUILD_EFFECT));
+    assert_eq!(animation.duration, Some(1.0));
+    assert_eq!(animation.direction, None);
+    assert_eq!(
+        native.attributes.custom_text_delivery,
+        Some(BuildAttributesTextDelivery::KTextDeliveryByObject as i32)
+    );
+    assert_eq!(
+        native.attributes.custom_delivery_option,
+        Some(BuildAttributesDeliveryOption::KDeliveryOptionForward as i32)
+    );
+    assert_eq!(native.attributes.custom_bounce, None);
+    assert_eq!(native.attributes.custom_motion_blur, None);
+    assert_eq!(native.attributes.custom_include_endpoints, None);
+    assert_eq!(native.attributes.custom_shine, None);
+    assert_eq!(native.attributes.custom_scale_amount, None);
+    assert_eq!(native.attributes.custom_travel_distance, None);
+    drop(graph);
+
+    let build_out = KeynoteBuildSettings::dissolve_out();
+    editor
+        .set_slide_build(0, created.object_id, build_out.clone())
+        .unwrap();
+    assert_eq!(editor.slide_builds(0).unwrap()[0].settings, build_out);
+
+    let before_invalid = editor.to_bytes().unwrap();
+    let mut invalid_direction = KeynoteBuildSettings::dissolve_out();
+    invalid_direction.direction = Some(11);
+    assert!(
+        editor
+            .set_slide_build(0, created.object_id, invalid_direction)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_invalid);
+
+    editor.remove_slide_build(0, created.object_id).unwrap();
+    assert!(editor.slide_builds(0).unwrap().is_empty());
 }
 
 #[test]
@@ -2582,7 +2641,7 @@ fn build_updates_preserve_unknown_wire_and_normalize_native_merge_payloads() {
 
     let mut editor = KeynoteEditor::from_package(package).unwrap();
     let mut settings = KeynoteBuildSettings::appear_in();
-    settings.effect = "apple:dissolve character".to_owned();
+    settings.effect = "apple:unmapped-test-effect".to_owned();
     settings.duration = 2.5;
     editor
         .set_slide_build(0, created.object_id, settings)

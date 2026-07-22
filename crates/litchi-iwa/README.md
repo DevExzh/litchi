@@ -913,8 +913,7 @@ if let Some(drawable) = keynote.slide_drawables(0)?.first() {
         drawable.object_id,
         KeynoteBuildSettings::appear_in(),
     )?;
-    let mut build_settings = build.settings.clone();
-    build_settings.effect = "apple:dissolve character".to_owned();
+    let mut build_settings = KeynoteBuildSettings::dissolve_in();
     build_settings.duration = 1.5;
     build_settings.start = KeynoteBuildStart::AfterTransition;
     build_settings.delay = 0.25;

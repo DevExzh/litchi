@@ -278,6 +278,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "Shimmer",
             )?;
         },
+        "add-dissolve-in" | "add-dissolve-out" => {
+            let settings = if operation == "add-dissolve-in" {
+                KeynoteBuildSettings::dissolve_in()
+            } else {
+                KeynoteBuildSettings::dissolve_out()
+            };
+            add_typed_build(
+                &mut editor,
+                slide_index,
+                object_id,
+                settings,
+                arguments.next(),
+                "Dissolve",
+            )?;
+        },
         "add-skid-in" | "add-skid-out" | "add-trace-in" | "add-trace-out" => {
             let direction = match arguments.next().ok_or(usage())?.as_str() {
                 "left-to-right" => KeynoteHorizontalBuildDirection::LeftToRight,
@@ -381,7 +396,8 @@ fn usage() -> &'static str {
     "usage: edit_keynote_build <input.key> <output.key> <slide-index> \
      <add|add-rotate|add-scale|add-opacity|add-move|add-move-bezier|add-blink|add-bounce|\
      add-flip|add-jiggle|add-pop|add-pulse|add-keyboard-in|add-keyboard-out|\
-     add-shimmer-in|add-shimmer-out|add-skid-in|add-skid-out|\
+     add-dissolve-in|add-dissolve-out|add-shimmer-in|add-shimmer-out|\
+     add-skid-in|add-skid-out|\
      add-swoosh-in|add-swoosh-out|add-trace-in|add-trace-out|\
      update|timing|move|remove> \
      <drawable-or-build-id> \
@@ -403,6 +419,7 @@ fn usage() -> &'static str {
      add-pop arguments: <scale-percent> [duration]\n\
      add-pulse arguments: <repeat-count> <scale-percent> [duration]\n\
      add-keyboard-in/out arguments: <forward|backward> <cursor|no-cursor> [duration]\n\
+     add-dissolve-in/out arguments: [duration]\n\
      add-shimmer-in/out arguments: [duration]\n\
      add-skid-in/out and add-trace-in/out arguments: \
      <left-to-right|right-to-left> [duration]\n\
