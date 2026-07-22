@@ -4846,6 +4846,13 @@ impl<'a> Parser<'a> {
                             self.record_body_page_break()?;
                             self.pos += 1;
                         },
+                        ControlWord::Section => {
+                            if !text_buffer.is_empty() {
+                                self.flush_text_buffer(&mut text_buffer)?;
+                            }
+                            self.pos += 1;
+                            self.apply_control_word(control)?;
+                        },
                         ControlWord::LegacyParagraphNumbering(_) => {
                             return Err(RtfError::MalformedDocument("RTF pn control must be the first control in its own destination group".to_string()));
                         },
@@ -8418,6 +8425,50 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    fn bind_pending_section_break(&mut self, section_index: usize) {
+        for event in self.body_story_events.iter_mut().rev() {
+            if let ParsedBodyStoryEvent::Resolved(crate::BodyStoryEvent::SectionBreak(boundary)) = event
+                && boundary.next_section.is_none()
+            {
+                boundary.next_section = Some(section_index);
+                return;
+            }
+        }
+    }
+
+    fn begin_section(&mut self) -> RtfResult<()> {
+        if self.sections.len() >= MAX_SECTIONS {
+            return Err(RtfError::MalformedDocument(
+                "RTF section count exceeds the safety limit".to_string(),
+            ));
+        }
+        let inherited = self
+            .sections
+            .last()
+            .map(|section| section.properties.clone())
+            .unwrap_or_default();
+        let inherited_gutter_override = self
+            .section_gutter_overrides
+            .last()
+            .copied()
+            .unwrap_or(false);
+        let mut section = super::section::Section::new();
+        section.properties = inherited;
+        if self.sections.is_empty() {
+            section.properties.margin_gutter = self
+                .print_layout_settings
+                .document_gutter_twips
+                .unwrap_or_default() as i32;
+        }
+        let section_index = self.sections.len();
+        self.sections.push(section);
+        self.section_gutter_overrides
+            .push(inherited_gutter_override);
+        self.bind_pending_section_break(section_index);
+        self.section_properties_active = true;
+        Ok(())
+    }
+
     fn apply_section_control(&mut self, control: &ControlWord<'_>) -> RtfResult<bool> {
         use super::section::{
             PageNumberFormat, PageOrientation, SectionBreakType, VerticalAlignment,
@@ -8437,6 +8488,11 @@ impl<'a> Parser<'a> {
         {
             return Ok(true);
         }
+        let in_root_document_body = self.states.len() == 2
+            && self
+                .states
+                .last()
+                .is_some_and(|state| state.destination == Destination::DocumentBody);
 
         if let Some(side) = match control {
             ControlWord::PageBorderTop => Some(crate::PageBorderSide::Top),
@@ -8446,19 +8502,8 @@ impl<'a> Parser<'a> {
             _ => None,
         } {
             let border = self.parse_page_border_run()?;
-            if self.sections.is_empty() {
-                if self.sections.len() >= MAX_SECTIONS {
-                    return Err(RtfError::MalformedDocument(
-                        "RTF section count exceeds limit".to_string(),
-                    ));
-                }
-                let mut section = super::section::Section::new();
-                section.properties.margin_gutter = self
-                    .print_layout_settings
-                    .document_gutter_twips
-                    .unwrap_or_default() as i32;
-                self.sections.push(section);
-                self.section_gutter_overrides.push(false);
+            if !self.section_properties_active {
+                self.begin_section()?;
             }
             let section = self
                 .sections
@@ -8475,6 +8520,14 @@ impl<'a> Parser<'a> {
         }
 
         if matches!(control, ControlWord::Section) {
+            if in_root_document_body {
+                self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                    crate::BodyStoryEvent::SectionBreak(crate::SectionBreak::new(
+                        self.body_text_len,
+                        None,
+                    )),
+                ));
+            }
             self.current_state_mut()?.section_column_number = None;
             self.section_properties_active = false;
             self.section_note_options_closed = false;
@@ -8494,11 +8547,6 @@ impl<'a> Parser<'a> {
         if !is_section_control(control) {
             return Ok(false);
         }
-        let in_root_document_body = self.states.len() == 2
-            && self
-                .states
-                .last()
-                .is_some_and(|state| state.destination == Destination::DocumentBody);
         if matches!(control, ControlWord::SectionDefault) && in_root_document_body {
             self.root_section_format_run = true;
         } else if matches!(control, ControlWord::SectionBreak) {
@@ -8526,33 +8574,7 @@ impl<'a> Parser<'a> {
         }
 
         if !self.section_properties_active {
-            if self.sections.len() >= MAX_SECTIONS {
-                return Err(RtfError::MalformedDocument(
-                    "RTF section count exceeds the safety limit".to_string(),
-                ));
-            }
-            let inherited = self
-                .sections
-                .last()
-                .map(|section| section.properties.clone())
-                .unwrap_or_default();
-            let inherited_gutter_override = self
-                .section_gutter_overrides
-                .last()
-                .copied()
-                .unwrap_or(false);
-            let mut section = super::section::Section::new();
-            section.properties = inherited;
-            if self.sections.is_empty() {
-                section.properties.margin_gutter = self
-                    .print_layout_settings
-                    .document_gutter_twips
-                    .unwrap_or_default() as i32;
-            }
-            self.sections.push(section);
-            self.section_gutter_overrides
-                .push(inherited_gutter_override);
-            self.section_properties_active = true;
+            self.begin_section()?;
         }
         if matches!(control, ControlWord::SectionDefault) {
             if let Some(overridden) = self.section_gutter_overrides.last_mut() {
@@ -21581,19 +21603,14 @@ impl<'a> Parser<'a> {
             "header/footer",
         )?;
 
-        // Add header/footer to the current section or create a new section
-        if let Some(section) = self.sections.last_mut() {
-            section.add_header_footer(hf);
-        } else {
-            let mut section = super::section::Section::new();
-            section.properties.margin_gutter = self
-                .print_layout_settings
-                .document_gutter_twips
-                .unwrap_or_default() as i32;
-            section.add_header_footer(hf);
-            self.sections.push(section);
-            self.section_gutter_overrides.push(false);
+        // Headers and footers attach to the section currently being defined.
+        if !self.section_properties_active {
+            self.begin_section()?;
         }
+        self.sections
+            .last_mut()
+            .ok_or_else(|| RtfError::MalformedDocument("no active RTF section".to_string()))?
+            .add_header_footer(hf);
 
         self.current_hf_type = None;
         Ok(())

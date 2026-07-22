@@ -2363,6 +2363,17 @@ impl<'a> RtfDocument<'a> {
         })
     }
 
+    /// Explicit main-story section boundaries in source order.
+    ///
+    /// A boundary with `next_section == None` starts an inherited section that
+    /// has no separately retained section definition.
+    pub fn section_breaks(&self) -> impl Iterator<Item = &crate::SectionBreak> {
+        self.body_story_events.iter().filter_map(|event| match event {
+            crate::BodyStoryEvent::SectionBreak(section_break) => Some(section_break),
+            _ => None,
+        })
+    }
+
     pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
         let body = self.text();
         if body.get(position..position).is_none() {
@@ -2812,7 +2823,8 @@ impl<'a> RtfDocument<'a> {
             .find_map(|event| match *event {
                 crate::BodyStoryEvent::Drawing(_)
                 | crate::BodyStoryEvent::Field(_)
-                | crate::BodyStoryEvent::PageBreak(_) => {
+                | crate::BodyStoryEvent::PageBreak(_)
+                | crate::BodyStoryEvent::SectionBreak(_) => {
                     self.body_story_event_position(*event)
                 },
                 _ => None,
@@ -2829,6 +2841,7 @@ impl<'a> RtfDocument<'a> {
             },
             crate::BodyStoryEvent::Field(index) => self.fields.get(index)?.position,
             crate::BodyStoryEvent::PageBreak(page_break) => page_break.position,
+            crate::BodyStoryEvent::SectionBreak(section_break) => section_break.position,
             crate::BodyStoryEvent::BookmarkStart(index) => {
                 self.bookmarks.bookmarks().get(index)?.position
             },

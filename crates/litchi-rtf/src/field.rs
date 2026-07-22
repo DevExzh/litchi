@@ -48,9 +48,30 @@ impl PageBreak {
     }
 }
 
+/// A zero-width explicit `\sect` control at a UTF-8 main-story boundary.
+///
+/// `next_section` identifies the typed section definition that starts after
+/// this boundary. `None` means the following section inherits its properties
+/// and therefore has no separately retained section definition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SectionBreak {
+    pub position: usize,
+    pub next_section: Option<usize>,
+}
+
+impl SectionBreak {
+    pub const fn new(position: usize, next_section: Option<usize>) -> Self {
+        Self {
+            position,
+            next_section,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BodyStoryEvent {
     PageBreak(PageBreak),
+    SectionBreak(SectionBreak),
     Drawing(crate::StoryDrawing),
     Field(usize),
     BookmarkStart(usize),

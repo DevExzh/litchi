@@ -463,7 +463,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Text, paragraphs, and runs | ✅ | ✅ | ✅ | Unicode/ANSI text, formatting groups, and deterministic serialization |
-| Sections | 🟡 | ✅ | 🟡 | Section properties are typed; document writer cannot retain body boundaries for multiple sections |
+| Sections | ✅ | ✅ | ✅ | Typed multi-section properties, headers/footers, explicit `\sect` boundaries, and inherited sections round-trip in source order |
 | Page layout, columns, borders, and numbering | ✅ | ✅ | ✅ | Orientation, dimensions, margins, facing pages, columns, page borders, and line/page numbering |
 | Headers and footers | ✅ | ✅ | ✅ | Header/footer story content and types |
 | Tables | ✅ | ✅ | ✅ | Nested/floating tables, merges, geometry, borders, shading, distances, banding, and story ownership |

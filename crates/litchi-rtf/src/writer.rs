@@ -92,6 +92,7 @@ enum BodyEventKind<'b, 'a> {
     FormFieldEnd,
     GenericField(&'b crate::Field<'a>),
     PageBreak,
+    SectionBreak(Option<&'b Section<'a>>),
 }
 
 #[derive(Clone, Copy)]
@@ -130,12 +131,7 @@ impl<W: Write> RtfWriter<W> {
     pub fn write_document<'a>(&mut self, doc: &RtfDocument<'a>) -> io::Result<()> {
         Self::validate_table_story_metadata_ownership(doc)?;
         Self::validate_generic_field_ownership(doc)?;
-        if doc.sections().len() > 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "RTF document model does not retain body boundaries for multiple sections",
-            ));
-        }
+        Self::validate_section_boundary_mapping(doc.sections(), doc.body_story_events())?;
         // Collect font and color tables from document by cloning them
         // We need to convert the lifetime to 'static for storage
         let font_table: FontTable<'static> = FontTable {
@@ -304,8 +300,18 @@ impl<W: Write> RtfWriter<W> {
         // Document variables are header-level inert metadata.
         self.write_document_variables(doc.document_variables())?;
 
-        // Headers and footers belong to the section definition before body text.
-        for section in doc.sections() {
+        // The first explicit section definition precedes body text unless it is
+        // introduced later by a retained `\sect` boundary.
+        let first_section_is_boundary_scoped = doc.body_story_events().iter().any(|event| {
+            matches!(
+                event,
+                crate::BodyStoryEvent::SectionBreak(section_break)
+                    if section_break.next_section == Some(0)
+            )
+        });
+        if !first_section_is_boundary_scoped
+            && let Some(section) = doc.sections().first()
+        {
             self.write_section_with_fields(section, doc.fields())?;
         }
 
@@ -328,6 +334,7 @@ impl<W: Write> RtfWriter<W> {
             doc.legacy_drawings(),
             doc.form_fields(),
             doc.fields(),
+            doc.sections(),
             doc.body_story_events(),
         )?;
 
@@ -353,6 +360,44 @@ impl<W: Write> RtfWriter<W> {
         // Close document
         self.write_str("}")?;
 
+        Ok(())
+    }
+
+    fn validate_section_boundary_mapping(
+        sections: &[Section<'_>],
+        body_story_events: &[crate::BodyStoryEvent],
+    ) -> io::Result<()> {
+        let first_section_is_boundary_scoped = body_story_events.iter().any(|event| {
+            matches!(
+                event,
+                crate::BodyStoryEvent::SectionBreak(section_break)
+                    if section_break.next_section == Some(0)
+            )
+        });
+        let mut next_section_index = if first_section_is_boundary_scoped {
+            0
+        } else {
+            usize::from(!sections.is_empty())
+        };
+        for event in body_story_events {
+            if let crate::BodyStoryEvent::SectionBreak(section_break) = *event
+                && let Some(index) = section_break.next_section
+            {
+                if index != next_section_index || index >= sections.len() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF section boundary has an invalid or out-of-order section reference",
+                    ));
+                }
+                next_section_index += 1;
+            }
+        }
+        if next_section_index != sections.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF section definitions are missing main-story boundaries",
+            ));
+        }
         Ok(())
     }
 
@@ -3656,6 +3701,7 @@ impl<W: Write> RtfWriter<W> {
         legacy_drawings: &[crate::LegacyDrawing<'_>],
         form_fields: &[crate::FormField<'_>],
         fields: &[crate::Field<'_>],
+        sections: &[Section<'_>],
         body_story_events: &[crate::BodyStoryEvent],
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
@@ -4215,6 +4261,18 @@ impl<W: Write> RtfWriter<W> {
         let mut saw_navigation_entries = vec![false; navigation_entries.len()];
         let mut ordered_drawings = Vec::with_capacity(expected_drawings);
         let mut previous_story_position = None;
+        let first_section_is_boundary_scoped = body_story_events.iter().any(|event| {
+            matches!(
+                event,
+                crate::BodyStoryEvent::SectionBreak(section_break)
+                    if section_break.next_section == Some(0)
+            )
+        });
+        let mut next_section_index = if first_section_is_boundary_scoped {
+            0
+        } else {
+            usize::from(!sections.is_empty())
+        };
         for story_event in body_story_events {
             let (position, kind) = match *story_event {
                 crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(index))
@@ -4249,6 +4307,24 @@ impl<W: Write> RtfWriter<W> {
                 },
                 crate::BodyStoryEvent::PageBreak(page_break) => {
                     (page_break.position, BodyEventKind::PageBreak)
+                },
+                crate::BodyStoryEvent::SectionBreak(section_break) => {
+                    let section = match section_break.next_section {
+                        None => None,
+                        Some(index)
+                            if index == next_section_index && index < sections.len() =>
+                        {
+                            next_section_index += 1;
+                            Some(&sections[index])
+                        },
+                        Some(_) => {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF section boundary has an invalid or out-of-order section reference",
+                            ));
+                        },
+                    };
+                    (section_break.position, BodyEventKind::SectionBreak(section))
                 },
                 crate::BodyStoryEvent::BookmarkStart(index)
                     if index < bookmark_items.len() && !saw_bookmark_starts[index] =>
@@ -4463,6 +4539,7 @@ impl<W: Write> RtfWriter<W> {
             && saw_generated_markers.iter().all(|seen| *seen)
             && saw_legacy_text_boxes.iter().all(|seen| *seen)
             && saw_legacy_drawings.iter().all(|seen| *seen)
+            && next_section_index == sections.len()
             && saw_navigation_entries
                 .iter()
                 .enumerate()
@@ -4544,6 +4621,13 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::FormFieldEnd => self.write_str("}}"),
             BodyEventKind::GenericField(field) => self.write_field_with_fields(field, fields, 0),
             BodyEventKind::PageBreak => self.write_str("\\page "),
+            BodyEventKind::SectionBreak(section) => {
+                self.write_control_word("sect", None)?;
+                if let Some(section) = section {
+                    self.write_section_with_fields(section, fields)?;
+                }
+                Ok(())
+            },
         }
     }
 
@@ -7976,14 +8060,167 @@ mod tests {
     }
 
     #[test]
-    fn document_writer_rejects_ambiguous_multiple_sections() {
-        let document =
-            RtfDocument::parse(r#"{\rtf1\sectd{\header First}One\sect\sectd{\header Second}Two}"#)
-                .unwrap();
-        assert_eq!(document.sections().len(), 2);
-        let error = RtfWriter::new(Vec::new())
+    fn document_writer_round_trips_multiple_section_boundaries() {
+        let document = RtfDocument::parse(
+            r#"{\rtf1\ansi\sectd\sbkpage\pgwsxn10000{\header First}One\sect\sectd\sbknone\pgwsxn12000{\header Second}Two\sect\sectd\sbkeven\pgwsxn14000{\header Third}Three}"#,
+        )
+        .unwrap();
+        assert_eq!(document.text(), "OneTwoThree");
+        assert_eq!(document.sections().len(), 3);
+        assert_eq!(
+            document.section_breaks().copied().collect::<Vec<_>>(),
+            vec![
+                crate::SectionBreak::new("One".len(), Some(1)),
+                crate::SectionBreak::new("OneTwo".len(), Some(2)),
+            ]
+        );
+
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
             .write_document(&document)
-            .unwrap_err();
-        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+            .unwrap();
+        let serialized = String::from_utf8_lossy(&output);
+        assert!(serialized.contains("\\sect\\sectd"));
+
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), document.text());
+        assert_eq!(reparsed.sections().len(), 3);
+        assert_eq!(
+            reparsed.section_breaks().copied().collect::<Vec<_>>(),
+            document.section_breaks().copied().collect::<Vec<_>>(),
+        );
+        assert_eq!(
+            reparsed.sections()[0].properties.break_type,
+            crate::SectionBreakType::Page
+        );
+        assert_eq!(reparsed.sections()[0].properties.page_width, 10000);
+        assert_eq!(
+            reparsed.sections()[1].properties.break_type,
+            crate::SectionBreakType::Continuous
+        );
+        assert_eq!(reparsed.sections()[1].properties.page_width, 12000);
+        assert_eq!(
+            reparsed.sections()[2].properties.break_type,
+            crate::SectionBreakType::EvenPage
+        );
+        assert_eq!(reparsed.sections()[2].properties.page_width, 14000);
+        for (section, expected_header) in reparsed
+            .sections()
+            .iter()
+            .zip(["First", "Second", "Third"])
+        {
+            assert_eq!(
+                section
+                    .get_header(HeaderFooterType::Header)
+                    .unwrap()
+                    .text(),
+                expected_header
+            );
+        }
+    }
+
+    #[test]
+    fn document_writer_round_trips_boundary_to_first_explicit_section() {
+        let document = RtfDocument::parse(
+            r#"{\rtf1\ansi Before\sect\sectd\sbknone{\header Second}After}"#,
+        )
+        .unwrap();
+        assert_eq!(document.text(), "BeforeAfter");
+        assert_eq!(document.sections().len(), 1);
+        assert_eq!(
+            document.section_breaks().copied().collect::<Vec<_>>(),
+            vec![crate::SectionBreak::new("Before".len(), Some(0))]
+        );
+
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), document.text());
+        assert_eq!(
+            reparsed.section_breaks().copied().collect::<Vec<_>>(),
+            document.section_breaks().copied().collect::<Vec<_>>(),
+        );
+        assert_eq!(reparsed.sections().len(), 1);
+        assert_eq!(
+            reparsed.sections()[0]
+                .get_header(HeaderFooterType::Header)
+                .unwrap()
+                .text(),
+            "Second"
+        );
+    }
+
+    #[test]
+    fn document_writer_preserves_inherited_section_boundary() {
+        let document = RtfDocument::parse(r#"{\rtf1\ansi\sectd\sbknone One\sect Two}"#).unwrap();
+        assert_eq!(document.text(), "OneTwo");
+        assert_eq!(document.sections().len(), 1);
+        assert_eq!(
+            document.section_breaks().copied().collect::<Vec<_>>(),
+            vec![crate::SectionBreak::new("One".len(), None)]
+        );
+
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), document.text());
+        assert_eq!(reparsed.sections().len(), 1);
+        assert_eq!(
+            reparsed.section_breaks().copied().collect::<Vec<_>>(),
+            document.section_breaks().copied().collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn document_writer_preserves_page_then_section_break_order() {
+        let document =
+            RtfDocument::parse(r#"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}"#)
+                .unwrap();
+        assert_eq!(document.text(), "OneTwo");
+        assert_eq!(document.sections().len(), 2);
+        assert_eq!(
+            document.body_story_events(),
+            [
+                crate::BodyStoryEvent::PageBreak(crate::PageBreak::new("One".len())),
+                crate::BodyStoryEvent::SectionBreak(crate::SectionBreak::new(
+                    "One".len(),
+                    Some(1),
+                )),
+            ]
+        );
+
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), document.text());
+        assert_eq!(reparsed.body_story_events(), document.body_story_events());
+    }
+
+    #[test]
+    fn document_writer_round_trips_libreoffice_multi_section_fixture() {
+        let document = RtfDocument::parse(include_str!(
+            "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf94043.rtf"
+        ))
+        .unwrap();
+        assert!(document.sections().len() >= 3);
+        assert!(document.section_breaks().count() >= 3);
+
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), document.text());
+        assert_eq!(reparsed.sections().len(), document.sections().len());
+        assert_eq!(
+            reparsed.section_breaks().copied().collect::<Vec<_>>(),
+            document.section_breaks().copied().collect::<Vec<_>>(),
+        );
     }
 }
