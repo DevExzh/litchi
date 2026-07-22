@@ -228,7 +228,7 @@ conversion, fonts, and image conversion are optional.
 | Headers and footers | ✅ | ✅ | ✅ | Per-section story ranges and types |
 | Footnotes and endnotes | ✅ | ✅ | ✅ | References, text stories, and writer APIs |
 | Numbering and lists | ✅ | ✅ | ✅ | List templates, overrides, names, and numbering formats |
-| Hyperlinks and fields | ✅ | ✅ | ✅ | HYPERLINK plus every parsed field story’s stored instruction and cached-result text, with typed inert `MACROBUTTON` macro-name/button/cached-result, `MERGEFIELD` data-column/switch/cached-result, `MERGEREC`/`MERGESEQ` kind/cached-result, and `NEXT` cached-result/state metadata; fields are never evaluated, mail merge never opens data sources or runs, and DDE, OLE, macros, links, and external sources remain inert |
+| Hyperlinks and fields | ✅ | ✅ | ✅ | HYPERLINK plus every parsed field story’s stored instruction and cached-result text, with typed inert `MACROBUTTON` macro-name/button/cached-result, `MERGEFIELD` data-column/switch/cached-result, `MERGEREC`/`MERGESEQ` kind/cached-result, `NEXT` cached-result/state, and `NEXTIF`/`SKIPIF` kind/unparsed-comparison/cached-result metadata; fields are never evaluated, mail merge never opens data sources or runs, and DDE, OLE, macros, links, and external sources remain inert |
 | Bookmarks | ✅ | ✅ | ✅ | Bookmark ranges and writer support |
 | Comments | ✅ | ✅ | ✅ | Annotation ranges, authors, and reply metadata |
 | Track changes | ✅ | ✅ | ✅ | Transactional add/update/remove/accept/reject editing |

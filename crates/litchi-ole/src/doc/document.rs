@@ -14,8 +14,8 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    Field, FieldStory, FieldText, FieldsTable, MacroButtonField, MailMergeCounterField,
-    MailMergeNextField, MergeField,
+    Field, FieldStory, FieldText, FieldsTable, MacroButtonField, MailMergeConditionalControlField,
+    MailMergeCounterField, MailMergeNextField, MergeField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -641,6 +641,25 @@ impl Document {
     /// Get the number of typed, inert `NEXT` mail-merge control fields.
     pub fn mail_merge_next_field_count(&self) -> Result<usize> {
         Ok(self.mail_merge_next_fields()?.len())
+    }
+
+    /// Get typed, inert `NEXTIF` and `SKIPIF` fields in story and source order.
+    ///
+    /// Returned values expose only stored comparison text, cached results, and
+    /// field state. This method never evaluates a comparison, changes record
+    /// selection, opens a data source, performs a merge, or refreshes a field
+    /// result.
+    pub fn mail_merge_conditional_controls(&self) -> Result<Vec<MailMergeConditionalControlField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::mail_merge_conditional_control)
+            .collect())
+    }
+
+    /// Get the number of typed, inert conditional mail-merge control fields.
+    pub fn mail_merge_conditional_control_count(&self) -> Result<usize> {
+        Ok(self.mail_merge_conditional_controls()?.len())
     }
 
     /// Get stored instruction and cached-result text for one parsed field.
