@@ -74,6 +74,7 @@ impl BodySortPlan {
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum SortScalar {
     Number(f64),
+    Text(u32),
     Boolean(bool),
     Date(f64),
     Duration(f64),
@@ -82,6 +83,7 @@ enum SortScalar {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum SortScalarKind {
     Number,
+    Text,
     Boolean,
     Date,
     Duration,
@@ -91,13 +93,14 @@ impl SortScalar {
     fn kind(self) -> SortScalarKind {
         match self {
             Self::Number(_) => SortScalarKind::Number,
+            Self::Text(_) => SortScalarKind::Text,
             Self::Boolean(_) => SortScalarKind::Boolean,
             Self::Date(_) => SortScalarKind::Date,
             Self::Duration(_) => SortScalarKind::Duration,
         }
     }
 
-    fn compare(self, other: Self) -> Ordering {
+    fn compare(self, other: Self, text_by_identifier: &HashMap<u32, String>) -> Ordering {
         let kinds = self.kind().cmp(&other.kind());
         if kinds != Ordering::Equal {
             return kinds;
@@ -106,6 +109,13 @@ impl SortScalar {
             (Self::Number(left), Self::Number(right))
             | (Self::Date(left), Self::Date(right))
             | (Self::Duration(left), Self::Duration(right)) => compare_finite_numbers(left, right),
+            (Self::Text(left), Self::Text(right)) => match (
+                text_by_identifier.get(&left),
+                text_by_identifier.get(&right),
+            ) {
+                (Some(left), Some(right)) => left.cmp(right),
+                _ => left.cmp(&right),
+            },
             (Self::Boolean(left), Self::Boolean(right)) => left.cmp(&right),
             _ => Ordering::Equal,
         }
@@ -351,11 +361,31 @@ fn plan_body_sort(
         })
         .collect::<Result<Vec<_>>>()?;
     validate_consistent_scalar_kinds(&keys_by_body_row, order)?;
+    let text_identifiers = keys_by_body_row
+        .iter()
+        .flatten()
+        .filter_map(|scalar| match scalar {
+            SortScalar::Text(identifier) => Some(*identifier),
+            _ => None,
+        })
+        .collect::<HashSet<_>>();
+    let text_by_identifier = resolve_table_string_values(
+        package,
+        locations,
+        model.base_data_store.string_table.identifier,
+        &text_identifiers,
+    )?;
+    validate_sort_text_references(&keys_by_body_row, body_start, order, &text_by_identifier)?;
 
     let mut source_offsets = (0..keys_by_body_row.len()).collect::<Vec<_>>();
     source_offsets.sort_by(|left, right| {
-        compare_body_rows(&keys_by_body_row[*left], &keys_by_body_row[*right], order)
-            .then_with(|| left.cmp(right))
+        compare_body_rows(
+            &keys_by_body_row[*left],
+            &keys_by_body_row[*right],
+            order,
+            &text_by_identifier,
+        )
+        .then_with(|| left.cmp(right))
     });
     Ok(BodySortPlan {
         body_start,
@@ -415,6 +445,9 @@ fn validate_movable_body_cell(cell: &BncCell, row: usize, column: usize) -> Resu
 }
 
 fn sort_scalar(cell: &BncCell, row: usize, column: usize) -> Result<SortScalar> {
+    if let StoredValue::Text(identifier) = cell.stored_value() {
+        return Ok(SortScalar::Text(identifier));
+    }
     let scalar = match cell.cached_scalar()? {
         Some(CachedScalar::Number(value)) if value.is_finite() => SortScalar::Number(value),
         Some(CachedScalar::Boolean(value)) => SortScalar::Boolean(value),
@@ -455,8 +488,34 @@ fn validate_consistent_scalar_kinds(
             .any(|keys| keys[rule_position].kind() != kind)
         {
             return Err(Error::ParseError(format!(
-                "Numbers sort column {} mixes scalar types; use one Number, Boolean, Date, or Duration type per rule",
+                "Numbers sort column {} mixes scalar types; use one Number, plain Text, Boolean, Date, or Duration type per rule",
                 rule.column().get()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_sort_text_references(
+    keys_by_body_row: &[Vec<SortScalar>],
+    body_start: usize,
+    order: &NumbersTableSortOrder,
+    text_by_identifier: &HashMap<u32, String>,
+) -> Result<()> {
+    for (body_row, keys) in keys_by_body_row.iter().enumerate() {
+        for (rule_position, scalar) in keys.iter().enumerate() {
+            let SortScalar::Text(identifier) = scalar else {
+                continue;
+            };
+            if text_by_identifier.contains_key(identifier) {
+                continue;
+            }
+            let row = body_start
+                .checked_add(body_row)
+                .ok_or_else(|| Error::ParseError("Numbers sort body row overflow".to_owned()))?;
+            let column = order.rules()[rule_position].column().get();
+            return Err(Error::InvalidFormat(format!(
+                "Numbers sort key in body cell ({row}, {column}) references missing string {identifier}"
             )));
         }
     }
@@ -467,9 +526,10 @@ fn compare_body_rows(
     left: &[SortScalar],
     right: &[SortScalar],
     order: &NumbersTableSortOrder,
+    text_by_identifier: &HashMap<u32, String>,
 ) -> Ordering {
     for ((left, right), rule) in left.iter().zip(right).zip(order.rules()) {
-        let ordering = left.compare(*right);
+        let ordering = left.compare(*right, text_by_identifier);
         let ordering = match rule.direction() {
             NumbersTableSortDirection::Ascending => ordering,
             NumbersTableSortDirection::Descending => ordering.reverse(),

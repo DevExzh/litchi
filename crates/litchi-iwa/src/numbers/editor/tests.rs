@@ -5783,6 +5783,198 @@ fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
 }
 
 #[test]
+fn source_created_table_executes_stable_plain_text_sort() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(5, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    editor
+        .set_cells(
+            table_id,
+            [
+                TableCellUpdate::new(0, 0, CellValue::Text("Name".to_owned())),
+                TableCellUpdate::new(0, 1, CellValue::Text("Marker".to_owned())),
+                TableCellUpdate::new(1, 0, CellValue::Text("zebra".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::Text("last".to_owned())),
+                TableCellUpdate::new(2, 0, CellValue::Text("apple".to_owned())),
+                TableCellUpdate::new(2, 1, CellValue::Text("first apple".to_owned())),
+                TableCellUpdate::new(3, 0, CellValue::Text("banana".to_owned())),
+                TableCellUpdate::new(3, 1, CellValue::Text("middle".to_owned())),
+                TableCellUpdate::new(4, 0, CellValue::Text("apple".to_owned())),
+                TableCellUpdate::new(4, 1, CellValue::Text("second apple".to_owned())),
+            ],
+        )
+        .unwrap();
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(0).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    editor
+        .set_table_sort_order(table_id, order.clone())
+        .unwrap();
+
+    assert!(editor.apply_table_sort_order(table_id).unwrap());
+    assert_eq!(editor.table_sort_order(table_id).unwrap(), Some(order));
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!(
+        table.get_cell(0, 0),
+        Some(&CellValue::Text("Name".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(0, 1),
+        Some(&CellValue::Text("Marker".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(1, 0),
+        Some(&CellValue::Text("apple".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(1, 1),
+        Some(&CellValue::Text("first apple".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(2, 0),
+        Some(&CellValue::Text("apple".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(2, 1),
+        Some(&CellValue::Text("second apple".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(3, 0),
+        Some(&CellValue::Text("banana".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(3, 1),
+        Some(&CellValue::Text("middle".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(4, 0),
+        Some(&CellValue::Text("zebra".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(4, 1),
+        Some(&CellValue::Text("last".to_owned()))
+    );
+
+    let sorted = editor.to_bytes().unwrap();
+    assert!(!editor.apply_table_sort_order(table_id).unwrap());
+    assert_eq!(editor.to_bytes().unwrap(), sorted);
+}
+
+#[test]
+fn table_sort_resolves_plain_text_keys_from_segmented_string_storage() {
+    const TABLE_ID: u64 = 10;
+    const STRING_LIST_ID: u64 = 20;
+    const STRING_SEGMENT_ID: u64 = 60;
+
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    editor
+        .set_cells(
+            TABLE_ID,
+            [
+                TableCellUpdate::new(0, 0, CellValue::Text("zebra".to_owned())),
+                TableCellUpdate::new(1, 0, CellValue::Text("apple".to_owned())),
+                TableCellUpdate::new(2, 0, CellValue::Text("banana".to_owned())),
+                TableCellUpdate::new(3, 0, CellValue::Text("apple".to_owned())),
+            ],
+        )
+        .unwrap();
+    editor
+        .set_table_sort_order(
+            TABLE_ID,
+            NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(0).unwrap(),
+                NumbersTableSortDirection::Ascending,
+            )])
+            .unwrap(),
+        )
+        .unwrap();
+    let mut package = editor.into_package();
+    move_table_data_list_entries_to_segment(&mut package, STRING_LIST_ID, STRING_SEGMENT_ID);
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+
+    assert!(editor.apply_table_sort_order(TABLE_ID).unwrap());
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!(
+        table.get_cell(0, 0),
+        Some(&CellValue::Text("apple".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(1, 0),
+        Some(&CellValue::Text("apple".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(2, 0),
+        Some(&CellValue::Text("banana".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(3, 0),
+        Some(&CellValue::Text("zebra".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(3, 1),
+        Some(&CellValue::Text("Original".to_owned()))
+    );
+}
+
+#[test]
+fn table_sort_rejects_missing_plain_text_storage_transactionally() {
+    const TABLE_ID: u64 = 10;
+    const STRING_LIST_ID: u64 = 20;
+
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    editor
+        .set_cells(
+            TABLE_ID,
+            [
+                TableCellUpdate::new(0, 0, CellValue::Text("zebra".to_owned())),
+                TableCellUpdate::new(1, 0, CellValue::Text("apple".to_owned())),
+                TableCellUpdate::new(2, 0, CellValue::Text("banana".to_owned())),
+                TableCellUpdate::new(3, 0, CellValue::Text("apple".to_owned())),
+            ],
+        )
+        .unwrap();
+    editor
+        .set_table_sort_order(
+            TABLE_ID,
+            NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(0).unwrap(),
+                NumbersTableSortDirection::Ascending,
+            )])
+            .unwrap(),
+        )
+        .unwrap();
+    let mut package = editor.into_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(STRING_LIST_ID).unwrap();
+            let message = object.messages[0].clone();
+            let mut strings = TableDataList::decode(message.data.as_slice())?;
+            strings.entries.clear();
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: strings.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    let error = editor.apply_table_sort_order(TABLE_ID).unwrap_err();
+    assert!(error.to_string().contains("references missing string"));
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn source_created_table_executes_sort_order_without_moving_headers_or_footers() {
     let mut editor = NumbersDocumentBuilder::new()
         .table_dimensions(5, 3)

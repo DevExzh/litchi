@@ -2,6 +2,8 @@
 
 use super::*;
 
+const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6011;
+
 #[derive(Debug)]
 pub(super) struct RichTextEntryLocation {
     table_id: u64,
@@ -99,7 +101,7 @@ pub(super) fn resolve_table_data_list(
         let segment_messages = segment_object
             .messages
             .iter()
-            .filter(|message| message.type_ == 6011)
+            .filter(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE)
             .collect::<Vec<_>>();
         if segment_messages.len() != 1 {
             return Err(Error::InvalidFormat(format!(
@@ -133,6 +135,106 @@ pub(super) fn resolve_table_data_list(
         list,
         entries,
     })
+}
+
+/// Resolve only the requested plain-string entries without cloning an entire
+/// potentially large table string list.
+pub(super) fn resolve_table_string_values(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    table_id: u64,
+    requested_keys: &HashSet<u32>,
+) -> Result<HashMap<u32, String>> {
+    if requested_keys.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let table_archive = locations.get(&table_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers table-data-list object {table_id} is missing"
+        ))
+    })?;
+    let archive = package.archive(table_archive)?;
+    let object = archive.object(table_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers table-data-list object {table_id} is missing"
+        ))
+    })?;
+    let list_type = tst::table_data_list::ListType::String;
+    let message_index = table_data_list_message_index(object, list_type).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Object {table_id} has no Numbers {list_type:?} TableDataList payload"
+        ))
+    })?;
+    let list = TableDataList::decode(object.messages[message_index].data.as_slice())?;
+    let TableDataList {
+        entries, segments, ..
+    } = list;
+    let mut values = HashMap::with_capacity(requested_keys.len());
+    let mut keys = HashSet::with_capacity(entries.len());
+    for entry in entries {
+        let key = entry.key;
+        if !keys.insert(key) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers String table {table_id} contains duplicate root entry keys"
+            )));
+        }
+        if requested_keys.contains(&key)
+            && let Some(value) = entry.string
+        {
+            values.insert(key, value);
+        }
+    }
+
+    let mut segment_ids = HashSet::with_capacity(segments.len());
+    for reference in segments {
+        if !segment_ids.insert(reference.identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers String table {table_id} repeats segment object {}",
+                reference.identifier
+            )));
+        }
+        let segment_archive = locations.get(&reference.identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table-data-list segment object {} is missing",
+                reference.identifier
+            ))
+        })?;
+        let archive = package.archive(segment_archive)?;
+        let segment_object = archive.object(reference.identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table-data-list segment object {} is missing",
+                reference.identifier
+            ))
+        })?;
+        let segment_messages = segment_object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        if segment_messages.len() != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "Object {} has {} Numbers TableDataListSegment payloads",
+                reference.identifier,
+                segment_messages.len()
+            )));
+        }
+        let segment = TableDataListSegment::decode(segment_messages[0].data.as_slice())?;
+        validate_table_data_list_segment(reference.identifier, list_type, &segment)?;
+        for entry in segment.entries {
+            let key = entry.key;
+            if !keys.insert(key) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers String table {table_id} repeats entry key {key} across root and segments"
+                )));
+            }
+            if requested_keys.contains(&key)
+                && let Some(value) = entry.string
+            {
+                values.insert(key, value);
+            }
+        }
+    }
+    Ok(values)
 }
 
 pub(super) fn validate_table_data_list_segment(
@@ -807,7 +909,7 @@ where
                 let message_index = object
                     .messages
                     .iter()
-                    .position(|message| message.type_ == 6011)
+                    .position(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE)
                     .ok_or_else(|| {
                         Error::InvalidFormat(format!(
                             "Object {object_id} has no Numbers TableDataListSegment payload"
@@ -846,7 +948,13 @@ where
                         .flat_map(entry_object_references)
                         .collect::<HashSet<_>>();
                     let data = rewrite_table_data_list_segment_wire(original, &previous, &segment)?;
-                    object.replace_message(message_index, RawMessage { type_: 6011, data })?;
+                    object.replace_message(
+                        message_index,
+                        RawMessage {
+                            type_: TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE,
+                            data,
+                        },
+                    )?;
                     for reference in old_references.difference(&remaining_references) {
                         remove_message_object_reference(object, message_index, *reference);
                     }
@@ -1521,7 +1629,7 @@ where
                 let message_index = object
                     .messages
                     .iter()
-                    .position(|message| message.type_ == 6011)
+                    .position(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE)
                     .ok_or_else(|| {
                         Error::InvalidFormat(format!(
                             "Object {object_id} has no Numbers TableDataListSegment payload"
@@ -1552,7 +1660,13 @@ where
                         "Numbers formula table segment wire mutation failed validation".to_owned(),
                     ));
                 }
-                object.replace_message(message_index, RawMessage { type_: 6011, data })?;
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE,
+                        data,
+                    },
+                )?;
                 Ok(())
             })
         },
