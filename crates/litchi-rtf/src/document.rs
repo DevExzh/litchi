@@ -1144,6 +1144,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `IF` fields in document order.
+    ///
+    /// Stored expression text, cached results, and field state are exposed
+    /// solely as metadata. This method never parses or evaluates an expression,
+    /// resolves field values, or refreshes field results.
+    pub fn if_fields(&self) -> Vec<crate::IfField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::if_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `IF` fields.
+    pub fn if_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.if_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert TOC fields in document field order.
     ///
     /// Stored options and cached results are exposed solely as metadata. This

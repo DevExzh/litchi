@@ -169,14 +169,14 @@ pub use field::{
     BibliographyField, BibliographyOption, BodyStoryEvent, CitationField, CitationOption, DdeField,
     DdeFieldKind, DdeRepresentation, DocumentVariableField, EquationField, ExternalIncludeField,
     ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
-    FieldSwitch, FieldType, HyperlinkCode, IncludeFieldKind, IndexEntryField, IndexEntryOption,
-    IndexField, IndexOption, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
-    MailMergeCounterKind, MailMergeNextField, MergeField, PageBreak, ParsedFieldCode,
-    ReferenceCode, SectionBreak, StoryEvent, StoryField, TableOfAuthoritiesEntryField,
-    TableOfAuthoritiesEntryOption, TableOfAuthoritiesField, TableOfAuthoritiesOption,
-    TableOfContentsEntryField, TableOfContentsEntryOption, TableOfContentsField,
-    TableOfContentsOption, parse_field_code,
+    FieldSwitch, FieldType, HyperlinkCode, IfField, IncludeFieldKind, IndexEntryField,
+    IndexEntryOption, IndexField, IndexOption, LinkField, LinkFormatting, LinkResultOption,
+    MacroButtonField, MailMergeConditionalControlField, MailMergeConditionalControlKind,
+    MailMergeCounterField, MailMergeCounterKind, MailMergeNextField, MergeField, PageBreak,
+    ParsedFieldCode, ReferenceCode, SectionBreak, StoryEvent, StoryField,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesEntryOption, TableOfAuthoritiesField,
+    TableOfAuthoritiesOption, TableOfContentsEntryField, TableOfContentsEntryOption,
+    TableOfContentsField, TableOfContentsOption, parse_field_code,
 };
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};
