@@ -3283,6 +3283,50 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_inert_dde_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let manual = document.add_paragraph();
+            manual.add_field(crate::docx::writer::MutableField::with_result(
+                r#"DDE Excel "missing.xlsx" "Sheet1!A1" \a \p"#.to_string(),
+                "cached DDE link".to_string(),
+            ));
+            let automatic = document.add_paragraph();
+            automatic.add_field(crate::docx::writer::MutableField::with_result(
+                r#"DDEAUTO Excel "missing.xlsx" "Sheet1!A2" \t"#.to_string(),
+                "cached DDE auto link".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let links = document.dde_links().unwrap();
+        assert_eq!(document.dde_link_count().unwrap(), 2);
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].kind(), crate::docx::DdeFieldKind::Dde);
+        assert_eq!(links[0].application(), "Excel");
+        assert_eq!(links[0].source(), "missing.xlsx");
+        assert_eq!(links[0].item(), Some("Sheet1!A1"));
+        assert!(links[0].requests_automatic_updates());
+        assert_eq!(
+            links[0].representation(),
+            Some(crate::docx::DdeRepresentation::Picture)
+        );
+        assert_eq!(links[0].cached_result(), Some("cached DDE link"));
+        assert_eq!(links[1].kind(), crate::docx::DdeFieldKind::DdeAuto);
+        assert_eq!(links[1].item(), Some("Sheet1!A2"));
+        assert!(links[1].requests_automatic_updates());
+        assert_eq!(
+            links[1].representation(),
+            Some(crate::docx::DdeRepresentation::Text)
+        );
+        assert_eq!(links[1].cached_result(), Some("cached DDE auto link"));
+    }
+
+    #[test]
     fn writes_and_discovers_typed_inert_link_fields() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

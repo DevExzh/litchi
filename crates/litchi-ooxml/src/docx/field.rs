@@ -206,6 +206,34 @@ impl Field {
         LinkField::from_field(self)
     }
 
+    /// Check whether this is a legacy DDE field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never
+    /// launches an application, initiates a DDE conversation, opens a source,
+    /// or refreshes the field.
+    pub fn is_dde(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "DDE").is_some()
+    }
+
+    /// Check whether this is a legacy automatically updating DDEAUTO field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never
+    /// launches an application, initiates a DDE conversation, opens a source,
+    /// or refreshes the field.
+    pub fn is_dde_auto(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "DDEAUTO").is_some()
+    }
+
+    /// Parse this field as inert typed DDE or DDEAUTO metadata.
+    ///
+    /// Returns Ok(None) for other fields. The result exposes stored
+    /// application, source, item, representation, and cached metadata only; it
+    /// never launches an application, initiates a DDE conversation, opens,
+    /// contacts, refreshes, converts, evaluates, or executes anything.
+    pub fn dde_link(&self) -> Result<Option<DdeField>> {
+        DdeField::from_field(self)
+    }
+
     /// Check whether this is a `TOC` (Table of Contents) field.
     ///
     /// The field's cached result remains data only; calling this method never
@@ -562,6 +590,197 @@ impl FieldSwitch {
     /// Return the optional argument supplied to this switch.
     pub fn argument(&self) -> Option<&str> {
         self.argument.as_deref()
+    }
+}
+
+/// The stored kind of a legacy DDE field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DdeFieldKind {
+    /// A DDE field, which can request automatic updates with its a switch.
+    Dde,
+    /// A DDEAUTO field, which declares automatic updates.
+    DdeAuto,
+}
+
+/// One stored DDE result representation switch.
+///
+/// This value describes a requested representation only. It never causes a
+/// source to be contacted, converted, embedded, or displayed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DdeRepresentation {
+    /// The b switch requests a bitmap representation.
+    Bitmap,
+    /// The h switch requests HTML-formatted text.
+    Html,
+    /// The p switch requests a picture representation.
+    Picture,
+    /// The r switch requests rich-text format.
+    RichText,
+    /// The t switch requests text-only format.
+    Text,
+    /// The u switch requests Unicode text.
+    UnicodeText,
+}
+
+/// Typed, inert metadata for a legacy DDE or DDEAUTO field.
+///
+/// Application, source, item, representation, and storage switches are
+/// retained as stored field data. This type never launches an application,
+/// initiates a DDE conversation, opens a source, requests data, refreshes
+/// content, converts content, or executes code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DdeField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    kind: DdeFieldKind,
+    application: String,
+    source: String,
+    item: Option<String>,
+    automatic_updates: bool,
+    representation: Option<DdeRepresentation>,
+    omit_graphic_data: bool,
+    switches: Vec<FieldSwitch>,
+}
+
+impl DdeField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((kind, application, source, item, switches)) =
+            parse_dde_operands_and_switches(field.instruction())?
+        else {
+            return Ok(None);
+        };
+
+        let mut automatic_updates = kind == DdeFieldKind::DdeAuto;
+        let mut saw_automatic_update = false;
+        let mut representation = None;
+        let mut omit_graphic_data = false;
+        for switch in &switches {
+            match switch.name {
+                'a' if kind == DdeFieldKind::Dde => {
+                    if saw_automatic_update || switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "DDE \\a switch cannot be repeated or take an argument".to_string(),
+                        ));
+                    }
+                    automatic_updates = true;
+                    saw_automatic_update = true;
+                },
+                'a' => {
+                    return Err(OoxmlError::InvalidFormat(
+                        "DDEAUTO field does not allow a \\a switch".to_string(),
+                    ));
+                },
+                'd' => {
+                    if representation.is_some() || omit_graphic_data || switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "DDE result and storage switches cannot be combined".to_string(),
+                        ));
+                    }
+                    omit_graphic_data = true;
+                },
+                'b' | 'h' | 'p' | 'r' | 't' | 'u' => {
+                    if representation.is_some() || omit_graphic_data || switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "DDE result and storage switches cannot be combined".to_string(),
+                        ));
+                    }
+                    representation = Some(match switch.name {
+                        'b' => DdeRepresentation::Bitmap,
+                        'h' => DdeRepresentation::Html,
+                        'p' => DdeRepresentation::Picture,
+                        'r' => DdeRepresentation::RichText,
+                        't' => DdeRepresentation::Text,
+                        'u' => DdeRepresentation::UnicodeText,
+                        _ => unreachable!("DDE representation switch was matched above"),
+                    });
+                },
+                _ => {},
+            }
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            kind,
+            application,
+            source,
+            item,
+            automatic_updates,
+            representation,
+            omit_graphic_data,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached field result, if one was stored.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return whether this is a DDE or DDEAUTO field.
+    pub fn kind(&self) -> DdeFieldKind {
+        self.kind
+    }
+
+    /// Return the stored DDE application name without launching it.
+    pub fn application(&self) -> &str {
+        &self.application
+    }
+
+    /// Return the stored source identifier without opening or resolving it.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Return the optional stored source item, such as a cell range or bookmark.
+    pub fn item(&self) -> Option<&str> {
+        self.item.as_deref()
+    }
+
+    /// Whether the stored instruction requests automatic DDE updates.
+    ///
+    /// This is metadata only. The API never performs an update.
+    pub fn requests_automatic_updates(&self) -> bool {
+        self.automatic_updates
+    }
+
+    /// Return the requested stored result representation, if present.
+    ///
+    /// This is metadata only and never triggers source access or conversion.
+    pub fn representation(&self) -> Option<DdeRepresentation> {
+        self.representation
+    }
+
+    /// Whether the stored d switch omits graphic data from the document.
+    ///
+    /// This is stored metadata only. The API never reads the source to obtain
+    /// omitted data.
+    pub fn omits_graphic_data(&self) -> bool {
+        self.omit_graphic_data
+    }
+
+    /// Return all stored field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
     }
 }
 
@@ -1647,20 +1866,61 @@ fn parse_field_operand_and_switches(
 fn parse_link_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(String, String, Option<String>, Vec<FieldSwitch>)>> {
-    let Some(remainder) = field_instruction_remainder(instruction, "LINK") else {
+    parse_external_link_operands_and_switches(instruction, "LINK")
+}
+
+fn parse_dde_operands_and_switches(
+    instruction: &str,
+) -> Result<
+    Option<(
+        DdeFieldKind,
+        String,
+        String,
+        Option<String>,
+        Vec<FieldSwitch>,
+    )>,
+> {
+    if let Some((application, source, item, switches)) =
+        parse_external_link_operands_and_switches(instruction, "DDEAUTO")?
+    {
+        return Ok(Some((
+            DdeFieldKind::DdeAuto,
+            application,
+            source,
+            item,
+            switches,
+        )));
+    }
+
+    Ok(
+        parse_external_link_operands_and_switches(instruction, "DDE")?.map(
+            |(application, source, item, switches)| {
+                (DdeFieldKind::Dde, application, source, item, switches)
+            },
+        ),
+    )
+}
+
+fn parse_external_link_operands_and_switches(
+    instruction: &str,
+    field_type: &str,
+) -> Result<Option<(String, String, Option<String>, Vec<FieldSwitch>)>> {
+    let Some(remainder) = field_instruction_remainder(instruction, field_type) else {
         return Ok(None);
     };
     let mut characters = remainder.chars().peekable();
-    let application_type = parse_next_field_argument(&mut characters, "LINK")?
+    let application_type = parse_next_field_argument(&mut characters, field_type)?
         .filter(|value| !value.is_empty())
         .ok_or_else(|| {
-            OoxmlError::InvalidFormat("LINK field is missing its application type".to_string())
+            OoxmlError::InvalidFormat(format!("{field_type} field is missing its application type"))
         })?;
-    let source = parse_next_field_argument(&mut characters, "LINK")?
+    let source = parse_next_field_argument(&mut characters, field_type)?
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| OoxmlError::InvalidFormat("LINK field is missing its source".to_string()))?;
-    let item = parse_next_field_argument(&mut characters, "LINK")?;
-    let switches = parse_field_switches_from_characters(&mut characters, "LINK")?;
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!("{field_type} field is missing its source"))
+        })?;
+    let item = parse_next_field_argument(&mut characters, field_type)?;
+    let switches = parse_field_switches_from_characters(&mut characters, field_type)?;
     Ok(Some((application_type, source, item, switches)))
 }
 
@@ -2114,6 +2374,97 @@ mod tests {
             .link()
             .is_err()
         );
+    }
+
+    #[test]
+    fn parses_inert_dde_fields_without_starting_conversations() {
+        let field = Field::new(
+            r#"DDE Excel "C:\\no-contact\\source.xlsx" "Sheet1!R1C1:R4C4" \a \p \* MERGEFORMAT"#
+                .to_string(),
+            Some("cached DDE result".to_string()),
+            true,
+        );
+        assert!(field.is_dde());
+        assert!(!field.is_dde_auto());
+        let dde = field.dde_link().unwrap().unwrap();
+        assert_eq!(
+            dde.instruction(),
+            r#"DDE Excel "C:\\no-contact\\source.xlsx" "Sheet1!R1C1:R4C4" \a \p \* MERGEFORMAT"#
+        );
+        assert_eq!(dde.kind(), DdeFieldKind::Dde);
+        assert_eq!(dde.application(), "Excel");
+        assert_eq!(dde.source(), r"C:\no-contact\source.xlsx");
+        assert_eq!(dde.item(), Some("Sheet1!R1C1:R4C4"));
+        assert!(dde.requests_automatic_updates());
+        assert_eq!(dde.representation(), Some(DdeRepresentation::Picture));
+        assert!(!dde.omits_graphic_data());
+        assert_eq!(dde.cached_result(), Some("cached DDE result"));
+        assert!(dde.is_dirty());
+        assert!(!dde.is_locked());
+        assert_eq!(dde.switches().len(), 3);
+        assert_eq!(dde.switches()[0].name(), 'a');
+        assert_eq!(dde.switches()[2].name(), '*');
+        assert_eq!(dde.switches()[2].argument(), Some("MERGEFORMAT"));
+
+        let automatic = Field::new(
+            r#"DDEAUTO Excel "missing.xlsx" "Sheet1!A1" \t"#.to_string(),
+            None,
+            false,
+        );
+        assert!(!automatic.is_dde());
+        assert!(automatic.is_dde_auto());
+        let automatic = automatic.dde_link().unwrap().unwrap();
+        assert_eq!(automatic.kind(), DdeFieldKind::DdeAuto);
+        assert!(automatic.requests_automatic_updates());
+        assert_eq!(automatic.representation(), Some(DdeRepresentation::Text));
+
+        let omit_graphics = Field::new(r"DDE Excel source \a \d".to_string(), None, false)
+            .dde_link()
+            .unwrap()
+            .unwrap();
+        assert!(omit_graphics.requests_automatic_updates());
+        assert!(omit_graphics.omits_graphic_data());
+        assert_eq!(omit_graphics.representation(), None);
+
+        assert!(
+            Field::new("DDE".to_string(), None, false)
+                .dde_link()
+                .is_err()
+        );
+        assert!(
+            Field::new(r"DDE Excel \p".to_string(), None, false)
+                .dde_link()
+                .is_err()
+        );
+        assert!(
+            Field::new(r"DDE Excel source \p unexpected".to_string(), None, false)
+                .dde_link()
+                .is_err()
+        );
+        assert!(
+            Field::new(r"DDE Excel source \p \t".to_string(), None, false)
+                .dde_link()
+                .is_err()
+        );
+        assert!(
+            Field::new(r"DDEAUTO Excel source \p \t".to_string(), None, false)
+                .dde_link()
+                .is_err()
+        );
+        assert!(
+            Field::new(r"DDEAUTO Excel source \a".to_string(), None, false)
+                .dde_link()
+                .is_err()
+        );
+        assert!(
+            Field::new(r"DDE Excel source \a \a".to_string(), None, false)
+                .dde_link()
+                .is_err()
+        );
+        let not_dde = Field::new("DDEAUTOMATED Excel source".to_string(), None, false);
+        assert!(!not_dde.is_dde());
+        assert!(!not_dde.is_dde_auto());
+        assert!(not_dde.dde_link().unwrap().is_none());
     }
 
     #[test]

@@ -8,7 +8,7 @@ use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
-    BibliographyField, CitationField, Field, IndexEntryField, IndexField, LinkField,
+    BibliographyField, CitationField, DdeField, Field, IndexEntryField, IndexField, LinkField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
 };
 use crate::docx::footnote::Note;
@@ -1258,6 +1258,25 @@ impl<'a> Document<'a> {
     /// Get the number of bibliography fields in the main document.
     pub fn bibliography_count(&self) -> Result<usize> {
         Ok(self.bibliographies()?.len())
+    }
+
+    /// Get typed, inert `DDE` and `DDEAUTO` fields in document order.
+    ///
+    /// Returned fields expose stored application, source, item, representation,
+    /// storage, cached content, and dirty/lock metadata only. This method never
+    /// launches an application, initiates a DDE conversation, opens a source,
+    /// requests data, refreshes, converts, evaluates, or executes anything.
+    pub fn dde_links(&self) -> Result<Vec<DdeField>> {
+        self.fields()?
+            .iter()
+            .map(Field::dde_link)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `DDE` and `DDEAUTO` fields in the main document.
+    pub fn dde_link_count(&self) -> Result<usize> {
+        Ok(self.dde_links()?.len())
     }
 
     /// Get typed, inert `LINK` fields in document order.
