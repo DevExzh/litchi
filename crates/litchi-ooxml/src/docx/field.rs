@@ -8,7 +8,7 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
-const MAX_TOC_SWITCHES: usize = 64;
+const MAX_FIELD_SWITCHES: usize = 64;
 
 /// A field in a Word document.
 ///
@@ -159,7 +159,7 @@ impl Field {
     /// The field's cached result remains data only; calling this method never
     /// recalculates the table of contents or follows any hyperlinks in it.
     pub fn is_table_of_contents(&self) -> bool {
-        toc_instruction_remainder(&self.instruction).is_some()
+        field_instruction_remainder(&self.instruction, "TOC").is_some()
     }
 
     /// Parse this field as an inert typed table-of-contents field.
@@ -169,6 +169,38 @@ impl Field {
     /// it never evaluates the field or refreshes its cached content.
     pub fn table_of_contents(&self) -> Result<Option<TableOfContentsField>> {
         TableOfContentsField::from_field(self)
+    }
+
+    /// Check whether this is a `TOA` (Table of Authorities) field.
+    ///
+    /// This only recognizes the stored field code. It never generates the
+    /// table, resolves its cited authorities, or recalculates page references.
+    pub fn is_table_of_authorities(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "TOA").is_some()
+    }
+
+    /// Parse this field as an inert typed table-of-authorities field.
+    ///
+    /// Returns `Ok(None)` for non-`TOA` fields. Stored switches and cached
+    /// visible content are exposed as data only; no authority table is built.
+    pub fn table_of_authorities(&self) -> Result<Option<TableOfAuthoritiesField>> {
+        TableOfAuthoritiesField::from_field(self)
+    }
+
+    /// Check whether this is a `TA` (Table of Authorities Entry) field.
+    ///
+    /// Such fields mark stored citations for a `TOA` field. They remain inert
+    /// data and are never interpreted as executable content.
+    pub fn is_table_of_authorities_entry(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "TA").is_some()
+    }
+
+    /// Parse this field as an inert typed table-of-authorities entry field.
+    ///
+    /// Returns `Ok(None)` for non-`TA` fields. The result does not search for
+    /// matching citations, generate a `TOA`, or refresh any cached content.
+    pub fn table_of_authorities_entry(&self) -> Result<Option<TableOfAuthoritiesEntryField>> {
+        TableOfAuthoritiesEntryField::from_field(self)
     }
 
     /// Extract all fields from document XML bytes.
@@ -426,18 +458,18 @@ impl Field {
     }
 }
 
-/// One lexical switch in a `TOC` field instruction.
+/// One lexical switch in a Word field instruction.
 ///
 /// Switch names are normalized to ASCII lowercase. Quoted and unquoted
-/// arguments are decoded into their logical text, while the complete original
-/// instruction remains available through [`TableOfContentsField::instruction`].
+/// arguments are decoded into their logical text. Typed field models retain the
+/// complete original instruction alongside these values.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableOfContentsSwitch {
+pub struct FieldSwitch {
     name: char,
     argument: Option<String>,
 }
 
-impl TableOfContentsSwitch {
+impl FieldSwitch {
     /// Return the switch character, without its leading backslash.
     pub fn name(&self) -> char {
         self.name
@@ -448,6 +480,9 @@ impl TableOfContentsSwitch {
         self.argument.as_deref()
     }
 }
+
+/// Backward-compatible name for a lexical switch exposed by a TOC field.
+pub type TableOfContentsSwitch = FieldSwitch;
 
 /// An inclusive heading-level range selected by a `TOC \o` switch.
 ///
@@ -492,12 +527,12 @@ pub struct TableOfContentsField {
     cached_result: Option<String>,
     dirty: bool,
     locked: bool,
-    switches: Vec<TableOfContentsSwitch>,
+    switches: Vec<FieldSwitch>,
 }
 
 impl TableOfContentsField {
     fn from_field(field: &Field) -> Result<Option<Self>> {
-        let Some(switches) = parse_toc_switches(field.instruction())? else {
+        let Some(switches) = parse_field_switches(field.instruction(), "TOC")? else {
             return Ok(None);
         };
         Ok(Some(Self {
@@ -530,15 +565,13 @@ impl TableOfContentsField {
     }
 
     /// Return the field switches in source order.
-    pub fn switches(&self) -> &[TableOfContentsSwitch] {
+    pub fn switches(&self) -> &[FieldSwitch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
     pub fn has_switch(&self, name: char) -> bool {
-        self.switches
-            .iter()
-            .any(|switch| switch.name.eq_ignore_ascii_case(&name))
+        has_field_switch(&self.switches, name)
     }
 
     /// Return every built-in heading-style level range selected by `\o`.
@@ -577,11 +610,253 @@ impl TableOfContentsField {
     }
 }
 
-fn toc_instruction_remainder(instruction: &str) -> Option<&str> {
+/// A typed, inert Word table-of-authorities (`TOA`) field.
+///
+/// A TOA collects stored `TA` citation-marker fields into a rendered list.
+/// This model exposes only the persisted code and cached result: it does not
+/// find citations, paginate the document, generate authorities, or execute
+/// any field instruction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfAuthoritiesField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    switches: Vec<FieldSwitch>,
+}
+
+impl TableOfAuthoritiesField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(switches) = parse_field_switches(field.instruction(), "TOA")? else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached visible result, if present.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+
+    /// Return the selected authority category, where zero means all categories.
+    ///
+    /// The Word TOA model bounds category values to zero through sixteen.
+    pub fn category(&self) -> Result<Option<u8>> {
+        optional_field_switch_argument(&self.switches, 'c', "TOA")?
+            .map(|value| parse_authority_category(value, 0, "TOA"))
+            .transpose()
+    }
+
+    /// Return the bookmark limiting where authority entries are collected.
+    pub fn bookmark(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'b', "TOA")
+    }
+
+    /// Whether five or more page references may be rendered as "Passim".
+    pub fn uses_passim(&self) -> bool {
+        self.has_switch('p')
+    }
+
+    /// Whether formatting stored with `TA` entries is retained in the result.
+    pub fn keeps_entry_formatting(&self) -> bool {
+        self.has_switch('f')
+    }
+
+    /// Return the separator between a sequence number and its page number.
+    pub fn sequence_page_separator(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'd', "TOA")
+    }
+
+    /// Return the `SEQ` field identifier used to number authority entries.
+    pub fn sequence_name(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 's', "TOA")
+    }
+
+    /// Return the separator between an authority entry and its page number.
+    pub fn entry_page_separator(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'e', "TOA")
+    }
+
+    /// Return the separator between the endpoints of a page range.
+    pub fn page_range_separator(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'g', "TOA")
+    }
+
+    /// Whether category headers are included in the stored TOA configuration.
+    pub fn includes_category_headers(&self) -> bool {
+        self.has_switch('h')
+    }
+
+    /// Return the separator between individual page references.
+    pub fn page_number_separator(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'l', "TOA")
+    }
+}
+
+/// A typed, inert Word table-of-authorities entry (`TA`) field.
+///
+/// This represents one stored citation marker. It deliberately does not search
+/// document text for matching citations, alter hidden-text state, or generate a
+/// table of authorities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfAuthoritiesEntryField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    switches: Vec<FieldSwitch>,
+}
+
+impl TableOfAuthoritiesEntryField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(switches) = parse_field_switches(field.instruction(), "TA")? else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached visible result, if present.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+
+    /// Return the long citation text used in a generated table of authorities.
+    pub fn long_citation(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'l', "TA")
+    }
+
+    /// Return the short citation stored for matching/entry selection.
+    pub fn short_citation(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 's', "TA")
+    }
+
+    /// Return the authority category, if explicitly stored.
+    ///
+    /// Citation-marker categories are numbered one through sixteen.
+    pub fn category(&self) -> Result<Option<u8>> {
+        optional_field_switch_argument(&self.switches, 'c', "TA")?
+            .map(|value| parse_authority_category(value, 1, "TA"))
+            .transpose()
+    }
+
+    /// Whether the generated authority entry asks for bold formatting.
+    pub fn is_bold(&self) -> bool {
+        self.has_switch('b')
+    }
+
+    /// Whether the generated authority entry asks for italic formatting.
+    pub fn is_italic(&self) -> bool {
+        self.has_switch('i')
+    }
+}
+
+fn has_field_switch(switches: &[FieldSwitch], name: char) -> bool {
+    switches
+        .iter()
+        .any(|switch| switch.name.eq_ignore_ascii_case(&name))
+}
+
+fn optional_field_switch_argument<'a>(
+    switches: &'a [FieldSwitch],
+    name: char,
+    field_type: &str,
+) -> Result<Option<&'a str>> {
+    let mut matching = switches
+        .iter()
+        .filter(|switch| switch.name.eq_ignore_ascii_case(&name));
+    let Some(switch) = matching.next() else {
+        return Ok(None);
+    };
+    if matching.next().is_some() {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{field_type} field has duplicate \\{name} switches"
+        )));
+    }
+    switch.argument.as_deref().map(Some).ok_or_else(|| {
+        OoxmlError::InvalidFormat(format!("{field_type} \\{name} switch requires an argument"))
+    })
+}
+
+fn parse_authority_category(value: &str, minimum: u8, field_type: &str) -> Result<u8> {
+    let value = value.parse::<u8>().map_err(|_| {
+        OoxmlError::InvalidFormat(format!("{field_type} authority category is not an integer"))
+    })?;
+    if !(minimum..=16).contains(&value) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{field_type} authority category must be in {minimum}..=16"
+        )));
+    }
+    Ok(value)
+}
+
+fn field_instruction_remainder<'a>(instruction: &'a str, field_type: &str) -> Option<&'a str> {
     let instruction = instruction.trim_start();
-    let field_type = instruction.get(..3)?;
-    let remainder = instruction.get(3..)?;
-    if !field_type.eq_ignore_ascii_case("TOC") {
+    let field_type_end = field_type.len();
+    let candidate = instruction.get(..field_type_end)?;
+    let remainder = instruction.get(field_type_end..)?;
+    if !candidate.eq_ignore_ascii_case(field_type) {
         return None;
     }
     match remainder.chars().next() {
@@ -591,8 +866,8 @@ fn toc_instruction_remainder(instruction: &str) -> Option<&str> {
     }
 }
 
-fn parse_toc_switches(instruction: &str) -> Result<Option<Vec<TableOfContentsSwitch>>> {
-    let Some(remainder) = toc_instruction_remainder(instruction) else {
+fn parse_field_switches(instruction: &str, field_type: &str) -> Result<Option<Vec<FieldSwitch>>> {
+    let Some(remainder) = field_instruction_remainder(instruction, field_type) else {
         return Ok(None);
     };
     let mut characters = remainder.chars().peekable();
@@ -608,17 +883,17 @@ fn parse_toc_switches(instruction: &str) -> Result<Option<Vec<TableOfContentsSwi
             break;
         };
         if character != '\\' {
-            return Err(OoxmlError::InvalidFormat(
-                "TOC field contains text outside a field switch".to_string(),
-            ));
+            return Err(OoxmlError::InvalidFormat(format!(
+                "{field_type} field contains text outside a field switch"
+            )));
         }
         let name = characters.next().ok_or_else(|| {
-            OoxmlError::InvalidFormat("TOC field ends with a switch introducer".to_string())
+            OoxmlError::InvalidFormat(format!("{field_type} field ends with a switch introducer"))
         })?;
         if name == '\\' || name.is_whitespace() {
-            return Err(OoxmlError::InvalidFormat(
-                "TOC field has an invalid switch name".to_string(),
-            ));
+            return Err(OoxmlError::InvalidFormat(format!(
+                "{field_type} field has an invalid switch name"
+            )));
         }
         while characters
             .peek()
@@ -630,16 +905,16 @@ fn parse_toc_switches(instruction: &str) -> Result<Option<Vec<TableOfContentsSwi
             None | Some('\\') => None,
             Some('"') => {
                 characters.next();
-                Some(parse_toc_quoted_argument(&mut characters)?)
+                Some(parse_field_quoted_argument(&mut characters, field_type)?)
             },
-            Some(_) => Some(parse_toc_unquoted_argument(&mut characters)),
+            Some(_) => Some(parse_field_unquoted_argument(&mut characters)),
         };
-        if switches.len() >= MAX_TOC_SWITCHES {
+        if switches.len() >= MAX_FIELD_SWITCHES {
             return Err(OoxmlError::InvalidFormat(format!(
-                "TOC field exceeds {MAX_TOC_SWITCHES} switches"
+                "{field_type} field exceeds {MAX_FIELD_SWITCHES} switches"
             )));
         }
-        switches.push(TableOfContentsSwitch {
+        switches.push(FieldSwitch {
             name: name.to_ascii_lowercase(),
             argument,
         });
@@ -647,8 +922,9 @@ fn parse_toc_switches(instruction: &str) -> Result<Option<Vec<TableOfContentsSwi
     Ok(Some(switches))
 }
 
-fn parse_toc_quoted_argument(
+fn parse_field_quoted_argument(
     characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    field_type: &str,
 ) -> Result<String> {
     let mut argument = String::new();
     let mut escaped = false;
@@ -668,21 +944,21 @@ fn parse_toc_quoted_argument(
                     .peek()
                     .is_some_and(|next| !next.is_whitespace() && *next != '\\')
                 {
-                    return Err(OoxmlError::InvalidFormat(
-                        "TOC quoted switch argument has trailing text".to_string(),
-                    ));
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "{field_type} quoted switch argument has trailing text"
+                    )));
                 }
                 return Ok(argument);
             },
             _ => argument.push(character),
         }
     }
-    Err(OoxmlError::InvalidFormat(
-        "TOC field has an unterminated quoted switch argument".to_string(),
-    ))
+    Err(OoxmlError::InvalidFormat(format!(
+        "{field_type} field has an unterminated quoted switch argument"
+    )))
 }
 
-fn parse_toc_unquoted_argument(
+fn parse_field_unquoted_argument(
     characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
 ) -> String {
     let mut argument = String::new();
@@ -690,7 +966,7 @@ fn parse_toc_unquoted_argument(
         .peek()
         .is_some_and(|character| !character.is_whitespace() && *character != '\\')
     {
-        argument.push(characters.next().expect("checked TOC argument character"));
+        argument.push(characters.next().expect("checked field argument character"));
     }
     argument
 }
@@ -911,6 +1187,67 @@ mod tests {
             second.heading_style_levels().unwrap(),
             vec![TableOfContentsLevelRange::new(2, 4).unwrap()]
         );
+    }
+
+    #[test]
+    fn parses_table_of_authorities_and_entry_fields() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" TOA \c 0 \b &quot;Authorities&quot; \p \f \d &quot;-&quot; \s &quot;Chapter&quot; \e &quot;, &quot; \g &quot;&#x2013;&quot; \h \l &quot;, &quot; " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>Cases</w:t><w:tab/><w:t>1, 5</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>TA\l&quot;Long citation&quot;\s &quot;Short citation&quot; \c 1 \b \i</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>hidden citation marker</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="TABLE \c 1"><w:r><w:t>not an authority table</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_table_of_authorities());
+        assert!(fields[1].is_table_of_authorities_entry());
+        assert!(!fields[2].is_table_of_authorities());
+        assert!(!fields[2].is_table_of_authorities_entry());
+
+        let toa = fields[0].table_of_authorities().unwrap().unwrap();
+        assert_eq!(toa.cached_result(), Some("Cases\t1, 5"));
+        assert!(toa.is_dirty());
+        assert!(toa.is_locked());
+        assert_eq!(toa.category().unwrap(), Some(0));
+        assert_eq!(toa.bookmark().unwrap(), Some("Authorities"));
+        assert!(toa.uses_passim());
+        assert!(toa.keeps_entry_formatting());
+        assert_eq!(toa.sequence_page_separator().unwrap(), Some("-"));
+        assert_eq!(toa.sequence_name().unwrap(), Some("Chapter"));
+        assert_eq!(toa.entry_page_separator().unwrap(), Some(", "));
+        assert_eq!(toa.page_range_separator().unwrap(), Some("–"));
+        assert!(toa.includes_category_headers());
+        assert_eq!(toa.page_number_separator().unwrap(), Some(", "));
+
+        let entry = fields[1].table_of_authorities_entry().unwrap().unwrap();
+        assert_eq!(entry.cached_result(), Some("hidden citation marker"));
+        assert!(entry.is_dirty());
+        assert!(entry.is_locked());
+        assert_eq!(entry.long_citation().unwrap(), Some("Long citation"));
+        assert_eq!(entry.short_citation().unwrap(), Some("Short citation"));
+        assert_eq!(entry.category().unwrap(), Some(1));
+        assert!(entry.is_bold());
+        assert!(entry.is_italic());
+    }
+
+    #[test]
+    fn rejects_invalid_table_of_authorities_semantics() {
+        let invalid_toa = Field::new(r#"TOA \c 17"#.to_string(), None, false);
+        let toa = invalid_toa.table_of_authorities().unwrap().unwrap();
+        assert!(toa.category().is_err());
+
+        let invalid_entry = Field::new(r#"TA \c 0"#.to_string(), None, false);
+        let entry = invalid_entry.table_of_authorities_entry().unwrap().unwrap();
+        assert!(entry.category().is_err());
+
+        let duplicate = Field::new(r#"TOA \b "a" \b "b""#.to_string(), None, false);
+        let toa = duplicate.table_of_authorities().unwrap().unwrap();
+        assert!(toa.bookmark().is_err());
     }
 
     #[test]

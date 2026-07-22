@@ -3136,6 +3136,44 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_table_of_authorities_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let authority_table = document.add_paragraph();
+            authority_table.add_field(crate::docx::writer::MutableField::with_result(
+                r#"TOA \c 2 \b "Authorities" \p \h"#.to_string(),
+                "Statutes\t3".to_string(),
+            ));
+            let entry = document.add_paragraph();
+            entry.add_field(crate::docx::writer::MutableField::with_result(
+                r#"TA \l "Example Statute" \s "Example" \c 2 \b"#.to_string(),
+                "hidden marker".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let authorities = document.tables_of_authorities().unwrap();
+        assert_eq!(document.table_of_authorities_count().unwrap(), 1);
+        assert_eq!(authorities.len(), 1);
+        assert_eq!(authorities[0].category().unwrap(), Some(2));
+        assert_eq!(authorities[0].bookmark().unwrap(), Some("Authorities"));
+        assert!(authorities[0].uses_passim());
+        assert!(authorities[0].includes_category_headers());
+
+        let entries = document.table_of_authorities_entries().unwrap();
+        assert_eq!(document.table_of_authorities_entry_count().unwrap(), 1);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].long_citation().unwrap(), Some("Example Statute"));
+        assert_eq!(entries[0].short_citation().unwrap(), Some("Example"));
+        assert_eq!(entries[0].category().unwrap(), Some(2));
+        assert!(entries[0].is_bold());
+    }
+
+    #[test]
     fn body_edits_preserve_settings_part_byte_for_byte() {
         let mut package = Package::new().unwrap();
         let settings_uri = PackURI::new("/word/settings.xml").unwrap();

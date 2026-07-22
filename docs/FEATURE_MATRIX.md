@@ -110,7 +110,7 @@ conversion, fonts, and image conversion are optional.
 | Office Math equations in-document | ✅ | ✅ | ✅ | Exact OMML extraction plus validated inline/display equation and math-paragraph authoring; layout and equation evaluation remain renderer responsibilities |
 | SmartArt | ❌ | ❌ | ❌ | Diagram parts are not exposed as a DOCX semantic model |
 | DrawingML text boxes and WordArt | ❌ | ❌ | ❌ | No typed DOCX authoring model |
-| Citations, bibliography, index, and TOA | ❌ | ❌ | ❌ | Generic fields do not constitute these semantic models |
+| Citations, bibliography, index, and TOA | 🟡 | 🟡 | ❌ | Typed inert TOA/TA discovery exposes stored authority categories, citation-marker text, switches, cached results, and dirty/lock state; bibliography, `CITATION`, and index field models plus semantic authoring remain unexposed, and no table generation or refresh occurs |
 | IRM/Rights Management | ❌ | ❌ | ❌ | Not implemented |
 | RibbonX customization | ❌ | ❌ | ❌ | Not implemented |
 | VBA projects/DOCM macros | ❌ | ❌ | ❌ | No typed VBA project or code-module support |

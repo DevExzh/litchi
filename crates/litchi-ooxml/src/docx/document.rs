@@ -7,7 +7,9 @@ use crate::docx::comment::Comment;
 use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
-use crate::docx::field::{Field, TableOfContentsField};
+use crate::docx::field::{
+    Field, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+};
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
 use crate::docx::header_footer::HeaderFooter;
@@ -1240,6 +1242,41 @@ impl<'a> Document<'a> {
         Ok(self.table_of_contents()?.len())
     }
 
+    /// Get typed, inert table-of-authorities fields in document order.
+    ///
+    /// Returned fields expose stored switches and cached content only. This
+    /// method never locates citation text, paginates the document, generates a
+    /// table of authorities, or refreshes fields.
+    pub fn tables_of_authorities(&self) -> Result<Vec<TableOfAuthoritiesField>> {
+        self.fields()?
+            .iter()
+            .map(Field::table_of_authorities)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of table-of-authorities fields in the main document.
+    pub fn table_of_authorities_count(&self) -> Result<usize> {
+        Ok(self.tables_of_authorities()?.len())
+    }
+
+    /// Get typed, inert table-of-authorities entry (`TA`) fields in document order.
+    ///
+    /// These are stored citation markers. This method does not search for
+    /// matching visible text, change hidden-text state, or generate a `TOA`.
+    pub fn table_of_authorities_entries(&self) -> Result<Vec<TableOfAuthoritiesEntryField>> {
+        self.fields()?
+            .iter()
+            .map(Field::table_of_authorities_entry)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of table-of-authorities entry fields in the main document.
+    pub fn table_of_authorities_entry_count(&self) -> Result<usize> {
+        Ok(self.table_of_authorities_entries()?.len())
+    }
+
     /// Get all mail-merge fields in document order.
     ///
     /// This recognizes `MERGEFIELD` instructions represented by either
@@ -1694,6 +1731,9 @@ impl<'a> Document<'a> {
     // ✅ Table of contents: table_of_contents(), table_of_contents_count()
     // - Typed inert field discovery and cached results; no pagination,
     //   automatic refresh, or structured-document-tag mutation
+    //
+    // ✅ Tables of authorities: tables_of_authorities(), table_of_authorities_entries()
+    // - Typed inert TOA/TA discovery; no citation search, pagination, or refresh
     //
     // ✅ Mail merge field discovery: merge_fields(), merge_field_names()
     // TODO: Mail merge mutation (MS-DOCX Section 17.16.5.35)
