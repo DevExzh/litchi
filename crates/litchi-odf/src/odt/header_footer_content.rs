@@ -75,6 +75,10 @@ pub enum HeaderFooterFieldKind {
     UserDefined,
     /// A sender identity or contact field defined by ODF's `text:sender-*` elements.
     Sender(HeaderFooterSenderFieldKind),
+    /// Inert `text:script` metadata. Its URI and payload are never opened or executed.
+    Script,
+    /// Inert `text:execute-macro` metadata. Its named macro is never invoked.
+    ExecuteMacro,
     Unknown {
         namespace: String,
         local_name: String,
@@ -566,6 +570,8 @@ fn field_kind(local: &[u8]) -> Option<HeaderFooterFieldKind> {
         b"sender-state-or-province" => {
             HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::StateOrProvince)
         },
+        b"script" => HeaderFooterFieldKind::Script,
+        b"execute-macro" => HeaderFooterFieldKind::ExecuteMacro,
         _ => return None,
     })
 }
@@ -799,6 +805,36 @@ mod tests {
             );
             assert_eq!(sender_kind.element_name(), local_name);
         }
+    }
+
+    #[test]
+    fn retains_inert_script_and_macro_metadata() {
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:master-styles><s:master-page s:name="A"><s:header><t:p><t:script x:type="simple" x:href="https://example.invalid/never-open">payload</t:script><t:execute-macro t:name="Standard.Module1.Main">button</t:execute-macro></t:p></s:header></s:master-page></o:master-styles></o:document-styles>"#;
+        let regions = parse_header_footer_blocks(xml).unwrap();
+        let blocks = &regions[&(String::from("A"), HeaderFooterKind::Header)];
+        let fields: Vec<_> = blocks[0]
+            .content
+            .iter()
+            .filter_map(|inline| match inline {
+                HeaderFooterInline::Field(field) => Some(field),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].kind, HeaderFooterFieldKind::Script);
+        assert_eq!(fields[0].displayed_text, "payload");
+        assert!(fields[0].attributes.contains(&(
+            "{http://www.w3.org/1999/xlink}href".into(),
+            "https://example.invalid/never-open".into(),
+        )));
+        assert_eq!(fields[1].kind, HeaderFooterFieldKind::ExecuteMacro);
+        assert_eq!(fields[1].displayed_text, "button");
+        assert!(
+            fields[1]
+                .attributes
+                .contains(&("text:name".into(), "Standard.Module1.Main".into()))
+        );
     }
 
     #[test]
