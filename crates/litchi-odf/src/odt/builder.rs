@@ -881,12 +881,13 @@ impl DocumentBuilder {
         Ok(self)
     }
 
-    /// Append a validated plain-text footnote or endnote to one `text:p` paragraph.
+    /// Append a validated footnote or endnote to one `text:p` paragraph.
     ///
     /// The note is inserted at the paragraph end selected in document order,
     /// including paragraphs nested in lists, table cells, and note bodies.
-    /// Its body is serialized as plain text only; newlines create separate ODF
-    /// paragraphs. No field, link, script, or embedded payload is evaluated.
+    /// Plain-text body newlines create separate ODF paragraphs; a note with an
+    /// `OdfNoteBodyContent` retains its validated structured body. No field,
+    /// link, script, macro, event listener, or embedded payload is evaluated.
     pub fn add_note(&mut self, paragraph_index: usize, note: &crate::Note) -> Result<&mut Self> {
         note.validate()?;
         let body = self.generate_content_body();

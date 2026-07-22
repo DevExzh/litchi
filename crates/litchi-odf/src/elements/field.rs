@@ -803,17 +803,8 @@ pub struct OdfMetaFieldContent {
 
 impl OdfMetaFieldContent {
     pub fn new(nodes: Vec<OdfMetaFieldNode>) -> Result<Self> {
-        let mut aggregate = 0usize;
-        let mut node_count = 0usize;
-        let mut display_text = String::new();
-        validate_meta_nodes(
-            &nodes,
-            0,
-            MetaContentGrammar::ParagraphOrHyperlink,
-            &mut aggregate,
-            &mut node_count,
-            &mut display_text,
-        )?;
+        let display_text =
+            validated_meta_display_text(&nodes, MetaContentGrammar::ParagraphOrHyperlink)?;
         Ok(Self {
             nodes,
             display_text,
@@ -831,6 +822,129 @@ impl OdfMetaFieldContent {
     fn write_xml(&self, output: &mut String) {
         for node in &self.nodes {
             write_meta_node(node, output);
+        }
+    }
+}
+
+/// Validated, inert structured content for an ODF `text:note-body`.
+///
+/// The ODF 1.3 schema permits paragraph-like blocks, lists, tables, selected
+/// drawing content, and related structured text descendants in a note body.
+/// Direct character data is deliberately rejected: it belongs inside one of
+/// those schema-defined child elements. Links, fields, event listeners, and
+/// macro metadata are serialized only as inert XML; this type never follows,
+/// evaluates, or executes them.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OdfNoteBodyContent {
+    nodes: Vec<OdfMetaFieldNode>,
+    display_text: String,
+}
+
+impl OdfNoteBodyContent {
+    /// Construct structured note-body content from namespace-resolved nodes.
+    pub fn new(nodes: Vec<OdfMetaFieldNode>) -> Result<Self> {
+        if nodes
+            .iter()
+            .any(|node| matches!(node, OdfMetaFieldNode::Text(_)))
+        {
+            return Err(Error::InvalidFormat(
+                "text:note-body cannot contain direct character data".to_string(),
+            ));
+        }
+        validated_meta_display_text(&nodes, MetaContentGrammar::NoteBody)?;
+        let display_text = note_body_display_text(&nodes);
+        Ok(Self {
+            nodes,
+            display_text,
+        })
+    }
+
+    /// Return the ordered, namespace-resolved note-body nodes.
+    pub fn nodes(&self) -> &[OdfMetaFieldNode] {
+        &self.nodes
+    }
+
+    /// Return a cached visible-text projection of the structured note body.
+    ///
+    /// Paragraph and heading descendants are separated by line feeds. Nested
+    /// note bodies are omitted from an enclosing note's projection, while a
+    /// nested note's citation remains inline, matching the bounded semantic
+    /// note reader.
+    pub fn display_text(&self) -> &str {
+        &self.display_text
+    }
+
+    /// Return whether this body has no schema child elements.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    /// Revalidate this value's bounded XML and resource constraints.
+    pub fn validate(&self) -> Result<()> {
+        Self::new(self.nodes.clone()).map(|_| ())
+    }
+
+    pub(crate) fn write_xml(&self, output: &mut String) {
+        for node in &self.nodes {
+            write_meta_node(node, output);
+        }
+    }
+}
+
+fn validated_meta_display_text(
+    nodes: &[OdfMetaFieldNode],
+    grammar: MetaContentGrammar,
+) -> Result<String> {
+    let mut aggregate = 0usize;
+    let mut node_count = 0usize;
+    let mut display_text = String::new();
+    validate_meta_nodes(
+        nodes,
+        0,
+        grammar,
+        &mut aggregate,
+        &mut node_count,
+        &mut display_text,
+    )?;
+    Ok(display_text)
+}
+
+fn note_body_display_text(nodes: &[OdfMetaFieldNode]) -> String {
+    let mut display_text = String::new();
+    let mut seen_block = false;
+    append_note_body_display_text(nodes, &mut display_text, &mut seen_block);
+    display_text
+}
+
+fn append_note_body_display_text(
+    nodes: &[OdfMetaFieldNode],
+    display_text: &mut String,
+    seen_block: &mut bool,
+) {
+    for node in nodes {
+        match node {
+            OdfMetaFieldNode::Text(value) => display_text.push_str(value),
+            OdfMetaFieldNode::Element(element) => {
+                if element.namespace_uri == TEXT_DATABASE_NAMESPACE && element.local_name == "note"
+                {
+                    if let Some(OdfMetaFieldNode::Element(citation)) = element.children.first()
+                        && citation.namespace_uri == TEXT_DATABASE_NAMESPACE
+                        && citation.local_name == "note-citation"
+                    {
+                        append_note_body_display_text(&citation.children, display_text, seen_block);
+                    }
+                    continue;
+                }
+                if element.namespace_uri == TEXT_DATABASE_NAMESPACE
+                    && matches!(element.local_name.as_str(), "p" | "h")
+                {
+                    if *seen_block {
+                        display_text.push('\n');
+                    }
+                    *seen_block = true;
+                }
+                append_note_body_display_text(&element.children, display_text, seen_block);
+            },
         }
     }
 }
@@ -6799,6 +6913,63 @@ mod meta_field_tests {
         assert!(
             OdfMetaFieldContent::new(vec![OdfMetaFieldNode::Element(oversized_attribute,)])
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn note_body_content_enforces_block_root_grammar_and_projects_text() {
+        let content = OdfNoteBodyContent::new(vec![
+            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                local_name: "p".to_string(),
+                attributes: Vec::new(),
+                children: vec![
+                    OdfMetaFieldNode::Text("First ".to_string()),
+                    OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                        namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                        local_name: "span".to_string(),
+                        attributes: vec![OdfMetaFieldAttribute {
+                            namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                            local_name: "style-name".to_string(),
+                            value: "Emphasis".to_string(),
+                        }],
+                        children: vec![OdfMetaFieldNode::Text("styled".to_string())],
+                    }),
+                ],
+            }),
+            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                local_name: "list".to_string(),
+                attributes: Vec::new(),
+                children: vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                    namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                    local_name: "list-item".to_string(),
+                    attributes: Vec::new(),
+                    children: vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                        namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                        local_name: "p".to_string(),
+                        attributes: Vec::new(),
+                        children: vec![OdfMetaFieldNode::Text("Second".to_string())],
+                    })],
+                })],
+            }),
+        ])
+        .unwrap();
+        assert_eq!(content.display_text(), "First styled\nSecond");
+        assert!(content.validate().is_ok());
+
+        assert!(
+            OdfNoteBodyContent::new(vec![OdfMetaFieldNode::Text("not a block".to_string(),)])
+                .is_err()
+        );
+        assert!(
+            OdfNoteBodyContent::new(vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                local_name: "span".to_string(),
+                attributes: Vec::new(),
+                children: vec![OdfMetaFieldNode::Text("not a root block".to_string())],
+            },)])
+            .is_err()
         );
     }
 

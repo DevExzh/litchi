@@ -1,4 +1,4 @@
-//! Plain-text ODF note authoring and byte-preserving XML mutations.
+//! Inert ODF note authoring and byte-preserving XML mutations.
 
 use super::{Note, parse_notes};
 use crate::elements::xml::{TEXT_NAMESPACE, is_bound};
@@ -11,11 +11,14 @@ const MAX_XML_BYTES: usize = 256 * 1024 * 1024;
 const MAX_DEPTH: usize = 4_096;
 
 impl Note {
-    /// Serialize a validated plain-text note as a `text:note` fragment.
+    /// Serialize a validated note as a `text:note` fragment.
     ///
-    /// Newlines in the body are represented by consecutive `text:p` elements.
+    /// Plain-text body newlines are represented by consecutive `text:p`
+    /// elements. Structured bodies retain their validated ODF child nodes.
     /// The fragment declares no namespaces itself; mutation helpers add a
-    /// local `text` binding when the selected XML context requires one.
+    /// local `text` binding when the selected XML context requires one. All
+    /// fields, links, event listeners, scripts, and macro metadata remain
+    /// inert while the fragment is serialized.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut xml = format!(r#"<text:note text:note-class="{}""#, self.class.as_str());
@@ -30,7 +33,15 @@ impl Note {
         xml.push('>');
         xml.push_str(&escape_xml(&self.citation));
         xml.push_str("</text:note-citation>");
-        if self.body.is_empty() {
+        if let Some(rich_body) = &self.rich_body {
+            if rich_body.is_empty() {
+                xml.push_str("<text:note-body/>");
+            } else {
+                xml.push_str("<text:note-body>");
+                rich_body.write_xml(&mut xml);
+                xml.push_str("</text:note-body>");
+            }
+        } else if self.body.is_empty() {
             xml.push_str("<text:note-body/>");
         } else {
             xml.push_str("<text:note-body>");
@@ -46,7 +57,7 @@ impl Note {
     }
 }
 
-/// Insert a validated plain-text note at the end of a `text:p` selected in document order.
+/// Insert a validated note at the end of a `text:p` selected in document order.
 ///
 /// Paragraphs nested in lists, tables, and existing note bodies participate in
 /// the ordinal. The helper never evaluates fields, follows links, or executes
@@ -83,8 +94,8 @@ pub fn insert_note_xml(xml: &str, paragraph_index: usize, note: &Note) -> Result
 
 /// Replace one `text:note` selected in document order.
 ///
-/// The replacement intentionally writes the public plain-text note model;
-/// callers needing to retain rich note-body markup can leave that note intact.
+/// The replacement writes the public note model, including validated structured
+/// body content when the replacement has one.
 pub fn replace_note_xml(xml: &str, note_index: usize, replacement: &Note) -> Result<String> {
     let scan = validated_scan(xml)?;
     let site = scan
@@ -354,7 +365,10 @@ const TEXT_NAMESPACE_STRING: &str = "urn:oasis:names:tc:opendocument:xmlns:text:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::odt::NoteClass;
+    use crate::{
+        OdfMetaFieldAttribute, OdfMetaFieldElement, OdfMetaFieldNode, OdfNoteBodyContent,
+        odt::NoteClass,
+    };
 
     const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 
@@ -362,6 +376,36 @@ mod tests {
         format!(
             r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="{TEXT}">{body}</office:text>"#
         )
+    }
+
+    fn rich_body() -> OdfNoteBodyContent {
+        OdfNoteBodyContent::new(vec![
+            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                namespace_uri: TEXT.to_string(),
+                local_name: "p".to_string(),
+                attributes: Vec::new(),
+                children: vec![
+                    OdfMetaFieldNode::Text("First ".to_string()),
+                    OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                        namespace_uri: TEXT.to_string(),
+                        local_name: "span".to_string(),
+                        attributes: vec![OdfMetaFieldAttribute {
+                            namespace_uri: TEXT.to_string(),
+                            local_name: "style-name".to_string(),
+                            value: "Emphasis".to_string(),
+                        }],
+                        children: vec![OdfMetaFieldNode::Text("styled".to_string())],
+                    }),
+                ],
+            }),
+            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                namespace_uri: TEXT.to_string(),
+                local_name: "p".to_string(),
+                attributes: Vec::new(),
+                children: vec![OdfMetaFieldNode::Text("Second".to_string())],
+            }),
+        ])
+        .unwrap()
     }
 
     #[test]
@@ -384,6 +428,45 @@ mod tests {
         let removed = remove_note_xml(&replaced, 0).unwrap();
         assert!(parse_notes(&removed).unwrap().is_empty());
         assert!(removed.contains("<text:p></text:p>"));
+    }
+
+    #[test]
+    fn rich_note_authoring_uses_validated_structure_and_libreoffice_fixture() {
+        let mut note = Note::with_rich_body(NoteClass::Footnote, "*", rich_body()).unwrap();
+        note.set_id(Some("rich-note".to_string())).unwrap();
+        note.set_label(Some("custom".to_string())).unwrap();
+        assert_eq!(note.body(), "First styled\nSecond");
+        assert!(note.rich_body().is_some());
+
+        let fragment = note.to_xml_fragment().unwrap();
+        assert!(fragment.contains("<text:note-body><text:p xmlns:text="));
+        assert!(fragment.contains(r#"text:style-name="Emphasis""#));
+        let semantic = parse_notes(&document(&fragment)).unwrap();
+        assert_eq!(semantic, vec![note.clone()]);
+
+        let fixture = include_str!(
+            "../../../../../3rdparty/libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/footnote.fodt"
+        );
+        let inserted = insert_note_xml(fixture, 0, &note).unwrap();
+        let inserted_notes = parse_notes(&inserted).unwrap();
+        assert_eq!(inserted_notes.len(), 2);
+        assert_eq!(inserted_notes[0].body(), "Footnote content");
+        assert_eq!(inserted_notes[1].body(), "First styled\nSecond");
+        assert!(inserted.contains(r#"text:style-name="Emphasis""#));
+
+        let replacement = Note::with_rich_body(NoteClass::Endnote, "i", rich_body()).unwrap();
+        let replaced = replace_note_xml(&inserted, 0, &replacement).unwrap();
+        let replaced_notes = parse_notes(&replaced).unwrap();
+        assert_eq!(replaced_notes[0].class(), NoteClass::Endnote);
+        assert_eq!(replaced_notes[0].body(), "First styled\nSecond");
+
+        note.set_body("Plain replacement").unwrap();
+        assert!(note.rich_body().is_none());
+        assert!(
+            note.to_xml_fragment()
+                .unwrap()
+                .contains("<text:p>Plain replacement</text:p>")
+        );
     }
 
     #[test]

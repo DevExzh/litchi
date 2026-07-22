@@ -1,9 +1,10 @@
-//! Semantic footnote and endnote parsing.
+//! Semantic footnote and endnote parsing plus inert authoring.
 
 mod writing;
 
 pub use writing::{insert_note_xml, remove_note_xml, replace_note_xml};
 
+use crate::elements::field::OdfNoteBodyContent;
 use crate::elements::xml::{
     TEXT_NAMESPACE, append_checked, append_text_control, decode_reference, is_bound,
     namespaced_attribute,
@@ -33,21 +34,39 @@ impl NoteClass {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A semantic ODF footnote or endnote.
+///
+/// Equality compares note metadata and the visible body text. Structured body
+/// markup is an authoring detail because the semantic reader intentionally
+/// exposes a bounded text projection for existing note bodies.
+#[derive(Debug, Clone)]
 pub struct Note {
     class: NoteClass,
     id: Option<String>,
     citation: String,
     label: Option<String>,
     body: String,
+    rich_body: Option<OdfNoteBodyContent>,
 }
+
+impl PartialEq for Note {
+    fn eq(&self, other: &Self) -> bool {
+        self.class == other.class
+            && self.id == other.id
+            && self.citation == other.citation
+            && self.label == other.label
+            && self.body == other.body
+    }
+}
+
+impl Eq for Note {}
 
 impl Note {
     /// Construct a plain-text footnote or endnote.
     ///
-    /// Newlines in `body` are serialized as separate `text:p` elements. Rich
-    /// note-body markup remains readable but is intentionally not synthesized
-    /// by this plain-text authoring API.
+    /// Newlines in `body` are serialized as separate `text:p` elements. Use
+    /// [`Self::with_rich_body`] when the note body needs structured ODF
+    /// content.
     pub fn new(
         class: NoteClass,
         citation: impl Into<String>,
@@ -59,6 +78,29 @@ impl Note {
             citation: citation.into(),
             label: None,
             body: body.into(),
+            rich_body: None,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
+    /// Construct a footnote or endnote with validated structured ODF content.
+    ///
+    /// The rich body is serialized structurally and remains inert: this API
+    /// does not follow links, evaluate fields, or execute macros, scripts, or
+    /// event listeners represented in the content.
+    pub fn with_rich_body(
+        class: NoteClass,
+        citation: impl Into<String>,
+        rich_body: OdfNoteBodyContent,
+    ) -> Result<Self> {
+        let value = Self {
+            class,
+            id: None,
+            citation: citation.into(),
+            label: None,
+            body: rich_body.display_text().to_string(),
+            rich_body: Some(rich_body),
         };
         value.validate()?;
         Ok(value)
@@ -78,6 +120,15 @@ impl Note {
     }
     pub fn body(&self) -> &str {
         &self.body
+    }
+
+    /// Return the structured body supplied through [`Self::with_rich_body`] or
+    /// [`Self::set_rich_body`].
+    ///
+    /// Parsed legacy notes continue to expose their semantic text through
+    /// [`Self::body`]; their existing XML stays byte-preserved until replaced.
+    pub fn rich_body(&self) -> Option<&OdfNoteBodyContent> {
+        self.rich_body.as_ref()
     }
 
     /// Set the optional `text:id` metadata.
@@ -109,14 +160,30 @@ impl Note {
     /// Set the plain-text note body.
     ///
     /// Newlines become separate `text:p` elements when the note is serialized.
+    /// This clears any previously configured structured body.
     pub fn set_body(&mut self, body: impl Into<String>) -> Result<()> {
         let body = body.into();
         validate_note_text(&body, "note body")?;
         self.body = body;
+        self.rich_body = None;
         Ok(())
     }
 
-    /// Validate this value for plain-text ODF note serialization.
+    /// Set validated structured ODF note-body content.
+    ///
+    /// Its visible-text projection becomes [`Self::body`]. The content remains
+    /// inert: serializing a note never evaluates fields, follows links, or
+    /// executes scripts, macros, or event listeners.
+    pub fn set_rich_body(&mut self, rich_body: OdfNoteBodyContent) -> Result<()> {
+        rich_body.validate()?;
+        let body = rich_body.display_text().to_string();
+        validate_note_text(&body, "note body")?;
+        self.body = body;
+        self.rich_body = Some(rich_body);
+        Ok(())
+    }
+
+    /// Validate this value for ODF note serialization.
     pub fn validate(&self) -> Result<()> {
         validate_note_text(&self.citation, "note citation")?;
         validate_note_text(&self.body, "note body")?;
@@ -125,6 +192,14 @@ impl Note {
         }
         if let Some(value) = self.label.as_deref() {
             validate_note_text(value, "note citation label")?;
+        }
+        if let Some(rich_body) = &self.rich_body {
+            rich_body.validate()?;
+            if self.body != rich_body.display_text() {
+                return Err(Error::InvalidFormat(
+                    "note body does not match structured note-body content".to_string(),
+                ));
+            }
         }
         Ok(())
     }
@@ -219,6 +294,7 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                             citation: String::new(),
                             label: None,
                             body: String::new(),
+                            rich_body: None,
                         },
                         depth: 1,
                         citation_depth: None,

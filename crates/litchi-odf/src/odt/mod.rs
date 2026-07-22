@@ -32,7 +32,7 @@
 //! - ✅ `DocumentBuilder::new()` - Create new documents
 //! - ✅ `add_paragraph()` - Add paragraphs with text
 //! - ✅ `add_hyperlink()` / `add_hyperlink_element()` - Add inert simple hyperlinks
-//! - ✅ `add_note()` - Author plain-text footnotes and endnotes
+//! - ✅ `add_note()` - Author plain-text or validated structured footnotes and endnotes
 //! - ✅ `add_ruby_annotation()` / `add_ruby_style()` - Author typed ruby annotations and styles
 //! - ✅ `add_table()` - Add tables with rows/cells
 //! - ✅ `add_list()` - Add lists

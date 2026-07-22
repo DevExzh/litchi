@@ -318,7 +318,8 @@ pub use elements::bookmark::{
 };
 pub use elements::field::{
     OdfDatabaseConnectionResource, OdfDatabaseField, OdfDatabaseFieldKind, OdfDatabaseSource,
-    OdfDatabaseTableType,
+    OdfDatabaseTableType, OdfMetaFieldAttribute, OdfMetaFieldContent, OdfMetaFieldElement,
+    OdfMetaFieldNode, OdfNoteBodyContent,
 };
 mod chart_properties;
 mod annotation_package;

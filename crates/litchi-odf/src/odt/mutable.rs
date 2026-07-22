@@ -183,11 +183,11 @@ impl MutableDocument {
             .collect())
     }
 
-    /// Append a validated plain-text footnote or endnote to one `text:p` paragraph.
+    /// Append a validated footnote or endnote to one `text:p` paragraph.
     ///
     /// The paragraph is selected in document order, including paragraphs nested
-    /// in lists, tables, and note bodies. The library serializes only the
-    /// public plain-text note model and never evaluates embedded content.
+    /// in lists, tables, and note bodies. Structured note bodies are serialized
+    /// from their validated public model; all embedded content remains inert.
     pub fn insert_note(&mut self, paragraph_index: usize, note: &crate::Note) -> Result<()> {
         let updated =
             self.with_content_xml(|xml| crate::insert_note_xml(xml, paragraph_index, note))?;
@@ -197,8 +197,8 @@ impl MutableDocument {
 
     /// Replace one note selected in document order and return its old semantic value.
     ///
-    /// Replacement emits a plain-text ODF note, so rich note-body markup in the
-    /// old value is intentionally not synthesized into the new one.
+    /// Replacement emits the public note model, including validated structured
+    /// content when the replacement carries an `OdfNoteBodyContent`.
     pub fn replace_note(
         &mut self,
         note_index: usize,
@@ -2454,6 +2454,31 @@ mod tests {
         Document::from_bytes(builder.build().unwrap()).unwrap()
     }
 
+    fn rich_note_body() -> crate::OdfNoteBodyContent {
+        const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+        crate::OdfNoteBodyContent::new(vec![crate::OdfMetaFieldNode::Element(
+            crate::OdfMetaFieldElement {
+                namespace_uri: TEXT.to_string(),
+                local_name: "p".to_string(),
+                attributes: Vec::new(),
+                children: vec![
+                    crate::OdfMetaFieldNode::Text("Styled ".to_string()),
+                    crate::OdfMetaFieldNode::Element(crate::OdfMetaFieldElement {
+                        namespace_uri: TEXT.to_string(),
+                        local_name: "span".to_string(),
+                        attributes: vec![crate::OdfMetaFieldAttribute {
+                            namespace_uri: TEXT.to_string(),
+                            local_name: "style-name".to_string(),
+                            value: "Emphasis".to_string(),
+                        }],
+                        children: vec![crate::OdfMetaFieldNode::Text("body".to_string())],
+                    }),
+                ],
+            },
+        )])
+        .unwrap()
+    }
+
     fn element_kinds(document: &Document) -> Vec<&'static str> {
         document
             .elements()
@@ -2701,6 +2726,19 @@ mod tests {
 
         let document = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
         assert!(document.notes().unwrap().is_empty());
+    }
+
+    #[test]
+    fn mutable_document_round_trips_structured_note_authoring() {
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("Before").unwrap();
+        let note =
+            crate::Note::with_rich_body(crate::NoteClass::Footnote, "1", rich_note_body()).unwrap();
+        mutable.insert_note(0, &note).unwrap();
+
+        let document = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let notes = document.notes().unwrap();
+        assert_eq!(notes, vec![note]);
     }
 
     #[test]
