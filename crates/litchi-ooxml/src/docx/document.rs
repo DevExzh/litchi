@@ -8,8 +8,8 @@ use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
-    BibliographyField, CitationField, DdeField, ExternalIncludeField, Field, IndexEntryField,
-    IndexField, LinkField, ReferencedDocumentField, TableOfAuthoritiesEntryField,
+    BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
+    IndexEntryField, IndexField, LinkField, ReferencedDocumentField, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesField, TableOfContentsField,
 };
 use crate::docx::footnote::Note;
@@ -1259,6 +1259,24 @@ impl<'a> Document<'a> {
     /// Get the number of bibliography fields in the main document.
     pub fn bibliography_count(&self) -> Result<usize> {
         Ok(self.bibliographies()?.len())
+    }
+
+    /// Get typed, inert `DOCVARIABLE` fields in document order.
+    ///
+    /// Returned values expose stored names, switches, cached content, and
+    /// dirty/lock state only. This method never reads the settings part,
+    /// resolves document-variable values, or refreshes fields.
+    pub fn document_variable_fields(&self) -> Result<Vec<DocumentVariableField>> {
+        self.fields()?
+            .iter()
+            .map(Field::document_variable)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of document-variable fields in the main document.
+    pub fn document_variable_field_count(&self) -> Result<usize> {
+        Ok(self.document_variable_fields()?.len())
     }
 
     /// Get typed, inert `DDE` and `DDEAUTO` fields in document order.

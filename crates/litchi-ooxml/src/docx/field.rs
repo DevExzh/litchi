@@ -188,6 +188,24 @@ impl Field {
         BibliographyField::from_field(self)
     }
 
+    /// Check whether this is a `DOCVARIABLE` field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never reads
+    /// settings XML, resolves a variable value, or refreshes the field.
+    pub fn is_document_variable(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "DOCVARIABLE").is_some()
+    }
+
+    /// Parse this field as inert typed document-variable metadata.
+    ///
+    /// Returns `Ok(None)` for non-`DOCVARIABLE` fields. The result exposes the
+    /// stored variable name, switches, cached content, and dirty/lock state
+    /// only; it never reads settings XML, resolves a value, or refreshes a
+    /// field.
+    pub fn document_variable(&self) -> Result<Option<DocumentVariableField>> {
+        DocumentVariableField::from_field(self)
+    }
+
     /// Check whether this is a legacy `LINK` field.
     ///
     /// Recognition is limited to the stored field instruction. It never
@@ -1473,6 +1491,88 @@ impl BibliographyField {
     }
 
     /// Return the field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+}
+
+/// A typed, inert Word `DOCVARIABLE` field.
+///
+/// This preserves a stored variable name, field switches, and cached result.
+/// It never reads a document's settings XML, resolves a variable value, or
+/// refreshes the field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentVariableField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    variable_name: String,
+    switches: Vec<FieldSwitch>,
+}
+
+impl DocumentVariableField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((variable_name, switches)) =
+            parse_field_operand_and_switches(field.instruction(), "DOCVARIABLE")?
+        else {
+            return Ok(None);
+        };
+        let variable_name = variable_name.ok_or_else(|| {
+            OoxmlError::InvalidFormat("DOCVARIABLE field is missing its variable name".to_string())
+        })?;
+        if variable_name.is_empty() {
+            return Err(OoxmlError::InvalidFormat(
+                "DOCVARIABLE field variable name is empty".to_string(),
+            ));
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            variable_name,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored document-variable name without resolving it.
+    pub fn variable_name(&self) -> &str {
+        &self.variable_name
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from a variable.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    ///
+    /// DOCVARIABLE has no field-specific switches. Preserved switches are
+    /// inert source metadata and are never interpreted.
     pub fn switches(&self) -> &[FieldSwitch] {
         &self.switches
     }
@@ -3080,6 +3180,55 @@ mod tests {
         assert_eq!(bibliography.switches()[1].argument(), Some("1036"));
         assert_eq!(bibliography.switches()[2].argument(), Some("Doe2024"));
         assert_eq!(bibliography.switches()[3].argument(), Some("Smith2025"));
+    }
+
+    #[test]
+    fn parses_document_variable_fields_without_resolving_values() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" DOCVARIABLE &quot;Customer Region&quot; \* MERGEFORMAT " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached region</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>DOCVARIABLE CustomerName</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached customer</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="DOCVARIABLES CustomerName"><w:r><w:t>not a variable</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_document_variable());
+        assert!(fields[1].is_document_variable());
+        assert!(!fields[2].is_document_variable());
+
+        let region = fields[0].document_variable().unwrap().unwrap();
+        assert_eq!(region.variable_name(), "Customer Region");
+        assert_eq!(region.cached_result(), Some("cached region"));
+        assert!(region.is_dirty());
+        assert!(region.is_locked());
+        assert!(region.has_switch('*'));
+        assert_eq!(region.switches()[0].argument(), Some("MERGEFORMAT"));
+
+        let customer = fields[1].document_variable().unwrap().unwrap();
+        assert_eq!(customer.variable_name(), "CustomerName");
+        assert_eq!(customer.cached_result(), Some("cached customer"));
+        assert!(customer.is_dirty());
+        assert!(customer.is_locked());
+        assert!(customer.switches().is_empty());
+        assert!(fields[2].document_variable().unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_document_variable_field_semantics() {
+        let missing_name = Field::new("DOCVARIABLE \\* MERGEFORMAT".to_string(), None, false);
+        assert!(missing_name.document_variable().is_err());
+
+        let empty_name = Field::new(r#"DOCVARIABLE "" "#.to_string(), None, false);
+        assert!(empty_name.document_variable().is_err());
+
+        let unexpected_operand =
+            Field::new("DOCVARIABLE Customer unexpected".to_string(), None, false);
+        assert!(unexpected_operand.document_variable().is_err());
     }
 
     #[test]

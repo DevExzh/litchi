@@ -77,7 +77,7 @@ conversion, fonts, and image conversion are optional.
 | Footnotes and endnotes | ✅ | ✅ | ✅ | Notes, separators, continuations, and references |
 | Hyperlinks | ✅ | ✅ | ✅ | Internal and external links |
 | Bookmarks | ✅ | ✅ | ✅ | Range and point bookmarks |
-| Fields | ✅ | ✅ | ✅ | Typed field delimiters/instructions plus inert `DDE`/`DDEAUTO`, `LINK`, `RD`, and `INCLUDETEXT`/`INCLUDEPICTURE` source/option metadata; fields are not recalculated, DDE never starts a conversation, `LINK` never activates OLE, and external/referenced documents are never opened, resolved, or refreshed |
+| Fields | ✅ | ✅ | ✅ | Typed field delimiters/instructions plus inert `DDE`/`DDEAUTO`, `LINK`, `RD`, `INCLUDETEXT`/`INCLUDEPICTURE` source/option metadata, and `DOCVARIABLE` name/cached-result metadata; fields are not recalculated, DDE never starts a conversation, `LINK` never activates OLE, document variables are never resolved, and external/referenced documents are never opened, resolved, or refreshed |
 | Document statistics | ✅ | ✅ | N/A | Word, character, paragraph, line, and page metadata where present |
 | Core, extended, and custom properties | ✅ | ✅ | ✅ | Typed package properties |
 
@@ -90,7 +90,7 @@ conversion, fonts, and image conversion are optional.
 | Track changes | ✅ | ✅ | ✅ | Insert/delete/move plus paragraph, table, row, cell, and property revisions |
 | Content controls | ✅ | ✅ | ✅ | Structured document tags and properties |
 | Custom XML data stores and bindings | ✅ | ✅ | ✅ | Package graph load/store and ordered CRUD |
-| Document variables | ✅ | ✅ | ✅ | Settings-backed variables |
+| Document variables | ✅ | ✅ | ✅ | Settings-backed variables plus inert stored `DOCVARIABLE` references; field values are never resolved or refreshed |
 | Attached templates | ✅ | ✅ | ✅ | Internal/external template relationship metadata; external targets remain inert |
 | Smart tags | ✅ | ✅ | ✅ | Typed smart-tag properties and writer support |
 | Glossary/building blocks | ✅ | ✅ | ✅ | Glossary package graph and entry CRUD |
