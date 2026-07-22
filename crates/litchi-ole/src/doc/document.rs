@@ -13,7 +13,9 @@ use super::parts::bookmarks::BookmarksTable;
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
-use super::parts::fields::{Field, FieldStory, FieldText, FieldsTable, MacroButtonField};
+use super::parts::fields::{
+    Field, FieldStory, FieldText, FieldsTable, MacroButtonField, MergeField,
+};
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
@@ -587,6 +589,21 @@ impl Document {
     /// Get the number of typed, inert `MACROBUTTON` fields.
     pub fn macro_button_field_count(&self) -> Result<usize> {
         Ok(self.macro_button_fields()?.len())
+    }
+
+    /// Get typed, inert `MERGEFIELD` fields in story and source order.
+    ///
+    /// Returned values expose only stored data-column names, switches, cached
+    /// results, and field state. This method never opens a data source, resolves
+    /// records, performs a merge, or refreshes a field result.
+    pub fn merge_fields(&self) -> Result<Vec<MergeField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::merge_field).collect())
+    }
+
+    /// Get the number of typed, inert `MERGEFIELD` fields.
+    pub fn merge_field_count(&self) -> Result<usize> {
+        Ok(self.merge_fields()?.len())
     }
 
     /// Get stored instruction and cached-result text for one parsed field.
