@@ -1164,6 +1164,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `ASK` and `FILLIN` fields in document order.
+    ///
+    /// Stored prompt, bookmark, default-response, cached results, and field
+    /// state are exposed solely as metadata. This method never displays a
+    /// prompt, captures a response, creates or updates a bookmark, performs a
+    /// merge, or refreshes field results.
+    pub fn prompt_fields(&self) -> Vec<crate::PromptField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::prompt_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `ASK` and `FILLIN` fields.
+    pub fn prompt_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.prompt_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert TOC fields in document field order.
     ///
     /// Stored options and cached results are exposed solely as metadata. This
