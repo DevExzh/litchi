@@ -85,6 +85,15 @@ pub enum HeaderFooterFieldKind {
     Sequence,
     Expression,
     TextInput,
+    Placeholder,
+    ConditionalText,
+    HiddenText,
+    HiddenParagraph,
+    /// Cached DDE field metadata. The named connection is never opened or refreshed.
+    DdeConnection,
+    Measure,
+    TableFormula,
+    MetaField,
     Title,
     Subject,
     AuthorName,
@@ -593,6 +602,14 @@ fn field_kind(local: &[u8]) -> Option<HeaderFooterFieldKind> {
         b"sequence" => HeaderFooterFieldKind::Sequence,
         b"expression" => HeaderFooterFieldKind::Expression,
         b"text-input" => HeaderFooterFieldKind::TextInput,
+        b"placeholder" => HeaderFooterFieldKind::Placeholder,
+        b"conditional-text" => HeaderFooterFieldKind::ConditionalText,
+        b"hidden-text" => HeaderFooterFieldKind::HiddenText,
+        b"hidden-paragraph" => HeaderFooterFieldKind::HiddenParagraph,
+        b"dde-connection" => HeaderFooterFieldKind::DdeConnection,
+        b"measure" => HeaderFooterFieldKind::Measure,
+        b"table-formula" => HeaderFooterFieldKind::TableFormula,
+        b"meta-field" => HeaderFooterFieldKind::MetaField,
         b"title" => HeaderFooterFieldKind::Title,
         b"subject" => HeaderFooterFieldKind::Subject,
         b"author-name" => HeaderFooterFieldKind::AuthorName,
@@ -1046,6 +1063,51 @@ mod tests {
                 .attributes
                 .contains(&("text:description".into(), "Prompt".into()))
         );
+    }
+
+    #[test]
+    fn classifies_cached_conditional_dde_formula_and_metadata_fields() {
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:placeholder t:placeholder-type="text">Hint</t:placeholder><t:conditional-text t:condition="of:=1=1" t:string-value-if-true="yes" t:string-value-if-false="no">yes</t:conditional-text><t:hidden-text t:condition="of:=0=1" t:string-value="hidden">hidden</t:hidden-text><t:hidden-paragraph t:condition="of:=0=1">paragraph</t:hidden-paragraph><t:dde-connection t:connection-name="NeverOpen">cached DDE</t:dde-connection><t:measure t:kind="unit">cm</t:measure><t:table-formula t:formula="of:=SUM([.A1:.A2])">42</t:table-formula><t:meta-field xml:id="meta1">meta <t:span>text</t:span></t:meta-field></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
+        let regions = parse_header_footer_blocks(xml).unwrap();
+        let blocks = &regions[&(String::from("A"), HeaderFooterKind::Footer)];
+        let fields: Vec<_> = blocks[0]
+            .content
+            .iter()
+            .filter_map(|inline| match inline {
+                HeaderFooterInline::Field(field) => Some(field),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
+            vec![
+                &HeaderFooterFieldKind::Placeholder,
+                &HeaderFooterFieldKind::ConditionalText,
+                &HeaderFooterFieldKind::HiddenText,
+                &HeaderFooterFieldKind::HiddenParagraph,
+                &HeaderFooterFieldKind::DdeConnection,
+                &HeaderFooterFieldKind::Measure,
+                &HeaderFooterFieldKind::TableFormula,
+                &HeaderFooterFieldKind::MetaField,
+            ]
+        );
+        assert!(
+            fields[1]
+                .attributes
+                .contains(&("text:condition".into(), "of:=1=1".into()))
+        );
+        assert!(
+            fields[4]
+                .attributes
+                .contains(&("text:connection-name".into(), "NeverOpen".into()))
+        );
+        assert!(
+            fields[6]
+                .attributes
+                .contains(&("text:formula".into(), "of:=SUM([.A1:.A2])".into()))
+        );
+        assert_eq!(fields[7].displayed_text, "meta text");
     }
 
     #[test]
