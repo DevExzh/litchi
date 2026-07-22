@@ -37,8 +37,8 @@ impl NoteClass {
 /// A semantic ODF footnote or endnote.
 ///
 /// Equality compares note metadata and the visible body text. Structured body
-/// markup is an authoring detail because the semantic reader intentionally
-/// exposes a bounded text projection for existing note bodies.
+/// markup is available separately through [`Self::rich_body`] so existing
+/// semantic equality remains stable across canonical XML serialization.
 #[derive(Debug, Clone)]
 pub struct Note {
     class: NoteClass,
@@ -122,11 +122,11 @@ impl Note {
         &self.body
     }
 
-    /// Return the structured body supplied through [`Self::with_rich_body`] or
-    /// [`Self::set_rich_body`].
+    /// Return the validated structured body supplied by authoring or parsed
+    /// from an existing ODF note.
     ///
-    /// Parsed legacy notes continue to expose their semantic text through
-    /// [`Self::body`]; their existing XML stays byte-preserved until replaced.
+    /// All dynamic descendants remain inert. The parallel [`Self::body`]
+    /// accessor provides the bounded visible-text projection.
     pub fn rich_body(&self) -> Option<&OdfNoteBodyContent> {
         self.rich_body.as_ref()
     }
@@ -485,7 +485,25 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
         ));
     }
     notes.sort_by_key(|(order, _)| *order);
-    Ok(notes.into_iter().map(|(_, note)| note).collect())
+    let mut notes = notes.into_iter().map(|(_, note)| note).collect::<Vec<_>>();
+    if notes.is_empty() {
+        return Ok(notes);
+    }
+    let rich_bodies = crate::elements::field::parse_note_body_contents(xml)?;
+    if notes.len() != rich_bodies.len() {
+        return Err(Error::InvalidFormat(
+            "semantic note and structured note-body scans disagree".to_string(),
+        ));
+    }
+    for (note, rich_body) in notes.iter_mut().zip(rich_bodies) {
+        if note.body != rich_body.display_text() {
+            return Err(Error::InvalidFormat(
+                "semantic note text disagrees with structured note-body content".to_string(),
+            ));
+        }
+        note.rich_body = Some(rich_body);
+    }
+    Ok(notes)
 }
 
 fn append_note_text(active: &mut [ActiveNote], value: &str) -> Result<()> {
@@ -537,6 +555,58 @@ mod tests {
     }
 
     #[test]
+    fn parses_libreoffice_structured_note_body_and_preserves_it_on_replacement() {
+        let fixture = include_str!("../../../../test-data/odf/odt/note-ordinary-numbering.fodt");
+        let notes = parse_notes(fixture).unwrap();
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].class(), NoteClass::Endnote);
+        assert_eq!(notes[0].citation(), "i");
+        assert_eq!(notes[0].body(), "xyz");
+        let rich_body = notes[0].rich_body().unwrap();
+        assert_eq!(rich_body.display_text(), "xyz");
+        let crate::OdfMetaFieldNode::Element(list) = &rich_body.nodes()[0] else {
+            panic!("expected LibreOffice note body list");
+        };
+        assert_eq!(list.namespace_uri, TEXT);
+        assert_eq!(list.local_name, "list");
+        assert!(list.attributes.iter().any(|attribute| {
+            attribute.namespace_uri == TEXT
+                && attribute.local_name == "style-name"
+                && attribute.value == "L2"
+        }));
+
+        let replaced = crate::replace_note_xml(fixture, 0, &notes[0]).unwrap();
+        let reparsed = parse_notes(&replaced).unwrap();
+        assert_eq!(reparsed, notes);
+        assert_eq!(reparsed[0].rich_body(), notes[0].rich_body());
+    }
+
+    #[test]
+    fn parses_libreoffice_note_body_fixture_variants() {
+        let fixtures = [
+            (
+                "nested note",
+                include_str!("../../../../test-data/odf/odt/note-nested.fodt"),
+            ),
+            (
+                "drawing anchored in note",
+                include_str!("../../../../test-data/odf/odt/note-drawing.fodt"),
+            ),
+            (
+                "hyperlink host",
+                include_str!("../../../../test-data/odf/odt/note-hyperlink-host.fodt"),
+            ),
+            (
+                "tracked changes",
+                include_str!("../../../../test-data/odf/odt/note-tracked-changes.fodt"),
+            ),
+        ];
+        for (name, fixture) in fixtures {
+            assert!(parse_notes(fixture).is_ok(), "failed to parse {name}");
+        }
+    }
+
+    #[test]
     fn notes_reject_invalid_structure_and_ambiguous_metadata() {
         let missing_class = format!(
             r#"<x:note xmlns:x="{TEXT}"><x:note-citation>1</x:note-citation><x:note-body/></x:note>"#
@@ -568,6 +638,22 @@ mod tests {
         assert!(parse_notes(&aliases).is_err());
         let empty = format!(r#"<x:note xmlns:x="{TEXT}" x:note-class="footnote"/>"#);
         assert!(parse_notes(&empty).is_err());
+        let non_block_body = format!(
+            r#"<x:note xmlns:x="{TEXT}" x:note-class="footnote"><x:note-citation>1</x:note-citation><x:note-body>not a block</x:note-body></x:note>"#
+        );
+        assert!(parse_notes(&non_block_body).is_err());
+        let invalid_body_child = format!(
+            r#"<x:note xmlns:x="{TEXT}" x:note-class="footnote"><x:note-citation>1</x:note-citation><x:note-body><x:span>not a block</x:span></x:note-body></x:note>"#
+        );
+        assert!(parse_notes(&invalid_body_child).is_err());
+        let attributed_body = format!(
+            r#"<x:note xmlns:x="{TEXT}" x:note-class="footnote"><x:note-citation>1</x:note-citation><x:note-body x:style-name="not-permitted"/></x:note>"#
+        );
+        assert!(parse_notes(&attributed_body).is_err());
+        let active_body = format!(
+            r#"<x:note xmlns:x="{TEXT}" x:note-class="footnote"><x:note-citation>1</x:note-citation><x:note-body><x:p>body<?unsafe data?></x:p></x:note-body></x:note>"#
+        );
+        assert!(parse_notes(&active_body).is_err());
         assert!(parse_notes("<x:note>").is_err());
     }
 

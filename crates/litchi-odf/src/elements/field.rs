@@ -830,10 +830,10 @@ impl OdfMetaFieldContent {
 ///
 /// The ODF 1.3 schema permits paragraph-like blocks, lists, tables, selected
 /// drawing content, and related structured text descendants in a note body.
-/// Direct character data is deliberately rejected: it belongs inside one of
-/// those schema-defined child elements. Links, fields, event listeners, and
-/// macro metadata are serialized only as inert XML; this type never follows,
-/// evaluates, or executes them.
+/// This models ODF 1.3 Part 3, section 6.3.4. Direct character data is
+/// deliberately rejected: it belongs inside one of those schema-defined child
+/// elements. Links, fields, event listeners, and macro metadata are serialized
+/// only as inert XML; this type never follows, evaluates, or executes them.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OdfNoteBodyContent {
     nodes: Vec<OdfMetaFieldNode>,
@@ -852,7 +852,7 @@ impl OdfNoteBodyContent {
             ));
         }
         validated_meta_display_text(&nodes, MetaContentGrammar::NoteBody)?;
-        let display_text = note_body_display_text(&nodes);
+        let display_text = note_body_display_text(&nodes)?;
         Ok(Self {
             nodes,
             display_text,
@@ -868,8 +868,9 @@ impl OdfNoteBodyContent {
     ///
     /// Paragraph and heading descendants are separated by line feeds. Nested
     /// note bodies are omitted from an enclosing note's projection, while a
-    /// nested note's citation remains inline, matching the bounded semantic
-    /// note reader.
+    /// nested note's citation remains inline. `text:s`, `text:tab`, and
+    /// `text:line-break` receive their corresponding text semantics, matching
+    /// the bounded semantic note reader.
     pub fn display_text(&self) -> &str {
         &self.display_text
     }
@@ -909,44 +910,125 @@ fn validated_meta_display_text(
     Ok(display_text)
 }
 
-fn note_body_display_text(nodes: &[OdfMetaFieldNode]) -> String {
+fn note_body_display_text(nodes: &[OdfMetaFieldNode]) -> Result<String> {
     let mut display_text = String::new();
     let mut seen_block = false;
-    append_note_body_display_text(nodes, &mut display_text, &mut seen_block);
-    display_text
+    append_note_body_display_text(nodes, &mut display_text, &mut seen_block, false)?;
+    Ok(display_text)
 }
 
 fn append_note_body_display_text(
     nodes: &[OdfMetaFieldNode],
     display_text: &mut String,
     seen_block: &mut bool,
-) {
+    in_paragraph: bool,
+) -> Result<()> {
     for node in nodes {
         match node {
-            OdfMetaFieldNode::Text(value) => display_text.push_str(value),
+            OdfMetaFieldNode::Text(value) if in_paragraph => {
+                append_note_body_display_value(display_text, value)?;
+            },
+            OdfMetaFieldNode::Text(_) => {},
             OdfMetaFieldNode::Element(element) => {
                 if element.namespace_uri == TEXT_DATABASE_NAMESPACE && element.local_name == "note"
                 {
-                    if let Some(OdfMetaFieldNode::Element(citation)) = element.children.first()
+                    if in_paragraph
+                        && let Some(OdfMetaFieldNode::Element(citation)) = element.children.first()
                         && citation.namespace_uri == TEXT_DATABASE_NAMESPACE
                         && citation.local_name == "note-citation"
                     {
-                        append_note_body_display_text(&citation.children, display_text, seen_block);
+                        append_note_body_display_text(
+                            &citation.children,
+                            display_text,
+                            seen_block,
+                            true,
+                        )?;
                     }
                     continue;
                 }
                 if element.namespace_uri == TEXT_DATABASE_NAMESPACE
                     && matches!(element.local_name.as_str(), "p" | "h")
                 {
-                    if *seen_block {
-                        display_text.push('\n');
+                    if !in_paragraph {
+                        if *seen_block {
+                            append_note_body_display_value(display_text, "\n")?;
+                        }
+                        *seen_block = true;
                     }
-                    *seen_block = true;
+                    append_note_body_display_text(
+                        &element.children,
+                        display_text,
+                        seen_block,
+                        true,
+                    )?;
+                    continue;
                 }
-                append_note_body_display_text(&element.children, display_text, seen_block);
+                if in_paragraph && element.namespace_uri == TEXT_DATABASE_NAMESPACE {
+                    match element.local_name.as_str() {
+                        "s" => {
+                            append_note_body_spaces(display_text, element)?;
+                            continue;
+                        },
+                        "tab" => {
+                            append_note_body_display_value(display_text, "\t")?;
+                            continue;
+                        },
+                        "line-break" => {
+                            append_note_body_display_value(display_text, "\n")?;
+                            continue;
+                        },
+                        _ => {},
+                    }
+                }
+                append_note_body_display_text(
+                    &element.children,
+                    display_text,
+                    seen_block,
+                    in_paragraph,
+                )?;
             },
         }
     }
+    Ok(())
+}
+
+fn append_note_body_display_value(output: &mut String, value: &str) -> Result<()> {
+    let total = output.len().checked_add(value.len()).ok_or_else(|| {
+        Error::InvalidFormat("text:note-body display text size overflow".to_string())
+    })?;
+    if total > MAX_DYNAMIC_FIELD_AGGREGATE {
+        return Err(Error::InvalidFormat(format!(
+            "text:note-body display text exceeds {MAX_DYNAMIC_FIELD_AGGREGATE} bytes"
+        )));
+    }
+    output.push_str(value);
+    Ok(())
+}
+
+fn append_note_body_spaces(output: &mut String, element: &OdfMetaFieldElement) -> Result<()> {
+    let count = element
+        .attributes
+        .iter()
+        .find(|attribute| {
+            attribute.namespace_uri == TEXT_DATABASE_NAMESPACE && attribute.local_name == "c"
+        })
+        .map(|attribute| {
+            attribute.value.parse::<usize>().map_err(|_| {
+                Error::InvalidFormat("text:s text:c must be a non-negative integer".to_string())
+            })
+        })
+        .transpose()?
+        .unwrap_or(1);
+    let total = output.len().checked_add(count).ok_or_else(|| {
+        Error::InvalidFormat("text:note-body display text size overflow".to_string())
+    })?;
+    if total > MAX_DYNAMIC_FIELD_AGGREGATE {
+        return Err(Error::InvalidFormat(format!(
+            "text:note-body display text exceeds {MAX_DYNAMIC_FIELD_AGGREGATE} bytes"
+        )));
+    }
+    output.extend(std::iter::repeat_n(' ', count));
+    Ok(())
 }
 
 impl OdfUserDefinedMetadataValues {
@@ -4002,16 +4084,54 @@ struct ActiveMetaField {
     builder: MetaContentBuilder,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
+struct ActiveNoteBody {
+    depth: usize,
+    order: usize,
+    builder: MetaContentBuilder,
+}
+
+#[derive(Debug)]
 struct MetaContentBuilder {
     roots: Vec<OdfMetaFieldNode>,
     stack: Vec<OdfMetaFieldElement>,
     nodes: usize,
     aggregate: usize,
+    root_grammar: MetaContentGrammar,
+    root_name: &'static str,
+}
+
+impl Default for MetaContentBuilder {
+    fn default() -> Self {
+        Self::new(MetaContentGrammar::ParagraphOrHyperlink, "text:meta-field")
+    }
 }
 
 impl MetaContentBuilder {
+    fn new(root_grammar: MetaContentGrammar, root_name: &'static str) -> Self {
+        Self {
+            roots: Vec::new(),
+            stack: Vec::new(),
+            nodes: 0,
+            aggregate: 0,
+            root_grammar,
+            root_name,
+        }
+    }
+
+    fn note_body() -> Self {
+        Self::new(MetaContentGrammar::NoteBody, "text:note-body")
+    }
+
     fn push_text(&mut self, value: &str) -> Result<()> {
+        if self.stack.is_empty() && self.root_grammar == MetaContentGrammar::NoteBody {
+            if value.chars().all(char::is_whitespace) {
+                return Ok(());
+            }
+            return Err(Error::InvalidFormat(
+                "text:note-body cannot contain direct character data".to_string(),
+            ));
+        }
         add_meta_size(&mut self.aggregate, value.len())?;
         if let Some(OdfMetaFieldNode::Text(text)) = self.current_nodes_mut().last_mut() {
             text.push_str(value);
@@ -4029,10 +4149,12 @@ impl MetaContentBuilder {
         local_name: String,
         attributes: Vec<OdfMetaFieldAttribute>,
     ) -> Result<()> {
-        if self.stack.is_empty() && !is_allowed_meta_inline_root(&namespace_uri, &local_name) {
+        if self.stack.is_empty()
+            && meta_child_grammar(self.root_grammar, &namespace_uri, &local_name).is_err()
+        {
             return Err(Error::InvalidFormat(format!(
-                "{}:{local_name} is not permitted directly in text:meta-field",
-                namespace_uri
+                "{}:{local_name} is not permitted directly in {}",
+                namespace_uri, self.root_name
             )));
         }
         validate_meta_element_parts(
@@ -4075,13 +4197,22 @@ impl MetaContentBuilder {
         Ok(())
     }
 
-    fn finish(self) -> Result<OdfMetaFieldContent> {
+    fn finish_meta_field(self) -> Result<OdfMetaFieldContent> {
         if !self.stack.is_empty() {
             return Err(Error::InvalidFormat(
                 "incomplete text:meta-field content".to_string(),
             ));
         }
         OdfMetaFieldContent::new(self.roots)
+    }
+
+    fn finish_note_body(self) -> Result<OdfNoteBodyContent> {
+        if !self.stack.is_empty() {
+            return Err(Error::InvalidFormat(
+                "incomplete text:note-body content".to_string(),
+            ));
+        }
+        OdfNoteBodyContent::new(self.roots)
     }
 
     fn current_nodes_mut(&mut self) -> &mut Vec<OdfMetaFieldNode> {
@@ -4242,7 +4373,7 @@ fn parse_meta_fields(xml: &str) -> Result<Vec<OdfDynamicTextField>> {
                         OdfDynamicTextField::MetaField {
                             xml_id: field.xml_id,
                             data_style_name: field.data_style_name,
-                            content: field.builder.finish()?,
+                            content: field.builder.finish_meta_field()?,
                         },
                     ));
                 }
@@ -4275,6 +4406,193 @@ fn parse_meta_fields(xml: &str) -> Result<Vec<OdfDynamicTextField>> {
     }
     completed.sort_by_key(|(order, _)| *order);
     Ok(completed.into_iter().map(|(_, field)| field).collect())
+}
+
+/// Parse every direct `text:note-body` child of an ODF `text:note` into the
+/// shared inert mixed-content model. This does not evaluate fields, links,
+/// event listeners, scripts, or macros represented by the nodes.
+pub(crate) fn parse_note_body_contents(xml: &str) -> Result<Vec<OdfNoteBodyContent>> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut stack: Vec<(Option<String>, String)> = Vec::new();
+    let mut active: Vec<ActiveNoteBody> = Vec::new();
+    let mut completed = Vec::new();
+    let mut next_order = 0usize;
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid note-body XML: {error}")))?;
+        match event {
+            Event::Start(ref source) => {
+                let namespace_uri = resolved_namespace(&namespace)?;
+                let local = utf8(source.local_name().as_ref(), "note-body element name")?;
+                let is_note_body = namespace_uri.as_deref() == Some(TEXT_DATABASE_NAMESPACE)
+                    && local == "note-body"
+                    && stack
+                        .last()
+                        .is_some_and(|(parent_namespace, parent_local)| {
+                            parent_namespace.as_deref() == Some(TEXT_DATABASE_NAMESPACE)
+                                && parent_local == "note"
+                        });
+                if is_note_body {
+                    validate_note_body_attributes(source)?;
+                }
+                if !active.is_empty() {
+                    let attributes = parse_meta_node_attributes(&reader, source)?;
+                    let namespace_uri = namespace_uri.clone().ok_or_else(|| {
+                        Error::InvalidFormat("unqualified note-body child element".to_string())
+                    })?;
+                    for body in &mut active {
+                        body.builder.start_element(
+                            namespace_uri.clone(),
+                            local.clone(),
+                            attributes.clone(),
+                        )?;
+                    }
+                }
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("note-body XML depth overflow".to_string())
+                })?;
+                if depth > MAX_FIELD_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "note-body XML exceeds {MAX_FIELD_DEPTH} levels"
+                    )));
+                }
+                if is_note_body {
+                    if next_order >= MAX_FIELDS {
+                        return Err(Error::InvalidFormat(
+                            "document exceeds note-body limit".to_string(),
+                        ));
+                    }
+                    active.push(ActiveNoteBody {
+                        depth,
+                        order: next_order,
+                        builder: MetaContentBuilder::note_body(),
+                    });
+                    next_order += 1;
+                }
+                stack.push((namespace_uri, local));
+            },
+            Event::Empty(ref source) => {
+                let namespace_uri = resolved_namespace(&namespace)?;
+                let local = utf8(source.local_name().as_ref(), "note-body element name")?;
+                let is_note_body = namespace_uri.as_deref() == Some(TEXT_DATABASE_NAMESPACE)
+                    && local == "note-body"
+                    && stack
+                        .last()
+                        .is_some_and(|(parent_namespace, parent_local)| {
+                            parent_namespace.as_deref() == Some(TEXT_DATABASE_NAMESPACE)
+                                && parent_local == "note"
+                        });
+                if is_note_body {
+                    validate_note_body_attributes(source)?;
+                }
+                if !active.is_empty() {
+                    let attributes = parse_meta_node_attributes(&reader, source)?;
+                    let namespace_uri = namespace_uri.clone().ok_or_else(|| {
+                        Error::InvalidFormat("unqualified note-body child element".to_string())
+                    })?;
+                    for body in &mut active {
+                        body.builder.empty_element(
+                            namespace_uri.clone(),
+                            local.clone(),
+                            attributes.clone(),
+                        )?;
+                    }
+                }
+                if is_note_body {
+                    if next_order >= MAX_FIELDS {
+                        return Err(Error::InvalidFormat(
+                            "document exceeds note-body limit".to_string(),
+                        ));
+                    }
+                    completed.push((next_order, OdfNoteBodyContent::new(Vec::new())?));
+                    next_order += 1;
+                }
+            },
+            Event::Text(ref value) if !active.is_empty() => {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid note-body text: {error}"))
+                    })?;
+                for body in &mut active {
+                    body.builder.push_text(&value)?;
+                }
+            },
+            Event::CData(ref value) if !active.is_empty() => {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid note-body CDATA: {error}"))
+                    })?;
+                for body in &mut active {
+                    body.builder.push_text(&value)?;
+                }
+            },
+            Event::GeneralRef(ref reference) if !active.is_empty() => {
+                let value = decode_reference(reference, "note-body")?;
+                for body in &mut active {
+                    body.builder.push_text(&value)?;
+                }
+            },
+            Event::End(_) => {
+                for body in &mut active {
+                    if body.depth < depth {
+                        body.builder.end_element()?;
+                    }
+                }
+                if active.last().is_some_and(|body| body.depth == depth) {
+                    let body = active.pop().expect("checked active note body");
+                    completed.push((body.order, body.builder.finish_note_body()?));
+                }
+                stack.pop().ok_or_else(|| {
+                    Error::InvalidFormat("note-body XML stack underflow".to_string())
+                })?;
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("note-body XML depth underflow".to_string())
+                })?;
+            },
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "DOCTYPE is not permitted in ODF note-body XML".to_string(),
+                ));
+            },
+            Event::PI(_) if !active.is_empty() => {
+                return Err(Error::InvalidFormat(
+                    "processing instructions are not permitted in text:note-body".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if depth != 0 || !stack.is_empty() || !active.is_empty() {
+        return Err(Error::InvalidFormat("incomplete note-body XML".to_string()));
+    }
+    completed.sort_by_key(|(order, _)| *order);
+    Ok(completed.into_iter().map(|(_, body)| body).collect())
+}
+
+fn validate_note_body_attributes(source: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+    for attribute in source.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid text:note-body attribute: {error}"))
+        })?;
+        let raw = attribute.key.as_ref();
+        if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
+            continue;
+        }
+        return Err(Error::InvalidFormat(
+            "text:note-body does not permit attributes".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn collect_document_xml_id(
@@ -5108,10 +5426,6 @@ fn is_allowed_meta_namespace(namespace: &str) -> bool {
             | FORM_NAMESPACE
             | SCRIPT_NAMESPACE
     )
-}
-
-fn is_allowed_meta_inline_root(namespace: &str, local: &str) -> bool {
-    meta_child_grammar(MetaContentGrammar::ParagraphOrHyperlink, namespace, local).is_ok()
 }
 
 fn add_meta_size(aggregate: &mut usize, amount: usize) -> Result<()> {
@@ -6971,6 +7285,56 @@ mod meta_field_tests {
             },)])
             .is_err()
         );
+    }
+
+    #[test]
+    fn note_body_content_projects_odf_whitespace_controls() {
+        let text_control = |local_name: &str, attributes: Vec<OdfMetaFieldAttribute>| {
+            OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                local_name: local_name.to_string(),
+                attributes,
+                children: Vec::new(),
+            })
+        };
+        let content =
+            OdfNoteBodyContent::new(vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                local_name: "p".to_string(),
+                attributes: Vec::new(),
+                children: vec![
+                    OdfMetaFieldNode::Text("A".to_string()),
+                    text_control(
+                        "s",
+                        vec![OdfMetaFieldAttribute {
+                            namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                            local_name: "c".to_string(),
+                            value: "2".to_string(),
+                        }],
+                    ),
+                    text_control("tab", Vec::new()),
+                    text_control("line-break", Vec::new()),
+                    OdfMetaFieldNode::Text("B".to_string()),
+                ],
+            })])
+            .unwrap();
+        assert_eq!(content.display_text(), "A  \t\nB");
+
+        let invalid =
+            OdfNoteBodyContent::new(vec![OdfMetaFieldNode::Element(OdfMetaFieldElement {
+                namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                local_name: "p".to_string(),
+                attributes: Vec::new(),
+                children: vec![text_control(
+                    "s",
+                    vec![OdfMetaFieldAttribute {
+                        namespace_uri: TEXT_DATABASE_NAMESPACE.to_string(),
+                        local_name: "c".to_string(),
+                        value: "two".to_string(),
+                    }],
+                )],
+            })]);
+        assert!(invalid.is_err());
     }
 
     #[test]
