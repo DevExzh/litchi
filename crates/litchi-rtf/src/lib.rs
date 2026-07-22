@@ -167,11 +167,11 @@ pub use external_reference::{
 };
 pub use field::{
     BibliographyField, BibliographyOption, BodyStoryEvent, CitationField, CitationOption, DdeField,
-    DdeFieldKind, DdeRepresentation, EquationField, ExternalIncludeField, ExternalIncludeOption,
-    Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus, FieldSwitch, FieldType,
-    HyperlinkCode, IncludeFieldKind, IndexEntryField, IndexEntryOption, IndexField, IndexOption,
-    LinkField, LinkFormatting, LinkResultOption, MacroButtonField, PageBreak, ParsedFieldCode,
-    ReferenceCode, SectionBreak, StoryEvent, StoryField,
+    DdeFieldKind, DdeRepresentation, DocumentVariableField, EquationField, ExternalIncludeField,
+    ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
+    FieldSwitch, FieldType, HyperlinkCode, IncludeFieldKind, IndexEntryField, IndexEntryOption,
+    IndexField, IndexOption, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
+    PageBreak, ParsedFieldCode, ReferenceCode, SectionBreak, StoryEvent, StoryField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesEntryOption, TableOfAuthoritiesField,
     TableOfAuthoritiesOption, TableOfContentsEntryField, TableOfContentsEntryOption,
     TableOfContentsField, TableOfContentsOption, parse_field_code,

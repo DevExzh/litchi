@@ -31,6 +31,7 @@ pub enum FieldType {
     IndexEntry,
     Citation,
     Bibliography,
+    DocumentVariable,
     Unknown,
 }
 
@@ -744,6 +745,22 @@ pub struct BibliographyField<'a> {
     position: usize,
 }
 
+/// Inert metadata for a legacy RTF DOCVARIABLE field.
+///
+/// This model retains a stored variable name, preserved switches, and cached
+/// result only. It never reads a document-variable destination,
+/// resolves a variable value, evaluates a field, or refreshes its result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentVariableField<'a> {
+    instruction: &'a str,
+    variable_name: Cow<'a, str>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 struct ExternalIncludeParts<'a> {
     kind: IncludeFieldKind,
     source: Cow<'a, str>,
@@ -794,6 +811,11 @@ struct CitationParts<'a> {
 
 struct BibliographyParts<'a> {
     options: Vec<BibliographyOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct DocumentVariableFieldParts<'a> {
+    variable_name: Cow<'a, str>,
     unknown_switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -1606,6 +1628,58 @@ impl<'a> BibliographyField<'a> {
     }
 }
 
+impl<'a> DocumentVariableField<'a> {
+    /// Return the complete stored DOCVARIABLE field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored document-variable name without resolving it.
+    pub fn variable_name(&self) -> &str {
+        &self.variable_name
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    ///
+    /// DOCVARIABLE has no field-specific switches. These values are retained
+    /// as inert source metadata and are never interpreted.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated from a variable.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> Field<'a> {
     #[inline]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
@@ -1701,6 +1775,11 @@ impl<'a> Field<'a> {
                 if keyword.eq_ignore_ascii_case("BIBLIOGRAPHY") =>
             {
                 FieldType::Bibliography
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("DOCVARIABLE") =>
+            {
+                FieldType::DocumentVariable
             },
             _ => FieldType::Unknown,
         };
@@ -2027,6 +2106,27 @@ impl<'a> Field<'a> {
         Some(BibliographyField {
             instruction: self.instruction.as_ref(),
             options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed DOCVARIABLE field.
+    ///
+    /// The stored variable name is never resolved against document variables,
+    /// and the cached result is never refreshed. Malformed DOCVARIABLE
+    /// instructions remain generic fields and return None here.
+    pub fn document_variable(&self) -> Option<DocumentVariableField<'_>> {
+        if self.field_type != FieldType::DocumentVariable {
+            return None;
+        }
+        let parts = document_variable_field_parts(self.instruction.as_ref())?;
+        Some(DocumentVariableField {
+            instruction: self.instruction.as_ref(),
+            variable_name: parts.variable_name,
             unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
@@ -3293,6 +3393,40 @@ fn bibliography_parts(instruction: &str) -> Option<BibliographyParts<'_>> {
 
     Some(BibliographyParts {
         options,
+        unknown_switches,
+    })
+}
+
+fn document_variable_field_parts(instruction: &str) -> Option<DocumentVariableFieldParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("DOCVARIABLE") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let variable_name = tokens.first()?.value.clone();
+    if variable_name.is_empty() || switch_name(tokens.first()?).is_some() {
+        return None;
+    }
+    tokens.remove(0);
+
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let value = tokens
+            .get(index + 1)
+            .filter(|token| switch_name(token).is_none());
+        unknown_switches.push(FieldSwitch {
+            name: Cow::Owned(name.to_string()),
+            value: value.map(|token| token.value.clone()),
+        });
+        index += 1 + usize::from(value.is_some());
+    }
+
+    Some(DocumentVariableFieldParts {
+        variable_name,
         unknown_switches,
     })
 }
@@ -4592,6 +4726,74 @@ mod tests {
             Field::parse_instruction(r"BIBLIOGRAPHIES \l 1033").field_type,
             FieldType::Unknown
         );
+    }
+
+    #[test]
+    fn document_variable_fields_preserve_names_without_resolution() {
+        let mut field =
+            Field::parse_instruction(r#"DOCVARIABLE "Customer Region" \* MERGEFORMAT"#);
+        field.result = Cow::Borrowed("cached region");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::DocumentVariable);
+        let variable = field.document_variable().unwrap();
+        assert_eq!(variable.instruction(), field.instruction);
+        assert_eq!(variable.variable_name(), "Customer Region");
+        assert_eq!(variable.cached_result(), Some("cached region"));
+        assert!(variable.is_dirty());
+        assert!(variable.is_locked());
+        assert_eq!(variable.owner(), FieldOwner::Body);
+        assert_eq!(variable.position(), 4);
+        assert_eq!(variable.unknown_switches().len(), 1);
+        assert_eq!(variable.unknown_switches()[0].name, "*");
+        assert_eq!(
+            variable.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+
+        assert!(
+            Field::parse_instruction("DOCVARIABLE")
+                .document_variable()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"DOCVARIABLE \* MERGEFORMAT")
+                .document_variable()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction("DOCVARIABLE Customer unexpected")
+                .document_variable()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction("DOCVARIABLES Customer").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
+    fn document_discovers_document_variable_fields_without_resolving_them() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DOCVARIABLE CustomerName \\* MERGEFORMAT}{\fldrslt cached customer}}After}"#,
+        )
+        .unwrap();
+
+        let fields = document.document_variable_fields();
+        assert_eq!(document.document_variable_field_count(), 1);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].variable_name(), "CustomerName");
+        assert_eq!(fields[0].cached_result(), Some("cached customer"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert!(document.document_variables().is_empty());
+        assert_eq!(document.text(), "Before After");
     }
 
     #[test]

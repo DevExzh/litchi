@@ -1041,6 +1041,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert DOCVARIABLE fields in document field order.
+    ///
+    /// Variable names, switches, and cached results are exposed solely as
+    /// stored metadata. This method never reads document-variable destinations,
+    /// resolves values, evaluates fields, or refreshes results.
+    pub fn document_variable_fields(&self) -> Vec<crate::DocumentVariableField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::document_variable)
+            .collect()
+    }
+
+    /// Return the number of typed, inert DOCVARIABLE fields in the document.
+    pub fn document_variable_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.document_variable().is_some())
+            .count()
+    }
+
     /// Return typed, inert TOC fields in document field order.
     ///
     /// Stored options and cached results are exposed solely as metadata. This
