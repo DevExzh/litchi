@@ -16,6 +16,10 @@ use crate::xlsx::named_sheet_view::{
     NamedSheetViews, load_worksheet_named_sheet_views, remove_worksheet_named_sheet_views,
     store_worksheet_named_sheet_views,
 };
+use crate::xlsx::xml_maps::{
+    XmlMapConformance, XmlMapInfo, load_from_package_with_conformance as load_xml_maps,
+    remove_from_package as remove_xml_maps, store_in_package as store_xml_maps,
+};
 use crate::xlsx::external_links::{
     ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
     build_external_link_part_with_conformance, load_external_link,
@@ -516,6 +520,32 @@ impl Workbook {
         self.calculation_chain = None;
         self.calculation_chain_conformance = None;
         Ok(removed)
+    }
+
+    /// Load inert Custom XML Maps metadata and its namespace family.
+    ///
+    /// Inline schemas and data bindings are retained as metadata only. This
+    /// never resolves schema locations, opens files, or imports/exports mapped
+    /// worksheet data.
+    pub fn xml_maps(&self) -> SheetResult<Option<(XmlMapInfo, XmlMapConformance)>> {
+        load_xml_maps(&self.package)
+    }
+
+    /// Replace the workbook's inert Custom XML Maps metadata.
+    ///
+    /// This writes only the caller-provided MapInfo part. It does not apply a
+    /// mapping, resolve a schema, or interact with bound external content.
+    pub fn set_xml_maps(
+        &mut self,
+        value: &XmlMapInfo,
+        conformance: XmlMapConformance,
+    ) -> SheetResult<()> {
+        store_xml_maps(&mut self.package, value, conformance)
+    }
+
+    /// Remove Custom XML Maps metadata without changing worksheet cell data.
+    pub fn remove_xml_maps(&mut self) -> SheetResult<bool> {
+        remove_xml_maps(&mut self.package)
     }
 
     /// Return passive `workbookProtection` metadata from the current `workbook.xml` part.
@@ -1566,11 +1596,16 @@ impl Workbook {
                 // collections. Detach inert companion parts first so old targets
                 // do not become orphaned, then restore them after materialization.
                 let named_sheet_views = self.detach_named_sheet_views_before_materialization()?;
+                let xml_maps = load_xml_maps(&self.package)?;
                 if self.calculation_chain.is_some() {
                     remove_calculation_chain(&mut self.package)?;
                 }
+                if xml_maps.is_some() {
+                    remove_xml_maps(&mut self.package)?;
+                }
                 self.update_workbook_parts(&mut mutable_data)?;
                 self.restore_calculation_chain_after_materialization()?;
+                self.restore_xml_maps_after_materialization(&xml_maps)?;
                 self.restore_named_sheet_views_after_materialization(&named_sheet_views)?;
                 self.mutable_data = Some(mutable_data);
             }
@@ -1650,6 +1685,18 @@ impl Workbook {
             self.calculation_chain_conformance.unwrap_or_default(),
         )?;
         Ok(())
+    }
+
+    /// Restore Custom XML Maps after the mutable writer recreates the workbook
+    /// relationship collection. No mapping is applied during this operation.
+    fn restore_xml_maps_after_materialization(
+        &mut self,
+        value: &Option<(XmlMapInfo, XmlMapConformance)>,
+    ) -> SheetResult<()> {
+        let Some((value, conformance)) = value else {
+            return Ok(());
+        };
+        store_xml_maps(&mut self.package, value, *conformance)
     }
 
     /// Detach worksheet-scoped modern views before rebuilding worksheet parts.

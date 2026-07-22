@@ -162,7 +162,7 @@ conversion, fonts, and image conversion are optional.
 | Connections and query tables | ✅ | ✅ | ✅ | Typed package CRUD; external queries are never executed |
 | OLE objects | ✅ | ✅ | ✅ | Worksheet object metadata, anchors, payload resources, and package graph |
 | ActiveX controls | 🟡 | ✅ | ❌ | Typed control/property discovery; no worksheet control authoring graph |
-| XML maps | 🟡 | ✅ | ❌ | Map/schema discovery only |
+| XML maps | 🟡 | ✅ | ✅ | Typed inert MapInfo/schema/data-binding package CRUD with strict/transitional relationships; mappings, schema locations, and bound files are never resolved or executed |
 | Data model/custom data/XLDM | 🟡 | ✅ | ✅ | Inert model/custom-data package storage plus bounded XLDM inspection/writing |
 | Workbook revisions | ✅ | ✅ | ✅ | Revision headers, users, logs, and package storage; revisions are not replayed |
 | Calculation properties | ✅ | ✅ | ✅ | Calculation mode, IDs, iteration, precision, and reference mode |

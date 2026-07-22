@@ -184,6 +184,13 @@ pub use named_sheet_view::{
     parse_named_sheet_views, remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views,
     write_named_sheet_views,
 };
+pub use xml_maps::{
+    XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema,
+    load_from_package as load_xml_maps_from_package,
+    load_from_package_with_conformance as load_xml_maps_from_package_with_conformance,
+    remove_from_package as remove_xml_maps_from_package,
+    store_in_package as store_xml_maps_in_package,
+};
 pub use ole_objects::{
     OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker, OleObjectProperties,
     OleObjectRelationshipKind, OleObjectResource, OleObjectTarget, OleObjectUpdate,

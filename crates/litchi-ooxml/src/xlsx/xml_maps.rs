@@ -23,6 +23,28 @@ const MAX_OPAQUE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;
 const MAX_EVENTS: usize = 1_000_000;
 
+/// Namespace family used for a Custom XML Maps part and its workbook relationship.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum XmlMapConformance {
+    #[default]
+    Transitional,
+    Strict,
+}
+
+impl XmlMapConformance {
+    const fn relationship_type(self) -> &'static str {
+        match self {
+            Self::Transitional => REL,
+            Self::Strict => STRICT_REL,
+        }
+    }
+
+    /// Whether this conformance uses ISO/IEC 29500 Strict namespace URIs.
+    pub const fn is_strict(self) -> bool {
+        matches!(self, Self::Strict)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct XmlMapSchema {
     pub id: String,
@@ -164,15 +186,135 @@ impl XmlMapInfo {
 
 /// Discovers and parses the single Custom XML Maps part related to the workbook.
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<XmlMapInfo>> {
-    let workbook = package.main_document_part()?;
-    let mut matches = workbook
-        .rels()
-        .iter()
-        .filter(|r| matches!(r.reltype(), REL | STRICT_REL));
-    let Some(relationship) = matches.next() else {
+    Ok(load_from_package_with_conformance(package)?.map(|(value, _)| value))
+}
+
+/// Discovers the workbook's Custom XML Maps part together with its namespace family.
+///
+/// The schema payload and data-binding payloads remain opaque. This function does
+/// not resolve schema locations, open bound files, or import/export mapped data.
+pub fn load_from_package_with_conformance(
+    package: &OpcPackage,
+) -> Result<Option<(XmlMapInfo, XmlMapConformance)>> {
+    let workbook_uri = main_workbook_uri(package)?;
+    load_for_workbook(package, &workbook_uri)
+}
+
+/// Store caller-authored Custom XML Maps metadata in a SpreadsheetML package.
+///
+/// Existing malformed XML Maps relationships are rejected before mutation. The
+/// writer never resolves inline schema references, opens bound files, or applies
+/// a mapping to worksheet cells.
+pub fn store_in_package(
+    package: &mut OpcPackage,
+    value: &XmlMapInfo,
+    conformance: XmlMapConformance,
+) -> Result<()> {
+    let xml = value.to_xml(conformance.is_strict())?;
+    let workbook_uri = main_workbook_uri(package)?;
+    let existing = xml_maps_relationship(package, &workbook_uri)?;
+
+    if let Some(existing) = existing {
+        validate_xml_maps_graph(package, &workbook_uri, Some(&existing))?;
+        validate_xml_maps_part(package, &existing.part_name)?;
+        package.get_part_mut(&existing.part_name)?.set_blob(xml);
+        if existing.conformance != conformance {
+            let workbook = package.get_part_mut(&workbook_uri)?;
+            workbook.rels_mut().remove(&existing.relationship_id);
+            workbook.rels_mut().add_relationship(
+                conformance.relationship_type().into(),
+                existing.target_reference,
+                existing.relationship_id,
+                false,
+            );
+        }
+    } else {
+        validate_xml_maps_graph(package, &workbook_uri, None)?;
+        let part_name = next_xml_maps_part_name(package)?;
+        let relationship_id = next_xml_maps_relationship_id(package, &workbook_uri)?;
+        let target = part_name.relative_ref(workbook_uri.base_uri());
+        package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
+            part_name,
+            CONTENT_TYPE.into(),
+            xml,
+        )))?;
+        package
+            .get_part_mut(&workbook_uri)?
+            .rels_mut()
+            .add_relationship(
+                conformance.relationship_type().into(),
+                target,
+                relationship_id,
+                false,
+            );
+    }
+
+    let _ = package.clear_digital_signatures();
+    Ok(())
+}
+
+/// Remove the workbook's Custom XML Maps relationship and its unreferenced part.
+///
+/// No mapping is applied to worksheet data. A target that remains referenced by
+/// another package part is retained.
+pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
+    let workbook_uri = main_workbook_uri(package)?;
+    let Some(existing) = xml_maps_relationship(package, &workbook_uri)? else {
+        validate_xml_maps_graph(package, &workbook_uri, None)?;
+        return Ok(false);
+    };
+    validate_xml_maps_graph(package, &workbook_uri, Some(&existing))?;
+    validate_xml_maps_part(package, &existing.part_name)?;
+
+    package
+        .get_part_mut(&workbook_uri)?
+        .rels_mut()
+        .remove(&existing.relationship_id);
+    if !package_part_is_referenced(package, &existing.part_name) {
+        package.remove_part(&existing.part_name);
+    }
+    let _ = package.clear_digital_signatures();
+    Ok(true)
+}
+
+fn load_for_workbook(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+) -> Result<Option<(XmlMapInfo, XmlMapConformance)>> {
+    let Some(relationship) = xml_maps_relationship(package, workbook_uri)? else {
+        validate_xml_maps_graph(package, workbook_uri, None)?;
         return Ok(None);
     };
-    if matches.next().is_some() {
+    validate_xml_maps_graph(package, workbook_uri, Some(&relationship))?;
+    validate_xml_maps_part(package, &relationship.part_name)?;
+    let part = package.get_part(&relationship.part_name)?;
+    Ok(Some((
+        XmlMapInfo::parse(part.blob())?,
+        relationship.conformance,
+    )))
+}
+
+#[derive(Clone, Debug)]
+struct XmlMapsRelationship {
+    relationship_id: String,
+    part_name: PackURI,
+    target_reference: String,
+    conformance: XmlMapConformance,
+}
+
+fn xml_maps_relationship(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+) -> Result<Option<XmlMapsRelationship>> {
+    let workbook = package.get_part(workbook_uri)?;
+    let mut relationships = workbook
+        .rels()
+        .iter()
+        .filter(|relationship| matches!(relationship.reltype(), REL | STRICT_REL));
+    let Some(relationship) = relationships.next() else {
+        return Ok(None);
+    };
+    if relationships.next().is_some() {
         return Err(invalid(
             "workbook has multiple custom XML maps relationships",
         ));
@@ -180,18 +322,151 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<XmlMapInfo>> {
     if relationship.is_external() {
         return Err(invalid("custom XML maps relationship cannot be external"));
     }
-    let uri: PackURI = relationship.target_partname()?;
-    let part = package.get_part(&uri)?;
+    let conformance = if relationship.reltype() == REL {
+        XmlMapConformance::Transitional
+    } else {
+        XmlMapConformance::Strict
+    };
+    Ok(Some(XmlMapsRelationship {
+        relationship_id: relationship.r_id().to_string(),
+        part_name: relationship.target_partname()?,
+        target_reference: relationship.target_ref().to_string(),
+        conformance,
+    }))
+}
+
+fn validate_xml_maps_part(package: &OpcPackage, part_name: &PackURI) -> Result<()> {
+    let part = package.get_part(part_name)?;
     if part.content_type() != CONTENT_TYPE {
         return Err(invalid(format!(
-            "custom XML maps part '{uri}' has content type '{}', expected '{CONTENT_TYPE}'",
+            "custom XML maps part '{part_name}' has content type '{}', expected '{CONTENT_TYPE}'",
             part.content_type()
         )));
     }
     if part.rels().iter().next().is_some() {
         return Err(invalid("custom XML maps part must not have relationships"));
     }
-    Ok(Some(XmlMapInfo::parse(part.blob())?))
+    Ok(())
+}
+
+fn validate_xml_maps_graph(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+    expected: Option<&XmlMapsRelationship>,
+) -> Result<()> {
+    let mut found = 0usize;
+    for part in package.iter_parts() {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| matches!(relationship.reltype(), REL | STRICT_REL))
+        {
+            if part.partname() != workbook_uri {
+                return Err(invalid(
+                    "custom XML maps relationships may only originate from the workbook",
+                ));
+            }
+            if relationship.is_external() {
+                return Err(invalid("custom XML maps relationship cannot be external"));
+            }
+            let target = relationship.target_partname()?;
+            let Some(expected) = expected else {
+                return Err(invalid(
+                    "workbook has an unexpected custom XML maps relationship",
+                ));
+            };
+            if relationship.r_id() != expected.relationship_id || target != expected.part_name {
+                return Err(invalid(
+                    "custom XML maps relationship graph is inconsistent",
+                ));
+            }
+            found += 1;
+        }
+    }
+    if package
+        .rels()
+        .iter()
+        .any(|relationship| matches!(relationship.reltype(), REL | STRICT_REL))
+    {
+        return Err(invalid(
+            "custom XML maps relationships may not originate from the package root",
+        ));
+    }
+    match (expected, found) {
+        (None, 0) | (Some(_), 1) => {},
+        (None, _) => {
+            return Err(invalid(
+                "workbook has an unexpected custom XML maps relationship",
+            ));
+        },
+        (Some(_), _) => {
+            return Err(invalid(
+                "workbook custom XML maps relationship graph is incomplete",
+            ));
+        },
+    }
+    Ok(())
+}
+
+fn main_workbook_uri(package: &OpcPackage) -> Result<PackURI> {
+    use litchi_opc::constants::content_type as ct;
+
+    let workbook = package.main_document_part()?;
+    if !matches!(
+        workbook.content_type(),
+        ct::SML_SHEET_MAIN
+            | ct::SML_TEMPLATE_MAIN
+            | ct::SML_SHEET_MACRO_MAIN
+            | ct::SML_TEMPLATE_MACRO_MAIN
+    ) {
+        return Err(invalid(format!(
+            "main document part '{}' is not an XML workbook",
+            workbook.partname()
+        )));
+    }
+    Ok(workbook.partname().clone())
+}
+
+fn next_xml_maps_part_name(package: &OpcPackage) -> Result<PackURI> {
+    for suffix in 0..=65_536u32 {
+        let name = if suffix == 0 {
+            "/xl/xmlMaps.xml".to_string()
+        } else {
+            format!("/xl/xmlMaps{suffix}.xml")
+        };
+        let candidate = PackURI::new(&name)?;
+        if package.get_part(&candidate).is_err() {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("no free custom XML maps part name"))
+}
+
+fn next_xml_maps_relationship_id(package: &OpcPackage, workbook_uri: &PackURI) -> Result<String> {
+    let relationships = package.get_part(workbook_uri)?.rels();
+    for suffix in 1..=65_537u32 {
+        let candidate = format!("rIdXmlMaps{suffix}");
+        if relationships.get(&candidate).is_none() {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("no free custom XML maps relationship ID"))
+}
+
+fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
+    package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|part_name| part_name == *target)
+        })
+    }) || package.rels().iter().any(|relationship| {
+        !relationship.is_external()
+            && relationship
+                .target_partname()
+                .is_ok_and(|part_name| part_name == *target)
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -893,9 +1168,100 @@ fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sy
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+    use litchi_opc::part::{BlobPart, Part};
+
     fn package(bytes: &[u8]) -> XmlMapInfo {
         let package = OpcPackage::from_bytes(bytes).unwrap();
         load_from_package(&package).unwrap().unwrap()
+    }
+
+    fn fixture_info() -> XmlMapInfo {
+        XmlMapInfo {
+            selection_namespaces: "xmlns:xs='http://www.w3.org/2001/XMLSchema'".into(),
+            schemas: vec![XmlMapSchema {
+                id: "schema-1".into(),
+                schema_reference: Some("urn:litchi:example".into()),
+                namespace: Some("urn:litchi:example".into()),
+                payload_xml: Some(
+                    br#"<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#.to_vec(),
+                ),
+            }],
+            maps: vec![XmlMap {
+                id: 1,
+                name: "Example map".into(),
+                root_element: "example".into(),
+                schema_id: "schema-1".into(),
+                show_import_export_validation_errors: true,
+                auto_fit: true,
+                append: false,
+                preserve_sort_auto_filter_layout: true,
+                preserve_format: true,
+                data_binding: Some(XmlMapDataBinding {
+                    data_binding_name: Some("inert binding".into()),
+                    file_binding: Some(false),
+                    connection_id: Some(7),
+                    file_binding_name: None,
+                    load_mode: 1,
+                    payload_xml: Some(br#"<binding xmlns="urn:litchi:binding"/>"#.to_vec()),
+                }),
+            }],
+        }
+    }
+
+    fn workbook_package() -> OpcPackage {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
+        let workbook = BlobPart::new(
+            workbook_uri,
+            ct::SML_SHEET_MAIN.into(),
+            format!(
+                r#"<workbook xmlns="{}"><sheets/></workbook>"#,
+                std::str::from_utf8(NS).unwrap()
+            )
+            .into_bytes(),
+        );
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+        package.add_part(Box::new(workbook));
+        package
+    }
+
+    fn synthetic_package(
+        relationship_type: &str,
+        external: bool,
+        content_type: &str,
+        outbound: bool,
+    ) -> OpcPackage {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
+        let mut workbook = BlobPart::new(
+            workbook_uri.clone(),
+            ct::SML_SHEET_MAIN.into(),
+            format!(
+                r#"<workbook xmlns="{}"><sheets/></workbook>"#,
+                std::str::from_utf8(NS).unwrap()
+            )
+            .into_bytes(),
+        );
+        if external {
+            workbook.relate_to_ext("https://example.invalid/xmlMaps.xml", relationship_type);
+        } else {
+            workbook.relate_to("xmlMaps.xml", relationship_type);
+        }
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+        package.add_part(Box::new(workbook));
+        if !external {
+            let mut maps = BlobPart::new(
+                PackURI::new("/xl/xmlMaps.xml").unwrap(),
+                content_type.into(),
+                fixture_info().to_xml(false).unwrap(),
+            );
+            if outbound {
+                maps.relate_to("worksheets/sheet1.xml", rt::WORKSHEET);
+            }
+            package.add_part(Box::new(maps));
+        }
+        package
     }
     #[test]
     fn reads_poi_real_fixture_and_round_trips_strict() {
@@ -961,5 +1327,202 @@ mod tests {
         ));
         valid.schemas[0].payload_xml = Some(b"<?unsafe?><x/>".to_vec());
         assert!(valid.to_xml(false).is_err());
+    }
+
+    #[test]
+    fn stores_rewrites_and_removes_inert_xml_maps_parts() {
+        let mut package = workbook_package();
+        let value = fixture_info();
+
+        store_in_package(&mut package, &value, XmlMapConformance::Transitional).unwrap();
+        assert_eq!(load_from_package(&package).unwrap(), Some(value.clone()));
+        assert_eq!(
+            load_from_package_with_conformance(&package).unwrap(),
+            Some((value.clone(), XmlMapConformance::Transitional))
+        );
+
+        let workbook = package.main_document_part().unwrap();
+        let relationship = workbook
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == REL)
+            .unwrap();
+        let relationship_id = relationship.r_id().to_string();
+        let part_name = relationship.target_partname().unwrap();
+        assert_eq!(part_name, PackURI::new("/xl/xmlMaps.xml").unwrap());
+        assert!(
+            std::str::from_utf8(package.get_part(&part_name).unwrap().blob())
+                .unwrap()
+                .contains(std::str::from_utf8(NS).unwrap())
+        );
+
+        let mut replacement = value.clone();
+        replacement.maps[0].name = "Strict replacement".into();
+        store_in_package(&mut package, &replacement, XmlMapConformance::Strict).unwrap();
+        let workbook = package.main_document_part().unwrap();
+        let relationship = workbook
+            .rels()
+            .iter()
+            .find(|relationship| relationship.r_id() == relationship_id)
+            .unwrap();
+        assert_eq!(relationship.reltype(), STRICT_REL);
+        assert_eq!(relationship.target_partname().unwrap(), part_name);
+        assert!(
+            std::str::from_utf8(package.get_part(&part_name).unwrap().blob())
+                .unwrap()
+                .contains(std::str::from_utf8(STRICT_NS).unwrap())
+        );
+        assert_eq!(
+            load_from_package_with_conformance(&package).unwrap(),
+            Some((replacement, XmlMapConformance::Strict))
+        );
+
+        assert!(remove_from_package(&mut package).unwrap());
+        assert!(package.get_part(&part_name).is_err());
+        assert_eq!(load_from_package(&package).unwrap(), None);
+        assert!(!remove_from_package(&mut package).unwrap());
+    }
+
+    #[test]
+    fn preserves_unrelated_references_when_removing_xml_maps() {
+        let mut package = workbook_package();
+        let value = fixture_info();
+        store_in_package(&mut package, &value, XmlMapConformance::Transitional).unwrap();
+
+        let part_name = PackURI::new("/xl/xmlMaps.xml").unwrap();
+        let mut referring_part = BlobPart::new(
+            PackURI::new("/xl/retained-reference.xml").unwrap(),
+            ct::XML.into(),
+            b"<reference/>".to_vec(),
+        );
+        referring_part.relate_to("xmlMaps.xml", "urn:litchi:test:xml-maps-reference");
+        package.add_part(Box::new(referring_part));
+
+        assert!(remove_from_package(&mut package).unwrap());
+        assert!(package.get_part(&part_name).is_ok());
+        assert_eq!(load_from_package(&package).unwrap(), None);
+
+        store_in_package(&mut package, &value, XmlMapConformance::Transitional).unwrap();
+        let relationship = package
+            .main_document_part()
+            .unwrap()
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == REL)
+            .unwrap();
+        assert_eq!(
+            relationship.target_partname().unwrap(),
+            PackURI::new("/xl/xmlMaps1.xml").unwrap()
+        );
+    }
+
+    #[test]
+    fn writes_real_poi_xml_maps_package_without_resolving_schema_payloads() {
+        let mut package = OpcPackage::from_bytes(include_bytes!(
+            "../../../../3rdparty/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"
+        ))
+        .unwrap();
+        let (value, conformance) = load_from_package_with_conformance(&package)
+            .unwrap()
+            .unwrap();
+        store_in_package(&mut package, &value, conformance).unwrap();
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("xml-maps.xlsx");
+        package.save(&path).unwrap();
+        let reopened = OpcPackage::open(&path).unwrap();
+        assert_eq!(
+            load_from_package_with_conformance(&reopened).unwrap(),
+            Some((value, conformance))
+        );
+    }
+
+    #[test]
+    fn workbook_xml_maps_mutators_and_materialization_preserve_metadata() {
+        let mut workbook = crate::xlsx::Workbook::create().unwrap();
+        let value = fixture_info();
+        workbook
+            .set_xml_maps(&value, XmlMapConformance::Strict)
+            .unwrap();
+        assert_eq!(
+            workbook.xml_maps().unwrap(),
+            Some((value.clone(), XmlMapConformance::Strict))
+        );
+
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "materialized");
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("materialized-xml-maps.xlsx");
+        workbook.save(&path).unwrap();
+        let reopened = crate::xlsx::Workbook::open(&path).unwrap();
+        assert_eq!(
+            reopened.xml_maps().unwrap(),
+            Some((value.clone(), XmlMapConformance::Strict))
+        );
+
+        let mut reopened = reopened;
+        assert!(reopened.remove_xml_maps().unwrap());
+        assert_eq!(reopened.xml_maps().unwrap(), None);
+        assert!(!reopened.remove_xml_maps().unwrap());
+    }
+
+    #[test]
+    fn package_xml_maps_mutators_reject_invalid_existing_graphs_before_replacement() {
+        let value = fixture_info();
+        let mut wrong_content_type = synthetic_package(REL, false, ct::SML_STYLES, false);
+        let part_name = PackURI::new("/xl/xmlMaps.xml").unwrap();
+        let original = wrong_content_type
+            .get_part(&part_name)
+            .unwrap()
+            .blob()
+            .to_vec();
+        assert!(
+            store_in_package(
+                &mut wrong_content_type,
+                &value,
+                XmlMapConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert_eq!(
+            wrong_content_type.get_part(&part_name).unwrap().blob(),
+            original
+        );
+        assert!(remove_from_package(&mut wrong_content_type).is_err());
+
+        let mut duplicate = synthetic_package(REL, false, CONTENT_TYPE, false);
+        duplicate
+            .get_part_mut(&PackURI::new("/xl/workbook.xml").unwrap())
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                REL.into(),
+                "xmlMaps.xml".into(),
+                "rIdDuplicateXmlMaps".into(),
+                false,
+            );
+        assert!(store_in_package(&mut duplicate, &value, XmlMapConformance::Transitional).is_err());
+        assert!(remove_from_package(&mut duplicate).is_err());
+
+        let mut external = synthetic_package(REL, true, CONTENT_TYPE, false);
+        assert!(store_in_package(&mut external, &value, XmlMapConformance::Transitional).is_err());
+        assert!(remove_from_package(&mut external).is_err());
+
+        let mut outbound = synthetic_package(REL, false, CONTENT_TYPE, true);
+        assert!(store_in_package(&mut outbound, &value, XmlMapConformance::Transitional).is_err());
+        assert!(remove_from_package(&mut outbound).is_err());
+
+        let mut root_relationship = workbook_package();
+        root_relationship.relate_to("xl/xmlMaps.xml", REL);
+        assert!(
+            store_in_package(
+                &mut root_relationship,
+                &value,
+                XmlMapConformance::Transitional,
+            )
+            .is_err()
+        );
     }
 }
