@@ -455,6 +455,47 @@ pub(super) fn remap_numbers_shape_wire(data: &[u8], remap: &HashMap<u64, u64>) -
     Ok(data)
 }
 
+fn remap_numbers_drawable_archive(drawable: &mut tsd::DrawableArchive, remap: &HashMap<u64, u64>) {
+    remap_numbers_reference(&mut drawable.parent, remap);
+    remap_numbers_reference(&mut drawable.comment, remap);
+    for reference in &mut drawable.pencil_annotations {
+        if let Some(identifier) = remap.get(&reference.identifier) {
+            reference.identifier = *identifier;
+        }
+    }
+    remap_numbers_reference(&mut drawable.title, remap);
+    remap_numbers_reference(&mut drawable.caption, remap);
+}
+
+pub(super) fn remap_numbers_image_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
+    const REFERENCE_PATHS: &[&[u32]] = &[
+        &[1, 2],
+        &[1, 6],
+        &[1, 9],
+        &[1, 10],
+        &[1, 11],
+        &[2],
+        &[3],
+        &[5],
+        &[6],
+        &[8],
+    ];
+    let mut expected = tsd::ImageArchive::decode(data)?;
+    remap_numbers_drawable_archive(&mut expected.super_, remap);
+    remap_numbers_reference(&mut expected.database_data, remap);
+    remap_numbers_reference(&mut expected.style, remap);
+    remap_numbers_reference(&mut expected.mask, remap);
+    remap_numbers_reference(&mut expected.database_thumbnail_data, remap);
+    remap_numbers_reference(&mut expected.database_original_data, remap);
+    let data = remap_numbers_reference_paths(data, REFERENCE_PATHS, remap)?;
+    if tsd::ImageArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers ImageArchive wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn remap_numbers_storage_wire(
     data: &[u8],
     remap: &HashMap<u64, u64>,
@@ -497,6 +538,7 @@ pub(super) fn clone_numbers_drawable_graph_object(
     {
         let data = match message.type_ {
             SHAPE_INFO_MESSAGE_TYPE => remap_numbers_shape_wire(&message.data, remap)?,
+            IMAGE_MESSAGE_TYPE => remap_numbers_image_wire(&message.data, remap)?,
             2_001 | 2_022 => remap_numbers_storage_wire(&message.data, remap)?,
             STANDIN_CAPTION_MESSAGE_TYPE => message.data.clone(),
             _ => {

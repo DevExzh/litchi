@@ -1,10 +1,12 @@
 //! Standalone image-object CRUD for Numbers sheets.
 
+use std::collections::HashMap;
+
 use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
 
 mod graph;
 
@@ -156,6 +158,124 @@ impl NumbersEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Duplicate one ordinary sheet image using Numbers' native placement.
+    ///
+    /// The image and title/caption stand-ins receive fresh identifiers and
+    /// UUIDs while retaining the source's style and unknown protobuf fields.
+    /// The clone is added to the same sheet and reuses the embedded image
+    /// asset, so replacing either image's data updates both images.
+    pub fn duplicate_sheet_image(
+        &mut self,
+        sheet_id: u64,
+        source_drawable_object_id: u64,
+    ) -> Result<NumbersSheetImageInfo> {
+        let source = image_graph(self, sheet_id, source_drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Numbers image graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Numbers image object {identifier} is missing"))
+                })?;
+                clone_numbers_drawable_graph_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat("Numbers image clone has no drawable identifier".to_owned())
+        })?;
+        let geometry = offset_drawable_geometry(source.info.geometry, DRAWABLE_DUPLICATE_OFFSET)?;
+        set_image_geometry(&mut staged, &source.archive_name, new_drawable_id, geometry)?;
+        patch_numbers_sheet_drawable_reference(
+            &mut staged,
+            &source.archive_name,
+            source.sheet_id,
+            None,
+            Some(new_drawable_id),
+        )?;
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Numbers image graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers image clone has no UUID identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
+        for &(data_identifier, object_identifier) in &source.data_references {
+            let new_object_identifier =
+                remap.get(&object_identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers image clone has no data-reference object for {object_identifier}"
+                    ))
+                })?;
+            add_component_data_reference(
+                &mut staged,
+                source.component_id,
+                data_identifier,
+                new_object_identifier,
+            )?;
+        }
+
+        let verified = Self::from_package(staged)?;
+        let created = verified
+            .sheet_images(sheet_id)?
+            .into_iter()
+            .find(|image| image.drawable_object_id == new_drawable_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers image duplication failed validation".to_owned())
+            })?;
+        let created_graph = image_graph(&verified, sheet_id, new_drawable_id)?;
+        let expected_data_references = source
+            .data_references
+            .iter()
+            .map(|&(data_identifier, object_identifier)| {
+                let new_object_identifier = remap.get(&object_identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers image clone has no validated data-reference object for {object_identifier}"
+                    ))
+                })?;
+                Ok((data_identifier, new_object_identifier))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if created.sheet_id != source.info.sheet_id
+            || created.image_data_identifier != source.info.image_data_identifier
+            || created.thumbnail_data_identifier != source.info.thumbnail_data_identifier
+            || created.geometry != geometry
+            || created.original_size != source.info.original_size
+            || created.natural_size != source.info.natural_size
+            || created_graph.object_ids.len() != source.object_ids.len()
+            || created_graph.data_references != expected_data_references
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers image duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created)
     }
 
     /// Replace the primary bytes referenced by one ordinary sheet image.
@@ -363,12 +483,125 @@ mod tests {
     }
 
     #[test]
+    fn scratch_spreadsheet_supports_native_image_duplication() {
+        let original = fixture("test-data/images/png/lena.png");
+        let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Media")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_image(sheet_id, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+            .unwrap();
+
+        let duplicate = editor
+            .duplicate_sheet_image(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
+        let source_graph = image_graph(&editor, sheet_id, source.drawable_object_id).unwrap();
+        let duplicate_graph = image_graph(&editor, sheet_id, duplicate.drawable_object_id).unwrap();
+        assert!(
+            source_graph
+                .object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.object_ids.contains(identifier))
+        );
+        assert!(
+            source_graph
+                .uuid_object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.uuid_object_ids.contains(identifier))
+        );
+        assert_eq!(duplicate.sheet_id, source.sheet_id);
+        assert_eq!(
+            duplicate.image_data_identifier,
+            source.image_data_identifier
+        );
+        assert_eq!(
+            duplicate.thumbnail_data_identifier,
+            source.thumbnail_data_identifier
+        );
+        assert_eq!(
+            duplicate.geometry.position,
+            source.geometry.position.map(|position| DrawablePoint {
+                x: position.x + DRAWABLE_DUPLICATE_OFFSET,
+                y: position.y + DRAWABLE_DUPLICATE_OFFSET,
+            })
+        );
+        assert_eq!(duplicate.geometry.size, source.geometry.size);
+        assert_eq!(duplicate.geometry.flags, source.geometry.flags);
+        assert_eq!(duplicate.geometry.angle, source.geometry.angle);
+
+        let moved_duplicate = DrawableGeometry {
+            position: Some(DrawablePoint { x: 640.0, y: 360.0 }),
+            ..duplicate.geometry
+        };
+        editor
+            .set_sheet_image_geometry(sheet_id, duplicate.drawable_object_id, moved_duplicate)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_image_geometry(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            source.geometry
+        );
+        assert_eq!(
+            editor
+                .sheet_image_geometry(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            moved_duplicate
+        );
+
+        assert_eq!(
+            editor
+                .replace_sheet_image_data(sheet_id, duplicate.drawable_object_id, &replacement)
+                .unwrap(),
+            original
+        );
+        assert_eq!(
+            editor.extract_media(source.image_data_identifier).unwrap(),
+            replacement
+        );
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.sheet_images(sheet_id).unwrap().len(), 2);
+        assert_eq!(
+            reopened
+                .sheet_images(sheet_id)
+                .unwrap()
+                .into_iter()
+                .find(|image| image.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .geometry,
+            moved_duplicate
+        );
+
+        let removed_source = editor
+            .remove_sheet_image(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert!(removed_source.removed_data_identifiers.is_empty());
+        assert_eq!(editor.sheet_images(sheet_id).unwrap().len(), 1);
+        let removed_duplicate = editor
+            .remove_sheet_image(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            removed_duplicate.removed_data_identifiers,
+            [source.image_data_identifier]
+        );
+        assert!(editor.sheet_images(sheet_id).unwrap().is_empty());
+        assert!(editor.media_assets().unwrap().is_empty());
+        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    }
+
+    #[test]
     fn invalid_image_creation_and_geometry_are_transactional() {
         let original = fixture("test-data/images/png/lena.png");
         let mut editor = NumbersEditor::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
 
+        assert!(editor.duplicate_sheet_image(sheet_id, 999).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
         assert!(
             editor
                 .add_sheet_image(

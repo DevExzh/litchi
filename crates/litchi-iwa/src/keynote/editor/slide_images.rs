@@ -1,10 +1,12 @@
 //! Standalone image-object CRUD for Keynote slides.
 
+use std::collections::HashMap;
+
 use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
 
 mod graph;
 
@@ -164,6 +166,125 @@ impl KeynoteEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Duplicate one ordinary file-backed slide image using Keynote's native
+    /// shared-asset behavior.
+    ///
+    /// The image and its private title/caption graph receive fresh identifiers
+    /// and UUIDs while retaining the source's style and unknown protobuf
+    /// fields. The clone is offset on the same slide, but its embedded image
+    /// asset remains shared, so replacing either image's data updates both.
+    pub fn duplicate_slide_image(
+        &mut self,
+        slide_index: usize,
+        source_drawable_object_id: u64,
+    ) -> Result<KeynoteSlideImageInfo> {
+        let source = require_file_image(self, slide_index, source_drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Keynote image graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Keynote image object {identifier} is missing"))
+                })?;
+                clone_slide_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat("Keynote image clone has no drawable identifier".to_owned())
+        })?;
+        let geometry = offset_drawable_geometry(source.info.geometry, DRAWABLE_DUPLICATE_OFFSET)?;
+        set_image_geometry(&mut staged, &source.archive_name, new_drawable_id, geometry)?;
+        patch_slide_drawable_references(
+            &mut staged,
+            &source.archive_name,
+            source.slide_id,
+            None,
+            Some(new_drawable_id),
+        )?;
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Keynote image graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote image clone has no UUID identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
+        for &(data_identifier, object_identifier) in &source.data_references {
+            let new_object_identifier =
+                remap.get(&object_identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote image clone has no data-reference object for {object_identifier}"
+                    ))
+                })?;
+            add_component_data_reference(
+                &mut staged,
+                source.component_id,
+                data_identifier,
+                new_object_identifier,
+            )?;
+        }
+
+        let verified = Self::from_package(staged)?;
+        let created = verified
+            .slide_images(slide_index)?
+            .into_iter()
+            .find(|image| image.drawable_object_id == new_drawable_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Keynote image duplication failed validation".to_owned())
+            })?;
+        let created_graph = require_file_image(&verified, slide_index, new_drawable_id)?;
+        let expected_data_references = source
+            .data_references
+            .iter()
+            .map(|&(data_identifier, object_identifier)| {
+                let new_object_identifier = remap.get(&object_identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote image clone has no validated data-reference object for {object_identifier}"
+                    ))
+                })?;
+                Ok((data_identifier, new_object_identifier))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if created.kind != KeynoteSlideImageKind::File
+            || created.image_data_identifier != source.info.image_data_identifier
+            || created.thumbnail_data_identifier != source.info.thumbnail_data_identifier
+            || created.geometry != geometry
+            || created.original_size != source.info.original_size
+            || created.natural_size != source.info.natural_size
+            || created_graph.object_ids.len() != source.object_ids.len()
+            || created_graph.data_references != expected_data_references
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote image duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created)
     }
 
     /// Replace the bytes referenced by one ordinary slide image.
@@ -350,11 +471,125 @@ mod tests {
     }
 
     #[test]
+    fn scratch_presentation_supports_native_image_duplication() {
+        let original = fixture("test-data/images/png/lena.png");
+        let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Image clone")
+            .subtitle("Shared native media")
+            .build()
+            .unwrap();
+        let source = editor
+            .add_slide_image(0, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+            .unwrap();
+
+        let duplicate = editor
+            .duplicate_slide_image(0, source.drawable_object_id)
+            .unwrap();
+        assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
+        let source_graph = require_file_image(&editor, 0, source.drawable_object_id).unwrap();
+        let duplicate_graph = require_file_image(&editor, 0, duplicate.drawable_object_id).unwrap();
+        assert!(
+            source_graph
+                .object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.object_ids.contains(identifier))
+        );
+        assert!(
+            source_graph
+                .uuid_object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.uuid_object_ids.contains(identifier))
+        );
+        assert_eq!(duplicate.kind, KeynoteSlideImageKind::File);
+        assert_eq!(duplicate.slide_index, source.slide_index);
+        assert_eq!(
+            duplicate.image_data_identifier,
+            source.image_data_identifier
+        );
+        assert_eq!(
+            duplicate.thumbnail_data_identifier,
+            source.thumbnail_data_identifier
+        );
+        assert_eq!(
+            duplicate.geometry.position,
+            source.geometry.position.map(|position| DrawablePoint {
+                x: position.x + DRAWABLE_DUPLICATE_OFFSET,
+                y: position.y + DRAWABLE_DUPLICATE_OFFSET,
+            })
+        );
+        assert_eq!(duplicate.geometry.size, source.geometry.size);
+        assert_eq!(duplicate.geometry.flags, source.geometry.flags);
+        assert_eq!(duplicate.geometry.angle, source.geometry.angle);
+
+        let moved_duplicate = DrawableGeometry {
+            position: Some(DrawablePoint { x: 720.0, y: 420.0 }),
+            ..duplicate.geometry
+        };
+        editor
+            .set_slide_image_geometry(0, duplicate.drawable_object_id, moved_duplicate)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_image_geometry(0, source.drawable_object_id)
+                .unwrap(),
+            source.geometry
+        );
+        assert_eq!(
+            editor
+                .slide_image_geometry(0, duplicate.drawable_object_id)
+                .unwrap(),
+            moved_duplicate
+        );
+
+        assert_eq!(
+            editor
+                .replace_slide_image_data(0, duplicate.drawable_object_id, &replacement)
+                .unwrap(),
+            original
+        );
+        assert_eq!(
+            editor.extract_media(source.image_data_identifier).unwrap(),
+            replacement
+        );
+        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.slide_images(0).unwrap().len(), 2);
+        assert_eq!(
+            reopened
+                .slide_images(0)
+                .unwrap()
+                .into_iter()
+                .find(|image| image.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .geometry,
+            moved_duplicate
+        );
+
+        let removed_source = editor
+            .remove_slide_image(0, source.drawable_object_id)
+            .unwrap();
+        assert!(removed_source.removed_data_identifiers.is_empty());
+        assert_eq!(editor.slide_images(0).unwrap().len(), 1);
+        let removed_duplicate = editor
+            .remove_slide_image(0, duplicate.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            removed_duplicate.removed_data_identifiers,
+            [source.image_data_identifier]
+        );
+        assert!(editor.slide_images(0).unwrap().is_empty());
+        assert!(editor.media_assets().unwrap().is_empty());
+        KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    }
+
+    #[test]
     fn invalid_image_creation_and_geometry_are_transactional() {
         let original = fixture("test-data/images/png/lena.png");
         let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();
 
+        assert!(editor.duplicate_slide_image(0, 999).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
         assert!(
             editor
                 .add_slide_image(

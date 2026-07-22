@@ -58,6 +58,7 @@ const GUIDE_STORAGE_MESSAGE_TYPE: u32 = 3047;
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 const PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2011;
+const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
@@ -2402,6 +2403,45 @@ fn remap_pages_shape_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<
     Ok(data)
 }
 
+fn remap_pages_drawable_archive(drawable: &mut tsd::DrawableArchive, remap: &HashMap<u64, u64>) {
+    remap_optional_pages_reference(&mut drawable.parent, remap);
+    remap_optional_pages_reference(&mut drawable.comment, remap);
+    for reference in &mut drawable.pencil_annotations {
+        remap_pages_reference(reference, remap);
+    }
+    remap_optional_pages_reference(&mut drawable.title, remap);
+    remap_optional_pages_reference(&mut drawable.caption, remap);
+}
+
+fn remap_pages_image_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
+    const REFERENCE_PATHS: &[&[u32]] = &[
+        &[1, 2],
+        &[1, 6],
+        &[1, 9],
+        &[1, 10],
+        &[1, 11],
+        &[2],
+        &[3],
+        &[5],
+        &[6],
+        &[8],
+    ];
+    let mut expected = tsd::ImageArchive::decode(data)?;
+    remap_pages_drawable_archive(&mut expected.super_, remap);
+    remap_optional_pages_reference(&mut expected.database_data, remap);
+    remap_optional_pages_reference(&mut expected.style, remap);
+    remap_optional_pages_reference(&mut expected.mask, remap);
+    remap_optional_pages_reference(&mut expected.database_thumbnail_data, remap);
+    remap_optional_pages_reference(&mut expected.database_original_data, remap);
+    let data = remap_pages_reference_paths(data, REFERENCE_PATHS, remap)?;
+    if tsd::ImageArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Pages ImageArchive wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 fn remap_pages_storage_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const OBJECT_TABLE_FIELDS: &[u32] = &[5, 7, 8, 9, 11, 12, 15, 16, 17, 18, 21, 22, 23, 27, 28];
     let mut expected = StorageArchive::decode(data)?;
@@ -2453,6 +2493,7 @@ fn clone_pages_drawable_graph_object(
     {
         let data = match message.type_ {
             SHAPE_INFO_MESSAGE_TYPE => remap_pages_shape_wire(&message.data, remap)?,
+            IMAGE_MESSAGE_TYPE => remap_pages_image_wire(&message.data, remap)?,
             2001 | 2022 => remap_pages_storage_wire(&message.data, remap)?,
             DRAWABLE_ATTACHMENT_MESSAGE_TYPE => remap_pages_attachment_wire(&message.data, remap)?,
             STANDIN_CAPTION_MESSAGE_TYPE => message.data.clone(),
@@ -2615,6 +2656,19 @@ fn offset_pages_body_drawable_clone(
         Ok(())
     })?;
 
+    offset_pages_body_drawable_attachment_clone(package, attachment_id, offset)
+}
+
+pub(super) fn offset_pages_body_drawable_attachment_clone(
+    package: &mut IWorkPackage,
+    attachment_id: u64,
+    offset: f32,
+) -> Result<()> {
+    if !offset.is_finite() {
+        return Err(Error::ParseError(
+            "Pages drawable duplicate offset must be finite".to_owned(),
+        ));
+    }
     let attachment_archive = find_object_archive(package, attachment_id)?;
     package.update_archive(&attachment_archive, |archive| {
         let object = archive.object_mut(attachment_id).ok_or_else(|| {

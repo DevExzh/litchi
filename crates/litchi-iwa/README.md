@@ -248,16 +248,23 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 let body = "Quarterly report";
 let image = fs::read("chart.png")?;
 let mut pages = PagesEditor::create_with_text(body)?;
-pages.add_body_image(
+let source = pages.add_body_image(
     body.encode_utf16().count(),
     "chart.png",
     &image,
     DrawablePoint { x: 96.0, y: 144.0 },
     DrawableSize { width: 300.0, height: 225.0 },
 )?;
+let duplicate_anchor = pages.body_text()?.encode_utf16().count();
+let duplicate = pages.duplicate_body_image(source.drawable_object_id, duplicate_anchor)?;
+assert_eq!(duplicate.image_data_identifier, source.image_data_identifier);
 pages.save("created-with-image.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+`duplicate_body_image` retains the native Pages relationship: the duplicated
+drawable has independent geometry and body anchoring, but both images share one
+embedded asset. Updating either image's bytes therefore updates both.
 
 File-backed movies are also body-anchored and source-built. Their video and
 poster assets, playback bounds, drawable graph, stand-ins, body attachment,
@@ -414,16 +421,22 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 let image = fs::read("chart.png")?;
 let mut numbers = NumbersDocumentBuilder::new().build()?;
 let sheet_id = numbers.sheets()?[0].object_id;
-numbers.add_sheet_image(
+let source = numbers.add_sheet_image(
     sheet_id,
     "chart.png",
     &image,
     DrawablePoint { x: 420.0, y: 180.0 },
     DrawableSize { width: 320.0, height: 240.0 },
 )?;
+let duplicate = numbers.duplicate_sheet_image(sheet_id, source.drawable_object_id)?;
+assert_eq!(duplicate.image_data_identifier, source.image_data_identifier);
 numbers.save("created-with-image.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+`duplicate_sheet_image` follows Numbers' Duplicate command: it creates an
+independently positioned drawable while retaining a shared embedded image asset.
+Replacing the data through either image updates the pair.
 
 File-backed movies are likewise sheet-owned and source-built. Their video and
 poster assets, drawable graph, playback bounds, media style, stand-ins, UUIDs,
@@ -620,16 +633,22 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 let image = fs::read("chart.png")?;
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
-keynote.add_slide_image(
+let source = keynote.add_slide_image(
     0,
     "chart.png",
     &image,
     DrawablePoint { x: 704.0, y: 284.0 },
     DrawableSize { width: 512.0, height: 512.0 },
 )?;
+let duplicate = keynote.duplicate_slide_image(0, source.drawable_object_id)?;
+assert_eq!(duplicate.image_data_identifier, source.image_data_identifier);
 keynote.save("created-with-image.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+`duplicate_slide_image` mirrors Keynote: the duplicate is independently
+positioned on the same slide, while its media data stays shared with the source.
+Replacing either image's bytes updates both images.
 
 File-backed movies use the same source-built path. The video, poster, media
 style, stand-ins, component registrations, and Keynote's automatic playback

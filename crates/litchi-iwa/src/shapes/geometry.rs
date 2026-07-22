@@ -67,6 +67,35 @@ impl DrawableGeometry {
     }
 }
 
+/// Return a copy of geometry moved by the same finite amount on both axes.
+pub(crate) fn offset_drawable_geometry(
+    geometry: DrawableGeometry,
+    offset: f32,
+) -> Result<DrawableGeometry> {
+    if !offset.is_finite() {
+        return Err(Error::ParseError(
+            "iWork drawable offset must be finite".to_owned(),
+        ));
+    }
+    let position = geometry.position.ok_or_else(|| {
+        Error::InvalidFormat("iWork drawable geometry has no position to offset".to_owned())
+    })?;
+    let position = DrawablePoint {
+        x: position.x + offset,
+        y: position.y + offset,
+    };
+    if !position.x.is_finite() || !position.y.is_finite() {
+        return Err(Error::ParseError(
+            "iWork drawable offset overflows its position".to_owned(),
+        ));
+    }
+    DrawableGeometry {
+        position: Some(position),
+        ..geometry
+    }
+    .validate()
+}
+
 pub(crate) fn shape_geometry(
     package: &IWorkPackage,
     archive_name: &str,
@@ -253,6 +282,50 @@ fn patch_size(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn geometry_offset_requires_a_finite_position_and_offset() {
+        let geometry = DrawableGeometry {
+            position: Some(DrawablePoint { x: 12.0, y: 24.0 }),
+            size: Some(DrawableSize {
+                width: 100.0,
+                height: 80.0,
+            }),
+            flags: Some(3),
+            angle: Some(15.0),
+        };
+        assert_eq!(
+            offset_drawable_geometry(geometry, 10.0).unwrap(),
+            DrawableGeometry {
+                position: Some(DrawablePoint { x: 22.0, y: 34.0 }),
+                ..geometry
+            }
+        );
+        assert!(offset_drawable_geometry(geometry, f32::NAN).is_err());
+        assert!(
+            offset_drawable_geometry(
+                DrawableGeometry {
+                    position: None,
+                    ..geometry
+                },
+                10.0,
+            )
+            .is_err()
+        );
+        assert!(
+            offset_drawable_geometry(
+                DrawableGeometry {
+                    position: Some(DrawablePoint {
+                        x: f32::MAX,
+                        y: f32::MAX,
+                    }),
+                    ..geometry
+                },
+                f32::MAX,
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn geometry_patch_preserves_nested_unknowns_and_restores_exactly() {

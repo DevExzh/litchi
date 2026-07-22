@@ -84,6 +84,7 @@ impl ImageObjectIds {
 
 pub(super) struct BodyImageGraph {
     pub(super) archive_name: String,
+    pub(super) attachment_id: u64,
     pub(super) info: PagesImageInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
@@ -350,6 +351,7 @@ pub(super) fn body_image_graph(
     }
     Ok(BodyImageGraph {
         archive_name,
+        attachment_id: *attachment_id,
         info,
         object_ids,
         uuid_object_ids,
