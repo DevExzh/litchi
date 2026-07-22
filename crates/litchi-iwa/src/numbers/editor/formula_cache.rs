@@ -494,20 +494,65 @@ pub(super) fn refresh_formula_caches_after_cell_writes(
     let Some(graph) = DependencyGraph::from_package(package)? else {
         return Ok(0);
     };
-    let Some(&owner_id) = graph.table_to_owner.get(&table_id) else {
+    let seeds = formula_hosts_for_coordinates(&graph, table_id, coordinates)?;
+    let impacted = downstream_formula_hosts(&graph, &seeds, false);
+    refresh_formula_hosts(package, &graph, impacted)
+}
+
+/// Recalculate specific formula hosts and every formula that depends on them.
+///
+/// Structural edits use this when a formula's AST is rewritten even though no
+/// ordinary cell value was written. Starting with the hosts themselves keeps
+/// their native cached values coherent before iWork opens the document.
+pub(super) fn refresh_formula_caches_at_hosts(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    coordinates: &[(usize, usize)],
+) -> Result<usize> {
+    if coordinates.is_empty() {
+        return Ok(0);
+    }
+    let Some(graph) = DependencyGraph::from_package(package)? else {
         return Ok(0);
     };
-    let mut impacted = HashSet::new();
-    let mut queue = VecDeque::with_capacity(coordinates.len());
-    for &(row, column) in coordinates {
-        queue.push_back(CellKey {
-            owner_id,
-            row: u32::try_from(row)
-                .map_err(|_| Error::ParseError("Numbers row exceeds u32".to_owned()))?,
-            column: u32::try_from(column)
-                .map_err(|_| Error::ParseError("Numbers column exceeds u32".to_owned()))?,
-        });
-    }
+    let seeds = formula_hosts_for_coordinates(&graph, table_id, coordinates)?;
+    let impacted = downstream_formula_hosts(&graph, &seeds, true);
+    refresh_formula_hosts(package, &graph, impacted)
+}
+
+fn formula_hosts_for_coordinates(
+    graph: &DependencyGraph,
+    table_id: u64,
+    coordinates: &[(usize, usize)],
+) -> Result<Vec<CellKey>> {
+    let Some(&owner_id) = graph.table_to_owner.get(&table_id) else {
+        return Ok(Vec::new());
+    };
+    coordinates
+        .iter()
+        .map(|&(row, column)| {
+            Ok(CellKey {
+                owner_id,
+                row: u32::try_from(row)
+                    .map_err(|_| Error::ParseError("Numbers row exceeds u32".to_owned()))?,
+                column: u32::try_from(column)
+                    .map_err(|_| Error::ParseError("Numbers column exceeds u32".to_owned()))?,
+            })
+        })
+        .collect()
+}
+
+fn downstream_formula_hosts(
+    graph: &DependencyGraph,
+    seeds: &[CellKey],
+    include_seeds: bool,
+) -> HashSet<CellKey> {
+    let mut impacted: HashSet<CellKey> = if include_seeds {
+        seeds.iter().copied().collect()
+    } else {
+        HashSet::new()
+    };
+    let mut queue = seeds.iter().copied().collect::<VecDeque<_>>();
     while let Some(precedent) = queue.pop_front() {
         for dependent in graph.dependents_of(precedent) {
             if impacted.insert(dependent) {
@@ -515,6 +560,14 @@ pub(super) fn refresh_formula_caches_after_cell_writes(
             }
         }
     }
+    impacted
+}
+
+fn refresh_formula_hosts(
+    package: &mut IWorkPackage,
+    graph: &DependencyGraph,
+    impacted: HashSet<CellKey>,
+) -> Result<usize> {
     if impacted.is_empty() {
         return Ok(0);
     }
@@ -563,7 +616,7 @@ pub(super) fn refresh_formula_caches_after_cell_writes(
 
     let mut refreshed = HashMap::with_capacity(ordered.len());
     for &host in &ordered {
-        let value = evaluate_formula(package, &graph, &refreshed, host)?;
+        let value = evaluate_formula(package, graph, &refreshed, host)?;
         refreshed.insert(host, value);
     }
     for host in &ordered {

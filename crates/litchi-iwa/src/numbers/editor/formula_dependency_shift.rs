@@ -1,6 +1,7 @@
 //! Formula dependency coordinate shifts for inserted and deleted table axes.
 
 use super::*;
+use std::collections::BTreeSet;
 
 mod ast;
 mod wire;
@@ -113,6 +114,41 @@ impl FormulaHostRetentions {
         }
     }
 
+    /// Return the adjustment to a relative cross-table reference held by a
+    /// formula host as its table axis changes.
+    ///
+    /// An ordinary formula moves with its host, so its relative cross-table
+    /// coordinates compensate for that host movement and continue to point at
+    /// the same external cell. A merged anchor retained through deletion is
+    /// different: native iWork first relocates it one cell forward, then
+    /// compacts the deleted band. Its relative external coordinates therefore
+    /// advance by one even though the final host coordinate is unchanged.
+    fn cross_table_relative_offset(
+        &self,
+        row: u32,
+        column: u32,
+        axis: DependencyAxis,
+        position: u32,
+        mutation: DependencyMutation,
+        what: &str,
+    ) -> Result<i64> {
+        if self.contains(row, column) {
+            return match mutation {
+                DependencyMutation::Delete => Ok(1),
+                DependencyMutation::Insert => Err(Error::InvalidFormat(
+                    "An iWork formula host cannot be retained during axis insertion".to_owned(),
+                )),
+            };
+        }
+        let (shifted_row, shifted_column) =
+            self.shifted_host(row, column, axis, position, mutation, what)?;
+        let (host, shifted_host) = match axis {
+            DependencyAxis::Column => (column, shifted_column),
+            DependencyAxis::Row => (row, shifted_row),
+        };
+        Ok(i64::from(host) - i64::from(shifted_host))
+    }
+
     fn is_empty(&self) -> bool {
         self.hosts.is_empty()
     }
@@ -148,6 +184,7 @@ enum DependencyMutation {
 #[derive(Debug, Default)]
 struct FormulaDependencyAdjustments {
     local_precedents: BTreeMap<(u32, u32), LocalPrecedentAdjustments>,
+    external_precedents: BTreeMap<(u32, u32), ExternalPrecedentAdjustments>,
 }
 
 #[derive(Debug, Default)]
@@ -167,6 +204,27 @@ impl LocalPrecedentAdjustments {
     fn is_empty(&self) -> bool {
         self.insert.is_empty() && self.remove.is_empty()
     }
+}
+
+/// Exact direct cross-table precedents before and after an AST rewrite.
+///
+/// The CalculationEngine stores these separately from the formula AST. A
+/// retained merged anchor can intentionally rebase a relative external
+/// reference, so its edge list must follow the rewritten AST rather than the
+/// physical source-table compaction alone.
+#[derive(Debug)]
+struct ExternalPrecedentAdjustments {
+    previous: BTreeSet<(u32, u32, u32)>,
+    current: BTreeSet<(u32, u32, u32)>,
+}
+
+/// Calculation-engine identity and bounds for one table addressable from a
+/// cross-table formula AST.
+#[derive(Clone, Copy, Debug)]
+struct ExternalFormulaOwner {
+    internal_owner_id: u32,
+    rows: u32,
+    columns: u32,
 }
 
 impl DependencyMutation {
@@ -469,7 +527,34 @@ fn mutate_formula_dependencies(
             },
         )?;
         Ok(())
-    })
+    })?;
+    if adjustments.external_precedents.is_empty() {
+        return Ok(());
+    }
+    let table_id = attached_table_descriptors(package)?
+        .into_iter()
+        .find(|table| table.table_info_id == table_info_id)
+        .map(|table| table.object_id)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork table info {table_info_id} has no attached table model"
+            ))
+        })?;
+    let hosts = adjustments
+        .external_precedents
+        .keys()
+        .map(|&(row, column)| {
+            Ok((
+                usize::try_from(row)
+                    .map_err(|_| Error::ParseError("iWork formula row exceeds usize".to_owned()))?,
+                usize::try_from(column).map_err(|_| {
+                    Error::ParseError("iWork formula column exceeds usize".to_owned())
+                })?,
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    formula_cache::refresh_formula_caches_at_hosts(package, table_id, &hosts)?;
+    Ok(())
 }
 
 fn range_dependency_hosts(
@@ -697,23 +782,15 @@ fn mutate_uuid_references(
     let Some(references) = references else {
         return Ok(());
     };
-    if !retained_hosts.is_empty()
-        && (!references.table_refs.is_empty() || !references.table_uuid_refs.is_empty())
-    {
-        return Err(Error::ParseError(
-            "Cannot yet relocate a merged iWork formula anchor with UUID-reference dependencies"
-                .to_owned(),
-        ));
-    }
     for reference in &mut references.table_refs {
         if let Some(coordinates) = &mut reference.coord_set {
-            mutate_cell_coord_set(coordinates, axis, position, mutation)?;
+            mutate_cell_coord_set(coordinates, axis, position, mutation, retained_hosts)?;
         }
     }
     for table in &mut references.table_uuid_refs {
         for reference in &mut table.uuid_refs {
             if let Some(coordinates) = &mut reference.coord_set {
-                mutate_cell_coord_set(coordinates, axis, position, mutation)?;
+                mutate_cell_coord_set(coordinates, axis, position, mutation, retained_hosts)?;
             }
         }
     }
@@ -725,11 +802,21 @@ fn mutate_cell_coord_set(
     axis: DependencyAxis,
     position: u32,
     mutation: DependencyMutation,
+    retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
     for column in &mut coordinates.column_entries {
         if axis == DependencyAxis::Column {
-            column.column =
-                mutation.coordinate(column.column, position, "UUID-reference host column")?;
+            if mutation == DependencyMutation::Delete && column.column == position {
+                if !row_set_is_fully_retained(&column.row_set, column.column, retained_hosts)? {
+                    return Err(Error::ParseError(
+                        "Cannot delete an iWork UUID-reference host column containing formulas that are not retained by a merged cell"
+                            .to_owned(),
+                    ));
+                }
+            } else {
+                column.column =
+                    mutation.coordinate(column.column, position, "UUID-reference host column")?;
+            }
         } else {
             for entry in &mut column.row_set.entries {
                 let begin = u32::try_from(entry.range_begin).map_err(|_| {
@@ -742,11 +829,22 @@ fn mutate_cell_coord_set(
                     .map_err(|_| {
                         Error::InvalidFormat("iWork UUID-reference row is negative".to_owned())
                     })?;
-                if end.is_some_and(|end| begin < position && position <= end) {
-                    return Err(Error::ParseError(format!(
-                        "Cannot {} an iWork row through a compact UUID-reference host range",
-                        mutation.verb()
-                    )));
+                let finish = end.unwrap_or(begin);
+                if finish < begin {
+                    return Err(Error::InvalidFormat(
+                        "iWork UUID-reference row range is inverted".to_owned(),
+                    ));
+                }
+                if mutation == DependencyMutation::Delete
+                    && (begin..=finish).contains(&position)
+                    && retained_hosts.contains(position, column.column)
+                {
+                    if finish > position {
+                        entry.range_end = Some(i32::try_from(finish - 1).map_err(|_| {
+                            Error::ParseError("iWork UUID-reference row overflow".to_owned())
+                        })?);
+                    }
+                    continue;
                 }
                 entry.range_begin = i32::try_from(mutation.coordinate(
                     begin,
@@ -771,6 +869,57 @@ fn mutate_cell_coord_set(
         }
     }
     Ok(())
+}
+
+/// Return whether every coordinate encoded by one UUID column entry belongs to
+/// an anchor retained through the current deletion.
+///
+/// A column deletion cannot split a `ColumnEntry` without changing its native
+/// protobuf shape. It is safe to preserve that entry only when every one of
+/// its rows is a retained formula host. Row deletion has a denser native
+/// representation and is handled directly above.
+fn row_set_is_fully_retained(
+    rows: &tsce::IndexSetArchive,
+    column: u32,
+    retained_hosts: &FormulaHostRetentions,
+) -> Result<bool> {
+    if rows.entries.is_empty() {
+        return Ok(false);
+    }
+    for entry in &rows.entries {
+        let begin = u32::try_from(entry.range_begin)
+            .map_err(|_| Error::InvalidFormat("iWork UUID-reference row is negative".to_owned()))?;
+        let finish = entry
+            .range_end
+            .map(u32::try_from)
+            .transpose()
+            .map_err(|_| Error::InvalidFormat("iWork UUID-reference row is negative".to_owned()))?
+            .unwrap_or(begin);
+        if finish < begin {
+            return Err(Error::InvalidFormat(
+                "iWork UUID-reference row range is inverted".to_owned(),
+            ));
+        }
+        let count = u64::from(finish)
+            .checked_sub(u64::from(begin))
+            .and_then(|difference| difference.checked_add(1))
+            .ok_or_else(|| {
+                Error::ParseError("iWork UUID-reference row range overflow".to_owned())
+            })?;
+        if count
+            > u64::try_from(retained_hosts.hosts.len()).map_err(|_| {
+                Error::ParseError("iWork formula-host retention count exceeds u64".to_owned())
+            })?
+        {
+            return Ok(false);
+        }
+        for row in begin..=finish {
+            if !retained_hosts.contains(row, column) {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
 }
 
 fn explicit_cell_coordinate(
@@ -1051,6 +1200,7 @@ fn mutate_dependency_record(
     retained_hosts: &FormulaHostRetentions,
 ) -> Result<()> {
     let previous_host = (record.row, record.column);
+    let external_adjustment = adjustments.external_precedents.get(&previous_host);
     let (row, column) = retained_hosts.shifted_host(
         record.row,
         record.column,
@@ -1062,6 +1212,12 @@ fn mutate_dependency_record(
     record.row = row;
     record.column = column;
     let Some(edges) = &mut record.expanded_edges else {
+        if external_adjustment.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork formula host ({}, {}) has cross-table references but no dependency edges",
+                previous_host.0, previous_host.1
+            )));
+        }
         return Ok(());
     };
     if edges.edge_without_owner_rows.len() != edges.edge_without_owner_columns.len()
@@ -1154,6 +1310,39 @@ fn mutate_dependency_record(
                 },
             )?;
         }
+    }
+    if let Some(adjustment) = external_adjustment {
+        let existing = edges
+            .internal_owner_id_for_edge
+            .iter()
+            .copied()
+            .zip(edges.edge_with_owner_rows.iter().copied())
+            .zip(edges.edge_with_owner_columns.iter().copied())
+            .map(|((owner, row), column)| (owner, row, column))
+            .collect::<BTreeSet<_>>();
+        if existing != adjustment.previous {
+            return Err(Error::InvalidFormat(format!(
+                "iWork formula host ({}, {}) has cross-table dependency edges that do not match its AST",
+                previous_host.0, previous_host.1
+            )));
+        }
+        let expected_owners = adjustment
+            .current
+            .iter()
+            .map(|(owner, _, _)| *owner)
+            .collect::<Vec<_>>();
+        if edges.internal_owner_id_for_edge != expected_owners {
+            return Err(Error::ParseError(format!(
+                "Cannot relocate iWork formula host ({}, {}) because its cross-table dependency owner sequence would change",
+                previous_host.0, previous_host.1
+            )));
+        }
+        edges.edge_with_owner_rows = adjustment.current.iter().map(|(_, row, _)| *row).collect();
+        edges.edge_with_owner_columns = adjustment
+            .current
+            .iter()
+            .map(|(_, _, column)| *column)
+            .collect();
     }
     Ok(())
 }

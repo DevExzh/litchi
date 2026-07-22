@@ -657,6 +657,125 @@ mod tests {
     }
 
     #[test]
+    fn merged_cross_table_formula_anchor_rebases_uuid_hosts_and_external_edges() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(5, 6)
+            .build()
+            .unwrap();
+        let source_table_id = editor.tables().unwrap()[0].object_id;
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let target_table = editor
+            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .unwrap();
+        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        editor
+            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .unwrap();
+        editor
+            .set_formula_with_cached_value(
+                source_table_id,
+                region.row(),
+                region.column(),
+                FormulaExpression::table_cell(
+                    target_table.object_id,
+                    FormulaCellReference::relative(1, 0),
+                ),
+                FormulaCachedValue::Number(7.0),
+            )
+            .unwrap();
+        editor.merge_cells(source_table_id, region).unwrap();
+
+        let mut package = editor.into_package();
+        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        let mut editor = NumbersEditor::from_package(package).unwrap();
+        let external_owner_id = formula_owner_at_host(&editor, 1, 1)
+            .cell_dependencies
+            .as_ref()
+            .unwrap()
+            .cell_record[0]
+            .expanded_edges
+            .as_ref()
+            .unwrap()
+            .internal_owner_id_for_edge[0];
+
+        editor
+            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_merges(source_table_id).unwrap(),
+            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+        );
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula("=Sheet 1::Referenced::A3".to_owned()))
+        );
+        assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 0.0);
+        assert_formula_host_dependencies(&editor, external_owner_id, 2, 0);
+
+        editor
+            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        assert!(
+            editor
+                .table_cell_merges(source_table_id)
+                .unwrap()
+                .is_empty()
+        );
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Formula("=Sheet 1::Referenced::B3".to_owned()))
+        );
+        assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 0.0);
+        assert_formula_host_dependencies(&editor, external_owner_id, 2, 1);
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_formula_host_dependencies(&reopened, external_owner_id, 2, 1);
+    }
+
+    #[test]
+    fn merged_cross_table_range_anchor_deletion_is_transactional() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(5, 6)
+            .build()
+            .unwrap();
+        let source_table_id = editor.tables().unwrap()[0].object_id;
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let target_table = editor
+            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .unwrap();
+        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        editor
+            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .unwrap();
+        editor
+            .set_formula_with_cached_value(
+                source_table_id,
+                region.row(),
+                region.column(),
+                FormulaExpression::function(
+                    "SUM",
+                    [FormulaExpression::table_range(
+                        target_table.object_id,
+                        FormulaCellReference::relative(1, 0),
+                        FormulaCellReference::relative(1, 0),
+                    )],
+                ),
+                FormulaCachedValue::Number(7.0),
+            )
+            .unwrap();
+        editor.merge_cells(source_table_id, region).unwrap();
+        let baseline = editor.to_bytes().unwrap();
+
+        assert!(
+            editor
+                .remove_table_row(source_table_id, TableRowDeletion::body(0))
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
     fn merged_table_axis_deletion_removes_and_rewrites_formula_pairs_together() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(5, 6)
@@ -1203,6 +1322,148 @@ mod tests {
     fn append_unknown_varint(data: &mut Vec<u8>, field: u32, value: u64) {
         data.extend(crate::varint::encode_varint(u64::from(field) << 3));
         data.extend(crate::varint::encode_varint(value));
+    }
+
+    fn install_uuid_host_references(package: &mut IWorkPackage, row: u32, column: u32) {
+        let component = package
+            .calculation_engine_entry_name()
+            .unwrap()
+            .unwrap()
+            .to_owned();
+        package
+            .update_archive(&component, |archive| {
+                let mut installed = false;
+                for object in &mut archive.objects {
+                    for message in &mut object.messages {
+                        if message.type_ != 4_008 {
+                            continue;
+                        }
+                        let mut owner =
+                            tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+                        let contains_host =
+                            owner
+                                .cell_dependencies
+                                .as_ref()
+                                .is_some_and(|dependencies| {
+                                    dependencies
+                                        .cell_record
+                                        .iter()
+                                        .any(|record| record.row == row && record.column == column)
+                                });
+                        if !contains_host {
+                            continue;
+                        }
+                        let owner_uuid = owner.formula_owner_uid;
+                        owner.uuid_references = Some(tsce::UuidReferencesArchive {
+                            table_refs: vec![tsce::uuid_references_archive::TableRef {
+                                owner_uuid,
+                                coord_set: Some(uuid_host_coordinate_set(row, column)),
+                            }],
+                            table_uuid_refs: vec![
+                                tsce::uuid_references_archive::TableWithUuidRef {
+                                    owner_uuid,
+                                    uuid_refs: vec![tsce::uuid_references_archive::UuidRef {
+                                        uuid: tsp::Uuid {
+                                            lower: 0x0123_4567_89ab_cdef,
+                                            upper: 0xfedc_ba98_7654_3210,
+                                        },
+                                        coord_set: Some(uuid_host_coordinate_set(row, column)),
+                                    }],
+                                },
+                            ],
+                        });
+                        message.data = owner.encode_to_vec();
+                        installed = true;
+                    }
+                }
+                installed.then_some(()).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "Test formula owner has no matching dependency host".to_owned(),
+                    )
+                })
+            })
+            .unwrap();
+    }
+
+    fn uuid_host_coordinate_set(row: u32, column: u32) -> tsce::CellCoordSetArchive {
+        tsce::CellCoordSetArchive {
+            column_entries: vec![tsce::cell_coord_set_archive::ColumnEntry {
+                column,
+                row_set: tsce::IndexSetArchive {
+                    entries: vec![tsce::index_set_archive::IndexSetEntry {
+                        range_begin: i32::try_from(row).unwrap(),
+                        range_end: None,
+                    }],
+                },
+            }],
+        }
+    }
+
+    fn formula_owner_at_host(
+        editor: &NumbersEditor,
+        row: u32,
+        column: u32,
+    ) -> tsce::FormulaOwnerDependenciesArchive {
+        let component = editor
+            .package()
+            .calculation_engine_entry_name()
+            .unwrap()
+            .unwrap();
+        let archive = editor.package().archive(component).unwrap();
+        archive
+            .objects
+            .iter()
+            .flat_map(|object| &object.messages)
+            .filter(|message| message.type_ == 4_008)
+            .filter_map(|message| {
+                tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice()).ok()
+            })
+            .find(|owner| {
+                owner
+                    .cell_dependencies
+                    .as_ref()
+                    .is_some_and(|dependencies| {
+                        dependencies
+                            .cell_record
+                            .iter()
+                            .any(|record| record.row == row && record.column == column)
+                    })
+            })
+            .unwrap()
+    }
+
+    fn assert_formula_host_dependencies(
+        editor: &NumbersEditor,
+        external_owner_id: u32,
+        target_row: u32,
+        target_column: u32,
+    ) {
+        let owner = formula_owner_at_host(editor, 1, 1);
+        let record = &owner.cell_dependencies.as_ref().unwrap().cell_record[0];
+        assert_eq!((record.row, record.column), (1, 1));
+        let edges = record.expanded_edges.as_ref().unwrap();
+        assert_eq!(edges.internal_owner_id_for_edge, [external_owner_id]);
+        assert_eq!(edges.edge_with_owner_rows, [target_row]);
+        assert_eq!(edges.edge_with_owner_columns, [target_column]);
+        let references = owner.uuid_references.as_ref().unwrap();
+        assert_uuid_host_coordinate(references.table_refs[0].coord_set.as_ref().unwrap(), 1, 1);
+        assert_uuid_host_coordinate(
+            references.table_uuid_refs[0].uuid_refs[0]
+                .coord_set
+                .as_ref()
+                .unwrap(),
+            1,
+            1,
+        );
+    }
+
+    fn assert_uuid_host_coordinate(coordinates: &tsce::CellCoordSetArchive, row: i32, column: u32) {
+        assert_eq!(coordinates.column_entries.len(), 1);
+        let entry = &coordinates.column_entries[0];
+        assert_eq!(entry.column, column);
+        assert_eq!(entry.row_set.entries.len(), 1);
+        assert_eq!(entry.row_set.entries[0].range_begin, row);
+        assert_eq!(entry.row_set.entries[0].range_end, None);
     }
 
     fn cached_formula_number(

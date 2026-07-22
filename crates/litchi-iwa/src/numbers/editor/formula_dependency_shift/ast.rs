@@ -20,15 +20,20 @@ pub(super) fn rewrite_formula_asts(
     expand_footer_ranges: bool,
     retained_hosts: &FormulaHostRetentions,
 ) -> Result<FormulaDependencyAdjustments> {
-    let descriptor = attached_table_descriptors(package)?
-        .into_iter()
+    let descriptors = attached_table_descriptors(package)?;
+    let descriptor = descriptors
+        .iter()
         .find(|table| table.table_info_id == table_info_id)
+        .cloned()
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork table info {table_info_id} has no attached table model"
             ))
         })?;
     let archive = package.archive(component)?;
+    let external_owners = (!retained_hosts.is_empty())
+        .then(|| external_formula_owners(&archive, &descriptors))
+        .transpose()?;
     let owner = archive
         .objects
         .iter()
@@ -162,6 +167,36 @@ pub(super) fn rewrite_formula_asts(
             dependency_adjustments
                 .local_precedents
                 .insert((row, column), local_adjustments);
+        }
+        if retained_hosts.contains(row, column)
+            && formula_contains_cross_table_reference(&previous.ast_node_array)
+        {
+            let external_owners = external_owners.as_ref().ok_or_else(|| {
+                Error::InvalidFormat(
+                    "A retained iWork formula host has no cross-table owner map".to_owned(),
+                )
+            })?;
+            let previous_precedents = direct_cross_table_precedents(
+                &previous.ast_node_array,
+                row,
+                column,
+                external_owners,
+            )?;
+            let current_precedents = direct_cross_table_precedents(
+                &current.ast_node_array,
+                row,
+                column,
+                external_owners,
+            )?;
+            if previous_precedents != current_precedents {
+                dependency_adjustments.external_precedents.insert(
+                    (row, column),
+                    ExternalPrecedentAdjustments {
+                        previous: previous_precedents,
+                        current: current_precedents,
+                    },
+                );
+            }
         }
         rewrites
             .entry(identifier)
@@ -329,6 +364,180 @@ fn local_cell_coordinate(
     )))
 }
 
+/// Resolve every direct cross-table cell reference in a formula AST.
+///
+/// Retained merge anchors may rebase relative cross-table references. Their
+/// direct dependency edges therefore need an exact before/after set. Native
+/// cross-table range dependencies have separate range records, so they remain
+/// deliberately unsupported here until those records can be rebased in the
+/// same transaction.
+fn direct_cross_table_precedents(
+    array: &tsce::AstNodeArrayArchive,
+    host_row: u32,
+    host_column: u32,
+    owners: &HashMap<(u64, u64), ExternalFormulaOwner>,
+) -> Result<BTreeSet<(u32, u32, u32)>> {
+    let mut precedents = BTreeSet::new();
+    collect_direct_cross_table_precedents(array, host_row, host_column, owners, &mut precedents)?;
+    Ok(precedents)
+}
+
+fn collect_direct_cross_table_precedents(
+    array: &tsce::AstNodeArrayArchive,
+    host_row: u32,
+    host_column: u32,
+    owners: &HashMap<(u64, u64), ExternalFormulaOwner>,
+    precedents: &mut BTreeSet<(u32, u32, u32)>,
+) -> Result<()> {
+    for node in &array.ast_node {
+        if let Some(reference) = &node.ast_cross_table_reference_extra_info {
+            if node.ast_colon_tract.is_some() {
+                return Err(Error::ParseError(
+                    "Cannot yet relocate a merged iWork formula anchor with cross-table range dependencies"
+                        .to_owned(),
+                ));
+            }
+            let (Some(row), Some(column)) = (node.ast_row.as_ref(), node.ast_column.as_ref())
+            else {
+                return Err(Error::ParseError(
+                    "Cannot yet relocate a merged iWork formula anchor with an unsupported cross-table reference"
+                        .to_owned(),
+                ));
+            };
+            let key = cfuuid_key(&reference.table_id).ok_or_else(|| {
+                Error::InvalidFormat(
+                    "iWork cross-table formula reference has an invalid owner UUID".to_owned(),
+                )
+            })?;
+            let owner = owners.get(&key).ok_or_else(|| {
+                Error::ParseError(
+                    "Cannot relocate a merged iWork formula anchor with an unresolved cross-table reference"
+                        .to_owned(),
+                )
+            })?;
+            let target_row = resolve_cross_table_coordinate(
+                row.row,
+                row.absolute.unwrap_or(false),
+                host_row,
+                "row",
+            )?;
+            let target_column = resolve_cross_table_coordinate(
+                column.column,
+                column.absolute.unwrap_or(false),
+                host_column,
+                "column",
+            )?;
+            if target_row >= owner.rows || target_column >= owner.columns {
+                return Err(Error::ParseError(format!(
+                    "iWork cross-table formula reference ({target_row}, {target_column}) is outside its {}x{} target table",
+                    owner.rows, owner.columns
+                )));
+            }
+            precedents.insert((owner.internal_owner_id, target_row, target_column));
+        }
+        if let Some(nested) = &node.ast_thunk_node_array {
+            collect_direct_cross_table_precedents(
+                nested,
+                host_row,
+                host_column,
+                owners,
+                precedents,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn formula_contains_cross_table_reference(array: &tsce::AstNodeArrayArchive) -> bool {
+    array.ast_node.iter().any(|node| {
+        node.ast_cross_table_reference_extra_info.is_some()
+            || node
+                .ast_thunk_node_array
+                .as_ref()
+                .is_some_and(formula_contains_cross_table_reference)
+    })
+}
+
+fn external_formula_owners(
+    archive: &Archive,
+    descriptors: &[TableDescriptor],
+) -> Result<HashMap<(u64, u64), ExternalFormulaOwner>> {
+    let descriptors = descriptors
+        .iter()
+        .map(|descriptor| (descriptor.table_info_id, descriptor))
+        .collect::<HashMap<_, _>>();
+    let mut owners = HashMap::new();
+    for message in archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .filter(|message| message.type_ == 4008)
+    {
+        let owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+        let Some(table_info_id) = owner
+            .formula_owner
+            .as_ref()
+            .map(|reference| reference.identifier)
+        else {
+            continue;
+        };
+        let Some(descriptor) = descriptors.get(&table_info_id) else {
+            continue;
+        };
+        let key = (owner.formula_owner_uid.lower, owner.formula_owner_uid.upper);
+        if owners
+            .insert(
+                key,
+                ExternalFormulaOwner {
+                    internal_owner_id: owner.internal_formula_owner_id,
+                    rows: descriptor.model.number_of_rows,
+                    columns: descriptor.model.number_of_columns,
+                },
+            )
+            .is_some()
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork formula owner UUID {:016x}-{:016x} is duplicated",
+                key.0, key.1
+            )));
+        }
+    }
+    Ok(owners)
+}
+
+fn cfuuid_key(uuid: &tsp::CfuuidArchive) -> Option<(u64, u64)> {
+    let words = || {
+        Some((
+            u64::from(uuid.uuid_w0?) | (u64::from(uuid.uuid_w1?) << 32),
+            u64::from(uuid.uuid_w2?) | (u64::from(uuid.uuid_w3?) << 32),
+        ))
+    };
+    let bytes = || {
+        let bytes: [u8; 16] = uuid.uuid_bytes.as_deref()?.try_into().ok()?;
+        let value = u128::from_be_bytes(bytes);
+        Some((value as u64, (value >> 64) as u64))
+    };
+    words().or_else(bytes)
+}
+
+fn resolve_cross_table_coordinate(
+    encoded: i32,
+    absolute: bool,
+    host: u32,
+    axis: &str,
+) -> Result<u32> {
+    let coordinate = if absolute {
+        i64::from(encoded)
+    } else {
+        i64::from(host) + i64::from(encoded)
+    };
+    u32::try_from(coordinate).map_err(|_| {
+        Error::ParseError(format!(
+            "iWork cross-table formula {axis} coordinate is negative or exceeds u32"
+        ))
+    })
+}
+
 fn rewrite_formula_nodes(
     array: &mut tsce::AstNodeArrayArchive,
     host_row: u32,
@@ -356,6 +565,14 @@ fn rewrite_formula_nodes(
         DependencyAxis::Row => shifted_row,
         DependencyAxis::Column => shifted_column,
     };
+    let cross_table_relative_offset = retained_hosts.cross_table_relative_offset(
+        host_row,
+        host_column,
+        axis,
+        position,
+        mutation,
+        "formula host coordinate",
+    )?;
     let footer_overrides = footer_range_overrides(
         array,
         host_row,
@@ -416,9 +633,8 @@ fn rewrite_formula_nodes(
             if absolute {
                 i64::from(encoded)
             } else {
-                i64::from(host)
-                    .checked_add(i64::from(encoded))
-                    .and_then(|target| target.checked_sub(i64::from(shifted_host)))
+                i64::from(encoded)
+                    .checked_add(cross_table_relative_offset)
                     .ok_or_else(|| {
                         Error::ParseError("iWork formula coordinate overflow".to_owned())
                     })?
@@ -504,6 +720,14 @@ fn rewrite_colon_tract(
         DependencyAxis::Column => shifted_column,
         DependencyAxis::Row => shifted_row,
     };
+    let cross_table_relative_offset = retained_hosts.cross_table_relative_offset(
+        host_row,
+        host_column,
+        axis,
+        position,
+        mutation,
+        "formula host coordinate",
+    )?;
     for range in relative {
         let begin = resolve_relative_tract_coordinate(host, range.range_begin)?;
         let end = range
@@ -522,10 +746,19 @@ fn rewrite_colon_tract(
             &column_ranges,
             dependency_adjustments,
         )?;
-        range.range_begin = relative_tract_coordinate(shifted_begin, shifted_host)?;
-        range.range_end = (shifted_begin != shifted_end)
-            .then(|| relative_tract_coordinate(shifted_end, shifted_host))
-            .transpose()?;
+        if cross_table {
+            range.range_begin =
+                shift_relative_tract_coordinate(range.range_begin, cross_table_relative_offset)?;
+            range.range_end = range
+                .range_end
+                .map(|end| shift_relative_tract_coordinate(end, cross_table_relative_offset))
+                .transpose()?;
+        } else {
+            range.range_begin = relative_tract_coordinate(shifted_begin, shifted_host)?;
+            range.range_end = (shifted_begin != shifted_end)
+                .then(|| relative_tract_coordinate(shifted_end, shifted_host))
+                .transpose()?;
+        }
     }
     for range in absolute {
         let begin = range.range_begin;
@@ -644,6 +877,14 @@ fn resolve_relative_tract_coordinate(host: u32, offset: i32) -> Result<u32> {
 fn relative_tract_coordinate(coordinate: u32, host: u32) -> Result<i32> {
     let offset = i64::from(coordinate) - i64::from(host);
     i32::try_from(offset)
+        .map_err(|_| Error::ParseError("iWork formula tract exceeds i32".to_owned()))
+}
+
+fn shift_relative_tract_coordinate(offset: i32, adjustment: i64) -> Result<i32> {
+    let shifted = i64::from(offset)
+        .checked_add(adjustment)
+        .ok_or_else(|| Error::ParseError("iWork formula tract coordinate overflow".to_owned()))?;
+    i32::try_from(shifted)
         .map_err(|_| Error::ParseError("iWork formula tract exceeds i32".to_owned()))
 }
 
