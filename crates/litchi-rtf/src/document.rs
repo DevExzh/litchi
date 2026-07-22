@@ -939,6 +939,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert external include fields in document field order.
+    ///
+    /// Sources and converter names are exposed as stored metadata only. This
+    /// method never resolves, opens, fetches, converts, updates, or writes to
+    /// an external source.
+    pub fn external_includes(&self) -> Vec<crate::ExternalIncludeField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::external_include)
+            .collect()
+    }
+
+    /// Return the number of typed, inert external include fields in the document.
+    pub fn external_include_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.external_include().is_some())
+            .count()
+    }
+
     pub fn push_field(&mut self, field: super::field::Field<'a>) -> RtfResult<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
             return Err(RtfError::MalformedDocument(

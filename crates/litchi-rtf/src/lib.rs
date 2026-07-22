@@ -166,9 +166,10 @@ pub use external_reference::{
     MAX_DOCUMENT_EXTERNAL_REFERENCE_TOTAL_BYTES,
 };
 pub use field::{
-    BodyStoryEvent, EquationField, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
-    FieldSwitch, FieldType, HyperlinkCode, MacroButtonField, PageBreak, ParsedFieldCode,
-    ReferenceCode, SectionBreak, StoryEvent, StoryField, parse_field_code,
+    BodyStoryEvent, EquationField, ExternalIncludeField, Field, FieldCodeError, FieldCodeToken,
+    FieldOwner, FieldStatus, FieldSwitch, FieldType, HyperlinkCode, IncludeFieldKind,
+    MacroButtonField, PageBreak, ParsedFieldCode, ReferenceCode, SectionBreak, StoryEvent,
+    StoryField, parse_field_code,
 };
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};

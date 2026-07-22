@@ -19,6 +19,8 @@ pub enum FieldType {
     Bookmark,
     Equation,
     MacroButton,
+    IncludeText,
+    IncludePicture,
     Index,
     Unknown,
 }
@@ -229,6 +231,46 @@ pub struct MacroButtonField<'a> {
     position: usize,
 }
 
+/// The kind of external content referenced by an RTF include field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IncludeFieldKind {
+    /// An `INCLUDETEXT` field that refers to document text and graphics.
+    Text,
+    /// An `INCLUDEPICTURE` field that refers to a graphic.
+    Picture,
+}
+
+/// Inert metadata for legacy RTF external-content fields.
+///
+/// This represents `INCLUDETEXT` and `INCLUDEPICTURE` field instructions.
+/// The source is retained as stored metadata only. This crate never opens,
+/// resolves, fetches, converts, updates, or writes back to the source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalIncludeField<'a> {
+    instruction: &'a str,
+    kind: IncludeFieldKind,
+    source: Cow<'a, str>,
+    bookmark: Option<Cow<'a, str>>,
+    converter: Option<Cow<'a, str>>,
+    suppress_nested_field_updates: bool,
+    omit_picture_data: bool,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+struct ExternalIncludeParts<'a> {
+    kind: IncludeFieldKind,
+    source: Cow<'a, str>,
+    bookmark: Option<Cow<'a, str>>,
+    converter: Option<Cow<'a, str>>,
+    suppress_nested_field_updates: bool,
+    omit_picture_data: bool,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
 impl<'a> EquationField<'a> {
     /// Return the complete stored `EQ` field instruction.
     pub fn instruction(&self) -> &'a str {
@@ -323,6 +365,87 @@ impl<'a> MacroButtonField<'a> {
     }
 }
 
+impl<'a> ExternalIncludeField<'a> {
+    /// Return the complete stored include-field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return whether this stores an `INCLUDETEXT` or `INCLUDEPICTURE` field.
+    pub const fn kind(&self) -> IncludeFieldKind {
+        self.kind
+    }
+
+    /// Return the stored source path or URL without resolving it.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Return the optional `INCLUDETEXT` bookmark selector.
+    ///
+    /// `INCLUDEPICTURE` fields do not define a bookmark operand, so they
+    /// always return `None` here.
+    pub fn bookmark(&self) -> Option<&str> {
+        self.bookmark.as_deref()
+    }
+
+    /// Return the optional stored `\\c` converter name.
+    ///
+    /// The converter is never looked up or invoked.
+    pub fn converter(&self) -> Option<&str> {
+        self.converter.as_deref()
+    }
+
+    /// Whether an `INCLUDETEXT` `\\!` switch suppresses nested field updates.
+    ///
+    /// This is stored metadata only; this crate never updates fields.
+    pub const fn suppresses_nested_field_updates(&self) -> bool {
+        self.suppress_nested_field_updates
+    }
+
+    /// Whether an `INCLUDEPICTURE` `\\d` switch omits picture data.
+    ///
+    /// This is stored metadata only; this crate never retrieves a picture.
+    pub const fn omits_picture_data(&self) -> bool {
+        self.omit_picture_data
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> Field<'a> {
     #[inline]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
@@ -372,6 +495,16 @@ impl<'a> Field<'a> {
                 if keyword.eq_ignore_ascii_case("MACROBUTTON") =>
             {
                 FieldType::MacroButton
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("INCLUDETEXT") =>
+            {
+                FieldType::IncludeText
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("INCLUDEPICTURE") =>
+            {
+                FieldType::IncludePicture
             },
             ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("INDEX") || keyword.eq_ignore_ascii_case("XE") =>
@@ -447,6 +580,35 @@ impl<'a> Field<'a> {
             instruction: self.instruction.as_ref(),
             macro_name,
             display_text,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed external include field.
+    ///
+    /// Sources are never resolved, opened, fetched, converted, updated, or
+    /// written back. Malformed include instructions remain generic fields and
+    /// return `None` here.
+    pub fn external_include(&self) -> Option<ExternalIncludeField<'_>> {
+        if !matches!(
+            self.field_type,
+            FieldType::IncludeText | FieldType::IncludePicture
+        ) {
+            return None;
+        }
+        let parts = external_include_parts(self.instruction.as_ref())?;
+        Some(ExternalIncludeField {
+            instruction: self.instruction.as_ref(),
+            kind: parts.kind,
+            source: parts.source,
+            bookmark: parts.bookmark,
+            converter: parts.converter,
+            suppress_nested_field_updates: parts.suppress_nested_field_updates,
+            omit_picture_data: parts.omit_picture_data,
+            unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
             owner: self.owner,
@@ -619,6 +781,97 @@ fn macro_button_parts(instruction: &str) -> Option<(Cow<'_, str>, Option<Cow<'_,
         )),
     };
     Some((macro_name, display_text))
+}
+
+fn external_include_parts(instruction: &str) -> Option<ExternalIncludeParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    let kind = if keyword.value.eq_ignore_ascii_case("INCLUDETEXT") {
+        IncludeFieldKind::Text
+    } else if keyword.value.eq_ignore_ascii_case("INCLUDEPICTURE") {
+        IncludeFieldKind::Picture
+    } else {
+        return None;
+    };
+    tokens.remove(0);
+
+    let source = tokens.first()?.value.clone();
+    if source.is_empty() || switch_name(tokens.first()?).is_some() {
+        return None;
+    }
+    tokens.remove(0);
+
+    let bookmark = if kind == IncludeFieldKind::Text
+        && tokens
+            .first()
+            .is_some_and(|token| switch_name(token).is_none())
+    {
+        Some(tokens.remove(0).value)
+    } else {
+        None
+    };
+    if kind == IncludeFieldKind::Picture
+        && tokens
+            .first()
+            .is_some_and(|token| switch_name(token).is_none())
+    {
+        return None;
+    }
+
+    let mut converter = None;
+    let mut suppress_nested_field_updates = false;
+    let mut omit_picture_data = false;
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        if name.eq_ignore_ascii_case("c") {
+            if converter.is_some() {
+                return None;
+            }
+            converter = Some(switch_value(&tokens, index, name).ok()?);
+            index += 2;
+        } else if kind == IncludeFieldKind::Text && name == "!" {
+            if suppress_nested_field_updates
+                || tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+            {
+                return None;
+            }
+            suppress_nested_field_updates = true;
+            index += 1;
+        } else if kind == IncludeFieldKind::Picture && name.eq_ignore_ascii_case("d") {
+            if omit_picture_data
+                || tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+            {
+                return None;
+            }
+            omit_picture_data = true;
+            index += 1;
+        } else {
+            let value = tokens
+                .get(index + 1)
+                .filter(|token| switch_name(token).is_none());
+            unknown_switches.push(FieldSwitch {
+                name: Cow::Owned(name.to_string()),
+                value: value.map(|token| token.value.clone()),
+            });
+            index += 1 + usize::from(value.is_some());
+        }
+    }
+
+    Some(ExternalIncludeParts {
+        kind,
+        source,
+        bookmark,
+        converter,
+        suppress_nested_field_updates,
+        omit_picture_data,
+        unknown_switches,
+    })
 }
 
 pub(crate) fn validate_story_events(
@@ -848,6 +1101,9 @@ fn parse_reference(tokens: Vec<FieldCodeToken<'_>>) -> Result<ReferenceCode<'_>,
 }
 
 fn switch_name<'a>(token: &'a FieldCodeToken<'_>) -> Option<&'a str> {
+    if token.quoted {
+        return None;
+    }
     token
         .value
         .strip_prefix('\\')
@@ -1097,6 +1353,71 @@ mod tests {
     }
 
     #[test]
+    fn external_include_fields_expose_stored_metadata_without_resolution() {
+        let mut include_text = Field::parse_instruction(
+            r#"INCLUDETEXT "missing source.docx" Summary \! \c Word8 \* MERGEFORMAT"#,
+        );
+        include_text.result = Cow::Borrowed("cached text");
+        include_text.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        include_text.owner = FieldOwner::Body;
+        include_text.position = 4;
+
+        assert_eq!(include_text.field_type, FieldType::IncludeText);
+        let text = include_text.external_include().unwrap();
+        assert_eq!(text.kind(), IncludeFieldKind::Text);
+        assert_eq!(text.source(), "missing source.docx");
+        assert_eq!(text.bookmark(), Some("Summary"));
+        assert_eq!(text.converter(), Some("Word8"));
+        assert!(text.suppresses_nested_field_updates());
+        assert!(!text.omits_picture_data());
+        assert_eq!(text.cached_result(), Some("cached text"));
+        assert!(text.is_dirty());
+        assert!(text.is_locked());
+        assert_eq!(text.owner(), FieldOwner::Body);
+        assert_eq!(text.position(), 4);
+        assert_eq!(text.unknown_switches().len(), 1);
+        assert_eq!(text.unknown_switches()[0].name, "*");
+        assert_eq!(text.unknown_switches()[0].value.as_deref(), Some("MERGEFORMAT"));
+
+        let unc_source = Field::parse_instruction(
+            r#"INCLUDETEXT "\\server\\share\\source.docx""#,
+        );
+        assert_eq!(
+            unc_source.external_include().unwrap().source(),
+            r"\server\share\source.docx"
+        );
+
+        let include_picture = Field::parse_instruction(
+            r#"INCLUDEPICTURE "missing picture.gif" \c Pictim32 \d \* MERGEFORMAT"#,
+        );
+        assert_eq!(include_picture.field_type, FieldType::IncludePicture);
+        let picture = include_picture.external_include().unwrap();
+        assert_eq!(picture.kind(), IncludeFieldKind::Picture);
+        assert_eq!(picture.source(), "missing picture.gif");
+        assert_eq!(picture.bookmark(), None);
+        assert_eq!(picture.converter(), Some("Pictim32"));
+        assert!(!picture.suppresses_nested_field_updates());
+        assert!(picture.omits_picture_data());
+        assert_eq!(picture.unknown_switches().len(), 1);
+        assert_eq!(picture.unknown_switches()[0].name, "*");
+
+        assert!(Field::parse_instruction("INCLUDETEXT").external_include().is_none());
+        assert!(Field::parse_instruction("INCLUDETEXT \\c Word8")
+            .external_include()
+            .is_none());
+        assert!(Field::parse_instruction(r#"INCLUDEPICTURE "picture.gif" Selector"#)
+            .external_include()
+            .is_none());
+        assert!(Field::parse_instruction(r#"INCLUDEPICTURE "picture.gif" \d extra"#)
+            .external_include()
+            .is_none());
+    }
+
+    #[test]
     fn document_discovers_eq_fields_without_calculating_them() {
         let document = crate::RtfDocument::parse(
             r#"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}"#,
@@ -1109,6 +1430,27 @@ mod tests {
         assert_eq!(equations[0].expression(), r"\f(1,2)");
         assert_eq!(equations[0].cached_result(), None);
         assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_external_includes_without_opening_sources() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty{\*\fldinst INCLUDETEXT "missing.docx" Summary \\!}{\fldrslt cached text}}Middle {\field{\*\fldinst INCLUDEPICTURE "missing.gif" \\d}{\fldrslt cached picture}}After}"#,
+        )
+        .unwrap();
+
+        let includes = document.external_includes();
+        assert_eq!(document.external_include_count(), 2);
+        assert_eq!(includes.len(), 2);
+        assert_eq!(includes[0].kind(), IncludeFieldKind::Text);
+        assert_eq!(includes[0].source(), "missing.docx");
+        assert_eq!(includes[0].bookmark(), Some("Summary"));
+        assert!(includes[0].suppresses_nested_field_updates());
+        assert!(includes[0].is_dirty());
+        assert_eq!(includes[1].kind(), IncludeFieldKind::Picture);
+        assert_eq!(includes[1].source(), "missing.gif");
+        assert!(includes[1].omits_picture_data());
+        assert_eq!(document.text(), "Before Middle After");
     }
 
     #[test]
