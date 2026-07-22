@@ -1131,28 +1131,28 @@ mod tests {
 
     #[test]
     fn parses_libreoffice_internal_hyperlink_fixtures() {
-        for (relative, expected) in [
-            ("rtfexport/data/fdo86750.rtf", "anchor"),
-            ("rtfexport/data/tdf134614_toc_indent.rtf", "_Toc1"),
+        let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/rtf");
+        for (fixture, expected) in [
+            ("fdo86750.rtf", "anchor"),
+            ("tdf134614_toc_indent.rtf", "_Toc1"),
         ] {
-            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../3rdparty/libreoffice-core/sw/qa/extras")
-                .join(relative);
-            let document = crate::RtfDocument::from_bytes(&std::fs::read(path).unwrap()).unwrap();
+            let document = crate::RtfDocument::from_bytes(
+                &std::fs::read(fixture_root.join(fixture)).unwrap(),
+            )
+            .unwrap();
             assert!(
                 document.fields().iter().any(|field| {
                     field.extract_bookmark().as_deref() == Some(expected)
                         && field.extract_url().as_deref() == Some(format!("#{expected}").as_str())
                 }),
-                "fixture {relative} fields: {:?}",
+                "fixture {fixture} fields: {:?}",
                 document.fields()
             );
         }
 
-        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/sw/qa/extras");
         let formatted = crate::RtfDocument::from_bytes(
-            &std::fs::read(base.join("rtfimport/data/fdo82071.rtf")).unwrap(),
+            &std::fs::read(fixture_root.join("fdo82071.rtf")).unwrap(),
         )
         .unwrap();
         assert!(formatted.fields().iter().any(|field| matches!(
@@ -1162,7 +1162,7 @@ mod tests {
         )));
 
         let backslashes = crate::RtfDocument::from_bytes(
-            &std::fs::read(base.join("rtfexport/data/hyperlink-with-backslashes.rtf")).unwrap(),
+            &std::fs::read(fixture_root.join("hyperlink-with-backslashes.rtf")).unwrap(),
         )
         .unwrap();
         assert_eq!(
@@ -1171,7 +1171,7 @@ mod tests {
         );
 
         let target = crate::RtfDocument::from_bytes(
-            &std::fs::read(base.join("rtfexport/data/hyperlink-target.rtf")).unwrap(),
+            &std::fs::read(fixture_root.join("hyperlink-target.rtf")).unwrap(),
         )
         .unwrap();
         let ParsedFieldCode::Hyperlink(code) = target.fields()[0].parsed_code() else {
