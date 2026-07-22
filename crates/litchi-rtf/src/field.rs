@@ -359,20 +359,41 @@ pub enum IncludeFieldKind {
     Picture,
 }
 
+/// One recognized stored option of an external-include field.
+///
+/// These values are configuration metadata only. This crate never opens,
+/// resolves, imports, transforms, or evaluates the referenced source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExternalIncludeOption<'a> {
+    /// A document or graphics converter name from the c switch.
+    Converter(Cow<'a, str>),
+    /// A source encoding from the INCLUDETEXT e switch.
+    Encoding(Cow<'a, str>),
+    /// A source MIME type from the INCLUDETEXT m switch.
+    MimeType(Cow<'a, str>),
+    /// An XML namespace mapping from the INCLUDETEXT n switch.
+    NamespaceMapping(Cow<'a, str>),
+    /// An XSLT location from the INCLUDETEXT t switch.
+    Xslt(Cow<'a, str>),
+    /// An XPath expression from the INCLUDETEXT x switch.
+    XPath(Cow<'a, str>),
+}
+
 /// Inert metadata for legacy RTF external-content fields.
 ///
 /// This represents `INCLUDETEXT` and `INCLUDEPICTURE` field instructions.
-/// The source is retained as stored metadata only. This crate never opens,
-/// resolves, fetches, converts, updates, or writes back to the source.
+/// Sources, converter names, and XML options are retained as stored metadata
+/// only. This crate never opens, resolves, fetches, transforms, converts,
+/// updates, or writes back to the source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalIncludeField<'a> {
     instruction: &'a str,
     kind: IncludeFieldKind,
     source: Cow<'a, str>,
     bookmark: Option<Cow<'a, str>>,
-    converter: Option<Cow<'a, str>>,
     suppress_nested_field_updates: bool,
     omit_picture_data: bool,
+    options: Vec<ExternalIncludeOption<'a>>,
     unknown_switches: Vec<FieldSwitch<'a>>,
     cached_result: Option<&'a str>,
     status: FieldStatus,
@@ -384,9 +405,9 @@ struct ExternalIncludeParts<'a> {
     kind: IncludeFieldKind,
     source: Cow<'a, str>,
     bookmark: Option<Cow<'a, str>>,
-    converter: Option<Cow<'a, str>>,
     suppress_nested_field_updates: bool,
     omit_picture_data: bool,
+    options: Vec<ExternalIncludeOption<'a>>,
     unknown_switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -708,7 +729,18 @@ impl<'a> ExternalIncludeField<'a> {
     ///
     /// The converter is never looked up or invoked.
     pub fn converter(&self) -> Option<&str> {
-        self.converter.as_deref()
+        self.options.iter().find_map(|option| match option {
+            ExternalIncludeOption::Converter(value) => Some(value.as_ref()),
+            _ => None,
+        })
+    }
+
+    /// Return recognized converter and XML options in stored source order.
+    ///
+    /// All options are inert metadata. This method never resolves a converter,
+    /// opens a source, runs XSLT, or evaluates XPath.
+    pub fn options(&self) -> &[ExternalIncludeOption<'a>] {
+        &self.options
     }
 
     /// Whether an `INCLUDETEXT` `\\!` switch suppresses nested field updates.
@@ -984,9 +1016,9 @@ impl<'a> Field<'a> {
             kind: parts.kind,
             source: parts.source,
             bookmark: parts.bookmark,
-            converter: parts.converter,
             suppress_nested_field_updates: parts.suppress_nested_field_updates,
             omit_picture_data: parts.omit_picture_data,
+            options: parts.options,
             unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
@@ -1413,7 +1445,7 @@ fn external_include_parts(instruction: &str) -> Option<ExternalIncludeParts<'_>>
         return None;
     }
 
-    let mut converter = None;
+    let mut options = Vec::new();
     let mut suppress_nested_field_updates = false;
     let mut omit_picture_data = false;
     let mut unknown_switches = Vec::new();
@@ -1421,10 +1453,34 @@ fn external_include_parts(instruction: &str) -> Option<ExternalIncludeParts<'_>>
     while index < tokens.len() {
         let name = switch_name(&tokens[index])?;
         if name.eq_ignore_ascii_case("c") {
-            if converter.is_some() {
-                return None;
-            }
-            converter = Some(switch_value(&tokens, index, name).ok()?);
+            options.push(ExternalIncludeOption::Converter(
+                switch_value(&tokens, index, name).ok()?,
+            ));
+            index += 2;
+        } else if kind == IncludeFieldKind::Text && name.eq_ignore_ascii_case("e") {
+            options.push(ExternalIncludeOption::Encoding(
+                switch_value(&tokens, index, name).ok()?,
+            ));
+            index += 2;
+        } else if kind == IncludeFieldKind::Text && name.eq_ignore_ascii_case("m") {
+            options.push(ExternalIncludeOption::MimeType(
+                switch_value(&tokens, index, name).ok()?,
+            ));
+            index += 2;
+        } else if kind == IncludeFieldKind::Text && name.eq_ignore_ascii_case("n") {
+            options.push(ExternalIncludeOption::NamespaceMapping(
+                switch_value(&tokens, index, name).ok()?,
+            ));
+            index += 2;
+        } else if kind == IncludeFieldKind::Text && name.eq_ignore_ascii_case("t") {
+            options.push(ExternalIncludeOption::Xslt(
+                switch_value(&tokens, index, name).ok()?,
+            ));
+            index += 2;
+        } else if kind == IncludeFieldKind::Text && name.eq_ignore_ascii_case("x") {
+            options.push(ExternalIncludeOption::XPath(
+                switch_value(&tokens, index, name).ok()?,
+            ));
             index += 2;
         } else if kind == IncludeFieldKind::Text && name == "!" {
             if suppress_nested_field_updates
@@ -1462,9 +1518,9 @@ fn external_include_parts(instruction: &str) -> Option<ExternalIncludeParts<'_>>
         kind,
         source,
         bookmark,
-        converter,
         suppress_nested_field_updates,
         omit_picture_data,
+        options,
         unknown_switches,
     })
 }
@@ -2136,7 +2192,7 @@ mod tests {
     #[test]
     fn external_include_fields_expose_stored_metadata_without_resolution() {
         let mut include_text = Field::parse_instruction(
-            r#"INCLUDETEXT "missing source.docx" Summary \! \c Word8 \* MERGEFORMAT"#,
+            r#"INCLUDETEXT "missing source.xml" Summary \! \c Word8 \e utf-8 \m application/xml \n "xmlns:a=\"resume-schema\"" \t "file:///C:/display.xsl" \x a:Resume/a:Name \* MERGEFORMAT"#,
         );
         include_text.result = Cow::Borrowed("cached text");
         include_text.status = FieldStatus {
@@ -2150,9 +2206,20 @@ mod tests {
         assert_eq!(include_text.field_type, FieldType::IncludeText);
         let text = include_text.external_include().unwrap();
         assert_eq!(text.kind(), IncludeFieldKind::Text);
-        assert_eq!(text.source(), "missing source.docx");
+        assert_eq!(text.source(), "missing source.xml");
         assert_eq!(text.bookmark(), Some("Summary"));
         assert_eq!(text.converter(), Some("Word8"));
+        assert_eq!(
+            text.options(),
+            &[
+                ExternalIncludeOption::Converter(Cow::Borrowed("Word8")),
+                ExternalIncludeOption::Encoding(Cow::Borrowed("utf-8")),
+                ExternalIncludeOption::MimeType(Cow::Borrowed("application/xml")),
+                ExternalIncludeOption::NamespaceMapping(Cow::Borrowed("xmlns:a=\"resume-schema\"")),
+                ExternalIncludeOption::Xslt(Cow::Borrowed("file:///C:/display.xsl")),
+                ExternalIncludeOption::XPath(Cow::Borrowed("a:Resume/a:Name")),
+            ]
+        );
         assert!(text.suppresses_nested_field_updates());
         assert!(!text.omits_picture_data());
         assert_eq!(text.cached_result(), Some("cached text"));
@@ -2162,11 +2229,12 @@ mod tests {
         assert_eq!(text.position(), 4);
         assert_eq!(text.unknown_switches().len(), 1);
         assert_eq!(text.unknown_switches()[0].name, "*");
-        assert_eq!(text.unknown_switches()[0].value.as_deref(), Some("MERGEFORMAT"));
-
-        let unc_source = Field::parse_instruction(
-            r#"INCLUDETEXT "\\server\\share\\source.docx""#,
+        assert_eq!(
+            text.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
         );
+
+        let unc_source = Field::parse_instruction(r#"INCLUDETEXT "\\server\\share\\source.docx""#);
         assert_eq!(
             unc_source.external_include().unwrap().source(),
             r"\server\share\source.docx"
@@ -2181,21 +2249,40 @@ mod tests {
         assert_eq!(picture.source(), "missing picture.gif");
         assert_eq!(picture.bookmark(), None);
         assert_eq!(picture.converter(), Some("Pictim32"));
+        assert_eq!(
+            picture.options(),
+            &[ExternalIncludeOption::Converter(Cow::Borrowed("Pictim32"))]
+        );
         assert!(!picture.suppresses_nested_field_updates());
         assert!(picture.omits_picture_data());
         assert_eq!(picture.unknown_switches().len(), 1);
         assert_eq!(picture.unknown_switches()[0].name, "*");
 
-        assert!(Field::parse_instruction("INCLUDETEXT").external_include().is_none());
-        assert!(Field::parse_instruction("INCLUDETEXT \\c Word8")
-            .external_include()
-            .is_none());
-        assert!(Field::parse_instruction(r#"INCLUDEPICTURE "picture.gif" Selector"#)
-            .external_include()
-            .is_none());
-        assert!(Field::parse_instruction(r#"INCLUDEPICTURE "picture.gif" \d extra"#)
-            .external_include()
-            .is_none());
+        assert!(
+            Field::parse_instruction("INCLUDETEXT")
+                .external_include()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction("INCLUDETEXT \\c Word8")
+                .external_include()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"INCLUDEPICTURE "picture.gif" Selector"#)
+                .external_include()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"INCLUDEPICTURE "picture.gif" \d extra"#)
+                .external_include()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"INCLUDETEXT source \e")
+                .external_include()
+                .is_none()
+        );
     }
 
     #[test]

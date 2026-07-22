@@ -983,9 +983,9 @@ impl<'a> RtfDocument<'a> {
 
     /// Return typed, inert external include fields in document field order.
     ///
-    /// Sources and converter names are exposed as stored metadata only. This
-    /// method never resolves, opens, fetches, converts, updates, or writes to
-    /// an external source.
+    /// Sources, converter names, and XML options are exposed as stored metadata
+    /// only. This method never resolves, opens, fetches, transforms, converts,
+    /// updates, or writes to an external source.
     pub fn external_includes(&self) -> Vec<crate::ExternalIncludeField<'_>> {
         self.fields
             .iter()
