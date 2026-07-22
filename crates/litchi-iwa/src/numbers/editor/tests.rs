@@ -5535,6 +5535,296 @@ fn source_created_table_supports_sort_order_configuration_crud() {
 }
 
 #[test]
+fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    editor
+        .set_cells(
+            10,
+            [
+                TableCellUpdate::new(0, 0, CellValue::Text("C first".to_owned())),
+                TableCellUpdate::new(0, 1, CellValue::Number(3.0)),
+                TableCellUpdate::new(1, 0, CellValue::Text("A".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::Number(1.0)),
+                TableCellUpdate::new(2, 0, CellValue::Text("C second".to_owned())),
+                TableCellUpdate::new(2, 1, CellValue::Number(3.0)),
+                TableCellUpdate::new(3, 0, CellValue::Text("B".to_owned())),
+                TableCellUpdate::new(3, 1, CellValue::Number(2.0)),
+            ],
+        )
+        .unwrap();
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    editor.set_table_sort_order(10, order.clone()).unwrap();
+
+    assert!(editor.apply_table_sort_order(10).unwrap());
+    assert_eq!(editor.table_sort_order(10).unwrap(), Some(order));
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!(table.get_cell(0, 0), Some(&CellValue::Text("A".to_owned())));
+    assert_eq!(table.get_cell(0, 1), Some(&CellValue::Number(1.0)));
+    assert_eq!(table.get_cell(1, 0), Some(&CellValue::Text("B".to_owned())));
+    assert_eq!(table.get_cell(1, 1), Some(&CellValue::Number(2.0)));
+    assert_eq!(
+        table.get_cell(2, 0),
+        Some(&CellValue::Text("C first".to_owned()))
+    );
+    assert_eq!(table.get_cell(2, 1), Some(&CellValue::Number(3.0)));
+    assert_eq!(
+        table.get_cell(3, 0),
+        Some(&CellValue::Text("C second".to_owned()))
+    );
+    assert_eq!(table.get_cell(3, 1), Some(&CellValue::Number(3.0)));
+
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let uid_map = tst::ColumnRowUidMapArchive::decode(
+        archive.object(40).unwrap().messages[0].data.as_slice(),
+    )
+    .unwrap();
+    assert_eq!(uid_map.row_uid_for_index, [1, 3, 0, 2]);
+    assert_eq!(uid_map.row_index_for_uid, [2, 0, 3, 1]);
+
+    let sorted = editor.to_bytes().unwrap();
+    assert!(!editor.apply_table_sort_order(10).unwrap());
+    assert_eq!(editor.to_bytes().unwrap(), sorted);
+}
+
+#[test]
+fn source_created_table_executes_sort_order_without_moving_headers_or_footers() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(5, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    editor
+        .set_table_header_settings(
+            table_id,
+            NumbersTableHeaderSettings {
+                header_rows: Some(NumbersTableHeaderCount::ONE),
+                footer_rows: Some(NumbersTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    editor
+        .set_cells(
+            table_id,
+            [
+                TableCellUpdate::new(0, 0, CellValue::Text("Region".to_owned())),
+                TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
+                TableCellUpdate::new(1, 0, CellValue::Text("North".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::Number(120.0)),
+                TableCellUpdate::new(2, 0, CellValue::Text("South".to_owned())),
+                TableCellUpdate::new(2, 1, CellValue::Number(98.0)),
+                TableCellUpdate::new(3, 0, CellValue::Text("Central".to_owned())),
+                TableCellUpdate::new(3, 1, CellValue::Number(105.0)),
+                TableCellUpdate::new(4, 0, CellValue::Text("Total".to_owned())),
+                TableCellUpdate::new(4, 1, CellValue::Number(323.0)),
+            ],
+        )
+        .unwrap();
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    editor
+        .set_table_sort_order(table_id, order.clone())
+        .unwrap();
+
+    assert!(editor.apply_table_sort_order(table_id).unwrap());
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!(
+        table.get_cell(0, 0),
+        Some(&CellValue::Text("Region".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(0, 1),
+        Some(&CellValue::Text("Q1".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(1, 0),
+        Some(&CellValue::Text("South".to_owned()))
+    );
+    assert_eq!(table.get_cell(1, 1), Some(&CellValue::Number(98.0)));
+    assert_eq!(
+        table.get_cell(2, 0),
+        Some(&CellValue::Text("Central".to_owned()))
+    );
+    assert_eq!(table.get_cell(2, 1), Some(&CellValue::Number(105.0)));
+    assert_eq!(
+        table.get_cell(3, 0),
+        Some(&CellValue::Text("North".to_owned()))
+    );
+    assert_eq!(table.get_cell(3, 1), Some(&CellValue::Number(120.0)));
+    assert_eq!(
+        table.get_cell(4, 0),
+        Some(&CellValue::Text("Total".to_owned()))
+    );
+    assert_eq!(table.get_cell(4, 1), Some(&CellValue::Number(323.0)));
+    let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.table_sort_order(table_id).unwrap(), Some(order));
+}
+
+#[test]
+fn table_sort_moves_rows_across_tile_boundaries() {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let model_object = archive.object_mut(10).unwrap();
+            let model_message = model_object.messages[0].clone();
+            let mut model = TableModelArchive::decode(model_message.data.as_slice())?;
+            model.base_data_store.tiles.tile_size = Some(2);
+            model
+                .base_data_store
+                .tiles
+                .tiles
+                .push(tst::tile_storage::Tile {
+                    tileid: 1,
+                    tile: Reference {
+                        identifier: 31,
+                        ..Default::default()
+                    },
+                });
+            model_object.replace_message(
+                0,
+                RawMessage {
+                    type_: model_message.type_,
+                    data: model.encode_to_vec(),
+                },
+            )?;
+            archive.insert_object(ArchiveObject::new(
+                31,
+                vec![RawMessage {
+                    type_: 6002,
+                    data: Tile {
+                        max_column: 0,
+                        max_row: 3,
+                        num_cells: 0,
+                        numrows: 0,
+                        row_infos: Vec::new(),
+                        storage_version: Some(5),
+                        last_saved_in_bnc: Some(true),
+                        should_use_wide_rows: None,
+                    }
+                    .encode_to_vec(),
+                }],
+            )?)
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor
+        .set_cells(
+            10,
+            [
+                TableCellUpdate::new(0, 0, CellValue::Number(3.0)),
+                TableCellUpdate::new(1, 0, CellValue::Number(2.0)),
+                TableCellUpdate::new(2, 0, CellValue::Number(1.0)),
+                TableCellUpdate::new(3, 0, CellValue::Number(0.0)),
+            ],
+        )
+        .unwrap();
+    editor
+        .set_table_sort_order(
+            10,
+            NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(0).unwrap(),
+                NumbersTableSortDirection::Ascending,
+            )])
+            .unwrap(),
+        )
+        .unwrap();
+
+    assert!(editor.apply_table_sort_order(10).unwrap());
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!(table.get_cell(0, 0), Some(&CellValue::Number(0.0)));
+    assert_eq!(table.get_cell(1, 0), Some(&CellValue::Number(1.0)));
+    assert_eq!(table.get_cell(2, 0), Some(&CellValue::Number(2.0)));
+    assert_eq!(table.get_cell(3, 0), Some(&CellValue::Number(3.0)));
+
+    let uid_map = editor
+        .package()
+        .archive("Index/Document.iwa")
+        .unwrap()
+        .object(40)
+        .unwrap()
+        .messages
+        .iter()
+        .find_map(|message| tst::ColumnRowUidMapArchive::decode(message.data.as_slice()).ok())
+        .unwrap();
+    assert_eq!(uid_map.row_uid_for_index, [3, 2, 1, 0]);
+}
+
+#[test]
+fn table_sort_execution_rejects_unsupported_state_transactionally() {
+    let mut package = test_package();
+    add_test_stroke_layer(&mut package, 88, TestStrokeLayerSide::Top, 0, &[(0, 4)]);
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor
+        .set_cells(
+            10,
+            [
+                TableCellUpdate::new(0, 1, CellValue::Number(3.0)),
+                TableCellUpdate::new(1, 1, CellValue::Number(1.0)),
+                TableCellUpdate::new(2, 1, CellValue::Number(4.0)),
+                TableCellUpdate::new(3, 1, CellValue::Number(2.0)),
+            ],
+        )
+        .unwrap();
+    editor
+        .set_table_sort_order(
+            10,
+            NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(1).unwrap(),
+                NumbersTableSortDirection::Ascending,
+            )])
+            .unwrap(),
+        )
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.apply_table_sort_order(10).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let mut no_order = NumbersEditor::from_package(test_package()).unwrap();
+    let before = no_order.to_bytes().unwrap();
+    assert!(no_order.apply_table_sort_order(10).is_err());
+    assert_eq!(no_order.to_bytes().unwrap(), before);
+
+    let mut formula_editor =
+        NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    formula_editor
+        .set_formula(10, 0, 1, FormulaExpression::Number(3.0))
+        .unwrap();
+    formula_editor
+        .set_cells(
+            10,
+            [
+                TableCellUpdate::new(1, 1, CellValue::Number(1.0)),
+                TableCellUpdate::new(2, 1, CellValue::Number(4.0)),
+                TableCellUpdate::new(3, 1, CellValue::Number(2.0)),
+            ],
+        )
+        .unwrap();
+    formula_editor
+        .set_table_sort_order(
+            10,
+            NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(1).unwrap(),
+                NumbersTableSortDirection::Ascending,
+            )])
+            .unwrap(),
+        )
+        .unwrap();
+    let before = formula_editor.to_bytes().unwrap();
+    assert!(formula_editor.apply_table_sort_order(10).is_err());
+    assert_eq!(formula_editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn table_title_settings_are_lossless_transactional_and_wire_exact() {
     let mut package = crate::numbers::NumbersDocumentBuilder::new()
         .build_package()

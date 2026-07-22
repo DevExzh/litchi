@@ -4,8 +4,10 @@ use std::collections::BTreeSet;
 
 use super::*;
 
+mod apply;
 mod wire;
 
+use apply::apply_attached_table_sort_order;
 use wire::{
     clear_table_sort_order_wire, read_native_table_sort_order_wire, write_table_sort_order_wire,
 };
@@ -258,6 +260,43 @@ impl NumbersEditor {
         }
         self.package = staged;
         Ok(())
+    }
+
+    /// Execute the attached table's configured full-table sort order.
+    ///
+    /// This is the programmatic equivalent of Numbers' **Organize → Sort →
+    /// Sort Now** action. It moves only body rows, leaving configured header
+    /// and footer rows in place, and retains the native sort configuration for
+    /// subsequent use in Numbers.
+    ///
+    /// The current executor deliberately supports the scalar, non-formula
+    /// subset that can be moved without rewriting a formula graph: every sort
+    /// key in the body must be a complete finite Number, Boolean, Date, or
+    /// Duration column of one consistent type. It rejects formula, error, and
+    /// commented body cells, merged cells, filters, hidden rows, grouping,
+    /// pivots, spill state, conditional styles, and explicit border layers
+    /// transactionally rather than risking a semantically partial rewrite.
+    ///
+    /// Returns `true` when one or more body rows were physically reordered,
+    /// and `false` when the body was already in the requested stable order.
+    pub fn apply_table_sort_order(&mut self, table_id: u64) -> Result<bool> {
+        let order = self.table_sort_order(table_id)?.ok_or_else(|| {
+            Error::ParseError(
+                "Cannot execute a Numbers sort without a configured table sort order".to_owned(),
+            )
+        })?;
+        let mut staged = self.package.clone();
+        if !apply_attached_table_sort_order(&mut staged, table_id, &order)? {
+            return Ok(false);
+        }
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_sort_order(table_id)?.as_ref() != Some(&order) {
+            return Err(Error::InvalidFormat(
+                "Numbers table sort execution did not preserve its sort order".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(true)
     }
 }
 
