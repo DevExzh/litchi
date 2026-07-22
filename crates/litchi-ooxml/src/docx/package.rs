@@ -3452,6 +3452,42 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_prompt_fields_without_displaying_prompts() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let ask = document.add_paragraph();
+            ask.add_field(crate::docx::writer::MutableField::with_result(
+                r#"ASK AskResponse "What is your first name?" \d "" \o"#.to_string(),
+                "cached ask response".to_string(),
+            ));
+            let fill_in = document.add_paragraph();
+            fill_in.add_field(crate::docx::writer::MutableField::with_result(
+                r#"FILLIN "Enter appointment time" \d "09:00""#.to_string(),
+                "10:30".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let fields = document.prompt_fields().unwrap();
+        assert_eq!(document.prompt_field_count().unwrap(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].kind(), crate::docx::PromptFieldKind::Ask);
+        assert_eq!(fields[0].bookmark(), Some("AskResponse"));
+        assert_eq!(fields[0].default_response(), Some(""));
+        assert!(fields[0].prompts_once_per_mail_merge());
+        assert_eq!(fields[0].cached_result(), Some("cached ask response"));
+        assert_eq!(fields[1].kind(), crate::docx::PromptFieldKind::FillIn);
+        assert_eq!(fields[1].bookmark(), None);
+        assert_eq!(fields[1].prompt(), Some("Enter appointment time"));
+        assert_eq!(fields[1].default_response(), Some("09:00"));
+        assert_eq!(fields[1].cached_result(), Some("10:30"));
+    }
+
+    #[test]
     fn writes_and_discovers_inert_macro_button_fields_without_execution() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

@@ -11,7 +11,7 @@ use crate::docx::field::{
     BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
     IfField, IndexEntryField, IndexField, LinkField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField, MergeField,
-    ReferencedDocumentField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
+    PromptField, ReferencedDocumentField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
     TableOfContentsField,
 };
 use crate::docx::footnote::Note;
@@ -1556,6 +1556,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `IF` fields.
     pub fn if_field_count(&self) -> Result<usize> {
         Ok(self.if_fields()?.len())
+    }
+
+    /// Get typed, inert `ASK` and `FILLIN` fields in document order.
+    ///
+    /// Returned values expose stored prompt, bookmark, default-response, cached
+    /// content, and dirty/lock state only. This method never displays a prompt,
+    /// captures a response, creates or updates a bookmark, performs a merge, or
+    /// refreshes a field result.
+    pub fn prompt_fields(&self) -> Result<Vec<PromptField>> {
+        self.fields()?
+            .iter()
+            .map(Field::prompt_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `ASK` and `FILLIN` fields.
+    pub fn prompt_field_count(&self) -> Result<usize> {
+        Ok(self.prompt_fields()?.len())
     }
 
     /// Get all mail-merge fields in document order.

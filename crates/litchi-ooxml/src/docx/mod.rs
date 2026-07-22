@@ -117,7 +117,8 @@ pub use field::{
     IfField, IncludeFieldKind, IndexEntryField, IndexField, IndexSortOrder, LinkField,
     LinkFormatting, LinkResultOption, MacroButtonField, MailMergeConditionalControlField,
     MailMergeConditionalControlKind, MailMergeCounterField, MailMergeCounterKind,
-    MailMergeNextField, MergeField, ReferencedDocumentField, TableOfAuthoritiesEntryField,
+    MailMergeNextField, MergeField, PromptField, PromptFieldKind, ReferencedDocumentField,
+    TableOfAuthoritiesEntryField,
     TableOfAuthoritiesField, TableOfContentsField, TableOfContentsLevelRange,
     TableOfContentsSwitch,
 };
