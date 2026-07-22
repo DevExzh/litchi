@@ -162,6 +162,112 @@ fn source_built_table_roundtrips_full_crud() {
 }
 
 #[test]
+fn source_built_table_duplication_clones_formula_storage_and_geometry() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let source = editor
+        .add_slide_table(0, "Budget", 3, 2, position, size)
+        .unwrap();
+    editor
+        .set_slide_table_cells(
+            0,
+            source.model_object_id,
+            [
+                KeynoteTableCellUpdate::new(
+                    0,
+                    0,
+                    KeynoteTableCellValue::Text("Category".to_owned()),
+                ),
+                KeynoteTableCellUpdate::new(1, 0, KeynoteTableCellValue::Text("Travel".to_owned())),
+                KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::Number(125.0)),
+            ],
+        )
+        .unwrap();
+    editor
+        .set_slide_table_formula(
+            0,
+            source.model_object_id,
+            2,
+            1,
+            KeynoteTableFormulaExpression::function(
+                "SUM",
+                [
+                    KeynoteTableFormulaExpression::Number(100.0),
+                    KeynoteTableFormulaExpression::Number(25.0),
+                ],
+            ),
+            KeynoteTableFormulaCachedValue::Number(125.0),
+        )
+        .unwrap();
+
+    let copied = editor
+        .duplicate_slide_table(0, source.drawable_object_id)
+        .unwrap();
+    assert_ne!(copied.drawable_object_id, source.drawable_object_id);
+    assert_ne!(copied.model_object_id, source.model_object_id);
+    assert_eq!(copied.name, "Budget copy");
+    assert_eq!((copied.rows, copied.columns), (source.rows, source.columns));
+    let mut expected_geometry = source.geometry;
+    if let Some(position) = expected_geometry.position.as_mut() {
+        position.x += TABLE_DUPLICATE_OFFSET;
+        position.y += TABLE_DUPLICATE_OFFSET;
+    }
+    assert_eq!(copied.geometry, expected_geometry);
+    assert_eq!(
+        editor
+            .slide_table(copied.slide_index, copied.model_object_id)
+            .unwrap()
+            .get_cell(1, 0),
+        Some(&KeynoteTableCellValue::Text("Travel".to_owned()))
+    );
+    assert_eq!(
+        editor
+            .slide_table_formula(copied.slide_index, copied.model_object_id, 2, 1)
+            .unwrap()
+            .as_deref(),
+        Some("=SUM(100,25)")
+    );
+
+    editor
+        .set_slide_table_cell(
+            copied.slide_index,
+            copied.model_object_id,
+            1,
+            0,
+            KeynoteTableCellValue::Text("Lodging".to_owned()),
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_table(source.slide_index, source.model_object_id)
+            .unwrap()
+            .get_cell(1, 0),
+        Some(&KeynoteTableCellValue::Text("Travel".to_owned()))
+    );
+    assert_eq!(
+        editor
+            .duplicate_slide_table(0, source.drawable_object_id)
+            .unwrap()
+            .name,
+        "Budget copy 2"
+    );
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.slide_tables(0).unwrap().len(), 3);
+    reopened
+        .remove_slide_table(copied.slide_index, copied.drawable_object_id)
+        .unwrap();
+    assert_eq!(reopened.slide_tables(0).unwrap().len(), 2);
+    assert_eq!(
+        reopened
+            .slide_table(source.slide_index, source.model_object_id)
+            .unwrap()
+            .get_cell(1, 0),
+        Some(&KeynoteTableCellValue::Text("Travel".to_owned()))
+    );
+}
+
+#[test]
 fn source_built_table_roundtrips_full_table_sort_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let (position, size) = table_geometry();

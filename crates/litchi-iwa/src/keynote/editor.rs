@@ -67,6 +67,7 @@ const SKID_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.KNBuildSkidByCharacter"
 const SWOOSH_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.BLTSwoosh";
 const TRACE_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.Trace";
 const TEXT_BOX_DUPLICATE_OFFSET: f32 = 10.0;
+const TABLE_DUPLICATE_OFFSET: f32 = TEXT_BOX_DUPLICATE_OFFSET;
 
 /// Writable text targets resolved from one slide in presentation order.
 #[derive(Debug, Clone, PartialEq)]

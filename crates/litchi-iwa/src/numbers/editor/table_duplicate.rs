@@ -2,6 +2,18 @@
 
 use super::*;
 
+const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
+
+/// Fresh object identifiers for a cloned attached table graph.
+///
+/// The caller owns attaching `info_object_id` to its enclosing Pages body,
+/// Numbers sheet, or Keynote slide.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct AttachedTableGraphClone {
+    pub(crate) info_object_id: u64,
+    pub(crate) model_object_id: u64,
+}
+
 pub(super) fn table_owned_graph(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
@@ -64,7 +76,7 @@ pub(super) fn table_owned_graph(
     Ok(graph)
 }
 
-pub(super) fn duplicate_table_name(source: &str, existing: &HashSet<&str>) -> Result<String> {
+pub(crate) fn duplicate_table_name(source: &str, existing: &HashSet<&str>) -> Result<String> {
     validate_name(source, "table")?;
     let base = format!("{source} copy");
     if !existing.contains(base.as_str()) {
@@ -77,8 +89,218 @@ pub(super) fn duplicate_table_name(source: &str, existing: &HashSet<&str>) -> Re
         }
     }
     Err(Error::ParseError(
-        "Unable to allocate a unique Numbers table name".to_owned(),
+        "Unable to allocate a unique iWork table name".to_owned(),
     ))
+}
+
+/// Clone one populated attached table into `staged` without attaching it.
+///
+/// `source` is a stable pre-mutation snapshot. The clone gets fresh object
+/// identifiers, table UUID, private storage, and CalculationEngine owner
+/// family; references to the existing parent stay intact. Callers add the
+/// returned drawable to their native container only after this succeeds.
+pub(crate) fn duplicate_attached_table_graph_in_package(
+    source: &IWorkPackage,
+    staged: &mut IWorkPackage,
+    source_info_id: u64,
+    source_model_id: u64,
+    name: &str,
+    position_offset: f32,
+) -> Result<AttachedTableGraphClone> {
+    validate_name(name, "table")?;
+    if !position_offset.is_finite() {
+        return Err(Error::ParseError(
+            "iWork table duplicate offset must be finite".to_owned(),
+        ));
+    }
+
+    let locations = object_locations(source)?;
+    let info_archive_name = locations.get(&source_info_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork table info {source_info_id} is missing"))
+    })?;
+    let info_archive = source.archive(info_archive_name)?;
+    let info_object = info_archive.object(source_info_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork table info {source_info_id} is missing"))
+    })?;
+    let (info_message_index, source_info) = decode_table_info(info_object)?;
+    if source_info.table_model.identifier != source_model_id {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table info {source_info_id} points to model {}, expected {source_model_id}",
+            source_info.table_model.identifier
+        )));
+    }
+
+    let model_archive_name = locations.get(&source_model_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork table model {source_model_id} is missing"))
+    })?;
+    let model_archive = source.archive(model_archive_name)?;
+    let model_object = model_archive.object(source_model_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork table model {source_model_id} is missing"))
+    })?;
+    let model_message_index = find_table_model_message(model_object)?;
+    let source_model =
+        TableModelArchive::decode(model_object.messages[model_message_index].data.as_slice())?;
+
+    let graph = table_owned_graph(source, &locations, &source_model)?;
+    if graph.contains_key(&source_info_id) || graph.contains_key(&source_model_id) {
+        return Err(Error::InvalidFormat(
+            "iWork table graph aliases its drawable or model object".to_owned(),
+        ));
+    }
+
+    let mut next_identifier = next_object_identifier(staged)?;
+    let new_info_id = take_identifier(&mut next_identifier)?;
+    let new_model_id = take_identifier(&mut next_identifier)?;
+    let mut remap = HashMap::with_capacity(graph.len() + 2);
+    remap.insert(source_info_id, new_info_id);
+    remap.insert(source_model_id, new_model_id);
+    for &identifier in graph.keys() {
+        remap.insert(identifier, take_identifier(&mut next_identifier)?);
+    }
+
+    let existing_table_ids = table_uuids(staged)?;
+    let existing_table_ids = existing_table_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    let table_uuid = allocate_table_uuid(new_model_id, &existing_table_ids);
+
+    let model_data = duplicate_table_model_wire(
+        model_object.messages[model_message_index].data.as_slice(),
+        &source_model,
+        &remap,
+        &table_uuid,
+        name,
+    )?;
+    let mut objects = Vec::with_capacity(graph.len() + 2);
+    objects.push((
+        model_archive_name.clone(),
+        clone_numbers_object_metadata(
+            model_object,
+            new_model_id,
+            vec![RawMessage {
+                type_: model_object.messages[model_message_index].type_,
+                data: model_data,
+            }],
+            &remap,
+        )?,
+    ));
+
+    let info_data = duplicate_table_info_wire(
+        info_object.messages[info_message_index].data.as_slice(),
+        &source_info,
+        &remap,
+        position_offset,
+    )?;
+    objects.push((
+        info_archive_name.clone(),
+        clone_numbers_object_metadata(
+            info_object,
+            new_info_id,
+            vec![RawMessage {
+                type_: info_object.messages[info_message_index].type_,
+                data: info_data,
+            }],
+            &remap,
+        )?,
+    ));
+
+    for &source_id in graph.keys() {
+        let archive_name = locations.get(&source_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork table storage object {source_id} is missing"))
+        })?;
+        let archive = source.archive(archive_name)?;
+        let source_object = archive.object(source_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork table storage object {source_id} is missing"))
+        })?;
+        let mut cloned = clone_table_storage_object(source_object, &remap)?;
+        remap_cloned_formula_storage(&mut cloned, &source_model.table_id, &table_uuid)?;
+        objects.push((archive_name.clone(), cloned));
+    }
+
+    for (archive_name, object) in objects {
+        staged.update_archive(&archive_name, |archive| archive.insert_object(object))?;
+    }
+    register_cloned_numbers_objects(staged, source, &locations, &remap)?;
+
+    if let Some(parent) = source_info.super_.parent.as_ref() {
+        let parent_archive_name = locations.get(&parent.identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork table parent {} is missing",
+                parent.identifier
+            ))
+        })?;
+        register_numbers_component_reference(
+            staged,
+            parent_archive_name,
+            info_archive_name,
+            new_info_id,
+        )?;
+    }
+
+    if let Some((source_owner_uuid, new_owner_uuid)) =
+        formula_graph_owner_uuids(staged, source_info_id, &source_model.table_id, &table_uuid)?
+    {
+        for &source_id in graph.keys() {
+            let archive_name = locations.get(&source_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("iWork table storage object {source_id} is missing"))
+            })?;
+            let cloned_id = remap[&source_id];
+            staged.update_archive(archive_name, |archive| {
+                let object = archive.object_mut(cloned_id).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "iWork cloned table storage object {cloned_id} is missing"
+                    ))
+                })?;
+                remap_cloned_formula_owner_storage(object, &source_owner_uuid, &new_owner_uuid)
+            })?;
+        }
+    }
+
+    let table_last_identifier = next_identifier.checked_sub(1).ok_or_else(|| {
+        Error::InvalidFormat("iWork table clone allocated no identifiers".to_owned())
+    })?;
+    set_package_last_object_identifier(staged, table_last_identifier)?;
+    let calculation_engine_entry = staged.calculation_engine_entry_name()?.map(str::to_owned);
+    clone_table_formula_graph(
+        staged,
+        source_info_id,
+        new_info_id,
+        &source_model.table_id,
+        &table_uuid,
+    )?;
+    if let Some(calculation_engine_entry) = calculation_engine_entry {
+        register_numbers_component_reference(
+            staged,
+            &calculation_engine_entry,
+            info_archive_name,
+            new_info_id,
+        )?;
+    }
+
+    Ok(AttachedTableGraphClone {
+        info_object_id: new_info_id,
+        model_object_id: new_model_id,
+    })
+}
+
+fn table_uuids(package: &IWorkPackage) -> Result<HashSet<String>> {
+    let mut identifiers = HashSet::new();
+    for archive_name in package.iwa_entry_names() {
+        let archive = package.archive(archive_name)?;
+        for object in &archive.objects {
+            for message in object
+                .messages
+                .iter()
+                .filter(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_))
+            {
+                if let Ok(model) = TableModelArchive::decode(message.data.as_slice()) {
+                    identifiers.insert(model.table_id);
+                }
+            }
+        }
+    }
+    Ok(identifiers)
 }
 
 pub(super) fn duplicate_table_model_wire(

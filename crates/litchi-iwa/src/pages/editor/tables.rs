@@ -36,6 +36,7 @@ use crate::protobuf::tst::{TableInfoArchive, TableModelArchive};
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
+const INLINE_TABLE_DUPLICATE_OFFSET: f32 = 0.0;
 
 /// Strongly typed cell value shared by Pages and Numbers table storage.
 pub type PagesCellValue = crate::numbers::CellValue;
@@ -352,48 +353,13 @@ impl PagesEditor {
                     columns,
                 )?;
 
-            let new_attachment_id = next_object_identifier(&staged)?;
-            let attachment_archive_name =
-                find_object_archive(source, template.attachment_object_id)?;
-            let attachment_archive = source.archive(&attachment_archive_name)?;
-            let attachment_object = attachment_archive
-                .object(template.attachment_object_id)
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Pages table attachment {} is missing",
-                        template.attachment_object_id
-                    ))
-                })?;
-            let remap = HashMap::from([
-                (template.attachment_object_id, new_attachment_id),
-                (template.info.drawable_object_id, new_info_id),
-            ]);
-            let cloned_attachment = clone_pages_text_box_object(attachment_object, &remap)?;
-            staged.update_archive(&attachment_archive_name, |archive| {
-                archive.insert_object(cloned_attachment)
-            })?;
-
-            if let Some(component) =
-                component_identifier_for_entry(source, &attachment_archive_name)?
-            {
-                if component_uuid_identifiers(source, component)?
-                    .is_some_and(|identifiers| identifiers.contains(&template.attachment_object_id))
-                {
-                    add_component_object_uuids(&mut staged, component, &[new_attachment_id])?;
-                }
-                let new_info_archive = find_object_archive(&staged, new_info_id)?;
-                if let Some(target_component) =
-                    component_identifier_for_entry(&staged, &new_info_archive)?
-                    && target_component != component
-                {
-                    add_component_external_reference(
-                        &mut staged,
-                        component,
-                        target_component,
-                        new_info_id,
-                    )?;
-                }
-            }
+            let new_attachment_id = clone_body_table_attachment(
+                source,
+                &mut staged,
+                template.attachment_object_id,
+                template.info.drawable_object_id,
+                new_info_id,
+            )?;
             (new_info_id, new_model_id, new_attachment_id)
         } else {
             let graph = crate::pages::creation::bootstrap_first_table_graph(
@@ -437,6 +403,94 @@ impl PagesEditor {
         {
             return Err(Error::InvalidFormat(
                 "Pages table insertion produced unexpected properties".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created.info)
+    }
+
+    /// Duplicate a populated body table at a UTF-16 body position.
+    ///
+    /// The clone has independent table storage, object identifiers, table UUID,
+    /// and formula-owner state. Its attachment is inserted at
+    /// `anchor_character_index`, shifting later body content exactly as a
+    /// normal inline table insertion would.
+    pub fn duplicate_table(
+        &mut self,
+        model_object_id: u64,
+        anchor_character_index: usize,
+    ) -> Result<PagesTableInfo> {
+        let body_length = self.body_text()?.encode_utf16().count();
+        if anchor_character_index > body_length {
+            return Err(Error::ParseError(format!(
+                "Pages table anchor {anchor_character_index} exceeds body length {body_length}"
+            )));
+        }
+        let tables = body_table_graphs(self)?;
+        let source = tables
+            .iter()
+            .find(|graph| graph.info.model_object_id == model_object_id)
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "Pages table model {model_object_id} is not attached to the body"
+                ))
+            })?;
+        let existing_names = tables
+            .iter()
+            .map(|graph| graph.info.name.as_str())
+            .collect::<HashSet<_>>();
+        let name =
+            crate::numbers::editor::duplicate_table_name(&source.info.name, &existing_names)?;
+        let source_info_id = source.info.drawable_object_id;
+        let source_model_id = source.info.model_object_id;
+        let source_attachment_id = source.attachment_object_id;
+        let source_rows = source.info.rows;
+        let source_columns = source.info.columns;
+
+        let package = self.package();
+        let mut staged = package.clone();
+        let cloned = crate::numbers::editor::duplicate_attached_table_graph_in_package(
+            package,
+            &mut staged,
+            source_info_id,
+            source_model_id,
+            &name,
+            INLINE_TABLE_DUPLICATE_OFFSET,
+        )?;
+        let attachment_id = clone_body_table_attachment(
+            package,
+            &mut staged,
+            source_attachment_id,
+            source_info_id,
+            cloned.info_object_id,
+        )?;
+        let mut text_editor = IWorkTextEditor::from_package(staged);
+        text_editor.replace_text(
+            self.body_storage_id,
+            anchor_character_index..anchor_character_index,
+            "\u{fffc}",
+        )?;
+        staged = text_editor.into_package();
+        add_body_drawable_attachment(
+            &mut staged,
+            self.body_storage_id,
+            anchor_character_index,
+            attachment_id,
+        )?;
+        let last_identifier = next_object_identifier(&staged)?
+            .checked_sub(1)
+            .ok_or_else(|| Error::InvalidFormat("Pages package has no object IDs".to_owned()))?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let created = verified.require_body_table(cloned.model_object_id)?;
+        if created.info.drawable_object_id != cloned.info_object_id
+            || created.info.anchor_character_index != anchor_character_index
+            || created.info.name != name
+            || (created.info.rows, created.info.columns) != (source_rows, source_columns)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table duplication produced unexpected properties".to_owned(),
             ));
         }
         *self = verified;
@@ -753,6 +807,49 @@ fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
     Ok(result)
 }
 
+fn clone_body_table_attachment(
+    source: &IWorkPackage,
+    staged: &mut IWorkPackage,
+    source_attachment_id: u64,
+    source_drawable_id: u64,
+    new_drawable_id: u64,
+) -> Result<u64> {
+    let new_attachment_id = next_object_identifier(staged)?;
+    let attachment_archive_name = find_object_archive(source, source_attachment_id)?;
+    let attachment_archive = source.archive(&attachment_archive_name)?;
+    let attachment_object = attachment_archive
+        .object(source_attachment_id)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages table attachment {source_attachment_id} is missing"
+            ))
+        })?;
+    let remap = HashMap::from([
+        (source_attachment_id, new_attachment_id),
+        (source_drawable_id, new_drawable_id),
+    ]);
+    let cloned_attachment = clone_pages_text_box_object(attachment_object, &remap)?;
+    staged.update_archive(&attachment_archive_name, |archive| {
+        archive.insert_object(cloned_attachment)
+    })?;
+
+    if let Some(component) = component_identifier_for_entry(source, &attachment_archive_name)? {
+        if component_uuid_identifiers(source, component)?
+            .is_some_and(|identifiers| identifiers.contains(&source_attachment_id))
+        {
+            add_component_object_uuids(staged, component, &[new_attachment_id])?;
+        }
+        let new_drawable_archive = find_object_archive(staged, new_drawable_id)?;
+        if let Some(target_component) =
+            component_identifier_for_entry(staged, &new_drawable_archive)?
+            && target_component != component
+        {
+            add_component_external_reference(staged, component, target_component, new_drawable_id)?;
+        }
+    }
+    Ok(new_attachment_id)
+}
+
 fn expand_formula_contexts(
     package: &IWorkPackage,
     contexts: &mut Vec<u64>,
@@ -888,6 +985,104 @@ mod tests {
         assert_eq!(table.get_cell(1, 1), Some(&PagesCellValue::Number(42.5)));
         reopened.clear_table_cell(model_id, 0, 0).unwrap();
         assert!(reopened.table(model_id).unwrap().get_cell(0, 0).is_none());
+    }
+
+    #[test]
+    fn source_built_table_duplication_clones_formula_storage_and_attachment() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_text("Budget\n")
+            .body_table("Budget", 3, 2)
+            .build()
+            .unwrap();
+        let source = editor.tables().unwrap().remove(0);
+        editor
+            .set_table_cells(
+                source.model_object_id,
+                [
+                    PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Category".to_owned())),
+                    PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("Travel".to_owned())),
+                    PagesTableCellUpdate::new(1, 1, PagesCellValue::Number(125.0)),
+                ],
+            )
+            .unwrap();
+        editor
+            .set_table_formula(
+                source.model_object_id,
+                2,
+                1,
+                PagesTableFormulaExpression::function(
+                    "SUM",
+                    [
+                        PagesTableFormulaExpression::Number(100.0),
+                        PagesTableFormulaExpression::Number(25.0),
+                    ],
+                ),
+                PagesTableFormulaCachedValue::Number(125.0),
+            )
+            .unwrap();
+
+        let insertion_anchor = editor.body_text().unwrap().encode_utf16().count();
+        let copied = editor
+            .duplicate_table(source.model_object_id, insertion_anchor)
+            .unwrap();
+        assert_ne!(copied.drawable_object_id, source.drawable_object_id);
+        assert_ne!(copied.model_object_id, source.model_object_id);
+        assert_eq!(copied.name, "Budget copy");
+        assert_eq!(copied.anchor_character_index, insertion_anchor);
+        assert_eq!((copied.rows, copied.columns), (source.rows, source.columns));
+        assert_eq!(
+            editor.table(copied.model_object_id).unwrap().get_cell(1, 0),
+            Some(&PagesCellValue::Text("Travel".to_owned()))
+        );
+        assert_eq!(
+            editor
+                .table_formula(copied.model_object_id, 2, 1)
+                .unwrap()
+                .as_deref(),
+            Some("=SUM(100,25)")
+        );
+
+        editor
+            .set_table_cell(
+                copied.model_object_id,
+                1,
+                0,
+                PagesCellValue::Text("Lodging".to_owned()),
+            )
+            .unwrap();
+        assert_eq!(
+            editor.table(source.model_object_id).unwrap().get_cell(1, 0),
+            Some(&PagesCellValue::Text("Travel".to_owned()))
+        );
+
+        let second_anchor = editor.body_text().unwrap().encode_utf16().count();
+        assert_eq!(
+            editor
+                .duplicate_table(source.model_object_id, second_anchor)
+                .unwrap()
+                .name,
+            "Budget copy 2"
+        );
+        let before_invalid = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .duplicate_table(source.model_object_id, usize::MAX)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_invalid);
+
+        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.tables().unwrap().len(), 3);
+        let mut reopened = reopened;
+        reopened.remove_table(copied.model_object_id).unwrap();
+        assert_eq!(reopened.tables().unwrap().len(), 2);
+        assert_eq!(
+            reopened
+                .table(source.model_object_id)
+                .unwrap()
+                .get_cell(1, 0),
+            Some(&PagesCellValue::Text("Travel".to_owned()))
+        );
     }
 
     #[test]

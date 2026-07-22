@@ -2584,46 +2584,6 @@ impl NumbersEditor {
             .find(|descriptor| descriptor.object_id == table_id)
             .ok_or_else(|| Error::ParseError(format!("Numbers table {table_id} not found")))?;
         let owner = find_table_owner(&self.package, table_id)?;
-        let locations = object_locations(&self.package)?;
-        let info_archive_name = locations.get(&owner.table_info_id).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Numbers table info {} is missing",
-                owner.table_info_id
-            ))
-        })?;
-        let info_archive = self.package.archive(info_archive_name)?;
-        let info_object = info_archive.object(owner.table_info_id).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Numbers table info {} is missing",
-                owner.table_info_id
-            ))
-        })?;
-        let (info_message_index, source_info) = decode_table_info(info_object)?;
-        let model_archive_name = locations.get(&table_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers table model {table_id} is missing"))
-        })?;
-        let model_archive = self.package.archive(model_archive_name)?;
-        let model_object = model_archive.object(table_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers table model {table_id} is missing"))
-        })?;
-        let model_message_index = find_table_model_message(model_object)?;
-
-        let graph = table_owned_graph(&self.package, &locations, &source.model)?;
-        let mut next_identifier = next_object_identifier(&self.package)?;
-        let new_info_id = take_identifier(&mut next_identifier)?;
-        let new_model_id = take_identifier(&mut next_identifier)?;
-        let mut remap = HashMap::with_capacity(graph.len() + 2);
-        remap.insert(owner.table_info_id, new_info_id);
-        remap.insert(table_id, new_model_id);
-        for &identifier in graph.keys() {
-            remap.insert(identifier, take_identifier(&mut next_identifier)?);
-        }
-
-        let existing_table_ids = descriptors
-            .iter()
-            .map(|descriptor| descriptor.model.table_id.as_str())
-            .collect::<HashSet<_>>();
-        let table_uuid = allocate_table_uuid(new_model_id, &existing_table_ids);
         let existing_names = descriptors
             .iter()
             .filter_map(|descriptor| {
@@ -2634,95 +2594,20 @@ impl NumbersEditor {
             })
             .collect::<HashSet<_>>();
         let name = duplicate_table_name(&source.model.table_name, &existing_names)?;
-
-        let model_data = duplicate_table_model_wire(
-            model_object.messages[model_message_index].data.as_slice(),
-            &source.model,
-            &remap,
-            &table_uuid,
-            &name,
-        )?;
-        let mut objects = Vec::with_capacity(graph.len() + 2);
-        objects.push((
-            model_archive_name.clone(),
-            clone_numbers_object_metadata(
-                model_object,
-                new_model_id,
-                vec![RawMessage {
-                    type_: model_object.messages[model_message_index].type_,
-                    data: model_data,
-                }],
-                &remap,
-            )?,
-        ));
-
-        let info_data = duplicate_table_info_wire(
-            info_object.messages[info_message_index].data.as_slice(),
-            &source_info,
-            &remap,
-            TABLE_DUPLICATE_OFFSET,
-        )?;
-        objects.push((
-            info_archive_name.clone(),
-            clone_numbers_object_metadata(
-                info_object,
-                new_info_id,
-                vec![RawMessage {
-                    type_: info_object.messages[info_message_index].type_,
-                    data: info_data,
-                }],
-                &remap,
-            )?,
-        ));
-
-        for &source_id in graph.keys() {
-            let archive_name = locations.get(&source_id).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers table storage object {source_id} is missing"
-                ))
-            })?;
-            let archive = self.package.archive(archive_name)?;
-            let source_object = archive.object(source_id).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers table storage object {source_id} is missing"
-                ))
-            })?;
-            let mut cloned = clone_table_storage_object(source_object, &remap)?;
-            remap_cloned_formula_storage(&mut cloned, &source.model.table_id, &table_uuid)?;
-            objects.push((archive_name.clone(), cloned));
-        }
-
-        let mut staged = self.package.clone();
-        for (archive_name, object) in objects {
-            staged.update_archive(&archive_name, |archive| archive.insert_object(object))?;
-        }
-        register_cloned_numbers_objects(&mut staged, &self.package, &locations, &remap)?;
-        if let Some((source_owner_uuid, new_owner_uuid)) = formula_graph_owner_uuids(
-            &staged,
-            owner.table_info_id,
-            &source.model.table_id,
-            &table_uuid,
-        )? {
-            for &source_id in graph.keys() {
-                let archive_name = locations.get(&source_id).ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Numbers table storage object {source_id} is missing"
-                    ))
-                })?;
-                let cloned_id = remap[&source_id];
-                staged.update_archive(archive_name, |archive| {
-                    let object = archive.object_mut(cloned_id).ok_or_else(|| {
-                        Error::InvalidFormat(format!(
-                            "Numbers cloned table storage object {cloned_id} is missing"
-                        ))
-                    })?;
-                    remap_cloned_formula_owner_storage(object, &source_owner_uuid, &new_owner_uuid)
-                })?;
-            }
-        }
+        let source_package = &self.package;
+        let locations = object_locations(source_package)?;
         let sheet_archive_name = locations.get(&owner.sheet_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
         })?;
+        let mut staged = source_package.clone();
+        let cloned = duplicate_attached_table_graph_in_package(
+            source_package,
+            &mut staged,
+            owner.table_info_id,
+            table_id,
+            &name,
+            TABLE_DUPLICATE_OFFSET,
+        )?;
         staged.update_archive(sheet_archive_name, |archive| {
             let object = archive.object_mut(owner.sheet_id).ok_or_else(|| {
                 Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
@@ -2734,53 +2619,27 @@ impl NumbersEditor {
                 .map(|reference| reference.identifier)
                 .collect::<Vec<_>>();
             let mut current = previous.clone();
-            current.push(new_info_id);
+            current.push(cloned.info_object_id);
             replace_sheet_drawable_references(object, message_index, &previous, &current)?;
             let info = &mut object.archive_info.message_infos[message_index];
-            info.object_references.push(new_info_id);
+            info.object_references.push(cloned.info_object_id);
             for field in &mut info.field_infos {
                 if field
                     .object_references
                     .iter()
                     .any(|identifier| previous.contains(identifier))
                 {
-                    field.object_references.push(new_info_id);
+                    field.object_references.push(cloned.info_object_id);
                 }
             }
             Ok(())
         })?;
-        register_numbers_component_reference(
-            &mut staged,
-            sheet_archive_name,
-            info_archive_name,
-            new_info_id,
-        )?;
-        let table_last_identifier = next_identifier.checked_sub(1).ok_or_else(|| {
-            Error::InvalidFormat("Numbers table clone allocated no identifiers".to_owned())
-        })?;
-        set_package_last_object_identifier(&mut staged, table_last_identifier)?;
-        let calculation_engine_entry = staged.calculation_engine_entry_name()?.map(str::to_owned);
-        clone_table_formula_graph(
-            &mut staged,
-            owner.table_info_id,
-            new_info_id,
-            &source.model.table_id,
-            &table_uuid,
-        )?;
-        if let Some(calculation_engine_entry) = calculation_engine_entry {
-            register_numbers_component_reference(
-                &mut staged,
-                &calculation_engine_entry,
-                info_archive_name,
-                new_info_id,
-            )?;
-        }
 
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         let created = verified
             .tables()?
             .into_iter()
-            .find(|table| table.object_id == new_model_id)
+            .find(|table| table.object_id == cloned.model_object_id)
             .ok_or_else(|| {
                 Error::InvalidFormat("Numbers table duplication failed validation".to_owned())
             })?;
@@ -3296,7 +3155,10 @@ pub use table_axis_deletion::{TableColumnDeletion, TableRowDeletion};
 pub use table_axis_insertion::{TableColumnInsertion, TableRowInsertion};
 pub(crate) use table_cells::TableCellBatch;
 pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};
-use table_duplicate::*;
+pub(crate) use table_duplicate::{duplicate_attached_table_graph_in_package, duplicate_table_name};
+use table_duplicate::{
+    register_cloned_numbers_objects, register_numbers_component_reference, table_owned_graph,
+};
 pub use table_headers::{NumbersTableHeaderCount, NumbersTableHeaderSettings};
 pub use table_sort::{
     NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,

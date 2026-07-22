@@ -1083,6 +1083,13 @@ UUID registries, and cross-component references are remapped transactionally;
 unsupported advanced dependency state is rejected without modifying the editor.
 See `duplicate_numbers_table`.
 
+Pages body tables and Keynote slide tables can use the same native graph clone
+without first saving or opening a template document. Pages inserts the copied
+inline attachment at an explicit UTF-16 body position; Keynote appends the
+copied drawable to the slide and offsets it for direct selection. Both retain
+independent cell storage and formula-owner state. See `duplicate_pages_table`
+and `duplicate_keynote_table`.
+
 Ordinary sheet-owned text boxes expose UTF-16 text replacement, geometry,
 hyperlink, lock, aspect-ratio, and accessibility-property updates. Their
 four-object private graph—shape, title and caption stand-ins, and writable

@@ -289,6 +289,66 @@ impl KeynoteEditor {
         Ok(created.info)
     }
 
+    /// Duplicate a populated table on one slide with independent storage.
+    ///
+    /// The clone receives fresh object identifiers, table UUID, and
+    /// CalculationEngine owner state. It is appended to the slide's native
+    /// drawable lists and offset by ten points so both tables remain directly
+    /// selectable in Keynote.
+    pub fn duplicate_slide_table(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<KeynoteSlideTableInfo> {
+        let source = slide_table_graph(self, slide_index, drawable_object_id)?;
+        let tables = self.slide_tables(slide_index)?;
+        let existing_names = tables
+            .iter()
+            .map(|table| table.name.as_str())
+            .collect::<HashSet<_>>();
+        let name =
+            crate::numbers::editor::duplicate_table_name(&source.info.name, &existing_names)?;
+        let source_rows = source.info.rows;
+        let source_columns = source.info.columns;
+        let mut expected_geometry = source.info.geometry;
+        if let Some(position) = expected_geometry.position.as_mut() {
+            position.x += TABLE_DUPLICATE_OFFSET;
+            position.y += TABLE_DUPLICATE_OFFSET;
+        }
+
+        let package = self.package();
+        let mut staged = package.clone();
+        let cloned = crate::numbers::editor::duplicate_attached_table_graph_in_package(
+            package,
+            &mut staged,
+            source.info.drawable_object_id,
+            source.info.model_object_id,
+            &name,
+            TABLE_DUPLICATE_OFFSET,
+        )?;
+        patch_slide_drawable_references(
+            &mut staged,
+            &source.slide_archive,
+            source.info.slide_id,
+            None,
+            Some(cloned.info_object_id),
+        )?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let created = slide_table_graph(&verified, slide_index, cloned.info_object_id)?;
+        if created.info.model_object_id != cloned.model_object_id
+            || created.info.name != name
+            || (created.info.rows, created.info.columns) != (source_rows, source_columns)
+            || created.info.geometry != expected_geometry
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created.info)
+    }
+
     /// Set or clear one cell in a reachable slide table transactionally.
     ///
     /// Supported dependent formula caches are refreshed before commit;
