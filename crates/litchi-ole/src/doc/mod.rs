@@ -106,7 +106,7 @@ pub use parts::document_properties_2003::{
 };
 pub use parts::fields::{
     Field, FieldBoundary, FieldDescriptor, FieldEndFlags, FieldMarker, FieldMarkerValue,
-    FieldStory, FieldStoryTable, FieldText, FieldType, FieldsTable,
+    FieldStory, FieldStoryTable, FieldText, FieldType, FieldsTable, MacroButtonField,
 };
 pub use parts::glossary::{
     GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,

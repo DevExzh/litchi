@@ -530,6 +530,64 @@ pub struct FieldText {
     pub result: Option<String>,
 }
 
+/// A typed, inert legacy Word `MACROBUTTON` field.
+///
+/// ECMA-376 Part 1 §17.16.5.34 defines two stored field arguments: a macro or
+/// command name and the text or graphic used as its button.
+///
+/// This preserves the stored macro or command name, button text, cached
+/// result, and field-marker state. It never resolves, loads, invokes, or
+/// otherwise executes the named macro or command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MacroButtonField {
+    field: Field,
+    instruction: String,
+    macro_name: String,
+    display_text: String,
+    cached_result: Option<String>,
+}
+
+impl MacroButtonField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored macro or command name without resolving or invoking it.
+    pub fn macro_name(&self) -> &str {
+        &self.macro_name
+    }
+
+    /// Return the stored button text.
+    ///
+    /// This is source metadata, not a generated result.
+    pub fn display_text(&self) -> &str {
+        &self.display_text
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from the macro or command.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 impl FieldText {
     pub(crate) fn from_field<F>(field: &Field, mut text_at_range: F) -> Result<Self>
     where
@@ -565,6 +623,120 @@ impl FieldText {
             result,
         })
     }
+
+    /// Return inert typed metadata when this is a well-formed `MACROBUTTON`
+    /// field.
+    ///
+    /// The macro or command name and button text are parsed only from stored
+    /// field text. Neither is resolved, loaded, invoked, or executed.
+    /// Malformed instructions remain available through this generic type and
+    /// return `None` here.
+    pub fn macro_button(&self) -> Option<MacroButtonField> {
+        if self.field.field_type != FieldType::MacroButton {
+            return None;
+        }
+        let (macro_name, display_text) = parse_macro_button_parts(&self.instruction)?;
+        Some(MacroButtonField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            macro_name,
+            display_text,
+            cached_result: self.result.clone(),
+        })
+    }
+}
+
+const MAX_MACRO_BUTTON_INSTRUCTION_BYTES: usize = 64 * 1024;
+
+fn parse_macro_button_parts(instruction: &str) -> Option<(String, String)> {
+    if instruction.len() > MAX_MACRO_BUTTON_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("MACROBUTTON") {
+        return None;
+    }
+
+    let macro_name = next_field_argument(instruction, &mut position).ok()??;
+    if macro_name.is_empty() {
+        return None;
+    }
+    let display_text = next_field_argument(instruction, &mut position).ok()??;
+    if display_text.is_empty() {
+        return None;
+    }
+    if next_field_argument(instruction, &mut position)
+        .ok()?
+        .is_some()
+    {
+        return None;
+    }
+
+    Some((macro_name, display_text))
+}
+
+fn next_field_argument(
+    input: &str,
+    position: &mut usize,
+) -> std::result::Result<Option<String>, ()> {
+    skip_field_whitespace(input, position);
+    let Some(first) = next_field_character(input, position) else {
+        return Ok(None);
+    };
+
+    if first != '"' {
+        *position -= first.len_utf8();
+        let mut value = String::new();
+        while let Some(character) = next_field_character(input, position) {
+            if character.is_whitespace() || character == '"' {
+                *position -= character.len_utf8();
+                break;
+            }
+            if character == '\\' {
+                let escaped = next_field_character(input, position).ok_or(())?;
+                if !matches!(escaped, '"' | '\\') {
+                    return Err(());
+                }
+                value.push(escaped);
+            } else {
+                value.push(character);
+            }
+        }
+        return Ok(Some(value));
+    }
+
+    let mut value = String::new();
+    loop {
+        let character = next_field_character(input, position).ok_or(())?;
+        match character {
+            '"' => return Ok(Some(value)),
+            '\\' => {
+                let escaped = next_field_character(input, position).ok_or(())?;
+                if !matches!(escaped, '"' | '\\') {
+                    return Err(());
+                }
+                value.push(escaped);
+            },
+            _ => value.push(character),
+        }
+    }
+}
+
+fn skip_field_whitespace(input: &str, position: &mut usize) {
+    while let Some(character) = input.get(*position..).and_then(|rest| rest.chars().next()) {
+        if !character.is_whitespace() {
+            break;
+        }
+        *position += character.len_utf8();
+    }
+}
+
+fn next_field_character(input: &str, position: &mut usize) -> Option<char> {
+    let character = input.get(*position..)?.chars().next()?;
+    *position += character.len_utf8();
+    Some(character)
 }
 
 /// One parsed and validated story-local `Plcfld`.
@@ -964,6 +1136,82 @@ mod tests {
 
         assert_eq!(text.instruction, " MACROBUTTON NeverRun Label ");
         assert_eq!(text.result, None);
+        let macro_button = text.macro_button().unwrap();
+        assert_eq!(macro_button.macro_name(), "NeverRun");
+        assert_eq!(macro_button.display_text(), "Label");
+        assert_eq!(macro_button.cached_result(), None);
+        assert!(!macro_button.is_dirty());
+        assert!(!macro_button.is_locked());
+    }
+
+    #[test]
+    fn macro_button_field_exposes_stored_metadata_without_execution() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 44,
+            field_type: FieldType::MacroButton,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" MACROBUTTON "Never Run" "Click \"here\"\\now" "#.to_string(),
+            result: Some("cached button".to_string()),
+        };
+
+        let macro_button = text.macro_button().unwrap();
+        assert_eq!(macro_button.field(), &field);
+        assert_eq!(macro_button.macro_name(), "Never Run");
+        assert_eq!(macro_button.display_text(), r#"Click "here"\now"#);
+        assert_eq!(macro_button.cached_result(), Some("cached button"));
+        assert!(macro_button.is_dirty());
+        assert!(macro_button.is_locked());
+
+        let compact = FieldText {
+            instruction: r#"MACROBUTTON"Never Run""Click""#.to_string(),
+            ..text.clone()
+        };
+        let compact_button = compact.macro_button().unwrap();
+        assert_eq!(compact_button.macro_name(), "Never Run");
+        assert_eq!(compact_button.display_text(), "Click");
+
+        let missing_button = FieldText {
+            instruction: "MACROBUTTON NeverRun".to_string(),
+            ..text.clone()
+        };
+        assert!(missing_button.macro_button().is_none());
+
+        let empty_button = FieldText {
+            instruction: r#"MACROBUTTON NeverRun """#.to_string(),
+            ..text.clone()
+        };
+        assert!(empty_button.macro_button().is_none());
+
+        let extra_argument = FieldText {
+            instruction: "MACROBUTTON NeverRun Button unexpected".to_string(),
+            ..text.clone()
+        };
+        assert!(extra_argument.macro_button().is_none());
+
+        let invalid_escape = FieldText {
+            instruction: r#"MACROBUTTON NeverRun "Click \now""#.to_string(),
+            ..text.clone()
+        };
+        assert!(invalid_escape.macro_button().is_none());
+
+        let wrong_keyword = FieldText {
+            instruction: "DOCVARIABLE Customer".to_string(),
+            ..text
+        };
+        assert!(wrong_keyword.macro_button().is_none());
     }
 
     #[test]

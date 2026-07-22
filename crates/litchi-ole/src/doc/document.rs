@@ -13,7 +13,7 @@ use super::parts::bookmarks::BookmarksTable;
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
-use super::parts::fields::{Field, FieldStory, FieldText, FieldsTable};
+use super::parts::fields::{Field, FieldStory, FieldText, FieldsTable, MacroButtonField};
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
@@ -565,13 +565,28 @@ impl Document {
     /// 2.8.25. It is read from the document's existing text only: fields are
     /// never evaluated or refreshed, DDE conversations are never started,
     /// external paths are never opened, OLE objects are never activated, and
-    /// macro instructions are not executed or inspected.
+    /// macro instructions are never resolved, loaded, or executed.
     pub fn fields(&self) -> Result<Vec<FieldText>> {
         let Some(fields) = &self.fields_table else {
             return Ok(Vec::new());
         };
 
         fields.field_texts(|story, start, end| self.field_story_text(story, start, end))
+    }
+
+    /// Get typed, inert `MACROBUTTON` fields in story and source order.
+    ///
+    /// Returned values expose only stored macro or command names, button text,
+    /// cached results, and field state. This method never resolves, loads,
+    /// invokes, or otherwise executes a macro or command.
+    pub fn macro_button_fields(&self) -> Result<Vec<MacroButtonField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::macro_button).collect())
+    }
+
+    /// Get the number of typed, inert `MACROBUTTON` fields.
+    pub fn macro_button_field_count(&self) -> Result<usize> {
+        Ok(self.macro_button_fields()?.len())
     }
 
     /// Get stored instruction and cached-result text for one parsed field.
