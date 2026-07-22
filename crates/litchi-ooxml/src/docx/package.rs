@@ -3174,6 +3174,43 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_index_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let index = document.add_paragraph();
+            index.add_field(crate::docx::writer::MutableField::with_result(
+                r#"INDEX \c 2 \f "topics" \r"#.to_string(),
+                "Topic\t3".to_string(),
+            ));
+            let entry = document.add_paragraph();
+            entry.add_field(crate::docx::writer::MutableField::with_result(
+                r#"XE "Topic" \f "topics" \r TopicRange \b"#.to_string(),
+                "hidden marker".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let indexes = document.indexes().unwrap();
+        assert_eq!(document.index_count().unwrap(), 1);
+        assert_eq!(indexes.len(), 1);
+        assert_eq!(indexes[0].columns().unwrap(), Some(2));
+        assert_eq!(indexes[0].entry_identifier().unwrap(), Some("topics"));
+        assert!(indexes[0].runs_subentries_inline());
+
+        let entries = document.index_entries().unwrap();
+        assert_eq!(document.index_entry_count().unwrap(), 1);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].entry(), "Topic");
+        assert_eq!(entries[0].entry_identifier().unwrap(), Some("topics"));
+        assert_eq!(entries[0].page_range_bookmark().unwrap(), Some("TopicRange"));
+        assert!(entries[0].is_bold());
+    }
+
+    #[test]
     fn body_edits_preserve_settings_part_byte_for_byte() {
         let mut package = Package::new().unwrap();
         let settings_uri = PackURI::new("/word/settings.xml").unwrap();

@@ -203,6 +203,38 @@ impl Field {
         TableOfAuthoritiesEntryField::from_field(self)
     }
 
+    /// Check whether this is an `INDEX` field.
+    ///
+    /// This recognizes only the stored configuration and does not sort entries,
+    /// calculate page references, or generate the index result.
+    pub fn is_index(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "INDEX").is_some()
+    }
+
+    /// Parse this field as an inert typed generated-index field.
+    ///
+    /// Returns `Ok(None)` for non-`INDEX` fields. The model exposes the stored
+    /// switches and cached result without regenerating or paginating an index.
+    pub fn index(&self) -> Result<Option<IndexField>> {
+        IndexField::from_field(self)
+    }
+
+    /// Check whether this is an `XE` (Index Entry) field.
+    ///
+    /// XE fields mark stored index entries. They are inspected as data only and
+    /// never affect hidden text, sorting, or generated index content.
+    pub fn is_index_entry(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "XE").is_some()
+    }
+
+    /// Parse this field as an inert typed index-entry field.
+    ///
+    /// Returns `Ok(None)` for non-`XE` fields. It never searches document text
+    /// for entries, follows bookmarks, or updates an `INDEX` field.
+    pub fn index_entry(&self) -> Result<Option<IndexEntryField>> {
+        IndexEntryField::from_field(self)
+    }
+
     /// Extract all fields from document XML bytes.
     ///
     /// # Arguments
@@ -812,6 +844,266 @@ impl TableOfAuthoritiesEntryField {
     }
 }
 
+/// East Asian sort order requested by Word's `INDEX \o` extension switch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexSortOrder {
+    /// Sort within radicals by stroke count (`S`).
+    Stroke,
+    /// Sort by pronunciation (`P`).
+    Pronunciation,
+}
+
+/// A typed, inert Word generated-index (`INDEX`) field.
+///
+/// This represents the stored index configuration and cached result. It never
+/// searches for `XE` markers, sorts index entries, calculates pages, or updates
+/// the rendered field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    switches: Vec<FieldSwitch>,
+}
+
+impl IndexField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(switches) = parse_field_switches(field.instruction(), "INDEX")? else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached visible result, if present.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+
+    /// Return the bookmark limiting which portion of the document is indexed.
+    pub fn bookmark(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'b', "INDEX")
+    }
+
+    /// Return the requested number of index columns.
+    ///
+    /// Word bounds the `\c` switch to one through four columns.
+    pub fn columns(&self) -> Result<Option<u8>> {
+        optional_field_switch_argument(&self.switches, 'c', "INDEX")?
+            .map(parse_index_columns)
+            .transpose()
+    }
+
+    /// Return the separator between a sequence number and a page number.
+    pub fn sequence_page_separator(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'd', "INDEX")
+    }
+
+    /// Return the separator between an index entry and its page number.
+    pub fn entry_page_separator(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'e', "INDEX")
+    }
+
+    /// Return the entry identifier used to select matching `XE` fields.
+    pub fn entry_identifier(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'f', "INDEX")
+    }
+
+    /// Return the separator between the endpoints of a page range.
+    pub fn page_range_separator(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'g', "INDEX")
+    }
+
+    /// Return the text inserted between alphabetic groups in the index.
+    pub fn alphabetic_group_heading(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'h', "INDEX")
+    }
+
+    /// Return the separator between an entry and its cross-reference text.
+    pub fn cross_reference_separator(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'k', "INDEX")
+    }
+
+    /// Return the separator between multiple page references.
+    pub fn page_reference_separator(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'l', "INDEX")
+    }
+
+    /// Return Word's requested East Asian index sort order, if present.
+    ///
+    /// `\o` is a documented Word extension rather than a core ECMA-376 INDEX
+    /// switch, so unknown values are reported as invalid instead of guessed.
+    pub fn sort_order(&self) -> Result<Option<IndexSortOrder>> {
+        optional_field_switch_argument(&self.switches, 'o', "INDEX")?
+            .map(parse_index_sort_order)
+            .transpose()
+    }
+
+    /// Return the alphabetic range used to restrict generated entries.
+    pub fn letter_range(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'p', "INDEX")
+    }
+
+    /// Whether subentries are configured to run into their main-entry line.
+    pub fn runs_subentries_inline(&self) -> bool {
+        self.has_switch('r')
+    }
+
+    /// Return the `SEQ` field identifier included with page numbers.
+    pub fn sequence_name(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 's', "INDEX")
+    }
+
+    /// Whether the field enables yomi text for index entries.
+    pub fn uses_yomi(&self) -> bool {
+        self.has_switch('y')
+    }
+
+    /// Return the language identifier Word stores for index generation.
+    ///
+    /// This preserves the lexical field value rather than resolving it to a
+    /// locale or changing sorting behavior.
+    pub fn language_id(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'z', "INDEX")
+    }
+}
+
+/// A typed, inert Word index-entry (`XE`) field.
+///
+/// The entry text and its stored switches are available for inspection. This
+/// model does not change hidden-text formatting, resolve the page-range
+/// bookmark, sort entries, or generate an `INDEX` result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexEntryField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    entry: String,
+    switches: Vec<FieldSwitch>,
+}
+
+impl IndexEntryField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((entry, switches)) = parse_field_operand_and_switches(field.instruction(), "XE")?
+        else {
+            return Ok(None);
+        };
+        let entry = entry.ok_or_else(|| {
+            OoxmlError::InvalidFormat("XE field is missing its index-entry text".to_string())
+        })?;
+        if entry.is_empty() {
+            return Err(OoxmlError::InvalidFormat(
+                "XE field index-entry text is empty".to_string(),
+            ));
+        }
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            entry,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached visible result, if present.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the text that is marked for inclusion in an index.
+    pub fn entry(&self) -> &str {
+        &self.entry
+    }
+
+    /// Return the field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+
+    /// Whether the marked page number is formatted in bold.
+    pub fn is_bold(&self) -> bool {
+        self.has_switch('b')
+    }
+
+    /// Return the entry identifier used to select an `INDEX` field.
+    pub fn entry_identifier(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'f', "XE")
+    }
+
+    /// Whether the marked page number is formatted in italics.
+    pub fn is_italic(&self) -> bool {
+        self.has_switch('i')
+    }
+
+    /// Return the bookmark marking the stored page range.
+    pub fn page_range_bookmark(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'r', "XE")
+    }
+
+    /// Return text substituted for a page number, such as a cross-reference.
+    pub fn cross_reference(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 't', "XE")
+    }
+
+    /// Return yomi sort text, if the entry stores it.
+    pub fn yomi(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'y', "XE")
+    }
+}
+
 fn has_field_switch(switches: &[FieldSwitch], name: char) -> bool {
     switches
         .iter()
@@ -851,6 +1143,28 @@ fn parse_authority_category(value: &str, minimum: u8, field_type: &str) -> Resul
     Ok(value)
 }
 
+fn parse_index_columns(value: &str) -> Result<u8> {
+    let columns = value.parse::<u8>().map_err(|_| {
+        OoxmlError::InvalidFormat("INDEX column count is not an integer".to_string())
+    })?;
+    if !(1..=4).contains(&columns) {
+        return Err(OoxmlError::InvalidFormat(
+            "INDEX column count must be in 1..=4".to_string(),
+        ));
+    }
+    Ok(columns)
+}
+
+fn parse_index_sort_order(value: &str) -> Result<IndexSortOrder> {
+    match value {
+        "S" | "s" => Ok(IndexSortOrder::Stroke),
+        "P" | "p" => Ok(IndexSortOrder::Pronunciation),
+        _ => Err(OoxmlError::InvalidFormat(format!(
+            "INDEX \\o sort order must be S or P, got {value:?}"
+        ))),
+    }
+}
+
 fn field_instruction_remainder<'a>(instruction: &'a str, field_type: &str) -> Option<&'a str> {
     let instruction = instruction.trim_start();
     let field_type_end = field_type.len();
@@ -860,7 +1174,7 @@ fn field_instruction_remainder<'a>(instruction: &'a str, field_type: &str) -> Op
         return None;
     }
     match remainder.chars().next() {
-        None | Some('\\') => Some(remainder),
+        None | Some('\\') | Some('"') => Some(remainder),
         Some(character) if character.is_whitespace() => Some(remainder),
         Some(_) => None,
     }
@@ -871,14 +1185,40 @@ fn parse_field_switches(instruction: &str, field_type: &str) -> Result<Option<Ve
         return Ok(None);
     };
     let mut characters = remainder.chars().peekable();
+    Ok(Some(parse_field_switches_from_characters(
+        &mut characters,
+        field_type,
+    )?))
+}
+
+fn parse_field_operand_and_switches(
+    instruction: &str,
+    field_type: &str,
+) -> Result<Option<(Option<String>, Vec<FieldSwitch>)>> {
+    let Some(remainder) = field_instruction_remainder(instruction, field_type) else {
+        return Ok(None);
+    };
+    let mut characters = remainder.chars().peekable();
+    skip_field_whitespace(&mut characters);
+    let operand = match characters.peek().copied() {
+        None | Some('\\') => None,
+        Some('"') => {
+            characters.next();
+            Some(parse_field_quoted_argument(&mut characters, field_type)?)
+        },
+        Some(_) => Some(parse_field_unquoted_argument(&mut characters)),
+    };
+    let switches = parse_field_switches_from_characters(&mut characters, field_type)?;
+    Ok(Some((operand, switches)))
+}
+
+fn parse_field_switches_from_characters(
+    mut characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    field_type: &str,
+) -> Result<Vec<FieldSwitch>> {
     let mut switches = Vec::new();
     loop {
-        while characters
-            .peek()
-            .is_some_and(|character| character.is_whitespace())
-        {
-            characters.next();
-        }
+        skip_field_whitespace(characters);
         let Some(character) = characters.next() else {
             break;
         };
@@ -895,12 +1235,7 @@ fn parse_field_switches(instruction: &str, field_type: &str) -> Result<Option<Ve
                 "{field_type} field has an invalid switch name"
             )));
         }
-        while characters
-            .peek()
-            .is_some_and(|character| character.is_whitespace())
-        {
-            characters.next();
-        }
+        skip_field_whitespace(characters);
         let argument = match characters.peek().copied() {
             None | Some('\\') => None,
             Some('"') => {
@@ -919,7 +1254,16 @@ fn parse_field_switches(instruction: &str, field_type: &str) -> Result<Option<Ve
             argument,
         });
     }
-    Ok(Some(switches))
+    Ok(switches)
+}
+
+fn skip_field_whitespace(characters: &mut std::iter::Peekable<std::str::Chars<'_>>) {
+    while characters
+        .peek()
+        .is_some_and(|character| character.is_whitespace())
+    {
+        characters.next();
+    }
 }
 
 fn parse_field_quoted_argument(
@@ -1236,6 +1580,62 @@ mod tests {
     }
 
     #[test]
+    fn parses_index_and_index_entry_fields() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" INDEX \b Scope \c 2 \d &quot;.&quot; \e &quot;; &quot; \f &quot;topics&quot; \g &quot; to &quot; \h &quot;A&quot; \k &quot;: &quot; \l &quot; / &quot; \o &quot;P&quot; \p a-m \r \s Chapter \y \z 1033 " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>Rulers</w:t><w:tab/><w:t>4</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>XE&quot;Machiavelli: The Prince&quot;\b\i\f &quot;topics&quot; \r IndexRange \t &quot;See Rulers&quot; \y &quot;ma&quot;</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>hidden index marker</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="INDEXENTRY \f ignored"><w:r><w:t>not an index</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_index());
+        assert!(fields[1].is_index_entry());
+        assert!(!fields[2].is_index());
+        assert!(!fields[2].is_index_entry());
+
+        let index = fields[0].index().unwrap().unwrap();
+        assert_eq!(index.cached_result(), Some("Rulers\t4"));
+        assert!(index.is_dirty());
+        assert!(index.is_locked());
+        assert_eq!(index.bookmark().unwrap(), Some("Scope"));
+        assert_eq!(index.columns().unwrap(), Some(2));
+        assert_eq!(index.sequence_page_separator().unwrap(), Some("."));
+        assert_eq!(index.entry_page_separator().unwrap(), Some("; "));
+        assert_eq!(index.entry_identifier().unwrap(), Some("topics"));
+        assert_eq!(index.page_range_separator().unwrap(), Some(" to "));
+        assert_eq!(index.alphabetic_group_heading().unwrap(), Some("A"));
+        assert_eq!(index.cross_reference_separator().unwrap(), Some(": "));
+        assert_eq!(index.page_reference_separator().unwrap(), Some(" / "));
+        assert_eq!(
+            index.sort_order().unwrap(),
+            Some(IndexSortOrder::Pronunciation)
+        );
+        assert_eq!(index.letter_range().unwrap(), Some("a-m"));
+        assert!(index.runs_subentries_inline());
+        assert_eq!(index.sequence_name().unwrap(), Some("Chapter"));
+        assert!(index.uses_yomi());
+        assert_eq!(index.language_id().unwrap(), Some("1033"));
+
+        let entry = fields[1].index_entry().unwrap().unwrap();
+        assert_eq!(entry.cached_result(), Some("hidden index marker"));
+        assert!(entry.is_dirty());
+        assert!(entry.is_locked());
+        assert_eq!(entry.entry(), "Machiavelli: The Prince");
+        assert!(entry.is_bold());
+        assert!(entry.is_italic());
+        assert_eq!(entry.entry_identifier().unwrap(), Some("topics"));
+        assert_eq!(entry.page_range_bookmark().unwrap(), Some("IndexRange"));
+        assert_eq!(entry.cross_reference().unwrap(), Some("See Rulers"));
+        assert_eq!(entry.yomi().unwrap(), Some("ma"));
+    }
+
+    #[test]
     fn rejects_invalid_table_of_authorities_semantics() {
         let invalid_toa = Field::new(r#"TOA \c 17"#.to_string(), None, false);
         let toa = invalid_toa.table_of_authorities().unwrap().unwrap();
@@ -1248,6 +1648,30 @@ mod tests {
         let duplicate = Field::new(r#"TOA \b "a" \b "b""#.to_string(), None, false);
         let toa = duplicate.table_of_authorities().unwrap().unwrap();
         assert!(toa.bookmark().is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_index_field_semantics() {
+        let invalid_columns = Field::new(r#"INDEX \c 5"#.to_string(), None, false);
+        let index = invalid_columns.index().unwrap().unwrap();
+        assert!(index.columns().is_err());
+
+        let invalid_sort = Field::new(r#"INDEX \o "radical""#.to_string(), None, false);
+        let index = invalid_sort.index().unwrap().unwrap();
+        assert!(index.sort_order().is_err());
+
+        let missing_entry = Field::new(r#"XE \b"#.to_string(), None, false);
+        assert!(missing_entry.index_entry().is_err());
+        let empty_entry = Field::new(r#"XE """#.to_string(), None, false);
+        assert!(empty_entry.index_entry().is_err());
+
+        let duplicate_identifier = Field::new(
+            r#"XE "topic" \f "first" \f "second""#.to_string(),
+            None,
+            false,
+        );
+        let entry = duplicate_identifier.index_entry().unwrap().unwrap();
+        assert!(entry.entry_identifier().is_err());
     }
 
     #[test]

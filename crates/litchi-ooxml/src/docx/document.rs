@@ -8,7 +8,8 @@ use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
-    Field, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+    Field, IndexEntryField, IndexField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
+    TableOfContentsField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1277,6 +1278,41 @@ impl<'a> Document<'a> {
         Ok(self.table_of_authorities_entries()?.len())
     }
 
+    /// Get typed, inert generated-index (`INDEX`) fields in document order.
+    ///
+    /// Returned fields expose stored switches and cached content only. This
+    /// method never searches for index markers, sorts entries, calculates page
+    /// references, generates an index, or refreshes fields.
+    pub fn indexes(&self) -> Result<Vec<IndexField>> {
+        self.fields()?
+            .iter()
+            .map(Field::index)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of generated-index fields in the main document.
+    pub fn index_count(&self) -> Result<usize> {
+        Ok(self.indexes()?.len())
+    }
+
+    /// Get typed, inert index-entry (`XE`) fields in document order.
+    ///
+    /// These are stored index markers. This method does not change hidden text,
+    /// resolve page-range bookmarks, sort entries, or generate an `INDEX`.
+    pub fn index_entries(&self) -> Result<Vec<IndexEntryField>> {
+        self.fields()?
+            .iter()
+            .map(Field::index_entry)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of index-entry fields in the main document.
+    pub fn index_entry_count(&self) -> Result<usize> {
+        Ok(self.index_entries()?.len())
+    }
+
     /// Get all mail-merge fields in document order.
     ///
     /// This recognizes `MERGEFIELD` instructions represented by either
@@ -1734,6 +1770,9 @@ impl<'a> Document<'a> {
     //
     // ✅ Tables of authorities: tables_of_authorities(), table_of_authorities_entries()
     // - Typed inert TOA/TA discovery; no citation search, pagination, or refresh
+    //
+    // ✅ Generated indexes: indexes(), index_entries()
+    // - Typed inert INDEX/XE discovery; no marker search, sorting, pagination, or refresh
     //
     // ✅ Mail merge field discovery: merge_fields(), merge_field_names()
     // TODO: Mail merge mutation (MS-DOCX Section 17.16.5.35)

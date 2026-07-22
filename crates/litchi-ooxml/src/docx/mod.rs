@@ -105,8 +105,9 @@ pub use document::Document;
 pub use drawing::{DrawingObject, ShapeType};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::{
-    Field, FieldSwitch, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
-    TableOfContentsField, TableOfContentsLevelRange, TableOfContentsSwitch,
+    Field, FieldSwitch, IndexEntryField, IndexField, IndexSortOrder, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesField, TableOfContentsField, TableOfContentsLevelRange,
+    TableOfContentsSwitch,
 };
 pub use font_table::{
     EmbeddedFont, EmbeddedFontLicensing, EmbeddedFontResource, EmbeddedFontStyle, Font,
