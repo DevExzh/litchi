@@ -10,9 +10,9 @@ use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
     BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
     IfField, IndexEntryField, IndexField, LinkField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField, MergeField,
-    PromptField, ReferencedDocumentField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
-    TableOfContentsField,
+    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
+    MailMergeRecipientField, MergeField, PromptField, ReferencedDocumentField,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1575,6 +1575,26 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `ASK` and `FILLIN` fields.
     pub fn prompt_field_count(&self) -> Result<usize> {
         Ok(self.prompt_fields()?.len())
+    }
+
+    /// Get typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields in document
+    /// order.
+    ///
+    /// Returned values expose stored recipient layout, locale, country, fallback,
+    /// cached-content, and dirty/lock state only. This method never opens a data
+    /// source, selects a record, performs a merge, expands placeholders, generates
+    /// text, or refreshes a field result.
+    pub fn mail_merge_recipient_fields(&self) -> Result<Vec<MailMergeRecipientField>> {
+        self.fields()?
+            .iter()
+            .map(Field::mail_merge_recipient_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields.
+    pub fn mail_merge_recipient_field_count(&self) -> Result<usize> {
+        Ok(self.mail_merge_recipient_fields()?.len())
     }
 
     /// Get all mail-merge fields in document order.
