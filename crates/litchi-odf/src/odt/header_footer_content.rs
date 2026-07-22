@@ -94,6 +94,16 @@ pub enum HeaderFooterFieldKind {
     Measure,
     TableFormula,
     MetaField,
+    /// Database field metadata. Its source is never opened or queried.
+    DatabaseDisplay,
+    /// Database field metadata. Its source is never opened or queried.
+    DatabaseNext,
+    /// Database field metadata. Its source is never opened or queried.
+    DatabaseRowSelect,
+    /// Database field metadata. Its source is never opened or queried.
+    DatabaseRowNumber,
+    /// Database field metadata. Its source is never opened or queried.
+    DatabaseName,
     Title,
     Subject,
     AuthorName,
@@ -610,6 +620,11 @@ fn field_kind(local: &[u8]) -> Option<HeaderFooterFieldKind> {
         b"measure" => HeaderFooterFieldKind::Measure,
         b"table-formula" => HeaderFooterFieldKind::TableFormula,
         b"meta-field" => HeaderFooterFieldKind::MetaField,
+        b"database-display" => HeaderFooterFieldKind::DatabaseDisplay,
+        b"database-next" => HeaderFooterFieldKind::DatabaseNext,
+        b"database-row-select" => HeaderFooterFieldKind::DatabaseRowSelect,
+        b"database-row-number" => HeaderFooterFieldKind::DatabaseRowNumber,
+        b"database-name" => HeaderFooterFieldKind::DatabaseName,
         b"title" => HeaderFooterFieldKind::Title,
         b"subject" => HeaderFooterFieldKind::Subject,
         b"author-name" => HeaderFooterFieldKind::AuthorName,
@@ -1108,6 +1123,48 @@ mod tests {
                 .contains(&("text:formula".into(), "of:=SUM([.A1:.A2])".into()))
         );
         assert_eq!(fields[7].displayed_text, "meta text");
+    }
+
+    #[test]
+    fn classifies_inert_database_field_metadata() {
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:footer><t:p><t:database-display t:database-name="NeverOpen" t:table-name="Records" t:column-name="Name">Ada</t:database-display><t:database-next t:database-name="NeverOpen" t:table-name="Records" t:condition="of:=TRUE">Next</t:database-next><t:database-row-select t:database-name="NeverOpen" t:table-name="Records" t:condition="of:=TRUE">Select</t:database-row-select><t:database-row-number t:database-name="NeverOpen" t:table-name="Records" t:value="7">7</t:database-row-number><t:database-name t:database-name="NeverOpen" t:table-name="Records">NeverOpen</t:database-name></t:p></s:footer></s:master-page></o:master-styles></o:document-styles>"#;
+        let regions = parse_header_footer_blocks(xml).unwrap();
+        let blocks = &regions[&(String::from("A"), HeaderFooterKind::Footer)];
+        let fields: Vec<_> = blocks[0]
+            .content
+            .iter()
+            .filter_map(|inline| match inline {
+                HeaderFooterInline::Field(field) => Some(field),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
+            vec![
+                &HeaderFooterFieldKind::DatabaseDisplay,
+                &HeaderFooterFieldKind::DatabaseNext,
+                &HeaderFooterFieldKind::DatabaseRowSelect,
+                &HeaderFooterFieldKind::DatabaseRowNumber,
+                &HeaderFooterFieldKind::DatabaseName,
+            ]
+        );
+        assert_eq!(fields[0].displayed_text, "Ada");
+        assert!(
+            fields[0]
+                .attributes
+                .contains(&("text:database-name".into(), "NeverOpen".into()))
+        );
+        assert!(
+            fields[1]
+                .attributes
+                .contains(&("text:condition".into(), "of:=TRUE".into()))
+        );
+        assert!(
+            fields[3]
+                .attributes
+                .contains(&("text:value".into(), "7".into()))
+        );
     }
 
     #[test]
