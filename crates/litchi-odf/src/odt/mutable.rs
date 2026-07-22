@@ -160,6 +160,69 @@ impl MutableDocument {
         self.with_content_xml(FieldParser::parse_dynamic_text_fields)
     }
 
+    /// Return semantic footnotes and endnotes from the current content XML.
+    pub fn notes(&self) -> Result<Vec<crate::Note>> {
+        self.with_content_xml(crate::odt::parse_notes)
+    }
+
+    /// Return only footnotes from the current content XML.
+    pub fn footnotes(&self) -> Result<Vec<crate::Note>> {
+        Ok(self
+            .notes()?
+            .into_iter()
+            .filter(|note| note.class() == crate::NoteClass::Footnote)
+            .collect())
+    }
+
+    /// Return only endnotes from the current content XML.
+    pub fn endnotes(&self) -> Result<Vec<crate::Note>> {
+        Ok(self
+            .notes()?
+            .into_iter()
+            .filter(|note| note.class() == crate::NoteClass::Endnote)
+            .collect())
+    }
+
+    /// Append a validated plain-text footnote or endnote to one `text:p` paragraph.
+    ///
+    /// The paragraph is selected in document order, including paragraphs nested
+    /// in lists, tables, and note bodies. The library serializes only the
+    /// public plain-text note model and never evaluates embedded content.
+    pub fn insert_note(&mut self, paragraph_index: usize, note: &crate::Note) -> Result<()> {
+        let updated =
+            self.with_content_xml(|xml| crate::insert_note_xml(xml, paragraph_index, note))?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+
+    /// Replace one note selected in document order and return its old semantic value.
+    ///
+    /// Replacement emits a plain-text ODF note, so rich note-body markup in the
+    /// old value is intentionally not synthesized into the new one.
+    pub fn replace_note(
+        &mut self,
+        note_index: usize,
+        replacement: &crate::Note,
+    ) -> Result<crate::Note> {
+        let old = self.notes()?.get(note_index).cloned().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("note index {note_index} is out of bounds"))
+        })?;
+        let updated =
+            self.with_content_xml(|xml| crate::replace_note_xml(xml, note_index, replacement))?;
+        self.content_xml = Some(updated);
+        Ok(old)
+    }
+
+    /// Remove one note selected in document order and return its old semantic value.
+    pub fn remove_note(&mut self, note_index: usize) -> Result<crate::Note> {
+        let old = self.notes()?.get(note_index).cloned().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("note index {note_index} is out of bounds"))
+        })?;
+        let updated = self.with_content_xml(|xml| crate::remove_note_xml(xml, note_index))?;
+        self.content_xml = Some(updated);
+        Ok(old)
+    }
+
     /// Return structure-preserving ruby annotations from the current content XML.
     pub fn ruby_annotations(&self) -> Result<crate::RubyAnnotations> {
         self.with_content_xml(crate::parse_ruby_annotations)
@@ -2619,6 +2682,25 @@ mod tests {
             package.manifest().get_media_type("custom/data.bin"),
             Some("application/x-litchi-test")
         );
+    }
+
+    #[test]
+    fn mutable_note_crud_round_trips_through_an_odt_package() {
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("Before").unwrap();
+        let first = crate::Note::new(crate::NoteClass::Footnote, "1", "Initial").unwrap();
+        mutable.insert_note(0, &first).unwrap();
+        assert_eq!(mutable.footnotes().unwrap(), vec![first.clone()]);
+        assert!(mutable.endnotes().unwrap().is_empty());
+
+        let replacement = crate::Note::new(crate::NoteClass::Endnote, "i", "Replacement").unwrap();
+        assert_eq!(mutable.replace_note(0, &replacement).unwrap(), first);
+        assert_eq!(mutable.endnotes().unwrap(), vec![replacement.clone()]);
+        assert_eq!(mutable.remove_note(0).unwrap(), replacement);
+        assert!(mutable.notes().unwrap().is_empty());
+
+        let document = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert!(document.notes().unwrap().is_empty());
     }
 
     #[test]

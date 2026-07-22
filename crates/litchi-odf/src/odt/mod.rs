@@ -32,6 +32,7 @@
 //! - ✅ `DocumentBuilder::new()` - Create new documents
 //! - ✅ `add_paragraph()` - Add paragraphs with text
 //! - ✅ `add_hyperlink()` / `add_hyperlink_element()` - Add inert simple hyperlinks
+//! - ✅ `add_note()` - Author plain-text footnotes and endnotes
 //! - ✅ `add_ruby_annotation()` / `add_ruby_style()` - Author typed ruby annotations and styles
 //! - ✅ `add_table()` - Add tables with rows/cells
 //! - ✅ `add_list()` - Add lists
@@ -66,6 +67,7 @@ pub(crate) use index::expanded_attributes;
 mod index_mark;
 mod mutable;
 mod note;
+pub(crate) use note::parse_notes;
 pub(crate) mod page_layout;
 mod parser;
 mod reference_mark;
@@ -102,7 +104,7 @@ pub use index_mark::{
     insert_text_index_mark_xml, remove_text_index_mark_xml, replace_text_index_mark_xml,
 };
 pub use mutable::MutableDocument;
-pub use note::{Note, NoteClass};
+pub use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
 pub use reference_mark::{
     ReferenceMark, ReferenceMarkFragments, insert_reference_mark_xml, remove_reference_mark_xml,

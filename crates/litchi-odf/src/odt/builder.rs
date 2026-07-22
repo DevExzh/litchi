@@ -43,6 +43,7 @@ pub struct DocumentBuilder {
     reference_marks: Vec<(usize, crate::ReferenceMark)>,
     bookmark_targets: Vec<(usize, crate::BookmarkTarget)>,
     ruby_annotations: Vec<(usize, crate::RubyAnnotation)>,
+    notes: Vec<(usize, crate::Note)>,
     ruby_styles: Vec<crate::RubyStyle>,
     property_forms: Vec<crate::OdfPropertyForm>,
     control_forms: Vec<crate::OdfControlForm>,
@@ -100,6 +101,7 @@ impl DocumentBuilder {
             reference_marks: Vec::new(),
             bookmark_targets: Vec::new(),
             ruby_annotations: Vec::new(),
+            notes: Vec::new(),
             ruby_styles: Vec::new(),
             property_forms: Vec::new(),
             control_forms: Vec::new(),
@@ -879,6 +881,23 @@ impl DocumentBuilder {
         Ok(self)
     }
 
+    /// Append a validated plain-text footnote or endnote to one `text:p` paragraph.
+    ///
+    /// The note is inserted at the paragraph end selected in document order,
+    /// including paragraphs nested in lists, table cells, and note bodies.
+    /// Its body is serialized as plain text only; newlines create separate ODF
+    /// paragraphs. No field, link, script, or embedded payload is evaluated.
+    pub fn add_note(&mut self, paragraph_index: usize, note: &crate::Note) -> Result<&mut Self> {
+        note.validate()?;
+        let body = self.generate_content_body();
+        let xml = format!(
+            r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{body}</office:text>"#
+        );
+        crate::insert_note_xml(&xml, paragraph_index, note)?;
+        self.notes.push((paragraph_index, note.clone()));
+        Ok(self)
+    }
+
     /// Add a named ODF ruby style definition to `styles.xml`.
     pub fn add_ruby_style(&mut self, style: crate::RubyStyle) -> Result<&mut Self> {
         style.validate()?;
@@ -1333,6 +1352,17 @@ impl DocumentBuilder {
             body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
         }
 
+        if !self.notes.is_empty() {
+            let prefix = r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#;
+            let suffix = "</office:text>";
+            let mut wrapped = format!("{prefix}{body}{suffix}");
+            for (paragraph_index, note) in &self.notes {
+                wrapped = crate::insert_note_xml(&wrapped, *paragraph_index, note)
+                    .expect("validated builder note");
+            }
+            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
+        }
+
         body
     }
 
@@ -1772,6 +1802,34 @@ mod tests {
         let mut invalid = DocumentBuilder::new();
         assert!(invalid.add_ruby_annotation(0, &annotation).is_err());
         assert!(invalid.elements.is_empty());
+    }
+
+    #[test]
+    fn note_authoring_round_trips_through_an_odt_package() {
+        let mut note = crate::Note::new(crate::NoteClass::Footnote, "1", "First\nSecond").unwrap();
+        note.set_id(Some("note-1".to_string())).unwrap();
+        note.set_label(Some("*".to_string())).unwrap();
+
+        let mut builder = DocumentBuilder::new();
+        builder.add_paragraph("Body text").unwrap();
+        builder.add_note(0, &note).unwrap();
+
+        let document = crate::odt::Document::from_bytes(builder.build().unwrap()).unwrap();
+        assert_eq!(document.notes().unwrap(), vec![note.clone()]);
+        assert_eq!(document.footnotes().unwrap(), vec![note]);
+        assert!(document.endnotes().unwrap().is_empty());
+
+        let mut invalid = DocumentBuilder::new();
+        invalid.add_paragraph("Only paragraph").unwrap();
+        assert!(
+            invalid
+                .add_note(
+                    1,
+                    &crate::Note::new(crate::NoteClass::Endnote, "i", "No").unwrap()
+                )
+                .is_err()
+        );
+        assert!(invalid.notes.is_empty());
     }
 
     #[test]

@@ -1,5 +1,9 @@
 //! Semantic footnote and endnote parsing.
 
+mod writing;
+
+pub use writing::{insert_note_xml, remove_note_xml, replace_note_xml};
+
 use crate::elements::xml::{
     TEXT_NAMESPACE, append_checked, append_text_control, decode_reference, is_bound,
     namespaced_attribute,
@@ -11,11 +15,22 @@ use quick_xml::reader::NsReader;
 
 const MAX_DEPTH: usize = 4_096;
 const MAX_NOTES: usize = 1_000_000;
+const MAX_NOTE_TEXT_BYTES: usize = 1_048_576;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoteClass {
     Footnote,
     Endnote,
+}
+
+impl NoteClass {
+    /// The ODF lexical value used by `text:note-class`.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Footnote => "footnote",
+            Self::Endnote => "endnote",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,6 +43,27 @@ pub struct Note {
 }
 
 impl Note {
+    /// Construct a plain-text footnote or endnote.
+    ///
+    /// Newlines in `body` are serialized as separate `text:p` elements. Rich
+    /// note-body markup remains readable but is intentionally not synthesized
+    /// by this plain-text authoring API.
+    pub fn new(
+        class: NoteClass,
+        citation: impl Into<String>,
+        body: impl Into<String>,
+    ) -> Result<Self> {
+        let value = Self {
+            class,
+            id: None,
+            citation: citation.into(),
+            label: None,
+            body: body.into(),
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
     pub fn class(&self) -> NoteClass {
         self.class
     }
@@ -43,6 +79,69 @@ impl Note {
     pub fn body(&self) -> &str {
         &self.body
     }
+
+    /// Set the optional `text:id` metadata.
+    pub fn set_id(&mut self, id: Option<String>) -> Result<()> {
+        if let Some(value) = id.as_deref() {
+            validate_note_text(value, "note ID")?;
+        }
+        self.id = id;
+        Ok(())
+    }
+
+    /// Set the citation text emitted in `text:note-citation`.
+    pub fn set_citation(&mut self, citation: impl Into<String>) -> Result<()> {
+        let citation = citation.into();
+        validate_note_text(&citation, "note citation")?;
+        self.citation = citation;
+        Ok(())
+    }
+
+    /// Set optional `text:label` metadata for the citation.
+    pub fn set_label(&mut self, label: Option<String>) -> Result<()> {
+        if let Some(value) = label.as_deref() {
+            validate_note_text(value, "note citation label")?;
+        }
+        self.label = label;
+        Ok(())
+    }
+
+    /// Set the plain-text note body.
+    ///
+    /// Newlines become separate `text:p` elements when the note is serialized.
+    pub fn set_body(&mut self, body: impl Into<String>) -> Result<()> {
+        let body = body.into();
+        validate_note_text(&body, "note body")?;
+        self.body = body;
+        Ok(())
+    }
+
+    /// Validate this value for plain-text ODF note serialization.
+    pub fn validate(&self) -> Result<()> {
+        validate_note_text(&self.citation, "note citation")?;
+        validate_note_text(&self.body, "note body")?;
+        if let Some(value) = self.id.as_deref() {
+            validate_note_text(value, "note ID")?;
+        }
+        if let Some(value) = self.label.as_deref() {
+            validate_note_text(value, "note citation label")?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_note_text(value: &str, context: &str) -> Result<()> {
+    if value.len() > MAX_NOTE_TEXT_BYTES
+        || value.chars().any(|character| {
+            matches!(
+                character,
+                '\0'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}' | '\u{fffe}' | '\u{ffff}'
+            )
+        })
+    {
+        return Err(Error::InvalidFormat(format!("invalid {context}")));
+    }
+    Ok(())
 }
 
 struct ActiveNote {

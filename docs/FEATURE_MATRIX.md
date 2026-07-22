@@ -369,7 +369,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Styles and page layouts | ✅ | ✅ | ✅ | Paragraph/text/table styles, columns, drop caps, tab stops, and page properties |
 | Master pages, headers, and footers | ✅ | ✅ | ✅ | Master-page CRUD and header/footer content/properties |
 | Hyperlinks | ✅ | ✅ | ✅ | Typed inert `text:a` insertion with XLink target/show/actuate and office/text metadata; links are never followed |
-| Footnotes and endnotes | 🟡 | ✅ | 🟡 | Full semantic reading plus note configuration/separators; note-body CRUD is limited |
+| Footnotes and endnotes | 🟡 | ✅ | 🟡 | Full semantic reading plus configuration/separators and plain-text note insert/replace/remove; existing rich note bodies remain readable but are not synthesized by edits |
 | Bookmarks and reference marks | ✅ | ✅ | ✅ | Point/range targets and typed insertion/replacement/removal |
 | Comments/annotations | ✅ | ✅ | ✅ | Point/range annotations and package-aware CRUD |
 | Track changes | ✅ | ✅ | ✅ | Change metadata, regions, policy, and mutation APIs |
