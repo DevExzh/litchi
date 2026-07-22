@@ -76,6 +76,7 @@ pub mod views;
 pub mod volatile_dependencies;
 pub mod workbook;
 pub mod workbook_metadata;
+pub mod workbook_protection;
 pub mod worksheet;
 pub mod xml_maps;
 pub use chartsheet::{
@@ -256,6 +257,7 @@ pub use views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
 };
 pub use workbook::Workbook;
+pub use workbook_protection::{WorkbookProtectionMetadata, parse_workbook_protection};
 pub use worksheet::{
     AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule, Hyperlink,
     PageBreak, PageSetup, RowInfo, Worksheet, WorksheetInfo,

@@ -28,6 +28,9 @@ use crate::xlsx::sheet_protection::{
     parse_worksheet_protection, replace_worksheet_protection,
     validate_worksheet_protection_metadata,
 };
+use crate::xlsx::workbook_protection::{
+    WorkbookProtectionMetadata, parse_workbook_protection,
+};
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
@@ -471,6 +474,17 @@ impl Workbook {
     /// Return the optional inert calculation-chain metadata.
     pub fn calculation_chain(&self) -> Option<&CalculationChain> {
         self.calculation_chain.as_ref()
+    }
+
+    /// Return passive `workbookProtection` metadata from the current `workbook.xml` part.
+    ///
+    /// Password verifier values remain opaque: this method never accepts or
+    /// checks a password, and it does not enforce the requested locks.
+    pub fn workbook_protection_metadata(
+        &self,
+    ) -> SheetResult<Option<WorkbookProtectionMetadata>> {
+        let workbook_part = self.package.get_part(&self.workbook_uri)?;
+        parse_workbook_protection(workbook_part.blob()).map_err(Into::into)
     }
 
     pub fn external_link(&self, one_based_index: u32) -> Option<&ExternalLinkEntry> {
