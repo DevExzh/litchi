@@ -1,5 +1,6 @@
 //! Body-anchored movie CRUD for Pages documents.
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use super::*;
@@ -7,7 +8,7 @@ use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
 
 mod graph;
 
@@ -248,7 +249,148 @@ impl PagesEditor {
         Ok(())
     }
 
+    /// Duplicate one body movie at a UTF-16 body position.
+    ///
+    /// The movie, poster/title/caption stand-ins, and body attachment receive
+    /// fresh identifiers and UUIDs while retaining the source's style and
+    /// unknown protobuf fields. The clone is offset using Pages' native
+    /// duplicate placement. Its video and poster assets remain shared with the
+    /// source, so replacing either asset updates both movies.
+    pub fn duplicate_body_movie(
+        &mut self,
+        source_drawable_object_id: u64,
+        anchor_character_index: usize,
+    ) -> Result<PagesMovieInfo> {
+        let source = body_movie_graph(self, source_drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Pages movie graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Pages movie object {identifier} is missing"))
+                })?;
+                clone_pages_drawable_graph_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat("Pages movie clone has no drawable identifier".to_owned())
+        })?;
+        let new_attachment_id = *remap.get(&source.attachment_id).ok_or_else(|| {
+            Error::InvalidFormat("Pages movie clone has no attachment identifier".to_owned())
+        })?;
+        let geometry =
+            offset_drawable_geometry(source.info.geometry, BODY_DRAWABLE_DUPLICATE_OFFSET)?;
+        set_movie_geometry(&mut staged, &source.archive_name, new_drawable_id, geometry)?;
+        offset_pages_body_drawable_attachment_clone(
+            &mut staged,
+            new_attachment_id,
+            BODY_DRAWABLE_DUPLICATE_OFFSET,
+        )?;
+        let mut text_editor = IWorkTextEditor::from_package(staged);
+        text_editor.replace_text(
+            self.body_storage_id,
+            anchor_character_index..anchor_character_index,
+            "\u{fffc}",
+        )?;
+        staged = text_editor.into_package();
+        add_body_drawable_attachment(
+            &mut staged,
+            self.body_storage_id,
+            anchor_character_index,
+            new_attachment_id,
+        )?;
+        patch_pages_zorder(&mut staged, None, Some(new_drawable_id))?;
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Pages movie graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Pages movie clone has no UUID identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &new_uuid_object_ids)?;
+        for &(data_identifier, object_identifier) in &source.data_references {
+            let new_object_identifier =
+                remap.get(&object_identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Pages movie clone has no data-reference object for {object_identifier}"
+                    ))
+                })?;
+            add_component_data_reference(
+                &mut staged,
+                DOCUMENT_OBJECT_ID,
+                data_identifier,
+                new_object_identifier,
+            )?;
+        }
+
+        let verified = Self::from_package(staged)?;
+        let created = verified
+            .body_movies()?
+            .into_iter()
+            .find(|movie| movie.drawable_object_id == new_drawable_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Pages movie duplication failed validation".to_owned())
+            })?;
+        let created_graph = body_movie_graph(&verified, new_drawable_id)?;
+        let expected_anchor = u32::try_from(anchor_character_index)
+            .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
+        let expected_data_references = source
+            .data_references
+            .iter()
+            .map(|&(data_identifier, object_identifier)| {
+                let new_object_identifier = remap.get(&object_identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Pages movie clone has no validated data-reference object for {object_identifier}"
+                    ))
+                })?;
+                Ok((data_identifier, new_object_identifier))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if created.anchor_character_index != expected_anchor
+            || created.movie_data_identifier != source.info.movie_data_identifier
+            || created.poster_image_data_identifier != source.info.poster_image_data_identifier
+            || created.geometry != geometry
+            || created.original_size != source.info.original_size
+            || created.natural_size != source.info.natural_size
+            || created.duration != source.info.duration
+            || created_graph.object_ids.len() != source.object_ids.len()
+            || created_graph.data_references != expected_data_references
+        {
+            return Err(Error::InvalidFormat(
+                "Pages movie duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created)
+    }
+
     /// Replace the video bytes referenced by one body-anchored movie.
+    ///
+    /// Movies duplicated with [`Self::duplicate_body_movie`] share video data,
+    /// matching Pages' native Duplicate behavior.
     pub fn replace_body_movie_data(
         &mut self,
         drawable_object_id: u64,
@@ -259,6 +401,9 @@ impl PagesEditor {
     }
 
     /// Replace the poster image referenced by one body-anchored movie.
+    ///
+    /// Movies duplicated with [`Self::duplicate_body_movie`] share poster data,
+    /// matching Pages' native Duplicate behavior.
     pub fn replace_body_movie_poster(
         &mut self,
         drawable_object_id: u64,
@@ -453,9 +598,140 @@ mod tests {
     }
 
     #[test]
+    fn scratch_document_supports_native_movie_duplication() {
+        let mut editor = PagesEditor::create_with_text("Quarterly report").unwrap();
+        let source = editor
+            .add_body_movie(
+                "Quarterly report".encode_utf16().count(),
+                "movie.mov",
+                MOVIE,
+                "poster.png",
+                POSTER,
+                options(),
+            )
+            .unwrap();
+        let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
+
+        let duplicate = editor
+            .duplicate_body_movie(source.drawable_object_id, duplicate_anchor)
+            .unwrap();
+        assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
+        let source_graph = body_movie_graph(&editor, source.drawable_object_id).unwrap();
+        let duplicate_graph = body_movie_graph(&editor, duplicate.drawable_object_id).unwrap();
+        assert!(
+            source_graph
+                .object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.object_ids.contains(identifier))
+        );
+        assert!(
+            source_graph
+                .uuid_object_ids
+                .iter()
+                .all(|identifier| !duplicate_graph.uuid_object_ids.contains(identifier))
+        );
+        assert_eq!(duplicate.anchor_character_index, duplicate_anchor as u32);
+        assert_eq!(
+            duplicate.movie_data_identifier,
+            source.movie_data_identifier
+        );
+        assert_eq!(
+            duplicate.poster_image_data_identifier,
+            source.poster_image_data_identifier
+        );
+        assert_eq!(
+            duplicate.geometry.position,
+            source.geometry.position.map(|position| DrawablePoint {
+                x: position.x + BODY_DRAWABLE_DUPLICATE_OFFSET,
+                y: position.y + BODY_DRAWABLE_DUPLICATE_OFFSET,
+            })
+        );
+        assert_eq!(duplicate.geometry.size, source.geometry.size);
+        assert_eq!(duplicate.geometry.flags, source.geometry.flags);
+        assert_eq!(duplicate.geometry.angle, source.geometry.angle);
+        assert_eq!(duplicate.original_size, source.original_size);
+        assert_eq!(duplicate.natural_size, source.natural_size);
+        assert_eq!(duplicate.duration, source.duration);
+
+        let moved_duplicate = DrawableGeometry {
+            position: Some(DrawablePoint { x: 312.0, y: 264.0 }),
+            ..duplicate.geometry
+        };
+        editor
+            .set_body_movie_geometry(duplicate.drawable_object_id, moved_duplicate)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_movie_geometry(source.drawable_object_id)
+                .unwrap(),
+            source.geometry
+        );
+        assert_eq!(
+            editor
+                .body_movie_geometry(duplicate.drawable_object_id)
+                .unwrap(),
+            moved_duplicate
+        );
+        assert_eq!(
+            editor
+                .replace_body_movie_data(duplicate.drawable_object_id, REPLACEMENT_MOVIE)
+                .unwrap(),
+            MOVIE
+        );
+        assert_eq!(
+            editor.extract_media(source.movie_data_identifier).unwrap(),
+            REPLACEMENT_MOVIE
+        );
+        assert_eq!(
+            editor
+                .replace_body_movie_poster(duplicate.drawable_object_id, REPLACEMENT_POSTER)
+                .unwrap(),
+            POSTER
+        );
+        assert_eq!(
+            editor
+                .extract_media(source.poster_image_data_identifier)
+                .unwrap(),
+            REPLACEMENT_POSTER
+        );
+
+        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.body_movies().unwrap().len(), 2);
+        assert_eq!(
+            reopened
+                .body_movies()
+                .unwrap()
+                .into_iter()
+                .find(|movie| movie.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .geometry,
+            moved_duplicate
+        );
+
+        let removed_source = editor.remove_body_movie(source.drawable_object_id).unwrap();
+        assert!(removed_source.removed_data_identifiers.is_empty());
+        assert_eq!(editor.body_movies().unwrap().len(), 1);
+        let removed_duplicate = editor
+            .remove_body_movie(duplicate.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            removed_duplicate.removed_data_identifiers,
+            [
+                source.movie_data_identifier,
+                source.poster_image_data_identifier,
+            ]
+        );
+        assert!(editor.body_movies().unwrap().is_empty());
+        assert!(editor.media_assets().unwrap().is_empty());
+        PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    }
+
+    #[test]
     fn invalid_movie_creation_and_cross_type_edits_are_transactional() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
+        assert!(editor.duplicate_body_movie(999, 0).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
         for result in [
             editor.add_body_movie(4, "poster.png", POSTER, "poster.png", POSTER, options()),
             editor.add_body_movie(4, "movie.mov", MOVIE, "movie.mov", MOVIE, options()),

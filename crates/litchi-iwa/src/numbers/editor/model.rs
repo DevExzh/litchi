@@ -496,6 +496,33 @@ pub(super) fn remap_numbers_image_wire(data: &[u8], remap: &HashMap<u64, u64>) -
     Ok(data)
 }
 
+pub(super) fn remap_numbers_movie_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
+    const REFERENCE_PATHS: &[&[u32]] = &[
+        &[1, 2],
+        &[1, 6],
+        &[1, 9],
+        &[1, 10],
+        &[1, 11],
+        &[2],
+        &[10],
+        &[11],
+        &[19],
+    ];
+    let mut expected = tsd::MovieArchive::decode(data)?;
+    remap_numbers_drawable_archive(&mut expected.super_, remap);
+    remap_numbers_reference(&mut expected.database_movie_data, remap);
+    remap_numbers_reference(&mut expected.database_poster_image_data, remap);
+    remap_numbers_reference(&mut expected.database_audio_only_image_data, remap);
+    remap_numbers_reference(&mut expected.style, remap);
+    let data = remap_numbers_reference_paths(data, REFERENCE_PATHS, remap)?;
+    if tsd::MovieArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers MovieArchive wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn remap_numbers_storage_wire(
     data: &[u8],
     remap: &HashMap<u64, u64>,
@@ -539,6 +566,7 @@ pub(super) fn clone_numbers_drawable_graph_object(
         let data = match message.type_ {
             SHAPE_INFO_MESSAGE_TYPE => remap_numbers_shape_wire(&message.data, remap)?,
             IMAGE_MESSAGE_TYPE => remap_numbers_image_wire(&message.data, remap)?,
+            MOVIE_MESSAGE_TYPE => remap_numbers_movie_wire(&message.data, remap)?,
             2_001 | 2_022 => remap_numbers_storage_wire(&message.data, remap)?,
             STANDIN_CAPTION_MESSAGE_TYPE => message.data.clone(),
             _ => {

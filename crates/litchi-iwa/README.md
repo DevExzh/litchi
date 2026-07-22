@@ -281,7 +281,7 @@ let body = "Quarterly report";
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
 let mut pages = PagesEditor::create_with_text(body)?;
-pages.add_body_movie(
+let source = pages.add_body_movie(
     body.encode_utf16().count(),
     "demo.mov",
     &movie,
@@ -293,9 +293,20 @@ pages.add_body_movie(
         Duration::from_secs(8),
     ),
 )?;
+let duplicate_anchor = pages.body_text()?.encode_utf16().count();
+let duplicate = pages.duplicate_body_movie(source.drawable_object_id, duplicate_anchor)?;
+assert_eq!(duplicate.movie_data_identifier, source.movie_data_identifier);
+assert_eq!(
+    duplicate.poster_image_data_identifier,
+    source.poster_image_data_identifier,
+);
 pages.save("created-with-movie.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+`duplicate_body_movie` produces an independently positioned and anchored movie
+while keeping its video and poster bytes shared with the source, exactly as
+Pages' Duplicate command does.
 
 Audio-only media controls use the same source-free body ownership model. The
 audio asset, playback bounds, zero-size control geometry, body attachment,
@@ -452,7 +463,7 @@ let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
 let mut numbers = NumbersDocumentBuilder::new().build()?;
 let sheet_id = numbers.sheets()?[0].object_id;
-numbers.add_sheet_movie(
+let source = numbers.add_sheet_movie(
     sheet_id,
     "demo.mov",
     &movie,
@@ -464,9 +475,18 @@ numbers.add_sheet_movie(
         Duration::from_secs(8),
     ),
 )?;
+let duplicate = numbers.duplicate_sheet_movie(sheet_id, source.drawable_object_id)?;
+assert_eq!(duplicate.movie_data_identifier, source.movie_data_identifier);
+assert_eq!(
+    duplicate.poster_image_data_identifier,
+    source.poster_image_data_identifier,
+);
 numbers.save("created-with-movie.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+`duplicate_sheet_movie` follows Numbers' native 10-point placement and keeps
+the duplicate's video and poster assets shared with the original.
 
 Audio-only media controls use the same source-built sheet ownership model. The
 audio asset, playback bounds, zero-size control geometry, stand-ins, media
@@ -663,7 +683,7 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
-keynote.add_slide_movie(
+let source = keynote.add_slide_movie(
     0,
     "demo.mov",
     &movie,
@@ -675,9 +695,18 @@ keynote.add_slide_movie(
         Duration::from_secs(8),
     ),
 )?;
+let duplicate = keynote.duplicate_slide_movie(0, source.drawable_object_id)?;
+assert_eq!(duplicate.movie_data_identifier, source.movie_data_identifier);
+assert_eq!(
+    duplicate.poster_image_data_identifier,
+    source.poster_image_data_identifier,
+);
 keynote.save("created-with-movie.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+`duplicate_slide_movie` mirrors Keynote's Duplicate command: it creates a new
+movie graph and playback build with shared video and poster data.
 
 Independently positioned audio uses a distinct typed API even though Keynote
 stores it in the movie-archive family. Its zero-size control, media style,

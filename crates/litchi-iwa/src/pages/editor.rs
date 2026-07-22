@@ -59,6 +59,7 @@ const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 const PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2011;
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
+const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
@@ -2442,6 +2443,33 @@ fn remap_pages_image_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<
     Ok(data)
 }
 
+fn remap_pages_movie_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
+    const REFERENCE_PATHS: &[&[u32]] = &[
+        &[1, 2],
+        &[1, 6],
+        &[1, 9],
+        &[1, 10],
+        &[1, 11],
+        &[2],
+        &[10],
+        &[11],
+        &[19],
+    ];
+    let mut expected = tsd::MovieArchive::decode(data)?;
+    remap_pages_drawable_archive(&mut expected.super_, remap);
+    remap_optional_pages_reference(&mut expected.database_movie_data, remap);
+    remap_optional_pages_reference(&mut expected.database_poster_image_data, remap);
+    remap_optional_pages_reference(&mut expected.database_audio_only_image_data, remap);
+    remap_optional_pages_reference(&mut expected.style, remap);
+    let data = remap_pages_reference_paths(data, REFERENCE_PATHS, remap)?;
+    if tsd::MovieArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Pages MovieArchive wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 fn remap_pages_storage_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const OBJECT_TABLE_FIELDS: &[u32] = &[5, 7, 8, 9, 11, 12, 15, 16, 17, 18, 21, 22, 23, 27, 28];
     let mut expected = StorageArchive::decode(data)?;
@@ -2494,6 +2522,7 @@ fn clone_pages_drawable_graph_object(
         let data = match message.type_ {
             SHAPE_INFO_MESSAGE_TYPE => remap_pages_shape_wire(&message.data, remap)?,
             IMAGE_MESSAGE_TYPE => remap_pages_image_wire(&message.data, remap)?,
+            MOVIE_MESSAGE_TYPE => remap_pages_movie_wire(&message.data, remap)?,
             2001 | 2022 => remap_pages_storage_wire(&message.data, remap)?,
             DRAWABLE_ATTACHMENT_MESSAGE_TYPE => remap_pages_attachment_wire(&message.data, remap)?,
             STANDIN_CAPTION_MESSAGE_TYPE => message.data.clone(),
