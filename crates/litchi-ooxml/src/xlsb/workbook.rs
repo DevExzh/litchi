@@ -6,6 +6,7 @@ use crate::xlsb::error::XlsbResult;
 use crate::xlsb::formula::{
     FormulaExternalBook, FormulaExternalSheet, FormulaPivotViewDefinition,
     FormulaResolutionContext, FormulaSupportingLink, FormulaTableDefinition, excel_name_eq,
+    XlsbExternalLink, XlsbExternalLinkKind,
 };
 use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
@@ -21,6 +22,28 @@ use litchi_opc::constants::relationship_type;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap};
 use std::io::{BufReader, Cursor, Read, Seek, Write};
+
+/// External-workbook relationship types documented by MS-XLSB.
+const EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES: &[&str] = &[
+    relationship_type::EXTERNAL_LINK_PATH,
+    relationship_type::STRICT_EXTERNAL_LINK_PATH,
+    "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath/xlStartup",
+    "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath/xlAlternateStartup",
+    "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath/xlLibrary",
+    "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath/xlPathMissing",
+    "http://schemas.microsoft.com/office/2019/04/relationships/externalLinkLongPath",
+    "http://schemas.microsoft.com/office/2019/04/relationships/xlExternalLinkLongPath/xlStartup",
+    "http://schemas.microsoft.com/office/2019/04/relationships/xlExternalLinkLongPath/xlAlternateStartup",
+    "http://schemas.microsoft.com/office/2009/04/relationships/xlExternalLinkLongPath/xlPathMissing",
+    "http://schemas.microsoft.com/office/2009/04/relationships/xlExternalLinkLongPath/xlLibrary",
+];
+
+/// OLE data-source relationship types documented by MS-XLSB and MS-OI29500.
+const OLE_DATA_SOURCE_RELATIONSHIP_TYPES: &[&str] = &[
+    relationship_type::OLE_OBJECT,
+    relationship_type::STRICT_OLE_OBJECT,
+    "http://schemas.microsoft.com/office/2019/04/relationships/oleObjectLinkLongPath",
+];
 
 /// XLSB workbook implementation
 #[allow(dead_code)]
@@ -121,6 +144,19 @@ impl XlsbWorkbook {
     /// Workbook and sheet-scoped defined names in `PtgName` index order.
     pub fn defined_names(&self) -> &[String] {
         &self.formula_context.defined_names
+    }
+
+    /// Return stored external-workbook, DDE, and OLE link metadata.
+    ///
+    /// The returned values are data-only snapshots in workbook link order.
+    /// Litchi never follows, opens, contacts, refreshes, evaluates, or
+    /// executes any external-link target.
+    pub fn external_links(&self) -> Vec<XlsbExternalLink> {
+        self.formula_context
+            .external_books
+            .iter()
+            .map(FormulaExternalBook::metadata)
+            .collect()
     }
 
     /// Structured-table definitions in workbook table-ID order of discovery.
@@ -1228,13 +1264,13 @@ impl XlsbWorkbook {
                             "BrtSupNameStart has trailing bytes".to_string(),
                         ));
                     }
-                    validate_defined_name(&name)?;
                     if kind == 0 {
-                        defined_names.push(name);
+                        validate_defined_name(&name)?;
                         sup_name_state = 1;
                     } else {
                         sup_name_state = 2;
                     }
+                    defined_names.push(name);
                 },
                 record_types::SUP_NAME_FORMULA => {
                     if link_type != Some(0) || sup_name_state != 1 || record.data.len() < 4 {
@@ -1315,22 +1351,63 @@ impl XlsbWorkbook {
                 "external workbook link has no BrtSupTabs".to_string(),
             ));
         }
-        let target = if kind == 1 {
-            format!("{target_key}:{target_detail}")
-        } else {
-            let relationship = part.rels().get(&target_key).ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidFormula(format!(
-                    "external data relationship {target_key:?} is missing"
-                ))
-            })?;
-            if !relationship.is_external() {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
-                    "external data relationship {target_key:?} is internal"
-                )));
-            }
-            relationship.target_ref().to_string()
+        let (link_kind, source, detail, target) = match kind {
+            1 => {
+                if !part.rels().is_empty() {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        "DDE external link must not contain relationships".to_string(),
+                    ));
+                }
+                let target = format!("{target_key}:{target_detail}");
+                (
+                    XlsbExternalLinkKind::Dde,
+                    target_key,
+                    Some(target_detail),
+                    target,
+                )
+            },
+            0 | 2 => {
+                let relationship = part.rels().get(&target_key).ok_or_else(|| {
+                    crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "external data relationship {target_key:?} is missing"
+                    ))
+                })?;
+                if !relationship.is_external() {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "external data relationship {target_key:?} is internal"
+                    )));
+                }
+                let allowed_relationship_types = if kind == 0 {
+                    EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES
+                } else {
+                    OLE_DATA_SOURCE_RELATIONSHIP_TYPES
+                };
+                if !allowed_relationship_types.contains(&relationship.reltype()) {
+                    let source_kind = if kind == 0 {
+                        "external workbook"
+                    } else {
+                        "OLE data source"
+                    };
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "{source_kind} relationship {target_key:?} has invalid type {:?}",
+                        relationship.reltype()
+                    )));
+                }
+                let target = relationship.target_ref().to_string();
+                let link_kind = if kind == 0 {
+                    XlsbExternalLinkKind::Workbook
+                } else {
+                    XlsbExternalLinkKind::Ole
+                };
+                let detail = if kind == 2 { Some(target_detail) } else { None };
+                (link_kind, target.clone(), detail, target)
+            },
+            _ => unreachable!("external link kind was validated above"),
         };
         Ok(FormulaExternalBook {
+            kind: link_kind,
+            source,
+            detail,
             target,
             sheet_names: sheet_names.into(),
             defined_names: defined_names.into(),
@@ -1823,18 +1900,30 @@ mod tests {
     }
 
     fn parse_external_link(records: &[(u16, Vec<u8>)]) -> XlsbResult<FormulaExternalBook> {
+        parse_external_link_with_relationship_type(
+            records,
+            Some(relationship_type::EXTERNAL_LINK_PATH),
+        )
+    }
+
+    fn parse_external_link_with_relationship_type(
+        records: &[(u16, Vec<u8>)],
+        target_relationship_type: Option<&str>,
+    ) -> XlsbResult<FormulaExternalBook> {
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
         let mut part = BlobPart::new(
             uri.clone(),
             "application/vnd.ms-excel.externalLink".to_string(),
             external_link_records(records),
         );
-        part.rels_mut().add_relationship(
-            "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath".to_string(),
-            "Book.xlsx".to_string(),
-            "rIdPath".to_string(),
-            true,
-        );
+        if let Some(target_relationship_type) = target_relationship_type {
+            part.rels_mut().add_relationship(
+                target_relationship_type.to_string(),
+                "Book.xlsx".to_string(),
+                "rIdPath".to_string(),
+                true,
+            );
+        }
         let mut package = OpcPackage::new();
         package.add_part(Box::new(part));
         let workbook = XlsbWorkbook {
@@ -1869,6 +1958,25 @@ mod tests {
             (record_types::SUP_TABS, tabs),
             (record_types::SUP_NAME_START, wide_string("Rate")),
             (record_types::SUP_NAME_FORMULA, 0u32.to_le_bytes().to_vec()),
+            (record_types::SUP_NAME_BITS, vec![0; 7]),
+            (record_types::SUP_NAME_END, Vec::new()),
+            (record_types::END_SUP_BOOK, Vec::new()),
+        ]
+    }
+
+    fn external_data_source_records(
+        kind: u16,
+        source: &str,
+        detail: &str,
+        item_name: &str,
+    ) -> Vec<(u16, Vec<u8>)> {
+        assert!(matches!(kind, 1 | 2));
+        let mut begin = kind.to_le_bytes().to_vec();
+        begin.extend_from_slice(&wide_string(source));
+        begin.extend_from_slice(&wide_string(detail));
+        vec![
+            (record_types::BEGIN_SUP_BOOK, begin),
+            (record_types::SUP_NAME_START, wide_string(item_name)),
             (record_types::SUP_NAME_BITS, vec![0; 7]),
             (record_types::SUP_NAME_END, Vec::new()),
             (record_types::END_SUP_BOOK, Vec::new()),
@@ -1953,63 +2061,59 @@ mod tests {
     }
 
     #[test]
-    fn reads_rich_and_phonetic_shared_strings_from_reference_fixtures_when_available() {
-        let rich_path = std::path::Path::new(concat!(
+    fn reads_rich_and_phonetic_shared_strings_from_local_fixtures() {
+        let rich_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/sample.xlsb"
-        ));
-        if rich_path.exists() {
-            let workbook = XlsbWorkbook::new(File::open(rich_path).unwrap()).unwrap();
-            let rich = workbook
-                .shared_strings()
-                .iter()
-                .find(|value| !value.runs.is_empty())
-                .expect("sample.xlsb should contain rich shared strings");
-            assert_eq!(rich.text, "hello, xssf");
-            assert_eq!(rich.runs[0].character_index, 0);
-            let mut found_cell_text = false;
-            for index in 0..workbook.formula_context.worksheet_names.len() {
-                let worksheet = workbook.worksheet(index).unwrap();
-                let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() else {
-                    continue;
-                };
-                for row in min_row..=max_row {
-                    for col in min_col..=max_col {
-                        found_cell_text |= worksheet.get_cell(row, col).is_some_and(|cell| {
-                            matches!(cell.value(), litchi_core::sheet::CellValue::String(value) if value == "hello, xssf")
-                        });
-                    }
+            "/../../test-data/ooxml/xlsb/sample.xlsb"
+        );
+        let workbook = XlsbWorkbook::new(File::open(rich_path).unwrap()).unwrap();
+        let rich = workbook
+            .shared_strings()
+            .iter()
+            .find(|value| !value.runs.is_empty())
+            .expect("sample.xlsb should contain rich shared strings");
+        assert_eq!(rich.text, "hello, xssf");
+        assert_eq!(rich.runs[0].character_index, 0);
+        let mut found_cell_text = false;
+        for index in 0..workbook.formula_context.worksheet_names.len() {
+            let worksheet = workbook.worksheet(index).unwrap();
+            let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() else {
+                continue;
+            };
+            for row in min_row..=max_row {
+                for col in min_col..=max_col {
+                    found_cell_text |= worksheet.get_cell(row, col).is_some_and(|cell| {
+                        matches!(cell.value(), litchi_core::sheet::CellValue::String(value) if value == "hello, xssf")
+                    });
                 }
             }
-            assert!(
-                found_cell_text,
-                "rich SST text should remain the cell value"
-            );
         }
+        assert!(
+            found_cell_text,
+            "rich SST text should remain the cell value"
+        );
 
-        let phonetic_path = std::path::Path::new(concat!(
+        let phonetic_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/51519.xlsb"
-        ));
-        if phonetic_path.exists() {
-            let workbook = XlsbWorkbook::new(File::open(phonetic_path).unwrap()).unwrap();
-            let phonetic = workbook
-                .shared_strings()
-                .iter()
-                .find_map(|value| {
-                    value
-                        .phonetic
-                        .as_ref()
-                        .filter(|value| !value.runs.is_empty())
-                })
-                .expect("51519.xlsb should contain phonetic shared strings");
-            assert_eq!(phonetic.font_id, 1);
-            assert_eq!(
-                phonetic.phonetic_type,
-                crate::xlsb::PhoneticType::FullWidthKatakana
-            );
-            assert_eq!(phonetic.alignment, crate::xlsb::PhoneticAlignment::Left);
-        }
+            "/../../test-data/ooxml/xlsb/51519.xlsb"
+        );
+        let workbook = XlsbWorkbook::new(File::open(phonetic_path).unwrap()).unwrap();
+        let phonetic = workbook
+            .shared_strings()
+            .iter()
+            .find_map(|value| {
+                value
+                    .phonetic
+                    .as_ref()
+                    .filter(|value| !value.runs.is_empty())
+            })
+            .expect("51519.xlsb should contain phonetic shared strings");
+        assert_eq!(phonetic.font_id, 1);
+        assert_eq!(
+            phonetic.phonetic_type,
+            crate::xlsb::PhoneticType::FullWidthKatakana
+        );
+        assert_eq!(phonetic.alignment, crate::xlsb::PhoneticAlignment::Left);
     }
 
     #[test]
@@ -2111,14 +2215,11 @@ mod tests {
     }
 
     #[test]
-    fn opens_poi_custom_number_fixture_when_available() {
-        let path = std::path::Path::new(concat!(
+    fn opens_custom_number_fixture() {
+        let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/62815.xlsb"
-        ));
-        if !path.exists() {
-            return;
-        }
+            "/../../test-data/ooxml/xlsb/62815.xlsb"
+        );
         let workbook = XlsbWorkbook::new(File::open(path).unwrap()).unwrap();
         assert!(workbook.styles().num_fmts.keys().any(|id| *id >= 164));
         let worksheet = workbook.worksheet(0).unwrap();
@@ -2126,14 +2227,11 @@ mod tests {
     }
 
     #[test]
-    fn reads_external_book_metadata_from_poi_corpus_when_available() {
-        let path = std::path::Path::new(concat!(
+    fn reads_external_book_metadata_from_local_fixture() {
+        let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/bug66682.xlsb"
-        ));
-        if !path.exists() {
-            return;
-        }
+            "/../../test-data/ooxml/xlsb/bug66682.xlsb"
+        );
 
         let package = OpcPackage::open(path).unwrap();
         let workbook = XlsbWorkbook {
@@ -2160,6 +2258,75 @@ mod tests {
         assert_eq!(book.target, "Book.xlsx");
         assert_eq!(&*book.sheet_names, &["Data Sheet"]);
         assert_eq!(&*book.defined_names, &["Rate"]);
+
+        let link = book.metadata();
+        assert_eq!(link.kind(), XlsbExternalLinkKind::Workbook);
+        assert!(link.is_workbook());
+        assert_eq!(link.source(), "Book.xlsx");
+        assert_eq!(link.dde_topic(), None);
+        assert_eq!(link.ole_program_id(), None);
+        assert_eq!(link.sheet_names(), &["Data Sheet".to_string()]);
+        assert_eq!(link.declared_names(), &["Rate".to_string()]);
+    }
+
+    #[test]
+    fn exposes_inert_dde_and_ole_link_metadata() {
+        let dde_records = external_data_source_records(1, "Excel", "System", "Rates Item");
+        let dde = parse_external_link_with_relationship_type(&dde_records, None)
+            .unwrap()
+            .metadata();
+        assert_eq!(dde.kind(), XlsbExternalLinkKind::Dde);
+        assert!(!dde.is_workbook());
+        assert_eq!(dde.source(), "Excel");
+        assert_eq!(dde.dde_topic(), Some("System"));
+        assert_eq!(dde.ole_program_id(), None);
+        assert!(dde.sheet_names().is_empty());
+        assert_eq!(dde.declared_names(), &["Rates Item".to_string()]);
+
+        let ole_records =
+            external_data_source_records(2, "rIdPath", "Acme.Server", "Report Item");
+        let ole = parse_external_link_with_relationship_type(
+            &ole_records,
+            Some(relationship_type::OLE_OBJECT),
+        )
+        .unwrap()
+        .metadata();
+        assert_eq!(ole.kind(), XlsbExternalLinkKind::Ole);
+        assert!(!ole.is_workbook());
+        assert_eq!(ole.source(), "Book.xlsx");
+        assert_eq!(ole.dde_topic(), None);
+        assert_eq!(ole.ole_program_id(), Some("Acme.Server"));
+        assert!(ole.sheet_names().is_empty());
+        assert_eq!(ole.declared_names(), &["Report Item".to_string()]);
+    }
+
+    #[test]
+    fn validates_external_link_relationship_types() {
+        assert!(matches!(
+            parse_external_link_with_relationship_type(
+                &external_workbook_records(),
+                Some(relationship_type::OLE_OBJECT),
+            ),
+            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+        ));
+
+        let dde_records = external_data_source_records(1, "Excel", "System", "Rates");
+        assert!(matches!(
+            parse_external_link_with_relationship_type(
+                &dde_records,
+                Some(relationship_type::EXTERNAL_LINK_PATH),
+            ),
+            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+        ));
+
+        let ole_records = external_data_source_records(2, "rIdPath", "Acme.Server", "Report");
+        assert!(matches!(
+            parse_external_link_with_relationship_type(
+                &ole_records,
+                Some(relationship_type::EXTERNAL_LINK_PATH),
+            ),
+            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+        ));
     }
 
     #[test]
@@ -2185,8 +2352,7 @@ mod tests {
             workbook_data,
         );
         workbook_part.rels_mut().add_relationship(
-            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink"
-                .to_string(),
+            relationship_type::EXTERNAL_LINK.to_string(),
             "externalLinks/externalLink1.bin".to_string(),
             "rIdExternal".to_string(),
             false,
@@ -2199,7 +2365,7 @@ mod tests {
             external_link_records(&external_workbook_records()),
         );
         external_part.rels_mut().add_relationship(
-            "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath".to_string(),
+            relationship_type::EXTERNAL_LINK_PATH.to_string(),
             "Book.xlsx".to_string(),
             "rIdPath".to_string(),
             true,
@@ -2209,6 +2375,14 @@ mod tests {
         package.add_part(Box::new(workbook_part));
         package.add_part(Box::new(external_part));
         let workbook = XlsbWorkbook::from_opc_package(package).unwrap();
+
+        let links = workbook.external_links();
+        assert_eq!(links.len(), 1);
+        let link = &links[0];
+        assert_eq!(link.kind(), XlsbExternalLinkKind::Workbook);
+        assert_eq!(link.source(), "Book.xlsx");
+        assert_eq!(link.sheet_names(), &["Data Sheet".to_string()]);
+        assert_eq!(link.declared_names(), &["Rate".to_string()]);
 
         let reference = FormulaParser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0])
             .parse()

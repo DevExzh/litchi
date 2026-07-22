@@ -311,13 +311,109 @@ impl FormulaTableDefinition {
     }
 }
 
-/// Metadata from one XLSB External Link part.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+/// Stored kind of an XLSB External Link part.
+///
+/// The kind describes metadata already present in the package; it does not
+/// cause its source to be opened, contacted, refreshed, or executed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XlsbExternalLinkKind {
+    /// A link to another workbook.
+    Workbook,
+    /// A link to a Dynamic Data Exchange server and topic.
+    Dde,
+    /// A link to an OLE data source.
+    Ole,
+}
+
+/// Typed, inert metadata from one XLSB External Link part.
+///
+/// The source, topic, program ID, worksheet names, and declared names are
+/// stored package metadata. Reading this value never follows a relationship,
+/// opens a workbook, contacts a DDE server, initializes an OLE object,
+/// refreshes data, evaluates formulas, or executes code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsbExternalLink {
+    kind: XlsbExternalLinkKind,
+    source: String,
+    detail: Option<String>,
+    sheet_names: Vec<String>,
+    declared_names: Vec<String>,
+}
+
+impl XlsbExternalLink {
+    /// Return the stored external-link kind.
+    pub const fn kind(&self) -> XlsbExternalLinkKind {
+        self.kind
+    }
+
+    /// Return the stored source identifier.
+    ///
+    /// This is the external relationship target for workbook and OLE links,
+    /// and the DDE server name for DDE links. It is never resolved or opened.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Return the stored DDE topic when this is a DDE link.
+    pub fn dde_topic(&self) -> Option<&str> {
+        match self.kind {
+            XlsbExternalLinkKind::Dde => self.detail.as_deref(),
+            XlsbExternalLinkKind::Workbook | XlsbExternalLinkKind::Ole => None,
+        }
+    }
+
+    /// Return the stored OLE program ID when this is an OLE link.
+    pub fn ole_program_id(&self) -> Option<&str> {
+        match self.kind {
+            XlsbExternalLinkKind::Ole => self.detail.as_deref(),
+            XlsbExternalLinkKind::Workbook | XlsbExternalLinkKind::Dde => None,
+        }
+    }
+
+    /// Return cached worksheet names for a workbook link.
+    ///
+    /// DDE and OLE links return an empty slice.
+    pub fn sheet_names(&self) -> &[String] {
+        &self.sheet_names
+    }
+
+    /// Return stored names declared by this link.
+    ///
+    /// For workbook links, these are external defined names. For DDE and OLE
+    /// links, these are data-item names. They are metadata only and are never
+    /// evaluated or requested from the source.
+    pub fn declared_names(&self) -> &[String] {
+        &self.declared_names
+    }
+
+    /// Return whether this link stores metadata for another workbook.
+    pub const fn is_workbook(&self) -> bool {
+        matches!(self.kind, XlsbExternalLinkKind::Workbook)
+    }
+}
+
+/// Formula-resolution metadata from one XLSB External Link part.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FormulaExternalBook {
+    pub(crate) kind: XlsbExternalLinkKind,
+    pub(crate) source: String,
+    pub(crate) detail: Option<String>,
     pub(crate) target: String,
     pub(crate) sheet_names: std::sync::Arc<[String]>,
     pub(crate) defined_names: std::sync::Arc<[String]>,
     pub(crate) is_workbook: bool,
+}
+
+impl FormulaExternalBook {
+    pub(crate) fn metadata(&self) -> XlsbExternalLink {
+        XlsbExternalLink {
+            kind: self.kind,
+            source: self.source.clone(),
+            detail: self.detail.clone(),
+            sheet_names: self.sheet_names.to_vec(),
+            declared_names: self.defined_names.to_vec(),
+        }
+    }
 }
 
 /// Kind of supporting link referenced by `BrtExternSheet` entries.
@@ -5380,6 +5476,9 @@ mod tests {
             }]
             .into(),
             external_books: vec![FormulaExternalBook {
+                kind: XlsbExternalLinkKind::Workbook,
+                source: "Book.xlsx".to_string(),
+                detail: None,
                 target: "Book.xlsx".to_string(),
                 sheet_names: vec!["Data Sheet".to_string()].into(),
                 defined_names: vec!["Rate".to_string()].into(),
@@ -5842,6 +5941,9 @@ mod tests {
             }]
             .into(),
             external_books: vec![FormulaExternalBook {
+                kind: XlsbExternalLinkKind::Workbook,
+                source: "Book.xlsx".to_string(),
+                detail: None,
                 target: "Book.xlsx".to_string(),
                 sheet_names: vec!["Data Sheet".to_string()].into(),
                 defined_names: Vec::new().into(),
@@ -5991,6 +6093,9 @@ mod structured_reference_compiler_tests {
             },
         ];
         let external_books = vec![FormulaExternalBook {
+            kind: XlsbExternalLinkKind::Workbook,
+            source: "Book.xlsx".to_string(),
+            detail: None,
             target: "Book.xlsx".to_string(),
             sheet_names: vec!["Data Sheet".to_string()].into(),
             defined_names: Vec::new().into(),

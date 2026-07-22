@@ -305,7 +305,7 @@ conversion, fonts, and image conversion are optional.
 | Pivot tables/caches | ❌ | ❌ | ❌ | No public compiled XLSB pivot module |
 | Charts and drawings | ❌ | ❌ | ❌ | No typed XLSB chart/drawing model |
 | Structured tables | ❌ | ❌ | ❌ | No ListObject model |
-| External links and connections | ❌ | ❌ | ❌ | No typed model |
+| External links and connections | 🟡 | ✅ | ❌ | Typed inert external-workbook, DDE, and OLE link targets, sheet names, and declared name/item metadata; connections remain unmodeled and no target is opened, contacted, refreshed, or executed |
 | VBA project/code modules | 🟡 | 🟡 | ❌ | Inert MS-XLSB Workbook → VBA Project topology plus declared legacy/Agile signature-part metadata; project/signature payload contents are never inspected, parsed, verified, or executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |

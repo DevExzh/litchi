@@ -159,6 +159,7 @@ pub use calculation::{CalculationMode, CalculationProperties};
 pub use cell::XlsbCell;
 pub use data_validation::{DataValidation, DataValidationRecordKind, DataValidationSettings};
 pub use error::{XlsbError, XlsbResult};
+pub use formula::{XlsbExternalLink, XlsbExternalLinkKind};
 pub use shared_strings::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedString, SharedStringRun,
 };
