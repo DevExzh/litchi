@@ -107,7 +107,7 @@ conversion, fonts, and image conversion are optional.
 | Document protection | 🟡 | ✅ | ✅ | Protection settings and hashes; the library does not enforce editing policy |
 | Table of contents | 🟡 | ❌ | ✅ | TOC field/content authoring; no pagination or automatic refresh |
 | Watermarks | 🟡 | ❌ | ✅ | Writer support for generated watermark content |
-| Office Math equations in-document | ❌ | ❌ | ❌ | Standalone OMML conversion exists, but no DOCX equation CRUD model |
+| Office Math equations in-document | ✅ | ✅ | ✅ | Exact OMML extraction plus validated inline/display equation and math-paragraph authoring; layout and equation evaluation remain renderer responsibilities |
 | SmartArt | ❌ | ❌ | ❌ | Diagram parts are not exposed as a DOCX semantic model |
 | DrawingML text boxes and WordArt | ❌ | ❌ | ❌ | No typed DOCX authoring model |
 | Citations, bibliography, index, and TOA | ❌ | ❌ | ❌ | Generic fields do not constitute these semantic models |

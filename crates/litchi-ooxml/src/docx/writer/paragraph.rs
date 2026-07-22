@@ -1,5 +1,6 @@
 //! Paragraph types and implementation for DOCX documents.
 use crate::docx::namespace::normalize_xml_integer;
+use crate::docx::{OfficeMath, OfficeMathParagraph};
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
@@ -20,6 +21,8 @@ use super::smart_tag::MutableSmartTag;
 #[derive(Debug)]
 pub(crate) enum ParagraphElement {
     Run(MutableRun),
+    /// Display `<m:oMathPara>` content directly inside the paragraph.
+    DisplayOfficeMath(OfficeMathParagraph),
     Hyperlink(MutableHyperlink),
     InlineImage(MutableInlineImage),
     /// Bookmark start marker
@@ -53,6 +56,10 @@ impl ParagraphElement {
     ) -> Result<()> {
         match self {
             Self::Run(run) => run.to_xml_mode(xml, mode),
+            Self::DisplayOfficeMath(math) => {
+                xml.push_str(math.xml());
+                Ok(())
+            },
             Self::Hyperlink(hyperlink) => {
                 let placeholder = format!("{{{{HYPERLINK_{}}}}}", *hyperlink_index);
                 hyperlink.to_xml_mode(xml, Some(&placeholder), mode)?;
@@ -104,6 +111,10 @@ impl ParagraphElement {
     ) -> Result<()> {
         match self {
             Self::Run(run) => run.to_xml_mode(xml, mode),
+            Self::DisplayOfficeMath(math) => {
+                xml.push_str(math.xml());
+                Ok(())
+            },
             Self::Hyperlink(hyperlink) => {
                 if hyperlink.url.is_some() {
                     if let Some(rel_id) = rel_mapper.get_hyperlink_id(*hyperlink_index) {
@@ -214,6 +225,57 @@ impl MutableParagraph {
         let run = self.add_run();
         run.set_text(text);
         run
+    }
+
+    /// Add an inline Office Math equation to this paragraph.
+    ///
+    /// The equation is emitted as `<w:r><m:oMath>…</m:oMath></w:r>`, allowing
+    /// it to appear between ordinary text runs.
+    pub fn add_inline_office_math(&mut self, equation: OfficeMath) -> &mut Self {
+        self.add_run().set_office_math(equation);
+        self
+    }
+
+    /// Parse and add an inline Office Math equation.
+    pub fn add_inline_office_math_xml(
+        &mut self,
+        xml: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let equation = OfficeMath::from_xml(xml)?;
+        Ok(self.add_inline_office_math(equation))
+    }
+
+    /// Add a display Office Math equation to this paragraph.
+    ///
+    /// Display equations are enclosed in an `<m:oMathPara>` container as
+    /// required by Word's display-math layout model.
+    pub fn add_display_office_math(&mut self, equation: OfficeMath) -> &mut Self {
+        self.add_office_math_paragraph(OfficeMathParagraph::from_equation(equation))
+    }
+
+    /// Parse and add a display Office Math equation.
+    pub fn add_display_office_math_xml(
+        &mut self,
+        xml: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let equation = OfficeMath::from_xml(xml)?;
+        Ok(self.add_display_office_math(equation))
+    }
+
+    /// Add a fully specified display-math paragraph.
+    pub fn add_office_math_paragraph(&mut self, paragraph: OfficeMathParagraph) -> &mut Self {
+        self.elements
+            .push(ParagraphElement::DisplayOfficeMath(paragraph));
+        self
+    }
+
+    /// Parse and add a fully specified display-math paragraph.
+    pub fn add_office_math_paragraph_xml(
+        &mut self,
+        xml: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let paragraph = OfficeMathParagraph::from_xml(xml)?;
+        Ok(self.add_office_math_paragraph(paragraph))
     }
 
     /// Add a hyperlink to the paragraph.
@@ -871,7 +933,7 @@ pub enum ListType {
 #[cfg(test)]
 mod tests {
     use super::MutableParagraph;
-    use crate::docx::Paragraph;
+    use crate::docx::{OfficeMath, Paragraph};
     use crate::docx::writer::relmap::RelationshipMapper;
 
     #[test]
@@ -916,5 +978,30 @@ mod tests {
         let mut paragraph = MutableParagraph::new();
         assert!(paragraph.set_division_id("12.5").is_err());
         assert_eq!(paragraph.division_id(), None);
+    }
+
+    #[test]
+    fn writes_and_reopens_inline_and_display_office_math() {
+        let inline = OfficeMath::text("x + y");
+        let display = OfficeMath::from_xml("<m:oMath><m:r><m:t>z</m:t></m:r></m:oMath>")
+            .unwrap();
+        let mut paragraph = MutableParagraph::new();
+        paragraph.add_run_with_text("before ");
+        paragraph.add_inline_office_math(inline.clone());
+        paragraph.add_run_with_text(" after");
+        paragraph.add_display_office_math(display.clone());
+
+        let mut xml = String::new();
+        paragraph.to_xml(&mut xml).unwrap();
+        assert!(xml.contains("<w:r><m:oMath"));
+        assert!(xml.contains("<m:oMathPara"));
+
+        let parsed = Paragraph::new(xml.into_bytes());
+        assert_eq!(parsed.inline_office_math().unwrap(), vec![inline]);
+        assert_eq!(parsed.display_office_math().unwrap(), vec![display]);
+
+        let count = paragraph.element_count();
+        assert!(paragraph.add_inline_office_math_xml("<m:notMath/>").is_err());
+        assert_eq!(paragraph.element_count(), count);
     }
 }

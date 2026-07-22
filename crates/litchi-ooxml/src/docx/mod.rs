@@ -68,6 +68,7 @@ pub mod hyperlink;
 pub mod image;
 pub mod list;
 pub mod mail_merge;
+pub mod math;
 pub mod modern_comments;
 mod namespace;
 pub mod numbering;
@@ -125,6 +126,7 @@ pub use mail_merge::{
     MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,
     MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
 };
+pub use math::{OfficeMath, OfficeMathParagraph};
 pub use modern_comments::{
     CommentExtension, CommentIdMapping, CommentReaction, CommentReactionInfo, CommentReactionUser,
     ExtensibleComment, ModernCommentConformance, ModernCommentMetadata,

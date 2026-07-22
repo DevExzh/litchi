@@ -3050,6 +3050,43 @@ mod tests {
     }
 
     #[test]
+    fn saves_and_reopens_inline_and_display_office_math() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let inline = crate::docx::OfficeMath::text("x + y");
+        let display = crate::docx::OfficeMath::from_xml(
+            "<m:oMath><m:r><m:t>z</m:t></m:r></m:oMath>",
+        )
+        .unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            document
+                .add_paragraph()
+                .add_inline_office_math(inline.clone());
+            document.add_display_office_math(display.clone());
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document_uri = PackURI::new("/word/document.xml").unwrap();
+        let document_xml = std::str::from_utf8(
+            reopened
+                .opc
+                .get_part(&document_uri)
+                .unwrap()
+                .blob(),
+        )
+        .unwrap();
+        let document_opening = &document_xml[..document_xml.find("><w:body>").unwrap()];
+        assert!(document_opening.contains(
+            "xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\""
+        ));
+        let paragraphs = reopened.document().unwrap().paragraphs().unwrap();
+        assert_eq!(paragraphs[0].inline_office_math().unwrap(), vec![inline]);
+        assert_eq!(paragraphs[1].display_office_math().unwrap(), vec![display]);
+    }
+
+    #[test]
     fn writes_and_rediscovers_distinct_watermarks() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

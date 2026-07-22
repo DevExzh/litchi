@@ -4,6 +4,7 @@ use crate::common::xml::{
 use crate::docx::drawing::{DrawingObject, parse_drawing_objects};
 use crate::docx::hyperlink::Hyperlink;
 use crate::docx::image::{InlineImage, parse_inline_images};
+use crate::docx::math::OfficeMath;
 use crate::docx::namespace::{
     direct_word_property_value, is_wordprocessing_namespace, normalize_xml_integer,
     scan_word_element_ranges,
@@ -793,6 +794,19 @@ impl Paragraph {
         Ok(formulas)
     }
 
+    /// Extract inline Office Math equations as validated typed fragments.
+    ///
+    /// Inline equations are `<m:oMath>` elements nested in Word runs.  Their
+    /// exact raw XML remains available through [`Self::omml_formulas`]; this
+    /// method turns each fragment into a validated [`OfficeMath`] value
+    /// suitable for reuse with the mutable writer.
+    pub fn inline_office_math(&self) -> Result<Vec<OfficeMath>> {
+        self.omml_formulas()?
+            .into_iter()
+            .map(OfficeMath::from_xml)
+            .collect()
+    }
+
     /// Extract all inline images from this paragraph.
     ///
     /// Returns a vector of `InlineImage` objects found in `<w:drawing>` elements
@@ -903,6 +917,19 @@ impl Paragraph {
             Ok(())
         })?;
         Ok(formulas)
+    }
+
+    /// Extract display Office Math equations as validated typed fragments.
+    ///
+    /// Display equations are `<m:oMath>` elements outside Word runs, normally
+    /// enclosed by an `<m:oMathPara>` math paragraph.  The result is flattened
+    /// into document order; use [`Self::paragraph_level_formulas`] when the
+    /// original XML strings are required.
+    pub fn display_office_math(&self) -> Result<Vec<OfficeMath>> {
+        self.paragraph_level_formulas()?
+            .into_iter()
+            .map(OfficeMath::from_xml)
+            .collect()
     }
     /// Get all hyperlinks in this paragraph.
     ///
@@ -2159,6 +2186,16 @@ mod tests {
                     .to_string()
             )
         );
+        let inline = paragraph.inline_office_math().unwrap();
+        assert_eq!(inline.len(), 2);
+        assert_eq!(
+            inline[1].xml(),
+            r#"<q:oMath q:id="2" xmlns:q="http://schemas.openxmlformats.org/officeDocument/2006/math"/>"#
+        );
+        assert_eq!(
+            paragraph.display_office_math().unwrap()[0].xml(),
+            r#"<q:oMath xmlns:q="http://schemas.openxmlformats.org/officeDocument/2006/math"><q:r/></q:oMath>"#
+        );
     }
 
     #[test]
@@ -2176,6 +2213,15 @@ mod tests {
         assert_eq!(
             inherited.omml_formula().unwrap().as_deref(),
             Some("<m:oMath><m:r/></m:oMath>")
+        );
+
+        let inherited_default = Paragraph::new(
+            br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:r><oMath><r/></oMath></w:r></w:p>"#
+                .to_vec(),
+        );
+        assert_eq!(
+            inherited_default.inline_office_math().unwrap()[0].xml(),
+            r#"<oMath xmlns="http://schemas.openxmlformats.org/officeDocument/2006/math"><r/></oMath>"#
         );
 
         let foreign =

@@ -1,5 +1,6 @@
 /// Document writer implementation for DOCX.
 use crate::docx::alt_chunk::{AltChunk, AltChunkNamespace, scan_alt_chunks};
+use crate::docx::OfficeMath;
 use crate::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
 
@@ -345,6 +346,22 @@ impl MutableDocument {
         let para = self.add_paragraph();
         para.add_run_with_text(text);
         para
+    }
+
+    /// Add a paragraph containing one display Office Math equation.
+    pub fn add_display_office_math(&mut self, equation: OfficeMath) -> &mut MutableParagraph {
+        let paragraph = self.add_paragraph();
+        paragraph.add_display_office_math(equation);
+        paragraph
+    }
+
+    /// Parse and add a paragraph containing one display Office Math equation.
+    pub fn add_display_office_math_xml(
+        &mut self,
+        xml: impl Into<String>,
+    ) -> Result<&mut MutableParagraph> {
+        let equation = OfficeMath::from_xml(xml)?;
+        Ok(self.add_display_office_math(equation))
     }
 
     /// Add a heading paragraph.
@@ -1147,7 +1164,7 @@ impl MutableDocument {
             xml.push_str(prefix);
         } else {
             xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-            xml.push_str(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><w:body>"#);
+            xml.push_str(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body>"#);
         }
     }
 

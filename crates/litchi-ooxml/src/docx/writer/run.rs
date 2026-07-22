@@ -1,4 +1,5 @@
 //! Run types and implementation for DOCX documents.
+use crate::docx::OfficeMath;
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
@@ -14,6 +15,8 @@ use super::revision::{RevisionMetadata, RevisionTextMode, RunPropertyChange};
 pub enum RunContent {
     /// Plain text
     Text(String),
+    /// Inline Office Math equation
+    OfficeMath(OfficeMath),
     /// Page number field
     PageNumber(PageNumberFormat),
     /// Page count field (total pages)
@@ -81,6 +84,18 @@ impl MutableRun {
     /// Set the text content.
     pub fn set_text(&mut self, text: &str) {
         self.content = RunContent::Text(text.to_string());
+    }
+
+    /// Replace this run's content with an inline Office Math equation.
+    pub fn set_office_math(&mut self, equation: OfficeMath) -> &mut Self {
+        self.content = RunContent::OfficeMath(equation);
+        self
+    }
+
+    /// Parse and replace this run's content with an inline Office Math equation.
+    pub fn set_office_math_xml(&mut self, xml: impl Into<String>) -> Result<&mut Self> {
+        let equation = OfficeMath::from_xml(xml)?;
+        Ok(self.set_office_math(equation))
     }
 
     /// Get the text content.
@@ -251,6 +266,7 @@ impl MutableRun {
 
         // Write content based on type
         match &self.content {
+            RunContent::OfficeMath(math) => xml.push_str(math.xml()),
             RunContent::Text(text) if !text.is_empty() => {
                 let name = if mode == RevisionTextMode::Deleted { "delText" } else { "t" };
                 write!(xml, "<w:{name} xml:space=\"preserve\">{}</w:{name}>", escape_xml(text))

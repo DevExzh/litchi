@@ -14,7 +14,10 @@ pub(crate) const DRAWINGML_CHART_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/drawingml/2006/chart";
 pub(crate) const STRICT_DRAWINGML_CHART_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/drawingml/chart";
-const OMML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/math";
+/// Transitional Office Math namespace URI.
+pub(crate) const OMML_NAMESPACE_URI: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/math";
+const OMML_NAMESPACE: &[u8] = OMML_NAMESPACE_URI.as_bytes();
 const STRICT_OMML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/math";
 
 /// Decode a numeric or predefined XML entity reference.
@@ -93,7 +96,11 @@ pub(crate) fn unqualified_attribute_value(
     Ok(value)
 }
 
-fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
+pub(crate) fn is_omml_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+) -> bool {
     if name.local_name().as_ref() != local_name {
         return false;
     }
