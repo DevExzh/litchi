@@ -166,11 +166,12 @@ pub use external_reference::{
     MAX_DOCUMENT_EXTERNAL_REFERENCE_TOTAL_BYTES,
 };
 pub use field::{
-    BodyStoryEvent, DdeField, DdeFieldKind, DdeRepresentation, EquationField, ExternalIncludeField,
-    ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
-    FieldSwitch, FieldType, HyperlinkCode, IncludeFieldKind, IndexEntryField, IndexEntryOption,
-    IndexField, IndexOption, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
-    PageBreak, ParsedFieldCode, ReferenceCode, SectionBreak, StoryEvent, StoryField,
+    BibliographyField, BibliographyOption, BodyStoryEvent, CitationField, CitationOption, DdeField,
+    DdeFieldKind, DdeRepresentation, EquationField, ExternalIncludeField, ExternalIncludeOption,
+    Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus, FieldSwitch, FieldType,
+    HyperlinkCode, IncludeFieldKind, IndexEntryField, IndexEntryOption, IndexField, IndexOption,
+    LinkField, LinkFormatting, LinkResultOption, MacroButtonField, PageBreak, ParsedFieldCode,
+    ReferenceCode, SectionBreak, StoryEvent, StoryField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesEntryOption, TableOfAuthoritiesField,
     TableOfAuthoritiesOption, TableOfContentsEntryField, TableOfContentsEntryOption,
     TableOfContentsField, TableOfContentsOption, parse_field_code,

@@ -1001,6 +1001,46 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert CITATION fields in document field order.
+    ///
+    /// Source tags, switches, and cached results are exposed solely as stored
+    /// metadata. This method never loads bibliography sources, resolves tags,
+    /// applies a style, or formats a citation.
+    pub fn citations(&self) -> Vec<crate::CitationField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::citation)
+            .collect()
+    }
+
+    /// Return the number of typed, inert CITATION fields in the document.
+    pub fn citation_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.citation().is_some())
+            .count()
+    }
+
+    /// Return typed, inert BIBLIOGRAPHY fields in document field order.
+    ///
+    /// Switches and cached results are exposed solely as stored metadata. This
+    /// method never loads bibliography sources, filters records, applies a
+    /// style, sorts entries, or generates bibliography content.
+    pub fn bibliographies(&self) -> Vec<crate::BibliographyField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::bibliography)
+            .collect()
+    }
+
+    /// Return the number of typed, inert BIBLIOGRAPHY fields in the document.
+    pub fn bibliography_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.bibliography().is_some())
+            .count()
+    }
+
     /// Return typed, inert TOC fields in document field order.
     ///
     /// Stored options and cached results are exposed solely as metadata. This

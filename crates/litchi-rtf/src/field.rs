@@ -29,6 +29,8 @@ pub enum FieldType {
     IncludePicture,
     Index,
     IndexEntry,
+    Citation,
+    Bibliography,
     Unknown,
 }
 
@@ -667,6 +669,81 @@ pub struct IndexEntryField<'a> {
     position: usize,
 }
 
+/// One recognized stored option of a CITATION field.
+///
+/// These values describe a citation's stored bibliography metadata. They are
+/// inert only: this crate never resolves source tags, selects a bibliography
+/// style, or formats a citation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CitationOption<'a> {
+    /// The `\l` language identifier used when formatting the citation.
+    LanguageId(Cow<'a, str>),
+    /// The `\f` prefix prepended to the citation.
+    Prefix(Cow<'a, str>),
+    /// The `\s` suffix appended to the citation.
+    Suffix(Cow<'a, str>),
+    /// The `\p` cited page number.
+    PageNumber(Cow<'a, str>),
+    /// The `\v` cited volume number.
+    VolumeNumber(Cow<'a, str>),
+    /// The `\n` switch suppresses author information.
+    SuppressAuthor,
+    /// The `\t` switch suppresses title information.
+    SuppressTitle,
+    /// The `\y` switch suppresses year information.
+    SuppressYear,
+    /// A source tag added by the `\m` multi-source switch.
+    AdditionalSourceTag(Cow<'a, str>),
+}
+
+/// Inert metadata for a legacy RTF CITATION field.
+///
+/// This model retains a stored source tag, options, and cached result only. It
+/// never loads bibliography data, resolves source tags, applies a style, or
+/// formats a citation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CitationField<'a> {
+    instruction: &'a str,
+    source_tag: Cow<'a, str>,
+    options: Vec<CitationOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+/// One recognized stored option of a BIBLIOGRAPHY field.
+///
+/// These values describe bibliography selection metadata only. This crate
+/// never loads source records, filters them, applies a style, sorts entries,
+/// or generates bibliography content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BibliographyOption<'a> {
+    /// The `\l` language identifier used for sources without a locale.
+    LanguageId(Cow<'a, str>),
+    /// The `\f` language identifier used to filter source records.
+    FilterLanguageId(Cow<'a, str>),
+    /// The `\m` source tag used to select one source record.
+    SourceTag(Cow<'a, str>),
+}
+
+/// Inert metadata for a legacy RTF BIBLIOGRAPHY field.
+///
+/// This model retains stored options and a cached result only. It never loads
+/// source records, filters them, applies a style, sorts entries, or generates
+/// bibliography content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BibliographyField<'a> {
+    instruction: &'a str,
+    options: Vec<BibliographyOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 struct ExternalIncludeParts<'a> {
     kind: IncludeFieldKind,
     source: Cow<'a, str>,
@@ -706,6 +783,17 @@ struct IndexParts<'a> {
 struct IndexEntryParts<'a> {
     entry: Cow<'a, str>,
     options: Vec<IndexEntryOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct CitationParts<'a> {
+    source_tag: Cow<'a, str>,
+    options: Vec<CitationOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct BibliographyParts<'a> {
+    options: Vec<BibliographyOption<'a>>,
     unknown_switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -1409,6 +1497,115 @@ impl<'a> IndexEntryField<'a> {
     }
 }
 
+impl<'a> CitationField<'a> {
+    /// Return the complete stored CITATION field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the primary bibliography source tag without resolving it.
+    pub fn source_tag(&self) -> &str {
+        &self.source_tag
+    }
+
+    /// Return recognized CITATION options in stored source order.
+    ///
+    /// These options are metadata only. This method never loads sources,
+    /// applies a bibliography style, or formats a citation.
+    pub fn options(&self) -> &[CitationOption<'a>] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
+impl<'a> BibliographyField<'a> {
+    /// Return the complete stored BIBLIOGRAPHY field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return recognized BIBLIOGRAPHY options in stored source order.
+    ///
+    /// These options are metadata only. This method never loads sources,
+    /// filters records, applies a style, sorts entries, or generates content.
+    pub fn options(&self) -> &[BibliographyOption<'a>] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> Field<'a> {
     #[inline]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
@@ -1494,6 +1691,16 @@ impl<'a> Field<'a> {
             },
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("XE") => {
                 FieldType::IndexEntry
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("CITATION") =>
+            {
+                FieldType::Citation
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("BIBLIOGRAPHY") =>
+            {
+                FieldType::Bibliography
             },
             _ => FieldType::Unknown,
         };
@@ -1776,6 +1983,49 @@ impl<'a> Field<'a> {
         Some(IndexEntryField {
             instruction: self.instruction.as_ref(),
             entry: parts.entry,
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed CITATION field.
+    ///
+    /// Stored source tags and options are never resolved, loaded, styled, or
+    /// formatted. Malformed CITATION instructions remain generic fields and
+    /// return None here.
+    pub fn citation(&self) -> Option<CitationField<'_>> {
+        if self.field_type != FieldType::Citation {
+            return None;
+        }
+        let parts = citation_parts(self.instruction.as_ref())?;
+        Some(CitationField {
+            instruction: self.instruction.as_ref(),
+            source_tag: parts.source_tag,
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed BIBLIOGRAPHY field.
+    ///
+    /// Stored options are never used to load source records, apply a style,
+    /// sort entries, or generate bibliography content. Malformed BIBLIOGRAPHY
+    /// instructions remain generic fields and return None here.
+    pub fn bibliography(&self) -> Option<BibliographyField<'_>> {
+        if self.field_type != FieldType::Bibliography {
+            return None;
+        }
+        let parts = bibliography_parts(self.instruction.as_ref())?;
+        Some(BibliographyField {
+            instruction: self.instruction.as_ref(),
             options: parts.options,
             unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
@@ -2898,6 +3148,150 @@ fn index_entry_parts(instruction: &str) -> Option<IndexEntryParts<'_>> {
 
     Some(IndexEntryParts {
         entry,
+        options,
+        unknown_switches,
+    })
+}
+
+fn citation_parts(instruction: &str) -> Option<CitationParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("CITATION") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let source_tag = tokens.first()?.value.clone();
+    if source_tag.is_empty() || switch_name(tokens.first()?).is_some() {
+        return None;
+    }
+    tokens.remove(0);
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let normalized_name = name.to_ascii_lowercase();
+        match normalized_name.as_str() {
+            "l" => {
+                options.push(CitationOption::LanguageId(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "f" => {
+                options.push(CitationOption::Prefix(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "s" => {
+                options.push(CitationOption::Suffix(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "p" => {
+                options.push(CitationOption::PageNumber(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "v" => {
+                options.push(CitationOption::VolumeNumber(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "n" | "t" | "y" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(match normalized_name.as_str() {
+                    "n" => CitationOption::SuppressAuthor,
+                    "t" => CitationOption::SuppressTitle,
+                    "y" => CitationOption::SuppressYear,
+                    _ => unreachable!("CITATION suppression switch was matched above"),
+                });
+                index += 1;
+            },
+            "m" => {
+                options.push(CitationOption::AdditionalSourceTag(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            _ => {
+                let value = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none());
+                unknown_switches.push(FieldSwitch {
+                    name: Cow::Owned(name.to_string()),
+                    value: value.map(|token| token.value.clone()),
+                });
+                index += 1 + usize::from(value.is_some());
+            },
+        }
+    }
+
+    Some(CitationParts {
+        source_tag,
+        options,
+        unknown_switches,
+    })
+}
+
+fn bibliography_parts(instruction: &str) -> Option<BibliographyParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("BIBLIOGRAPHY") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let normalized_name = name.to_ascii_lowercase();
+        match normalized_name.as_str() {
+            "l" => {
+                options.push(BibliographyOption::LanguageId(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "f" => {
+                options.push(BibliographyOption::FilterLanguageId(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "m" => {
+                options.push(BibliographyOption::SourceTag(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            _ => {
+                let value = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none());
+                unknown_switches.push(FieldSwitch {
+                    name: Cow::Owned(name.to_string()),
+                    value: value.map(|token| token.value.clone()),
+                });
+                index += 1 + usize::from(value.is_some());
+            },
+        }
+    }
+
+    Some(BibliographyParts {
         options,
         unknown_switches,
     })
@@ -4069,6 +4463,176 @@ mod tests {
             Field::parse_instruction(r"XER entry").field_type,
             FieldType::Unknown
         );
+    }
+
+    #[test]
+    fn citation_fields_preserve_stored_metadata_without_resolving_sources() {
+        let mut field = Field::parse_instruction(
+            r#"CITATION Ecma01 \l 1033 \f "see " \s " (appendix)" \p 42 \v 2 \n \t \y \m Ecma02 \m Ecma03 \* MERGEFORMAT"#,
+        );
+        field.result = Cow::Borrowed("cached citation");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::Citation);
+        let citation = field.citation().unwrap();
+        assert_eq!(citation.instruction(), field.instruction);
+        assert_eq!(citation.source_tag(), "Ecma01");
+        assert_eq!(
+            citation.options(),
+            &[
+                CitationOption::LanguageId(Cow::Borrowed("1033")),
+                CitationOption::Prefix(Cow::Borrowed("see ")),
+                CitationOption::Suffix(Cow::Borrowed(" (appendix)")),
+                CitationOption::PageNumber(Cow::Borrowed("42")),
+                CitationOption::VolumeNumber(Cow::Borrowed("2")),
+                CitationOption::SuppressAuthor,
+                CitationOption::SuppressTitle,
+                CitationOption::SuppressYear,
+                CitationOption::AdditionalSourceTag(Cow::Borrowed("Ecma02")),
+                CitationOption::AdditionalSourceTag(Cow::Borrowed("Ecma03")),
+            ]
+        );
+        assert_eq!(citation.cached_result(), Some("cached citation"));
+        assert!(citation.is_dirty());
+        assert!(citation.is_locked());
+        assert_eq!(citation.owner(), FieldOwner::Body);
+        assert_eq!(citation.position(), 4);
+        assert_eq!(citation.unknown_switches().len(), 1);
+        assert_eq!(citation.unknown_switches()[0].name, "*");
+        assert_eq!(
+            citation.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+
+        assert!(Field::parse_instruction("CITATION").citation().is_none());
+        assert!(
+            Field::parse_instruction(r"CITATION \l 1033")
+                .citation()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction("CITATION Ecma01 unexpected")
+                .citation()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"CITATION Ecma01 \l")
+                .citation()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"CITATION Ecma01 \n unexpected")
+                .citation()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction("CITATIONS Ecma01").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
+    fn bibliography_fields_preserve_stored_metadata_without_generation() {
+        let mut field =
+            Field::parse_instruction(r#"BIBLIOGRAPHY \l 1033 \f en-US \m Ecma01 \* MERGEFORMAT"#);
+        field.result = Cow::Borrowed("cached bibliography");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::Bibliography);
+        let bibliography = field.bibliography().unwrap();
+        assert_eq!(bibliography.instruction(), field.instruction);
+        assert_eq!(
+            bibliography.options(),
+            &[
+                BibliographyOption::LanguageId(Cow::Borrowed("1033")),
+                BibliographyOption::FilterLanguageId(Cow::Borrowed("en-US")),
+                BibliographyOption::SourceTag(Cow::Borrowed("Ecma01")),
+            ]
+        );
+        assert_eq!(bibliography.cached_result(), Some("cached bibliography"));
+        assert!(bibliography.is_dirty());
+        assert!(bibliography.is_locked());
+        assert_eq!(bibliography.owner(), FieldOwner::Body);
+        assert_eq!(bibliography.position(), 4);
+        assert_eq!(bibliography.unknown_switches().len(), 1);
+        assert_eq!(bibliography.unknown_switches()[0].name, "*");
+        assert_eq!(
+            bibliography.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+
+        assert!(
+            Field::parse_instruction("BIBLIOGRAPHY")
+                .bibliography()
+                .is_some()
+        );
+        assert!(
+            Field::parse_instruction("BIBLIOGRAPHY unexpected")
+                .bibliography()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"BIBLIOGRAPHY \f")
+                .bibliography()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction(r"BIBLIOGRAPHIES \l 1033").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
+    fn document_discovers_bibliography_fields_without_loading_sources() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst CITATION Ecma01 \\l 1033 \\n \\m Ecma02}{\fldrslt cached citation}}Middle {\field{\*\fldinst BIBLIOGRAPHY \\l 1033 \\f en-US \\m Ecma01}{\fldrslt cached bibliography}}After}"#,
+        )
+        .unwrap();
+
+        let citations = document.citations();
+        assert_eq!(document.citation_count(), 1);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0].source_tag(), "Ecma01");
+        assert_eq!(
+            citations[0].options(),
+            &[
+                CitationOption::LanguageId(Cow::Borrowed("1033")),
+                CitationOption::SuppressAuthor,
+                CitationOption::AdditionalSourceTag(Cow::Borrowed("Ecma02")),
+            ]
+        );
+        assert_eq!(citations[0].cached_result(), Some("cached citation"));
+        assert!(citations[0].is_dirty());
+        assert!(citations[0].is_locked());
+
+        let bibliographies = document.bibliographies();
+        assert_eq!(document.bibliography_count(), 1);
+        assert_eq!(bibliographies.len(), 1);
+        assert_eq!(
+            bibliographies[0].options(),
+            &[
+                BibliographyOption::LanguageId(Cow::Borrowed("1033")),
+                BibliographyOption::FilterLanguageId(Cow::Borrowed("en-US")),
+                BibliographyOption::SourceTag(Cow::Borrowed("Ecma01")),
+            ]
+        );
+        assert_eq!(
+            bibliographies[0].cached_result(),
+            Some("cached bibliography")
+        );
+        assert_eq!(document.text(), "Before Middle After");
     }
 
     #[test]
