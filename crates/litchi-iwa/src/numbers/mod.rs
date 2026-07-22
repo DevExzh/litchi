@@ -51,11 +51,12 @@ pub use editor::{
     NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo, NumbersSheetInfo,
     NumbersSheetMovieInfo, NumbersSheetMovieOptions, NumbersSheetShapeInfo, NumbersSheetShapeKind,
     NumbersTableDimension, NumbersTableDimensionSize, NumbersTableHeaderCount,
-    NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints, NumbersTableTitleSettings,
-    NumbersTextBoxInfo, RemovedNumbersSheetAudio, RemovedNumbersSheetChart,
-    RemovedNumbersSheetImage, RemovedNumbersSheetMovie, RemovedNumbersSheetShape,
-    RemovedNumbersTextBox, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
-    TableRowInsertion,
+    NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints, NumbersTableSortColumnIndex,
+    NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRule,
+    NumbersTableTitleSettings, NumbersTextBoxInfo, RemovedNumbersSheetAudio,
+    RemovedNumbersSheetChart, RemovedNumbersSheetImage, RemovedNumbersSheetMovie,
+    RemovedNumbersSheetShape, RemovedNumbersTextBox, TableColumnDeletion, TableColumnInsertion,
+    TableRowDeletion, TableRowInsertion,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

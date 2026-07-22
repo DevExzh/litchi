@@ -63,6 +63,8 @@ println!("{}", structured.summary());
   automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header
   settings with lossless optional-field presence
+- Typed Numbers full-table sort-rule configuration CRUD with lossless native
+  rule and reference-tracker preservation
 - Lossless Numbers table-title visibility and title-outline settings
 - Typed Keynote theme-layout discovery and fresh empty-slide creation with native
   component registration, speaker notes, storage-less slide-number placeholders,
@@ -1040,7 +1042,11 @@ singular fields fail transactionally. Header rows, header columns, footer rows,
 freeze toggles, and print-time repeating-header toggles expose their native
 optional presence through typed settings; the validated count type matches
 Numbers' native 1–5 choices, with `None` representing zero. See
-`edit_numbers_table_headers`. Table resizing still updates tiles,
+`edit_numbers_table_headers`. Full-table sort rules have typed read, set, and
+clear APIs that preserve native rule extensions and reference-tracker metadata.
+They configure the order displayed in Numbers' **Organize → Sort** pane;
+executing that order remains Numbers' separate **Sort Now** action. Table
+resizing still updates tiles,
 header buckets, stable UID maps, and stroke sidecars as one checked operation;
 each existing object is now mutated through bounded wire paths, including the
 unpacked UID index arrays and nested UUID records. Grow/shrink restoration is

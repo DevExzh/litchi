@@ -3276,6 +3276,7 @@ mod table_duplicate;
 mod table_formula;
 mod table_headers;
 mod table_move;
+mod table_sort;
 mod table_title;
 mod table_topology;
 mod text_box_create;
@@ -3296,6 +3297,10 @@ pub(crate) use table_cells::TableCellBatch;
 pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};
 use table_duplicate::*;
 pub use table_headers::{NumbersTableHeaderCount, NumbersTableHeaderSettings};
+pub use table_sort::{
+    NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
+    NumbersTableSortRule,
+};
 pub use table_title::NumbersTableTitleSettings;
 pub(crate) use table_title::{
     set_table_title_settings_in_package, table_title_settings_in_package,

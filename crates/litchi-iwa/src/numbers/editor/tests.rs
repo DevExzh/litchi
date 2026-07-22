@@ -5260,6 +5260,281 @@ fn table_header_settings_reject_malformed_wire_transactionally() {
 }
 
 #[test]
+fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
+    let mut sort_unknown = Vec::new();
+    append_unknown_varint(&mut sort_unknown, 98, 980);
+    let mut rule_unknown = Vec::new();
+    append_unknown_varint(&mut rule_unknown, 97, 970);
+    let mut native = tst::TableSortOrderArchive {
+        r#type: tst::table_sort_order_archive::SortType::EntireTable as i32,
+        rules: vec![tst::table_sort_order_archive::SortRuleArchive {
+            index: 1,
+            direction: tst::table_sort_order_archive::sort_rule_archive::Direction::Ascending
+                as i32,
+        }],
+    }
+    .encode_to_vec();
+    native.extend_from_slice(&sort_unknown);
+    native = crate::wire::transform_length_delimited_fields_at_path(&native, &[2], |rule| {
+        let mut rule = rule.to_vec();
+        rule.extend_from_slice(&rule_unknown);
+        Ok(rule)
+    })
+    .unwrap();
+    let tracker = tst::SortRuleReferenceTrackerArchive {
+        reference_tracker: Reference {
+            identifier: 91,
+            ..Default::default()
+        },
+    }
+    .encode_to_vec();
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            let message = object.messages[0].clone();
+            let mut data = message.data;
+            append_unknown_varint(&mut data, 99, 990);
+            crate::wire::append_length_delimited_field(&mut data, 44, &native)?;
+            crate::wire::append_length_delimited_field(&mut data, 45, &tracker)?;
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    assert_eq!(
+        editor.table_sort_order(10).unwrap(),
+        Some(
+            NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(1).unwrap(),
+                NumbersTableSortDirection::Ascending,
+            )])
+            .unwrap()
+        )
+    );
+
+    let order = NumbersTableSortOrder::new([
+        NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(2).unwrap(),
+            NumbersTableSortDirection::Descending,
+        ),
+        NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(1).unwrap(),
+            NumbersTableSortDirection::Ascending,
+        ),
+    ])
+    .unwrap();
+    editor.set_table_sort_order(10, order.clone()).unwrap();
+    assert_eq!(editor.table_sort_order(10).unwrap(), Some(order.clone()));
+    assert_eq!(order.rules()[0].column().get(), 2);
+    assert_eq!(
+        order.rules()[0].direction(),
+        NumbersTableSortDirection::Descending
+    );
+    let changed = editor.to_bytes().unwrap();
+    let reparsed = NumbersEditor::from_bytes(&changed).unwrap();
+    assert_eq!(reparsed.table_sort_order(10).unwrap(), Some(order.clone()));
+
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let model =
+        TableModelArchive::decode(archive.object(10).unwrap().messages[0].data.as_slice()).unwrap();
+    let native = model.sort_order.unwrap();
+    assert_eq!(
+        native.r#type,
+        tst::table_sort_order_archive::SortType::EntireTable as i32
+    );
+    assert_eq!(native.rules.len(), 2);
+    assert_eq!(native.rules[0].index, 2);
+    assert_eq!(
+        native.rules[0].direction,
+        tst::table_sort_order_archive::sort_rule_archive::Direction::Descending as i32
+    );
+    let sort_payload = crate::wire::repeated_length_delimited_payloads(
+        archive.object(10).unwrap().messages[0].data.as_slice(),
+        44,
+    )
+    .unwrap()
+    .pop()
+    .unwrap();
+    assert!(sort_payload.ends_with(&sort_unknown));
+    let sort_rules = crate::wire::repeated_length_delimited_payloads(sort_payload, 2).unwrap();
+    assert_eq!(sort_rules.len(), 2);
+    assert!(sort_rules[0].ends_with(&rule_unknown));
+    assert_eq!(
+        crate::wire::repeated_length_delimited_payloads(
+            archive.object(10).unwrap().messages[0].data.as_slice(),
+            45,
+        )
+        .unwrap(),
+        vec![tracker.as_slice()]
+    );
+
+    editor.set_table_sort_order(10, order.clone()).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), changed);
+
+    let out_of_bounds = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(4).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    assert!(editor.set_table_sort_order(10, out_of_bounds).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), changed);
+
+    editor.clear_table_sort_order(10).unwrap();
+    assert_eq!(editor.table_sort_order(10).unwrap(), None);
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let model =
+        TableModelArchive::decode(archive.object(10).unwrap().messages[0].data.as_slice()).unwrap();
+    assert!(model.sort_order.is_some());
+    assert!(model.sort_order.unwrap().rules.is_empty());
+    let sort_payload = crate::wire::repeated_length_delimited_payloads(
+        archive.object(10).unwrap().messages[0].data.as_slice(),
+        44,
+    )
+    .unwrap()
+    .pop()
+    .unwrap();
+    assert!(sort_payload.ends_with(&sort_unknown));
+    assert!(
+        crate::wire::repeated_length_delimited_payloads(sort_payload, 2)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        crate::wire::repeated_length_delimited_payloads(
+            archive.object(10).unwrap().messages[0].data.as_slice(),
+            45,
+        )
+        .unwrap(),
+        vec![tracker.as_slice()]
+    );
+    let cleared = editor.to_bytes().unwrap();
+    editor.clear_table_sort_order(10).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), cleared);
+    assert_ne!(cleared, baseline);
+}
+
+#[test]
+fn table_sort_order_rejects_duplicate_wire_fields_transactionally() {
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    let native = tst::TableSortOrderArchive {
+        r#type: tst::table_sort_order_archive::SortType::EntireTable as i32,
+        rules: vec![tst::table_sort_order_archive::SortRuleArchive {
+            index: 1,
+            direction: tst::table_sort_order_archive::sort_rule_archive::Direction::Ascending
+                as i32,
+        }],
+    }
+    .encode_to_vec();
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            let message = object.messages[0].clone();
+            let mut data = message.data;
+            crate::wire::append_length_delimited_field(&mut data, 44, &native)?;
+            crate::wire::append_length_delimited_field(&mut data, 44, &native)?;
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.table_sort_order(10).is_err());
+    assert!(editor.set_table_sort_order(10, order).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn table_sort_order_rejects_malformed_nested_wire_transactionally() {
+    const SORT_TYPE_FIELD: u32 = 1;
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    let mut native = tst::TableSortOrderArchive {
+        r#type: tst::table_sort_order_archive::SortType::EntireTable as i32,
+        rules: vec![tst::table_sort_order_archive::SortRuleArchive {
+            index: 1,
+            direction: tst::table_sort_order_archive::sort_rule_archive::Direction::Ascending
+                as i32,
+        }],
+    }
+    .encode_to_vec();
+    append_unknown_varint(
+        &mut native,
+        SORT_TYPE_FIELD,
+        tst::table_sort_order_archive::SortType::EntireTable as u64,
+    );
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            let message = object.messages[0].clone();
+            let mut data = message.data;
+            crate::wire::append_length_delimited_field(&mut data, 44, &native)?;
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.table_sort_order(10).is_err());
+    assert!(editor.set_table_sort_order(10, order).is_err());
+    assert!(editor.clear_table_sort_order(10).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn source_created_table_supports_sort_order_configuration_crud() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(4, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let baseline = editor.to_bytes().unwrap();
+    editor.clear_table_sort_order(table_id).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    editor
+        .set_table_sort_order(table_id, order.clone())
+        .unwrap();
+    let reparsed = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(reparsed.table_sort_order(table_id).unwrap(), Some(order));
+
+    editor.clear_table_sort_order(table_id).unwrap();
+    assert_eq!(editor.table_sort_order(table_id).unwrap(), None);
+}
+
+#[test]
 fn table_title_settings_are_lossless_transactional_and_wire_exact() {
     let mut package = crate::numbers::NumbersDocumentBuilder::new()
         .build_package()
