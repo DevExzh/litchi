@@ -1185,6 +1185,28 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields in document
+    /// order.
+    ///
+    /// Stored recipient layout, locale, country, fallback, cached-result, and
+    /// field state are exposed solely as metadata. This method never opens a
+    /// data source, selects a record, performs a merge, expands placeholders,
+    /// generates text, or refreshes a field result.
+    pub fn mail_merge_recipient_fields(&self) -> Vec<crate::MailMergeRecipientField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::mail_merge_recipient_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields.
+    pub fn mail_merge_recipient_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.mail_merge_recipient_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert TOC fields in document field order.
     ///
     /// Stored options and cached results are exposed solely as metadata. This

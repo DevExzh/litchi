@@ -166,18 +166,19 @@ pub use external_reference::{
     MAX_DOCUMENT_EXTERNAL_REFERENCE_TOTAL_BYTES,
 };
 pub use field::{
-    BibliographyField, BibliographyOption, BodyStoryEvent, CitationField, CitationOption, DdeField,
-    DdeFieldKind, DdeRepresentation, DocumentVariableField, EquationField, ExternalIncludeField,
-    ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
-    FieldSwitch, FieldType, HyperlinkCode, IfField, IncludeFieldKind, IndexEntryField,
-    IndexEntryOption, IndexField, IndexOption, LinkField, LinkFormatting, LinkResultOption,
-    MacroButtonField, MailMergeConditionalControlField, MailMergeConditionalControlKind,
-    MailMergeCounterField, MailMergeCounterKind, MailMergeNextField, MergeField, PageBreak,
-    ParsedFieldCode, PromptField, PromptFieldKind, ReferenceCode, SectionBreak, StoryEvent,
-    StoryField,
-    TableOfAuthoritiesEntryField, TableOfAuthoritiesEntryOption, TableOfAuthoritiesField,
-    TableOfAuthoritiesOption, TableOfContentsEntryField, TableOfContentsEntryOption,
-    TableOfContentsField, TableOfContentsOption, parse_field_code,
+    AddressBlockCountryInclusion, BibliographyField, BibliographyOption, BodyStoryEvent,
+    CitationField, CitationOption, DdeField, DdeFieldKind, DdeRepresentation,
+    DocumentVariableField, EquationField, ExternalIncludeField, ExternalIncludeOption, Field,
+    FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus, FieldSwitch, FieldType, HyperlinkCode,
+    IfField, IncludeFieldKind, IndexEntryField, IndexEntryOption, IndexField, IndexOption,
+    LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
+    MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
+    MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
+    MergeField, PageBreak, ParsedFieldCode, PromptField, PromptFieldKind, ReferenceCode,
+    SectionBreak, StoryEvent, StoryField, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesEntryOption, TableOfAuthoritiesField, TableOfAuthoritiesOption,
+    TableOfContentsEntryField, TableOfContentsEntryOption, TableOfContentsField,
+    TableOfContentsOption, parse_field_code,
 };
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};

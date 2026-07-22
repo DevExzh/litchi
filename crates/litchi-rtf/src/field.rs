@@ -41,6 +41,8 @@ pub enum FieldType {
     If,
     Ask,
     FillIn,
+    AddressBlock,
+    GreetingLine,
     Unknown,
 }
 
@@ -897,6 +899,51 @@ pub struct PromptField<'a> {
     position: usize,
 }
 
+/// The stored kind of a mail-merge recipient layout field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MailMergeRecipientFieldKind {
+    /// An `ADDRESSBLOCK` field.
+    AddressBlock,
+    /// A `GREETINGLINE` field.
+    GreetingLine,
+}
+
+/// How an `ADDRESSBLOCK` field requests country/region text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddressBlockCountryInclusion {
+    /// `\\c 0` omits the country/region.
+    Omit,
+    /// `\\c 1` includes the country/region regardless of exclusions.
+    Always,
+    /// `\\c 2` includes the country/region unless it matches an excluded
+    /// country/region.
+    UnlessExcluded,
+}
+
+/// Inert metadata for a legacy RTF `ADDRESSBLOCK` or `GREETINGLINE` field.
+///
+/// ECMA-376 Part 1 §§17.16.5.1 and 17.16.5.24 define these mail-merge
+/// recipient layout fields. This type exposes stored layout metadata and a
+/// cached result only. It never opens a data source, selects a record,
+/// performs a merge, expands placeholders, generates text, or refreshes a
+/// field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MailMergeRecipientField<'a> {
+    instruction: &'a str,
+    kind: MailMergeRecipientFieldKind,
+    country_inclusion: Option<AddressBlockCountryInclusion>,
+    formats_using_recipient_country: bool,
+    excluded_countries: Vec<Cow<'a, str>>,
+    format_template: Option<Cow<'a, str>>,
+    language: Option<Cow<'a, str>>,
+    greeting_fallback_text: Option<Cow<'a, str>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 struct ExternalIncludeParts<'a> {
     kind: IncludeFieldKind,
     source: Cow<'a, str>,
@@ -945,6 +992,17 @@ struct PromptFieldParts<'a> {
     prompt: Option<Cow<'a, str>>,
     default_response: Option<Cow<'a, str>>,
     prompts_once_per_mail_merge: bool,
+}
+
+struct MailMergeRecipientFieldParts<'a> {
+    kind: MailMergeRecipientFieldKind,
+    country_inclusion: Option<AddressBlockCountryInclusion>,
+    formats_using_recipient_country: bool,
+    excluded_countries: Vec<Cow<'a, str>>,
+    format_template: Option<Cow<'a, str>>,
+    language: Option<Cow<'a, str>>,
+    greeting_fallback_text: Option<Cow<'a, str>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
 }
 
 struct CitationParts<'a> {
@@ -2129,6 +2187,110 @@ impl<'a> PromptField<'a> {
     }
 }
 
+impl<'a> MailMergeRecipientField<'a> {
+    /// Return the complete stored `ADDRESSBLOCK` or `GREETINGLINE` instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return whether this is an `ADDRESSBLOCK` or `GREETINGLINE` field.
+    pub const fn kind(&self) -> MailMergeRecipientFieldKind {
+        self.kind
+    }
+
+    /// Return how an `ADDRESSBLOCK` requests country/region text.
+    ///
+    /// This is `None` when the instruction has no `\\c` switch or when the
+    /// field is a `GREETINGLINE`. The stored request is never used to render
+    /// an address.
+    pub const fn country_inclusion(&self) -> Option<AddressBlockCountryInclusion> {
+        self.country_inclusion
+    }
+
+    /// Whether an `ADDRESSBLOCK` stores the `\\d` request to use the
+    /// recipient country's address format.
+    ///
+    /// This request is metadata only and never causes a record or country
+    /// format to be resolved.
+    pub const fn formats_using_recipient_country(&self) -> bool {
+        self.formats_using_recipient_country
+    }
+
+    /// Return country/region names excluded by `ADDRESSBLOCK` `\\e` switches.
+    ///
+    /// ECMA-376 permits repeated `\\e` switches; values are retained in source
+    /// order. They are never matched against a recipient record.
+    pub fn excluded_countries(&self) -> &[Cow<'a, str>] {
+        &self.excluded_countries
+    }
+
+    /// Return the stored `\\f` layout template, if any.
+    ///
+    /// For `ADDRESSBLOCK`, this is the standard address/name placeholder
+    /// template. For `GREETINGLINE`, this accepts Word's documented
+    /// compatibility form. Placeholder text remains opaque metadata and is
+    /// never expanded.
+    pub fn format_template(&self) -> Option<&str> {
+        self.format_template.as_deref()
+    }
+
+    /// Return the stored `\\l` language identifier, if any.
+    ///
+    /// The identifier is not used to choose locale-specific formatting.
+    pub fn language(&self) -> Option<&str> {
+        self.language.as_deref()
+    }
+
+    /// Return the stored `GREETINGLINE` fallback text, if any.
+    ///
+    /// ECMA-376 names `\\c` as this switch; Word-compatible fields can use
+    /// `\\e`. Both forms are accepted as stored metadata, but neither is ever
+    /// selected or displayed by this API.
+    pub fn greeting_fallback_text(&self) -> Option<&str> {
+        self.greeting_fallback_text.as_deref()
+    }
+
+    /// Return switches not specific to the recognized recipient-field kind.
+    ///
+    /// This includes formatting or producer-specific switches, retained in
+    /// source order as inert metadata.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated by a merge.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> Field<'a> {
     #[inline]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
@@ -2268,6 +2430,16 @@ impl<'a> Field<'a> {
                 if keyword.eq_ignore_ascii_case("FILLIN") =>
             {
                 FieldType::FillIn
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("ADDRESSBLOCK") =>
+            {
+                FieldType::AddressBlock
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("GREETINGLINE") =>
+            {
+                FieldType::GreetingLine
             },
             _ => FieldType::Unknown,
         };
@@ -2761,6 +2933,40 @@ impl<'a> Field<'a> {
             prompt: parts.prompt,
             default_response: parts.default_response,
             prompts_once_per_mail_merge: parts.prompts_once_per_mail_merge,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed `ADDRESSBLOCK` or
+    /// `GREETINGLINE` field.
+    ///
+    /// Stored layout, locale, country, fallback, and cached-result data are
+    /// never used to open a data source, select a record, perform a merge,
+    /// expand placeholders, generate text, or refresh a field. Malformed
+    /// instructions remain generic fields and return `None` here.
+    pub fn mail_merge_recipient_field(&self) -> Option<MailMergeRecipientField<'_>> {
+        let expected_kind = match self.field_type {
+            FieldType::AddressBlock => MailMergeRecipientFieldKind::AddressBlock,
+            FieldType::GreetingLine => MailMergeRecipientFieldKind::GreetingLine,
+            _ => return None,
+        };
+        let parts = mail_merge_recipient_field_parts(self.instruction.as_ref())?;
+        if parts.kind != expected_kind {
+            return None;
+        }
+        Some(MailMergeRecipientField {
+            instruction: self.instruction.as_ref(),
+            kind: parts.kind,
+            country_inclusion: parts.country_inclusion,
+            formats_using_recipient_country: parts.formats_using_recipient_country,
+            excluded_countries: parts.excluded_countries,
+            format_template: parts.format_template,
+            language: parts.language,
+            greeting_fallback_text: parts.greeting_fallback_text,
+            unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
             owner: self.owner,
@@ -4175,6 +4381,101 @@ fn prompt_field_parts(instruction: &str) -> Option<PromptFieldParts<'_>> {
         prompt,
         default_response,
         prompts_once_per_mail_merge,
+    })
+}
+
+fn mail_merge_recipient_field_parts(instruction: &str) -> Option<MailMergeRecipientFieldParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    let kind = if keyword.value.eq_ignore_ascii_case("ADDRESSBLOCK") {
+        MailMergeRecipientFieldKind::AddressBlock
+    } else if keyword.value.eq_ignore_ascii_case("GREETINGLINE") {
+        MailMergeRecipientFieldKind::GreetingLine
+    } else {
+        return None;
+    };
+    tokens.remove(0);
+
+    let mut country_inclusion = None;
+    let mut formats_using_recipient_country = false;
+    let mut excluded_countries = Vec::new();
+    let mut format_template = None;
+    let mut language = None;
+    let mut greeting_fallback_text = None;
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let normalized = name.to_ascii_lowercase();
+        let value = tokens
+            .get(index + 1)
+            .filter(|token| switch_name(token).is_none());
+
+        match (kind, normalized.as_str()) {
+            (MailMergeRecipientFieldKind::AddressBlock, "c") => {
+                if country_inclusion.is_some() {
+                    return None;
+                }
+                let value = value?.value.clone();
+                country_inclusion = Some(match value.as_ref() {
+                    "0" => AddressBlockCountryInclusion::Omit,
+                    "1" => AddressBlockCountryInclusion::Always,
+                    "2" => AddressBlockCountryInclusion::UnlessExcluded,
+                    _ => return None,
+                });
+                index += 2;
+            },
+            (MailMergeRecipientFieldKind::AddressBlock, "d") => {
+                if formats_using_recipient_country || value.is_some() {
+                    return None;
+                }
+                formats_using_recipient_country = true;
+                index += 1;
+            },
+            (MailMergeRecipientFieldKind::AddressBlock, "e") => {
+                excluded_countries.push(value?.value.clone());
+                index += 2;
+            },
+            (_, "f") => {
+                if format_template.is_some() {
+                    return None;
+                }
+                format_template = Some(value?.value.clone());
+                index += 2;
+            },
+            (_, "l") => {
+                if language.is_some() {
+                    return None;
+                }
+                language = Some(value?.value.clone());
+                index += 2;
+            },
+            (MailMergeRecipientFieldKind::GreetingLine, "c" | "e") => {
+                if greeting_fallback_text.is_some() {
+                    return None;
+                }
+                greeting_fallback_text = Some(value?.value.clone());
+                index += 2;
+            },
+            _ => {
+                unknown_switches.push(FieldSwitch {
+                    name: Cow::Owned(name.to_string()),
+                    value: value.map(|token| token.value.clone()),
+                });
+                index += 1 + usize::from(value.is_some());
+            },
+        }
+    }
+
+    Some(MailMergeRecipientFieldParts {
+        kind,
+        country_inclusion,
+        formats_using_recipient_country,
+        excluded_countries,
+        format_template,
+        language,
+        greeting_fallback_text,
+        unknown_switches,
     })
 }
 
@@ -5881,6 +6182,89 @@ mod tests {
     }
 
     #[test]
+    fn mail_merge_recipient_fields_preserve_layout_metadata_without_merging() {
+        let mut address = Field::parse_instruction(
+            r#"ADDRESSBLOCK \c 2 \d \e "United States" \e Canada \f "<<_FIRST0_>> <<_LAST0_>>" \l 1033 \* MERGEFORMAT"#,
+        );
+        address.result = Cow::Borrowed("cached address");
+        address.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        address.owner = FieldOwner::Body;
+        address.position = 4;
+
+        assert_eq!(address.field_type, FieldType::AddressBlock);
+        let address = address.mail_merge_recipient_field().unwrap();
+        assert_eq!(address.kind(), MailMergeRecipientFieldKind::AddressBlock);
+        assert_eq!(
+            address.country_inclusion(),
+            Some(AddressBlockCountryInclusion::UnlessExcluded)
+        );
+        assert!(address.formats_using_recipient_country());
+        let excluded = address
+            .excluded_countries()
+            .iter()
+            .map(Cow::as_ref)
+            .collect::<Vec<_>>();
+        assert_eq!(excluded, vec!["United States", "Canada"]);
+        assert_eq!(address.format_template(), Some("<<_FIRST0_>> <<_LAST0_>>"));
+        assert_eq!(address.language(), Some("1033"));
+        assert_eq!(address.greeting_fallback_text(), None);
+        assert_eq!(address.unknown_switches().len(), 1);
+        assert_eq!(address.unknown_switches()[0].name, "*");
+        assert_eq!(
+            address.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+        assert_eq!(address.cached_result(), Some("cached address"));
+        assert!(address.is_dirty());
+        assert!(address.is_locked());
+        assert_eq!(address.owner(), FieldOwner::Body);
+        assert_eq!(address.position(), 4);
+
+        let greeting = Field::parse_instruction(
+            r#"greetingline \f "Dear <<_FIRST0_>>," \e "To Whom It May Concern" \l en-US"#,
+        );
+        assert_eq!(greeting.field_type, FieldType::GreetingLine);
+        let greeting = greeting.mail_merge_recipient_field().unwrap();
+        assert_eq!(greeting.kind(), MailMergeRecipientFieldKind::GreetingLine);
+        assert_eq!(greeting.country_inclusion(), None);
+        assert!(!greeting.formats_using_recipient_country());
+        assert!(greeting.excluded_countries().is_empty());
+        assert_eq!(greeting.format_template(), Some("Dear <<_FIRST0_>>,"));
+        assert_eq!(greeting.language(), Some("en-US"));
+        assert_eq!(
+            greeting.greeting_fallback_text(),
+            Some("To Whom It May Concern")
+        );
+
+        for instruction in [
+            "ADDRESSBLOCK text",
+            r"ADDRESSBLOCK \c",
+            r"ADDRESSBLOCK \c 3",
+            r"ADDRESSBLOCK \d 1",
+            r"ADDRESSBLOCK \d \d",
+            r"ADDRESSBLOCK \f",
+            r#"GREETINGLINE \f "Dear" \f "Hello""#,
+            r"GREETINGLINE \l",
+            r#"GREETINGLINE \c "First" \e "Second""#,
+        ] {
+            assert!(
+                Field::parse_instruction(instruction)
+                    .mail_merge_recipient_field()
+                    .is_none(),
+                "{instruction}"
+            );
+        }
+        assert_eq!(
+            Field::parse_instruction(r"ADDRESSBLOCKING \c 1").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
     fn document_discovers_document_variable_fields_without_resolving_them() {
         let document = crate::RtfDocument::parse(
             r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DOCVARIABLE CustomerName \\* MERGEFORMAT}{\fldrslt cached customer}}After}"#,
@@ -6013,6 +6397,35 @@ mod tests {
         assert_eq!(fields[1].prompt(), Some("Enter appointment time"));
         assert_eq!(fields[1].default_response(), Some("09:00"));
         assert_eq!(fields[1].cached_result(), Some("10:30"));
+        assert_eq!(document.text(), "Before Middle After");
+    }
+
+    #[test]
+    fn document_discovers_recipient_fields_without_merging() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADDRESSBLOCK \\c 2 \\d \\e "United States" \\e Canada \\f "<<_FIRST0_>> <<_LAST0_>>" \\l 1033}{\fldrslt cached address}}Middle {\field{\*\fldinst GREETINGLINE \\f "Dear <<_FIRST0_>>," \\e "To Whom It May Concern" \\l en-US}{\fldrslt Dear Ada,}}After}"#,
+        )
+        .unwrap();
+
+        let fields = document.mail_merge_recipient_fields();
+        assert_eq!(document.mail_merge_recipient_field_count(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].kind(), MailMergeRecipientFieldKind::AddressBlock);
+        assert_eq!(
+            fields[0].country_inclusion(),
+            Some(AddressBlockCountryInclusion::UnlessExcluded)
+        );
+        assert!(fields[0].formats_using_recipient_country());
+        assert_eq!(fields[0].language(), Some("1033"));
+        assert_eq!(fields[0].cached_result(), Some("cached address"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[1].kind(), MailMergeRecipientFieldKind::GreetingLine);
+        assert_eq!(
+            fields[1].greeting_fallback_text(),
+            Some("To Whom It May Concern")
+        );
+        assert_eq!(fields[1].cached_result(), Some("Dear Ada,"));
         assert_eq!(document.text(), "Before Middle After");
     }
 
