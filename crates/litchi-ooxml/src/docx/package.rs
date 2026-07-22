@@ -3283,6 +3283,52 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_inert_link_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let spreadsheet = document.add_paragraph();
+            spreadsheet.add_field(crate::docx::writer::MutableField::with_result(
+                r#"LINK Excel.Sheet.8 "missing.xlsx" "Sheet1!A1" \a \f 4 \p"#.to_string(),
+                "cached spreadsheet link".to_string(),
+            ));
+            let text = document.add_paragraph();
+            text.add_field(crate::docx::writer::MutableField::with_result(
+                r#"LINK Word.Document.8 "missing.docx" Bookmark \t"#.to_string(),
+                "cached text link".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let links = document.link_fields().unwrap();
+        assert_eq!(document.link_field_count().unwrap(), 2);
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].application_type(), "Excel.Sheet.8");
+        assert_eq!(links[0].source(), "missing.xlsx");
+        assert_eq!(links[0].item(), Some("Sheet1!A1"));
+        assert!(links[0].requests_automatic_updates());
+        assert_eq!(
+            links[0].formatting_modes(),
+            &[crate::docx::LinkFormatting::SpreadsheetSource]
+        );
+        assert_eq!(
+            links[0].effective_result_option(),
+            Some(crate::docx::LinkResultOption::Picture)
+        );
+        assert_eq!(links[0].cached_result(), Some("cached spreadsheet link"));
+        assert_eq!(links[1].application_type(), "Word.Document.8");
+        assert_eq!(links[1].item(), Some("Bookmark"));
+        assert_eq!(
+            links[1].effective_result_option(),
+            Some(crate::docx::LinkResultOption::Text)
+        );
+        assert_eq!(links[1].cached_result(), Some("cached text link"));
+    }
+
+    #[test]
     fn saves_and_discovers_typed_inert_bibliography_source_stores() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

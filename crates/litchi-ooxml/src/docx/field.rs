@@ -188,6 +188,24 @@ impl Field {
         BibliographyField::from_field(self)
     }
 
+    /// Check whether this is a legacy `LINK` field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never
+    /// activates an OLE server, opens a source, or refreshes the field.
+    pub fn is_link(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "LINK").is_some()
+    }
+
+    /// Parse this field as inert typed `LINK` metadata.
+    ///
+    /// Returns `Ok(None)` for non-`LINK` fields. The result exposes stored
+    /// application, source, item, result, formatting, and cached metadata only;
+    /// it never activates, opens, contacts, converts, evaluates, or executes
+    /// anything.
+    pub fn link(&self) -> Result<Option<LinkField>> {
+        LinkField::from_field(self)
+    }
+
     /// Check whether this is a `TOC` (Table of Contents) field.
     ///
     /// The field's cached result remains data only; calling this method never
@@ -544,6 +562,219 @@ impl FieldSwitch {
     /// Return the optional argument supplied to this switch.
     pub fn argument(&self) -> Option<&str> {
         self.argument.as_deref()
+    }
+}
+
+/// One stored result or storage switch for a Word `LINK` field.
+///
+/// These values describe a linked-object representation or whether graphic data
+/// is stored. They never cause a source to be opened, contacted, converted, or
+/// displayed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkResultOption {
+    /// The `\\b` switch requests a bitmap representation.
+    Bitmap,
+    /// The `\\d` switch omits graphic data from the document.
+    OmitGraphicData,
+    /// The `\\h` switch requests HTML-formatted text.
+    Html,
+    /// The `\\p` switch requests a picture representation.
+    Picture,
+    /// The `\\r` switch requests rich-text format.
+    RichText,
+    /// The `\\t` switch requests text-only format.
+    Text,
+    /// The `\\u` switch requests Unicode text.
+    UnicodeText,
+}
+
+/// One integral `LINK` `\\f` formatting mode.
+///
+/// ECMA-376 marks modes `1` and `3` unsupported. Those values, and values
+/// outside its defined set, are retained as metadata without applying any
+/// formatting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkFormatting {
+    /// `0`: preserve formatting from the source file.
+    Source,
+    /// `2`: match formatting in the destination document.
+    Destination,
+    /// `4`: preserve source formatting for a SpreadsheetML workbook source.
+    SpreadsheetSource,
+    /// `5`: match destination formatting for a SpreadsheetML workbook source.
+    SpreadsheetDestination,
+    /// An ECMA-376-unsupported or otherwise unrecognized integral mode.
+    Unsupported(i64),
+}
+
+/// Typed, inert metadata for a legacy Word `LINK` field.
+///
+/// Application type, source, item, and all result/formatting switches are
+/// retained as stored field data. This type never activates an OLE server,
+/// launches an application, opens a source, requests data, refreshes content,
+/// converts content, or executes code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    application_type: String,
+    source: String,
+    item: Option<String>,
+    automatic_updates: bool,
+    result_options: Vec<LinkResultOption>,
+    formatting_modes: Vec<LinkFormatting>,
+    switches: Vec<FieldSwitch>,
+}
+
+impl LinkField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((application_type, source, item, switches)) =
+            parse_link_operands_and_switches(field.instruction())?
+        else {
+            return Ok(None);
+        };
+
+        let mut automatic_updates = false;
+        let mut result_options = Vec::new();
+        let mut formatting_modes = Vec::new();
+        for switch in &switches {
+            match switch.name {
+                'a' => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "LINK \\a switch does not take an argument".to_string(),
+                        ));
+                    }
+                    automatic_updates = true;
+                },
+                'f' => {
+                    let argument = switch.argument.as_deref().ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "LINK \\f switch requires an integral formatting mode".to_string(),
+                        )
+                    })?;
+                    let value = argument.parse::<i64>().map_err(|_| {
+                        OoxmlError::InvalidFormat(
+                            "LINK \\f formatting mode must be an integer".to_string(),
+                        )
+                    })?;
+                    formatting_modes.push(match value {
+                        0 => LinkFormatting::Source,
+                        2 => LinkFormatting::Destination,
+                        4 => LinkFormatting::SpreadsheetSource,
+                        5 => LinkFormatting::SpreadsheetDestination,
+                        other => LinkFormatting::Unsupported(other),
+                    });
+                },
+                'b' | 'd' | 'h' | 'p' | 'r' | 't' | 'u' => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "LINK \\{} switch does not take an argument",
+                            switch.name
+                        )));
+                    }
+                    result_options.push(match switch.name {
+                        'b' => LinkResultOption::Bitmap,
+                        'd' => LinkResultOption::OmitGraphicData,
+                        'h' => LinkResultOption::Html,
+                        'p' => LinkResultOption::Picture,
+                        'r' => LinkResultOption::RichText,
+                        't' => LinkResultOption::Text,
+                        'u' => LinkResultOption::UnicodeText,
+                        _ => unreachable!("LINK result switch was matched above"),
+                    });
+                },
+                _ => {},
+            }
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            application_type,
+            source,
+            item,
+            automatic_updates,
+            result_options,
+            formatting_modes,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the cached field result, if one was stored.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the stored linked-object application type.
+    ///
+    /// Word commonly stores an OLE Programmatic Identifier here. It is never
+    /// looked up or activated by this API.
+    pub fn application_type(&self) -> &str {
+        &self.application_type
+    }
+
+    /// Return the stored source identifier without opening or resolving it.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Return the optional stored source item, such as a cell range or bookmark.
+    pub fn item(&self) -> Option<&str> {
+        self.item.as_deref()
+    }
+
+    /// Whether the stored instruction requests automatic updates.
+    ///
+    /// This is metadata only. The API never performs an update.
+    pub fn requests_automatic_updates(&self) -> bool {
+        self.automatic_updates
+    }
+
+    /// Return recognized result and storage switches in stored source order.
+    ///
+    /// When several are present, [`Self::effective_result_option`] reflects
+    /// Word's documented last-switch behavior. Neither method contacts the
+    /// linked source.
+    pub fn result_options(&self) -> &[LinkResultOption] {
+        &self.result_options
+    }
+
+    /// Return the effective result or storage option under Word's documented
+    /// last-switch behavior, if one was stored.
+    pub fn effective_result_option(&self) -> Option<LinkResultOption> {
+        self.result_options.last().copied()
+    }
+
+    /// Return integral `\\f` formatting modes in stored source order.
+    ///
+    /// These are metadata only; this API never formats linked content.
+    pub fn formatting_modes(&self) -> &[LinkFormatting] {
+        &self.formatting_modes
+    }
+
+    /// Return all stored field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
     }
 }
 
@@ -1413,6 +1644,41 @@ fn parse_field_operand_and_switches(
     Ok(Some((operand, switches)))
 }
 
+fn parse_link_operands_and_switches(
+    instruction: &str,
+) -> Result<Option<(String, String, Option<String>, Vec<FieldSwitch>)>> {
+    let Some(remainder) = field_instruction_remainder(instruction, "LINK") else {
+        return Ok(None);
+    };
+    let mut characters = remainder.chars().peekable();
+    let application_type = parse_next_field_argument(&mut characters, "LINK")?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat("LINK field is missing its application type".to_string())
+        })?;
+    let source = parse_next_field_argument(&mut characters, "LINK")?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| OoxmlError::InvalidFormat("LINK field is missing its source".to_string()))?;
+    let item = parse_next_field_argument(&mut characters, "LINK")?;
+    let switches = parse_field_switches_from_characters(&mut characters, "LINK")?;
+    Ok(Some((application_type, source, item, switches)))
+}
+
+fn parse_next_field_argument(
+    characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    field_type: &str,
+) -> Result<Option<String>> {
+    skip_field_whitespace(characters);
+    match characters.peek().copied() {
+        None | Some('\\') => Ok(None),
+        Some('"') => {
+            characters.next();
+            Ok(Some(parse_field_quoted_argument(characters, field_type)?))
+        },
+        Some(_) => Ok(Some(parse_field_unquoted_argument(characters))),
+    }
+}
+
 /// Parse a `CITATION` instruction while accepting Word's documented leading
 /// `\\l` locale switch. Other switches still follow the primary source tag or
 /// a preceding `\\m` source tag.
@@ -1754,6 +2020,100 @@ mod tests {
         assert!(fields[2].is_locked());
         assert_eq!(fields[3].instruction(), "NUMPAGES");
         assert_eq!(fields[3].result(), None);
+    }
+
+    #[test]
+    fn parses_inert_link_field_metadata_without_activating_sources() {
+        let field = Field::new(
+            r#"LINK Excel.Sheet.8 "C:\\no-contact\\source.xlsx" "Sheet1!R1C1:R4C4" \a \f 4 \p \d \* MERGEFORMAT"#
+                .to_string(),
+            Some("cached LINK result".to_string()),
+            true,
+        );
+        assert!(field.is_link());
+        let link = field.link().unwrap().unwrap();
+        assert_eq!(
+            link.instruction(),
+            r#"LINK Excel.Sheet.8 "C:\\no-contact\\source.xlsx" "Sheet1!R1C1:R4C4" \a \f 4 \p \d \* MERGEFORMAT"#
+        );
+        assert_eq!(link.application_type(), "Excel.Sheet.8");
+        assert_eq!(link.source(), r"C:\no-contact\source.xlsx");
+        assert_eq!(link.item(), Some("Sheet1!R1C1:R4C4"));
+        assert!(link.requests_automatic_updates());
+        assert_eq!(
+            link.result_options(),
+            &[LinkResultOption::Picture, LinkResultOption::OmitGraphicData]
+        );
+        assert_eq!(
+            link.effective_result_option(),
+            Some(LinkResultOption::OmitGraphicData)
+        );
+        assert_eq!(
+            link.formatting_modes(),
+            &[LinkFormatting::SpreadsheetSource]
+        );
+        assert_eq!(link.cached_result(), Some("cached LINK result"));
+        assert!(link.is_dirty());
+        assert!(!link.is_locked());
+        assert_eq!(link.switches().len(), 5);
+        assert_eq!(link.switches()[0].name(), 'a');
+        assert_eq!(link.switches()[1].argument(), Some("4"));
+        assert_eq!(link.switches()[4].name(), '*');
+        assert_eq!(link.switches()[4].argument(), Some("MERGEFORMAT"));
+
+        let multiple_formatting = Field::new(
+            r"LINK Word.Document.8 source \f 0 \f 2 \t".to_string(),
+            None,
+            false,
+        );
+        let multiple_formatting = multiple_formatting.link().unwrap().unwrap();
+        assert_eq!(
+            multiple_formatting.formatting_modes(),
+            &[LinkFormatting::Source, LinkFormatting::Destination]
+        );
+        assert_eq!(
+            multiple_formatting.effective_result_option(),
+            Some(LinkResultOption::Text)
+        );
+
+        let unsupported = Field::new(r"LINK Package source \f 1".to_string(), None, false);
+        assert_eq!(
+            unsupported.link().unwrap().unwrap().formatting_modes(),
+            &[LinkFormatting::Unsupported(1)]
+        );
+
+        let repeated_updates =
+            Field::new(r"LINK Excel.Sheet.8 source \a \a".to_string(), None, false);
+        assert!(
+            repeated_updates
+                .link()
+                .unwrap()
+                .unwrap()
+                .requests_automatic_updates()
+        );
+
+        let not_link = Field::new("LINKAGE Excel.Sheet.8 source".to_string(), None, false);
+        assert!(!not_link.is_link());
+        assert!(not_link.link().unwrap().is_none());
+        assert!(Field::new("LINK".to_string(), None, false).link().is_err());
+        assert!(
+            Field::new(
+                r"LINK Excel.Sheet.8 source \f invalid".to_string(),
+                None,
+                false,
+            )
+            .link()
+            .is_err()
+        );
+        assert!(
+            Field::new(
+                r"LINK Excel.Sheet.8 source \p unexpected".to_string(),
+                None,
+                false,
+            )
+            .link()
+            .is_err()
+        );
     }
 
     #[test]

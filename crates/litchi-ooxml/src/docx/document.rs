@@ -8,7 +8,7 @@ use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
-    BibliographyField, CitationField, Field, IndexEntryField, IndexField,
+    BibliographyField, CitationField, Field, IndexEntryField, IndexField, LinkField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
 };
 use crate::docx::footnote::Note;
@@ -1258,6 +1258,25 @@ impl<'a> Document<'a> {
     /// Get the number of bibliography fields in the main document.
     pub fn bibliography_count(&self) -> Result<usize> {
         Ok(self.bibliographies()?.len())
+    }
+
+    /// Get typed, inert `LINK` fields in document order.
+    ///
+    /// Returned fields expose stored application, source, item, result,
+    /// formatting, cached content, and dirty/lock metadata only. This method
+    /// never activates an OLE server, launches an application, opens a source,
+    /// requests data, refreshes, converts, evaluates, or executes anything.
+    pub fn link_fields(&self) -> Result<Vec<LinkField>> {
+        self.fields()?
+            .iter()
+            .map(Field::link)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `LINK` fields in the main document.
+    pub fn link_field_count(&self) -> Result<usize> {
+        Ok(self.link_fields()?.len())
     }
 
     /// Get typed, inert table-of-contents fields in document order.

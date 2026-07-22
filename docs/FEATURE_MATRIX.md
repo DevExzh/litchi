@@ -77,7 +77,7 @@ conversion, fonts, and image conversion are optional.
 | Footnotes and endnotes | ✅ | ✅ | ✅ | Notes, separators, continuations, and references |
 | Hyperlinks | ✅ | ✅ | ✅ | Internal and external links |
 | Bookmarks | ✅ | ✅ | ✅ | Range and point bookmarks |
-| Fields | ✅ | ✅ | ✅ | Typed field delimiters/instructions; fields are not recalculated by Word layout logic |
+| Fields | ✅ | ✅ | ✅ | Typed field delimiters/instructions plus inert `LINK` application/source/item/result/formatting metadata; fields are not recalculated and `LINK` never activates OLE, opens a source, or refreshes content |
 | Document statistics | ✅ | ✅ | N/A | Word, character, paragraph, line, and page metadata where present |
 | Core, extended, and custom properties | ✅ | ✅ | ✅ | Typed package properties |
 

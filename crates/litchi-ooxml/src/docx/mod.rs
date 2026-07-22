@@ -113,8 +113,9 @@ pub use drawing::{DrawingObject, ShapeType};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::{
     BibliographyField, CitationField, Field, FieldSwitch, IndexEntryField, IndexField,
-    IndexSortOrder, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
-    TableOfContentsLevelRange, TableOfContentsSwitch,
+    IndexSortOrder, LinkField, LinkFormatting, LinkResultOption, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesField, TableOfContentsField, TableOfContentsLevelRange,
+    TableOfContentsSwitch,
 };
 pub use font_table::{
     EmbeddedFont, EmbeddedFontLicensing, EmbeddedFontResource, EmbeddedFontStyle, Font,
