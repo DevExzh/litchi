@@ -6400,6 +6400,13 @@ mod tests {
             fields[0].field_type,
             crate::doc::parts::fields::FieldType::Hyperlink
         );
+        let field_text = document.fields().unwrap();
+        assert_eq!(field_text.len(), 1);
+        assert_eq!(
+            field_text[0].instruction.trim(),
+            r#"HYPERLINK "https://example.test""#
+        );
+        assert_eq!(field_text[0].result.as_deref(), Some("link"));
         let headers = document.headers().unwrap();
         assert_eq!(headers.len(), 1, "{headers:?}");
         assert!(

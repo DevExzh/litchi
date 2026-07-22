@@ -514,6 +514,59 @@ impl Field {
     }
 }
 
+/// Stored text associated with a Word field.
+///
+/// MS-DOC section 2.8.25 defines the instruction as the text after the field
+/// begin character and before its separator or end character. When a separator
+/// exists, result holds the stored cached text after that separator. Neither
+/// value is evaluated, refreshed, resolved, or otherwise activated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FieldText {
+    /// The paired field markers and their story-relative positions.
+    pub field: Field,
+    /// Stored field instruction text.
+    pub instruction: String,
+    /// Stored cached result text, if the field has a separator.
+    pub result: Option<String>,
+}
+
+impl FieldText {
+    pub(crate) fn from_field<F>(field: &Field, mut text_at_range: F) -> Result<Self>
+    where
+        F: FnMut(u32, u32) -> Result<String>,
+    {
+        let instruction_start = field
+            .start_cp
+            .checked_add(1)
+            .ok_or_else(|| corrupted("field instruction start overflows"))?;
+        let instruction_end = field.separator_cp.unwrap_or(field.end_cp);
+        if instruction_start > instruction_end {
+            return Err(corrupted(
+                "field instruction range has its start after its end",
+            ));
+        }
+        let instruction = text_at_range(instruction_start, instruction_end)?;
+        let result = match field.separator_cp {
+            Some(separator) => {
+                let start = separator
+                    .checked_add(1)
+                    .ok_or_else(|| corrupted("field result start overflows"))?;
+                if start > field.end_cp {
+                    return Err(corrupted("field result range has its start after its end"));
+                }
+                Some(text_at_range(start, field.end_cp)?)
+            },
+            None => None,
+        };
+
+        Ok(Self {
+            field: field.clone(),
+            instruction,
+            result,
+        })
+    }
+}
+
 /// One parsed and validated story-local `Plcfld`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldStoryTable {
@@ -753,6 +806,19 @@ impl FieldsTable {
             .filter(|field| field.is_embedded_object())
             .collect()
     }
+
+    pub(crate) fn field_texts<F>(&self, mut text_at_range: F) -> Result<Vec<FieldText>>
+    where
+        F: FnMut(FieldStory, u32, u32) -> Result<String>,
+    {
+        self.stories
+            .iter()
+            .flat_map(|story| story.fields())
+            .map(|field| {
+                FieldText::from_field(field, |start, end| text_at_range(field.story, start, end))
+            })
+            .collect()
+    }
 }
 
 fn corrupted(message: impl Into<String>) -> DocError {
@@ -847,6 +913,138 @@ mod tests {
         assert_eq!(FieldType::from(0x58), FieldType::Hyperlink);
         assert_eq!(FieldType::from(0x45), FieldType::FileSize);
         assert_eq!(FieldType::from(0x04), FieldType::Unknown(0x04));
+    }
+
+    #[test]
+    fn field_text_keeps_instruction_and_cached_result_separate() {
+        let field = Field {
+            story: FieldStory::Header,
+            start_cp: 2,
+            separator_cp: Some(17),
+            end_cp: 23,
+            field_type: FieldType::IncludeText,
+            end_flags: FieldEndFlags {
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 0,
+            has_separator: true,
+        };
+
+        let text = FieldText::from_field(&field, |start, end| match (start, end) {
+            (3, 17) => Ok(r#" INCLUDETEXT "file:///draft.doc" "#.to_string()),
+            (18, 23) => Ok("cached".to_string()),
+            _ => Err(corrupted("unexpected field range")),
+        })
+        .unwrap();
+
+        assert_eq!(text.field, field);
+        assert_eq!(text.instruction, r#" INCLUDETEXT "file:///draft.doc" "#);
+        assert_eq!(text.result.as_deref(), Some("cached"));
+    }
+
+    #[test]
+    fn field_text_reports_absent_separator_as_no_cached_result() {
+        let field = Field {
+            story: FieldStory::Main,
+            start_cp: 4,
+            separator_cp: None,
+            end_cp: 12,
+            field_type: FieldType::MacroButton,
+            end_flags: FieldEndFlags::default(),
+            nesting_depth: 0,
+            has_separator: false,
+        };
+
+        let text = FieldText::from_field(&field, |start, end| {
+            assert_eq!((start, end), (5, 12));
+            Ok(" MACROBUTTON NeverRun Label ".to_string())
+        })
+        .unwrap();
+
+        assert_eq!(text.instruction, " MACROBUTTON NeverRun Label ");
+        assert_eq!(text.result, None);
+    }
+
+    #[test]
+    fn field_text_rejects_unrepresentable_or_reversed_ranges() {
+        let overflow = Field {
+            story: FieldStory::Main,
+            start_cp: u32::MAX,
+            separator_cp: None,
+            end_cp: u32::MAX,
+            field_type: FieldType::If,
+            end_flags: FieldEndFlags::default(),
+            nesting_depth: 0,
+            has_separator: false,
+        };
+        assert!(FieldText::from_field(&overflow, |_, _| Ok(String::new())).is_err());
+
+        let reversed = Field {
+            start_cp: 8,
+            end_cp: 8,
+            ..overflow
+        };
+        assert!(FieldText::from_field(&reversed, |_, _| Ok(String::new())).is_err());
+    }
+
+    #[test]
+    fn fields_table_extracts_text_from_each_field_story() {
+        let main = Field {
+            story: FieldStory::Main,
+            start_cp: 0,
+            separator_cp: None,
+            end_cp: 4,
+            field_type: FieldType::Date,
+            end_flags: FieldEndFlags::default(),
+            nesting_depth: 0,
+            has_separator: false,
+        };
+        let header = Field {
+            story: FieldStory::Header,
+            start_cp: 2,
+            separator_cp: Some(7),
+            end_cp: 9,
+            field_type: FieldType::IncludeText,
+            end_flags: FieldEndFlags {
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 0,
+            has_separator: true,
+        };
+        let table = FieldsTable {
+            stories: vec![
+                FieldStoryTable {
+                    story: FieldStory::Main,
+                    markers: Vec::new(),
+                    terminal_cp: 4,
+                    fields: vec![main],
+                },
+                FieldStoryTable {
+                    story: FieldStory::Header,
+                    markers: Vec::new(),
+                    terminal_cp: 9,
+                    fields: vec![header],
+                },
+            ],
+        };
+
+        let text = table
+            .field_texts(|story, start, end| {
+                Ok(match (story, start, end) {
+                    (FieldStory::Main, 1, 4) => " DATE ".to_string(),
+                    (FieldStory::Header, 3, 7) => r#" INCLUDETEXT "draft.doc" "#.to_string(),
+                    (FieldStory::Header, 8, 9) => "cached".to_string(),
+                    _ => return Err(corrupted("unexpected field story range")),
+                })
+            })
+            .unwrap();
+
+        assert_eq!(text.len(), 2);
+        assert_eq!(text[0].instruction, " DATE ");
+        assert_eq!(text[1].instruction, r#" INCLUDETEXT "draft.doc" "#);
+        assert_eq!(text[1].result.as_deref(), Some("cached"));
     }
 }
 

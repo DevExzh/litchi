@@ -228,7 +228,7 @@ conversion, fonts, and image conversion are optional.
 | Headers and footers | ✅ | ✅ | ✅ | Per-section story ranges and types |
 | Footnotes and endnotes | ✅ | ✅ | ✅ | References, text stories, and writer APIs |
 | Numbering and lists | ✅ | ✅ | ✅ | List templates, overrides, names, and numbering formats |
-| Hyperlinks and fields | ✅ | ✅ | ✅ | HYPERLINK and general field delimiters/instructions; fields stay inert |
+| Hyperlinks and fields | ✅ | ✅ | ✅ | HYPERLINK plus every parsed field story’s stored instruction and cached-result text; fields are never evaluated, and DDE, OLE, macros, links, and external sources remain inert |
 | Bookmarks | ✅ | ✅ | ✅ | Bookmark ranges and writer support |
 | Comments | ✅ | ✅ | ✅ | Annotation ranges, authors, and reply metadata |
 | Track changes | ✅ | ✅ | ✅ | Transactional add/update/remove/accept/reject editing |

@@ -13,7 +13,7 @@ use super::parts::bookmarks::BookmarksTable;
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
-use super::parts::fields::FieldsTable;
+use super::parts::fields::{Field, FieldStory, FieldText, FieldsTable};
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
@@ -557,6 +557,81 @@ impl Document {
     #[inline]
     pub fn fields_table(&self) -> Option<&FieldsTable> {
         self.fields_table.as_ref()
+    }
+
+    /// Get stored instruction and cached-result text for every field story.
+    ///
+    /// The returned text follows the field-range rules in MS-DOC section
+    /// 2.8.25. It is read from the document's existing text only: fields are
+    /// never evaluated or refreshed, DDE conversations are never started,
+    /// external paths are never opened, OLE objects are never activated, and
+    /// macro instructions are not executed or inspected.
+    pub fn fields(&self) -> Result<Vec<FieldText>> {
+        let Some(fields) = &self.fields_table else {
+            return Ok(Vec::new());
+        };
+
+        fields.field_texts(|story, start, end| self.field_story_text(story, start, end))
+    }
+
+    /// Get stored instruction and cached-result text for one parsed field.
+    ///
+    /// Field positions are relative to their FieldStory. This method reads only
+    /// that stored text range and performs no field evaluation or external
+    /// action.
+    pub fn field_text(&self, field: &Field) -> Result<FieldText> {
+        FieldText::from_field(field, |start, end| {
+            self.field_story_text(field.story, start, end)
+        })
+    }
+
+    fn field_story_text(&self, story: FieldStory, start: u32, end: u32) -> Result<String> {
+        if start > end {
+            return Err(DocError::Corrupted(
+                "field text range has its start after its end".to_string(),
+            ));
+        }
+
+        let (story_start, story_end) = self.field_story_range(story)?;
+        let start = story_start
+            .checked_add(start)
+            .ok_or_else(|| DocError::Corrupted("field text range start overflows".to_string()))?;
+        let end = story_start
+            .checked_add(end)
+            .ok_or_else(|| DocError::Corrupted("field text range end overflows".to_string()))?;
+        if end > story_end {
+            return Err(DocError::Corrupted(
+                "field text range exceeds its document story".to_string(),
+            ));
+        }
+
+        Ok(self.text_extractor.text_at_range(start, end).to_string())
+    }
+
+    fn field_story_range(&self, story: FieldStory) -> Result<(u32, u32)> {
+        let range = match story {
+            FieldStory::Main => Some(self.fib.get_main_doc_range()),
+            FieldStory::Header => self.fib.get_header_range(),
+            FieldStory::Footnote => self.fib.get_footnote_range(),
+            FieldStory::Comment => self.fib.get_comment_range(),
+            FieldStory::Endnote => self.fib.get_endnote_range(),
+            FieldStory::Textbox => self.fib.get_textbox_range(),
+            FieldStory::HeaderTextbox => self.fib.get_header_textbox_range(),
+        };
+        range.ok_or_else(|| {
+            DocError::Corrupted(format!(
+                "field table refers to absent {} story",
+                match story {
+                    FieldStory::Main => "main document",
+                    FieldStory::Header => "header/footer",
+                    FieldStory::Footnote => "footnote",
+                    FieldStory::Comment => "comment",
+                    FieldStory::Endnote => "endnote",
+                    FieldStory::Textbox => "textbox",
+                    FieldStory::HeaderTextbox => "header textbox",
+                }
+            ))
+        })
     }
 
     // ──────────────────────────────────────────────────────────────────
