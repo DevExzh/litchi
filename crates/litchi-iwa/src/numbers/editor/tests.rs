@@ -5510,6 +5510,197 @@ fn table_sort_order_rejects_malformed_nested_wire_transactionally() {
 }
 
 #[test]
+fn source_created_large_table_allocates_sparse_tiles_for_batch_writes() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(513, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let initial = attached_table_descriptor(editor.package(), table_id).unwrap();
+    assert_eq!(initial.model.base_data_store.tiles.tiles.len(), 1);
+    assert_eq!(initial.model.base_data_store.row_headers.buckets.len(), 1);
+
+    assert_eq!(
+        editor
+            .set_cells(
+                table_id,
+                [
+                    TableCellUpdate::new(512, 0, CellValue::Text("Last tile".to_owned())),
+                    TableCellUpdate::new(256, 1, CellValue::Text("Second tile".to_owned())),
+                ],
+            )
+            .unwrap(),
+        2
+    );
+
+    let descriptor = attached_table_descriptor(editor.package(), table_id).unwrap();
+    let tiles = &descriptor.model.base_data_store.tiles.tiles;
+    assert_eq!(
+        tiles.iter().map(|tile| tile.tileid).collect::<Vec<_>>(),
+        vec![0, 1, 2]
+    );
+    assert_eq!(
+        descriptor
+            .model
+            .base_data_store
+            .row_tile_tree
+            .nodes
+            .iter()
+            .map(|node| (node.key, node.value))
+            .collect::<Vec<_>>(),
+        vec![(0, 0), (256, 1), (512, 2)]
+    );
+    assert_eq!(descriptor.model.base_data_store.next_row_strip_id, 3);
+
+    let locations = object_locations(editor.package()).unwrap();
+    for tile in tiles.iter().skip(1) {
+        let archive = editor
+            .package()
+            .archive(&locations[&tile.tile.identifier])
+            .unwrap();
+        let tile = archive
+            .object(tile.tile.identifier)
+            .unwrap()
+            .messages
+            .iter()
+            .find_map(|message| Tile::decode(message.data.as_slice()).ok())
+            .unwrap();
+        assert_eq!(
+            tile.row_infos
+                .iter()
+                .map(|row| row.tile_row_index)
+                .collect::<Vec<_>>(),
+            vec![0]
+        );
+    }
+
+    let bytes = editor.to_bytes().unwrap();
+    let table = NumbersDocument::from_bytes(&bytes)
+        .unwrap()
+        .sheets()
+        .unwrap()
+        .remove(0)
+        .tables
+        .remove(0);
+    assert_eq!(
+        table.get_cell(256, 1),
+        Some(&CellValue::Text("Second tile".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(512, 0),
+        Some(&CellValue::Text("Last tile".to_owned()))
+    );
+    let reopened = NumbersEditor::from_bytes(&bytes).unwrap();
+    assert_eq!(reopened.tables().unwrap()[0].rows, 513);
+}
+
+#[test]
+fn source_created_sparse_boundary_supports_formula_and_comment_crud() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(257, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    editor
+        .set_formula_with_cached_value(
+            table_id,
+            256,
+            0,
+            FormulaExpression::Number(42.0),
+            FormulaCachedValue::Number(42.0),
+        )
+        .unwrap();
+    editor
+        .set_cell_comment(table_id, 256, 1, "Boundary comment")
+        .unwrap();
+
+    assert_eq!(
+        editor
+            .cell_comment(table_id, 256, 1)
+            .unwrap()
+            .unwrap()
+            .comment
+            .text,
+        "Boundary comment"
+    );
+    let descriptor = attached_table_descriptor(editor.package(), table_id).unwrap();
+    assert_eq!(
+        descriptor
+            .model
+            .base_data_store
+            .tiles
+            .tiles
+            .iter()
+            .map(|tile| tile.tileid)
+            .collect::<Vec<_>>(),
+        vec![0, 1]
+    );
+
+    let bytes = editor.to_bytes().unwrap();
+    let mut reopened = NumbersEditor::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        reopened
+            .cell_comment(table_id, 256, 1)
+            .unwrap()
+            .unwrap()
+            .comment
+            .text,
+        "Boundary comment"
+    );
+    reopened.clear_cell_comment(table_id, 256, 1).unwrap();
+    assert!(reopened.cell_comment(table_id, 256, 1).unwrap().is_none());
+}
+
+#[test]
+fn source_created_large_table_allocates_header_buckets_only_when_needed() {
+    const SECOND_HEADER_BUCKET_ROW: usize = 65_536;
+
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(SECOND_HEADER_BUCKET_ROW + 1, 1)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    editor
+        .set_cell(
+            table_id,
+            SECOND_HEADER_BUCKET_ROW,
+            0,
+            CellValue::Text("Second header bucket".to_owned()),
+        )
+        .unwrap();
+
+    let descriptor = attached_table_descriptor(editor.package(), table_id).unwrap();
+    assert_eq!(
+        descriptor.model.base_data_store.row_headers.buckets.len(),
+        2
+    );
+    assert_eq!(
+        descriptor
+            .model
+            .base_data_store
+            .tiles
+            .tiles
+            .iter()
+            .map(|tile| tile.tileid)
+            .collect::<Vec<_>>(),
+        vec![0, 256]
+    );
+    assert_eq!(
+        descriptor
+            .model
+            .base_data_store
+            .row_tile_tree
+            .nodes
+            .iter()
+            .map(|node| (node.key, node.value))
+            .collect::<Vec<_>>(),
+        vec![(0, 0), (65_536, 1)]
+    );
+    assert_eq!(descriptor.model.base_data_store.next_row_strip_id, 257);
+    assert!(NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).is_ok());
+}
+
+#[test]
 fn source_created_table_supports_sort_order_configuration_crud() {
     let mut editor = NumbersDocumentBuilder::new()
         .table_dimensions(4, 3)

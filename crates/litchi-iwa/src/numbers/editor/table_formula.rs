@@ -10,6 +10,7 @@ pub(super) fn set_attached_table_formula(
     expression: FormulaExpression,
     cached_value: Option<FormulaCachedValue>,
 ) -> Result<()> {
+    table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
     let descriptors = attached_table_descriptors(package)?;
     let descriptor = descriptors
         .iter()

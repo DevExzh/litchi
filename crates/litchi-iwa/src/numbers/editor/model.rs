@@ -2409,6 +2409,7 @@ pub(super) fn set_cell_in_package(
     column: usize,
     value: CellValue,
 ) -> Result<()> {
+    table_sparse_storage::ensure_cell_storage(package, table_id, row, column)?;
     let location = locate_cell(package, table_id, row, column)?;
     set_cell_at_location(package, location, row, column, value)
 }
@@ -2420,6 +2421,7 @@ pub(super) fn set_attached_cell_in_package(
     column: usize,
     value: CellValue,
 ) -> Result<()> {
+    table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
     let location = locate_attached_cell(package, table_id, row, column)?;
     set_cell_at_location(package, location, row, column, value)
 }
@@ -2543,6 +2545,12 @@ pub(super) fn set_cells_in_package(
     table_id: u64,
     updates: Vec<TableCellUpdate>,
 ) -> Result<()> {
+    validate_batch_values(&updates)?;
+    let coordinates = updates
+        .iter()
+        .map(|update| (update.row, update.column))
+        .collect::<Vec<_>>();
+    table_sparse_storage::ensure_cells_storage(package, table_id, &coordinates)?;
     let descriptor = table_models(package)?
         .into_iter()
         .find(|table| table.object_id == table_id)
@@ -2555,8 +2563,26 @@ pub(super) fn set_attached_cells_in_package(
     table_id: u64,
     updates: Vec<TableCellUpdate>,
 ) -> Result<()> {
+    validate_batch_values(&updates)?;
+    let coordinates = updates
+        .iter()
+        .map(|update| (update.row, update.column))
+        .collect::<Vec<_>>();
+    table_sparse_storage::ensure_attached_cells_storage(package, table_id, &coordinates)?;
     let descriptor = attached_table_descriptor(package, table_id)?;
     set_cells_for_descriptor(package, descriptor, updates)
+}
+
+fn validate_batch_values(updates: &[TableCellUpdate]) -> Result<()> {
+    if updates
+        .iter()
+        .any(|update| matches!(&update.value, CellValue::Formula(_) | CellValue::Error(_)))
+    {
+        return Err(Error::ParseError(
+            "Formula and error cell writes require referenced-table construction".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 fn set_cells_for_descriptor(
@@ -2569,11 +2595,6 @@ fn set_cells_for_descriptor(
     for update in updates {
         let (tile_archive, tile_id, tile_row) =
             cell_tile_location(&descriptor, &locations, update.row, update.column)?;
-        if matches!(&update.value, CellValue::Formula(_) | CellValue::Error(_)) {
-            return Err(Error::ParseError(
-                "Formula and error cell writes require referenced-table construction".to_owned(),
-            ));
-        }
         resolved.push((update, tile_archive, tile_id, tile_row));
     }
     for (update, tile_archive, tile_id, tile_row) in resolved {
@@ -3485,6 +3506,7 @@ pub(super) fn set_cell_comment_in_package(
     column: usize,
     text: String,
 ) -> Result<()> {
+    table_sparse_storage::ensure_cell_storage(package, table_id, row, column)?;
     let location = locate_cell(package, table_id, row, column)?;
     set_cell_comment_at_location(package, location, row, column, text)
 }
@@ -3496,6 +3518,7 @@ pub(super) fn set_attached_cell_comment_in_package(
     column: usize,
     text: String,
 ) -> Result<()> {
+    table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
     let location = locate_attached_cell(package, table_id, row, column)?;
     set_cell_comment_at_location(package, location, row, column, text)
 }

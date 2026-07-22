@@ -3277,6 +3277,7 @@ mod table_formula;
 mod table_headers;
 mod table_move;
 mod table_sort;
+mod table_sparse_storage;
 mod table_title;
 mod table_topology;
 mod text_box_create;

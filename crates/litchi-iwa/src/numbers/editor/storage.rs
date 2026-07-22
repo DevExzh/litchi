@@ -1685,6 +1685,7 @@ pub(super) fn set_encoded_cell_value(
     column: usize,
     value: EncodedValue,
 ) -> Result<()> {
+    table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
     let location = locate_attached_cell(package, table_id, row, column)?;
     let cell_count = update_tile(
         package,
