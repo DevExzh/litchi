@@ -17,6 +17,7 @@ pub enum FieldType {
     Date,
     Toc,
     TocEntry,
+    TableOfAuthoritiesEntry,
     Bookmark,
     Equation,
     MacroButton,
@@ -491,6 +492,43 @@ pub struct TableOfContentsEntryField<'a> {
     position: usize,
 }
 
+/// One recognized stored option of a TA field.
+///
+/// These values describe a legal-authority entry marker. They are inert
+/// metadata only: this crate never locates citations, changes hidden text,
+/// calculates page numbers, or generates a table of authorities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableOfAuthoritiesEntryOption<'a> {
+    /// The \\b switch toggles bold formatting for the entry page number.
+    BoldPageNumber,
+    /// The \\c integral authority category.
+    Category(Cow<'a, str>),
+    /// The \\i switch toggles italic formatting for the entry page number.
+    ItalicPageNumber,
+    /// The \\l long citation text.
+    LongCitation(Cow<'a, str>),
+    /// The \\r bookmark that marks the cited page range.
+    PageRangeBookmark(Cow<'a, str>),
+    /// The \\s short citation text.
+    ShortCitation(Cow<'a, str>),
+}
+
+/// Inert metadata for a legacy RTF TA field.
+///
+/// This model retains a stored table-of-authorities marker and cached result
+/// only. It never finds cited text, changes hidden text, follows bookmarks,
+/// paginates the document, or generates a table of authorities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfAuthoritiesEntryField<'a> {
+    instruction: &'a str,
+    options: Vec<TableOfAuthoritiesEntryOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 struct ExternalIncludeParts<'a> {
     kind: IncludeFieldKind,
     source: Cow<'a, str>,
@@ -509,6 +547,11 @@ struct TableOfContentsParts<'a> {
 struct TableOfContentsEntryParts<'a> {
     entry: Cow<'a, str>,
     options: Vec<TableOfContentsEntryOption<'a>>,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct TableOfAuthoritiesEntryParts<'a> {
+    options: Vec<TableOfAuthoritiesEntryOption<'a>>,
     unknown_switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -1001,6 +1044,56 @@ impl<'a> TableOfContentsEntryField<'a> {
     }
 }
 
+impl<'a> TableOfAuthoritiesEntryField<'a> {
+    /// Return the complete stored TA field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return recognized TA options in stored source order.
+    ///
+    /// These options are configuration metadata only. This method never finds
+    /// citations, follows bookmarks, calculates pages, or generates a table.
+    pub fn options(&self) -> &[TableOfAuthoritiesEntryOption<'a>] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> Field<'a> {
     #[inline]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
@@ -1040,6 +1133,9 @@ impl<'a> Field<'a> {
             },
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("TC") => {
                 FieldType::TocEntry
+            },
+            ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("TA") => {
+                FieldType::TableOfAuthoritiesEntry
             },
             ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("BOOKMARK") =>
@@ -1273,6 +1369,28 @@ impl<'a> Field<'a> {
         Some(TableOfContentsEntryField {
             instruction: self.instruction.as_ref(),
             entry: parts.entry,
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed TA entry field.
+    ///
+    /// The stored citation options and cached result are never used to find
+    /// text, follow bookmarks, change hidden text, calculate pages, or generate
+    /// a table of authorities. Malformed TA instructions remain generic fields
+    /// and return None here.
+    pub fn table_of_authorities_entry(&self) -> Option<TableOfAuthoritiesEntryField<'_>> {
+        if self.field_type != FieldType::TableOfAuthoritiesEntry {
+            return None;
+        }
+        let parts = table_of_authorities_entry_parts(self.instruction.as_ref())?;
+        Some(TableOfAuthoritiesEntryField {
+            instruction: self.instruction.as_ref(),
             options: parts.options,
             unknown_switches: parts.unknown_switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
@@ -2000,6 +2118,84 @@ fn table_of_contents_entry_parts(instruction: &str) -> Option<TableOfContentsEnt
 
     Some(TableOfContentsEntryParts {
         entry,
+        options,
+        unknown_switches,
+    })
+}
+
+fn table_of_authorities_entry_parts(instruction: &str) -> Option<TableOfAuthoritiesEntryParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("TA") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let normalized_name = name.to_ascii_lowercase();
+        match normalized_name.as_str() {
+            "b" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(TableOfAuthoritiesEntryOption::BoldPageNumber);
+                index += 1;
+            },
+            "c" => {
+                options.push(TableOfAuthoritiesEntryOption::Category(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "i" => {
+                if tokens
+                    .get(index + 1)
+                    .is_some_and(|token| switch_name(token).is_none())
+                {
+                    return None;
+                }
+                options.push(TableOfAuthoritiesEntryOption::ItalicPageNumber);
+                index += 1;
+            },
+            "l" => {
+                options.push(TableOfAuthoritiesEntryOption::LongCitation(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "r" => {
+                options.push(TableOfAuthoritiesEntryOption::PageRangeBookmark(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            "s" => {
+                options.push(TableOfAuthoritiesEntryOption::ShortCitation(
+                    switch_value(&tokens, index, name).ok()?,
+                ));
+                index += 2;
+            },
+            _ => {
+                let value = tokens
+                    .get(index + 1)
+                    .filter(|token| switch_name(token).is_none());
+                unknown_switches.push(FieldSwitch {
+                    name: Cow::Owned(name.to_string()),
+                    value: value.map(|token| token.value.clone()),
+                });
+                index += 1 + usize::from(value.is_some());
+            },
+        }
+    }
+
+    Some(TableOfAuthoritiesEntryParts {
         options,
         unknown_switches,
     })
@@ -2909,6 +3105,72 @@ mod tests {
     }
 
     #[test]
+    fn table_of_authorities_entry_fields_preserve_stored_metadata_without_generation() {
+        let mut field = Field::parse_instruction(
+            r#"TA \l "Baldwin v. Alberti" \c 1 \s Baldwin \b \i \r PageRange \* MERGEFORMAT"#,
+        );
+        field.result = Cow::Borrowed("cached authority");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::TableOfAuthoritiesEntry);
+        let entry = field.table_of_authorities_entry().unwrap();
+        assert_eq!(entry.instruction(), field.instruction);
+        assert_eq!(
+            entry.options(),
+            &[
+                TableOfAuthoritiesEntryOption::LongCitation(Cow::Borrowed("Baldwin v. Alberti")),
+                TableOfAuthoritiesEntryOption::Category(Cow::Borrowed("1")),
+                TableOfAuthoritiesEntryOption::ShortCitation(Cow::Borrowed("Baldwin")),
+                TableOfAuthoritiesEntryOption::BoldPageNumber,
+                TableOfAuthoritiesEntryOption::ItalicPageNumber,
+                TableOfAuthoritiesEntryOption::PageRangeBookmark(Cow::Borrowed("PageRange")),
+            ]
+        );
+        assert_eq!(entry.cached_result(), Some("cached authority"));
+        assert!(entry.is_dirty());
+        assert!(entry.is_locked());
+        assert_eq!(entry.owner(), FieldOwner::Body);
+        assert_eq!(entry.position(), 4);
+        assert_eq!(entry.unknown_switches().len(), 1);
+        assert_eq!(entry.unknown_switches()[0].name, "*");
+        assert_eq!(
+            entry.unknown_switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+
+        assert!(
+            Field::parse_instruction("TA")
+                .table_of_authorities_entry()
+                .is_some()
+        );
+        assert!(
+            Field::parse_instruction(r"TA \c")
+                .table_of_authorities_entry()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"TA \b unexpected")
+                .table_of_authorities_entry()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction("TA unexpected")
+                .table_of_authorities_entry()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction(r"TAX \l Citation").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
     fn document_discovers_eq_fields_without_calculating_them() {
         let document = crate::RtfDocument::parse(
             r#"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}"#,
@@ -3054,6 +3316,30 @@ mod tests {
                 TableOfContentsEntryOption::ListIdentifier(Cow::Borrowed("i")),
                 TableOfContentsEntryOption::Level(Cow::Borrowed("4")),
                 TableOfContentsEntryOption::OmitPageNumber,
+            ]
+        );
+        assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_table_of_authorities_entries_without_generating_a_table() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TA \\l "Baldwin v. Alberti" \\c 1 \\b}{\fldrslt cached authority}}After}"#,
+        )
+        .unwrap();
+
+        let entries = document.table_of_authorities_entries();
+        assert_eq!(document.table_of_authorities_entry_count(), 1);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].cached_result(), Some("cached authority"));
+        assert!(entries[0].is_dirty());
+        assert!(entries[0].is_locked());
+        assert_eq!(
+            entries[0].options(),
+            &[
+                TableOfAuthoritiesEntryOption::LongCitation(Cow::Borrowed("Baldwin v. Alberti")),
+                TableOfAuthoritiesEntryOption::Category(Cow::Borrowed("1")),
+                TableOfAuthoritiesEntryOption::BoldPageNumber,
             ]
         );
         assert_eq!(document.text(), "Before After");

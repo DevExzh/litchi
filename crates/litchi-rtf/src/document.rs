@@ -1042,6 +1042,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert TA entry fields in document field order.
+    ///
+    /// Stored citation options and cached results are exposed solely as
+    /// metadata. This method never finds cited text, follows bookmarks,
+    /// calculates page numbers, generates a table of authorities, or refreshes
+    /// a field.
+    pub fn table_of_authorities_entries(&self) -> Vec<crate::TableOfAuthoritiesEntryField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::table_of_authorities_entry)
+            .collect()
+    }
+
+    /// Return the number of typed, inert TA entry fields in the document.
+    pub fn table_of_authorities_entry_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.table_of_authorities_entry().is_some())
+            .count()
+    }
+
     pub fn push_field(&mut self, field: super::field::Field<'a>) -> RtfResult<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
             return Err(RtfError::MalformedDocument(
