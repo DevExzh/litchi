@@ -3,9 +3,11 @@
 use std::collections::HashMap;
 
 use super::*;
+use crate::ImageAdjustments;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::image_adjustments::replace_image_adjustments;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
 };
@@ -34,6 +36,8 @@ pub struct KeynoteSlideImageInfo {
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
+    /// Exposure, saturation, and automatic-enhancement settings.
+    pub image_adjustments: ImageAdjustments,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
 }
@@ -205,6 +209,44 @@ impl KeynoteEditor {
         if verified.slide_image_properties(slide_index, drawable_object_id)? != properties {
             return Err(Error::InvalidFormat(
                 "Keynote image properties update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read the basic controls in iWork's Image inspector for one ordinary slide image.
+    pub fn slide_image_adjustments(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ImageAdjustments> {
+        Ok(require_file_image(self, slide_index, drawable_object_id)?
+            .info
+            .image_adjustments)
+    }
+
+    /// Update image exposure, saturation, and automatic enhancement while preserving advanced
+    /// and unknown native adjustment fields.
+    pub fn set_slide_image_adjustments(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        adjustments: ImageAdjustments,
+    ) -> Result<()> {
+        let source = require_file_image(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let expected = replace_image_adjustments(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            "Keynote image",
+            adjustments,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_image_adjustments(slide_index, drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Keynote image adjustment update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -431,6 +473,7 @@ mod tests {
 
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
+    use crate::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -514,6 +557,29 @@ mod tests {
                 .slide_image_properties(0, created.drawable_object_id)
                 .unwrap(),
             DrawableProperties::default()
+        );
+
+        let changed_adjustments = ImageAdjustments::default()
+            .with_exposure(Some(ImageAdjustment::new(0.25).unwrap()))
+            .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
+            .with_enhancement(Some(ImageEnhancement::Enabled));
+        editor
+            .set_slide_image_adjustments(0, created.drawable_object_id, changed_adjustments)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_image_adjustments(0, created.drawable_object_id)
+                .unwrap(),
+            changed_adjustments
+        );
+        editor
+            .set_slide_image_adjustments(0, created.drawable_object_id, created.image_adjustments)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_image_adjustments(0, created.drawable_object_id)
+                .unwrap(),
+            created.image_adjustments
         );
 
         let previous = editor

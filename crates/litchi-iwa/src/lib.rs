@@ -131,6 +131,8 @@
 pub mod archive;
 pub mod bundle;
 pub mod identity;
+/// Typed native controls for basic image adjustments.
+pub mod image_adjustments;
 pub mod media;
 /// Shared movie and audio playback settings.
 pub mod media_playback;
@@ -175,6 +177,7 @@ pub use comments::{
 };
 pub use document::Document;
 pub use identity::IWorkDocumentIdentity;
+pub use image_adjustments::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 pub use media::{
     EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats, MediaType,
 };

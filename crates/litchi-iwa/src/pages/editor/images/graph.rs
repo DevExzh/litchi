@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
+use crate::image_adjustments::image_adjustments_from_archive;
 use crate::shapes::{
     drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
@@ -384,6 +385,7 @@ fn image_info(
         thumbnail_data_identifier: image.thumbnail_data.map(|reference| reference.identifier),
         geometry: geometry_from_drawable(&image.super_)?,
         properties: drawable_properties(&image.super_),
+        image_adjustments: image_adjustments_from_archive(&image)?,
         original_size: image.original_size.map(drawable_size),
         natural_size: image.natural_size.map(drawable_size),
     })

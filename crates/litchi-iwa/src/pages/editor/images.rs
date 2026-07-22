@@ -3,9 +3,11 @@
 use std::collections::HashMap;
 
 use super::*;
+use crate::ImageAdjustments;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::image_adjustments::replace_image_adjustments;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
@@ -26,6 +28,8 @@ pub struct PagesImageInfo {
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
+    /// Exposure, saturation, and automatic-enhancement settings.
+    pub image_adjustments: ImageAdjustments,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
 }
@@ -213,6 +217,39 @@ impl PagesEditor {
         if verified.body_image_properties(drawable_object_id)? != properties {
             return Err(Error::InvalidFormat(
                 "Pages image properties update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read the basic controls in iWork's Image inspector for one body image.
+    pub fn body_image_adjustments(&self, drawable_object_id: u64) -> Result<ImageAdjustments> {
+        Ok(body_image_graph(self, drawable_object_id)?
+            .info
+            .image_adjustments)
+    }
+
+    /// Update image exposure, saturation, and automatic enhancement while preserving advanced
+    /// and unknown native adjustment fields.
+    pub fn set_body_image_adjustments(
+        &mut self,
+        drawable_object_id: u64,
+        adjustments: ImageAdjustments,
+    ) -> Result<()> {
+        let source = body_image_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let expected = replace_image_adjustments(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            "Pages image",
+            adjustments,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_image_adjustments(drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Pages image adjustment update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -456,6 +493,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -538,6 +576,29 @@ mod tests {
                 .body_image_properties(created.drawable_object_id)
                 .unwrap(),
             DrawableProperties::default()
+        );
+
+        let changed_adjustments = ImageAdjustments::default()
+            .with_exposure(Some(ImageAdjustment::new(0.25).unwrap()))
+            .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
+            .with_enhancement(Some(ImageEnhancement::Enabled));
+        editor
+            .set_body_image_adjustments(created.drawable_object_id, changed_adjustments)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_image_adjustments(created.drawable_object_id)
+                .unwrap(),
+            changed_adjustments
+        );
+        editor
+            .set_body_image_adjustments(created.drawable_object_id, created.image_adjustments)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_image_adjustments(created.drawable_object_id)
+                .unwrap(),
+            created.image_adjustments
         );
 
         let previous = editor

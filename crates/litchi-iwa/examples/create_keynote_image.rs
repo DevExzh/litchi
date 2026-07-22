@@ -6,6 +6,7 @@ use std::path::Path;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -41,6 +42,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut properties = editor.slide_image_properties(0, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded image: {preferred_filename}"));
     editor.set_slide_image_properties(0, created.drawable_object_id, properties)?;
+    editor.set_slide_image_adjustments(
+        0,
+        created.drawable_object_id,
+        ImageAdjustments::default()
+            .with_exposure(Some(ImageAdjustment::new(0.25)?))
+            .with_saturation(Some(ImageAdjustment::new(-0.5)?))
+            .with_enhancement(Some(ImageEnhancement::Enabled)),
+    )?;
     editor.save(output)?;
     println!(
         "created Keynote image {} backed by data {}",

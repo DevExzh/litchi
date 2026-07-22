@@ -113,6 +113,12 @@ properties through `body_image_properties` / `set_body_image_properties`,
 text, hyperlinks, and lock state editable without raw protobuf mutation; see
 the `create_*_image` examples.
 
+The same image APIs expose the native basic Image-inspector controls through
+typed `ImageAdjustments`: exposure and saturation use checked normalized values
+from `-1.0` to `1.0` (`0.25` is `25%`), while `ImageEnhancement` models the
+automatic Enhance switch. The setters preserve all unmapped advanced native
+adjustments and opaque wire fields.
+
 ### Create Pages documents from scratch
 
 ```rust

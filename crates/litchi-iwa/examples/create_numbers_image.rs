@@ -5,6 +5,7 @@ use std::path::Path;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
 const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -38,6 +39,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut properties = editor.sheet_image_properties(sheet_id, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded image: {preferred_filename}"));
     editor.set_sheet_image_properties(sheet_id, created.drawable_object_id, properties)?;
+    editor.set_sheet_image_adjustments(
+        sheet_id,
+        created.drawable_object_id,
+        ImageAdjustments::default()
+            .with_exposure(Some(ImageAdjustment::new(0.25)?))
+            .with_saturation(Some(ImageAdjustment::new(-0.5)?))
+            .with_enhancement(Some(ImageEnhancement::Enabled)),
+    )?;
     editor.save(output)?;
     println!(
         "created Numbers image {} backed by data {}",
