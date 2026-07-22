@@ -3876,6 +3876,7 @@ mod body_shapes;
 mod charts;
 mod date_time_fields;
 mod document_options;
+mod drawable_order;
 mod footnote_settings;
 mod footnotes;
 mod images;

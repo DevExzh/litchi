@@ -130,6 +130,8 @@
 // Core parsing modules
 pub mod archive;
 pub mod bundle;
+/// Typed native drawable stacking-order controls.
+pub mod drawable_order;
 pub mod identity;
 /// Typed native controls for basic image adjustments.
 pub mod image_adjustments;
@@ -176,6 +178,7 @@ pub use comments::{
     IWorkTableCellCommentReplyInfo,
 };
 pub use document::Document;
+pub use drawable_order::DrawableLayerMove;
 pub use identity::IWorkDocumentIdentity;
 pub use image_adjustments::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 pub use media::{

@@ -3113,6 +3113,7 @@ pub(crate) fn create_empty_table_graph_in_package(
 mod cell_merge;
 mod column_insert;
 mod date_time_fields;
+mod drawable_order;
 mod formula_cache;
 mod formula_clone;
 mod formula_dependency_shift;

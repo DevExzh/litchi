@@ -119,6 +119,13 @@ from `-1.0` to `1.0` (`0.25` is `25%`), while `ImageEnhancement` models the
 automatic Enhance switch. The setters preserve all unmapped advanced native
 adjustments and opaque wire fields.
 
+All source-built and existing direct drawables also expose native Arrange
+stacking through `body_drawable_order`, `sheet_drawable_order`, and
+`slide_drawable_order`. Each list runs back-to-front; its setter requires an
+exact permutation, while `move_*_drawable` accepts typed
+`DrawableLayerMove::{ToBack, Backward, Forward, ToFront}` commands. See the
+`create_*_stacked_shapes` examples for complete scratch-file workflows.
+
 ### Create Pages documents from scratch
 
 ```rust
