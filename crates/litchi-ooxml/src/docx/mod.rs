@@ -114,8 +114,8 @@ pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::{
     BibliographyField, CitationField, DdeField, DdeFieldKind, DdeRepresentation,
     DocumentVariableField, ExternalIncludeField, ExternalIncludeOption, Field, FieldSwitch,
-    IncludeFieldKind, IndexEntryField, IndexField, IndexSortOrder, LinkField, LinkFormatting,
-    LinkResultOption, MacroButtonField, MailMergeConditionalControlField,
+    IfField, IncludeFieldKind, IndexEntryField, IndexField, IndexSortOrder, LinkField,
+    LinkFormatting, LinkResultOption, MacroButtonField, MailMergeConditionalControlField,
     MailMergeConditionalControlKind, MailMergeCounterField, MailMergeCounterKind,
     MailMergeNextField, MergeField, ReferencedDocumentField, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesField, TableOfContentsField, TableOfContentsLevelRange,

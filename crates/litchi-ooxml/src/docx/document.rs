@@ -9,9 +9,10 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
     BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
-    IndexEntryField, IndexField, LinkField, MacroButtonField, MailMergeConditionalControlField,
-    MailMergeCounterField, MailMergeNextField, MergeField, ReferencedDocumentField,
-    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+    IfField, IndexEntryField, IndexField, LinkField, MacroButtonField,
+    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField, MergeField,
+    ReferencedDocumentField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
+    TableOfContentsField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1537,6 +1538,24 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert conditional mail-merge control fields.
     pub fn mail_merge_conditional_control_count(&self) -> Result<usize> {
         Ok(self.mail_merge_conditional_controls()?.len())
+    }
+
+    /// Get typed, inert `IF` fields in document order.
+    ///
+    /// Returned values expose stored expression text, cached content, and
+    /// dirty/lock state only. This method never parses or evaluates an
+    /// expression, resolves field values, or refreshes a field result.
+    pub fn if_fields(&self) -> Result<Vec<IfField>> {
+        self.fields()?
+            .iter()
+            .map(Field::if_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `IF` fields.
+    pub fn if_field_count(&self) -> Result<usize> {
+        Ok(self.if_fields()?.len())
     }
 
     /// Get all mail-merge fields in document order.
