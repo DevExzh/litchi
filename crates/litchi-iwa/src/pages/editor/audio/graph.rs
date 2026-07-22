@@ -1,9 +1,8 @@
 //! Typed construction and strict discovery of body-anchored Pages audio graphs.
 
-use std::time::Duration;
-
 use super::*;
 use crate::IWorkThemeArchive;
+use crate::media_playback::media_playback_settings;
 use crate::shapes::{
     DrawableGeometry, DrawableProperties, DrawableSize, drawable_properties,
     geometry_from_drawable, patch_drawable_geometry, patch_wrapped_drawable_properties,
@@ -500,18 +499,9 @@ fn audio_info(
     let position = geometry_from_drawable(&audio.super_)?
         .position
         .ok_or_else(|| Error::InvalidFormat(format!("Pages audio {identifier} has no position")))?;
-    let start = audio.start_time.unwrap_or(0.0);
-    let end = audio
-        .end_time
-        .ok_or_else(|| Error::InvalidFormat(format!("Pages audio {identifier} has no end time")))?;
-    if !start.is_finite() || !end.is_finite() || end <= start {
-        return Err(Error::InvalidFormat(format!(
-            "Pages audio {identifier} has invalid playback bounds {start}..{end}"
-        )));
-    }
-    let duration = Duration::try_from_secs_f32(end - start).map_err(|_| {
+    let playback = media_playback_settings(&audio).map_err(|error| {
         Error::InvalidFormat(format!(
-            "Pages audio {identifier} playback duration does not fit std::time::Duration"
+            "Pages audio {identifier} has invalid playback settings: {error}"
         ))
     })?;
     Ok(PagesAudioInfo {
@@ -520,7 +510,8 @@ fn audio_info(
         audio_data_identifier,
         position,
         properties: drawable_properties(&audio.super_),
-        duration,
+        playback,
+        duration: playback.duration(),
     })
 }
 

@@ -1,0 +1,518 @@
+//! Typed, wire-preserving playback settings for iWork movie archives.
+
+use std::time::Duration;
+
+use prost::Message;
+
+use crate::archive::RawMessage;
+use crate::protobuf::tsd;
+use crate::wire::{patch_fixed32_field, patch_varint_field};
+use crate::{Error, IWorkPackage, Result};
+
+const MOVIE_ARCHIVE_MESSAGE_TYPE: u32 = 3_007;
+const START_TIME_FIELD: u32 = 3;
+const END_TIME_FIELD: u32 = 4;
+const POSTER_TIME_FIELD: u32 = 5;
+const LEGACY_LOOP_MODE_FIELD: u32 = 6;
+const VOLUME_FIELD: u32 = 7;
+const LOOP_MODE_FIELD: u32 = 24;
+const NO_LOOP_MODE: i32 = 0;
+const REPEAT_LOOP_MODE: i32 = 1;
+const BACK_AND_FORTH_LOOP_MODE: i32 = 2;
+
+/// A normalized media volume accepted by Pages, Numbers, and Keynote.
+///
+/// Values are expressed as a linear multiplier in the inclusive range
+/// `0.0..=1.0`. Construction rejects non-finite and out-of-range values.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(transparent)]
+pub struct MediaVolume(f32);
+
+impl MediaVolume {
+    /// Silence the media clip.
+    pub const SILENT: Self = Self(0.0);
+    /// Play the media clip at its unattenuated source volume.
+    pub const FULL: Self = Self(1.0);
+
+    /// Construct one validated linear volume multiplier.
+    pub fn new(value: f32) -> Result<Self> {
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err(Error::ParseError(
+                "media volume must be finite and within 0.0..=1.0".to_owned(),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    /// Return the native linear volume multiplier.
+    pub const fn as_f32(self) -> f32 {
+        self.0
+    }
+}
+
+impl TryFrom<f32> for MediaVolume {
+    type Error = Error;
+
+    fn try_from(value: f32) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
+/// Repeat behavior shared by movie and audio clips.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MediaLoopMode {
+    /// Stop after one playback.
+    None,
+    /// Restart from the beginning after each playback.
+    Repeat,
+    /// Alternate forward and reverse playback.
+    BackAndForth,
+    /// A value introduced by a newer iWork version.
+    Unknown(i32),
+}
+
+impl MediaLoopMode {
+    /// Decode a native `TSD.MovieArchive.MovieLoopOption` value losslessly.
+    pub const fn from_raw(value: i32) -> Self {
+        match value {
+            NO_LOOP_MODE => Self::None,
+            REPEAT_LOOP_MODE => Self::Repeat,
+            BACK_AND_FORTH_LOOP_MODE => Self::BackAndForth,
+            value => Self::Unknown(value),
+        }
+    }
+
+    /// Return the native `TSD.MovieArchive.MovieLoopOption` value.
+    pub const fn as_raw(self) -> i32 {
+        match self {
+            Self::None => NO_LOOP_MODE,
+            Self::Repeat => REPEAT_LOOP_MODE,
+            Self::BackAndForth => BACK_AND_FORTH_LOOP_MODE,
+            Self::Unknown(value) => value,
+        }
+    }
+
+    const fn is_canonical(self) -> bool {
+        !matches!(
+            self,
+            Self::Unknown(NO_LOOP_MODE | REPEAT_LOOP_MODE | BACK_AND_FORTH_LOOP_MODE)
+        )
+    }
+}
+
+/// Playback state stored by an iWork movie archive.
+///
+/// `end_time` is required because the supported file-backed media graphs use it
+/// as the authoritative playback boundary. Optional fields preserve the native
+/// distinction between an omitted value and an explicitly encoded default.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MediaPlaybackSettings {
+    /// Optional absolute trim start from the beginning of the source media.
+    pub start_time: Option<Duration>,
+    /// Absolute trim end from the beginning of the source media.
+    pub end_time: Duration,
+    /// Optional absolute frame or sample position used for the media poster.
+    pub poster_time: Option<Duration>,
+    /// Optional repeat behavior.
+    pub loop_mode: Option<MediaLoopMode>,
+    /// Optional linear volume multiplier.
+    pub volume: Option<MediaVolume>,
+}
+
+impl MediaPlaybackSettings {
+    /// Create settings with an explicit playback end and no optional fields.
+    #[must_use]
+    pub const fn new(end_time: Duration) -> Self {
+        Self {
+            start_time: None,
+            end_time,
+            poster_time: None,
+            loop_mode: None,
+            volume: None,
+        }
+    }
+
+    /// Set the optional absolute trim start.
+    #[must_use]
+    pub const fn with_start_time(mut self, start_time: Option<Duration>) -> Self {
+        self.start_time = start_time;
+        self
+    }
+
+    /// Set the optional absolute poster position.
+    #[must_use]
+    pub const fn with_poster_time(mut self, poster_time: Option<Duration>) -> Self {
+        self.poster_time = poster_time;
+        self
+    }
+
+    /// Set the optional repeat behavior.
+    #[must_use]
+    pub const fn with_loop_mode(mut self, loop_mode: Option<MediaLoopMode>) -> Self {
+        self.loop_mode = loop_mode;
+        self
+    }
+
+    /// Set the optional linear volume multiplier.
+    #[must_use]
+    pub const fn with_volume(mut self, volume: Option<MediaVolume>) -> Self {
+        self.volume = volume;
+        self
+    }
+
+    /// Return the playable duration after applying the trim range.
+    #[must_use]
+    pub fn duration(self) -> Duration {
+        self.end_time
+            .saturating_sub(self.start_time.unwrap_or(Duration::ZERO))
+    }
+}
+
+pub(crate) fn media_playback_settings(movie: &tsd::MovieArchive) -> Result<MediaPlaybackSettings> {
+    let start_time = movie
+        .start_time
+        .map(|value| duration_from_seconds(value, "media start time"))
+        .transpose()?;
+    let end_time = movie
+        .end_time
+        .ok_or_else(|| Error::InvalidFormat("media archive has no end time".to_owned()))
+        .and_then(|value| duration_from_seconds(value, "media end time"))?;
+    let poster_time = movie
+        .poster_time
+        .map(|value| duration_from_seconds(value, "media poster time"))
+        .transpose()?;
+    let loop_mode = movie_loop_mode(movie)?;
+    let volume = movie.volume.map(MediaVolume::new).transpose()?;
+    canonicalize_media_playback_settings(MediaPlaybackSettings {
+        start_time,
+        end_time,
+        poster_time,
+        loop_mode,
+        volume,
+    })
+}
+
+pub(crate) fn replace_movie_playback_settings(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    movie_id: u64,
+    context: &str,
+    settings: MediaPlaybackSettings,
+) -> Result<MediaPlaybackSettings> {
+    let settings = canonicalize_media_playback_settings(settings)?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(movie_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("{context} object {movie_id} is missing"))
+        })?;
+        let message_indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter_map(|(index, message)| {
+                (message.type_ == MOVIE_ARCHIVE_MESSAGE_TYPE).then_some(index)
+            })
+            .collect::<Vec<_>>();
+        let [message_index] = message_indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "{context} {movie_id} must have exactly one MovieArchive payload"
+            )));
+        };
+        let message_index = *message_index;
+        let original = object.messages[message_index].data.as_slice();
+        let movie = tsd::MovieArchive::decode(original)?;
+        if media_playback_settings(&movie).is_ok_and(|current| current == settings) {
+            return Ok(());
+        }
+        let data = patch_movie_playback_settings(original, &movie, settings)?;
+        let verified = tsd::MovieArchive::decode(data.as_slice())?;
+        if media_playback_settings(&verified)? != settings {
+            return Err(Error::InvalidFormat(format!(
+                "{context} playback patch failed validation"
+            )));
+        }
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: MOVIE_ARCHIVE_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })?;
+    Ok(settings)
+}
+
+fn canonicalize_media_playback_settings(
+    settings: MediaPlaybackSettings,
+) -> Result<MediaPlaybackSettings> {
+    let start_time = settings
+        .start_time
+        .map(|value| canonical_duration(value, "media start time"))
+        .transpose()?;
+    let end_time = canonical_duration(settings.end_time, "media end time")?;
+    let poster_time = settings
+        .poster_time
+        .map(|value| canonical_duration(value, "media poster time"))
+        .transpose()?;
+    let start = start_time.unwrap_or(Duration::ZERO);
+    if end_time <= start {
+        return Err(Error::ParseError(
+            "media end time must be later than its start time".to_owned(),
+        ));
+    }
+    if let Some(loop_mode) = settings.loop_mode
+        && !loop_mode.is_canonical()
+    {
+        return Err(Error::ParseError(
+            "media loop mode must not use a reserved native value as unknown".to_owned(),
+        ));
+    }
+    Ok(MediaPlaybackSettings {
+        start_time,
+        end_time,
+        poster_time,
+        loop_mode: settings.loop_mode,
+        volume: settings.volume,
+    })
+}
+
+#[allow(deprecated)]
+fn patch_movie_playback_settings(
+    original: &[u8],
+    movie: &tsd::MovieArchive,
+    settings: MediaPlaybackSettings,
+) -> Result<Vec<u8>> {
+    let data = patch_fixed32_field(
+        original,
+        START_TIME_FIELD,
+        movie.start_time.is_some(),
+        settings
+            .start_time
+            .map(|value| duration_as_seconds(value, "media start time"))
+            .transpose()?
+            .map(f32::to_bits),
+    )?;
+    let data = patch_fixed32_field(
+        &data,
+        END_TIME_FIELD,
+        movie.end_time.is_some(),
+        Some(duration_as_seconds(settings.end_time, "media end time")?.to_bits()),
+    )?;
+    let data = patch_fixed32_field(
+        &data,
+        POSTER_TIME_FIELD,
+        movie.poster_time.is_some(),
+        settings
+            .poster_time
+            .map(|value| duration_as_seconds(value, "media poster time"))
+            .transpose()?
+            .map(f32::to_bits),
+    )?;
+    let data = patch_varint_field(
+        &data,
+        LEGACY_LOOP_MODE_FIELD,
+        movie.loop_option_as_integer.is_some(),
+        if movie.loop_option_as_integer.is_some() {
+            legacy_loop_mode_value(settings.loop_mode)?
+        } else {
+            None
+        },
+    )?;
+    let data = patch_varint_field(
+        &data,
+        LOOP_MODE_FIELD,
+        movie.loop_option.is_some(),
+        if movie.loop_option.is_some() || movie.loop_option_as_integer.is_none() {
+            settings
+                .loop_mode
+                .map(|mode| i64::from(mode.as_raw()) as u64)
+        } else {
+            None
+        },
+    )?;
+    patch_fixed32_field(
+        &data,
+        VOLUME_FIELD,
+        movie.volume.is_some(),
+        settings.volume.map(|volume| volume.as_f32().to_bits()),
+    )
+}
+
+#[allow(deprecated)]
+fn movie_loop_mode(movie: &tsd::MovieArchive) -> Result<Option<MediaLoopMode>> {
+    let modern = movie.loop_option.map(MediaLoopMode::from_raw);
+    let legacy = movie
+        .loop_option_as_integer
+        .map(|value| MediaLoopMode::from_raw(i32::from_le_bytes(value.to_le_bytes())));
+    match (modern, legacy) {
+        (Some(modern), Some(legacy)) if modern != legacy => Err(Error::InvalidFormat(
+            "media archive has conflicting modern and legacy loop modes".to_owned(),
+        )),
+        (Some(mode), _) | (None, Some(mode)) => Ok(Some(mode)),
+        (None, None) => Ok(None),
+    }
+}
+
+fn legacy_loop_mode_value(loop_mode: Option<MediaLoopMode>) -> Result<Option<u64>> {
+    Ok(loop_mode.map(|mode| u64::from(u32::from_le_bytes(mode.as_raw().to_le_bytes()))))
+}
+
+fn canonical_duration(value: Duration, context: &str) -> Result<Duration> {
+    duration_from_seconds(duration_as_seconds(value, context)?, context)
+}
+
+fn duration_as_seconds(value: Duration, context: &str) -> Result<f32> {
+    let seconds = value.as_secs_f64();
+    if !seconds.is_finite() || seconds > f64::from(f32::MAX) {
+        return Err(Error::ParseError(format!(
+            "{context} must fit in finite f32 seconds"
+        )));
+    }
+    Ok(seconds as f32)
+}
+
+fn duration_from_seconds(value: f32, context: &str) -> Result<Duration> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(Error::InvalidFormat(format!(
+            "{context} must be finite and non-negative"
+        )));
+    }
+    Duration::try_from_secs_f32(value)
+        .map_err(|error| Error::InvalidFormat(format!("{context} is out of range: {error}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn playback_patch_preserves_unknown_fields_and_restores_exactly() {
+        let movie = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            start_time: Some(0.0),
+            end_time: Some(1.5),
+            poster_time: Some(0.0),
+            loop_option: Some(NO_LOOP_MODE),
+            volume: Some(1.0),
+            ..Default::default()
+        };
+        let baseline = media_playback_settings(&movie).unwrap();
+        let replacement = MediaPlaybackSettings {
+            start_time: Some(Duration::from_millis(250)),
+            end_time: Duration::from_millis(1_250),
+            poster_time: Some(Duration::from_millis(500)),
+            loop_mode: Some(MediaLoopMode::BackAndForth),
+            volume: Some(MediaVolume::new(0.75).unwrap()),
+        };
+        let mut original = movie.encode_to_vec();
+        append_unknown_varint(&mut original, 99, 990);
+
+        let changed = patch_movie_playback_settings(&original, &movie, replacement).unwrap();
+        let changed_movie = tsd::MovieArchive::decode(changed.as_slice()).unwrap();
+        assert_eq!(
+            media_playback_settings(&changed_movie).unwrap(),
+            replacement
+        );
+        assert!(
+            changed
+                .windows(3)
+                .any(|window| window == [0x98, 0x06, 0xde])
+        );
+
+        let restored = patch_movie_playback_settings(&changed, &changed_movie, baseline).unwrap();
+        assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn playback_settings_reject_invalid_ranges_and_volumes() {
+        assert!(MediaVolume::new(f32::NAN).is_err());
+        assert!(MediaVolume::new(1.01).is_err());
+        assert!(
+            canonicalize_media_playback_settings(MediaPlaybackSettings::new(Duration::ZERO,))
+                .is_err()
+        );
+        assert!(
+            canonicalize_media_playback_settings(
+                MediaPlaybackSettings::new(Duration::from_secs(1))
+                    .with_start_time(Some(Duration::from_secs(1))),
+            )
+            .is_err()
+        );
+        assert!(
+            canonicalize_media_playback_settings(
+                MediaPlaybackSettings::new(Duration::from_secs(1))
+                    .with_loop_mode(Some(MediaLoopMode::Unknown(NO_LOOP_MODE))),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn playback_settings_read_legacy_loop_modes() {
+        let movie = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(1.0),
+            loop_option_as_integer: Some(REPEAT_LOOP_MODE as u32),
+            ..Default::default()
+        };
+        assert_eq!(
+            media_playback_settings(&movie).unwrap().loop_mode,
+            Some(MediaLoopMode::Repeat)
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn playback_settings_round_trip_signed_unknown_legacy_loop_modes() {
+        let movie = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(1.0),
+            loop_option_as_integer: Some(u32::from_le_bytes((-1_i32).to_le_bytes())),
+            ..Default::default()
+        };
+        let settings = media_playback_settings(&movie).unwrap();
+        assert_eq!(settings.loop_mode, Some(MediaLoopMode::Unknown(-1)));
+
+        let patched =
+            patch_movie_playback_settings(&movie.encode_to_vec(), &movie, settings).unwrap();
+        let restored = tsd::MovieArchive::decode(patched.as_slice()).unwrap();
+        assert_eq!(
+            restored.loop_option_as_integer,
+            movie.loop_option_as_integer
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn legacy_only_loop_fields_are_not_upgraded() {
+        let movie = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(1.5),
+            loop_option_as_integer: Some(REPEAT_LOOP_MODE as u32),
+            ..Default::default()
+        };
+        let baseline = media_playback_settings(&movie).unwrap();
+        let replacement = MediaPlaybackSettings {
+            loop_mode: Some(MediaLoopMode::BackAndForth),
+            ..baseline
+        };
+        let original = movie.encode_to_vec();
+
+        let changed = patch_movie_playback_settings(&original, &movie, replacement).unwrap();
+        let changed_movie = tsd::MovieArchive::decode(changed.as_slice()).unwrap();
+        assert_eq!(changed_movie.loop_option, None);
+        assert_eq!(
+            changed_movie.loop_option_as_integer,
+            Some(BACK_AND_FORTH_LOOP_MODE as u32)
+        );
+
+        let restored = patch_movie_playback_settings(&changed, &changed_movie, baseline).unwrap();
+        assert_eq!(restored, original);
+    }
+
+    fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
+        data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
+        data.extend(crate::varint::encode_varint(value));
+    }
+}

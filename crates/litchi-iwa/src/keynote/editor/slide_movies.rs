@@ -1,9 +1,12 @@
 //! Standalone movie-object CRUD for Keynote slides.
 
 use super::*;
+use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media_playback::media_playback_settings;
+use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, geometry_from_drawable,
 };
@@ -48,6 +51,9 @@ pub struct KeynoteSlideMovieInfo {
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
+    /// Trim, poster, repeat, and volume settings when the media has a valid native playback
+    /// range. Existing documents, live video, and unresolved media placeholders can omit it.
+    pub playback: Option<MediaPlaybackSettings>,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
 }
@@ -328,6 +334,48 @@ impl KeynoteEditor {
         if verified.slide_movie_properties(slide_index, drawable_object_id)? != properties {
             return Err(Error::InvalidFormat(
                 "Keynote movie properties update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read trim, poster, repeat, and volume settings for one ordinary slide movie.
+    pub fn slide_movie_playback_settings(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<MediaPlaybackSettings> {
+        self.require_file_movie(slide_index, drawable_object_id)?
+            .info
+            .playback
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote movie {drawable_object_id} has no playback settings"
+                ))
+            })
+    }
+
+    /// Update playback settings while retaining unrelated and unknown movie fields.
+    pub fn set_slide_movie_playback_settings(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        settings: MediaPlaybackSettings,
+    ) -> Result<()> {
+        let source = self.require_file_movie(slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let expected = replace_movie_playback_settings(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            "Keynote movie",
+            settings,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_movie_playback_settings(slide_index, drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Keynote movie playback update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -841,6 +889,16 @@ fn movie_info(
     } else {
         KeynoteSlideMovieKind::File
     };
+    let playback = movie
+        .end_time
+        .map(|_| {
+            media_playback_settings(&movie).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Keynote media {identifier} has invalid playback settings: {error}"
+                ))
+            })
+        })
+        .transpose()?;
     Ok(KeynoteSlideMovieInfo {
         slide_index,
         drawable_object_id: identifier,
@@ -851,6 +909,7 @@ fn movie_info(
             .map(|reference| reference.identifier),
         geometry: geometry_from_drawable(&movie.super_)?,
         properties: crate::shapes::drawable_properties(&movie.super_),
+        playback,
         original_size: movie.original_size.map(drawable_size),
         natural_size: movie.natural_size.map(drawable_size),
     })
@@ -875,6 +934,7 @@ fn take_movie_identifier(next: &mut u64) -> Result<u64> {
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
+    use crate::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-movie";
@@ -940,6 +1000,25 @@ mod tests {
             roundtripped.slide_movies(0).unwrap(),
             std::slice::from_ref(&created)
         );
+
+        let initial_playback = created.playback.unwrap();
+        let changed_playback = MediaPlaybackSettings {
+            loop_mode: Some(MediaLoopMode::BackAndForth),
+            volume: Some(MediaVolume::new(0.75).unwrap()),
+            ..initial_playback
+        };
+        editor
+            .set_slide_movie_playback_settings(0, created.drawable_object_id, changed_playback)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_movie_playback_settings(0, created.drawable_object_id)
+                .unwrap(),
+            changed_playback
+        );
+        editor
+            .set_slide_movie_playback_settings(0, created.drawable_object_id, initial_playback)
+            .unwrap();
 
         let changed_properties = properties("Accessible Keynote movie");
         editor

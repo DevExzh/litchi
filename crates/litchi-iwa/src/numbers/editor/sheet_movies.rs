@@ -4,9 +4,11 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use super::*;
+use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
 };
@@ -25,6 +27,8 @@ pub struct NumbersSheetMovieInfo {
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
+    /// Trim, poster, repeat, and volume settings.
+    pub playback: MediaPlaybackSettings,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
     pub duration: Duration,
@@ -249,6 +253,43 @@ impl NumbersEditor {
         if verified.sheet_movie_properties(sheet_id, drawable_object_id)? != properties {
             return Err(Error::InvalidFormat(
                 "Numbers movie properties update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read trim, poster, repeat, and volume settings for one sheet movie.
+    pub fn sheet_movie_playback_settings(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<MediaPlaybackSettings> {
+        Ok(movie_graph(self, sheet_id, drawable_object_id)?
+            .info
+            .playback)
+    }
+
+    /// Update playback settings while retaining unrelated and unknown movie fields.
+    pub fn set_sheet_movie_playback_settings(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        settings: MediaPlaybackSettings,
+    ) -> Result<()> {
+        let source = movie_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let expected = replace_movie_playback_settings(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            "Numbers movie",
+            settings,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_movie_playback_settings(sheet_id, drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Numbers movie playback update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -499,6 +540,7 @@ impl NumbersEditor {
 mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
+    use crate::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-numbers-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-numbers-movie";
@@ -565,6 +607,32 @@ mod tests {
             roundtripped.sheet_movies(sheet_id).unwrap(),
             std::slice::from_ref(&created)
         );
+
+        let changed_playback = MediaPlaybackSettings {
+            loop_mode: Some(MediaLoopMode::BackAndForth),
+            volume: Some(MediaVolume::new(0.75).unwrap()),
+            ..created.playback
+        };
+        editor
+            .set_sheet_movie_playback_settings(
+                sheet_id,
+                created.drawable_object_id,
+                changed_playback,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_movie_playback_settings(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            changed_playback
+        );
+        editor
+            .set_sheet_movie_playback_settings(
+                sheet_id,
+                created.drawable_object_id,
+                created.playback,
+            )
+            .unwrap();
 
         let changed_properties = properties("Accessible Numbers movie");
         editor

@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideAudioOptions};
 use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::{MediaLoopMode, MediaVolume};
 
 const SLIDE_CENTER: DrawablePoint = DrawablePoint { x: 960.0, y: 540.0 };
 
@@ -39,6 +40,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut properties = editor.slide_audio_properties(0, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded audio: {preferred_filename}"));
     editor.set_slide_audio_properties(0, created.drawable_object_id, properties)?;
+    editor.set_slide_audio_playback_settings(
+        0,
+        created.drawable_object_id,
+        created
+            .playback
+            .with_loop_mode(Some(MediaLoopMode::Repeat))
+            .with_volume(Some(MediaVolume::new(0.75)?)),
+    )?;
     editor.save(output)?;
     println!(
         "created Keynote audio {} backed by data {}",

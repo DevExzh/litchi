@@ -4,9 +4,11 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use super::*;
+use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
@@ -27,6 +29,8 @@ pub struct PagesMovieInfo {
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
+    /// Trim, poster, repeat, and volume settings.
+    pub playback: MediaPlaybackSettings,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
     pub duration: Duration,
@@ -285,6 +289,39 @@ impl PagesEditor {
         Ok(())
     }
 
+    /// Read trim, poster, repeat, and volume settings for one body movie.
+    pub fn body_movie_playback_settings(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<MediaPlaybackSettings> {
+        Ok(body_movie_graph(self, drawable_object_id)?.info.playback)
+    }
+
+    /// Update playback settings while retaining unrelated and unknown movie fields.
+    pub fn set_body_movie_playback_settings(
+        &mut self,
+        drawable_object_id: u64,
+        settings: MediaPlaybackSettings,
+    ) -> Result<()> {
+        let source = body_movie_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let expected = replace_movie_playback_settings(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            "Pages movie",
+            settings,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_movie_playback_settings(drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Pages movie playback update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// Duplicate one body movie at a UTF-16 body position.
     ///
     /// The movie, poster/title/caption stand-ins, and body attachment receive
@@ -533,6 +570,7 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-pages-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-pages-movie";
@@ -590,6 +628,24 @@ mod tests {
             roundtripped.body_movies().unwrap(),
             std::slice::from_ref(&created)
         );
+
+        let changed_playback = MediaPlaybackSettings {
+            loop_mode: Some(MediaLoopMode::BackAndForth),
+            volume: Some(MediaVolume::new(0.75).unwrap()),
+            ..created.playback
+        };
+        editor
+            .set_body_movie_playback_settings(created.drawable_object_id, changed_playback)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_movie_playback_settings(created.drawable_object_id)
+                .unwrap(),
+            changed_playback
+        );
+        editor
+            .set_body_movie_playback_settings(created.drawable_object_id, created.playback)
+            .unwrap();
 
         let changed_properties = properties("Accessible Pages movie");
         editor

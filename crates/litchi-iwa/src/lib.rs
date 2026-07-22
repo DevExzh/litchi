@@ -132,6 +132,8 @@ pub mod archive;
 pub mod bundle;
 pub mod identity;
 pub mod media;
+/// Shared movie and audio playback settings.
+pub mod media_playback;
 pub mod object_index;
 pub mod package;
 mod package_metadata;
@@ -176,6 +178,7 @@ pub use identity::IWorkDocumentIdentity;
 pub use media::{
     EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats, MediaType,
 };
+pub use media_playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;
 pub use snappy::SnappyStream;

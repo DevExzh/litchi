@@ -1,8 +1,7 @@
 //! Typed construction and strict discovery of sheet-owned Numbers audio graphs.
 
-use std::time::Duration;
-
 use super::*;
+use crate::media_playback::media_playback_settings;
 use crate::shapes::{DrawableSize, drawable_properties, geometry_from_drawable};
 
 const AUDIO_MESSAGE_TYPE: u32 = 3_007;
@@ -342,18 +341,9 @@ fn audio_info(
     let position = geometry.position.ok_or_else(|| {
         Error::InvalidFormat(format!("Numbers audio {identifier} has no position"))
     })?;
-    let start = audio.start_time.unwrap_or(0.0);
-    let end = audio.end_time.ok_or_else(|| {
-        Error::InvalidFormat(format!("Numbers audio {identifier} has no end time"))
-    })?;
-    if !start.is_finite() || !end.is_finite() || end <= start {
-        return Err(Error::InvalidFormat(format!(
-            "Numbers audio {identifier} has invalid playback bounds {start}..{end}"
-        )));
-    }
-    let duration = Duration::try_from_secs_f32(end - start).map_err(|_| {
+    let playback = media_playback_settings(&audio).map_err(|error| {
         Error::InvalidFormat(format!(
-            "Numbers audio {identifier} playback duration does not fit std::time::Duration"
+            "Numbers audio {identifier} has invalid playback settings: {error}"
         ))
     })?;
     Ok(NumbersSheetAudioInfo {
@@ -362,7 +352,8 @@ fn audio_info(
         audio_data_identifier,
         position,
         properties: drawable_properties(&audio.super_),
-        duration,
+        playback,
+        duration: playback.duration(),
     })
 }
 

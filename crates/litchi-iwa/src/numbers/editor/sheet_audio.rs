@@ -7,9 +7,11 @@ use super::sheet_movies::graph::{
     MovieObjectIds, movie_creation_context, set_movie_geometry, set_movie_properties,
 };
 use super::*;
+use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, offset_drawable_geometry,
 };
@@ -28,6 +30,8 @@ pub struct NumbersSheetAudioInfo {
     pub position: DrawablePoint,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
+    /// Trim, poster, repeat, and volume settings.
+    pub playback: MediaPlaybackSettings,
     pub duration: Duration,
 }
 
@@ -222,6 +226,43 @@ impl NumbersEditor {
         if verified.sheet_audio_properties(sheet_id, drawable_object_id)? != properties {
             return Err(Error::InvalidFormat(
                 "Numbers audio properties update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read trim, poster, repeat, and volume settings for one sheet audio clip.
+    pub fn sheet_audio_playback_settings(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<MediaPlaybackSettings> {
+        Ok(audio_graph(self, sheet_id, drawable_object_id)?
+            .info
+            .playback)
+    }
+
+    /// Update playback settings while retaining unrelated and unknown audio fields.
+    pub fn set_sheet_audio_playback_settings(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        settings: MediaPlaybackSettings,
+    ) -> Result<()> {
+        let source = audio_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let expected = replace_movie_playback_settings(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            "Numbers audio",
+            settings,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_audio_playback_settings(sheet_id, drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Numbers audio playback update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -459,6 +500,7 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::DrawableSize;
+    use crate::{MediaLoopMode, MediaVolume};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-numbers-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-numbers-audio";
@@ -504,6 +546,32 @@ mod tests {
             roundtripped.sheet_audio(sheet_id).unwrap(),
             std::slice::from_ref(&created)
         );
+
+        let changed_playback = MediaPlaybackSettings {
+            loop_mode: Some(MediaLoopMode::Repeat),
+            volume: Some(MediaVolume::new(0.75).unwrap()),
+            ..created.playback
+        };
+        editor
+            .set_sheet_audio_playback_settings(
+                sheet_id,
+                created.drawable_object_id,
+                changed_playback,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_audio_playback_settings(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            changed_playback
+        );
+        editor
+            .set_sheet_audio_playback_settings(
+                sheet_id,
+                created.drawable_object_id,
+                created.playback,
+            )
+            .unwrap();
 
         let changed_properties = properties("Accessible Numbers audio");
         editor

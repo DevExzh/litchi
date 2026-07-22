@@ -4,9 +4,11 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use super::*;
+use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{DrawablePoint, DrawableProperties, offset_drawable_geometry};
 
@@ -28,6 +30,8 @@ pub struct PagesAudioInfo {
     pub position: DrawablePoint,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
+    /// Trim, poster, repeat, and volume settings.
+    pub playback: MediaPlaybackSettings,
     pub duration: Duration,
 }
 
@@ -246,6 +250,39 @@ impl PagesEditor {
         if verified.body_audio_properties(drawable_object_id)? != properties {
             return Err(Error::InvalidFormat(
                 "Pages audio properties update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read trim, poster, repeat, and volume settings for one body audio clip.
+    pub fn body_audio_playback_settings(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<MediaPlaybackSettings> {
+        Ok(body_audio_graph(self, drawable_object_id)?.info.playback)
+    }
+
+    /// Update playback settings while retaining unrelated and unknown audio fields.
+    pub fn set_body_audio_playback_settings(
+        &mut self,
+        drawable_object_id: u64,
+        settings: MediaPlaybackSettings,
+    ) -> Result<()> {
+        let source = body_audio_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let expected = replace_movie_playback_settings(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            "Pages audio",
+            settings,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_audio_playback_settings(drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Pages audio playback update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -485,6 +522,7 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{MediaLoopMode, MediaVolume};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-pages-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-pages-audio";
@@ -528,6 +566,24 @@ mod tests {
             roundtripped.body_audio().unwrap(),
             std::slice::from_ref(&created)
         );
+
+        let changed_playback = MediaPlaybackSettings {
+            loop_mode: Some(MediaLoopMode::Repeat),
+            volume: Some(MediaVolume::new(0.75).unwrap()),
+            ..created.playback
+        };
+        editor
+            .set_body_audio_playback_settings(created.drawable_object_id, changed_playback)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_audio_playback_settings(created.drawable_object_id)
+                .unwrap(),
+            changed_playback
+        );
+        editor
+            .set_body_audio_playback_settings(created.drawable_object_id, created.playback)
+            .unwrap();
 
         let changed_properties = properties("Accessible Pages audio");
         editor

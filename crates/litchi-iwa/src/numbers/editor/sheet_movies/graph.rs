@@ -1,9 +1,8 @@
 //! Typed construction and strict discovery of sheet-owned Numbers movie graphs.
 
-use std::time::Duration;
-
 use super::*;
 use crate::IWorkThemeArchive;
+use crate::media_playback::media_playback_settings;
 use crate::shapes::{
     DrawableProperties, drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
@@ -426,18 +425,9 @@ fn movie_info(
             Error::InvalidFormat(format!("Numbers movie {identifier} has no poster data"))
         })?
         .identifier;
-    let start = movie.start_time.unwrap_or(0.0);
-    let end = movie.end_time.ok_or_else(|| {
-        Error::InvalidFormat(format!("Numbers movie {identifier} has no end time"))
-    })?;
-    if !start.is_finite() || !end.is_finite() || end <= start {
-        return Err(Error::InvalidFormat(format!(
-            "Numbers movie {identifier} has invalid playback bounds {start}..{end}"
-        )));
-    }
-    let duration = Duration::try_from_secs_f32(end - start).map_err(|_| {
+    let playback = media_playback_settings(&movie).map_err(|error| {
         Error::InvalidFormat(format!(
-            "Numbers movie {identifier} playback duration does not fit std::time::Duration"
+            "Numbers movie {identifier} has invalid playback settings: {error}"
         ))
     })?;
     Ok(NumbersSheetMovieInfo {
@@ -447,9 +437,10 @@ fn movie_info(
         poster_image_data_identifier,
         geometry: geometry_from_drawable(&movie.super_)?,
         properties: drawable_properties(&movie.super_),
+        playback,
         original_size: movie.original_size.map(drawable_size),
         natural_size: movie.natural_size.map(drawable_size),
-        duration,
+        duration: playback.duration(),
     })
 }
 

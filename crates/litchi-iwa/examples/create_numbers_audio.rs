@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetAudioOptions};
 use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::{MediaLoopMode, MediaVolume};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -43,6 +44,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut properties = editor.sheet_audio_properties(sheet_id, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded audio: {preferred_filename}"));
     editor.set_sheet_audio_properties(sheet_id, created.drawable_object_id, properties)?;
+    editor.set_sheet_audio_playback_settings(
+        sheet_id,
+        created.drawable_object_id,
+        created
+            .playback
+            .with_loop_mode(Some(MediaLoopMode::Repeat))
+            .with_volume(Some(MediaVolume::new(0.75)?)),
+    )?;
     editor.save(output)?;
     println!(
         "sheet={sheet_id} drawable={} audio_data={} duration={:?}",

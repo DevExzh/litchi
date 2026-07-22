@@ -4,6 +4,8 @@ use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_T
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
 use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::{DrawablePoint, DrawableSize};
+use crate::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
+use std::time::Duration;
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
 const TEST_SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
@@ -4822,6 +4824,27 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     assert!(editor.slide_movies(0).unwrap().is_empty());
     assert!(editor.slide_builds(0).unwrap().is_empty());
     assert!(editor.media_assets().unwrap().is_empty());
+}
+
+#[test]
+fn slide_movie_playback_can_initialize_legacy_file_metadata() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
+    let movie = editor.slide_movies(0).unwrap().pop().unwrap();
+    assert_eq!(movie.kind, KeynoteSlideMovieKind::File);
+    assert_eq!(movie.playback, None);
+
+    let settings = MediaPlaybackSettings::new(Duration::from_secs(8))
+        .with_loop_mode(Some(MediaLoopMode::Repeat))
+        .with_volume(Some(MediaVolume::new(0.75).unwrap()));
+    editor
+        .set_slide_movie_playback_settings(0, movie.drawable_object_id, settings)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_movie_playback_settings(0, movie.drawable_object_id)
+            .unwrap(),
+        settings
+    );
 }
 
 #[test]

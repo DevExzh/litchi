@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideMovieOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::{MediaLoopMode, MediaVolume};
 
 const SLIDE_WIDTH_POINTS: f32 = 1_920.0;
 const SLIDE_HEIGHT_POINTS: f32 = 1_080.0;
@@ -53,6 +54,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut properties = editor.slide_movie_properties(0, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded movie: {movie_filename}"));
     editor.set_slide_movie_properties(0, created.drawable_object_id, properties)?;
+    let playback = created
+        .playback
+        .ok_or("created Keynote movie has no playback settings")?;
+    editor.set_slide_movie_playback_settings(
+        0,
+        created.drawable_object_id,
+        playback
+            .with_loop_mode(Some(MediaLoopMode::Repeat))
+            .with_volume(Some(MediaVolume::new(0.75)?)),
+    )?;
     editor.save(output)?;
     println!(
         "created Keynote movie {} backed by video {:?} and poster {:?}",

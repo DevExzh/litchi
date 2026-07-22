@@ -7,7 +7,10 @@ use super::slide_movies::graph::{
     MovieObjectIds, audio_creation_values, audio_objects, movie_creation_context,
 };
 use super::*;
+use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::add_component_data_reference;
+use crate::media_playback::media_playback_settings;
+use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawablePoint, DrawableProperties, drawable_properties, geometry_from_drawable,
 };
@@ -23,6 +26,8 @@ pub struct KeynoteSlideAudioInfo {
     pub position: DrawablePoint,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
+    /// Trim, poster, repeat, and volume settings.
+    pub playback: MediaPlaybackSettings,
     pub duration: Duration,
 }
 
@@ -236,6 +241,47 @@ impl KeynoteEditor {
         Ok(())
     }
 
+    /// Read trim, poster, repeat, and volume settings for one slide audio clip.
+    pub fn slide_audio_playback_settings(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<MediaPlaybackSettings> {
+        Ok(require_audio(self, slide_index, drawable_object_id)?.playback)
+    }
+
+    /// Update playback settings while retaining unrelated and unknown audio fields.
+    pub fn set_slide_audio_playback_settings(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        settings: MediaPlaybackSettings,
+    ) -> Result<()> {
+        let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
+        if source.info.kind != KeynoteSlideMovieKind::Audio {
+            return Err(Error::ParseError(format!(
+                "Keynote media {drawable_object_id} is {:?}, not slide audio",
+                source.info.kind
+            )));
+        }
+        let mut staged = self.package().clone();
+        let expected = replace_movie_playback_settings(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            "Keynote audio",
+            settings,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_audio_playback_settings(slide_index, drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Keynote audio playback update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// Duplicate one slide audio control using Keynote's native placement.
     ///
     /// The audio, title/caption stand-ins, and automatic Start Audio build
@@ -352,36 +398,27 @@ fn audio_info(
                 "Keynote audio {drawable_object_id} has no position"
             ))
         })?;
+    let playback = media_playback_settings(&audio).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Keynote audio {drawable_object_id} has invalid playback settings: {error}"
+        ))
+    })?;
     Ok(KeynoteSlideAudioInfo {
         slide_index,
         drawable_object_id,
         audio_data_identifier,
         position,
         properties: drawable_properties(&audio.super_),
-        duration: audio_duration(drawable_object_id, &audio)?,
+        playback,
+        duration: playback.duration(),
     })
-}
-
-fn audio_duration(drawable_object_id: u64, audio: &tsd::MovieArchive) -> Result<Duration> {
-    let start = audio.start_time.unwrap_or(0.0);
-    let end = audio.end_time.ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Keynote audio {drawable_object_id} has no end time"
-        ))
-    })?;
-    if !start.is_finite() || !end.is_finite() || end <= start {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote audio {drawable_object_id} has an invalid playback range"
-        )));
-    }
-    Duration::try_from_secs_f64(f64::from(end - start))
-        .map_err(|error| Error::InvalidFormat(error.to_string()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
+    use crate::{MediaLoopMode, MediaVolume};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-audio";
@@ -429,6 +466,24 @@ mod tests {
             roundtripped.slide_audio(0).unwrap(),
             std::slice::from_ref(&created)
         );
+
+        let changed_playback = MediaPlaybackSettings {
+            loop_mode: Some(MediaLoopMode::Repeat),
+            volume: Some(MediaVolume::new(0.75).unwrap()),
+            ..created.playback
+        };
+        editor
+            .set_slide_audio_playback_settings(0, created.drawable_object_id, changed_playback)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_audio_playback_settings(0, created.drawable_object_id)
+                .unwrap(),
+            changed_playback
+        );
+        editor
+            .set_slide_audio_playback_settings(0, created.drawable_object_id, created.playback)
+            .unwrap();
 
         let changed_properties = properties("Accessible Keynote audio");
         editor
