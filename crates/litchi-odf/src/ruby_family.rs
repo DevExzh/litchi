@@ -1133,9 +1133,7 @@ mod tests {
     }
     #[test]
     fn parses_real_libreoffice_fixture() {
-        let xml = include_str!(
-            "../../../3rdparty/libreoffice-core/sw/qa/extras/odfexport/data/ruby+hyperlink.fodt"
-        );
+        let xml = include_str!("../../../test-data/odf/odt/ruby-hyperlink.fodt");
         let styles = parse_ruby_styles(xml).unwrap();
         assert_eq!(
             styles.styles[0].properties.as_ref().unwrap().alignment,
