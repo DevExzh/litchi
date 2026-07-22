@@ -14,7 +14,7 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    Field, FieldStory, FieldText, FieldsTable, MacroButtonField, MergeField,
+    Field, FieldStory, FieldText, FieldsTable, MacroButtonField, MailMergeCounterField, MergeField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -604,6 +604,24 @@ impl Document {
     /// Get the number of typed, inert `MERGEFIELD` fields.
     pub fn merge_field_count(&self) -> Result<usize> {
         Ok(self.merge_fields()?.len())
+    }
+
+    /// Get typed, inert `MERGEREC` and `MERGESEQ` fields in story and source order.
+    ///
+    /// Returned values expose only stored kinds, cached results, and field
+    /// state. This method never selects or counts records, opens a data source,
+    /// performs a merge, or refreshes a field result.
+    pub fn mail_merge_counters(&self) -> Result<Vec<MailMergeCounterField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::mail_merge_counter)
+            .collect())
+    }
+
+    /// Get the number of typed, inert mail-merge counter fields.
+    pub fn mail_merge_counter_count(&self) -> Result<usize> {
+        Ok(self.mail_merge_counters()?.len())
     }
 
     /// Get stored instruction and cached-result text for one parsed field.

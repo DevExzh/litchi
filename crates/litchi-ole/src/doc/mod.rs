@@ -106,8 +106,8 @@ pub use parts::document_properties_2003::{
 };
 pub use parts::fields::{
     Field, FieldBoundary, FieldDescriptor, FieldEndFlags, FieldMarker, FieldMarkerValue,
-    FieldStory, FieldStoryTable, FieldText, FieldType, FieldsTable, MacroButtonField, MergeField,
-    MergeFieldSwitch,
+    FieldStory, FieldStoryTable, FieldText, FieldType, FieldsTable, MacroButtonField,
+    MailMergeCounterField, MailMergeCounterKind, MergeField, MergeFieldSwitch,
 };
 pub use parts::glossary::{
     GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,
