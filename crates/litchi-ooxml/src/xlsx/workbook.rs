@@ -581,6 +581,47 @@ impl Workbook {
         remove_volatile_dependencies(&mut self.package)
     }
 
+    /// Load the optional Named Sheet Views attached to one worksheet.
+    ///
+    /// These are stored sort/filter settings only. Reading them does not apply
+    /// filters, reorder cells, evaluate formulas, or fetch external data.
+    pub fn named_sheet_views(&self, index: usize) -> SheetResult<Option<NamedSheetViews>> {
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        load_worksheet_named_sheet_views(&self.package, &uri).map_err(Into::into)
+    }
+
+    /// Store caller-authored Named Sheet Views for one worksheet.
+    ///
+    /// The supplied metadata is serialized without applying its sort or filter
+    /// settings to worksheet cells.
+    pub fn set_named_sheet_views(
+        &mut self,
+        index: usize,
+        value: &NamedSheetViews,
+    ) -> SheetResult<()> {
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        store_worksheet_named_sheet_views(&mut self.package, &uri, value).map_err(Into::into)
+    }
+
+    /// Remove the optional Named Sheet Views from one worksheet without
+    /// changing the worksheet's ordinary active view or cell data.
+    pub fn remove_named_sheet_views(&mut self, index: usize) -> SheetResult<bool> {
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        remove_worksheet_named_sheet_views(&mut self.package, &uri).map_err(Into::into)
+    }
+
     /// Return passive `workbookProtection` metadata from the current `workbook.xml` part.
     ///
     /// Password verifier values remain opaque: this method never accepts or

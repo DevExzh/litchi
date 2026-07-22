@@ -168,7 +168,7 @@ conversion, fonts, and image conversion are optional.
 | Workbook revisions | ✅ | ✅ | ✅ | Revision headers, users, logs, and package storage; revisions are not replayed |
 | Calculation properties | ✅ | ✅ | ✅ | Calculation mode, IDs, iteration, precision, and reference mode |
 | Calculation chain | 🟡 | ✅ | ✅ | Typed inert parse/store of caller-authored calculation order; no dependency rebuilding or formula evaluation |
-| Named sheet views | 🟡 | ✅ | 🟡 | Typed filters/sorts/ranges parsing, validated worksheet-scoped round-trip storage/removal, and mutable-workbook save preservation; no construction API yet |
+| Named sheet views | 🟡 | ✅ | 🟡 | Typed filters/sorts/ranges parsing, validated worksheet-scoped package/workbook CRUD, mutable-workbook save preservation, and construction of core empty named views; detailed filter/sort and extension authoring remain bounded to parsed metadata |
 | Page setup, margins, and print options | ✅ | ✅ | ✅ | Orientation, paper, scaling, fit-to-page, margins, and options |
 | Print areas/titles | ✅ | ✅ | ✅ | Built-in defined names |
 | Headers and footers | ✅ | ✅ | ✅ | Odd/even/first sections and formatting codes |

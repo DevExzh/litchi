@@ -36,6 +36,17 @@ const MAX_NAMESPACE_DECLARATIONS: usize = 256;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedSheetViewGuid(String);
 impl NamedSheetViewGuid {
+    /// Parse a braced Named Sheet View GUID.
+    pub fn new(value: impl Into<String>) -> Result<Self> {
+        let value = value.into();
+        parse_guid(&value)
+    }
+
+    /// Generate a fresh RFC 4122 v4 GUID in the braced OOXML representation.
+    pub fn generate() -> Self {
+        Self(litchi_core::id::generate_guid_braced())
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -43,6 +54,12 @@ impl NamedSheetViewGuid {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NamedSheetViewRange(String);
 impl NamedSheetViewRange {
+    /// Parse a non-reversed A1 cell or rectangular range.
+    pub fn new(value: impl Into<String>) -> Result<Self> {
+        let value = value.into();
+        parse_range(&value)
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -310,6 +327,27 @@ pub struct NamedSheetView {
     extensions: Vec<NamedSheetViewExtension>,
 }
 impl NamedSheetView {
+    /// Create an empty Named Sheet View with a fresh identifier.
+    ///
+    /// The resulting view is metadata only: it does not apply filters or sort
+    /// worksheet data. Use [`NamedSheetViews::add_view`] to add it to the
+    /// worksheet-scoped collection before storing that collection.
+    pub fn new(name: impl Into<String>) -> Result<Self> {
+        Self::with_id(name, NamedSheetViewGuid::generate())
+    }
+
+    /// Create an empty Named Sheet View with a caller-supplied identifier.
+    pub fn with_id(name: impl Into<String>, id: NamedSheetViewGuid) -> Result<Self> {
+        let name = name.into();
+        validate_name(&name)?;
+        Ok(Self {
+            name,
+            id,
+            filters: Vec::new(),
+            extensions: Vec::new(),
+        })
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -330,6 +368,56 @@ pub struct NamedSheetViews {
     namespace_declarations: Vec<(String, String)>,
 }
 impl NamedSheetViews {
+    /// Start a valid Named Sheet Views collection with one view.
+    ///
+    /// A Named Sheet Views part requires at least one `namedSheetView`, so an
+    /// empty collection is deliberately not constructible through this API.
+    pub fn new(view: NamedSheetView) -> Self {
+        Self {
+            views: vec![view],
+            extensions: Vec::new(),
+            // Match the parser's retained root declarations so a freshly
+            // constructed value has parse/write round-trip equality too.
+            namespace_declarations: vec![(
+                "xmlns".into(),
+                std::str::from_utf8(NSV).unwrap().into(),
+            )],
+        }
+    }
+
+    /// Add a uniquely named and identified view to this worksheet collection.
+    pub fn add_view(&mut self, view: NamedSheetView) -> Result<&mut Self> {
+        if self.views.len() >= MAX_VIEWS {
+            return Err(invalid("too many named sheet views"));
+        }
+        if self.views.iter().any(|existing| existing.name == view.name) {
+            return Err(invalid("duplicate named sheet view name"));
+        }
+        if self.views.iter().any(|existing| existing.id == view.id) {
+            return Err(invalid("duplicate named sheet view GUID"));
+        }
+        self.views.push(view);
+        Ok(self)
+    }
+
+    /// Remove a view by its worksheet-scoped name.
+    ///
+    /// Removing the final view is rejected because an empty Named Sheet Views
+    /// part is not valid OOXML. Remove the worksheet part instead with
+    /// [`remove_worksheet_named_sheet_views`] or
+    /// [`crate::xlsx::Workbook::remove_named_sheet_views`].
+    pub fn remove_view(&mut self, name: &str) -> Result<Option<NamedSheetView>> {
+        let Some(index) = self.views.iter().position(|view| view.name == name) else {
+            return Ok(None);
+        };
+        if self.views.len() == 1 {
+            return Err(invalid(
+                "Named Sheet Views part must contain a namedSheetView",
+            ));
+        }
+        Ok(Some(self.views.remove(index)))
+    }
+
     pub fn views(&self) -> &[NamedSheetView] {
         &self.views
     }
@@ -513,14 +601,7 @@ pub fn remove_worksheet_named_sheet_views(
 /// [`load_worksheet_named_sheet_views`]. The writer preserves retained markup
 /// inertly and validates its own output by parsing it again.
 pub fn write_named_sheet_views(value: &NamedSheetViews) -> Result<Vec<u8>> {
-    if value.views.is_empty() {
-        return Err(invalid(
-            "Named Sheet Views part must contain a namedSheetView",
-        ));
-    }
-    if value.views.len() > MAX_VIEWS {
-        return Err(invalid("too many named sheet views"));
-    }
+    validate_view_collection(&value.views)?;
 
     let mut output = Vec::new();
     output.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
@@ -1659,21 +1740,7 @@ impl Parser {
         let root = self
             .root
             .ok_or_else(|| invalid("missing namedSheetViews root"))?;
-        if root.views.is_empty() {
-            return Err(invalid(
-                "Named Sheet Views part must contain a namedSheetView",
-            ));
-        }
-        let mut names = HashSet::new();
-        let mut ids = HashSet::new();
-        for view in &root.views {
-            if !names.insert(view.name.clone()) {
-                return Err(invalid("duplicate named sheet view name"));
-            }
-            if !ids.insert(view.id.clone()) {
-                return Err(invalid("duplicate named sheet view GUID"));
-            }
-        }
+        validate_view_collection(&root.views)?;
         Ok(root)
     }
 }
@@ -1839,6 +1906,27 @@ fn validate_name(v: &str) -> Result<()> {
         || v.chars().any(|c| c != ' ' && c.is_whitespace())
     {
         return Err(invalid("invalid named sheet view name"));
+    }
+    Ok(())
+}
+fn validate_view_collection(views: &[NamedSheetView]) -> Result<()> {
+    if views.is_empty() {
+        return Err(invalid(
+            "Named Sheet Views part must contain a namedSheetView",
+        ));
+    }
+    if views.len() > MAX_VIEWS {
+        return Err(invalid("too many named sheet views"));
+    }
+    let mut names = HashSet::new();
+    let mut ids = HashSet::new();
+    for view in views {
+        if !names.insert(view.name.as_str()) {
+            return Err(invalid("duplicate named sheet view name"));
+        }
+        if !ids.insert(&view.id) {
+            return Err(invalid("duplicate named sheet view GUID"));
+        }
     }
     Ok(())
 }
@@ -2047,6 +2135,80 @@ mod tests {
         let text = std::str::from_utf8(&xml).unwrap();
         assert!(text.contains("<filter colId=\"1\"><x:filters>"));
         assert!(text.contains("<sortCondition ref=\"C1:C8\"/>"));
+    }
+
+    #[test]
+    fn constructs_core_views_and_extends_libreoffice_metadata() {
+        let explicit_id =
+            NamedSheetViewGuid::new("{01234567-89AB-CDEF-0123-456789ABCDEF}").unwrap();
+        let primary = NamedSheetView::with_id("Personal", explicit_id.clone()).unwrap();
+        let mut authored = NamedSheetViews::new(primary);
+        let shared = NamedSheetView::new("Shared").unwrap();
+        assert!(NamedSheetViewGuid::new(shared.id().as_str()).is_ok());
+        authored.add_view(shared).unwrap();
+
+        assert!(
+            authored
+                .add_view(NamedSheetView::new("Personal").unwrap())
+                .is_err()
+        );
+        assert!(
+            authored
+                .add_view(NamedSheetView::with_id("Duplicate GUID", explicit_id).unwrap())
+                .is_err()
+        );
+        assert!(NamedSheetView::new(" _xlnsv.reserved").is_err());
+        assert!(NamedSheetViewGuid::new("not-a-guid").is_err());
+        assert!(NamedSheetViewRange::new("B2:A1").is_err());
+
+        let package = libreoffice_fixture();
+        let worksheet = fixture_worksheet();
+        let mut preserved = load_worksheet_named_sheet_views(&package, &worksheet)
+            .unwrap()
+            .unwrap();
+        preserved
+            .add_view(NamedSheetView::new("Authored").unwrap())
+            .unwrap();
+        assert_eq!(
+            parse_named_sheet_views(&write_named_sheet_views(&preserved).unwrap()).unwrap(),
+            preserved
+        );
+
+        let removed = authored.remove_view("Shared").unwrap().unwrap();
+        assert_eq!(removed.name(), "Shared");
+        assert!(authored.remove_view("Missing").unwrap().is_none());
+        assert!(authored.remove_view("Personal").is_err());
+    }
+
+    #[test]
+    fn workbook_api_stores_constructed_views_through_materialization() {
+        let mut workbook = crate::xlsx::Workbook::create().unwrap();
+        let mut views = NamedSheetViews::new(
+            NamedSheetView::with_id(
+                "Personal",
+                NamedSheetViewGuid::new("{01234567-89AB-CDEF-0123-456789ABCDEF}").unwrap(),
+            )
+            .unwrap(),
+        );
+        views
+            .add_view(NamedSheetView::new("Shared").unwrap())
+            .unwrap();
+
+        workbook.set_named_sheet_views(0, &views).unwrap();
+        assert_eq!(workbook.named_sheet_views(0).unwrap(), Some(views.clone()));
+
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "materialized");
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("authored-named-sheet-views.xlsx");
+        workbook.save(&path).unwrap();
+
+        let mut reopened = crate::xlsx::Workbook::open(&path).unwrap();
+        assert_eq!(reopened.named_sheet_views(0).unwrap(), Some(views));
+        assert!(reopened.remove_named_sheet_views(0).unwrap());
+        assert!(reopened.named_sheet_views(0).unwrap().is_none());
     }
 
     #[test]
