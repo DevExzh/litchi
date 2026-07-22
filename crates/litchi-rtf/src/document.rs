@@ -920,6 +920,25 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `MACROBUTTON` fields in document field order.
+    ///
+    /// Macro names and display text are exposed as stored metadata only. This
+    /// method never resolves, loads, invokes, or executes a macro.
+    pub fn macro_buttons(&self) -> Vec<crate::MacroButtonField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::macro_button)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `MACROBUTTON` fields in the document.
+    pub fn macro_button_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.macro_button().is_some())
+            .count()
+    }
+
     pub fn push_field(&mut self, field: super::field::Field<'a>) -> RtfResult<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
             return Err(RtfError::MalformedDocument(

@@ -167,8 +167,8 @@ pub use external_reference::{
 };
 pub use field::{
     BodyStoryEvent, EquationField, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
-    FieldSwitch, FieldType, HyperlinkCode, PageBreak, ParsedFieldCode, ReferenceCode, SectionBreak,
-    StoryEvent, StoryField, parse_field_code,
+    FieldSwitch, FieldType, HyperlinkCode, MacroButtonField, PageBreak, ParsedFieldCode,
+    ReferenceCode, SectionBreak, StoryEvent, StoryField, parse_field_code,
 };
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};

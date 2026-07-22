@@ -18,6 +18,7 @@ pub enum FieldType {
     Toc,
     Bookmark,
     Equation,
+    MacroButton,
     Index,
     Unknown,
 }
@@ -212,6 +213,22 @@ pub struct EquationField<'a> {
     position: usize,
 }
 
+/// Inert metadata for a legacy RTF `MACROBUTTON` field.
+///
+/// The macro name and button text are exposed solely as stored field metadata.
+/// This crate never resolves, loads, invokes, or otherwise executes the named
+/// macro.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MacroButtonField<'a> {
+    instruction: &'a str,
+    macro_name: Cow<'a, str>,
+    display_text: Option<Cow<'a, str>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 impl<'a> EquationField<'a> {
     /// Return the complete stored `EQ` field instruction.
     pub fn instruction(&self) -> &'a str {
@@ -227,6 +244,55 @@ impl<'a> EquationField<'a> {
     ///
     /// RTF 1.9.1 examples normally use an empty result for `EQ` fields. This
     /// value is metadata only and is never recalculated.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
+impl<'a> MacroButtonField<'a> {
+    /// Return the complete stored `MACROBUTTON` field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored macro name without resolving or invoking it.
+    pub fn macro_name(&self) -> &str {
+        &self.macro_name
+    }
+
+    /// Return the optional text stored after the macro name.
+    ///
+    /// This is the field's button/display text, not a generated value.
+    pub fn display_text(&self) -> Option<&str> {
+        self.display_text.as_deref()
+    }
+
+    /// Return the stored field result when a producer supplied one.
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
@@ -303,6 +369,11 @@ impl<'a> Field<'a> {
                 FieldType::Equation
             },
             ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("MACROBUTTON") =>
+            {
+                FieldType::MacroButton
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("INDEX") || keyword.eq_ignore_ascii_case("XE") =>
             {
                 FieldType::Index
@@ -356,6 +427,26 @@ impl<'a> Field<'a> {
         Some(EquationField {
             instruction: self.instruction.as_ref(),
             expression,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed `MACROBUTTON` field.
+    ///
+    /// The metadata is never treated as executable. Malformed macro-button
+    /// instructions remain generic fields and return `None` here.
+    pub fn macro_button(&self) -> Option<MacroButtonField<'_>> {
+        if self.field_type != FieldType::MacroButton {
+            return None;
+        }
+        let (macro_name, display_text) = macro_button_parts(self.instruction.as_ref())?;
+        Some(MacroButtonField {
+            instruction: self.instruction.as_ref(),
+            macro_name,
+            display_text,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
             owner: self.owner,
@@ -503,6 +594,31 @@ fn equation_expression(instruction: &str) -> Option<&str> {
         .then(|| {
             instruction[keyword_len..].trim_start_matches(|value: char| value.is_ascii_whitespace())
         })
+}
+
+fn macro_button_parts(instruction: &str) -> Option<(Cow<'_, str>, Option<Cow<'_, str>>)> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("MACROBUTTON") {
+        return None;
+    }
+    tokens.remove(0);
+    let macro_name = tokens.first()?.value.clone();
+    if macro_name.is_empty() {
+        return None;
+    }
+    let display_text = match tokens.len() {
+        1 => None,
+        2 => Some(tokens[1].value.clone()),
+        _ => Some(Cow::Owned(
+            tokens[1..]
+                .iter()
+                .map(|token| token.value.as_ref())
+                .collect::<Vec<_>>()
+                .join(" "),
+        )),
+    };
+    Some((macro_name, display_text))
 }
 
 pub(crate) fn validate_story_events(
@@ -950,6 +1066,37 @@ mod tests {
     }
 
     #[test]
+    fn macro_button_fields_expose_stored_metadata_without_execution() {
+        let mut field = Field::parse_instruction(r#"MACROBUTTON NoMacro "Click here""#);
+        field.result = Cow::Borrowed("Click here");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::MacroButton);
+        let macro_button = field.macro_button().unwrap();
+        assert_eq!(macro_button.instruction(), r#"MACROBUTTON NoMacro "Click here""#);
+        assert_eq!(macro_button.macro_name(), "NoMacro");
+        assert_eq!(macro_button.display_text(), Some("Click here"));
+        assert_eq!(macro_button.cached_result(), Some("Click here"));
+        assert!(macro_button.is_dirty());
+        assert!(macro_button.is_locked());
+        assert_eq!(macro_button.owner(), FieldOwner::Body);
+        assert_eq!(macro_button.position(), 4);
+
+        let multiword = Field::parse_instruction("MACROBUTTON NoMacro Click here now");
+        assert_eq!(multiword.macro_button().unwrap().display_text(), Some("Click here now"));
+        assert!(Field::parse_instruction("MACROBUTTON").macro_button().is_none());
+        assert!(Field::parse_instruction(r#"MACROBUTTON "" "button""#)
+            .macro_button()
+            .is_none());
+    }
+
+    #[test]
     fn document_discovers_eq_fields_without_calculating_them() {
         let document = crate::RtfDocument::parse(
             r#"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}"#,
@@ -961,6 +1108,24 @@ mod tests {
         assert_eq!(equations.len(), 1);
         assert_eq!(equations[0].expression(), r"\f(1,2)");
         assert_eq!(equations[0].cached_result(), None);
+        assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_macro_buttons_without_invoking_them() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst MACROBUTTON NoMacro Click here}{\fldrslt Click here}}After}"#,
+        )
+        .unwrap();
+
+        let macro_buttons = document.macro_buttons();
+        assert_eq!(document.macro_button_count(), 1);
+        assert_eq!(macro_buttons.len(), 1);
+        assert_eq!(macro_buttons[0].macro_name(), "NoMacro");
+        assert_eq!(macro_buttons[0].display_text(), Some("Click here"));
+        assert_eq!(macro_buttons[0].cached_result(), Some("Click here"));
+        assert!(macro_buttons[0].is_dirty());
+        assert!(macro_buttons[0].is_locked());
         assert_eq!(document.text(), "Before After");
     }
 

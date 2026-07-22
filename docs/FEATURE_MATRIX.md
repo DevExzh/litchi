@@ -480,7 +480,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Fields and hyperlinks | ✅ | ✅ | ✅ | Parsed field codes, status, nested fields, URLs, bookmarks, and page breaks; no field recalculation |
+| Fields and hyperlinks | ✅ | ✅ | ✅ | Parsed field codes, status, nested fields, URLs, bookmarks, page breaks, and typed inert `MACROBUTTON` macro-name/display metadata; no field recalculation, macro lookup, or macro execution |
 | Bookmarks and navigation entries | ✅ | ✅ | ✅ | Bookmark ranges, index entries, TOC entries, and page references |
 | Footnotes/endnotes and separators | ✅ | ✅ | ✅ | Note bodies, numbering/options, section overrides, and separator stories |
 | Comments/annotations | ✅ | ✅ | ✅ | Point/range comments, identity, positions, and mutation |
