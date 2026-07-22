@@ -239,14 +239,16 @@ pub enum TextHyperlinkShow {
 }
 
 impl TextHyperlinkShow {
-    const fn as_str(self) -> &'static str {
+    /// Return the ODF/XLink lexical value.
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::New => "new",
             Self::Replace => "replace",
         }
     }
 
-    fn from_str(value: &str) -> Option<Self> {
+    /// Parse an ODF/XLink lexical value.
+    pub fn parse(value: &str) -> Option<Self> {
         match value {
             "new" => Some(Self::New),
             "replace" => Some(Self::Replace),
@@ -263,13 +265,15 @@ pub enum TextHyperlinkActuate {
 }
 
 impl TextHyperlinkActuate {
-    const fn as_str(self) -> &'static str {
+    /// Return the ODF/XLink lexical value.
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::OnRequest => "onRequest",
         }
     }
 
-    fn from_str(value: &str) -> Option<Self> {
+    /// Parse an ODF/XLink lexical value.
+    pub fn parse(value: &str) -> Option<Self> {
         match value {
             "onRequest" => Some(Self::OnRequest),
             _ => None,
@@ -380,7 +384,7 @@ impl Hyperlink {
     pub fn show(&self) -> Option<TextHyperlinkShow> {
         self.element
             .get_attribute("xlink:show")
-            .and_then(TextHyperlinkShow::from_str)
+            .and_then(TextHyperlinkShow::parse)
     }
 
     /// Set or omit the XLink display behavior (`xlink:show`).
@@ -398,7 +402,7 @@ impl Hyperlink {
     pub fn actuate(&self) -> Option<TextHyperlinkActuate> {
         self.element
             .get_attribute("xlink:actuate")
-            .and_then(TextHyperlinkActuate::from_str)
+            .and_then(TextHyperlinkActuate::parse)
     }
 
     /// Set or omit the explicit XLink activation behavior (`xlink:actuate`).
@@ -454,7 +458,7 @@ impl Hyperlink {
         if self
             .element
             .get_attribute("xlink:show")
-            .is_some_and(|value| TextHyperlinkShow::from_str(value).is_none())
+            .is_some_and(|value| TextHyperlinkShow::parse(value).is_none())
         {
             return Err(Error::InvalidFormat(
                 "text:a hyperlink xlink:show must be 'new' or 'replace'".to_string(),
@@ -463,7 +467,7 @@ impl Hyperlink {
         if self
             .element
             .get_attribute("xlink:actuate")
-            .is_some_and(|value| TextHyperlinkActuate::from_str(value).is_none())
+            .is_some_and(|value| TextHyperlinkActuate::parse(value).is_none())
         {
             return Err(Error::InvalidFormat(
                 "text:a hyperlink xlink:actuate must be 'onRequest'".to_string(),

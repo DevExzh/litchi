@@ -41,6 +41,7 @@
 //! - ✅ `SpreadsheetBuilder::new()` - Create new spreadsheets
 //! - ✅ `add_sheet()` - Add sheets with names
 //! - ✅ `set_cell_value()` - Set cell values (all types)
+//! - ✅ `set_cell_hyperlink()` / `set_cell_hyperlink_data()` - Add inert full-cell hyperlinks
 //! - ✅ `set_cell_formula()` - Set cell formulas
 //! - ✅ `set_cell_style()` - Apply cell styling
 //! - ✅ `insert_row()` / `delete_row()` - Row operations

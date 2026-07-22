@@ -5,7 +5,8 @@
 
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
-    CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
+    CalculationSettings, Cell, CellAnnotation, CellDetective, CellHyperlink, CellRangeSource,
+    CellValue, Column,
     ConditionalCellStyle, Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink, LabelRange,
     NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
     SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, Spreadsheet,
@@ -115,6 +116,14 @@ impl MutableSpreadsheet {
             .flat_map(|row| row.cells.iter())
             .any(Cell::has_annotation)
             || self.dde_links.iter().any(DdeLink::has_annotations)
+    }
+
+    fn has_full_cell_hyperlinks(&self) -> bool {
+        self.sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+            .any(|cell| cell.full_cell_hyperlink().is_some())
     }
 
     fn push_table_columns(out: &mut String, max_cols: usize) {
@@ -693,6 +702,19 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    fn validate_hyperlinks(&self) -> Result<()> {
+        for hyperlink in self
+            .sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+            .filter_map(Cell::full_cell_hyperlink)
+        {
+            hyperlink.validate()?;
+        }
+        Ok(())
+    }
+
     fn validate_content_validations(&self) -> Result<()> {
         validate_collection(&self.content_validations)?;
         let names = self
@@ -880,6 +902,7 @@ impl MutableSpreadsheet {
             }
 
             // Set the cell value
+            row_data.cells[col].clear_hyperlinks();
             row_data.cells[col].value = value.clone();
             row_data.cells[col].text = match value {
                 CellValue::Empty => String::new(),
@@ -899,6 +922,73 @@ impl MutableSpreadsheet {
                 sheet_index
             )))
         }
+    }
+
+    /// Replace a cell's displayed value with one inert full-cell hyperlink.
+    ///
+    /// The target is serialized as ODF `text:a` metadata and is never
+    /// dereferenced or fetched by this library.
+    pub fn set_cell_hyperlink(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        href: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        self.set_cell_hyperlink_data(sheet_index, row, col, CellHyperlink::with_text(href, text)?)
+    }
+
+    /// Replace a cell's displayed value with a fully configured hyperlink.
+    pub fn set_cell_hyperlink_data(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        hyperlink: CellHyperlink,
+    ) -> Result<()> {
+        hyperlink.validate()?;
+        if self
+            .sheets
+            .get(sheet_index)
+            .and_then(|sheet| sheet.rows.get(row))
+            .and_then(|row| row.cells.get(col))
+            .is_some_and(|cell| cell.merge == crate::ods::CellMerge::Covered)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cannot author a hyperlink in a covered cell".to_string(),
+            ));
+        }
+        self.set_cell(
+            sheet_index,
+            row,
+            col,
+            CellValue::Text(hyperlink.text.clone()),
+        )?;
+        self.sheets
+            .get_mut(sheet_index)
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .expect("set_cell creates the requested cell")
+            .set_hyperlink(hyperlink)
+    }
+
+    /// Remove every hyperlink from a cell while preserving its displayed text.
+    pub fn remove_cell_hyperlinks(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+    ) -> Result<Vec<CellHyperlink>> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(sheet
+            .rows
+            .get_mut(row)
+            .and_then(|row| row.cells.get_mut(col))
+            .map(Cell::clear_hyperlinks)
+            .unwrap_or_default())
     }
 
     /// Attach or replace an annotation on a cell.
@@ -1830,6 +1920,7 @@ impl MutableSpreadsheet {
         );
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
+        let has_full_cell_hyperlinks = self.has_full_cell_hyperlinks();
         let has_sheet_images = self.sheets.iter().any(|sheet| !sheet.images.is_empty());
         let has_validation_event_listeners = self.has_validation_event_listeners();
         let has_table_sources = self.sheets.iter().any(|sheet| {
@@ -1860,7 +1951,7 @@ impl MutableSpreadsheet {
         if has_validation_event_listeners {
             out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
         }
-        if (has_validation_event_listeners || has_table_sources)
+        if (has_validation_event_listeners || has_table_sources || has_full_cell_hyperlinks)
             && !has_annotations
             && !has_sheet_images
         {
@@ -1886,7 +1977,7 @@ impl MutableSpreadsheet {
             if has_validation_event_listeners {
                 declared.extend(["script", "presentation"]);
             }
-            if (has_validation_event_listeners || has_table_sources)
+            if (has_validation_event_listeners || has_table_sources || has_full_cell_hyperlinks)
                 && !has_annotations
                 && !has_sheet_images
             {
@@ -1941,6 +2032,7 @@ impl MutableSpreadsheet {
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.validate_named_definitions()?;
         self.validate_annotations()?;
+        self.validate_hyperlinks()?;
         self.validate_content_validations()?;
         self.validate_database_ranges()?;
         crate::ods::data_pilot::validate_data_pilot_tables(&self.data_pilot_tables)?;
@@ -2290,6 +2382,47 @@ mod tests {
                 .flat_map(|row| &row.cells)
                 .all(|cell| cell.merge() == crate::ods::CellMerge::None)
         );
+    }
+
+    #[test]
+    fn mutable_spreadsheet_authors_and_removes_full_cell_hyperlinks() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Links").unwrap();
+        mutable
+            .set_cell_hyperlink(0, 0, 0, "https://example.test/", "External")
+            .unwrap();
+
+        let mut internal = CellHyperlink::with_text("#Sheet2.B10", "Jump").unwrap();
+        internal.title = Some("Jump to bookmark".to_string());
+        internal.show = Some(crate::TextHyperlinkShow::New);
+        mutable.set_cell_hyperlink_data(0, 0, 1, internal).unwrap();
+
+        let mut spreadsheet = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let cells = &spreadsheet.sheets().unwrap()[0].rows[0].cells;
+        assert_eq!(
+            cells[0].hyperlink().unwrap().href(),
+            "https://example.test/"
+        );
+        assert_eq!(
+            cells[1].hyperlink().unwrap().show,
+            Some(crate::TextHyperlinkShow::New)
+        );
+
+        let removed = mutable.remove_cell_hyperlinks(0, 0, 0).unwrap();
+        assert_eq!(removed.len(), 1);
+        let mut plain = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let cell = &plain.sheets().unwrap()[0].rows[0].cells[0];
+        assert_eq!(cell.text, "External");
+        assert!(!cell.has_hyperlinks());
+
+        let mut invalid = MutableSpreadsheet::new();
+        invalid.add_sheet("Links").unwrap();
+        assert!(
+            invalid
+                .set_cell_hyperlink(0, 0, 0, "https://example.test/\nnext", "unsafe")
+                .is_err()
+        );
+        assert!(invalid.sheets()[0].rows.is_empty());
     }
 
     #[test]

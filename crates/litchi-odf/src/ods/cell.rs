@@ -209,6 +209,39 @@ impl Cell {
         !self.hyperlinks.is_empty()
     }
 
+    /// Replace this cell's displayed content with one validated hyperlink.
+    ///
+    /// ODS allows links to appear amid arbitrary rich text, but this compact
+    /// cell model only authors a link that owns the complete displayed value.
+    /// This prevents a target from being accidentally applied to unrelated
+    /// plain text. The operation clears a formula and stores a string value.
+    pub fn set_hyperlink(&mut self, hyperlink: CellHyperlink) -> Result<()> {
+        if self.merge == CellMerge::Covered {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cannot author a hyperlink in a covered cell".to_string(),
+            ));
+        }
+        hyperlink.validate()?;
+        self.text = hyperlink.text.clone();
+        self.value = CellValue::Text(self.text.clone());
+        self.formula = None;
+        self.hyperlinks = vec![hyperlink];
+        Ok(())
+    }
+
+    /// Remove every parsed or authored hyperlink while preserving the cell text.
+    pub fn clear_hyperlinks(&mut self) -> Vec<CellHyperlink> {
+        std::mem::take(&mut self.hyperlinks)
+    }
+
+    /// Return a hyperlink that can be represented without losing plain text.
+    pub(crate) fn full_cell_hyperlink(&self) -> Option<&CellHyperlink> {
+        let [hyperlink] = self.hyperlinks.as_slice() else {
+            return None;
+        };
+        (hyperlink.text == self.text).then_some(hyperlink)
+    }
+
     /// Return inert external-range metadata without accessing its URI.
     pub fn range_source(&self) -> Option<&CellRangeSource> {
         self.range_source.as_ref()
@@ -630,6 +663,7 @@ pub(crate) fn unmerge_cell_range(rows: &mut [Row], start_row: usize, start_col: 
 }
 
 pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
+    let full_cell_hyperlink = cell.full_cell_hyperlink();
     output.push_str(match cell.merge {
         CellMerge::Covered => "<table:covered-table-cell",
         CellMerge::None | CellMerge::Span { .. } => "<table:table-cell",
@@ -684,6 +718,7 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         && cell.range_source.is_none()
         && cell.annotation.is_none()
         && cell.detective.is_none()
+        && full_cell_hyperlink.is_none()
     {
         output.push_str("/>");
         return;
@@ -741,7 +776,8 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         CellValue::Empty
             if cell.annotation.is_none()
                 && cell.range_source.is_none()
-                && cell.detective.is_none() =>
+                && cell.detective.is_none()
+                && full_cell_hyperlink.is_none() =>
         {
             output.push_str("/>");
             return;
@@ -759,7 +795,11 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
     if let Some(detective) = &cell.detective {
         super::detective::write_detective(output, detective);
     }
-    if !matches!(cell.value, CellValue::Empty) {
+    if let Some(hyperlink) = full_cell_hyperlink {
+        output.push_str("<text:p>");
+        hyperlink.write_xml(output);
+        output.push_str("</text:p>");
+    } else if !matches!(cell.value, CellValue::Empty) {
         output.push_str("<text:p>");
         output.push_str(&escape_xml(&cell.text));
         output.push_str("</text:p>");
@@ -782,6 +822,21 @@ mod tests {
         assert!(cell.matrix_span.is_none());
         assert_eq!(cell.protect, None);
         assert_eq!(cell.protected, None);
+    }
+
+    #[test]
+    fn set_hyperlink_replaces_the_complete_displayed_value() {
+        let mut cell = Cell::new(CellValue::Number(42.0), "42", 0, 0);
+        cell.formula = Some("of:=42".to_string());
+        let hyperlink = CellHyperlink::with_text("https://example.test/", "Example").unwrap();
+        cell.set_hyperlink(hyperlink.clone()).unwrap();
+
+        assert_eq!(cell.value, CellValue::Text("Example".to_string()));
+        assert_eq!(cell.text, "Example");
+        assert!(cell.formula.is_none());
+        assert_eq!(cell.full_cell_hyperlink(), Some(&hyperlink));
+        assert_eq!(cell.clear_hyperlinks(), vec![hyperlink]);
+        assert!(!cell.has_hyperlinks());
     }
 
     #[test]

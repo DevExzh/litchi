@@ -4,7 +4,8 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
+    CalculationSettings, Cell, CellAnnotation, CellDetective, CellHyperlink, CellRangeSource,
+    CellValue, Column,
     ConditionalCellStyle, Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink, LabelRange,
     NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
     SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection,
@@ -552,6 +553,19 @@ impl SpreadsheetBuilder {
         Ok(())
     }
 
+    fn validate_hyperlinks(&self) -> Result<()> {
+        for hyperlink in self
+            .sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+            .filter_map(Cell::full_cell_hyperlink)
+        {
+            hyperlink.validate()?;
+        }
+        Ok(())
+    }
+
     fn validate_content_validations(&self) -> Result<()> {
         validate_collection(&self.content_validations)?;
         let names = self
@@ -940,6 +954,60 @@ impl SpreadsheetBuilder {
         }
 
         Ok(self)
+    }
+
+    /// Replace a cell's displayed value with one inert full-cell hyperlink.
+    ///
+    /// The target is serialized as ODF `text:a` metadata and is never
+    /// dereferenced or fetched by this library.
+    pub fn set_cell_hyperlink(
+        &mut self,
+        row: usize,
+        col: usize,
+        href: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Result<&mut Self> {
+        self.set_cell_hyperlink_data(row, col, CellHyperlink::with_text(href, text)?)
+    }
+
+    /// Replace a cell's displayed value with a fully configured hyperlink.
+    pub fn set_cell_hyperlink_data(
+        &mut self,
+        row: usize,
+        col: usize,
+        hyperlink: CellHyperlink,
+    ) -> Result<&mut Self> {
+        hyperlink.validate()?;
+        if self
+            .sheets
+            .last()
+            .and_then(|sheet| sheet.rows.get(row))
+            .and_then(|row| row.cells.get(col))
+            .is_some_and(|cell| cell.merge == crate::ods::CellMerge::Covered)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "cannot author a hyperlink in a covered cell".to_string(),
+            ));
+        }
+        self.set_cell(row, col, CellValue::Text(hyperlink.text.clone()))?;
+        self.sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .expect("set_cell creates the requested current-sheet cell")
+            .set_hyperlink(hyperlink)?;
+        Ok(self)
+    }
+
+    /// Remove every hyperlink from a cell in the current sheet.
+    pub fn remove_cell_hyperlinks(&mut self, row: usize, col: usize) -> Result<Vec<CellHyperlink>> {
+        Ok(self
+            .sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .map(Cell::clear_hyperlinks)
+            .unwrap_or_default())
     }
 
     /// Set a cell formula at a specific position in the current sheet
@@ -1791,6 +1859,14 @@ impl SpreadsheetBuilder {
             || self.dde_links.iter().any(DdeLink::has_annotations)
     }
 
+    fn has_full_cell_hyperlinks(&self) -> bool {
+        self.sheets
+            .iter()
+            .flat_map(|sheet| sheet.rows.iter())
+            .flat_map(|row| row.cells.iter())
+            .any(|cell| cell.full_cell_hyperlink().is_some())
+    }
+
     fn push_table_start(out: &mut String, sheet: &Sheet) -> Result<()> {
         out.push_str("<table:table table:name=\"");
         out.push_str(&escape_xml(&sheet.name));
@@ -1943,6 +2019,7 @@ impl SpreadsheetBuilder {
         );
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
+        let has_full_cell_hyperlinks = self.has_full_cell_hyperlinks();
         let has_sheet_images = self.sheets.iter().any(|sheet| !sheet.images.is_empty());
         let has_validation_event_listeners = self.has_validation_event_listeners();
         let has_table_sources = self.sheets.iter().any(|sheet| {
@@ -1970,7 +2047,7 @@ impl SpreadsheetBuilder {
         if has_validation_event_listeners {
             out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
         }
-        if (has_validation_event_listeners || has_table_sources)
+        if (has_validation_event_listeners || has_table_sources || has_full_cell_hyperlinks)
             && !has_annotations
             && !has_sheet_images
         {
@@ -2036,6 +2113,7 @@ impl SpreadsheetBuilder {
     pub fn build(self) -> Result<Vec<u8>> {
         self.validate_named_definitions()?;
         self.validate_annotations()?;
+        self.validate_hyperlinks()?;
         self.validate_content_validations()?;
         self.validate_database_ranges()?;
         crate::ods::data_pilot::validate_data_pilot_tables(&self.data_pilot_tables)?;
@@ -2414,6 +2492,50 @@ mod tests {
         // Row 5 should exist with row index 5
         assert_eq!(builder.sheets[0].rows.len(), 6);
         assert_eq!(builder.sheets[0].rows[5].index, 5);
+    }
+
+    #[test]
+    fn builder_authors_full_cell_hyperlinks_and_round_trips_them() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .add_sheet("Links")
+            .unwrap()
+            .set_cell_hyperlink(0, 0, "https://example.test/a?x=1&y=2", "Example & link")
+            .unwrap();
+
+        let mut internal = CellHyperlink::with_text("#Sheet2.B10", "Jump").unwrap();
+        internal.name = Some("bookmark-link".to_string());
+        internal.title = Some("Jump to bookmark".to_string());
+        internal.target_frame_name = Some("_self".to_string());
+        internal.show = Some(crate::TextHyperlinkShow::Replace);
+        internal.actuate = Some(crate::TextHyperlinkActuate::OnRequest);
+        builder.set_cell_hyperlink_data(0, 1, internal).unwrap();
+
+        let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let cells = &spreadsheet.sheets().unwrap()[0].rows[0].cells;
+        assert_eq!(cells[0].text, "Example & link");
+        assert_eq!(
+            cells[0].hyperlink().unwrap().href(),
+            "https://example.test/a?x=1&y=2"
+        );
+        let internal = cells[1].hyperlink().unwrap();
+        assert_eq!(internal.href(), "#Sheet2.B10");
+        assert_eq!(internal.name.as_deref(), Some("bookmark-link"));
+        assert_eq!(internal.show, Some(crate::TextHyperlinkShow::Replace));
+        assert_eq!(
+            internal.actuate,
+            Some(crate::TextHyperlinkActuate::OnRequest)
+        );
+        assert!(spreadsheet.content_xml().contains("xmlns:xlink="));
+        assert!(spreadsheet.content_xml().contains("xlink:type=\"simple\""));
+
+        let mut invalid = SpreadsheetBuilder::new();
+        assert!(
+            invalid
+                .set_cell_hyperlink(0, 0, "", "missing target")
+                .is_err()
+        );
+        assert!(invalid.sheets.is_empty());
     }
 
     #[test]

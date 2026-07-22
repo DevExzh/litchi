@@ -15,6 +15,7 @@ use super::{
         split_cell_range_addresses,
     },
 };
+use crate::elements::text::{TextHyperlinkActuate, TextHyperlinkShow};
 use litchi_core::{Error, Result};
 use quick_xml::Reader;
 use quick_xml::XmlVersion;
@@ -1613,6 +1614,8 @@ impl OdsParser {
         let mut name = None;
         let mut title = None;
         let mut target_frame_name = None;
+        let mut show = None;
+        let mut actuate = None;
         let mut style_name = None;
         let mut visited_style_name = None;
         for attribute in element.attributes() {
@@ -1658,6 +1661,26 @@ impl OdsParser {
             } else if Self::attribute_name_is(
                 attribute.key.as_ref(),
                 namespaces,
+                XLINK_NAMESPACE,
+                "show",
+            ) {
+                let value = decode("xlink:show")?;
+                show = Some(TextHyperlinkShow::parse(&value).ok_or_else(|| {
+                    Error::InvalidFormat(format!("invalid hyperlink xlink:show '{value}'"))
+                })?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                XLINK_NAMESPACE,
+                "actuate",
+            ) {
+                let value = decode("xlink:actuate")?;
+                actuate = Some(TextHyperlinkActuate::parse(&value).ok_or_else(|| {
+                    Error::InvalidFormat(format!("invalid hyperlink xlink:actuate '{value}'"))
+                })?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
                 TEXT_NAMESPACE,
                 "style-name",
             ) {
@@ -1680,6 +1703,8 @@ impl OdsParser {
             name,
             title,
             target_frame_name,
+            show,
+            actuate,
             style_name,
             visited_style_name,
         })
@@ -3830,6 +3855,7 @@ mod tests {
             r#"xlink:href="https://example.com/" xlink:type="simple" "#,
             r#"office:name="Example" office:title="Example site" "#,
             r#"office:target-frame-name="_blank" text:style-name="Internet_20_link" "#,
+            r#"xlink:show="new" xlink:actuate="onRequest" "#,
             r#"text:visited-style-name="Visited_20_Internet_20_Link""#,
         );
         let xml = hyperlink_document(&format!(
@@ -3854,6 +3880,8 @@ mod tests {
         assert_eq!(first.name.as_deref(), Some("Example"));
         assert_eq!(first.title.as_deref(), Some("Example site"));
         assert_eq!(first.target_frame_name.as_deref(), Some("_blank"));
+        assert_eq!(first.show, Some(TextHyperlinkShow::New));
+        assert_eq!(first.actuate, Some(TextHyperlinkActuate::OnRequest));
         assert_eq!(first.style_name.as_deref(), Some("Internet_20_link"));
         assert_eq!(
             first.visited_style_name.as_deref(),
@@ -3865,6 +3893,8 @@ mod tests {
         assert_eq!(second.text, "an internal target");
         assert!(second.name.is_none());
         assert!(second.target_frame_name.is_none());
+        assert!(second.show.is_none());
+        assert!(second.actuate.is_none());
     }
 
     #[test]
@@ -3961,6 +3991,16 @@ mod tests {
             .err()
             .expect("parse must fail");
         assert!(error.to_string().contains("xlink:type"));
+    }
+
+    #[test]
+    fn rejects_hyperlink_with_invalid_xlink_show_or_actuate() {
+        for attributes in [r#"xlink:show="embed""#, r#"xlink:actuate="onLoad""#] {
+            let xml = hyperlink_document(&format!(
+                r#"<table:table-cell office:value-type="string"><text:p><text:a xlink:href="https://example.com/" {attributes}>x</text:a></text:p></table:table-cell>"#
+            ));
+            assert!(OdsParser::parse_sheets(&xml).is_err());
+        }
     }
 
     #[test]
