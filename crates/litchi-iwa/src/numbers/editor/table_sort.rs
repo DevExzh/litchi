@@ -215,7 +215,7 @@ impl NumbersEditor {
     /// by Numbers after its last sort rule is removed. Row-range sorts require
     /// transient native selection state and are rejected rather than guessed.
     pub fn table_sort_order(&self, table_id: u64) -> Result<Option<NumbersTableSortOrder>> {
-        read_attached_table_sort_order(&self.package, table_id)
+        table_sort_order_in_package(&self.package, table_id)
     }
 
     /// Set the full-table sort-rule configuration transactionally.
@@ -231,7 +231,7 @@ impl NumbersEditor {
         order: NumbersTableSortOrder,
     ) -> Result<()> {
         let mut staged = self.package.clone();
-        set_attached_table_sort_order(&mut staged, table_id, &order)?;
+        set_table_sort_order_in_package(&mut staged, table_id, &order)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         if verified.table_sort_order(table_id)?.as_ref() != Some(&order) {
             return Err(Error::InvalidFormat(
@@ -249,7 +249,7 @@ impl NumbersEditor {
     /// exactly as removing the final rule in the Numbers UI does.
     pub fn clear_table_sort_order(&mut self, table_id: u64) -> Result<()> {
         let mut staged = self.package.clone();
-        if !clear_attached_table_sort_order(&mut staged, table_id)? {
+        if !clear_table_sort_order_in_package(&mut staged, table_id)? {
             return Ok(());
         }
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -287,7 +287,7 @@ impl NumbersEditor {
             )
         })?;
         let mut staged = self.package.clone();
-        if !apply_attached_table_sort_order(&mut staged, table_id, &order)? {
+        if !apply_table_sort_order_in_package(&mut staged, table_id, &order)? {
             return Ok(false);
         }
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -299,6 +299,46 @@ impl NumbersEditor {
         self.package = staged;
         Ok(true)
     }
+}
+
+/// Read an attached native iWork table's full-table sort-rule configuration.
+pub(crate) fn table_sort_order_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<Option<NumbersTableSortOrder>> {
+    read_attached_table_sort_order(package, table_id)
+}
+
+/// Set an attached native iWork table's full-table sort-rule configuration.
+pub(crate) fn set_table_sort_order_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    order: &NumbersTableSortOrder,
+) -> Result<()> {
+    set_attached_table_sort_order(package, table_id, order)
+}
+
+/// Clear an attached native iWork table's stored sort rules.
+///
+/// Returns whether a non-empty native order was cleared.
+pub(crate) fn clear_table_sort_order_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+) -> Result<bool> {
+    clear_attached_table_sort_order(package, table_id)
+}
+
+/// Execute a validated full-table sort on an attached native iWork table.
+///
+/// The caller supplies the configuration it has already read from or assigned
+/// to the table so presentation-specific editors can preserve it while they
+/// validate their own ownership graph.
+pub(crate) fn apply_table_sort_order_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    order: &NumbersTableSortOrder,
+) -> Result<bool> {
+    apply_attached_table_sort_order(package, table_id, order)
 }
 
 pub(super) fn read_attached_table_sort_order(

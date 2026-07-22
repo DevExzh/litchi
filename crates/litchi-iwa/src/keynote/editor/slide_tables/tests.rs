@@ -162,6 +162,125 @@ fn source_built_table_roundtrips_full_crud() {
 }
 
 #[test]
+fn source_built_table_roundtrips_full_table_sort_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Cities", 5, 2, position, size)
+        .unwrap();
+    let model_id = table.model_object_id;
+    editor
+        .set_slide_table_header_settings(
+            0,
+            model_id,
+            KeynoteTableHeaderSettings {
+                header_rows: Some(KeynoteTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    editor
+        .set_slide_table_cells(
+            0,
+            model_id,
+            [
+                KeynoteTableCellUpdate::new(0, 0, KeynoteTableCellValue::Text("Name".to_owned())),
+                KeynoteTableCellUpdate::new(0, 1, KeynoteTableCellValue::Text("Marker".to_owned())),
+                KeynoteTableCellUpdate::new(1, 0, KeynoteTableCellValue::Text("zebra".to_owned())),
+                KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::Text("last".to_owned())),
+                KeynoteTableCellUpdate::new(2, 0, KeynoteTableCellValue::Text("apple".to_owned())),
+                KeynoteTableCellUpdate::new(
+                    2,
+                    1,
+                    KeynoteTableCellValue::Text("first apple".to_owned()),
+                ),
+                KeynoteTableCellUpdate::new(3, 0, KeynoteTableCellValue::Text("banana".to_owned())),
+                KeynoteTableCellUpdate::new(3, 1, KeynoteTableCellValue::Text("middle".to_owned())),
+                KeynoteTableCellUpdate::new(4, 0, KeynoteTableCellValue::Text("apple".to_owned())),
+                KeynoteTableCellUpdate::new(
+                    4,
+                    1,
+                    KeynoteTableCellValue::Text("second apple".to_owned()),
+                ),
+            ],
+        )
+        .unwrap();
+    let order = KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
+        KeynoteTableSortColumnIndex::new(0).unwrap(),
+        KeynoteTableSortDirection::Ascending,
+    )])
+    .unwrap();
+
+    assert_eq!(editor.slide_table_sort_order(0, model_id).unwrap(), None);
+    editor
+        .set_slide_table_sort_order(0, model_id, order.clone())
+        .unwrap();
+    assert_eq!(
+        editor.slide_table_sort_order(0, model_id).unwrap(),
+        Some(order.clone())
+    );
+    assert!(editor.apply_slide_table_sort_order(0, model_id).unwrap());
+    assert!(!editor.apply_slide_table_sort_order(0, model_id).unwrap());
+    let materialized = editor.slide_table(0, model_id).unwrap();
+    assert_eq!(
+        materialized.get_cell(0, 0),
+        Some(&KeynoteTableCellValue::Text("Name".to_owned()))
+    );
+    assert_eq!(
+        materialized.get_cell(1, 0),
+        Some(&KeynoteTableCellValue::Text("apple".to_owned()))
+    );
+    assert_eq!(
+        materialized.get_cell(1, 1),
+        Some(&KeynoteTableCellValue::Text("first apple".to_owned()))
+    );
+    assert_eq!(
+        materialized.get_cell(2, 1),
+        Some(&KeynoteTableCellValue::Text("second apple".to_owned()))
+    );
+    assert_eq!(
+        materialized.get_cell(3, 0),
+        Some(&KeynoteTableCellValue::Text("banana".to_owned()))
+    );
+    assert_eq!(
+        materialized.get_cell(4, 0),
+        Some(&KeynoteTableCellValue::Text("zebra".to_owned()))
+    );
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.slide_table_sort_order(0, model_id).unwrap(),
+        Some(order.clone())
+    );
+    let unchanged = reopened.to_bytes().unwrap();
+    reopened
+        .set_slide_table_sort_order(0, model_id, order)
+        .unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), unchanged);
+
+    let invalid = KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
+        KeynoteTableSortColumnIndex::new(2).unwrap(),
+        KeynoteTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    let before_invalid = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_slide_table_sort_order(0, model_id, invalid)
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_invalid);
+
+    reopened.clear_slide_table_sort_order(0, model_id).unwrap();
+    assert_eq!(reopened.slide_table_sort_order(0, model_id).unwrap(), None);
+    let unchanged = reopened.to_bytes().unwrap();
+    reopened.clear_slide_table_sort_order(0, model_id).unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), unchanged);
+    assert!(reopened.apply_slide_table_sort_order(0, model_id).is_err());
+    assert_eq!(reopened.to_bytes().unwrap(), unchanged);
+}
+
+#[test]
 fn source_built_table_roundtrips_formula_crud_transactionally() {
     let editor = KeynoteDocumentBuilder::new().build().unwrap();
     let mut package = editor.into_package();

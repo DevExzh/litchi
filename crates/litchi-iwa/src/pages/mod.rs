@@ -49,8 +49,9 @@ pub use editor::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
     PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints, PagesTableRowDeletion,
-    PagesTableRowInsertion, PagesTableTitleSettings, PagesTemplateKind, RemovedPagesAudio,
-    RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie,
-    RemovedPagesTextBox,
+    PagesTableRowInsertion, PagesTableSortColumnIndex, PagesTableSortDirection,
+    PagesTableSortOrder, PagesTableSortRule, PagesTableTitleSettings, PagesTemplateKind,
+    RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage,
+    RemovedPagesMovie, RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};

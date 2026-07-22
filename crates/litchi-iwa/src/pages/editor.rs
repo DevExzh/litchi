@@ -3792,7 +3792,8 @@ pub use tables::{
     PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
     PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
     PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
-    PagesTableRowDeletion, PagesTableRowInsertion, PagesTableTitleSettings,
+    PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
+    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRule, PagesTableTitleSettings,
 };
 
 #[cfg(test)]

@@ -11,6 +11,7 @@ use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
 mod comments;
 mod formula;
 mod graph;
+mod sort;
 mod storage;
 mod title;
 mod topology;
@@ -24,6 +25,10 @@ pub use formula::{
     KeynoteTableFormulaExpression,
 };
 use graph::{require_table_model, slide_table_graph, table_template};
+pub use sort::{
+    KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
+    KeynoteTableSortRule,
+};
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
 pub use title::KeynoteTableTitleSettings;
 

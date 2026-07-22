@@ -4468,7 +4468,9 @@ pub use slide_tables::{
     KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
     KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
     KeynoteTableHeaderSettings, KeynoteTablePoints, KeynoteTableRowDeletion,
-    KeynoteTableRowInsertion, KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
+    KeynoteTableRowInsertion, KeynoteTableSortColumnIndex, KeynoteTableSortDirection,
+    KeynoteTableSortOrder, KeynoteTableSortRule, KeynoteTableTitleSettings,
+    RemovedKeynoteSlideTable,
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;

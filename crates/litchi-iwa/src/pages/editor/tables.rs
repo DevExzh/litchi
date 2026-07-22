@@ -3,6 +3,7 @@
 mod comments;
 mod formula;
 mod layout;
+mod sort;
 mod title;
 mod topology;
 
@@ -16,6 +17,9 @@ pub use formula::{
 pub use layout::{
     PagesTableDimension, PagesTableDimensionSize, PagesTableHeaderCount, PagesTableHeaderSettings,
     PagesTablePoints,
+};
+pub use sort::{
+    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRule,
 };
 pub use title::PagesTableTitleSettings;
 
@@ -884,6 +888,112 @@ mod tests {
         assert_eq!(table.get_cell(1, 1), Some(&PagesCellValue::Number(42.5)));
         reopened.clear_table_cell(model_id, 0, 0).unwrap();
         assert!(reopened.table(model_id).unwrap().get_cell(0, 0).is_none());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_full_table_sort_crud() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Cities", 5, 2)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        editor
+            .set_table_header_settings(
+                model_id,
+                PagesTableHeaderSettings {
+                    header_rows: Some(PagesTableHeaderCount::ONE),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        editor
+            .set_table_cells(
+                model_id,
+                [
+                    PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Name".to_owned())),
+                    PagesTableCellUpdate::new(0, 1, PagesCellValue::Text("Marker".to_owned())),
+                    PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("zebra".to_owned())),
+                    PagesTableCellUpdate::new(1, 1, PagesCellValue::Text("last".to_owned())),
+                    PagesTableCellUpdate::new(2, 0, PagesCellValue::Text("apple".to_owned())),
+                    PagesTableCellUpdate::new(2, 1, PagesCellValue::Text("first apple".to_owned())),
+                    PagesTableCellUpdate::new(3, 0, PagesCellValue::Text("banana".to_owned())),
+                    PagesTableCellUpdate::new(3, 1, PagesCellValue::Text("middle".to_owned())),
+                    PagesTableCellUpdate::new(4, 0, PagesCellValue::Text("apple".to_owned())),
+                    PagesTableCellUpdate::new(
+                        4,
+                        1,
+                        PagesCellValue::Text("second apple".to_owned()),
+                    ),
+                ],
+            )
+            .unwrap();
+        let order = PagesTableSortOrder::new([PagesTableSortRule::new(
+            PagesTableSortColumnIndex::new(0).unwrap(),
+            PagesTableSortDirection::Ascending,
+        )])
+        .unwrap();
+
+        assert_eq!(editor.table_sort_order(model_id).unwrap(), None);
+        editor
+            .set_table_sort_order(model_id, order.clone())
+            .unwrap();
+        assert_eq!(
+            editor.table_sort_order(model_id).unwrap(),
+            Some(order.clone())
+        );
+        assert!(editor.apply_table_sort_order(model_id).unwrap());
+        assert!(!editor.apply_table_sort_order(model_id).unwrap());
+        let table = editor.table(model_id).unwrap();
+        assert_eq!(
+            table.get_cell(0, 0),
+            Some(&PagesCellValue::Text("Name".to_owned()))
+        );
+        assert_eq!(
+            table.get_cell(1, 0),
+            Some(&PagesCellValue::Text("apple".to_owned()))
+        );
+        assert_eq!(
+            table.get_cell(1, 1),
+            Some(&PagesCellValue::Text("first apple".to_owned()))
+        );
+        assert_eq!(
+            table.get_cell(2, 1),
+            Some(&PagesCellValue::Text("second apple".to_owned()))
+        );
+        assert_eq!(
+            table.get_cell(3, 0),
+            Some(&PagesCellValue::Text("banana".to_owned()))
+        );
+        assert_eq!(
+            table.get_cell(4, 0),
+            Some(&PagesCellValue::Text("zebra".to_owned()))
+        );
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_sort_order(model_id).unwrap(),
+            Some(order.clone())
+        );
+        let unchanged = reopened.to_bytes().unwrap();
+        reopened.set_table_sort_order(model_id, order).unwrap();
+        assert_eq!(reopened.to_bytes().unwrap(), unchanged);
+
+        let invalid = PagesTableSortOrder::new([PagesTableSortRule::new(
+            PagesTableSortColumnIndex::new(2).unwrap(),
+            PagesTableSortDirection::Ascending,
+        )])
+        .unwrap();
+        let before_invalid = reopened.to_bytes().unwrap();
+        assert!(reopened.set_table_sort_order(model_id, invalid).is_err());
+        assert_eq!(reopened.to_bytes().unwrap(), before_invalid);
+
+        reopened.clear_table_sort_order(model_id).unwrap();
+        assert_eq!(reopened.table_sort_order(model_id).unwrap(), None);
+        let unchanged = reopened.to_bytes().unwrap();
+        reopened.clear_table_sort_order(model_id).unwrap();
+        assert_eq!(reopened.to_bytes().unwrap(), unchanged);
+        assert!(reopened.apply_table_sort_order(model_id).is_err());
+        assert_eq!(reopened.to_bytes().unwrap(), unchanged);
     }
 
     #[test]

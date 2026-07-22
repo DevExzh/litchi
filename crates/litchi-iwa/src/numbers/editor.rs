@@ -3302,6 +3302,10 @@ pub use table_sort::{
     NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
     NumbersTableSortRule,
 };
+pub(crate) use table_sort::{
+    apply_table_sort_order_in_package, clear_table_sort_order_in_package,
+    set_table_sort_order_in_package, table_sort_order_in_package,
+};
 pub use table_title::NumbersTableTitleSettings;
 pub(crate) use table_title::{
     set_table_title_settings_in_package, table_title_settings_in_package,
