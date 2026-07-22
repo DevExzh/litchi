@@ -1,11 +1,14 @@
-//! Immutable static reader for the MS-XLSX Named Sheet Views part.
+//! Typed, inert reader and package writer for MS-XLSX Named Sheet Views.
 
 use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::Cell;
-use crate::xlsx::auto_filter::{FilterColumnDefinition, parse_auto_filter};
+use crate::xlsx::auto_filter::{
+    AutoFilterDefinition, FilterColumnDefinition, parse_auto_filter, write_auto_filter_fragment,
+};
 use crate::xlsx::sort::{SortBy, SortMethod};
-use litchi_opc::{OpcPackage, Relationships};
+use litchi_opc::constants::content_type as ct;
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -28,6 +31,7 @@ const MAX_FILTERS: usize = 65_536;
 const MAX_COLUMNS: usize = 16_384;
 const MAX_RETAINED_BYTES: usize = 8 * 1024 * 1024;
 const MAX_MARKUP_BYTES: usize = 1024 * 1024;
+const MAX_NAMESPACE_DECLARATIONS: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedSheetViewGuid(String);
@@ -131,6 +135,33 @@ impl NamedSheetViewIconSet {
             FiveArrows | FiveArrowsGray | FiveRating | FiveQuarters | FiveBoxes => 5,
             NoIcons => return None,
         })
+    }
+
+    fn as_str(self) -> &'static str {
+        use NamedSheetViewIconSet::*;
+        match self {
+            ThreeArrows => "3Arrows",
+            ThreeArrowsGray => "3ArrowsGray",
+            ThreeFlags => "3Flags",
+            ThreeTrafficLights1 => "3TrafficLights1",
+            ThreeTrafficLights2 => "3TrafficLights2",
+            ThreeSigns => "3Signs",
+            ThreeSymbols => "3Symbols",
+            ThreeSymbols2 => "3Symbols2",
+            FourArrows => "4Arrows",
+            FourArrowsGray => "4ArrowsGray",
+            FourRedToBlack => "4RedToBlack",
+            FourRating => "4Rating",
+            FourTrafficLights => "4TrafficLights",
+            FiveArrows => "5Arrows",
+            FiveArrowsGray => "5ArrowsGray",
+            FiveRating => "5Rating",
+            FiveQuarters => "5Quarters",
+            ThreeStars => "3Stars",
+            ThreeTriangles => "3Triangles",
+            FiveBoxes => "5Boxes",
+            NoIcons => "NoIcons",
+        }
     }
 }
 
@@ -296,6 +327,7 @@ impl NamedSheetView {
 pub struct NamedSheetViews {
     views: Vec<NamedSheetView>,
     extensions: Vec<NamedSheetViewExtension>,
+    namespace_declarations: Vec<(String, String)>,
 }
 impl NamedSheetViews {
     pub fn views(&self) -> &[NamedSheetView] {
@@ -303,6 +335,12 @@ impl NamedSheetViews {
     }
     pub fn extensions(&self) -> &[NamedSheetViewExtension] {
         &self.extensions
+    }
+
+    /// Serialize this parsed Named Sheet Views value without evaluating filters
+    /// or changing sort semantics.
+    pub fn to_xml(&self) -> Result<Vec<u8>> {
+        write_named_sheet_views(self)
     }
 }
 
@@ -397,6 +435,594 @@ pub fn parse_named_sheet_views(xml: &[u8]) -> Result<NamedSheetViews> {
     parser.finish()
 }
 
+/// Load the optional Named Sheet Views part owned by one worksheet.
+///
+/// Filters, sort metadata, and retained extensions are parsed only. This does
+/// not apply a view, evaluate formulas, or fetch any external resource.
+pub fn load_worksheet_named_sheet_views(
+    package: &OpcPackage,
+    worksheet_part: &PackURI,
+) -> Result<Option<NamedSheetViews>> {
+    require_worksheet(package.get_part(worksheet_part)?)?;
+    validate_named_sheet_views_graph(package)?;
+    let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? else {
+        return Ok(None);
+    };
+    let part = package.get_part(&relationship.part_name)?;
+    parse_named_sheet_views(part.blob()).map(Some)
+}
+
+/// Store a parsed Named Sheet Views value as the worksheet's sole modern view
+/// part.
+///
+/// The value is serialized as inert filter and sort metadata. Existing package
+/// graph violations are rejected before any part is changed.
+pub fn store_worksheet_named_sheet_views(
+    package: &mut OpcPackage,
+    worksheet_part: &PackURI,
+    value: &NamedSheetViews,
+) -> Result<()> {
+    let xml = write_named_sheet_views(value)?;
+    require_worksheet(package.get_part(worksheet_part)?)?;
+    validate_named_sheet_views_graph(package)?;
+
+    if let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? {
+        package.get_part_mut(&relationship.part_name)?.set_blob(xml);
+    } else {
+        let part_name = next_named_sheet_views_part_name(package)?;
+        let relationship_id = next_named_sheet_views_relationship_id(package, worksheet_part)?;
+        let target = part_name.relative_ref(worksheet_part.base_uri());
+        package.try_add_part(Box::new(BlobPart::new(part_name, CONTENT_TYPE.into(), xml)))?;
+        package
+            .get_part_mut(worksheet_part)?
+            .rels_mut()
+            .add_relationship(RELATIONSHIP.into(), target, relationship_id, false);
+    }
+
+    let _ = package.clear_digital_signatures();
+    Ok(())
+}
+
+/// Remove a worksheet's Named Sheet Views relationship and unreferenced part.
+///
+/// The worksheet data and its ordinary active view are left unchanged.
+pub fn remove_worksheet_named_sheet_views(
+    package: &mut OpcPackage,
+    worksheet_part: &PackURI,
+) -> Result<bool> {
+    require_worksheet(package.get_part(worksheet_part)?)?;
+    validate_named_sheet_views_graph(package)?;
+    let Some(relationship) = named_sheet_views_relationship(package, worksheet_part)? else {
+        return Ok(false);
+    };
+
+    package
+        .get_part_mut(worksheet_part)?
+        .rels_mut()
+        .remove(&relationship.relationship_id);
+    if !package_part_is_referenced(package, &relationship.part_name) {
+        package.remove_part(&relationship.part_name);
+    }
+    let _ = package.clear_digital_signatures();
+    Ok(true)
+}
+
+/// Serialize one modern Named Sheet Views part.
+///
+/// The caller supplies a value obtained from [`parse_named_sheet_views`] or
+/// [`load_worksheet_named_sheet_views`]. The writer preserves retained markup
+/// inertly and validates its own output by parsing it again.
+pub fn write_named_sheet_views(value: &NamedSheetViews) -> Result<Vec<u8>> {
+    if value.views.is_empty() {
+        return Err(invalid(
+            "Named Sheet Views part must contain a namedSheetView",
+        ));
+    }
+    if value.views.len() > MAX_VIEWS {
+        return Err(invalid("too many named sheet views"));
+    }
+
+    let mut output = Vec::new();
+    output.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+    output.extend_from_slice(b"<namedSheetViews");
+    write_xml_attribute(&mut output, "xmlns", std::str::from_utf8(NSV).unwrap());
+
+    let needs_spreadsheet_prefix = has_filter_payload(value);
+    let spreadsheet_prefix_needs_local_binding =
+        needs_spreadsheet_prefix && needs_local_spreadsheet_prefix_binding(value);
+    let mut declared = HashSet::new();
+    declared.insert("xmlns".to_string());
+    for (name, namespace) in &value.namespace_declarations {
+        if name == "xmlns" || !name.starts_with("xmlns:") || !declared.insert(name.clone()) {
+            continue;
+        }
+        write_xml_attribute(&mut output, name, namespace);
+    }
+    if needs_spreadsheet_prefix && !declared.contains("xmlns:x") {
+        write_xml_attribute(&mut output, "xmlns:x", std::str::from_utf8(CORE).unwrap());
+    }
+    output.push(b'>');
+
+    for view in &value.views {
+        write_named_sheet_view(&mut output, view, spreadsheet_prefix_needs_local_binding)?;
+    }
+    write_extensions(&mut output, &value.extensions);
+    output.extend_from_slice(b"</namedSheetViews>");
+
+    if output.len() > MAX_PART_BYTES {
+        return Err(invalid(
+            "serialized Named Sheet Views part exceeds size limit",
+        ));
+    }
+    parse_named_sheet_views(&output)?;
+    Ok(output)
+}
+
+#[derive(Debug, Clone)]
+struct NamedSheetViewsRelationship {
+    relationship_id: String,
+    part_name: PackURI,
+}
+
+fn named_sheet_views_relationship(
+    package: &OpcPackage,
+    worksheet_part: &PackURI,
+) -> Result<Option<NamedSheetViewsRelationship>> {
+    let worksheet = package.get_part(worksheet_part)?;
+    require_worksheet(worksheet)?;
+    let mut matches = worksheet
+        .rels()
+        .iter()
+        .filter(|relationship| relationship.reltype() == RELATIONSHIP);
+    let Some(relationship) = matches.next() else {
+        return Ok(None);
+    };
+    if matches.next().is_some() {
+        return Err(invalid(
+            "worksheet has multiple Named Sheet Views relationships",
+        ));
+    }
+    if relationship.is_external() {
+        return Err(invalid("Named Sheet Views relationship cannot be external"));
+    }
+    let part_name = relationship.target_partname()?;
+    validate_named_sheet_views_part(package, &part_name)?;
+    Ok(Some(NamedSheetViewsRelationship {
+        relationship_id: relationship.r_id().to_owned(),
+        part_name,
+    }))
+}
+
+fn validate_named_sheet_views_graph(package: &OpcPackage) -> Result<()> {
+    if package
+        .rels()
+        .iter()
+        .any(|relationship| relationship.reltype() == RELATIONSHIP)
+    {
+        return Err(invalid(
+            "package root cannot source a Named Sheet Views relationship",
+        ));
+    }
+
+    let mut targets = HashSet::new();
+    for source in package.iter_parts() {
+        let mut relationships = source
+            .rels()
+            .iter()
+            .filter(|relationship| relationship.reltype() == RELATIONSHIP);
+        let Some(relationship) = relationships.next() else {
+            continue;
+        };
+        require_worksheet(source)?;
+        if relationships.next().is_some() {
+            return Err(invalid(format!(
+                "worksheet '{}' has multiple Named Sheet Views relationships",
+                source.partname()
+            )));
+        }
+        if relationship.is_external() {
+            return Err(invalid("Named Sheet Views relationship cannot be external"));
+        }
+        let target = relationship.target_partname()?;
+        if !targets.insert(target.clone()) {
+            return Err(invalid(format!(
+                "Named Sheet Views part '{target}' is targeted more than once"
+            )));
+        }
+        validate_named_sheet_views_part(package, &target)?;
+    }
+
+    for part in package
+        .iter_parts()
+        .filter(|part| part.content_type() == CONTENT_TYPE)
+    {
+        if !targets.contains(part.partname()) {
+            return Err(invalid(format!(
+                "Named Sheet Views part '{}' has no worksheet relationship",
+                part.partname()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_named_sheet_views_part(package: &OpcPackage, part_name: &PackURI) -> Result<()> {
+    let part = package.get_part(part_name)?;
+    if part.content_type() != CONTENT_TYPE {
+        return Err(OoxmlError::InvalidContentType {
+            expected: CONTENT_TYPE.into(),
+            got: part.content_type().into(),
+        });
+    }
+    if !part.rels().is_empty() {
+        return Err(invalid(format!(
+            "Named Sheet Views part '{part_name}' must not have relationships"
+        )));
+    }
+    Ok(())
+}
+
+fn next_named_sheet_views_part_name(package: &OpcPackage) -> Result<PackURI> {
+    for suffix in 1..=65_536u32 {
+        let candidate = PackURI::new(format!("/xl/namedSheetViews/namedSheetView{suffix}.xml"))
+            .map_err(OoxmlError::InvalidUri)?;
+        if package
+            .iter_parts()
+            .all(|part| part.partname() != &candidate)
+        {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("no free Named Sheet Views part name"))
+}
+
+fn next_named_sheet_views_relationship_id(
+    package: &OpcPackage,
+    worksheet_part: &PackURI,
+) -> Result<String> {
+    let relationships = package.get_part(worksheet_part)?.rels();
+    for suffix in 1..=65_537u32 {
+        let candidate = format!("rIdNamedSheetView{suffix}");
+        if relationships.get(&candidate).is_none() {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("no free Named Sheet Views relationship ID"))
+}
+
+fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
+    package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|part_name| part_name == *target)
+        })
+    }) || package.rels().iter().any(|relationship| {
+        !relationship.is_external()
+            && relationship
+                .target_partname()
+                .is_ok_and(|part_name| part_name == *target)
+    })
+}
+
+fn require_worksheet(part: &dyn Part) -> Result<()> {
+    if part.content_type() == ct::SML_WORKSHEET {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "part '{}' is not a worksheet",
+            part.partname()
+        )))
+    }
+}
+
+fn has_filter_payload(value: &NamedSheetViews) -> bool {
+    value.views.iter().any(|view| {
+        view.filters.iter().any(|filter| {
+            filter
+                .column_filters
+                .iter()
+                .any(|column| column.filters.iter().any(|filter| filter.payload.is_some()))
+        })
+    })
+}
+
+fn needs_local_spreadsheet_prefix_binding(value: &NamedSheetViews) -> bool {
+    value
+        .namespace_declarations
+        .iter()
+        .find(|(name, _)| name == "xmlns:x")
+        .is_some_and(|(_, namespace)| {
+            namespace.as_bytes() != CORE && namespace.as_bytes() != STRICT
+        })
+}
+
+fn write_named_sheet_view(
+    output: &mut Vec<u8>,
+    view: &NamedSheetView,
+    spreadsheet_prefix_needs_local_binding: bool,
+) -> Result<()> {
+    validate_name(&view.name)?;
+    output.extend_from_slice(b"<namedSheetView");
+    write_xml_attribute(output, "name", &view.name);
+    write_xml_attribute(output, "id", view.id.as_str());
+    if view.filters.is_empty() && view.extensions.is_empty() {
+        output.extend_from_slice(b"/>");
+        return Ok(());
+    }
+    output.push(b'>');
+    for filter in &view.filters {
+        write_named_sheet_view_filter(output, filter, spreadsheet_prefix_needs_local_binding)?;
+    }
+    write_extensions(output, &view.extensions);
+    output.extend_from_slice(b"</namedSheetView>");
+    Ok(())
+}
+
+fn write_named_sheet_view_filter(
+    output: &mut Vec<u8>,
+    filter: &NamedSheetViewFilter,
+    spreadsheet_prefix_needs_local_binding: bool,
+) -> Result<()> {
+    output.extend_from_slice(b"<nsvFilter");
+    write_xml_attribute(output, "filterId", filter.filter_id.as_str());
+    if let Some(reference) = &filter.reference {
+        write_xml_attribute(output, "ref", reference.as_str());
+    }
+    if let Some(table_id) = filter.table_id {
+        write_xml_attribute(output, "tableId", &table_id.to_string());
+    }
+    if filter.column_filters.is_empty()
+        && filter.sort_rules.is_none()
+        && filter.extensions.is_empty()
+    {
+        output.extend_from_slice(b"/>");
+        return Ok(());
+    }
+    output.push(b'>');
+    for column in &filter.column_filters {
+        write_column_filter(output, column, spreadsheet_prefix_needs_local_binding)?;
+    }
+    if let Some(sort_rules) = &filter.sort_rules {
+        write_sort_rules(output, sort_rules)?;
+    }
+    write_extensions(output, &filter.extensions);
+    output.extend_from_slice(b"</nsvFilter>");
+    Ok(())
+}
+
+fn write_column_filter(
+    output: &mut Vec<u8>,
+    column: &NamedSheetViewColumnFilter,
+    spreadsheet_prefix_needs_local_binding: bool,
+) -> Result<()> {
+    if column.column_id >= MAX_COLUMNS as u32 {
+        return Err(invalid(
+            "named-sheet-view colId exceeds worksheet column limit",
+        ));
+    }
+    output.extend_from_slice(b"<columnFilter");
+    write_xml_attribute(output, "colId", &column.column_id.to_string());
+    if let Some(id) = &column.id {
+        write_xml_attribute(output, "id", id.as_str());
+    }
+    if column.differential_format.is_none()
+        && column.filters.is_empty()
+        && column.extensions.is_empty()
+    {
+        output.extend_from_slice(b"/>");
+        return Ok(());
+    }
+    output.push(b'>');
+    if let Some(differential_format) = &column.differential_format {
+        output.extend_from_slice(differential_format.xml());
+    }
+    for filter in &column.filters {
+        write_filter_payload(output, filter, spreadsheet_prefix_needs_local_binding)?;
+    }
+    write_extensions(output, &column.extensions);
+    output.extend_from_slice(b"</columnFilter>");
+    Ok(())
+}
+
+fn write_filter_payload(
+    output: &mut Vec<u8>,
+    filter: &FilterColumnDefinition,
+    spreadsheet_prefix_needs_local_binding: bool,
+) -> Result<()> {
+    output.extend_from_slice(b"<filter");
+    write_xml_attribute(output, "colId", &filter.column_id.to_string());
+    if filter.hidden_button {
+        write_xml_attribute(output, "hiddenButton", "1");
+    }
+    if !filter.show_button {
+        write_xml_attribute(output, "showButton", "0");
+    }
+    let Some(_) = &filter.payload else {
+        output.extend_from_slice(b"/>");
+        return Ok(());
+    };
+    if spreadsheet_prefix_needs_local_binding {
+        write_xml_attribute(output, "xmlns:x", std::str::from_utf8(CORE).unwrap());
+    }
+    output.push(b'>');
+    output.extend_from_slice(&filter_payload_markup(filter)?);
+    output.extend_from_slice(b"</filter>");
+    Ok(())
+}
+
+fn filter_payload_markup(filter: &FilterColumnDefinition) -> Result<Vec<u8>> {
+    let fragment = write_auto_filter_fragment(&AutoFilterDefinition {
+        reference: None,
+        columns: vec![filter.clone()],
+        sort_state: None,
+    })?;
+    let mut reader = NsReader::from_reader(fragment.as_slice());
+    let mut writer = Writer::new(Vec::new());
+    let mut in_column = false;
+    let mut depth = 0usize;
+    loop {
+        let event = reader.read_event().map_err(xml_error)?.into_owned();
+        match event {
+            Event::Start(element) if element.local_name().as_ref() == b"filterColumn" => {
+                if in_column {
+                    return Err(invalid("nested generated filterColumn"));
+                }
+                in_column = true;
+                depth = 1;
+            },
+            Event::Start(element) if in_column => {
+                writer
+                    .write_event(Event::Start(element))
+                    .map_err(xml_error)?;
+                depth += 1;
+            },
+            Event::Empty(element) if in_column => {
+                writer
+                    .write_event(Event::Empty(element))
+                    .map_err(xml_error)?;
+            },
+            Event::End(element) if in_column => {
+                if depth == 1 && element.local_name().as_ref() == b"filterColumn" {
+                    in_column = false;
+                    depth = 0;
+                } else {
+                    writer.write_event(Event::End(element)).map_err(xml_error)?;
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("generated filter depth underflow"))?;
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if in_column || depth != 0 {
+        return Err(invalid("unterminated generated filterColumn"));
+    }
+    let markup = writer.into_inner();
+    if markup.is_empty() {
+        return Err(invalid("generated Named Sheet Views filter has no payload"));
+    }
+    Ok(markup)
+}
+
+fn write_sort_rules(output: &mut Vec<u8>, rules: &NamedSheetViewSortRules) -> Result<()> {
+    output.extend_from_slice(b"<sortRules");
+    if rules.sort_method != SortMethod::None {
+        write_xml_attribute(output, "sortMethod", rules.sort_method.as_str());
+    }
+    if rules.case_sensitive {
+        write_xml_attribute(output, "caseSensitive", "1");
+    }
+    if rules.rules.is_empty() && rules.extensions.is_empty() {
+        output.extend_from_slice(b"/>");
+        return Ok(());
+    }
+    output.push(b'>');
+    for rule in &rules.rules {
+        write_sort_rule(output, rule)?;
+    }
+    write_extensions(output, &rules.extensions);
+    output.extend_from_slice(b"</sortRules>");
+    Ok(())
+}
+
+fn write_sort_rule(output: &mut Vec<u8>, rule: &NamedSheetViewSortRule) -> Result<()> {
+    if rule.column_id >= MAX_COLUMNS as u32 {
+        return Err(invalid(
+            "named-sheet-view colId exceeds worksheet column limit",
+        ));
+    }
+    output.extend_from_slice(b"<sortRule");
+    write_xml_attribute(output, "colId", &rule.column_id.to_string());
+    if let Some(id) = &rule.id {
+        write_xml_attribute(output, "id", id.as_str());
+    }
+    if rule.differential_format.is_none() && rule.condition.is_none() {
+        output.extend_from_slice(b"/>");
+        return Ok(());
+    }
+    output.push(b'>');
+    if let Some(differential_format) = &rule.differential_format {
+        output.extend_from_slice(differential_format.xml());
+    }
+    if let Some(condition) = &rule.condition {
+        write_sort_condition(output, condition)?;
+    }
+    output.extend_from_slice(b"</sortRule>");
+    Ok(())
+}
+
+fn write_sort_condition(
+    output: &mut Vec<u8>,
+    condition: &NamedSheetViewSortCondition,
+) -> Result<()> {
+    let name = match condition.kind {
+        NamedSheetViewSortConditionKind::Standard => "sortCondition",
+        NamedSheetViewSortConditionKind::RichValue => "richSortCondition",
+    };
+    output.push(b'<');
+    output.extend_from_slice(name.as_bytes());
+    write_xml_attribute(output, "ref", condition.reference.as_str());
+    if condition.descending {
+        write_xml_attribute(output, "descending", "1");
+    }
+    if condition.sort_by != SortBy::Value {
+        write_xml_attribute(output, "sortBy", condition.sort_by.as_str());
+    }
+    if let Some(custom_list) = &condition.custom_list {
+        write_xml_attribute(output, "customList", custom_list);
+    }
+    if let Some(differential_format_id) = condition.differential_format_id {
+        write_xml_attribute(output, "dxfId", &differential_format_id.to_string());
+    }
+    if let Some(icon_set) = condition.icon_set {
+        write_xml_attribute(output, "iconSet", icon_set.as_str());
+    }
+    if let Some(icon_id) = condition.icon_id {
+        write_xml_attribute(output, "iconId", &icon_id.to_string());
+    }
+    if let Some(rich_sort_key) = &condition.rich_sort_key {
+        write_xml_attribute(output, "richSortKey", rich_sort_key);
+    }
+    output.extend_from_slice(b"/>");
+    Ok(())
+}
+
+fn write_extensions(output: &mut Vec<u8>, extensions: &[NamedSheetViewExtension]) {
+    if extensions.is_empty() {
+        return;
+    }
+    output.extend_from_slice(b"<extLst>");
+    for extension in extensions {
+        output.extend_from_slice(extension.markup.xml());
+    }
+    output.extend_from_slice(b"</extLst>");
+}
+
+fn write_xml_attribute(output: &mut Vec<u8>, name: &str, value: &str) {
+    output.push(b' ');
+    output.extend_from_slice(name.as_bytes());
+    output.extend_from_slice(b"=\"");
+    for character in value.chars() {
+        match character {
+            '&' => output.extend_from_slice(b"&amp;"),
+            '<' => output.extend_from_slice(b"&lt;"),
+            '"' => output.extend_from_slice(b"&quot;"),
+            '\t' => output.extend_from_slice(b"&#9;"),
+            '\n' => output.extend_from_slice(b"&#10;"),
+            '\r' => output.extend_from_slice(b"&#13;"),
+            _ => {
+                let mut buffer = [0; 4];
+                output.extend_from_slice(character.encode_utf8(&mut buffer).as_bytes());
+            },
+        }
+    }
+    output.push(b'"');
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Ctx {
     Outside,
@@ -477,7 +1103,7 @@ impl Parser {
         let nsv = exact(ns, NSV);
         match (self.parent(), nsv, local.as_ref()) {
             (Ctx::Outside, true, b"namedSheetViews") => {
-                self.begin_root()?;
+                self.begin_root(e, d)?;
                 self.stack.push(Ctx::Root)
             },
             (Ctx::Root, true, b"namedSheetView") => {
@@ -642,7 +1268,7 @@ impl Parser {
         }
         Ok(())
     }
-    fn begin_root(&mut self) -> Result<()> {
+    fn begin_root(&mut self, e: &BytesStart<'_>, d: Decoder) -> Result<()> {
         if self.seen_root {
             return Err(invalid("duplicate namedSheetViews root"));
         }
@@ -651,6 +1277,7 @@ impl Parser {
         self.root = Some(NamedSheetViews {
             views: Vec::new(),
             extensions: Vec::new(),
+            namespace_declarations: parse_namespace_declarations(e, d)?,
         });
         Ok(())
     }
@@ -1265,6 +1892,28 @@ fn parse_range(v: &str) -> Result<NamedSheetViewRange> {
     }
     Ok(NamedSheetViewRange(v.into()))
 }
+fn parse_namespace_declarations(e: &BytesStart<'_>, d: Decoder) -> Result<Vec<(String, String)>> {
+    let mut declarations = Vec::new();
+    let mut names = HashSet::new();
+    for attribute in e.attributes().with_checks(true) {
+        let attribute = attribute.map_err(xml_error)?;
+        let name = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
+        if name != "xmlns" && !name.starts_with("xmlns:") {
+            continue;
+        }
+        if declarations.len() >= MAX_NAMESPACE_DECLARATIONS || !names.insert(name.clone()) {
+            return Err(invalid(
+                "too many or duplicate Named Sheet Views namespace declarations",
+            ));
+        }
+        let namespace = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
+            .map_err(xml_error)?
+            .into_owned();
+        declarations.push((name, namespace));
+    }
+    Ok(declarations)
+}
 fn attr(e: &BytesStart<'_>, name: &[u8], d: Decoder) -> Result<Option<String>> {
     let mut value = None;
     for a in e.attributes().with_checks(true) {
@@ -1339,12 +1988,21 @@ mod tests {
     use super::*;
     use crate::xlsx::auto_filter::{FilterColumnPayload, FilterItem};
     use litchi_opc::{OpcPackage, PackURI};
-    #[test]
-    fn discovers_libreoffice_fixture_and_parses_filters() {
-        let package = OpcPackage::from_bytes(include_bytes!(
+
+    fn libreoffice_fixture() -> OpcPackage {
+        OpcPackage::from_bytes(include_bytes!(
             "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx"
         ))
-        .unwrap();
+        .unwrap()
+    }
+
+    fn fixture_worksheet() -> PackURI {
+        PackURI::new("/xl/worksheets/sheet1.xml").unwrap()
+    }
+
+    #[test]
+    fn discovers_libreoffice_fixture_and_parses_filters() {
+        let package = libreoffice_fixture();
         let sheet = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
             .unwrap();
@@ -1374,6 +2032,115 @@ mod tests {
             _ => panic!("wrong payload"),
         }
     }
+
+    #[test]
+    fn serializes_libreoffice_fixture_without_losing_filter_or_sort_metadata() {
+        let package = libreoffice_fixture();
+        let worksheet = fixture_worksheet();
+        let value = load_worksheet_named_sheet_views(&package, &worksheet)
+            .unwrap()
+            .unwrap();
+
+        let xml = write_named_sheet_views(&value).unwrap();
+        let reparsed = parse_named_sheet_views(&xml).unwrap();
+        assert_eq!(reparsed, value);
+        let text = std::str::from_utf8(&xml).unwrap();
+        assert!(text.contains("<filter colId=\"1\"><x:filters>"));
+        assert!(text.contains("<sortCondition ref=\"C1:C8\"/>"));
+    }
+
+    #[test]
+    fn package_crud_round_trips_real_fixture_and_removes_unreferenced_part() {
+        let mut package = libreoffice_fixture();
+        let worksheet = fixture_worksheet();
+        let value = load_worksheet_named_sheet_views(&package, &worksheet)
+            .unwrap()
+            .unwrap();
+
+        store_worksheet_named_sheet_views(&mut package, &worksheet, &value).unwrap();
+        assert_eq!(
+            load_worksheet_named_sheet_views(&package, &worksheet).unwrap(),
+            Some(value.clone())
+        );
+
+        assert!(remove_worksheet_named_sheet_views(&mut package, &worksheet).unwrap());
+        assert_eq!(
+            load_worksheet_named_sheet_views(&package, &worksheet).unwrap(),
+            None
+        );
+        assert!(!remove_worksheet_named_sheet_views(&mut package, &worksheet).unwrap());
+
+        store_worksheet_named_sheet_views(&mut package, &worksheet, &value).unwrap();
+        let relationship = package
+            .get_part(&worksheet)
+            .unwrap()
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == RELATIONSHIP)
+            .unwrap();
+        assert_eq!(
+            relationship.target_partname().unwrap(),
+            PackURI::new("/xl/namedSheetViews/namedSheetView1.xml").unwrap()
+        );
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("named-sheet-views.xlsx");
+        package.save(&path).unwrap();
+        let reopened = OpcPackage::open(&path).unwrap();
+        assert_eq!(
+            load_worksheet_named_sheet_views(&reopened, &worksheet).unwrap(),
+            Some(value)
+        );
+    }
+
+    #[test]
+    fn workbook_materialization_retains_named_sheet_views() {
+        let mut workbook = crate::xlsx::Workbook::create().unwrap();
+        let worksheet = fixture_worksheet();
+        let value = parse_named_sheet_views(
+            br#"<namedSheetViews xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews"><namedSheetView name="Retained" id="{01234567-89AB-CDEF-0123-456789ABCDEF}"/></namedSheetViews>"#,
+        )
+        .unwrap();
+        store_worksheet_named_sheet_views(workbook.opc_package_mut(), &worksheet, &value).unwrap();
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "materialized");
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("materialized-named-sheet-views.xlsx");
+        workbook.save(&path).unwrap();
+        let reopened = crate::xlsx::Workbook::open(&path).unwrap();
+        assert_eq!(
+            load_worksheet_named_sheet_views(reopened.opc_package(), &worksheet).unwrap(),
+            Some(value)
+        );
+    }
+
+    #[test]
+    fn package_crud_rejects_invalid_existing_graph_before_replacement() {
+        let mut package = libreoffice_fixture();
+        let worksheet = fixture_worksheet();
+        let value = load_worksheet_named_sheet_views(&package, &worksheet)
+            .unwrap()
+            .unwrap();
+        let part_name = PackURI::new("/xl/namedSheetViews/namedSheetView1.xml").unwrap();
+        let original = package.get_part(&part_name).unwrap().blob().to_vec();
+        package
+            .get_part_mut(&worksheet)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                RELATIONSHIP.into(),
+                "../namedSheetViews/namedSheetView1.xml".into(),
+                "rIdDuplicateNamedSheetView".into(),
+                false,
+            );
+
+        assert!(store_worksheet_named_sheet_views(&mut package, &worksheet, &value).is_err());
+        assert_eq!(package.get_part(&part_name).unwrap().blob(), original);
+        assert!(remove_worksheet_named_sheet_views(&mut package, &worksheet).is_err());
+    }
     #[test]
     fn poi_fixture_has_no_named_sheet_views_relationship() {
         let package = OpcPackage::from_bytes(include_bytes!(
@@ -1398,7 +2165,11 @@ mod tests {
         let c = rules.rules()[0].condition().unwrap();
         assert_eq!(c.kind(), NamedSheetViewSortConditionKind::RichValue);
         assert_eq!(c.rich_sort_key(), Some("City"));
-        assert_eq!(v.views()[0].extensions()[0].uri(), "urn:test")
+        assert_eq!(v.views()[0].extensions()[0].uri(), "urn:test");
+        assert_eq!(
+            parse_named_sheet_views(&write_named_sheet_views(&v).unwrap()).unwrap(),
+            v
+        );
     }
     #[test]
     fn rejects_schema_guid_range_and_security_errors() {

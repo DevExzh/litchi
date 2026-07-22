@@ -12,6 +12,10 @@ use crate::xlsx::calculation_chain::{
 use crate::xlsx::calculation_properties::{
     WorkbookCalculationProperties, parse_workbook_calculation_properties,
 };
+use crate::xlsx::named_sheet_view::{
+    NamedSheetViews, load_worksheet_named_sheet_views, remove_worksheet_named_sheet_views,
+    store_worksheet_named_sheet_views,
+};
 use crate::xlsx::external_links::{
     ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
     build_external_link_part_with_conformance, load_external_link,
@@ -1558,14 +1562,16 @@ impl Workbook {
         if should_update {
             // Take mutable_data temporarily to avoid borrow issues
             if let Some(mut mutable_data) = self.mutable_data.take() {
-                // The mutable writer rebuilds workbook relationships. Detach the
-                // optional cache first so an unreferenced old part is not left
-                // behind, then restore it after materialization.
+                // The mutable writer rebuilds workbook and worksheet relationship
+                // collections. Detach inert companion parts first so old targets
+                // do not become orphaned, then restore them after materialization.
+                let named_sheet_views = self.detach_named_sheet_views_before_materialization()?;
                 if self.calculation_chain.is_some() {
                     remove_calculation_chain(&mut self.package)?;
                 }
                 self.update_workbook_parts(&mut mutable_data)?;
                 self.restore_calculation_chain_after_materialization()?;
+                self.restore_named_sheet_views_after_materialization(&named_sheet_views)?;
                 self.mutable_data = Some(mutable_data);
             }
         }
@@ -1643,6 +1649,42 @@ impl Workbook {
             chain,
             self.calculation_chain_conformance.unwrap_or_default(),
         )?;
+        Ok(())
+    }
+
+    /// Detach worksheet-scoped modern views before rebuilding worksheet parts.
+    /// The mutable writer owns its relationship collections, so leaving these
+    /// parts attached would create orphaned package data.
+    fn detach_named_sheet_views_before_materialization(
+        &mut self,
+    ) -> SheetResult<Vec<(u32, NamedSheetViews)>> {
+        let worksheets = self
+            .worksheets
+            .iter()
+            .map(|info| Ok((info.sheet_id, self.worksheet_part_uri(info)?)))
+            .collect::<SheetResult<Vec<_>>>()?;
+        let mut retained = Vec::new();
+        for (sheet_id, worksheet_part) in worksheets {
+            if let Some(value) = load_worksheet_named_sheet_views(&self.package, &worksheet_part)? {
+                remove_worksheet_named_sheet_views(&mut self.package, &worksheet_part)?;
+                retained.push((sheet_id, value));
+            }
+        }
+        Ok(retained)
+    }
+
+    /// Restore parsed Named Sheet Views after the mutable writer has recreated
+    /// worksheet parts and their relationship collections.
+    fn restore_named_sheet_views_after_materialization(
+        &mut self,
+        retained: &[(u32, NamedSheetViews)],
+    ) -> SheetResult<()> {
+        for (sheet_id, value) in retained {
+            let worksheet_part = PackURI::new(format!("/xl/worksheets/sheet{sheet_id}.xml"))?;
+            if self.package.get_part(&worksheet_part).is_ok() {
+                store_worksheet_named_sheet_views(&mut self.package, &worksheet_part, value)?;
+            }
+        }
         Ok(())
     }
 

@@ -180,7 +180,9 @@ pub use named_sheet_view::{
     NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewExtension, NamedSheetViewFilter,
     NamedSheetViewGuid, NamedSheetViewIconSet, NamedSheetViewMarkup, NamedSheetViewRange,
     NamedSheetViewSortCondition, NamedSheetViewSortConditionKind, NamedSheetViewSortRule,
-    NamedSheetViewSortRules, NamedSheetViews, parse_named_sheet_views,
+    NamedSheetViewSortRules, NamedSheetViews, load_worksheet_named_sheet_views,
+    parse_named_sheet_views, remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views,
+    write_named_sheet_views,
 };
 pub use ole_objects::{
     OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker, OleObjectProperties,
