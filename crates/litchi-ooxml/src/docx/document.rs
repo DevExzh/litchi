@@ -8,8 +8,9 @@ use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
-    BibliographyField, CitationField, DdeField, Field, IndexEntryField, IndexField, LinkField,
-    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+    BibliographyField, CitationField, DdeField, ExternalIncludeField, Field, IndexEntryField,
+    IndexField, LinkField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
+    TableOfContentsField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1277,6 +1278,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `DDE` and `DDEAUTO` fields in the main document.
     pub fn dde_link_count(&self) -> Result<usize> {
         Ok(self.dde_links()?.len())
+    }
+
+    /// Get typed, inert `INCLUDETEXT` and `INCLUDEPICTURE` fields in document order.
+    ///
+    /// Returned fields expose stored source, bookmark, converter, XML, cached,
+    /// and dirty/lock metadata only. This method never opens, resolves,
+    /// imports, fetches, refreshes, converts, transforms, evaluates, or
+    /// executes anything.
+    pub fn external_includes(&self) -> Result<Vec<ExternalIncludeField>> {
+        self.fields()?
+            .iter()
+            .map(Field::external_include)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert external-include fields in the main document.
+    pub fn external_include_count(&self) -> Result<usize> {
+        Ok(self.external_includes()?.len())
     }
 
     /// Get typed, inert `LINK` fields in document order.

@@ -77,7 +77,7 @@ conversion, fonts, and image conversion are optional.
 | Footnotes and endnotes | ✅ | ✅ | ✅ | Notes, separators, continuations, and references |
 | Hyperlinks | ✅ | ✅ | ✅ | Internal and external links |
 | Bookmarks | ✅ | ✅ | ✅ | Range and point bookmarks |
-| Fields | ✅ | ✅ | ✅ | Typed field delimiters/instructions plus inert `DDE`/`DDEAUTO` and `LINK` application/source/item/representation metadata; fields are not recalculated, DDE never starts a conversation, and `LINK` never activates OLE, opens a source, or refreshes content |
+| Fields | ✅ | ✅ | ✅ | Typed field delimiters/instructions plus inert `DDE`/`DDEAUTO`, `LINK`, and `INCLUDETEXT`/`INCLUDEPICTURE` source/option metadata; fields are not recalculated, DDE never starts a conversation, `LINK` never activates OLE, and external includes are never opened, resolved, or refreshed |
 | Document statistics | ✅ | ✅ | N/A | Word, character, paragraph, line, and page metadata where present |
 | Core, extended, and custom properties | ✅ | ✅ | ✅ | Typed package properties |
 

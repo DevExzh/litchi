@@ -3327,6 +3327,55 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_inert_external_include_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let text = document.add_paragraph();
+            text.add_field(crate::docx::writer::MutableField::with_result(
+                r#"INCLUDETEXT "file:///no-contact/source.docx" Summary \! \c Word8 \x /resume/name"#
+                    .to_string(),
+                "cached included text".to_string(),
+            ));
+            let picture = document.add_paragraph();
+            picture.add_field(crate::docx::writer::MutableField::with_result(
+                r#"INCLUDEPICTURE "file:///no-contact/picture.gif" \c Pictim32 \d"#.to_string(),
+                "cached picture".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let includes = document.external_includes().unwrap();
+        assert_eq!(document.external_include_count().unwrap(), 2);
+        assert_eq!(includes.len(), 2);
+        assert_eq!(includes[0].kind(), crate::docx::IncludeFieldKind::Text);
+        assert_eq!(includes[0].source(), "file:///no-contact/source.docx");
+        assert_eq!(includes[0].bookmark(), Some("Summary"));
+        assert!(includes[0].suppresses_nested_field_updates());
+        assert_eq!(
+            includes[0].options(),
+            &[
+                crate::docx::ExternalIncludeOption::Converter("Word8".to_string()),
+                crate::docx::ExternalIncludeOption::XPath("/resume/name".to_string()),
+            ]
+        );
+        assert_eq!(includes[0].cached_result(), Some("cached included text"));
+        assert_eq!(includes[1].kind(), crate::docx::IncludeFieldKind::Picture);
+        assert_eq!(includes[1].source(), "file:///no-contact/picture.gif");
+        assert!(includes[1].omits_picture_data());
+        assert_eq!(
+            includes[1].options(),
+            &[crate::docx::ExternalIncludeOption::Converter(
+                "Pictim32".to_string()
+            )]
+        );
+        assert_eq!(includes[1].cached_result(), Some("cached picture"));
+    }
+
+    #[test]
     fn writes_and_discovers_typed_inert_link_fields() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

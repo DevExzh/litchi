@@ -112,9 +112,10 @@ pub use document::Document;
 pub use drawing::{DrawingObject, ShapeType};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::{
-    BibliographyField, CitationField, DdeField, DdeFieldKind, DdeRepresentation, Field,
-    FieldSwitch, IndexEntryField, IndexField, IndexSortOrder, LinkField, LinkFormatting,
-    LinkResultOption, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+    BibliographyField, CitationField, DdeField, DdeFieldKind, DdeRepresentation,
+    ExternalIncludeField, ExternalIncludeOption, Field, FieldSwitch, IncludeFieldKind,
+    IndexEntryField, IndexField, IndexSortOrder, LinkField, LinkFormatting, LinkResultOption,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
     TableOfContentsLevelRange, TableOfContentsSwitch,
 };
 pub use font_table::{
