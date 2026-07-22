@@ -85,6 +85,7 @@ pub mod table;
 pub mod template;
 pub mod theme;
 pub mod variables;
+pub mod vba_project;
 pub mod web_settings;
 pub mod writer;
 
@@ -154,6 +155,7 @@ pub use styles::{Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use theme::Theme;
 pub use variables::DocumentVariables;
+pub use vba_project::VbaProject;
 pub use web_settings::{
     Frame, FrameLayout, FrameScrollbarVisibility, Frameset, FramesetChild, FramesetColor,
     FramesetSplitBar, HtmlDiv, HtmlDivBorder, HtmlDivBorders, TargetScreenSize, ThemeColor,

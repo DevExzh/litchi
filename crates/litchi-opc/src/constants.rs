@@ -41,6 +41,8 @@ pub mod content_type {
     pub const OFC_THEME: &str = "application/vnd.openxmlformats-officedocument.theme+xml";
     pub const OFC_THEME_OVERRIDE: &str =
         "application/vnd.openxmlformats-officedocument.themeOverride+xml";
+    /// MS-OFFMACRO2 VBA Project binary-part content type.
+    pub const OFC_VBA_PROJECT: &str = "application/vnd.ms-office.vbaProject";
     pub const OFC_VML_DRAWING: &str = "application/vnd.openxmlformats-officedocument.vmlDrawing";
 
     // OPC core content types
@@ -63,6 +65,12 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml";
     pub const WML_DOCUMENT_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+    /// MS-OFFMACRO2 macro-enabled Word document main-part content type.
+    pub const WML_DOCUMENT_MACRO_MAIN: &str =
+        "application/vnd.ms-word.document.macroEnabled.main+xml";
+    /// MS-OFFMACRO2 macro-enabled Word template main-part content type.
+    pub const WML_TEMPLATE_MACRO_MAIN: &str =
+        "application/vnd.ms-word.template.macroEnabledTemplate.main+xml";
     pub const WML_ENDNOTES: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml";
     pub const WML_FONT_TABLE: &str =
@@ -81,6 +89,8 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml";
     pub const WML_WEB_SETTINGS: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml";
+    /// MS-OFFMACRO2 Word VBA Supplemental Data part content type.
+    pub const WML_VBA_DATA: &str = "application/vnd.ms-word.vbaData+xml";
 
     // SpreadsheetML content types
     pub const SML_SHEET: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -323,6 +333,12 @@ pub mod relationship_type {
     // Custom XML
     pub const CUSTOM_XML: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml";
+
+    // Office macro-enabled package relationships (MS-OFFMACRO2)
+    pub const VBA_PROJECT: &str =
+        "http://schemas.microsoft.com/office/2006/relationships/vbaProject";
+    pub const WORD_VBA_DATA: &str =
+        "http://schemas.microsoft.com/office/2006/relationships/wordVbaData";
 
     // External links
     pub const HYPERLINK: &str =

@@ -113,7 +113,7 @@ conversion, fonts, and image conversion are optional.
 | Citations, bibliography, index, and TOA | 🟡 | 🟡 | ❌ | Typed inert TOA/TA and INDEX/XE discovery exposes stored authority/index categories, entry text, switches, cached results, and dirty/lock state; bibliography and `CITATION` field models plus semantic authoring remain unexposed, and no table/index generation or refresh occurs |
 | IRM/Rights Management | ❌ | ❌ | ❌ | Not implemented |
 | RibbonX customization | ❌ | ❌ | ❌ | Not implemented |
-| VBA projects/DOCM macros | ❌ | ❌ | ❌ | No typed VBA project or code-module support |
+| VBA projects/DOCM macros | 🟡 | 🟡 | ❌ | DOCM/DOTM main parts and the MS-OFFMACRO2 VBA Project → Word Supplemental Data relationship graph are validated as inert metadata; payload contents are never inspected, parsed, or executed by this API, and no macro authoring exists |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
 

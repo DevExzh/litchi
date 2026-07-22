@@ -28,6 +28,7 @@ use crate::docx::settings::{
     validate_attached_template_target,
 };
 use crate::docx::variables::DocumentVariables;
+use crate::docx::vba_project::{VbaProject, discover_vba_project};
 use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
 /// Package implementation for Word documents.
@@ -40,7 +41,26 @@ use litchi_opc::rel::TargetMode;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 
-/// A Word (.docx) package.
+fn validate_document_main_content_type(content_type: &str) -> Result<()> {
+    if matches!(
+        content_type,
+        ct::WML_DOCUMENT_MAIN | ct::WML_DOCUMENT_MACRO_MAIN | ct::WML_TEMPLATE_MACRO_MAIN
+    ) {
+        return Ok(());
+    }
+
+    Err(OoxmlError::InvalidContentType {
+        expected: format!(
+            "{}, {}, or {}",
+            ct::WML_DOCUMENT_MAIN,
+            ct::WML_DOCUMENT_MACRO_MAIN,
+            ct::WML_TEMPLATE_MACRO_MAIN,
+        ),
+        got: content_type.to_string(),
+    })
+}
+
+/// A WordprocessingML (.docx, .docm, or .dotm) package.
 ///
 /// This is the main entry point for working with Word documents.
 /// It wraps an OPC package and provides Word-specific functionality.
@@ -423,7 +443,7 @@ impl Package {
         })
     }
 
-    /// Open a .docx package from a file path.
+    /// Open a .docx, .docm, or .dotm package from a file path.
     ///
     /// # Arguments
     ///
@@ -445,13 +465,7 @@ impl Package {
             .main_document_part()
             .map_err(|e| OoxmlError::PartNotFound(format!("main document part: {}", e)))?;
 
-        let content_type = main_part.content_type();
-        if content_type != ct::WML_DOCUMENT_MAIN {
-            return Err(OoxmlError::InvalidContentType {
-                expected: ct::WML_DOCUMENT_MAIN.to_string(),
-                got: content_type.to_string(),
-            });
-        }
+        validate_document_main_content_type(main_part.content_type())?;
 
         // Try to extract custom properties
         let custom_properties = crate::custom_properties::extract_custom_properties(&opc)
@@ -501,13 +515,7 @@ impl Package {
             .main_document_part()
             .map_err(|e| OoxmlError::PartNotFound(format!("main document part: {}", e)))?;
 
-        let content_type = main_part.content_type();
-        if content_type != ct::WML_DOCUMENT_MAIN {
-            return Err(OoxmlError::InvalidContentType {
-                expected: ct::WML_DOCUMENT_MAIN.to_string(),
-                got: content_type.to_string(),
-            });
-        }
+        validate_document_main_content_type(main_part.content_type())?;
 
         // Try to extract custom properties
         let custom_properties = crate::custom_properties::extract_custom_properties(&opc)
@@ -523,7 +531,7 @@ impl Package {
         })
     }
 
-    /// Create a .docx package from a reader.
+    /// Create a .docx, .docm, or .dotm package from a reader.
     ///
     /// # Arguments
     ///
@@ -548,13 +556,7 @@ impl Package {
             .main_document_part()
             .map_err(|e| OoxmlError::PartNotFound(format!("main document part: {}", e)))?;
 
-        let content_type = main_part.content_type();
-        if content_type != ct::WML_DOCUMENT_MAIN {
-            return Err(OoxmlError::InvalidContentType {
-                expected: ct::WML_DOCUMENT_MAIN.to_string(),
-                got: content_type.to_string(),
-            });
-        }
+        validate_document_main_content_type(main_part.content_type())?;
 
         // Try to extract custom properties
         let custom_properties = crate::custom_properties::extract_custom_properties(&opc)
@@ -607,6 +609,16 @@ impl Package {
 
         // Create and return Document with reference to OPC package
         Ok(Document::new(doc_part, &self.opc))
+    }
+
+    /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payloads.
+    ///
+    /// This validates only the declared OPC relationship graph and content
+    /// types. It does not inspect, parse, decompress, or execute the binary
+    /// VBA project or Word supplemental-data bytes.
+    pub fn vba_project(&self) -> Result<Option<VbaProject>> {
+        let document = self.opc.main_document_part()?;
+        discover_vba_project(&self.opc, document)
     }
 
     /// Load typed font metadata and inert embedded-font resources.
