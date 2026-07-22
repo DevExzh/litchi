@@ -692,7 +692,7 @@ mod tests {
     fn parses_libreoffice_title_field_regression_fixture() {
         let xml = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sw/qa/core/txtnode/data/title-field-invalidate.fodt"
+            "/../../test-data/odf/odt/title-field-invalidate.fodt"
         ));
         let regions = parse_header_footer_blocks(xml).unwrap();
         let blocks = &regions[&(String::from("Standard"), HeaderFooterKind::Footer)];
