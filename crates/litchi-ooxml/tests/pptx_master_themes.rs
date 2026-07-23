@@ -2,16 +2,26 @@ use litchi_ooxml::OoxmlError;
 use litchi_ooxml::PackURI;
 use litchi_ooxml::pptx::Package;
 use litchi_opc::constants::relationship_type as rt;
+use tempfile::NamedTempFile;
 
 #[test]
-fn master_theme_and_presentation_theme_inventory_resolve() {
-    let package = Package::new().unwrap();
+fn master_layout_slide_and_presentation_theme_inventory_resolve() {
+    let package = package_with_slide();
     let presentation = package.presentation().unwrap();
     let masters = presentation.slide_masters().unwrap();
 
     let master_theme = masters[0].theme().unwrap();
     assert!(!master_theme.name.is_empty());
     assert!(!master_theme.colors.is_empty());
+
+    let slides = presentation.slides().unwrap();
+    let layout = slides[0].layout().unwrap();
+    assert_eq!(
+        slides[0].master().unwrap().name().unwrap(),
+        masters[0].name().unwrap()
+    );
+    assert_eq!(layout.theme().unwrap().name, master_theme.name);
+    assert_eq!(slides[0].theme().unwrap().name, master_theme.name);
 
     let themes = presentation.get_themes().unwrap();
     assert_eq!(themes.len(), 1);
@@ -20,7 +30,7 @@ fn master_theme_and_presentation_theme_inventory_resolve() {
 
 #[test]
 fn master_theme_accessor_rejects_external_theme_relationships() {
-    let mut package = Package::new().unwrap();
+    let mut package = package_with_slide();
     let master_name = PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
     let relationship_id = package
         .opc_package()
@@ -46,12 +56,29 @@ fn master_theme_accessor_rejects_external_theme_relationships() {
 
     let presentation = package.presentation().unwrap();
     let masters = presentation.slide_masters().unwrap();
+    let slides = presentation.slides().unwrap();
     assert!(matches!(
         masters[0].theme(),
+        Err(OoxmlError::InvalidRelationship(message)) if message.contains("must be internal")
+    ));
+    assert!(matches!(
+        slides[0].layout().unwrap().theme(),
+        Err(OoxmlError::InvalidRelationship(message)) if message.contains("must be internal")
+    ));
+    assert!(matches!(
+        slides[0].theme(),
         Err(OoxmlError::InvalidRelationship(message)) if message.contains("must be internal")
     ));
     assert!(matches!(
         presentation.get_themes(),
         Err(OoxmlError::InvalidRelationship(message)) if message.contains("must be internal")
     ));
+}
+
+fn package_with_slide() -> Package {
+    let output = NamedTempFile::with_suffix(".pptx").unwrap();
+    let mut package = Package::new().unwrap();
+    package.presentation_mut().unwrap().add_slide().unwrap();
+    package.save(output.path()).unwrap();
+    Package::open(output.path()).unwrap()
 }

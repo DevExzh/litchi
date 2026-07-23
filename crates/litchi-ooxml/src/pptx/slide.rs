@@ -447,6 +447,22 @@ impl<'a> Slide<'a> {
         ))
     }
 
+    /// Resolve the slide master used by this slide.
+    ///
+    /// The master is resolved through this slide's layout. Invalid layout or
+    /// master relationships are returned as errors.
+    pub fn master(&self) -> Result<SlideMaster<'a>> {
+        self.layout()?.master()
+    }
+
+    /// Resolve the Office theme inherited by this slide.
+    ///
+    /// The theme is resolved through this slide's layout and slide master.
+    /// Invalid layout, master, or theme relationships are returned as errors.
+    pub fn theme(&self) -> Result<crate::pptx::parts::Theme> {
+        self.layout()?.theme()
+    }
+
     /// Get the transition this slide will use after inheritance is applied.
     ///
     /// A transition defined on the slide takes precedence over its layout and
@@ -686,6 +702,14 @@ impl<'a> SlideLayout<'a> {
             SlideMasterPart::from_part(master_part)?,
             self.package,
         ))
+    }
+
+    /// Resolve the Office theme inherited by this layout.
+    ///
+    /// The theme is owned by the layout's slide master. Invalid master or theme
+    /// relationships are returned as errors.
+    pub fn theme(&self) -> Result<crate::pptx::parts::Theme> {
+        self.master()?.theme()
     }
 
     /// Get access to the underlying layout part.
