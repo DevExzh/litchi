@@ -24,6 +24,7 @@ const MAX_EMBED_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BARCODE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SHAPE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_LEGACY_FORM_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_DATA_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_INFO_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -802,6 +803,26 @@ impl Field {
     /// a drawing or canvas, or refreshes a field.
     pub fn shape_field(&self) -> Result<Option<ShapeField>> {
         ShapeField::from_field(self)
+    }
+
+    /// Check whether this is a legacy text, checkbox, or drop-down form-code field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never reads
+    /// associated form-property XML, fills a form, changes a selection or
+    /// checkbox state, invokes entry or exit macros, or refreshes a field.
+    pub fn is_legacy_form_field(&self) -> bool {
+        LegacyFormFieldKind::from_instruction(&self.instruction).is_some()
+    }
+
+    /// Parse this field as inert typed legacy form-code metadata.
+    ///
+    /// Returns `Ok(None)` for fields outside the `FORMTEXT`, `FORMCHECKBOX`, and
+    /// `FORMDROPDOWN` family. The result exposes only stored kind, opaque
+    /// instruction text, cached content, and dirty/lock state; it never reads
+    /// associated form-property XML, fills a form, changes a selection or
+    /// checkbox state, invokes entry or exit macros, or refreshes a field.
+    pub fn legacy_form_field(&self) -> Result<Option<LegacyFormField>> {
+        LegacyFormField::from_field(self)
     }
 
     /// Check whether this is an `ADDIN` field.
@@ -4770,6 +4791,110 @@ impl ShapeField {
     ///
     /// This is stored metadata only and is never regenerated from a drawing
     /// canvas.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
+/// The stored kind of a legacy Word form-code field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LegacyFormFieldKind {
+    /// A `FORMTEXT` text-box form field.
+    Text,
+    /// A `FORMCHECKBOX` checkbox form field.
+    CheckBox,
+    /// A `FORMDROPDOWN` drop-down-list form field.
+    DropDown,
+}
+
+impl LegacyFormFieldKind {
+    fn from_instruction(instruction: &str) -> Option<(Self, &str)> {
+        for (kind, keyword) in [
+            (Self::Text, "FORMTEXT"),
+            (Self::CheckBox, "FORMCHECKBOX"),
+            (Self::DropDown, "FORMDROPDOWN"),
+        ] {
+            if let Some(remainder) = field_instruction_remainder(instruction, keyword) {
+                return Some((kind, remainder));
+            }
+        }
+        None
+    }
+}
+
+/// A typed, inert Word legacy form-code field.
+///
+/// This type retains only the stored text/checkbox/drop-down kind, opaque
+/// instruction text, cached result, and field state. It never reads associated
+/// form-property XML, fills a form, changes a selection or checkbox state,
+/// invokes entry or exit macros, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LegacyFormField {
+    instruction: String,
+    kind: LegacyFormFieldKind,
+    opaque_instructions: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+}
+
+impl LegacyFormField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((kind, opaque_instructions)) =
+            LegacyFormFieldKind::from_instruction(field.instruction())
+        else {
+            return Ok(None);
+        };
+        if field.instruction().len() > MAX_LEGACY_FORM_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "legacy form-code field instruction exceeds {MAX_LEGACY_FORM_FIELD_INSTRUCTION_BYTES} bytes"
+            )));
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            kind,
+            opaque_instructions: opaque_instructions.trim().to_string(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to change a form
+    /// field.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return whether this is a text, checkbox, or drop-down form-code field.
+    pub const fn kind(&self) -> LegacyFormFieldKind {
+        self.kind
+    }
+
+    /// Return opaque stored instruction text after the form-code keyword.
+    ///
+    /// It is never parsed, interpreted, or used to fill a form, change a
+    /// checkbox or selection, or invoke a macro.
+    pub fn opaque_instructions(&self) -> &str {
+        &self.opaque_instructions
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored metadata only and is never regenerated from form state.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -9298,6 +9423,72 @@ mod tests {
             false,
         );
         assert!(too_long.shape_field().is_err());
+    }
+
+    #[test]
+    fn parses_inert_legacy_form_fields_without_reading_or_filling_forms() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" FORMTEXT \* MERGEFORMAT " w:dirty="true" w:fldLock="on">
+                <w:ffData>
+                    <w:name w:val="TextInput"/>
+                    <w:entryMacro w:val="NeverRun"/>
+                    <w:textInput><w:maxLength w:val="10"/></w:textInput>
+                </w:ffData>
+                <w:r><w:t>cached text field</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>formcheckbox</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached checkbox</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>FORMDROPDOWN \* MERGEFORMAT</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached drop-down selection</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="FORMTEXTUAL"><w:r><w:t>not a form field</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 4);
+        assert!(fields[0].is_legacy_form_field());
+        assert!(fields[1].is_legacy_form_field());
+        assert!(fields[2].is_legacy_form_field());
+        assert!(!fields[3].is_legacy_form_field());
+
+        let text = fields[0].legacy_form_field().unwrap().unwrap();
+        assert_eq!(text.kind(), LegacyFormFieldKind::Text);
+        assert_eq!(text.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(text.cached_result(), Some("cached text field"));
+        assert!(text.is_dirty());
+        assert!(text.is_locked());
+
+        let checkbox = fields[1].legacy_form_field().unwrap().unwrap();
+        assert_eq!(checkbox.kind(), LegacyFormFieldKind::CheckBox);
+        assert_eq!(checkbox.opaque_instructions(), "");
+        assert_eq!(checkbox.cached_result(), Some("cached checkbox"));
+        assert!(checkbox.is_dirty());
+        assert!(checkbox.is_locked());
+
+        let drop_down = fields[2].legacy_form_field().unwrap().unwrap();
+        assert_eq!(drop_down.kind(), LegacyFormFieldKind::DropDown);
+        assert_eq!(drop_down.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(
+            drop_down.cached_result(),
+            Some("cached drop-down selection")
+        );
+        assert!(drop_down.is_dirty());
+        assert!(drop_down.is_locked());
+        assert!(fields[3].legacy_form_field().unwrap().is_none());
+
+        let too_long = Field::new(
+            format!(
+                "FORMTEXT {}",
+                "x".repeat(MAX_LEGACY_FORM_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.legacy_form_field().is_err());
     }
 
     #[test]

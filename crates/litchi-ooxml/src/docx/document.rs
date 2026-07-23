@@ -12,7 +12,8 @@ use crate::docx::field::{
     AdvanceField, AutoNumberField, BarcodeField, BibliographyField, BidiOutlineField,
     CitationField, DdeField, DocumentVariableField, EmbedField, ExternalIncludeField, Field,
     GoToButtonField, IfField,
-    IndexEntryField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
+    IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
+    MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, PrintField, QuoteField,
@@ -1433,6 +1434,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `SHAPE` drawing-canvas anchor fields.
     pub fn shape_field_count(&self) -> Result<usize> {
         Ok(self.shape_fields()?.len())
+    }
+
+    /// Get typed, inert legacy form-code fields in document order.
+    ///
+    /// Returned values expose only stored text/checkbox/drop-down kind, opaque
+    /// instructions, cached content, and dirty/lock state. This method never
+    /// reads associated form-property XML, fills a form, changes a selection or
+    /// checkbox state, invokes entry or exit macros, or refreshes a field.
+    pub fn legacy_form_fields(&self) -> Result<Vec<LegacyFormField>> {
+        self.fields()?
+            .iter()
+            .map(Field::legacy_form_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert legacy form-code fields.
+    pub fn legacy_form_field_count(&self) -> Result<usize> {
+        Ok(self.legacy_form_fields()?.len())
     }
 
     /// Get typed, inert user-identity fields in document order.
