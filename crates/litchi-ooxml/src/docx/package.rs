@@ -3341,6 +3341,46 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_document_information_fields_without_resolution() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let title = document.add_paragraph();
+            title.add_field(crate::docx::writer::MutableField::with_result(
+                r#"TITLE \* MERGEFORMAT"#.to_string(),
+                "cached title".to_string(),
+            ));
+            let author = document.add_paragraph();
+            author.add_field(crate::docx::writer::MutableField::with_result(
+                r#"AUTHOR \@ "opaque format""#.to_string(),
+                "cached author".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let fields = document.document_information_fields().unwrap();
+        assert_eq!(document.document_information_field_count().unwrap(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(
+            fields[0].kind(),
+            crate::docx::DocumentInformationFieldKind::Title
+        );
+        assert_eq!(fields[0].cached_result(), Some("cached title"));
+        assert!(fields[0].has_switch('*'));
+        assert_eq!(fields[0].switches()[0].argument(), Some("MERGEFORMAT"));
+        assert_eq!(
+            fields[1].kind(),
+            crate::docx::DocumentInformationFieldKind::Author
+        );
+        assert_eq!(fields[1].cached_result(), Some("cached author"));
+        assert!(fields[1].has_switch('@'));
+        assert_eq!(fields[1].switches()[0].argument(), Some("opaque format"));
+    }
+
+    #[test]
     fn writes_and_discovers_typed_inert_merge_fields_without_merging() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

@@ -10,8 +10,8 @@ use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
     AdvanceField, AutoNumberField, BarcodeField, BibliographyField, BidiOutlineField,
-    CitationField, DatabaseField, DdeField, DocumentPropertyField, DocumentVariableField,
-    EmbedField, ExternalIncludeField, Field,
+    CitationField, DatabaseField, DdeField, DocumentInformationField, DocumentPropertyField,
+    DocumentVariableField, EmbedField, ExternalIncludeField, Field,
     GoToButtonField, IfField,
     IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
@@ -1323,6 +1323,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert explicit legacy `INFO` fields.
     pub fn info_field_count(&self) -> Result<usize> {
         Ok(self.info_fields()?.len())
+    }
+
+    /// Get typed, inert built-in document-information fields in document order.
+    ///
+    /// Returned values expose only stored kinds, switches, cached content, and
+    /// dirty/lock state. This method never reads package metadata or host
+    /// identity data, calculates dates, revisions, or statistics, resolves a
+    /// value, or refreshes fields.
+    pub fn document_information_fields(&self) -> Result<Vec<DocumentInformationField>> {
+        self.fields()?
+            .iter()
+            .map(Field::document_information)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert built-in document-information fields.
+    pub fn document_information_field_count(&self) -> Result<usize> {
+        Ok(self.document_information_fields()?.len())
     }
 
     /// Get typed, inert `MACROBUTTON` fields in document order.
