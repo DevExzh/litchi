@@ -20,6 +20,38 @@ fn processed(part: &dyn Part) -> Result<Arc<Vec<u8>>> {
     })
 }
 
+fn parse_shapes(xml: &[u8]) -> Result<Vec<BaseShape>> {
+    let mut shapes = Vec::new();
+    const TARGETS: &[&[u8]] = &[b"sp", b"pic", b"graphicFrame", b"grpSp", b"cxnSp"];
+    const TYPES: &[ShapeType] = &[
+        ShapeType::Shape,
+        ShapeType::Picture,
+        ShapeType::GraphicFrame,
+        ShapeType::GroupShape,
+        ShapeType::Connector,
+    ];
+    scan_presentationml_element_ranges(xml, TARGETS, |target, start, length| {
+        let start = usize::try_from(start).map_err(|_| {
+            OoxmlError::InvalidFormat("shape offset does not fit usize".to_string())
+        })?;
+        let length = usize::try_from(length).map_err(|_| {
+            OoxmlError::InvalidFormat("shape length does not fit usize".to_string())
+        })?;
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| OoxmlError::InvalidFormat("shape byte range overflow".to_string()))?;
+        let xml = xml.get(start..end).ok_or_else(|| {
+            OoxmlError::InvalidFormat("shape byte range is outside slide XML".to_string())
+        })?;
+        let shape_type = TYPES
+            .get(target)
+            .ok_or_else(|| OoxmlError::InvalidFormat("invalid shape range target".to_string()))?;
+        shapes.push(BaseShape::new(xml.to_vec(), shape_type.clone()));
+        Ok(())
+    })?;
+    Ok(shapes)
+}
+
 /// A slide part.
 ///
 /// Corresponds to `/ppt/slides/slideN.xml` in the package.
@@ -67,35 +99,7 @@ impl<'a> SlidePart<'a> {
     /// Returns a vector of BaseShape objects that can be checked for type
     /// and converted to specific shape types.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
-        let mut shapes = Vec::new();
-        const TARGETS: &[&[u8]] = &[b"sp", b"pic", b"graphicFrame", b"grpSp", b"cxnSp"];
-        const TYPES: &[ShapeType] = &[
-            ShapeType::Shape,
-            ShapeType::Picture,
-            ShapeType::GraphicFrame,
-            ShapeType::GroupShape,
-            ShapeType::Connector,
-        ];
-        scan_presentationml_element_ranges(self.xml_bytes(), TARGETS, |target, start, length| {
-            let start = usize::try_from(start).map_err(|_| {
-                OoxmlError::InvalidFormat("shape offset does not fit usize".to_string())
-            })?;
-            let length = usize::try_from(length).map_err(|_| {
-                OoxmlError::InvalidFormat("shape length does not fit usize".to_string())
-            })?;
-            let end = start.checked_add(length).ok_or_else(|| {
-                OoxmlError::InvalidFormat("shape byte range overflow".to_string())
-            })?;
-            let xml = self.xml_bytes().get(start..end).ok_or_else(|| {
-                OoxmlError::InvalidFormat("shape byte range is outside slide XML".to_string())
-            })?;
-            let shape_type = TYPES.get(target).ok_or_else(|| {
-                OoxmlError::InvalidFormat("invalid shape range target".to_string())
-            })?;
-            shapes.push(BaseShape::new(xml.to_vec(), shape_type.clone()));
-            Ok(())
-        })?;
-        Ok(shapes)
+        parse_shapes(self.xml_bytes())
     }
 
     /// Get the transition effect for this slide.
@@ -147,6 +151,11 @@ impl<'a> SlideLayoutPart<'a> {
         presentation_name(self.xml_bytes())
     }
 
+    /// Get all shapes defined by this layout.
+    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
+        parse_shapes(self.xml_bytes())
+    }
+
     /// Get the transition effect inherited from this slide layout.
     ///
     /// Parses the `<p:transition>` element from the layout XML.
@@ -195,6 +204,11 @@ impl<'a> SlideMasterPart<'a> {
     /// Get the master name.
     pub fn name(&self) -> Result<String> {
         presentation_name(self.xml_bytes())
+    }
+
+    /// Get all shapes defined by this master.
+    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
+        parse_shapes(self.xml_bytes())
     }
 
     /// Get the transition effect inherited from this slide master.

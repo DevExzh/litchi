@@ -748,6 +748,11 @@ impl<'a> SlideLayout<'a> {
         self.part.name()
     }
 
+    /// Get all shapes defined by this slide layout.
+    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
+        self.part.shapes()
+    }
+
     /// Get the transition effect inherited from this layout.
     ///
     /// Returns `None` if the layout has no transition.
@@ -917,6 +922,11 @@ impl<'a> SlideMaster<'a> {
     /// ```
     pub fn name(&self) -> Result<String> {
         self.part.name()
+    }
+
+    /// Get all shapes defined by this slide master.
+    pub fn shapes(&self) -> Result<Vec<BaseShape>> {
+        self.part.shapes()
     }
 
     /// Get the transition effect inherited from this master.
