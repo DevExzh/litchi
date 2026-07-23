@@ -351,6 +351,47 @@ impl MutableDocument {
             .map_or_else(|| Ok(Default::default()), crate::parse_notes_configurations)
     }
 
+    /// Return stored outline numbering styles from current styles metadata.
+    ///
+    /// The result does not apply styles to headings, generate labels, or
+    /// update tables of contents.
+    pub fn outline_styles(&self) -> Result<crate::OdfOutlineStyles> {
+        self.styles_xml
+            .as_deref()
+            .map_or_else(|| Ok(Default::default()), crate::parse_outline_styles)
+    }
+
+    /// Insert or replace one named outline numbering style.
+    ///
+    /// This edits `styles.xml` only and returns the previous style with the
+    /// same name. It does not alter heading structure or cached index content.
+    pub fn set_outline_style(
+        &mut self,
+        style: &crate::OdfOutlineStyle,
+    ) -> Result<Option<crate::OdfOutlineStyle>> {
+        style.validate()?;
+        let styles = self
+            .styles_xml
+            .clone()
+            .unwrap_or_else(OdfStructure::default_styles_xml);
+        let (updated, old) = crate::set_outline_style_xml(&styles, style)?;
+        self.styles_xml = Some(updated);
+        Ok(old)
+    }
+
+    /// Remove one named outline numbering style and return its prior value.
+    ///
+    /// Existing heading references are retained verbatim, allowing callers to
+    /// manage those references separately.
+    pub fn remove_outline_style(&mut self, name: &str) -> Result<Option<crate::OdfOutlineStyle>> {
+        let Some(styles) = self.styles_xml.as_deref() else {
+            return Ok(None);
+        };
+        let (updated, old) = crate::remove_outline_style_xml(styles, name)?;
+        self.styles_xml = Some(updated);
+        Ok(old)
+    }
+
     /// Insert or replace one stored footnote or endnote configuration.
     ///
     /// This edits `styles.xml` only and returns the prior configuration for the

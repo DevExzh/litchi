@@ -462,6 +462,17 @@ impl Document {
         )
     }
 
+    /// Return stored outline numbering styles.
+    ///
+    /// These are styles metadata only. This API does not apply styles to
+    /// headings, generate labels, or update tables of contents.
+    pub fn outline_styles(&self) -> Result<crate::OdfOutlineStyles> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::parse_outline_styles(styles.xml_content()),
+        )
+    }
+
     /// Return the stored document-wide bibliography formatting policy.
     ///
     /// This styles metadata remains inert: the API does not generate

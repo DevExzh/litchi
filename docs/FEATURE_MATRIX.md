@@ -407,7 +407,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Open/create/save | ✅ | ✅ | ✅ | Document and template packages, paths, readers, and bytes |
 | Text, paragraphs, spans, and headings | ✅ | ✅ | ✅ | Rich text extraction and mutation |
 | Tables | ✅ | ✅ | ✅ | Nested tables, properties, rows, and cells |
-| Lists and outline styles | ✅ | ✅ | ✅ | Ordered/unordered lists, labels, outline levels, and alignment |
+| Lists and outline styles | ✅ | ✅ | ✅ | Ordered/unordered lists, labels, outline levels, alignment, and typed outline-style inspection/mutation; no label regeneration |
 | Sections | ✅ | ✅ | ✅ | Add, wrap, unwrap, replace, remove, and protected/linked metadata |
 | Styles and page layouts | ✅ | ✅ | ✅ | Paragraph/text/table styles, document line-numbering configuration, columns, drop caps, tab stops, page properties, and read-only explicit `text:page-sequence` master-page assignments; no pagination or line-number generation |
 | Master pages, headers, and footers | ✅ | ✅ | ✅ | Master-page CRUD and header/footer content/properties, including typed cached page/navigation/statistic, reference/variable/sequence, conditional/formula/DDE/meta, database, document identity/revision, sender identity/contact, and script/macro metadata; fields remain inert |
