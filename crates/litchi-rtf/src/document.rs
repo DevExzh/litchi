@@ -1062,6 +1062,28 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert legacy form-code fields in document field order.
+    ///
+    /// Stored text/checkbox/drop-down kind, opaque instructions, cached
+    /// results, and state are metadata only. This method does not read or
+    /// reconcile the separate RTF `\formfield` destination. It never fills a form,
+    /// changes a selection or checkbox state, invokes entry or exit macros, or
+    /// refreshes a field.
+    pub fn legacy_form_fields(&self) -> Vec<crate::LegacyFormField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::legacy_form_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert legacy form-code fields.
+    pub fn legacy_form_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.legacy_form_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in
     /// document field order.
     ///

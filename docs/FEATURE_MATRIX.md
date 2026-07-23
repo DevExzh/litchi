@@ -524,6 +524,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Footnotes/endnotes and separators | ✅ | ✅ | ✅ | Note bodies, numbering/options, section overrides, and separator stories |
 | Comments/annotations | ✅ | ✅ | ✅ | Point/range comments, identity, positions, and mutation |
 | Track changes | ✅ | ✅ | ✅ | Author table, insert/delete ranges, revision metadata, and mutation |
+| Legacy form-code fields | ✅ | ✅ | N/A | Typed inert `FORMTEXT`/`FORMCHECKBOX`/`FORMDROPDOWN` kind/opaque-instruction/cached-result metadata; form properties are not reconciled, forms are never filled, selections and checkbox state are never changed, and entry or exit macros are never invoked |
 | Form fields | ✅ | ✅ | ✅ | Text, checkbox, dropdown, help/status, defaults, and positional mutation |
 | Mail-merge metadata | ✅ | ✅ | ✅ | Data sources, field mappings, and recipients as inert metadata; no merge execution |
 | Document variables and user properties | ✅ | ✅ | ✅ | Typed values, lexical forms, links, Unicode, and mutation |

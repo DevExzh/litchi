@@ -29,6 +29,9 @@ pub enum FieldType {
     Barcode,
     BidiOutline,
     Shape,
+    FormText,
+    FormCheckbox,
+    FormDropdown,
     AddIn,
     Control,
     HtmlControl,
@@ -399,6 +402,34 @@ pub struct BidiOutlineField<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeField<'a> {
     instruction: &'a str,
+    opaque_instructions: &'a str,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+/// The stored kind of a legacy RTF form-code field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LegacyFormFieldKind {
+    /// A `FORMTEXT` text-box form field.
+    Text,
+    /// A `FORMCHECKBOX` checkbox form field.
+    CheckBox,
+    /// A `FORMDROPDOWN` drop-down-list form field.
+    DropDown,
+}
+
+/// Inert metadata for a legacy RTF form-code field.
+///
+/// This code-level view retains only the stored kind, opaque instruction text,
+/// cached result, and field state. It does not read or reconcile the separate
+/// RTF `\formfield` destination. It never fills a form, changes a selection or
+/// checkbox state, invokes entry or exit macros, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LegacyFormField<'a> {
+    instruction: &'a str,
+    kind: LegacyFormFieldKind,
     opaque_instructions: &'a str,
     cached_result: Option<&'a str>,
     status: FieldStatus,
@@ -4120,6 +4151,61 @@ impl<'a> PromptField<'a> {
     }
 }
 
+impl<'a> LegacyFormField<'a> {
+    /// Return the complete stored field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to change a form
+    /// field.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return whether this is a text, checkbox, or drop-down form-code field.
+    pub const fn kind(&self) -> LegacyFormFieldKind {
+        self.kind
+    }
+
+    /// Return opaque stored instruction text after the form-code keyword.
+    ///
+    /// It is never parsed, interpreted, or used to fill a form, change a
+    /// checkbox or selection, or invoke a macro.
+    pub fn opaque_instructions(&self) -> &'a str {
+        self.opaque_instructions
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached metadata only and is never regenerated from form state.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> UserIdentityField<'a> {
     /// Return the complete stored user-identity field instruction.
     pub fn instruction(&self) -> &'a str {
@@ -4436,6 +4522,21 @@ impl<'a> Field<'a> {
                 if keyword.eq_ignore_ascii_case("SHAPE") =>
             {
                 FieldType::Shape
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("FORMTEXT") =>
+            {
+                FieldType::FormText
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("FORMCHECKBOX") =>
+            {
+                FieldType::FormCheckbox
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("FORMDROPDOWN") =>
+            {
+                FieldType::FormDropdown
             },
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("ADDIN") => {
                 FieldType::AddIn
@@ -4816,6 +4917,32 @@ impl<'a> Field<'a> {
         let opaque_instructions = shape_field_instructions(self.instruction.as_ref())?;
         Some(ShapeField {
             instruction: self.instruction.as_ref(),
+            opaque_instructions,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a legacy form-code field.
+    ///
+    /// Stored kind, opaque instructions, cached results, and field state remain
+    /// metadata only. This method does not read or reconcile the separate RTF
+    /// `\formfield` destination. It never fills a form, changes a selection or
+    /// checkbox state, invokes entry or exit macros, or refreshes a field.
+    pub fn legacy_form_field(&self) -> Option<LegacyFormField<'_>> {
+        let (kind, keyword) = match self.field_type {
+            FieldType::FormText => (LegacyFormFieldKind::Text, "FORMTEXT"),
+            FieldType::FormCheckbox => (LegacyFormFieldKind::CheckBox, "FORMCHECKBOX"),
+            FieldType::FormDropdown => (LegacyFormFieldKind::DropDown, "FORMDROPDOWN"),
+            _ => return None,
+        };
+        let opaque_instructions =
+            legacy_form_field_instructions(self.instruction.as_ref(), keyword)?;
+        Some(LegacyFormField {
+            instruction: self.instruction.as_ref(),
+            kind,
             opaque_instructions,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
@@ -5957,6 +6084,26 @@ fn shape_field_instructions(instruction: &str) -> Option<&str> {
         return None;
     }
     let remainder = instruction.get("SHAPE".len()..)?;
+    match remainder.chars().next() {
+        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
+        Some(_) => None,
+    }
+}
+
+fn legacy_form_field_instructions<'a>(
+    instruction: &'a str,
+    expected_keyword: &str,
+) -> Option<&'a str> {
+    if instruction.len() > MAX_INSTRUCTION_LEN {
+        return None;
+    }
+    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let keyword = instruction.get(..expected_keyword.len())?;
+    if !keyword.eq_ignore_ascii_case(expected_keyword) {
+        return None;
+    }
+    let remainder = instruction.get(expected_keyword.len()..)?;
     match remainder.chars().next() {
         None | Some('"') | Some('\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
@@ -8882,6 +9029,71 @@ mod tests {
     }
 
     #[test]
+    fn legacy_form_fields_preserve_metadata_without_filling_or_executing() {
+        let mut text = Field::parse_instruction(r#"FORMTEXT \* MERGEFORMAT"#);
+        text.result = Cow::Borrowed("cached text field");
+        text.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        text.owner = FieldOwner::Body;
+        text.position = 4;
+
+        assert_eq!(text.field_type, FieldType::FormText);
+        let text_field = text.legacy_form_field().unwrap();
+        assert_eq!(text_field.kind(), LegacyFormFieldKind::Text);
+        assert_eq!(text_field.instruction(), r#"FORMTEXT \* MERGEFORMAT"#);
+        assert_eq!(text_field.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(text_field.cached_result(), Some("cached text field"));
+        assert!(text_field.is_dirty());
+        assert!(text_field.is_locked());
+        assert_eq!(text_field.owner(), FieldOwner::Body);
+        assert_eq!(text_field.position(), 4);
+
+        let checkbox = Field::parse_instruction("formcheckbox");
+        assert_eq!(checkbox.field_type, FieldType::FormCheckbox);
+        let checkbox = checkbox.legacy_form_field().unwrap();
+        assert_eq!(checkbox.kind(), LegacyFormFieldKind::CheckBox);
+        assert_eq!(checkbox.opaque_instructions(), "");
+
+        let drop_down = Field::parse_instruction(r#"FORMDROPDOWN \* MERGEFORMAT"#);
+        assert_eq!(drop_down.field_type, FieldType::FormDropdown);
+        let drop_down = drop_down.legacy_form_field().unwrap();
+        assert_eq!(drop_down.kind(), LegacyFormFieldKind::DropDown);
+        assert_eq!(drop_down.opaque_instructions(), r#"\* MERGEFORMAT"#);
+
+        for instruction in [r#"FORMTEXTUAL"#, r#"FORMCHECKBOXLIST"#] {
+            assert_eq!(
+                Field::parse_instruction(instruction).field_type,
+                FieldType::Unknown
+            );
+            assert!(
+                Field::parse_instruction(instruction)
+                    .legacy_form_field()
+                    .is_none()
+            );
+        }
+
+        let mismatched_kind = Field::new(
+            FieldType::FormText,
+            Cow::Borrowed("FORMCHECKBOX"),
+            Cow::Borrowed(""),
+        );
+        assert!(mismatched_kind.legacy_form_field().is_none());
+
+        let too_long = Field::new(
+            FieldType::FormText,
+            Cow::Owned(format!(
+                "FORMTEXT {}",
+                "x".repeat(MAX_INSTRUCTION_LEN)
+            )),
+            Cow::Borrowed(""),
+        );
+        assert!(too_long.legacy_form_field().is_none());
+    }
+
+    #[test]
     fn auto_text_fields_preserve_metadata_without_lookup_or_insertion() {
         let mut glossary =
             Field::parse_instruction(r#"GLOSSARY "Legacy Clause" \* MERGEFORMAT \q opaque"#);
@@ -11691,6 +11903,37 @@ mod tests {
         assert_eq!(fields[1].cached_result(), Some("cached bare drawing anchor"));
         assert!(fields[1].is_dirty());
         assert!(fields[1].is_locked());
+        assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_legacy_form_fields_without_filling_or_executing() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst FORMTEXT \\* MERGEFORMAT}{\fldrslt cached text field}}{\field\flddirty\fldlock{\*\fldinst formcheckbox}{\fldrslt cached checkbox}}{\field\flddirty\fldlock{\*\fldinst FORMDROPDOWN \\* MERGEFORMAT}{\fldrslt cached drop-down selection}}After}"#,
+        )
+        .unwrap();
+
+        let fields = document.legacy_form_fields();
+        assert_eq!(document.legacy_form_field_count(), 3);
+        assert_eq!(fields.len(), 3);
+        assert_eq!(fields[0].kind(), LegacyFormFieldKind::Text);
+        assert_eq!(fields[0].opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(fields[0].cached_result(), Some("cached text field"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[1].kind(), LegacyFormFieldKind::CheckBox);
+        assert_eq!(fields[1].opaque_instructions(), "");
+        assert_eq!(fields[1].cached_result(), Some("cached checkbox"));
+        assert!(fields[1].is_dirty());
+        assert!(fields[1].is_locked());
+        assert_eq!(fields[2].kind(), LegacyFormFieldKind::DropDown);
+        assert_eq!(fields[2].opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(
+            fields[2].cached_result(),
+            Some("cached drop-down selection")
+        );
+        assert!(fields[2].is_dirty());
+        assert!(fields[2].is_locked());
         assert_eq!(document.text(), "Before After");
     }
 
