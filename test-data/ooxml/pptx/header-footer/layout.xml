@@ -1,0 +1,6 @@
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld name="Layout header/footer">
+    <p:spTree/>
+  </p:cSld>
+  <p:hf dt="0" ftr="true" hdr="0" sldNum="false"/>
+</p:sldLayout>

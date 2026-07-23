@@ -2,7 +2,8 @@
 use crate::error::{OoxmlError, Result};
 use crate::pptx::color_map::{ColorMap, ColorMapOverride, ColorMapSlot};
 use crate::pptx::parts::{
-    MasterVisibility, SlideLayoutMetadata, SlideLayoutPart, SlideMasterPart, SlidePart, ThemePart,
+    MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,
+    SlideMasterPart, SlidePart, ThemePart,
 };
 use crate::pptx::shapes::base::BaseShape;
 use litchi_opc::OpcPackage;
@@ -821,6 +822,11 @@ impl<'a> SlideLayout<'a> {
         self.part.metadata()
     }
 
+    /// Get local header and footer placeholder visibility for this layout.
+    pub fn header_footer(&self) -> Result<Option<SlideHeaderFooterVisibility>> {
+        self.part.header_footer()
+    }
+
     /// Get all shapes defined by this slide layout.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
         self.part.shapes()
@@ -1026,6 +1032,11 @@ impl<'a> SlideMaster<'a> {
     /// Whether this slide master is retained after its dependent slides are removed.
     pub fn is_preserved(&self) -> Result<bool> {
         self.part.is_preserved()
+    }
+
+    /// Get local header and footer placeholder visibility for this master.
+    pub fn header_footer(&self) -> Result<Option<SlideHeaderFooterVisibility>> {
+        self.part.header_footer()
     }
 
     /// Get all shapes defined by this slide master.

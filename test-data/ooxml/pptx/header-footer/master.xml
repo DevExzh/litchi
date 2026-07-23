@@ -1,0 +1,6 @@
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld name="Master header/footer">
+    <p:spTree/>
+  </p:cSld>
+  <p:hf dt="1" ftr="0" hdr="false" sldNum="1"/>
+</p:sldMaster>

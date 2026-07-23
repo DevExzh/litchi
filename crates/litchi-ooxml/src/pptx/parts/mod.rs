@@ -54,6 +54,7 @@ pub use comment::{
 };
 pub use presentation::PresentationPart;
 pub use slide::{
-    MasterVisibility, SlideLayoutMetadata, SlideLayoutPart, SlideMasterPart, SlidePart,
+    MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,
+    SlideMasterPart, SlidePart,
 };
 pub use theme::{Theme, ThemeColor, ThemeFont, ThemePart};

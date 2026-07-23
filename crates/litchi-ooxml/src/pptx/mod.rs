@@ -201,7 +201,7 @@ pub use parts::{
     ChartStyleMarkerSymbol, ChartStylePart, ChartStylePayload, ChartStyleReference,
     ChartStyleVariation, ChartType,
 };
-pub use parts::{MasterVisibility, SlideLayoutMetadata};
+pub use parts::{MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata};
 pub use presentation::{PptxChart, PptxTagList, Presentation};
 pub use presentation_properties::{
     BrowserSupport, ColorKind, HtmlPublishProperties, InertHtmlTarget,

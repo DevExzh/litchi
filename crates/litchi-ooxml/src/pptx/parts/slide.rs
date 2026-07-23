@@ -192,6 +192,70 @@ impl Default for SlideLayoutMetadata {
     }
 }
 
+/// Header and footer placeholder visibility declared by a master or layout.
+///
+/// PresentationML defaults all four settings to true when their corresponding
+/// attributes are omitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SlideHeaderFooterVisibility {
+    show_date_time: bool,
+    show_footer: bool,
+    show_header: bool,
+    show_slide_number: bool,
+}
+
+impl SlideHeaderFooterVisibility {
+    /// Whether the date and time placeholder is shown.
+    #[inline]
+    pub const fn shows_date_time(&self) -> bool {
+        self.show_date_time
+    }
+
+    /// Whether the footer placeholder is shown.
+    #[inline]
+    pub const fn shows_footer(&self) -> bool {
+        self.show_footer
+    }
+
+    /// Whether the header placeholder is shown.
+    #[inline]
+    pub const fn shows_header(&self) -> bool {
+        self.show_header
+    }
+
+    /// Whether the slide-number placeholder is shown.
+    #[inline]
+    pub const fn shows_slide_number(&self) -> bool {
+        self.show_slide_number
+    }
+
+    fn from_element(
+        element: &BytesStart<'_>,
+        decoder: quick_xml::encoding::Decoder,
+        root_label: &str,
+    ) -> Result<Self> {
+        Ok(Self {
+            show_date_time: parse_boolean_attribute(element, b"dt", decoder, root_label, true)?,
+            show_footer: parse_boolean_attribute(element, b"ftr", decoder, root_label, true)?,
+            show_header: parse_boolean_attribute(element, b"hdr", decoder, root_label, true)?,
+            show_slide_number: parse_boolean_attribute(
+                element, b"sldNum", decoder, root_label, true,
+            )?,
+        })
+    }
+}
+
+impl Default for SlideHeaderFooterVisibility {
+    fn default() -> Self {
+        Self {
+            show_date_time: true,
+            show_footer: true,
+            show_header: true,
+            show_slide_number: true,
+        }
+    }
+}
+
 fn parse_master_visibility(
     xml: &[u8],
     root_name: &[u8],
@@ -214,6 +278,90 @@ fn parse_slide_layout_metadata(xml: &[u8]) -> Result<SlideLayoutMetadata> {
 fn parse_slide_master_preserve(xml: &[u8]) -> Result<bool> {
     let (element, decoder) = read_root_element(xml, b"sldMaster", "slide master")?;
     parse_boolean_attribute(&element, b"preserve", decoder, "slide master", false)
+}
+
+fn parse_header_footer_visibility(
+    xml: &[u8],
+    root_name: &[u8],
+    root_label: &str,
+) -> Result<Option<SlideHeaderFooterVisibility>> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut header_footer = None;
+
+    loop {
+        let decoder = reader.decoder();
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat(format!("{root_label} XML nesting is too deep"))
+                })?;
+                if depth == 1 {
+                    if saw_root {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "{root_label} XML has multiple roots"
+                        )));
+                    }
+                    require_presentationml_root(&namespace, &element, root_name, root_label)?;
+                    saw_root = true;
+                } else if depth == 2 && is_presentationml_name(&namespace, element.name(), b"hf") {
+                    store_header_footer_visibility(
+                        &mut header_footer,
+                        SlideHeaderFooterVisibility::from_element(&element, decoder, root_label)?,
+                        root_label,
+                    )?;
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    if saw_root {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "{root_label} XML has multiple roots"
+                        )));
+                    }
+                    require_presentationml_root(&namespace, &element, root_name, root_label)?;
+                    saw_root = true;
+                } else if depth == 1 && is_presentationml_name(&namespace, element.name(), b"hf") {
+                    store_header_footer_visibility(
+                        &mut header_footer,
+                        SlideHeaderFooterVisibility::from_element(&element, decoder, root_label)?,
+                        root_label,
+                    )?;
+                }
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat(format!("invalid {root_label} XML nesting"))
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if depth != 0 || !saw_root {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "unterminated {root_label} XML"
+        )));
+    }
+    Ok(header_footer)
+}
+
+fn store_header_footer_visibility(
+    slot: &mut Option<SlideHeaderFooterVisibility>,
+    value: SlideHeaderFooterVisibility,
+    root_label: &str,
+) -> Result<()> {
+    if slot.replace(value).is_some() {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{root_label} has multiple header/footer elements"
+        )));
+    }
+    Ok(())
 }
 
 fn read_root_element(
@@ -434,6 +582,11 @@ impl<'a> SlideLayoutPart<'a> {
         parse_slide_layout_metadata(self.xml_bytes())
     }
 
+    /// Get local header and footer placeholder visibility for this layout.
+    pub fn header_footer(&self) -> Result<Option<SlideHeaderFooterVisibility>> {
+        parse_header_footer_visibility(self.xml_bytes(), b"sldLayout", "slide layout")
+    }
+
     /// Get all shapes defined by this layout.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
         parse_shapes(self.xml_bytes())
@@ -511,6 +664,11 @@ impl<'a> SlideMasterPart<'a> {
     /// Whether this slide master is retained after its dependent slides are removed.
     pub fn is_preserved(&self) -> Result<bool> {
         parse_slide_master_preserve(self.xml_bytes())
+    }
+
+    /// Get local header and footer placeholder visibility for this master.
+    pub fn header_footer(&self) -> Result<Option<SlideHeaderFooterVisibility>> {
+        parse_header_footer_visibility(self.xml_bytes(), b"sldMaster", "slide master")
     }
 
     /// Get all shapes defined by this master.
@@ -802,5 +960,61 @@ mod tests {
 
         let wrong_root = format!(r#"<p:sld xmlns:p="{P}"><p:cSld/></p:sld>"#);
         assert!(parse_slide_master_preserve(wrong_root.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn header_footer_visibility_defaults_to_true_and_supports_strict_namespaces() {
+        let master = format!(
+            r#"<p:sldMaster xmlns:p="{P}"><p:cSld/><p:hf
+                dt="0" ftr="true" hdr="0" sldNum="false"/></p:sldMaster>"#
+        );
+        let visibility =
+            parse_header_footer_visibility(master.as_bytes(), b"sldMaster", "slide master")
+                .unwrap()
+                .unwrap();
+        assert!(!visibility.shows_date_time());
+        assert!(visibility.shows_footer());
+        assert!(!visibility.shows_header());
+        assert!(!visibility.shows_slide_number());
+
+        let strict_layout = r#"<q:sldLayout
+            xmlns:q="http://purl.oclc.org/ooxml/presentationml/main"><q:cSld/><q:hf/></q:sldLayout>"#;
+        let default_visibility =
+            parse_header_footer_visibility(strict_layout.as_bytes(), b"sldLayout", "slide layout")
+                .unwrap()
+                .unwrap();
+        assert_eq!(default_visibility, SlideHeaderFooterVisibility::default());
+        assert!(default_visibility.shows_date_time());
+        assert!(default_visibility.shows_footer());
+        assert!(default_visibility.shows_header());
+        assert!(default_visibility.shows_slide_number());
+
+        let no_header_footer = format!(r#"<p:sldLayout xmlns:p="{P}"><p:cSld/></p:sldLayout>"#);
+        assert_eq!(
+            parse_header_footer_visibility(
+                no_header_footer.as_bytes(),
+                b"sldLayout",
+                "slide layout"
+            )
+            .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn header_footer_visibility_rejects_invalid_and_duplicate_elements() {
+        let invalid_value =
+            format!(r#"<p:sldLayout xmlns:p="{P}"><p:cSld/><p:hf dt="sometimes"/></p:sldLayout>"#);
+        assert!(
+            parse_header_footer_visibility(invalid_value.as_bytes(), b"sldLayout", "slide layout")
+                .is_err()
+        );
+
+        let duplicate =
+            format!(r#"<p:sldMaster xmlns:p="{P}"><p:cSld/><p:hf/><p:hf/></p:sldMaster>"#);
+        assert!(
+            parse_header_footer_visibility(duplicate.as_bytes(), b"sldMaster", "slide master")
+                .is_err()
+        );
     }
 }
