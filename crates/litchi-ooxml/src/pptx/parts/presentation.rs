@@ -801,6 +801,15 @@ impl<'a> PresentationPart<'a> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.handout_master_relationship_id)
     }
 
+    /// Get presentation slide identifiers in document order.
+    pub fn slide_ids(&self) -> Result<Vec<u32>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?
+            .slides
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect())
+    }
+
     /// Get the relationship IDs of all slides in presentation order.
     ///
     /// Returns a vector of relationship IDs that can be used to access

@@ -466,6 +466,13 @@ impl<'a> Presentation<'a> {
         self.part.modification_verifier()
     }
 
+    /// Get the typed PowerPoint 2010 section list.
+    ///
+    /// Section membership is expressed using stable presentation slide IDs.
+    pub fn sections(&self) -> Result<crate::pptx::sections::SectionList> {
+        self.part.sections()
+    }
+
     /// Get the relationship ID of the declared smart-tags data.
     ///
     /// Returns None when the presentation does not declare smart tags.
@@ -1246,64 +1253,28 @@ impl<'a> Presentation<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn get_sections(&self) -> Result<Vec<(String, Vec<usize>)>> {
-        use quick_xml::Reader;
-        use quick_xml::events::Event;
-
-        let xml = self.part.part().blob();
-        let mut reader = Reader::from_reader(xml);
-        reader.config_mut().trim_text(true);
-
-        let mut sections = Vec::new();
-        let mut current_section: Option<(String, usize)> = None;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                    if e.local_name().as_ref() == b"section" {
-                        let mut name = String::new();
-                        let mut id = 0;
-
-                        for attr in e.attributes().flatten() {
-                            match attr.key.as_ref() {
-                                b"name" => {
-                                    name = std::str::from_utf8(&attr.value)
-                                        .map(|s| s.to_string())
-                                        .unwrap_or_default();
-                                },
-                                b"id" => {
-                                    id = std::str::from_utf8(&attr.value)
-                                        .ok()
-                                        .and_then(|s| s.parse().ok())
-                                        .unwrap_or(0);
-                                },
-                                _ => {},
-                            }
-                        }
-
-                        if !name.is_empty() {
-                            current_section = Some((name, id));
-                        }
-                    } else if e.local_name().as_ref() == b"sldId" && current_section.is_some() {
-                        // This slide belongs to the current section
-                        // We'll need to track slide IDs and map them to indices
-                    }
-                },
-                Ok(Event::End(e)) => {
-                    if e.local_name().as_ref() == b"section"
-                        && let Some((name, _id)) = current_section.take()
-                    {
-                        // For now, we'll create empty section entries
-                        // A full implementation would track slide IDs
-                        sections.push((name, Vec::new()));
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(_) => break,
-                _ => {},
-            }
-        }
-
-        Ok(sections)
+        let slide_ids = self.part.slide_ids()?;
+        self.sections()?
+            .sections()
+            .iter()
+            .map(|section| {
+                let slide_indices = section
+                    .slide_ids
+                    .iter()
+                    .map(|slide_id| {
+                        slide_ids
+                            .iter()
+                            .position(|id| id == slide_id)
+                            .ok_or_else(|| {
+                                OoxmlError::InvalidFormat(format!(
+                                    "PowerPoint section references undeclared slide ID {slide_id}"
+                                ))
+                            })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                Ok((section.name.clone().unwrap_or_default(), slide_indices))
+            })
+            .collect()
     }
 
     // ========================================================================

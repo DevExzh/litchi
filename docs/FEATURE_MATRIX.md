@@ -225,7 +225,7 @@ conversion, fonts, and image conversion are optional.
 | Slide masters and layouts | 🟡 | ✅ | ❌ | Semantic reading, including master/layout shape and placeholder inventory, header/footer and master-content visibility flags, matching/type and master/layout retention metadata, typed layout-reference identifiers, master text-style level inventory, and slide/layout/master relationship resolution; no general master/layout authoring API |
 | Handout master | ✅ | ✅ | ✅ | Presentation-root relationship resolution plus layout and header/footer settings |
 | Themes | 🟡 | ✅ | ❌ | Master-, layout-, and slide-scoped validated theme resolution, typed color maps/overrides, and presentation inventory; no general theme authoring workflow |
-| Sections | ✅ | ✅ | ✅ | Graph-safe section and membership CRUD |
+| Sections | ✅ | ✅ | ✅ | Typed section readers with stable IDs and resolved slide-index membership, plus graph-safe CRUD |
 | Custom slide shows | ✅ | ✅ | ✅ | Named subsets and graph-safe ordered CRUD |
 | Presentation/slide protection | ✅ | ✅ | ✅ | Protection and password metadata, including root modification-verifier inspection; policy is not enforced by the library |
 | Embedded fonts | ✅ | ✅ | ✅ | Payloads, obfuscation, licensing checks, and ordered CRUD |
