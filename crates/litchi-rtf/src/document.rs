@@ -959,6 +959,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `PRINT` fields in document field order.
+    ///
+    /// Stored printer-instruction text, cached results, and field state are
+    /// opaque metadata only. This method never interprets control codes, opens
+    /// a printer, sends output, changes print settings, or refreshes a field.
+    pub fn print_fields(&self) -> Vec<crate::PrintField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::print_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `PRINT` fields in the document.
+    pub fn print_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.print_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in
     /// document field order.
     ///
