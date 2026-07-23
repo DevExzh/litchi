@@ -1,0 +1,8 @@
+<p:bg>
+  <p:bgPr>
+    <a:solidFill>
+      <a:srgbClr val="112233"/>
+    </a:solidFill>
+    <a:effectLst/>
+  </p:bgPr>
+</p:bg>

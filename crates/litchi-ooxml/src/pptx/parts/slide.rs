@@ -155,6 +155,14 @@ impl<'a> SlideLayoutPart<'a> {
         crate::pptx::transitions::SlideTransition::from_xml(self.part.blob())
     }
 
+    /// Get the background defined by this slide layout.
+    ///
+    /// Parses the p:bg element from the layout XML. Returns `None` when the
+    /// layout has no local background.
+    pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+        crate::pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes())
+    }
+
     /// Get the underlying OPC part.
     #[inline]
     pub fn part(&self) -> &'a dyn Part {
@@ -195,6 +203,14 @@ impl<'a> SlideMasterPart<'a> {
     /// Returns `None` if the master has no transition.
     pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
         crate::pptx::transitions::SlideTransition::from_xml(self.part.blob())
+    }
+
+    /// Get the background defined by this slide master.
+    ///
+    /// Parses the p:bg element from the master XML. Returns `None` when the
+    /// master has no local background.
+    pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+        crate::pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes())
     }
 
     /// Get the relationship IDs of all slide layouts in this master.

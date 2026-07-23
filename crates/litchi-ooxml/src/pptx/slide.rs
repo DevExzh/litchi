@@ -488,7 +488,9 @@ impl<'a> Slide<'a> {
 
     /// Get the background for this slide.
     ///
-    /// Returns `None` if no background is defined (uses master background).
+    /// Returns `None` if no background is defined directly on the slide. Use
+    /// [`effective_background`](Self::effective_background) to resolve layout
+    /// and master inheritance.
     ///
     /// # Examples
     ///
@@ -503,13 +505,28 @@ impl<'a> Slide<'a> {
     ///     if let Some(bg) = slide.background()? {
     ///         println!("Slide has custom background: {:?}", bg);
     ///     } else {
-    ///         println!("Using master background");
+    ///         println!("Using inherited background");
     ///     }
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
         self.part.background()
+    }
+
+    /// Get the background this slide will use after inheritance is applied.
+    ///
+    /// A background defined on the slide takes precedence over its layout and
+    /// slide master. If the slide has no local background, the layout's
+    /// effective background is returned instead.
+    pub fn effective_background(
+        &self,
+    ) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+        if let Some(background) = self.background()? {
+            return Ok(Some(background));
+        }
+
+        self.layout()?.effective_background()
     }
 
     /// Get the speaker notes for this slide.
@@ -712,6 +729,28 @@ impl<'a> SlideLayout<'a> {
         self.master()?.theme()
     }
 
+    /// Get the background defined by this layout.
+    ///
+    /// Returns `None` when the layout has no local background.
+    pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+        self.part.background()
+    }
+
+    /// Get the background this layout will use after inheritance is applied.
+    ///
+    /// A background defined on the layout takes precedence over its slide
+    /// master. If the layout has no local background, the master's background
+    /// is returned instead.
+    pub fn effective_background(
+        &self,
+    ) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+        if let Some(background) = self.background()? {
+            return Ok(Some(background));
+        }
+
+        self.master()?.background()
+    }
+
     /// Get access to the underlying layout part.
     #[inline]
     pub fn part(&self) -> &SlideLayoutPart<'a> {
@@ -776,6 +815,13 @@ impl<'a> SlideMaster<'a> {
     /// Returns `None` if the master has no transition.
     pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
         self.part.transition()
+    }
+
+    /// Get the background defined by this slide master.
+    ///
+    /// Returns `None` when the master has no local background.
+    pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+        self.part.background()
     }
 
     /// Resolve the theme used by this slide master.
