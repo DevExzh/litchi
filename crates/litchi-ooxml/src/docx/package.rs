@@ -3584,6 +3584,69 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_document_state_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            for (instruction, cached_result) in [
+                (
+                    r#"SET RecipientName "North America" \* MERGEFORMAT"#,
+                    "cached recipient",
+                ),
+                (r#"SEQ Figure FigureChapter \r 3 \* ARABIC"#, "3"),
+                (r#"=SUM(ABOVE) \* MERGEFORMAT"#, "42"),
+                (r#"STYLEREF "Heading 1" \n \p"#, "1 above"),
+            ] {
+                document.add_paragraph().add_field(
+                    crate::docx::writer::MutableField::with_result(
+                        instruction.to_string(),
+                        cached_result.to_string(),
+                    ),
+                );
+            }
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+
+        let sets = document.set_fields().unwrap();
+        assert_eq!(document.set_field_count().unwrap(), 1);
+        assert_eq!(sets.len(), 1);
+        assert_eq!(sets[0].target_name(), "RecipientName");
+        assert_eq!(sets[0].expression(), r#""North America" \* MERGEFORMAT"#);
+        assert_eq!(sets[0].cached_result(), Some("cached recipient"));
+
+        let sequences = document.sequence_fields().unwrap();
+        assert_eq!(document.sequence_field_count().unwrap(), 1);
+        assert_eq!(sequences.len(), 1);
+        assert_eq!(sequences[0].identifier(), "Figure");
+        assert_eq!(sequences[0].bookmark(), Some("FigureChapter"));
+        assert_eq!(sequences[0].tail(), r#"\r 3 \* ARABIC"#);
+        assert_eq!(sequences[0].cached_result(), Some("3"));
+
+        let formulas = document.formula_fields().unwrap();
+        assert_eq!(document.formula_field_count().unwrap(), 1);
+        assert_eq!(formulas.len(), 1);
+        assert_eq!(formulas[0].formula(), r#"SUM(ABOVE) \* MERGEFORMAT"#);
+        assert_eq!(formulas[0].cached_result(), Some("42"));
+
+        let style_references = document.style_reference_fields().unwrap();
+        assert_eq!(document.style_reference_field_count().unwrap(), 1);
+        assert_eq!(style_references.len(), 1);
+        assert_eq!(style_references[0].style_name(), "Heading 1");
+        assert_eq!(
+            style_references[0].options(),
+            &[
+                crate::docx::StyleReferenceFieldOption::ParagraphNumber,
+                crate::docx::StyleReferenceFieldOption::RelativePosition,
+            ]
+        );
+        assert_eq!(style_references[0].cached_result(), Some("1 above"));
+    }
+
+    #[test]
     fn writes_and_discovers_inert_prompt_fields_without_displaying_prompts() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

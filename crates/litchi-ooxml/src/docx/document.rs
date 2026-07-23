@@ -12,14 +12,15 @@ use crate::docx::field::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
     BarcodeField, BibliographyField, BidiOutlineField, CitationField, DatabaseField, DdeField,
     DocumentContextField, DocumentInformationField, DocumentPropertyField, DocumentVariableField,
-    EmbedField, ExternalIncludeField, Field, GoToButtonField, IfField,
+    EmbedField, ExternalIncludeField, Field, FormulaField, GoToButtonField, IfField,
     IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, PrintField, PrivateField, QuoteField,
-    ReferencedDocumentField, ShapeField, SymbolField, TableOfAuthoritiesEntryField,
-    TableOfAuthoritiesField, TableOfContentsEntryField, TableOfContentsField, UserIdentityField,
+    ReferencedDocumentField, SequenceField, SetField, ShapeField, StyleReferenceField,
+    SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
+    TableOfContentsEntryField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1958,6 +1959,81 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `COMPARE` fields in the main document.
     pub fn compare_field_count(&self) -> Result<usize> {
         Ok(self.compare_fields()?.len())
+    }
+
+    /// Get typed, inert `SET` fields in document order.
+    ///
+    /// Returned values expose stored target names, opaque expressions, cached
+    /// content, and dirty/lock state only. This method never evaluates an
+    /// expression, looks up or changes a bookmark, changes document state, or
+    /// refreshes a field.
+    pub fn set_fields(&self) -> Result<Vec<SetField>> {
+        self.fields()?
+            .iter()
+            .map(Field::set_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `SET` fields in the main document.
+    pub fn set_field_count(&self) -> Result<usize> {
+        Ok(self.set_fields()?.len())
+    }
+
+    /// Get typed, inert `=` formula fields in document order.
+    ///
+    /// Returned values expose stored formulas, cached content, and dirty/lock
+    /// state only. This method never parses or evaluates a formula, reads table
+    /// cells or bookmarks, resolves field values, or refreshes a field.
+    pub fn formula_fields(&self) -> Result<Vec<FormulaField>> {
+        self.fields()?
+            .iter()
+            .map(Field::formula_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert formula fields in the main document.
+    pub fn formula_field_count(&self) -> Result<usize> {
+        Ok(self.formula_fields()?.len())
+    }
+
+    /// Get typed, inert `SEQ` fields in document order.
+    ///
+    /// Returned values expose stored identifiers, optional bookmarks, opaque
+    /// tails, cached content, and dirty/lock state only. This method never
+    /// looks up a bookmark, increments or resets a sequence, calculates a
+    /// number, or refreshes a field.
+    pub fn sequence_fields(&self) -> Result<Vec<SequenceField>> {
+        self.fields()?
+            .iter()
+            .map(Field::sequence_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `SEQ` fields in the main document.
+    pub fn sequence_field_count(&self) -> Result<usize> {
+        Ok(self.sequence_fields()?.len())
+    }
+
+    /// Get typed, inert `STYLEREF` fields in document order.
+    ///
+    /// Returned values expose stored style names, options, switches, cached
+    /// content, and dirty/lock state only. This method never looks up styled
+    /// text, searches document stories, calculates paragraph numbers or
+    /// relative positions, resolves page layout, or refreshes a field.
+    pub fn style_reference_fields(&self) -> Result<Vec<StyleReferenceField>> {
+        self.fields()?
+            .iter()
+            .map(Field::style_reference_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `STYLEREF` fields in the main document.
+    pub fn style_reference_field_count(&self) -> Result<usize> {
+        Ok(self.style_reference_fields()?.len())
     }
 
     /// Get typed, inert `QUOTE` fields in document order.
