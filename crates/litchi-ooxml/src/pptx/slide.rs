@@ -523,6 +523,13 @@ impl<'a> SlideLayout<'a> {
         self.part.name()
     }
 
+    /// Get the transition effect inherited from this layout.
+    ///
+    /// Returns `None` if the layout has no transition.
+    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+        self.part.transition()
+    }
+
     /// Get access to the underlying layout part.
     #[inline]
     pub fn part(&self) -> &SlideLayoutPart<'a> {
@@ -578,6 +585,13 @@ impl<'a> SlideMaster<'a> {
     /// ```
     pub fn name(&self) -> Result<String> {
         self.part.name()
+    }
+
+    /// Get the transition effect inherited from this master.
+    ///
+    /// Returns `None` if the master has no transition.
+    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+        self.part.transition()
     }
 
     /// Get the relationship IDs of all slide layouts in this master.

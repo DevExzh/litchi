@@ -217,7 +217,7 @@ conversion, fonts, and image conversion are optional.
 | Audio, video, posters, and captions | ✅ | ✅ | ✅ | Embedded/linked media, trim/fade/bookmark metadata, and text-track parts |
 | Animations and timing trees | ✅ | ✅ | ✅ | Shape effects, sequences, triggers, and chart/diagram timing relationships |
 | Transitions and slide advance timing | ✅ | ✅ | ✅ | Effects, speed, direction, sound, click, and timed advance |
-| PowerPoint 2010 transition extensions | 🟡 | ✅ | ❌ | Compatibility-choice ripple effects, typed corner/center direction, and extended duration; no fallback authoring |
+| PowerPoint 2010 transition extensions | 🟡 | ✅ | ❌ | Compatibility-choice ripple effects on slides, layouts, and masters, with typed corner/center direction and extended duration; no fallback authoring |
 | Hyperlinks and slide-jump actions | 🟡 | ✅ | ✅ | URL and slide navigation plus bounded inert click/hover action-setting inventory for PowerPoint-reserved action values and declared targets; no target is followed, opened, activated, or executed |
 | Classic comments | ✅ | ✅ | ✅ | Authors, slide comment parts, and package-aware CRUD |
 | Modern comments | ✅ | ✅ | ✅ | Authors, anchors, replies, status, and package-aware CRUD |

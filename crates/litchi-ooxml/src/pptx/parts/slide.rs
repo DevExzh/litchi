@@ -147,6 +147,14 @@ impl<'a> SlideLayoutPart<'a> {
         presentation_name(self.xml_bytes())
     }
 
+    /// Get the transition effect inherited from this slide layout.
+    ///
+    /// Parses the `<p:transition>` element from the layout XML.
+    /// Returns `None` if the layout has no transition.
+    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+        crate::pptx::transitions::SlideTransition::from_xml(self.part.blob())
+    }
+
     /// Get the underlying OPC part.
     #[inline]
     pub fn part(&self) -> &'a dyn Part {
@@ -179,6 +187,14 @@ impl<'a> SlideMasterPart<'a> {
     /// Get the master name.
     pub fn name(&self) -> Result<String> {
         presentation_name(self.xml_bytes())
+    }
+
+    /// Get the transition effect inherited from this slide master.
+    ///
+    /// Parses the `<p:transition>` element from the master XML.
+    /// Returns `None` if the master has no transition.
+    pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+        crate::pptx::transitions::SlideTransition::from_xml(self.part.blob())
     }
 
     /// Get the relationship IDs of all slide layouts in this master.
