@@ -170,7 +170,7 @@ pub use field::{
     AddressBlockCountryInclusion, BibliographyField, BibliographyOption, BodyStoryEvent,
     CitationField, CitationOption, DdeField, DdeFieldKind, DdeRepresentation,
     DocumentVariableField, EquationField, ExternalIncludeField, ExternalIncludeOption, Field,
-    FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus, FieldSwitch, FieldType,
+    FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus, FieldSwitch, FieldType, FormulaField,
     GoToButtonField, HyperlinkCode, IfField, IncludeFieldKind, IndexEntryField, IndexEntryOption,
     IndexField, IndexOption, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
