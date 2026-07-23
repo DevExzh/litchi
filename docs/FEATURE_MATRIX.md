@@ -224,7 +224,7 @@ conversion, fonts, and image conversion are optional.
 | Speaker notes and notes masters | ✅ | ✅ | ✅ | Complete notes graph load/store with resources and themes |
 | Slide masters and layouts | 🟡 | ✅ | ❌ | Semantic reading plus slide/layout/master relationship resolution; no general master/layout authoring API |
 | Handout master | ✅ | ✅ | ✅ | Layout and header/footer settings |
-| Themes | 🟡 | ✅ | ❌ | Theme discovery/read model; no general theme authoring workflow |
+| Themes | 🟡 | ✅ | ❌ | Master-scoped validated theme resolution and presentation inventory; no general theme authoring workflow |
 | Sections | ✅ | ✅ | ✅ | Graph-safe section and membership CRUD |
 | Custom slide shows | ✅ | ✅ | ✅ | Named subsets and graph-safe ordered CRUD |
 | Presentation/slide protection | ✅ | ✅ | ✅ | Protection and password metadata; policy is not enforced by the library |

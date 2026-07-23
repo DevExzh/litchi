@@ -639,34 +639,8 @@ impl<'a> Presentation<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn get_themes(&self) -> Result<Vec<crate::pptx::parts::Theme>> {
-        use crate::pptx::parts::ThemePart;
-
-        let mut themes = Vec::new();
-
-        // Get themes from slide masters
         let masters = self.slide_masters()?;
-        for master in masters {
-            let master_part = master.part().part();
-            let rels = master_part.rels();
-
-            // Look for theme relationship
-            for rel in rels.iter() {
-                if rel.reltype()
-                    == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
-                {
-                    let base_uri = master_part.partname().base_uri();
-                    let theme_partname = PackURI::from_rel_ref(base_uri, rel.target_ref())
-                        .map_err(crate::error::OoxmlError::InvalidFormat)?;
-
-                    if let Ok(theme_part) = self.package.get_part(&theme_partname) {
-                        let theme_part = ThemePart::from_part(theme_part)?;
-                        themes.push(theme_part.theme()?);
-                    }
-                }
-            }
-        }
-
-        Ok(themes)
+        masters.iter().map(SlideMaster::theme).collect()
     }
 
     // ========================================================================

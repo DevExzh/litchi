@@ -1,6 +1,6 @@
 /// Slide-related objects, including Slide, SlideLayout, and SlideMaster.
 use crate::error::{OoxmlError, Result};
-use crate::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart};
+use crate::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart, ThemePart};
 use crate::pptx::shapes::base::BaseShape;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -9,6 +9,8 @@ const STRICT_SLIDE_LAYOUT_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideLayout";
 const STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideMaster";
+const STRICT_THEME_RELATIONSHIP_TYPE: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/theme";
 
 /// A slide in a presentation.
 ///
@@ -720,6 +722,59 @@ impl<'a> SlideMaster<'a> {
     /// Returns `None` if the master has no transition.
     pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
         self.part.transition()
+    }
+
+    /// Resolve the theme used by this slide master.
+    ///
+    /// The theme relationship must be internal and target an Office theme part.
+    /// A master with no theme relationship or more than one theme relationship
+    /// is invalid.
+    pub fn theme(&self) -> Result<crate::pptx::parts::Theme> {
+        let master_part = self.part.part();
+        let mut theme_relationships = master_part.rels().iter().filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::THEME | STRICT_THEME_RELATIONSHIP_TYPE
+            )
+        });
+        let relationship = theme_relationships.next().ok_or_else(|| {
+            OoxmlError::InvalidRelationship(
+                "slide master does not have a theme relationship".to_string(),
+            )
+        })?;
+        if theme_relationships.next().is_some() {
+            return Err(OoxmlError::InvalidRelationship(
+                "slide master has multiple theme relationships".to_string(),
+            ));
+        }
+        if relationship.is_external() {
+            return Err(OoxmlError::InvalidRelationship(format!(
+                "theme relationship '{}' must be internal",
+                relationship.r_id()
+            )));
+        }
+
+        let part_name = relationship.target_partname().map_err(|error| {
+            OoxmlError::InvalidRelationship(format!(
+                "invalid theme relationship '{}': {error}",
+                relationship.r_id()
+            ))
+        })?;
+        let theme_part = self.package.get_part(&part_name).map_err(|error| {
+            OoxmlError::PartNotFound(format!(
+                "theme relationship '{}' targets missing part '{}': {error}",
+                relationship.r_id(),
+                part_name.as_str()
+            ))
+        })?;
+        if theme_part.content_type() != ct::OFC_THEME {
+            return Err(OoxmlError::InvalidContentType {
+                expected: ct::OFC_THEME.to_string(),
+                got: theme_part.content_type().to_string(),
+            });
+        }
+
+        ThemePart::from_part(theme_part)?.theme()
     }
 
     /// Get the relationship IDs of all slide layouts in this master.
