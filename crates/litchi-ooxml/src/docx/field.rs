@@ -1052,28 +1052,31 @@ impl Field {
         DdeField::from_field(self)
     }
 
-    /// Check whether this is an INCLUDETEXT field.
+    /// Check whether this is an `INCLUDETEXT` or historical `INCLUDE` field.
     ///
     /// Recognition is limited to the stored field instruction. It never opens,
     /// resolves, imports, fetches, or refreshes the referenced source.
     pub fn is_include_text(&self) -> bool {
         field_instruction_remainder(&self.instruction, "INCLUDETEXT").is_some()
+            || field_instruction_remainder(&self.instruction, "INCLUDE").is_some()
     }
 
-    /// Check whether this is an INCLUDEPICTURE field.
+    /// Check whether this is an `INCLUDEPICTURE` or historical `IMPORT` field.
     ///
     /// Recognition is limited to the stored field instruction. It never opens,
     /// resolves, imports, fetches, or refreshes the referenced source.
     pub fn is_include_picture(&self) -> bool {
         field_instruction_remainder(&self.instruction, "INCLUDEPICTURE").is_some()
+            || field_instruction_remainder(&self.instruction, "IMPORT").is_some()
     }
 
     /// Parse this field as inert external-include metadata.
     ///
-    /// Returns Ok(None) for fields other than INCLUDETEXT or INCLUDEPICTURE.
-    /// The result exposes stored source, bookmark, converter, XML, and cached
-    /// metadata only; it never opens, resolves, imports, fetches, refreshes,
-    /// converts, evaluates, or executes anything.
+    /// Returns Ok(None) for fields other than `INCLUDETEXT`/`INCLUDEPICTURE` or
+    /// their historical `INCLUDE`/`IMPORT` aliases. The result exposes stored
+    /// source, bookmark, converter, XML, and cached metadata only; it never
+    /// opens, resolves, imports, fetches, refreshes, converts, evaluates, or
+    /// executes anything.
     pub fn external_include(&self) -> Result<Option<ExternalIncludeField>> {
         ExternalIncludeField::from_field(self)
     }
@@ -1649,9 +1652,10 @@ impl DdeField {
 /// The kind of externally sourced Word field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IncludeFieldKind {
-    /// An INCLUDETEXT field that stores a document or XML source.
+    /// An `INCLUDETEXT` or historical `INCLUDE` field that stores a document or XML
+    /// source.
     Text,
-    /// An INCLUDEPICTURE field that stores an image source.
+    /// An `INCLUDEPICTURE` or historical `IMPORT` field that stores an image source.
     Picture,
 }
 
@@ -1675,7 +1679,8 @@ pub enum ExternalIncludeOption {
     XPath(String),
 }
 
-/// Typed, inert metadata for an INCLUDETEXT or INCLUDEPICTURE field.
+/// Typed, inert metadata for an `INCLUDETEXT`/`INCLUDEPICTURE` or historical
+/// `INCLUDE`/`IMPORT` field.
 ///
 /// Source identifiers, bookmarks, options, and cached results are retained as
 /// stored field data. This type never opens, resolves, imports, fetches,
@@ -1784,6 +1789,9 @@ impl ExternalIncludeField {
     }
 
     /// Return whether this includes text or a picture.
+    ///
+    /// Text includes use `INCLUDETEXT` or historical `INCLUDE`; picture includes use
+    /// `INCLUDEPICTURE` or historical `IMPORT`.
     pub fn kind(&self) -> IncludeFieldKind {
         self.kind
     }
@@ -1793,19 +1801,22 @@ impl ExternalIncludeField {
         &self.source
     }
 
-    /// Return the optional stored bookmark selector for an INCLUDETEXT field.
+    /// Return the optional stored bookmark selector for a text-include field.
+    ///
+    /// `INCLUDEPICTURE` and `IMPORT` fields do not define a bookmark operand, so this
+    /// returns None for picture includes.
     pub fn bookmark(&self) -> Option<&str> {
         self.bookmark.as_deref()
     }
 
-    /// Whether the stored INCLUDETEXT instruction suppresses nested updates.
+    /// Whether the stored text-include instruction suppresses nested updates.
     ///
     /// This is metadata only. The API never performs an update.
     pub fn suppresses_nested_field_updates(&self) -> bool {
         self.suppress_nested_field_updates
     }
 
-    /// Whether the stored INCLUDEPICTURE instruction omits picture data.
+    /// Whether the stored picture-include instruction omits picture data.
     ///
     /// This is stored metadata only. The API never reads the source to obtain
     /// omitted picture data.
@@ -6430,13 +6441,18 @@ fn parse_dde_operands_and_switches(
 fn parse_external_include_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(IncludeFieldKind, String, Option<String>, Vec<FieldSwitch>)>> {
-    let (kind, field_type) = if field_instruction_remainder(instruction, "INCLUDETEXT").is_some() {
-        (IncludeFieldKind::Text, "INCLUDETEXT")
-    } else if field_instruction_remainder(instruction, "INCLUDEPICTURE").is_some() {
-        (IncludeFieldKind::Picture, "INCLUDEPICTURE")
-    } else {
-        return Ok(None);
-    };
+    let (kind, field_type) =
+        if field_instruction_remainder(instruction, "INCLUDETEXT").is_some() {
+            (IncludeFieldKind::Text, "INCLUDETEXT")
+        } else if field_instruction_remainder(instruction, "INCLUDE").is_some() {
+            (IncludeFieldKind::Text, "INCLUDE")
+        } else if field_instruction_remainder(instruction, "INCLUDEPICTURE").is_some() {
+            (IncludeFieldKind::Picture, "INCLUDEPICTURE")
+        } else if field_instruction_remainder(instruction, "IMPORT").is_some() {
+            (IncludeFieldKind::Picture, "IMPORT")
+        } else {
+            return Ok(None);
+        };
     let remainder =
         field_instruction_remainder(instruction, field_type).expect("recognized include field");
     let mut characters = remainder.chars().peekable();
@@ -8578,6 +8594,42 @@ mod tests {
         assert_eq!(picture.cached_result(), Some("cached picture"));
         assert_eq!(picture.switches()[2].name(), '*');
 
+        let legacy_text_field = Field::new(
+            r#"INCLUDE "file:///C:/no-contact/legacy.docx" LegacySection \!"#.to_string(),
+            Some("cached legacy text".to_string()),
+            true,
+        );
+        assert!(legacy_text_field.is_include_text());
+        assert!(!legacy_text_field.is_include_picture());
+        let legacy_text = legacy_text_field.external_include().unwrap().unwrap();
+        assert_eq!(legacy_text.kind(), IncludeFieldKind::Text);
+        assert_eq!(legacy_text.source(), "file:///C:/no-contact/legacy.docx");
+        assert_eq!(legacy_text.bookmark(), Some("LegacySection"));
+        assert!(legacy_text.suppresses_nested_field_updates());
+        assert_eq!(legacy_text.cached_result(), Some("cached legacy text"));
+        assert!(legacy_text.is_dirty());
+
+        let legacy_picture_field = Field::new(
+            r#"IMPORT "file:///C:/no-contact/legacy.wmf" \c GraphicsFilter \d"#.to_string(),
+            Some("cached legacy picture".to_string()),
+            false,
+        );
+        assert!(!legacy_picture_field.is_include_text());
+        assert!(legacy_picture_field.is_include_picture());
+        let legacy_picture = legacy_picture_field.external_include().unwrap().unwrap();
+        assert_eq!(legacy_picture.kind(), IncludeFieldKind::Picture);
+        assert_eq!(
+            legacy_picture.source(),
+            "file:///C:/no-contact/legacy.wmf"
+        );
+        assert_eq!(legacy_picture.bookmark(), None);
+        assert!(legacy_picture.omits_picture_data());
+        assert_eq!(
+            legacy_picture.options(),
+            &[ExternalIncludeOption::Converter("GraphicsFilter".to_string())]
+        );
+        assert_eq!(legacy_picture.cached_result(), Some("cached legacy picture"));
+
         assert!(
             Field::new("INCLUDETEXT".to_string(), None, false)
                 .external_include()
@@ -8616,10 +8668,16 @@ mod tests {
                 .external_include()
                 .is_err()
         );
-        let not_include = Field::new("INCLUDETEXTUAL missing.docx".to_string(), None, false);
-        assert!(!not_include.is_include_text());
-        assert!(!not_include.is_include_picture());
-        assert!(not_include.external_include().unwrap().is_none());
+        for instruction in [
+            "INCLUDETEXTUAL missing.docx",
+            r#"INCLUDES "source.docx""#,
+            r#"IMPORTS "picture.wmf""#,
+        ] {
+            let not_include = Field::new(instruction.to_string(), None, false);
+            assert!(!not_include.is_include_text());
+            assert!(!not_include.is_include_picture());
+            assert!(not_include.external_include().unwrap().is_none());
+        }
     }
 
     #[test]

@@ -3572,14 +3572,24 @@ mod tests {
                 r#"INCLUDEPICTURE "file:///no-contact/picture.gif" \c Pictim32 \d"#.to_string(),
                 "cached picture".to_string(),
             ));
+            let legacy_text = document.add_paragraph();
+            legacy_text.add_field(crate::docx::writer::MutableField::with_result(
+                r#"INCLUDE "file:///no-contact/legacy.docx" LegacySection \!"#.to_string(),
+                "cached legacy text".to_string(),
+            ));
+            let legacy_picture = document.add_paragraph();
+            legacy_picture.add_field(crate::docx::writer::MutableField::with_result(
+                r#"IMPORT "file:///no-contact/legacy.wmf" \c GraphicsFilter \d"#.to_string(),
+                "cached legacy picture".to_string(),
+            ));
         }
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
         let document = reopened.document().unwrap();
         let includes = document.external_includes().unwrap();
-        assert_eq!(document.external_include_count().unwrap(), 2);
-        assert_eq!(includes.len(), 2);
+        assert_eq!(document.external_include_count().unwrap(), 4);
+        assert_eq!(includes.len(), 4);
         assert_eq!(includes[0].kind(), crate::docx::IncludeFieldKind::Text);
         assert_eq!(includes[0].source(), "file:///no-contact/source.docx");
         assert_eq!(includes[0].bookmark(), Some("Summary"));
@@ -3602,6 +3612,21 @@ mod tests {
             )]
         );
         assert_eq!(includes[1].cached_result(), Some("cached picture"));
+        assert_eq!(includes[2].kind(), crate::docx::IncludeFieldKind::Text);
+        assert_eq!(includes[2].source(), "file:///no-contact/legacy.docx");
+        assert_eq!(includes[2].bookmark(), Some("LegacySection"));
+        assert!(includes[2].suppresses_nested_field_updates());
+        assert_eq!(includes[2].cached_result(), Some("cached legacy text"));
+        assert_eq!(includes[3].kind(), crate::docx::IncludeFieldKind::Picture);
+        assert_eq!(includes[3].source(), "file:///no-contact/legacy.wmf");
+        assert!(includes[3].omits_picture_data());
+        assert_eq!(
+            includes[3].options(),
+            &[crate::docx::ExternalIncludeOption::Converter(
+                "GraphicsFilter".to_string()
+            )]
+        );
+        assert_eq!(includes[3].cached_result(), Some("cached legacy picture"));
     }
 
     #[test]

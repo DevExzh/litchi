@@ -1549,7 +1549,8 @@ impl<'a> Document<'a> {
         Ok(self.dde_links()?.len())
     }
 
-    /// Get typed, inert `INCLUDETEXT` and `INCLUDEPICTURE` fields in document order.
+    /// Get typed, inert `INCLUDETEXT`/`INCLUDEPICTURE` fields and historical
+    /// `INCLUDE`/`IMPORT` aliases in document order.
     ///
     /// Returned fields expose stored source, bookmark, converter, XML, cached,
     /// and dirty/lock metadata only. This method never opens, resolves,
