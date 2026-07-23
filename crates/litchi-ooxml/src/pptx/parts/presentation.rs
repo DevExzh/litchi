@@ -481,6 +481,27 @@ impl PresentationPhotoAlbum {
     }
 }
 
+/// Presentation-level customer-data relationship references.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PresentationCustomerDataList {
+    custom_data_relationship_ids: Vec<String>,
+    tags_relationship_id: Option<String>,
+}
+
+impl PresentationCustomerDataList {
+    /// Return custom-data relationship IDs in document order.
+    #[inline]
+    pub fn custom_data_relationship_ids(&self) -> &[String] {
+        &self.custom_data_relationship_ids
+    }
+
+    /// Return the relationship ID for customer-data tags, if declared.
+    #[inline]
+    pub fn tags_relationship_id(&self) -> Option<&str> {
+        self.tags_relationship_id.as_deref()
+    }
+}
+
 /// The main presentation part.
 ///
 /// This part contains the presentation-level properties and references to slides,
@@ -610,6 +631,13 @@ impl<'a> PresentationPart<'a> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.photo_album)
     }
 
+    /// Get the presentation-level customer-data relationship references.
+    ///
+    /// Returns None when the presentation does not declare customer data.
+    pub fn customer_data(&self) -> Result<Option<PresentationCustomerDataList>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.customer_data)
+    }
+
     /// Get the relationship ID of the declared smart-tags data.
     ///
     /// Returns None when the presentation does not declare smart tags.
@@ -702,6 +730,7 @@ enum PresentationContext {
     SlideList,
     MasterList,
     HandoutMasterList,
+    CustomerDataList,
     DefaultTextStyle,
     Other,
 }
@@ -716,6 +745,7 @@ struct PresentationInfo {
     default_text_style: Option<PresentationDefaultTextStyle>,
     kinsoku_settings: Option<PresentationKinsokuSettings>,
     photo_album: Option<PresentationPhotoAlbum>,
+    customer_data: Option<PresentationCustomerDataList>,
     smart_tags_relationship_id: Option<String>,
     handout_master_relationship_id: Option<String>,
     seen_slide_list: bool,
@@ -849,6 +879,11 @@ impl PresentationInfo {
             self.seen_handout_master_list = true;
             Ok(PresentationContext::HandoutMasterList)
         } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"custDataLst")
+        {
+            self.begin_customer_data_list()?;
+            Ok(PresentationContext::CustomerDataList)
+        } else if parent == PresentationContext::Presentation
             && is_presentationml_name(namespace, element.name(), b"defaultTextStyle")
         {
             Ok(PresentationContext::DefaultTextStyle)
@@ -890,6 +925,10 @@ impl PresentationInfo {
                 ));
             }
             self.seen_handout_master_list = true;
+        } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"custDataLst")
+        {
+            self.begin_customer_data_list()?;
         }
         Ok(())
     }
@@ -952,6 +991,39 @@ impl PresentationInfo {
                 ));
             }
             self.photo_album = Some(PresentationPhotoAlbum::from_element(element, decoder)?);
+        } else if parent == PresentationContext::CustomerDataList
+            && is_presentationml_name(namespace, element.name(), b"custData")
+        {
+            let relationship_id =
+                required_relationship_id(element, decoder, resolver, "customer data")?;
+            self.customer_data
+                .as_mut()
+                .ok_or_else(|| {
+                    OoxmlError::InvalidFormat(
+                        "missing PowerPoint customer-data list context".to_string(),
+                    )
+                })?
+                .custom_data_relationship_ids
+                .push(relationship_id);
+        } else if parent == PresentationContext::CustomerDataList
+            && is_presentationml_name(namespace, element.name(), b"tags")
+        {
+            let relationship_id =
+                required_relationship_id(element, decoder, resolver, "customer-data tags")?;
+            let customer_data = self.customer_data.as_mut().ok_or_else(|| {
+                OoxmlError::InvalidFormat(
+                    "missing PowerPoint customer-data list context".to_string(),
+                )
+            })?;
+            if customer_data
+                .tags_relationship_id
+                .replace(relationship_id)
+                .is_some()
+            {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate PowerPoint customer-data tags reference".to_string(),
+                ));
+            }
         } else if parent == PresentationContext::Presentation
             && is_presentationml_name(namespace, element.name(), b"smartTags")
         {
@@ -1012,6 +1084,16 @@ impl PresentationInfo {
             ));
         }
         self.default_text_style = Some(PresentationDefaultTextStyle::default());
+        Ok(())
+    }
+
+    fn begin_customer_data_list(&mut self) -> Result<()> {
+        if self.customer_data.is_some() {
+            return Err(OoxmlError::InvalidFormat(
+                "duplicate PowerPoint customer-data list".to_string(),
+            ));
+        }
+        self.customer_data = Some(PresentationCustomerDataList::default());
         Ok(())
     }
 
@@ -1581,6 +1663,79 @@ mod tests {
     }
 
     #[test]
+    fn parses_customer_data_references_by_namespace() {
+        let xml = format!(
+            r#"<q:presentation xmlns:q="{P}" xmlns:rel="{R}" xmlns:f="urn:foreign">
+                <f:custDataLst><f:custData rel:id="spoof"/></f:custDataLst>
+                <q:custDataLst>
+                    <f:custData rel:id="spoof"/>
+                    <q:custData f:id="wrong" rel:id="customer-data-alpha">
+                        <q:tags rel:id="nested"/>
+                    </q:custData>
+                    <q:custData rel:id="customer-data-beta"/>
+                    <q:tags rel:id="customer-data-tags"/>
+                </q:custDataLst>
+                <q:extLst><q:custDataLst>
+                    <q:custData rel:id="extension"/>
+                </q:custDataLst></q:extLst>
+            </q:presentation>"#
+        );
+        let blob = part(xml);
+        let customer_data = PresentationPart::from_part(&blob)
+            .unwrap()
+            .customer_data()
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            customer_data.custom_data_relationship_ids(),
+            ["customer-data-alpha", "customer-data-beta"]
+        );
+        assert_eq!(
+            customer_data.tags_relationship_id(),
+            Some("customer-data-tags")
+        );
+
+        let strict = r#"<x:presentation xmlns:x="http://purl.oclc.org/ooxml/presentationml/main"
+            xmlns:z="http://purl.oclc.org/ooxml/officeDocument/relationships">
+            <x:custDataLst><x:custData z:id="strict-customer-data"/>
+            <x:tags z:id="strict-customer-data-tags"/></x:custDataLst></x:presentation>"#;
+        let blob = part(strict);
+        let customer_data = PresentationPart::from_part(&blob)
+            .unwrap()
+            .customer_data()
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            customer_data.custom_data_relationship_ids(),
+            ["strict-customer-data"]
+        );
+        assert_eq!(
+            customer_data.tags_relationship_id(),
+            Some("strict-customer-data-tags")
+        );
+
+        let empty = format!(r#"<p:presentation xmlns:p="{P}"><p:custDataLst/></p:presentation>"#);
+        let blob = part(empty);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .customer_data()
+                .unwrap(),
+            Some(PresentationCustomerDataList::default())
+        );
+
+        let absent = format!(r#"<p:presentation xmlns:p="{P}"></p:presentation>"#);
+        let blob = part(absent);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .customer_data()
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
     fn rejects_duplicate_default_text_style_declarations() {
         let cases = [
             format!(
@@ -1626,6 +1781,42 @@ mod tests {
                 PresentationPart::from_part(&blob)
                     .unwrap()
                     .smart_tags_relationship_id()
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_customer_data_references() {
+        let cases = [
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:custDataLst><p:custData/></p:custDataLst></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:custDataLst><p:custData r:id=""/></p:custDataLst></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:custDataLst><p:tags/></p:custDataLst></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:custDataLst><p:tags r:id=""/></p:custDataLst></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:custDataLst><p:tags r:id="one"/><p:tags r:id="two"/></p:custDataLst></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}" xmlns:z="http://purl.oclc.org/ooxml/officeDocument/relationships"><p:custDataLst><p:custData r:id="one" z:id="two"/></p:custDataLst></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:custDataLst/><p:custDataLst/></p:presentation>"#
+            ),
+        ];
+        for xml in cases {
+            let blob = part(xml);
+            assert!(
+                PresentationPart::from_part(&blob)
+                    .unwrap()
+                    .customer_data()
                     .is_err()
             );
         }

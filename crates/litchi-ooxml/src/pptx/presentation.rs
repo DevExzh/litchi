@@ -7,8 +7,9 @@ use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_trace
 use crate::pptx::namespace::is_presentationml_name;
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
 use crate::pptx::parts::{
-    NotesSize, PresentationDefaultTextStyle, PresentationKinsokuSettings, PresentationMetadata,
-    PresentationPart, PresentationPhotoAlbum, SlideMasterPart, SlidePart, SlideSize,
+    NotesSize, PresentationCustomerDataList, PresentationDefaultTextStyle,
+    PresentationKinsokuSettings, PresentationMetadata, PresentationPart, PresentationPhotoAlbum,
+    SlideMasterPart, SlidePart, SlideSize,
 };
 use crate::pptx::show_events::{
     PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events,
@@ -449,6 +450,13 @@ impl<'a> Presentation<'a> {
     /// Returns None when the presentation is not declared as a photo album.
     pub fn photo_album(&self) -> Result<Option<PresentationPhotoAlbum>> {
         self.part.photo_album()
+    }
+
+    /// Get the presentation-level customer-data relationship references.
+    ///
+    /// Returns None when the presentation does not declare customer data.
+    pub fn customer_data(&self) -> Result<Option<PresentationCustomerDataList>> {
+        self.part.customer_data()
     }
 
     /// Get the relationship ID of the declared smart-tags data.

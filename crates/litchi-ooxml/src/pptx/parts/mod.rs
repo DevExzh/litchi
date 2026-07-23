@@ -54,8 +54,8 @@ pub use comment::{
 };
 pub use presentation::{
     NotesSize, PhotoAlbumFrame, PhotoAlbumLayout, PresentationConformance,
-    PresentationDefaultTextStyle, PresentationKinsokuSettings, PresentationMetadata,
-    PresentationPart, PresentationPhotoAlbum, SlideSize,
+    PresentationCustomerDataList, PresentationDefaultTextStyle, PresentationKinsokuSettings,
+    PresentationMetadata, PresentationPart, PresentationPhotoAlbum, SlideSize,
 };
 pub use slide::{
     MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,

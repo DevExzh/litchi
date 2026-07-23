@@ -203,9 +203,10 @@ pub use parts::{
 };
 pub use parts::{
     MasterVisibility, NotesSize, PhotoAlbumFrame, PhotoAlbumLayout, PresentationConformance,
-    PresentationDefaultTextStyle, PresentationKinsokuSettings, PresentationMetadata,
-    PresentationPhotoAlbum, SlideHeaderFooterVisibility, SlideLayoutMetadata,
-    SlideLayoutReference, SlideMasterTextStyle, SlideMasterTextStyles, SlideSize,
+    PresentationCustomerDataList, PresentationDefaultTextStyle, PresentationKinsokuSettings,
+    PresentationMetadata, PresentationPhotoAlbum, SlideHeaderFooterVisibility,
+    SlideLayoutMetadata, SlideLayoutReference, SlideMasterTextStyle, SlideMasterTextStyles,
+    SlideSize,
 };
 pub use presentation::{PptxChart, PptxTagList, Presentation};
 pub use presentation_properties::{
