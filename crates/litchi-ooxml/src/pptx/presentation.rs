@@ -13,6 +13,63 @@ use crate::pptx::tags::{SlideTagList, TagList};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
+use litchi_opc::part::Part;
+
+const STRICT_SLIDE_RELATIONSHIP_TYPE: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/slide";
+const STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/slideMaster";
+
+fn resolve_presentation_relationship<'a>(
+    presentation_part: &dyn Part,
+    package: &'a OpcPackage,
+    relationship_id: &str,
+    relationship_types: &[&str],
+    relationship_label: &str,
+    expected_content_type: &str,
+) -> Result<&'a dyn Part> {
+    let relationship = presentation_part
+        .rels()
+        .get(relationship_id)
+        .ok_or_else(|| {
+            OoxmlError::InvalidRelationship(format!(
+                "presentation references missing {relationship_label} relationship '{relationship_id}'"
+            ))
+        })?;
+    if !relationship_types
+        .iter()
+        .any(|relationship_type| relationship.reltype() == *relationship_type)
+    {
+        return Err(OoxmlError::InvalidRelationship(format!(
+            "relationship '{relationship_id}' is not a {relationship_label} relationship"
+        )));
+    }
+    if relationship.is_external() {
+        return Err(OoxmlError::InvalidRelationship(format!(
+            "{relationship_label} relationship '{relationship_id}' must be internal"
+        )));
+    }
+
+    let part_name = relationship.target_partname().map_err(|error| {
+        OoxmlError::InvalidRelationship(format!(
+            "invalid {relationship_label} relationship '{relationship_id}': {error}"
+        ))
+    })?;
+    let target = package.get_part(&part_name).map_err(|error| {
+        OoxmlError::PartNotFound(format!(
+            "{relationship_label} relationship '{relationship_id}' targets missing part '{}': {error}",
+            part_name.as_str()
+        ))
+    })?;
+    if target.content_type() != expected_content_type {
+        return Err(OoxmlError::InvalidContentType {
+            expected: expected_content_type.to_string(),
+            got: target.content_type().to_string(),
+        });
+    }
+
+    Ok(target)
+}
 
 /// A chart part discovered on a presentation slide.
 ///
@@ -228,16 +285,15 @@ impl<'a> Presentation<'a> {
         let pres_part = self.part.part();
 
         for rid in slide_rids {
-            // Get the target reference from the relationship
-            let target_ref = pres_part.target_ref(&rid)?;
-
-            // Resolve the target partname and get the part from the package
-            let base_uri = pres_part.partname().base_uri();
-            let target_partname = PackURI::from_rel_ref(base_uri, target_ref)
-                .map_err(crate::error::OoxmlError::InvalidFormat)?;
-            let related_part = self.package.get_part(&target_partname)?;
-
-            let slide_part = SlidePart::from_part(related_part)?;
+            let slide = resolve_presentation_relationship(
+                pres_part,
+                self.package,
+                &rid,
+                &[rt::SLIDE, STRICT_SLIDE_RELATIONSHIP_TYPE],
+                "slide",
+                ct::PML_SLIDE,
+            )?;
+            let slide_part = SlidePart::from_part(slide)?;
             slides.push(Slide::with_package(slide_part, self.package));
         }
 
@@ -268,16 +324,15 @@ impl<'a> Presentation<'a> {
         let pres_part = self.part.part();
 
         for rid in master_rids {
-            // Get the target reference from the relationship
-            let target_ref = pres_part.target_ref(&rid)?;
-
-            // Resolve the target partname and get the part from the package
-            let base_uri = pres_part.partname().base_uri();
-            let target_partname = PackURI::from_rel_ref(base_uri, target_ref)
-                .map_err(crate::error::OoxmlError::InvalidFormat)?;
-            let related_part = self.package.get_part(&target_partname)?;
-
-            let master_part = SlideMasterPart::from_part(related_part)?;
+            let master = resolve_presentation_relationship(
+                pres_part,
+                self.package,
+                &rid,
+                &[rt::SLIDE_MASTER, STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE],
+                "slide-master",
+                ct::PML_SLIDE_MASTER,
+            )?;
+            let master_part = SlideMasterPart::from_part(master)?;
             masters.push(SlideMaster::with_package(master_part, self.package));
         }
 
