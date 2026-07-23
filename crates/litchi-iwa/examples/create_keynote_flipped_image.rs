@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideImageOptions};
 use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 704.0, y: 284.0 };
@@ -30,8 +30,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .title("Flipped Image")
         .subtitle("Typed native Arrange flip")
         .build()?;
-    let created =
-        editor.add_slide_image(0, preferred_filename, &image, IMAGE_POSITION, IMAGE_SIZE)?;
+    let created = editor.add_slide_image(
+        0,
+        preferred_filename,
+        &image,
+        KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+    )?;
     editor.flip_slide_image(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)?;
     editor.save(output)?;
     println!(

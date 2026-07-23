@@ -10,7 +10,7 @@ use crate::data_reference_registry::{
 use crate::image_adjustments::replace_image_adjustments;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, offset_drawable_geometry,
+    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
 
 mod graph;
@@ -43,6 +43,35 @@ pub struct KeynoteSlideImageInfo {
     pub natural_size: Option<DrawableSize>,
 }
 
+/// Typed layout metadata for a newly created Keynote slide image.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeynoteSlideImageOptions {
+    /// Top-left position on the slide, in points.
+    pub position: DrawablePoint,
+    /// Displayed image size on the slide, in points.
+    pub size: DrawableSize,
+    /// Untransformed media dimensions reported to Keynote, in points.
+    pub natural_size: DrawableSize,
+}
+
+impl KeynoteSlideImageOptions {
+    /// Create options whose displayed and natural dimensions are identical.
+    pub const fn new(position: DrawablePoint, size: DrawableSize) -> Self {
+        Self {
+            position,
+            size,
+            natural_size: size,
+        }
+    }
+
+    /// Set media dimensions independently of the displayed size.
+    #[must_use]
+    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
+        self.natural_size = natural_size;
+        self
+    }
+}
+
 /// Result of removing one slide-owned image and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedKeynoteSlideImage {
@@ -67,10 +96,9 @@ impl KeynoteEditor {
         slide_index: usize,
         preferred_filename: &str,
         data: &[u8],
-        position: DrawablePoint,
-        size: DrawableSize,
+        options: KeynoteSlideImageOptions,
     ) -> Result<KeynoteSlideImageInfo> {
-        let geometry = image_geometry(position, size)?;
+        let geometry = image_creation_values(options)?;
         let context = image_creation_context(self, slide_index)?;
         let ids = ImageObjectIds::allocate(next_object_identifier(self.package())?)?;
 
@@ -89,6 +117,7 @@ impl KeynoteEditor {
             context.style_id,
             asset.data_identifier,
             geometry,
+            options.natural_size,
         )?;
         staged.update_archive(&context.archive_name, |archive| {
             for object in objects {
@@ -130,6 +159,8 @@ impl KeynoteEditor {
         if created.kind != KeynoteSlideImageKind::File
             || created.image_data_identifier != asset.data_identifier
             || created.geometry != geometry
+            || created.original_size != Some(options.natural_size)
+            || created.natural_size != Some(options.natural_size)
             || created_graph.object_ids != ids.all()
             || verified.extract_media(asset.data_identifier)? != data
         {
@@ -150,6 +181,40 @@ impl KeynoteEditor {
         Ok(require_file_image(self, slide_index, drawable_object_id)?
             .info
             .geometry)
+    }
+
+    /// Restore a file-backed slide image's displayed dimensions from its stored original size.
+    ///
+    /// This keeps the current position, rotation, reflection, media asset, adjustments,
+    /// and properties unchanged. It returns an error when the image has no native
+    /// original-size metadata.
+    pub fn restore_slide_image_original_size(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<DrawableGeometry> {
+        let source = require_file_image(self, slide_index, drawable_object_id)?;
+        let original_size = source.info.original_size.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Keynote image {drawable_object_id} has no original-size metadata"
+            ))
+        })?;
+        let geometry = restore_drawable_original_size(source.info.geometry, original_size)?;
+        let mut staged = self.package().clone();
+        set_image_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_image_geometry(slide_index, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Keynote image original-size update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Apply one native Arrange Flip operation to an ordinary file-backed slide image.
@@ -510,6 +575,15 @@ mod tests {
         width: 512.0,
         height: 512.0,
     };
+    const NATURAL_IMAGE_SIZE: DrawableSize = DrawableSize {
+        width: 640.0,
+        height: 480.0,
+    };
+
+    fn options() -> KeynoteSlideImageOptions {
+        KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)
+            .with_natural_size(NATURAL_IMAGE_SIZE)
+    }
 
     #[test]
     fn scratch_presentation_supports_image_crud_without_a_source_drawable() {
@@ -524,12 +598,12 @@ mod tests {
         assert!(editor.slide_images(0).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
         let created = editor
-            .add_slide_image(0, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+            .add_slide_image(0, "lena.png", &original, options())
             .unwrap();
         assert_eq!(created.kind, KeynoteSlideImageKind::File);
         assert_eq!(created.thumbnail_data_identifier, None);
-        assert_eq!(created.original_size, Some(IMAGE_SIZE));
-        assert_eq!(created.natural_size, Some(IMAGE_SIZE));
+        assert_eq!(created.original_size, Some(NATURAL_IMAGE_SIZE));
+        assert_eq!(created.natural_size, Some(NATURAL_IMAGE_SIZE));
         assert_eq!(
             editor.extract_media(created.image_data_identifier).unwrap(),
             original
@@ -559,6 +633,20 @@ mod tests {
                 .unwrap(),
             changed_geometry
         );
+        let restored_original_size = editor
+            .restore_slide_image_original_size(0, created.drawable_object_id)
+            .unwrap();
+        let expected_original_size_geometry = DrawableGeometry {
+            size: Some(NATURAL_IMAGE_SIZE),
+            ..changed_geometry
+        };
+        assert_eq!(restored_original_size, expected_original_size_geometry);
+        assert_eq!(
+            editor
+                .slide_image_geometry(0, created.drawable_object_id)
+                .unwrap(),
+            expected_original_size_geometry
+        );
         let horizontally_flipped = editor
             .flip_slide_image(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)
             .unwrap();
@@ -568,7 +656,10 @@ mod tests {
                 .unwrap(),
             horizontally_flipped
         );
-        assert_ne!(horizontally_flipped.flags, changed_geometry.flags);
+        assert_ne!(
+            horizontally_flipped.flags,
+            expected_original_size_geometry.flags
+        );
         let vertically_flipped = editor
             .flip_slide_image(0, created.drawable_object_id, DrawableFlipAxis::Vertical)
             .unwrap();
@@ -578,7 +669,10 @@ mod tests {
                 .unwrap(),
             vertically_flipped
         );
-        assert_ne!(vertically_flipped.angle, changed_geometry.angle);
+        assert_ne!(
+            vertically_flipped.angle,
+            expected_original_size_geometry.angle
+        );
 
         let changed_properties = DrawableProperties {
             hyperlink_url: Some("https://example.test/keynote-image".to_owned()),
@@ -668,7 +762,7 @@ mod tests {
             .build()
             .unwrap();
         let source = editor
-            .add_slide_image(0, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+            .add_slide_image(0, "lena.png", &original, options())
             .unwrap();
         let source_properties = DrawableProperties {
             hyperlink_url: Some("https://example.test/keynote-source".to_owned()),
@@ -711,6 +805,8 @@ mod tests {
             duplicate.thumbnail_data_identifier,
             source.thumbnail_data_identifier
         );
+        assert_eq!(duplicate.original_size, source.original_size);
+        assert_eq!(duplicate.natural_size, source.natural_size);
         assert_eq!(duplicate.properties, source_properties);
         assert_eq!(
             duplicate.geometry.position,
@@ -817,20 +913,31 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         assert!(
             editor
+                .add_slide_image(0, "payload.bin", b"not an image", options())
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert!(
+            editor
                 .add_slide_image(
                     0,
-                    "payload.bin",
-                    b"not an image",
-                    IMAGE_POSITION,
-                    IMAGE_SIZE
+                    "lena.png",
+                    &original,
+                    options().with_natural_size(DrawableSize {
+                        width: 0.0,
+                        height: NATURAL_IMAGE_SIZE.height,
+                    }),
                 )
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let created = editor
-            .add_slide_image(0, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+            .add_slide_image(0, "lena.png", &original, options())
             .unwrap();
+        let before_restore = editor.to_bytes().unwrap();
+        assert!(editor.restore_slide_image_original_size(0, 999).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before_restore);
         let before_flip = editor.to_bytes().unwrap();
         assert!(
             editor

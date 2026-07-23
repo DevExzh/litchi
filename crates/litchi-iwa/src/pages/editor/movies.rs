@@ -632,6 +632,7 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pages::PagesImageOptions;
     use crate::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-pages-movie";
@@ -980,7 +981,12 @@ mod tests {
         }
 
         let image = editor
-            .add_body_image(4, "poster.png", POSTER, POSITION, SIZE)
+            .add_body_image(
+                4,
+                "poster.png",
+                POSTER,
+                PagesImageOptions::new(POSITION, SIZE),
+            )
             .unwrap();
         let before = editor.to_bytes().unwrap();
         assert!(

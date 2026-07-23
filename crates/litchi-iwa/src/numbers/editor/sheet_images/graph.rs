@@ -84,24 +84,19 @@ pub(super) struct SheetImageGraph {
     pub(super) data_references: Vec<(u64, u64)>,
 }
 
-pub(super) fn image_geometry(
-    position: DrawablePoint,
-    size: DrawableSize,
-) -> Result<DrawableGeometry> {
-    if !position.x.is_finite()
-        || !position.y.is_finite()
-        || !size.width.is_finite()
-        || !size.height.is_finite()
-        || size.width <= 0.0
-        || size.height <= 0.0
+pub(super) fn image_creation_values(options: NumbersSheetImageOptions) -> Result<DrawableGeometry> {
+    if !options.natural_size.width.is_finite()
+        || !options.natural_size.height.is_finite()
+        || options.natural_size.width <= 0.0
+        || options.natural_size.height <= 0.0
     {
         return Err(Error::ParseError(
-            "Numbers image position must be finite and size must be finite and positive".to_owned(),
+            "Numbers image natural size must be finite and greater than zero".to_owned(),
         ));
     }
     DrawableGeometry {
-        position: Some(position),
-        size: Some(size),
+        position: Some(options.position),
+        size: Some(options.size),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_IMAGE_ROTATION_DEGREES),
     }
@@ -442,6 +437,7 @@ pub(super) fn image_objects(
     style_id: u64,
     data_identifier: u64,
     geometry: DrawableGeometry,
+    natural_size: DrawableSize,
 ) -> Result<[ArchiveObject; 3]> {
     let position = geometry.position.ok_or_else(|| {
         Error::InvalidFormat("validated Numbers image geometry has no position".to_owned())
@@ -485,12 +481,12 @@ pub(super) fn image_objects(
         }),
         style: Some(reference(style_id)),
         original_size: Some(tsp::Size {
-            width: size.width,
-            height: size.height,
+            width: natural_size.width,
+            height: natural_size.height,
         }),
         natural_size: Some(tsp::Size {
-            width: size.width,
-            height: size.height,
+            width: natural_size.width,
+            height: natural_size.height,
         }),
         flags: Some(DEFAULT_IMAGE_FLAGS),
         ..Default::default()

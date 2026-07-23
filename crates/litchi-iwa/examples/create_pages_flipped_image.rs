@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
 use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
@@ -32,8 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         body.encode_utf16().count(),
         preferred_filename,
         &image,
-        IMAGE_POSITION,
-        IMAGE_SIZE,
+        PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
     )?;
     editor.flip_body_image(created.drawable_object_id, DrawableFlipAxis::Horizontal)?;
     editor.save(output)?;

@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
 use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
@@ -34,8 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         preferred_filename,
         &image,
-        IMAGE_POSITION,
-        IMAGE_SIZE,
+        NumbersSheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
     )?;
     editor.flip_sheet_image(
         sheet_id,

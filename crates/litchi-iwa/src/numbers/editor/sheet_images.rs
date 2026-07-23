@@ -10,7 +10,7 @@ use crate::data_reference_registry::{
 use crate::image_adjustments::replace_image_adjustments;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, offset_drawable_geometry,
+    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
 
 mod graph;
@@ -31,6 +31,35 @@ pub struct NumbersSheetImageInfo {
     pub image_adjustments: ImageAdjustments,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
+}
+
+/// Typed layout metadata for a newly created Numbers sheet image.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NumbersSheetImageOptions {
+    /// Top-left position on the sheet, in points.
+    pub position: DrawablePoint,
+    /// Displayed image size, in points.
+    pub size: DrawableSize,
+    /// Untransformed media dimensions reported to Numbers, in points.
+    pub natural_size: DrawableSize,
+}
+
+impl NumbersSheetImageOptions {
+    /// Create options whose displayed and natural dimensions are identical.
+    pub const fn new(position: DrawablePoint, size: DrawableSize) -> Self {
+        Self {
+            position,
+            size,
+            natural_size: size,
+        }
+    }
+
+    /// Set media dimensions independently of the displayed size.
+    #[must_use]
+    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
+        self.natural_size = natural_size;
+        self
+    }
 }
 
 /// Result of removing one sheet-owned image and its private object graph.
@@ -57,10 +86,9 @@ impl NumbersEditor {
         sheet_id: u64,
         preferred_filename: &str,
         data: &[u8],
-        position: DrawablePoint,
-        size: DrawableSize,
+        options: NumbersSheetImageOptions,
     ) -> Result<NumbersSheetImageInfo> {
-        let geometry = image_geometry(position, size)?;
+        let geometry = image_creation_values(options)?;
         let context = image_creation_context(self, sheet_id)?;
         let ids = ImageObjectIds::allocate(next_object_identifier(&self.package)?)?;
 
@@ -79,6 +107,7 @@ impl NumbersEditor {
             context.style_id,
             asset.data_identifier,
             geometry,
+            options.natural_size,
         )?;
         staged.update_archive(&context.archive_name, |archive| {
             for object in objects {
@@ -121,6 +150,8 @@ impl NumbersEditor {
         let created_graph = image_graph(&verified, sheet_id, ids.drawable)?;
         if created.image_data_identifier != asset.data_identifier
             || created.geometry != geometry
+            || created.original_size != Some(options.natural_size)
+            || created.natural_size != Some(options.natural_size)
             || created_graph.object_ids != ids.all()
             || verified.extract_media(asset.data_identifier)? != data
         {
@@ -141,6 +172,40 @@ impl NumbersEditor {
         Ok(image_graph(self, sheet_id, drawable_object_id)?
             .info
             .geometry)
+    }
+
+    /// Restore a sheet image's displayed dimensions from its stored original size.
+    ///
+    /// This keeps the current position, rotation, reflection, media asset, adjustments,
+    /// and properties unchanged. It returns an error when the image has no native
+    /// original-size metadata.
+    pub fn restore_sheet_image_original_size(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<DrawableGeometry> {
+        let source = image_graph(self, sheet_id, drawable_object_id)?;
+        let original_size = source.info.original_size.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers image {drawable_object_id} has no original-size metadata"
+            ))
+        })?;
+        let geometry = restore_drawable_original_size(source.info.geometry, original_size)?;
+        let mut staged = self.package.clone();
+        set_image_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_image_geometry(sheet_id, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Numbers image original-size update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Apply one native Arrange Flip operation to an ordinary sheet image.
@@ -514,7 +579,16 @@ mod tests {
         width: 320.0,
         height: 240.0,
     };
+    const NATURAL_IMAGE_SIZE: DrawableSize = DrawableSize {
+        width: 640.0,
+        height: 480.0,
+    };
     const UPDATED_ANGLE_DEGREES: f32 = 9.0;
+
+    fn options() -> NumbersSheetImageOptions {
+        NumbersSheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)
+            .with_natural_size(NATURAL_IMAGE_SIZE)
+    }
 
     #[test]
     fn scratch_spreadsheet_supports_image_crud_without_a_source_package() {
@@ -529,12 +603,12 @@ mod tests {
         assert!(editor.sheet_images(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
         let created = editor
-            .add_sheet_image(sheet_id, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+            .add_sheet_image(sheet_id, "lena.png", &original, options())
             .unwrap();
         assert_eq!(created.sheet_id, sheet_id);
         assert_eq!(created.thumbnail_data_identifier, None);
-        assert_eq!(created.original_size, Some(IMAGE_SIZE));
-        assert_eq!(created.natural_size, Some(IMAGE_SIZE));
+        assert_eq!(created.original_size, Some(NATURAL_IMAGE_SIZE));
+        assert_eq!(created.natural_size, Some(NATURAL_IMAGE_SIZE));
         assert_eq!(
             editor.extract_media(created.image_data_identifier).unwrap(),
             original
@@ -564,6 +638,20 @@ mod tests {
                 .unwrap(),
             changed_geometry
         );
+        let restored_original_size = editor
+            .restore_sheet_image_original_size(sheet_id, created.drawable_object_id)
+            .unwrap();
+        let expected_original_size_geometry = DrawableGeometry {
+            size: Some(NATURAL_IMAGE_SIZE),
+            ..changed_geometry
+        };
+        assert_eq!(restored_original_size, expected_original_size_geometry);
+        assert_eq!(
+            editor
+                .sheet_image_geometry(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            expected_original_size_geometry
+        );
         let horizontally_flipped = editor
             .flip_sheet_image(
                 sheet_id,
@@ -577,7 +665,10 @@ mod tests {
                 .unwrap(),
             horizontally_flipped
         );
-        assert_ne!(horizontally_flipped.flags, changed_geometry.flags);
+        assert_ne!(
+            horizontally_flipped.flags,
+            expected_original_size_geometry.flags
+        );
         let vertically_flipped = editor
             .flip_sheet_image(
                 sheet_id,
@@ -591,7 +682,10 @@ mod tests {
                 .unwrap(),
             vertically_flipped
         );
-        assert_ne!(vertically_flipped.angle, changed_geometry.angle);
+        assert_ne!(
+            vertically_flipped.angle,
+            expected_original_size_geometry.angle
+        );
 
         let changed_properties = DrawableProperties {
             hyperlink_url: Some("https://example.test/numbers-image".to_owned()),
@@ -696,7 +790,7 @@ mod tests {
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_image(sheet_id, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+            .add_sheet_image(sheet_id, "lena.png", &original, options())
             .unwrap();
         let source_properties = DrawableProperties {
             hyperlink_url: Some("https://example.test/numbers-source".to_owned()),
@@ -746,6 +840,8 @@ mod tests {
             duplicate.thumbnail_data_identifier,
             source.thumbnail_data_identifier
         );
+        assert_eq!(duplicate.original_size, source.original_size);
+        assert_eq!(duplicate.natural_size, source.natural_size);
         assert_eq!(duplicate.properties, source_properties);
         assert_eq!(
             duplicate.geometry.position,
@@ -853,26 +949,41 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         assert!(
             editor
-                .add_sheet_image(
-                    sheet_id,
-                    "payload.bin",
-                    b"not an image",
-                    IMAGE_POSITION,
-                    IMAGE_SIZE,
-                )
+                .add_sheet_image(sheet_id, "payload.bin", b"not an image", options(),)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         assert!(
             editor
-                .add_sheet_image(999, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+                .add_sheet_image(999, "lena.png", &original, options())
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert!(
+            editor
+                .add_sheet_image(
+                    sheet_id,
+                    "lena.png",
+                    &original,
+                    options().with_natural_size(DrawableSize {
+                        width: 0.0,
+                        height: NATURAL_IMAGE_SIZE.height,
+                    }),
+                )
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let created = editor
-            .add_sheet_image(sheet_id, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+            .add_sheet_image(sheet_id, "lena.png", &original, options())
             .unwrap();
+        let before_restore = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .restore_sheet_image_original_size(sheet_id, 999)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_restore);
         let before_flip = editor.to_bytes().unwrap();
         assert!(
             editor

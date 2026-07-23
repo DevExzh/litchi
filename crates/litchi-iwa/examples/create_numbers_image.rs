@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
@@ -33,8 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         preferred_filename,
         &image,
-        IMAGE_POSITION,
-        IMAGE_SIZE,
+        NumbersSheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
     )?;
     let mut properties = editor.sheet_image_properties(sheet_id, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded image: {preferred_filename}"));

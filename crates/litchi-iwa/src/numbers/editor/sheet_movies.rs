@@ -603,7 +603,7 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
     use crate::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-numbers-movie";
@@ -1022,7 +1022,12 @@ mod tests {
         }
 
         let image = editor
-            .add_sheet_image(sheet_id, "poster.png", POSTER, POSITION, SIZE)
+            .add_sheet_image(
+                sheet_id,
+                "poster.png",
+                POSTER,
+                NumbersSheetImageOptions::new(POSITION, SIZE),
+            )
             .unwrap();
         let before = editor.to_bytes().unwrap();
         assert!(

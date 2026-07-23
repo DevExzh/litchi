@@ -4,7 +4,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 704.0, y: 284.0 };
@@ -34,8 +34,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .title("Created from scratch")
         .subtitle("Native-style image duplication from typed IWA objects")
         .build()?;
-    let source =
-        editor.add_slide_image(0, preferred_filename, &image, IMAGE_POSITION, IMAGE_SIZE)?;
+    let source = editor.add_slide_image(
+        0,
+        preferred_filename,
+        &image,
+        KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+    )?;
     let duplicate = editor.duplicate_slide_image(0, source.drawable_object_id)?;
     editor.save(output)?;
     println!(

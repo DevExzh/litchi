@@ -11,7 +11,7 @@ use crate::image_adjustments::replace_image_adjustments;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, offset_drawable_geometry,
+    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
 
 mod graph;
@@ -33,6 +33,35 @@ pub struct PagesImageInfo {
     pub image_adjustments: ImageAdjustments,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
+}
+
+/// Typed layout metadata for a newly created Pages image.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PagesImageOptions {
+    /// Top-left position on the page, in points.
+    pub position: DrawablePoint,
+    /// Displayed image size, in points.
+    pub size: DrawableSize,
+    /// Untransformed media dimensions reported to Pages, in points.
+    pub natural_size: DrawableSize,
+}
+
+impl PagesImageOptions {
+    /// Create options whose displayed and natural dimensions are identical.
+    pub const fn new(position: DrawablePoint, size: DrawableSize) -> Self {
+        Self {
+            position,
+            size,
+            natural_size: size,
+        }
+    }
+
+    /// Set media dimensions independently of the displayed size.
+    #[must_use]
+    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
+        self.natural_size = natural_size;
+        self
+    }
 }
 
 /// Result of removing a body-anchored Pages image.
@@ -59,10 +88,9 @@ impl PagesEditor {
         anchor_character_index: usize,
         preferred_filename: &str,
         data: &[u8],
-        position: DrawablePoint,
-        size: DrawableSize,
+        options: PagesImageOptions,
     ) -> Result<PagesImageInfo> {
-        let geometry = image_geometry(position, size)?;
+        let geometry = image_creation_values(options)?;
         let root = root_document(self.package())?;
         let style_id = image_style_id(self.package(), &root)?;
         let first_identifier = next_object_identifier(self.package())?;
@@ -95,6 +123,7 @@ impl PagesEditor {
             style_id,
             asset.data_identifier,
             geometry,
+            options.natural_size,
             root.left_margin.unwrap_or_default(),
         )?;
         staged.update_archive(&archive_name, |archive| {
@@ -152,6 +181,8 @@ impl PagesEditor {
         if created.anchor_character_index != expected_anchor
             || created.image_data_identifier != asset.data_identifier
             || created.geometry != geometry
+            || created.original_size != Some(options.natural_size)
+            || created.natural_size != Some(options.natural_size)
             || created_graph.object_ids != ids.all()
             || verified.extract_media(asset.data_identifier)? != data
         {
@@ -166,6 +197,39 @@ impl PagesEditor {
     /// Read geometry for one body-anchored image.
     pub fn body_image_geometry(&self, drawable_object_id: u64) -> Result<DrawableGeometry> {
         Ok(body_image_graph(self, drawable_object_id)?.info.geometry)
+    }
+
+    /// Restore a body image's displayed dimensions from its stored original size.
+    ///
+    /// This keeps the current position, rotation, reflection, media asset, adjustments,
+    /// and properties unchanged. It returns an error when the image has no native
+    /// original-size metadata.
+    pub fn restore_body_image_original_size(
+        &mut self,
+        drawable_object_id: u64,
+    ) -> Result<DrawableGeometry> {
+        let source = body_image_graph(self, drawable_object_id)?;
+        let original_size = source.info.original_size.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages image {drawable_object_id} has no original-size metadata"
+            ))
+        })?;
+        let geometry = restore_drawable_original_size(source.info.geometry, original_size)?;
+        let mut staged = self.package().clone();
+        set_image_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_image_geometry(drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Pages image original-size update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Apply one native Arrange Flip operation to a body-anchored image.
@@ -529,7 +593,15 @@ mod tests {
         width: 240.0,
         height: 180.0,
     };
+    const NATURAL_IMAGE_SIZE: DrawableSize = DrawableSize {
+        width: 640.0,
+        height: 480.0,
+    };
     const UPDATED_ANGLE_DEGREES: f32 = 7.5;
+
+    fn options() -> PagesImageOptions {
+        PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE).with_natural_size(NATURAL_IMAGE_SIZE)
+    }
 
     #[test]
     fn scratch_document_supports_image_crud_without_a_source_package() {
@@ -544,13 +616,12 @@ mod tests {
                 "Quarterly report".encode_utf16().count(),
                 "lena.png",
                 &original,
-                IMAGE_POSITION,
-                IMAGE_SIZE,
+                options(),
             )
             .unwrap();
         assert_eq!(created.thumbnail_data_identifier, None);
-        assert_eq!(created.original_size, Some(IMAGE_SIZE));
-        assert_eq!(created.natural_size, Some(IMAGE_SIZE));
+        assert_eq!(created.original_size, Some(NATURAL_IMAGE_SIZE));
+        assert_eq!(created.natural_size, Some(NATURAL_IMAGE_SIZE));
         assert_eq!(editor.body_text().unwrap(), "Quarterly report\u{fffc}");
         assert_eq!(
             editor.extract_media(created.image_data_identifier).unwrap(),
@@ -581,6 +652,20 @@ mod tests {
                 .unwrap(),
             changed_geometry
         );
+        let restored_original_size = editor
+            .restore_body_image_original_size(created.drawable_object_id)
+            .unwrap();
+        let expected_original_size_geometry = DrawableGeometry {
+            size: Some(NATURAL_IMAGE_SIZE),
+            ..changed_geometry
+        };
+        assert_eq!(restored_original_size, expected_original_size_geometry);
+        assert_eq!(
+            editor
+                .body_image_geometry(created.drawable_object_id)
+                .unwrap(),
+            expected_original_size_geometry
+        );
         let horizontally_flipped = editor
             .flip_body_image(created.drawable_object_id, DrawableFlipAxis::Horizontal)
             .unwrap();
@@ -590,7 +675,10 @@ mod tests {
                 .unwrap(),
             horizontally_flipped
         );
-        assert_ne!(horizontally_flipped.flags, changed_geometry.flags);
+        assert_ne!(
+            horizontally_flipped.flags,
+            expected_original_size_geometry.flags
+        );
         let vertically_flipped = editor
             .flip_body_image(created.drawable_object_id, DrawableFlipAxis::Vertical)
             .unwrap();
@@ -600,7 +688,10 @@ mod tests {
                 .unwrap(),
             vertically_flipped
         );
-        assert_ne!(vertically_flipped.angle, changed_geometry.angle);
+        assert_ne!(
+            vertically_flipped.angle,
+            expected_original_size_geometry.angle
+        );
 
         let changed_properties = DrawableProperties {
             hyperlink_url: Some("https://example.test/pages-image".to_owned()),
@@ -687,8 +778,7 @@ mod tests {
                 "Quarterly report".encode_utf16().count(),
                 "lena.png",
                 &original,
-                IMAGE_POSITION,
-                IMAGE_SIZE,
+                options(),
             )
             .unwrap();
         let source_properties = DrawableProperties {
@@ -732,6 +822,8 @@ mod tests {
             duplicate.thumbnail_data_identifier,
             source.thumbnail_data_identifier
         );
+        assert_eq!(duplicate.original_size, source.original_size);
+        assert_eq!(duplicate.natural_size, source.natural_size);
         assert_eq!(duplicate.properties, source_properties);
         assert_eq!(
             duplicate.geometry.position,
@@ -832,26 +924,37 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         assert!(
             editor
-                .add_body_image(
-                    4,
-                    "payload.bin",
-                    b"not an image",
-                    IMAGE_POSITION,
-                    IMAGE_SIZE,
-                )
+                .add_body_image(4, "payload.bin", b"not an image", options(),)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         assert!(
             editor
-                .add_body_image(5, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+                .add_body_image(5, "lena.png", &original, options())
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert!(
+            editor
+                .add_body_image(
+                    4,
+                    "lena.png",
+                    &original,
+                    options().with_natural_size(DrawableSize {
+                        width: 0.0,
+                        height: NATURAL_IMAGE_SIZE.height,
+                    }),
+                )
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let created = editor
-            .add_body_image(4, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
+            .add_body_image(4, "lena.png", &original, options())
             .unwrap();
+        let before_restore = editor.to_bytes().unwrap();
+        assert!(editor.restore_body_image_original_size(999).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before_restore);
         let before_flip = editor.to_bytes().unwrap();
         assert!(
             editor

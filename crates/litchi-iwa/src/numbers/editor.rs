@@ -3150,7 +3150,7 @@ pub use cell_merge::IWorkTableCellRegion;
 use model::*;
 pub use sheet_audio::{NumbersSheetAudioInfo, NumbersSheetAudioOptions, RemovedNumbersSheetAudio};
 pub use sheet_charts::{NumbersSheetChartInfo, RemovedNumbersSheetChart};
-pub use sheet_images::{NumbersSheetImageInfo, RemovedNumbersSheetImage};
+pub use sheet_images::{NumbersSheetImageInfo, NumbersSheetImageOptions, RemovedNumbersSheetImage};
 pub use sheet_movies::{NumbersSheetMovieInfo, NumbersSheetMovieOptions, RemovedNumbersSheetMovie};
 pub use sheet_shapes::{NumbersSheetShapeInfo, NumbersSheetShapeKind, RemovedNumbersSheetShape};
 use storage::*;

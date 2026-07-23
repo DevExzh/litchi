@@ -137,6 +137,13 @@ File-backed images use the same typed command through `flip_body_image`,
 adjustments, and metadata; see `create_*_flipped_image` for scratch-file
 examples.
 
+Images with native original-size metadata can also restore just their displayed
+dimensions through `restore_body_image_original_size`,
+`restore_sheet_image_original_size`, or `restore_slide_image_original_size`.
+Those operations retain the current position and transform while returning an
+error for media that has no original dimensions; see
+`create_*_original_size_image` for scratch-file examples.
+
 File-backed movies likewise expose `flip_body_movie`, `flip_sheet_movie`, and
 `flip_slide_movie`, preserving their video and poster assets, playback settings,
 and metadata; see `create_*_flipped_movie` for scratch-file examples.
@@ -151,7 +158,7 @@ error for media that has no original dimensions; see
 ### Create Pages documents from scratch
 
 ```rust
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
 
 let mut pages = PagesEditor::builder()
     .body_text("Created entirely by litchi-iwa")
@@ -309,8 +316,10 @@ let source = pages.add_body_image(
     body.encode_utf16().count(),
     "chart.png",
     &image,
-    DrawablePoint { x: 96.0, y: 144.0 },
-    DrawableSize { width: 300.0, height: 225.0 },
+    PagesImageOptions::new(
+        DrawablePoint { x: 96.0, y: 144.0 },
+        DrawableSize { width: 300.0, height: 225.0 },
+    ),
 )?;
 let duplicate_anchor = pages.body_text()?.encode_utf16().count();
 let duplicate = pages.duplicate_body_image(source.drawable_object_id, duplicate_anchor)?;
@@ -405,7 +414,7 @@ The complete drawable graph and metadata are generated from typed values; no
 existing text box or blank package is required:
 
 ```rust
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 let mut numbers = NumbersDocumentBuilder::new()
@@ -499,8 +508,10 @@ let source = numbers.add_sheet_image(
     sheet_id,
     "chart.png",
     &image,
-    DrawablePoint { x: 420.0, y: 180.0 },
-    DrawableSize { width: 320.0, height: 240.0 },
+    NumbersSheetImageOptions::new(
+        DrawablePoint { x: 420.0, y: 180.0 },
+        DrawableSize { width: 320.0, height: 240.0 },
+    ),
 )?;
 let duplicate = numbers.duplicate_sheet_image(sheet_id, source.drawable_object_id)?;
 assert_eq!(duplicate.image_data_identifier, source.image_data_identifier);
@@ -591,7 +602,7 @@ retained hidden for later toggling; fresh slides cloned from the layout preserve
 the same native behavior:
 
 ```rust
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideImageOptions};
 
 let mut keynote = KeynoteDocumentBuilder::new()
     .title("Native slide numbers")
@@ -725,8 +736,10 @@ let source = keynote.add_slide_image(
     0,
     "chart.png",
     &image,
-    DrawablePoint { x: 704.0, y: 284.0 },
-    DrawableSize { width: 512.0, height: 512.0 },
+    KeynoteSlideImageOptions::new(
+        DrawablePoint { x: 704.0, y: 284.0 },
+        DrawableSize { width: 512.0, height: 512.0 },
+    ),
 )?;
 let duplicate = keynote.duplicate_slide_image(0, source.drawable_object_id)?;
 assert_eq!(duplicate.image_data_identifier, source.image_data_identifier);

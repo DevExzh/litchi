@@ -4456,7 +4456,10 @@ pub use slide_background_gradient::{
 };
 pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
 use slide_graph::*;
-pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
+pub use slide_images::{
+    KeynoteSlideImageInfo, KeynoteSlideImageKind, KeynoteSlideImageOptions,
+    RemovedKeynoteSlideImage,
+};
 pub use slide_movies::{
     KeynoteSlideMovieInfo, KeynoteSlideMovieKind, KeynoteSlideMovieOptions,
     RemovedKeynoteSlideMovie,

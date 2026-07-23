@@ -4,7 +4,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
@@ -33,11 +33,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         preferred_filename,
         &image,
-        DrawablePoint { x: 704.0, y: 284.0 },
-        DrawableSize {
-            width: 512.0,
-            height: 512.0,
-        },
+        KeynoteSlideImageOptions::new(
+            DrawablePoint { x: 704.0, y: 284.0 },
+            DrawableSize {
+                width: 512.0,
+                height: 512.0,
+            },
+        ),
     )?;
     let mut properties = editor.slide_image_properties(0, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded image: {preferred_filename}"));

@@ -1,6 +1,6 @@
 use std::fs;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
@@ -29,7 +29,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("image path has no UTF-8 filename")?;
 
     let mut editor = PagesEditor::create_with_text(body_text)?;
-    let created = editor.add_body_image(anchor, filename, &image, IMAGE_POSITION, IMAGE_SIZE)?;
+    let created = editor.add_body_image(
+        anchor,
+        filename,
+        &image,
+        PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+    )?;
     let mut properties = editor.body_image_properties(created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded image: {filename}"));
     editor.set_body_image_properties(created.drawable_object_id, properties)?;
