@@ -16,7 +16,7 @@ use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     Field, FieldStory, FieldText, FieldsTable, GoToButtonField, IfField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
-    MailMergeRecipientField, MergeField, PromptField,
+    MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -707,6 +707,24 @@ impl Document {
     /// Get the number of typed, inert `ASK` and `FILLIN` fields.
     pub fn prompt_field_count(&self) -> Result<usize> {
         Ok(self.prompt_fields()?.len())
+    }
+
+    /// Get typed, inert user-identity fields in story and source order.
+    ///
+    /// Returned values expose only stored kind, override, formatting, cached
+    /// result, and field state. This method never reads or modifies a host
+    /// user's identity, applies formatting, or refreshes a field.
+    pub fn user_identity_fields(&self) -> Result<Vec<UserIdentityField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::user_identity_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert user-identity fields.
+    pub fn user_identity_field_count(&self) -> Result<usize> {
+        Ok(self.user_identity_fields()?.len())
     }
 
     /// Get typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields in story and source

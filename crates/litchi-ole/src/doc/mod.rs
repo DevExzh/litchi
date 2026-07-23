@@ -110,7 +110,8 @@ pub use parts::fields::{
     GoToButtonField, IfField, MacroButtonField, MailMergeConditionalControlField,
     MailMergeConditionalControlKind, MailMergeCounterField, MailMergeCounterKind,
     MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind, MergeField,
-    MergeFieldSwitch, PromptField, PromptFieldKind,
+    MergeFieldSwitch, PromptField, PromptFieldKind, UserIdentityField, UserIdentityFieldKind,
+    UserIdentityFormatting,
 };
 pub use parts::glossary::{
     GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,
