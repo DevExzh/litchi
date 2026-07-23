@@ -17,7 +17,7 @@ use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
     CompareField, DdeField, DocumentContextField, DocumentInformationField, DocumentVariableField,
     ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
-    GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
+    GoToButtonField, IfField, IndexField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, QuoteField,
     ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
@@ -770,6 +770,25 @@ impl Document {
     /// Get the number of typed, inert legacy automatic-numbering fields.
     pub fn auto_number_field_count(&self) -> Result<usize> {
         Ok(self.auto_number_fields()?.len())
+    }
+
+    /// Get typed, inert `LISTNUM` fields in story and source order.
+    ///
+    /// Returned values expose only stored optional list names, switches, cached
+    /// results, and field state. This method never looks up a list, determines a
+    /// level or start value, calculates a number, changes layout, or refreshes
+    /// a field.
+    pub fn list_number_fields(&self) -> Result<Vec<ListNumberField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::list_number_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `LISTNUM` fields.
+    pub fn list_number_field_count(&self) -> Result<usize> {
+        Ok(self.list_number_fields()?.len())
     }
 
     /// Get typed, inert `SEQ` fields in story and source order.

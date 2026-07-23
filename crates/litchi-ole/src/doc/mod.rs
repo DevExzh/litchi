@@ -113,6 +113,7 @@ pub use parts::fields::{
 pub use parts::fields::DocumentPropertyField;
 pub use parts::fields::DocumentVariableField;
 pub use parts::fields::FormulaField;
+pub use parts::fields::ListNumberField;
 pub use parts::fields::QuoteField;
 pub use parts::fields::SequenceField;
 pub use parts::fields::SetField;
