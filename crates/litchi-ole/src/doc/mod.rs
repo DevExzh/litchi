@@ -116,6 +116,7 @@ pub use parts::fields::{
     UserIdentityFormatting,
 };
 pub use parts::fields::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
+pub use parts::fields::{DdeField, DdeFieldKind, DdeRepresentation};
 pub use parts::glossary::{
     GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,
 };

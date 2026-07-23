@@ -790,6 +790,135 @@ impl DocumentVariableField {
     }
 }
 
+/// The stored kind of a legacy Word DDE field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DdeFieldKind {
+    /// A `DDE` field, which can request automatic updates with `\\a`.
+    Dde,
+    /// A `DDEAUTO` field, which declares automatic updates.
+    DdeAuto,
+}
+
+/// One stored DDE result-representation switch.
+///
+/// This value describes a requested representation only. It never causes a
+/// source to be contacted, converted, embedded, or displayed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DdeRepresentation {
+    /// The `\\b` switch requests a bitmap representation.
+    Bitmap,
+    /// The `\\h` switch requests HTML-formatted text.
+    Html,
+    /// The `\\p` switch requests a picture representation.
+    Picture,
+    /// The `\\r` switch requests rich-text format.
+    RichText,
+    /// The `\\t` switch requests text-only format.
+    Text,
+    /// The `\\u` switch requests Unicode text.
+    UnicodeText,
+}
+
+/// Typed, inert metadata for a legacy Word `DDE` or `DDEAUTO` field.
+///
+/// [MS-DOC] §2.9.90 identifies their native field-type bytes. Application,
+/// source, item, representation, and storage switches remain stored metadata
+/// only. This type never launches an application, initiates a DDE conversation,
+/// opens a source, requests data, refreshes content, converts content, or
+/// executes code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DdeField {
+    field: Field,
+    instruction: String,
+    kind: DdeFieldKind,
+    application: String,
+    source: String,
+    item: Option<String>,
+    automatic_updates: bool,
+    representation: Option<DdeRepresentation>,
+    omit_graphic_data: bool,
+    unknown_switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl DdeField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return whether this is a `DDE` or `DDEAUTO` field.
+    pub fn kind(&self) -> DdeFieldKind {
+        self.kind
+    }
+
+    /// Return the stored DDE application name without launching it.
+    pub fn application(&self) -> &str {
+        &self.application
+    }
+
+    /// Return the stored source identifier without opening or resolving it.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Return the optional stored source item, such as a cell range or bookmark.
+    pub fn item(&self) -> Option<&str> {
+        self.item.as_deref()
+    }
+
+    /// Whether the stored instruction requests automatic DDE updates.
+    ///
+    /// This is metadata only. The API never performs an update.
+    pub fn requests_automatic_updates(&self) -> bool {
+        self.automatic_updates
+    }
+
+    /// Return the requested stored result representation, if present.
+    ///
+    /// This is metadata only and never triggers source access or conversion.
+    pub fn representation(&self) -> Option<DdeRepresentation> {
+        self.representation
+    }
+
+    /// Whether the stored `\\d` switch omits graphic data from the document.
+    ///
+    /// This is stored metadata only. The API never reads the source to obtain
+    /// omitted data.
+    pub fn omits_graphic_data(&self) -> bool {
+        self.omit_graphic_data
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    ///
+    /// These values are preserved as inert metadata and never interpreted.
+    pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from a DDE source.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The stored kind of a legacy Word mail-merge counter field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MailMergeCounterKind {
@@ -1580,6 +1709,37 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `DDE` or
+    /// `DDEAUTO` field.
+    ///
+    /// Stored application, source, item, and switch data are never used to
+    /// launch an application, initiate a DDE conversation, open a source,
+    /// request data, refresh a field, convert content, or execute code.
+    /// Malformed instructions remain available through this generic type and
+    /// return `None` here.
+    pub fn dde_link(&self) -> Option<DdeField> {
+        let parts = parse_dde_field_parts(&self.instruction)?;
+        if !matches!(
+            (self.field.field_type, parts.kind),
+            (FieldType::Dde, DdeFieldKind::Dde) | (FieldType::DdeAuto, DdeFieldKind::DdeAuto)
+        ) {
+            return None;
+        }
+        Some(DdeField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            kind: parts.kind,
+            application: parts.application,
+            source: parts.source,
+            item: parts.item,
+            automatic_updates: parts.automatic_updates,
+            representation: parts.representation,
+            omit_graphic_data: parts.omit_graphic_data,
+            unknown_switches: parts.unknown_switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed mail-merge counter.
     ///
     /// The stored kind and cached result are never used to select or count
@@ -1811,6 +1971,8 @@ const MAX_MERGE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MERGE_FIELD_SWITCHES: usize = 64;
 const MAX_DOCUMENT_VARIABLE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_VARIABLE_FIELD_SWITCHES: usize = 64;
+const MAX_DDE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_DDE_FIELD_SWITCHES: usize = 64;
 const MAX_MAIL_MERGE_COUNTER_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_NEXT_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_CONDITIONAL_CONTROL_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -1822,6 +1984,17 @@ const MAX_ADVANCE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_ADVANCE_FIELD_ADJUSTMENTS: usize = 64;
 const MAX_MAIL_MERGE_RECIPIENT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_RECIPIENT_FIELD_SWITCHES: usize = 64;
+
+struct DdeFieldParts {
+    kind: DdeFieldKind,
+    application: String,
+    source: String,
+    item: Option<String>,
+    automatic_updates: bool,
+    representation: Option<DdeRepresentation>,
+    omit_graphic_data: bool,
+    unknown_switches: Vec<MergeFieldSwitch>,
+}
 
 fn parse_macro_button_parts(instruction: &str) -> Option<(String, String)> {
     if instruction.len() > MAX_MACRO_BUTTON_INSTRUCTION_BYTES {
@@ -1971,6 +2144,106 @@ fn parse_document_variable_field_parts(
     }
 
     Some((variable_name, unknown_switches))
+}
+
+fn parse_dde_field_parts(instruction: &str) -> Option<DdeFieldParts> {
+    if instruction.len() > MAX_DDE_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    let kind = if keyword.eq_ignore_ascii_case("DDE") {
+        DdeFieldKind::Dde
+    } else if keyword.eq_ignore_ascii_case("DDEAUTO") {
+        DdeFieldKind::DdeAuto
+    } else {
+        return None;
+    };
+
+    let application = next_field_argument(instruction, &mut position).ok()??;
+    if application.is_empty() {
+        return None;
+    }
+    let source = next_field_argument(instruction, &mut position).ok()??;
+    if source.is_empty() {
+        return None;
+    }
+
+    skip_field_whitespace(instruction, &mut position);
+    let item = match peek_field_character(instruction, position) {
+        None | Some('\\') => None,
+        Some(_) => Some(next_field_argument(instruction, &mut position).ok()??),
+    };
+
+    let mut automatic_updates = kind == DdeFieldKind::DdeAuto;
+    let mut saw_automatic_update = false;
+    let mut representation = None;
+    let mut omit_graphic_data = false;
+    let mut unknown_switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' || unknown_switches.len() >= MAX_DDE_FIELD_SWITCHES {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        match name {
+            'a' if kind == DdeFieldKind::Dde => {
+                if saw_automatic_update || argument.is_some() {
+                    return None;
+                }
+                automatic_updates = true;
+                saw_automatic_update = true;
+            },
+            'a' => return None,
+            'd' => {
+                if representation.is_some() || omit_graphic_data || argument.is_some() {
+                    return None;
+                }
+                omit_graphic_data = true;
+            },
+            'b' | 'h' | 'p' | 'r' | 't' | 'u' => {
+                if representation.is_some() || omit_graphic_data || argument.is_some() {
+                    return None;
+                }
+                representation = Some(match name {
+                    'b' => DdeRepresentation::Bitmap,
+                    'h' => DdeRepresentation::Html,
+                    'p' => DdeRepresentation::Picture,
+                    'r' => DdeRepresentation::RichText,
+                    't' => DdeRepresentation::Text,
+                    'u' => DdeRepresentation::UnicodeText,
+                    _ => unreachable!("DDE representation switch was matched above"),
+                });
+            },
+            _ => unknown_switches.push(MergeFieldSwitch { name, argument }),
+        }
+    }
+
+    Some(DdeFieldParts {
+        kind,
+        application,
+        source,
+        item,
+        automatic_updates,
+        representation,
+        omit_graphic_data,
+        unknown_switches,
+    })
 }
 
 fn parse_mail_merge_counter_kind(instruction: &str) -> Option<MailMergeCounterKind> {
@@ -3131,6 +3404,89 @@ mod tests {
             ..text
         };
         assert!(wrong_type.document_variable().is_none());
+    }
+
+    #[test]
+    fn dde_links_expose_cached_metadata_without_activation() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::Dde,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" DDE Excel "missing.xlsx" "Sheet1!A1" \a \p \x "ignored" "#.to_string(),
+            result: Some("cached DDE".to_string()),
+        };
+
+        let dde = text.dde_link().unwrap();
+        assert_eq!(dde.field(), &field);
+        assert_eq!(dde.instruction(), text.instruction);
+        assert_eq!(dde.kind(), DdeFieldKind::Dde);
+        assert_eq!(dde.application(), "Excel");
+        assert_eq!(dde.source(), "missing.xlsx");
+        assert_eq!(dde.item(), Some("Sheet1!A1"));
+        assert!(dde.requests_automatic_updates());
+        assert_eq!(dde.representation(), Some(DdeRepresentation::Picture));
+        assert!(!dde.omits_graphic_data());
+        assert_eq!(dde.cached_result(), Some("cached DDE"));
+        assert!(dde.is_dirty());
+        assert!(dde.is_locked());
+        assert_eq!(dde.unknown_switches().len(), 1);
+        assert_eq!(dde.unknown_switches()[0].name(), 'x');
+        assert_eq!(dde.unknown_switches()[0].argument(), Some("ignored"));
+
+        let automatic = FieldText {
+            field: Field {
+                field_type: FieldType::DdeAuto,
+                ..field.clone()
+            },
+            instruction: r#"DDEAUTO Excel "missing.xlsx" "Sheet1!A2" \t"#.to_string(),
+            result: Some("cached auto".to_string()),
+        };
+        let automatic = automatic.dde_link().unwrap();
+        assert_eq!(automatic.kind(), DdeFieldKind::DdeAuto);
+        assert_eq!(automatic.item(), Some("Sheet1!A2"));
+        assert!(automatic.requests_automatic_updates());
+        assert_eq!(automatic.representation(), Some(DdeRepresentation::Text));
+
+        for instruction in [
+            r#"DDE Excel source \p \t"#,
+            r#"DDEAUTO Excel source \a"#,
+            r#"DDE Excel source \d \p"#,
+            r#"DDE Excel source \a value"#,
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.dde_link().is_none(), "{instruction}");
+        }
+
+        let wrong_keyword = FieldText {
+            instruction: "DDEAUTOMATED Excel source".to_string(),
+            ..text.clone()
+        };
+        assert!(wrong_keyword.dde_link().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Link,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.dde_link().is_none());
     }
 
     #[test]
