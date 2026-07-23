@@ -680,11 +680,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_libreoffice_dashed_line_fixture() {
-        let xml = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/filter/qa/unit/data/dashedline.fodg"
-        ));
+    fn parses_local_dashed_line_fixture() {
+        let xml = include_str!("../../../test-data/odf/drawing/dashed-line.fodg");
         let parsed = parse_drawing_stroke_dashes(xml).unwrap();
         let dash = parsed.get("DoubleDashDotDot").unwrap();
         assert_eq!(dash.dots1, Some(1));

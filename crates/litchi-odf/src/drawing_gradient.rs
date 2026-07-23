@@ -1300,16 +1300,12 @@ mod tests {
     }
 
     #[test]
-    fn parses_libreoffice_multicolor_gradient_fixture() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/xmloff/qa/unit/data/theme.fodp");
-        let Ok(xml) = std::fs::read_to_string(path) else {
-            return;
-        };
-        let gradients = parse_drawing_gradients(&xml).unwrap();
+    fn parses_local_multicolor_gradient_fixture() {
+        let xml = include_str!("../../../test-data/odf/drawing/multicolor-gradient.fodp");
+        let gradients = parse_drawing_gradients(xml).unwrap();
         assert!(gradients.gradients.len() >= 6);
         let OdfDrawingGradient::Legacy(first) = &gradients.gradients[0] else {
-            panic!("LibreOffice fixture should begin with a legacy gradient");
+            panic!("local fixture should begin with a legacy gradient");
         };
         assert_eq!(first.extension_stops.len(), 2);
         assert!(

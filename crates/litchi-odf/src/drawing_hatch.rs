@@ -566,13 +566,9 @@ mod tests {
     }
 
     #[test]
-    fn parses_libreoffice_angle_fixture() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/xmloff/qa/unit/data/tdf161327_HatchAngle.fodg");
-        let Ok(xml) = std::fs::read_to_string(path) else {
-            return;
-        };
-        let hatches = parse_drawing_hatches(&xml).unwrap();
+    fn parses_local_angle_fixture() {
+        let xml = include_str!("../../../test-data/odf/drawing/hatch-angles.fodg");
+        let hatches = parse_drawing_hatches(xml).unwrap();
         assert_eq!(hatches.hatches.len(), 4);
         assert_eq!(
             hatches.hatches[0].rotation.as_ref().unwrap().as_str(),
