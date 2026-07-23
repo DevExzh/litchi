@@ -583,6 +583,41 @@ impl OdfTemplateNameDisplay {
     }
 }
 
+/// Display format permitted by ODF 1.2's `text:chapter` field (§19.796.2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OdfChapterDisplay {
+    Name,
+    Number,
+    NumberAndName,
+    PlainNumber,
+    PlainNumberAndName,
+}
+
+impl OdfChapterDisplay {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Name => "name",
+            Self::Number => "number",
+            Self::NumberAndName => "number-and-name",
+            Self::PlainNumber => "plain-number",
+            Self::PlainNumberAndName => "plain-number-and-name",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "name" => Ok(Self::Name),
+            "number" => Ok(Self::Number),
+            "number-and-name" => Ok(Self::NumberAndName),
+            "plain-number" => Ok(Self::PlainNumber),
+            "plain-number-and-name" => Ok(Self::PlainNumberAndName),
+            _ => Err(Error::InvalidFormat(format!(
+                "invalid chapter text:display '{value}'"
+            ))),
+        }
+    }
+}
+
 /// Strict ODF `common-value-and-type-attlist` cached value group.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OdfCalculatedFieldValue {
@@ -1607,6 +1642,12 @@ pub enum OdfDynamicTextField {
     },
     /// Cached active spreadsheet sheet label; never resolves live sheet state.
     SheetName { display_text: String },
+    /// Cached chapter presentation; never resolves or updates the document outline.
+    Chapter {
+        display: Option<OdfChapterDisplay>,
+        outline_level: Option<OdfNonNegativeInteger>,
+        display_text: String,
+    },
     /// Cached presentation and optional fixed value of a metadata field.
     DocumentMetadata {
         kind: OdfDocumentMetadataFieldKind,
@@ -1687,6 +1728,7 @@ impl OdfDynamicTextField {
             | Self::FileName { display_text, .. }
             | Self::TemplateName { display_text, .. }
             | Self::SheetName { display_text, .. }
+            | Self::Chapter { display_text, .. }
             | Self::DocumentMetadata { display_text, .. }
             | Self::DocumentIdentity { display_text, .. }
             | Self::Sender { display_text, .. }
@@ -2251,6 +2293,24 @@ impl OdfDynamicTextField {
                     &mut aggregate,
                 )?;
             },
+            Self::Chapter {
+                outline_level,
+                display_text,
+                ..
+            } => {
+                validate_dynamic_value(
+                    "text:outline-level",
+                    outline_level.as_ref().map(OdfNonNegativeInteger::as_str),
+                    true,
+                    &mut aggregate,
+                )?;
+                validate_dynamic_value(
+                    "chapter display text",
+                    Some(display_text),
+                    false,
+                    &mut aggregate,
+                )?;
+            },
             Self::DocumentMetadata {
                 kind,
                 value,
@@ -2407,6 +2467,7 @@ impl OdfDynamicTextField {
             Self::FileName { .. } => Element::new("text:file-name"),
             Self::TemplateName { .. } => Element::new("text:template-name"),
             Self::SheetName { .. } => Element::new("text:sheet-name"),
+            Self::Chapter { .. } => Element::new("text:chapter"),
             Self::DocumentMetadata { kind, .. } => Element::new(kind.element_name()),
             Self::DocumentIdentity { kind, .. } => Element::new(kind.element_name()),
             Self::Sender { kind, .. } => Element::new(kind.element_name()),
@@ -2822,6 +2883,19 @@ impl OdfDynamicTextField {
                 element.set_text(display_text);
             },
             Self::SheetName { display_text } => {
+                element.set_text(display_text);
+            },
+            Self::Chapter {
+                display,
+                outline_level,
+                display_text,
+            } => {
+                if let Some(display) = display {
+                    element.set_attribute("text:display", display.as_str());
+                }
+                if let Some(outline_level) = outline_level {
+                    element.set_attribute("text:outline-level", outline_level.as_str());
+                }
                 element.set_text(display_text);
             },
             Self::DocumentMetadata {
@@ -3529,6 +3603,24 @@ impl Field {
             "text:sheet-name" => {
                 reject_unknown_field_attributes(self, &[])?;
                 let result = OdfDynamicTextField::SheetName {
+                    display_text: text(),
+                };
+                result.validate()?;
+                result
+            },
+            "text:chapter" => {
+                reject_unknown_field_attributes(self, &["text:display", "text:outline-level"])?;
+                let result = OdfDynamicTextField::Chapter {
+                    display: self
+                        .element
+                        .get_attribute("text:display")
+                        .map(OdfChapterDisplay::parse)
+                        .transpose()?,
+                    outline_level: self
+                        .element
+                        .get_attribute("text:outline-level")
+                        .map(OdfNonNegativeInteger::new)
+                        .transpose()?,
                     display_text: text(),
                 };
                 result.validate()?;
@@ -7425,6 +7517,118 @@ mod sender_field_tests {
         let forbidden = OdfDynamicTextField::Sender {
             kind: OdfSenderFieldKind::Email,
             fixed: Some(false),
+            display_text: "bad\u{0}".to_string(),
+        };
+        assert!(forbidden.to_xml_fragment().is_err());
+    }
+}
+
+#[cfg(test)]
+mod chapter_field_tests {
+    use super::*;
+
+    fn document(body: &str) -> String {
+        format!(
+            r#"<o:document-content
+                xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+                <o:body><o:text><t:p>{body}</t:p></o:text></o:body>
+            </o:document-content>"#
+        )
+    }
+
+    #[test]
+    fn chapter_fields_round_trip_every_standard_display() {
+        let displays = [
+            None,
+            Some(OdfChapterDisplay::Name),
+            Some(OdfChapterDisplay::Number),
+            Some(OdfChapterDisplay::NumberAndName),
+            Some(OdfChapterDisplay::PlainNumber),
+            Some(OdfChapterDisplay::PlainNumberAndName),
+        ];
+        let fields = displays
+            .into_iter()
+            .enumerate()
+            .map(|(index, display)| OdfDynamicTextField::Chapter {
+                display,
+                outline_level: (index % 2 == 0)
+                    .then(|| OdfNonNegativeInteger::new(&index.to_string()).unwrap()),
+                display_text: format!("cached chapter {index} & <inert>"),
+            })
+            .collect::<Vec<_>>();
+        let body = fields
+            .iter()
+            .map(OdfDynamicTextField::to_xml_fragment)
+            .collect::<Result<Vec<_>>>()
+            .unwrap()
+            .join("");
+        let parsed = FieldParser::parse_dynamic_text_fields(&document(&body)).unwrap();
+        assert_eq!(parsed, fields);
+        assert_eq!(parsed[5].display_text(), "cached chapter 5 & <inert>");
+    }
+
+    #[test]
+    fn chapter_fields_preserve_omission_and_canonical_outline_levels() {
+        let xml = document(
+            r#"<t:chapter>untargeted</t:chapter>
+               <t:chapter t:display="number-and-name" t:outline-level="0002">two</t:chapter>"#,
+        );
+        let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
+        assert_eq!(fields.len(), 2);
+        assert!(matches!(
+            &fields[0],
+            OdfDynamicTextField::Chapter {
+                display: None,
+                outline_level: None,
+                ..
+            }
+        ));
+        let OdfDynamicTextField::Chapter {
+            display,
+            outline_level,
+            ..
+        } = &fields[1]
+        else {
+            panic!("expected chapter field");
+        };
+        assert_eq!(*display, Some(OdfChapterDisplay::NumberAndName));
+        assert_eq!(outline_level.as_ref().unwrap().as_str(), "2");
+    }
+
+    #[test]
+    fn chapter_fields_reject_hostile_attributes_and_bounds() {
+        let invalid = [
+            r#"<t:chapter t:display="full">chapter</t:chapter>"#,
+            r#"<t:chapter t:outline-level="-1">chapter</t:chapter>"#,
+            r#"<t:chapter t:outline-level="1.5">chapter</t:chapter>"#,
+            r#"<t:chapter t:fixed="true">chapter</t:chapter>"#,
+            r#"<t:chapter s:data-style-name="N">chapter</t:chapter>"#,
+        ];
+        for body in invalid {
+            assert!(
+                FieldParser::parse_dynamic_text_fields(&document(body)).is_err(),
+                "accepted {body}"
+            );
+        }
+
+        let wrong_namespace = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+            xmlns:x="urn:not-text"><o:body><o:text><t:p>
+            <t:chapter x:outline-level="2">spoof</t:chapter>
+            </t:p></o:text></o:body></o:document-content>"#;
+        assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
+
+        let oversized = OdfDynamicTextField::Chapter {
+            display: None,
+            outline_level: None,
+            display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
+        };
+        assert!(oversized.to_xml_fragment().is_err());
+        let forbidden = OdfDynamicTextField::Chapter {
+            display: Some(OdfChapterDisplay::Name),
+            outline_level: Some(OdfNonNegativeInteger::new("1").unwrap()),
             display_text: "bad\u{0}".to_string(),
         };
         assert!(forbidden.to_xml_fragment().is_err());
