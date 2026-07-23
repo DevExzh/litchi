@@ -489,7 +489,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 
 | Family | Extensions | Status | Read | Write | Notes |
 |--------|------------|--------|------|-------|-------|
-| Drawing | `.odg`, `.otg` | ✅ | ✅ | ✅ | Pages, layers, standard 2D shapes, groups, text, geometry, metadata, typed named fill-image/gradient/hatch/marker/opacity/stroke-dash inspection, resources, builder, and mutable CRUD; no link following, style-use resolution, or rendering |
+| Drawing | `.odg`, `.otg` | ✅ | ✅ | ✅ | Pages, layers, standard 2D shapes, groups, text, geometry, metadata, typed named fill-image/gradient/hatch/marker/opacity/stroke-dash inspection from immutable and mutable drawings, resources, builder, and mutable CRUD; no link following, style-use resolution, or rendering |
 | Standalone chart | `.odc`, `.otc` | ✅ | ✅ | ✅ | Titles, legends, plot areas, axes, series, data points, analytics nodes, cached tables, and semantic mutation |
 | Formula document | `.odf`, `.otf` | 🟡 | ✅ | 🟡 | MathML mixed-content model, annotations, lossless source save, and validated formula/template package construction from direct MathML roots; no typed MathML-tree editor or evaluation |
 | Image document | `.odi`, `.oti` | 🟡 | ✅ | 🟡 | Frames, linked/package/base64 images, text boxes, objects, tables, maps, and exact lossless save |

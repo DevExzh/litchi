@@ -1,5 +1,6 @@
 use litchi_odf::{
-    DrawingDocument, drawing_gradient::OdfDrawingGradient, drawing_stroke_dash::OdfStrokeDashStyle,
+    DrawingDocument, MutableDrawing, drawing_gradient::OdfDrawingGradient,
+    drawing_stroke_dash::OdfStrokeDashStyle,
 };
 use std::io::{Cursor, Write};
 
@@ -70,4 +71,20 @@ fn drawing_document_exposes_named_style_resources() {
         dashes.get("Dash").unwrap().effective_style(),
         OdfStrokeDashStyle::Round
     );
+
+    let mutable = document.to_mutable().unwrap();
+    assert_eq!(mutable.drawing_fill_images().unwrap(), fill_images);
+    assert_eq!(mutable.drawing_gradients().unwrap(), gradients);
+    assert_eq!(mutable.drawing_hatches().unwrap(), hatches);
+    assert_eq!(mutable.drawing_markers().unwrap(), markers);
+    assert_eq!(mutable.drawing_opacities().unwrap(), opacities);
+    assert_eq!(mutable.drawing_stroke_dashes().unwrap(), dashes);
+
+    let empty = MutableDrawing::new();
+    assert!(empty.drawing_fill_images().unwrap().images.is_empty());
+    assert!(empty.drawing_gradients().unwrap().gradients.is_empty());
+    assert!(empty.drawing_hatches().unwrap().hatches.is_empty());
+    assert!(empty.drawing_markers().unwrap().markers.is_empty());
+    assert!(empty.drawing_opacities().unwrap().opacities.is_empty());
+    assert!(empty.drawing_stroke_dashes().unwrap().dashes.is_empty());
 }

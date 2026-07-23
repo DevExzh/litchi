@@ -116,6 +116,81 @@ impl MutableDrawing {
         })
     }
 
+    fn preserved_styles_xml(&self) -> Result<Option<String>> {
+        let Some(source) = &self.source else {
+            return Ok(None);
+        };
+        if !source.package.has_file(constants::ODF_STYLES)? {
+            return Ok(None);
+        }
+        String::from_utf8(source.package.get_file(constants::ODF_STYLES)?)
+            .map(Some)
+            .map_err(|_| Error::InvalidFormat("drawing styles XML is not UTF-8".to_string()))
+    }
+
+    /// Inspect named drawing fill-image definitions from preserved styles metadata.
+    ///
+    /// Links remain stored metadata: this does not follow them, load linked
+    /// resources, or render images.
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::OdfDrawingFillImages> {
+        self.preserved_styles_xml()?.map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_fill_image::parse_drawing_fill_images(&styles),
+        )
+    }
+
+    /// Inspect named legacy and SVG drawing gradients from preserved styles metadata.
+    ///
+    /// This does not resolve style use sites or render gradients.
+    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::OdfDrawingGradients> {
+        self.preserved_styles_xml()?.map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_gradient::parse_drawing_gradients(&styles),
+        )
+    }
+
+    /// Inspect named drawing hatch definitions from preserved styles metadata.
+    ///
+    /// This does not resolve style use sites or render hatches.
+    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::OdfDrawingHatches> {
+        self.preserved_styles_xml()?.map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_hatch::parse_drawing_hatches(&styles),
+        )
+    }
+
+    /// Inspect named drawing marker definitions from preserved styles metadata.
+    ///
+    /// This does not resolve style use sites or render marker paths.
+    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::OdfDrawingMarkers> {
+        self.preserved_styles_xml()?.map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_marker::parse_drawing_markers(&styles),
+        )
+    }
+
+    /// Inspect named drawing opacity definitions from preserved styles metadata.
+    ///
+    /// This does not resolve style use sites or render opacity gradients.
+    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::OdfDrawingOpacities> {
+        self.preserved_styles_xml()?.map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_opacity::parse_drawing_opacities(&styles),
+        )
+    }
+
+    /// Inspect named drawing stroke-dash definitions from preserved styles metadata.
+    ///
+    /// This does not resolve style use sites or render strokes.
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<crate::drawing_stroke_dash::OdfDrawingStrokeDashes> {
+        self.preserved_styles_xml()?.map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_stroke_dash::parse_drawing_stroke_dashes(&styles),
+        )
+    }
+
     /// Return the package MIME type.
     pub fn mimetype(&self) -> &str {
         &self.mimetype
