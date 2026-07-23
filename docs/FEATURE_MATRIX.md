@@ -222,7 +222,7 @@ conversion, fonts, and image conversion are optional.
 | Classic comments | ✅ | ✅ | ✅ | Authors, slide comment parts, and package-aware CRUD |
 | Modern comments | ✅ | ✅ | ✅ | Authors, anchors, replies, status, and package-aware CRUD |
 | Speaker notes and notes masters | ✅ | ✅ | ✅ | Complete notes graph load/store with resources and themes |
-| Slide masters and layouts | 🟡 | ✅ | ❌ | Semantic reading plus slide- and master-scoped resolved layout access; no general master/layout authoring API |
+| Slide masters and layouts | 🟡 | ✅ | ❌ | Semantic reading plus slide/layout/master relationship resolution; no general master/layout authoring API |
 | Handout master | ✅ | ✅ | ✅ | Layout and header/footer settings |
 | Themes | 🟡 | ✅ | ❌ | Theme discovery/read model; no general theme authoring workflow |
 | Sections | ✅ | ✅ | ✅ | Graph-safe section and membership CRUD |

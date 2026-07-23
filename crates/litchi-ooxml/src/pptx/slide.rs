@@ -7,6 +7,8 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
 const STRICT_SLIDE_LAYOUT_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideLayout";
+const STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/slideMaster";
 
 /// A slide in a presentation.
 ///
@@ -437,7 +439,10 @@ impl<'a> Slide<'a> {
             });
         }
 
-        Ok(SlideLayout::new(SlideLayoutPart::from_part(layout_part)?))
+        Ok(SlideLayout::with_package(
+            SlideLayoutPart::from_part(layout_part)?,
+            package,
+        ))
     }
 
     /// Get typed simple animation timing metadata for this slide.
@@ -564,14 +569,16 @@ impl<'a> Slide<'a> {
 pub struct SlideLayout<'a> {
     /// The underlying slide layout part
     part: SlideLayoutPart<'a>,
+    /// Package used to resolve the layout's owning master.
+    package: &'a OpcPackage,
 }
 
 impl<'a> SlideLayout<'a> {
-    /// Create a new SlideLayout from a SlideLayoutPart.
+    /// Create a new SlideLayout with its owning package.
     #[allow(unused)]
     #[inline]
-    pub(crate) fn new(part: SlideLayoutPart<'a>) -> Self {
-        Self { part }
+    pub(crate) fn with_package(part: SlideLayoutPart<'a>, package: &'a OpcPackage) -> Self {
+        Self { part, package }
     }
 
     /// Get the layout name.
@@ -591,6 +598,62 @@ impl<'a> SlideLayout<'a> {
     /// Returns `None` if the layout has no transition.
     pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
         self.part.transition()
+    }
+
+    /// Resolve the slide master that owns this layout.
+    ///
+    /// The master relationship must be internal and target a PresentationML
+    /// slide-master part. A layout with no master relationship or more than one
+    /// master relationship is invalid.
+    pub fn master(&self) -> Result<SlideMaster<'a>> {
+        let layout_part = self.part.part();
+        let mut master_relationships = layout_part.rels().iter().filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::SLIDE_MASTER | STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE
+            )
+        });
+        let relationship = master_relationships.next().ok_or_else(|| {
+            OoxmlError::InvalidRelationship(
+                "slide layout does not have a slide-master relationship".to_string(),
+            )
+        })?;
+        if master_relationships.next().is_some() {
+            return Err(OoxmlError::InvalidRelationship(
+                "slide layout has multiple slide-master relationships".to_string(),
+            ));
+        }
+        if relationship.is_external() {
+            return Err(OoxmlError::InvalidRelationship(format!(
+                "slide-master relationship '{}' must be internal",
+                relationship.r_id()
+            )));
+        }
+
+        let part_name = relationship.target_partname().map_err(|error| {
+            OoxmlError::InvalidRelationship(format!(
+                "invalid slide-master relationship '{}': {error}",
+                relationship.r_id()
+            ))
+        })?;
+        let master_part = self.package.get_part(&part_name).map_err(|error| {
+            OoxmlError::PartNotFound(format!(
+                "slide-master relationship '{}' targets missing part '{}': {error}",
+                relationship.r_id(),
+                part_name.as_str()
+            ))
+        })?;
+        if master_part.content_type() != ct::PML_SLIDE_MASTER {
+            return Err(OoxmlError::InvalidContentType {
+                expected: ct::PML_SLIDE_MASTER.to_string(),
+                got: master_part.content_type().to_string(),
+            });
+        }
+
+        Ok(SlideMaster::with_package(
+            SlideMasterPart::from_part(master_part)?,
+            self.package,
+        ))
     }
 
     /// Get access to the underlying layout part.
@@ -713,7 +776,10 @@ impl<'a> SlideMaster<'a> {
                     got: layout_part.content_type().to_string(),
                 });
             }
-            layouts.push(SlideLayout::new(SlideLayoutPart::from_part(layout_part)?));
+            layouts.push(SlideLayout::with_package(
+                SlideLayoutPart::from_part(layout_part)?,
+                package,
+            ));
         }
 
         Ok(layouts)
