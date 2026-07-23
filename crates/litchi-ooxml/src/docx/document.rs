@@ -10,8 +10,8 @@ use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
     AdvanceField, AutoNumberField, BarcodeField, BibliographyField, BidiOutlineField,
-    CitationField, DatabaseField, DdeField, DocumentVariableField, EmbedField,
-    ExternalIncludeField, Field,
+    CitationField, DatabaseField, DdeField, DocumentPropertyField, DocumentVariableField,
+    EmbedField, ExternalIncludeField, Field,
     GoToButtonField, IfField,
     IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
@@ -1286,6 +1286,24 @@ impl<'a> Document<'a> {
     /// Get the number of document-variable fields in the main document.
     pub fn document_variable_field_count(&self) -> Result<usize> {
         Ok(self.document_variable_fields()?.len())
+    }
+
+    /// Get typed, inert `DOCPROPERTY` fields in document order.
+    ///
+    /// Returned values expose stored property names, switches, cached content,
+    /// and dirty/lock state only. This method never reads core, extended, or
+    /// custom package properties, resolves a value, or refreshes fields.
+    pub fn document_property_fields(&self) -> Result<Vec<DocumentPropertyField>> {
+        self.fields()?
+            .iter()
+            .map(Field::document_property)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `DOCPROPERTY` fields in the main document.
+    pub fn document_property_field_count(&self) -> Result<usize> {
+        Ok(self.document_property_fields()?.len())
     }
 
     /// Get typed, inert explicit legacy `INFO` fields in document order.

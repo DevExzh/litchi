@@ -3314,6 +3314,33 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_document_property_fields_without_resolution() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let paragraph = document.add_paragraph();
+            paragraph.add_field(crate::docx::writer::MutableField::with_result(
+                r#"DOCPROPERTY "Project Name" \* MERGEFORMAT \@ "MMMM d, yyyy""#.to_string(),
+                "cached project".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let fields = document.document_property_fields().unwrap();
+        assert_eq!(document.document_property_field_count().unwrap(), 1);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].property_name(), "Project Name");
+        assert_eq!(fields[0].cached_result(), Some("cached project"));
+        assert!(fields[0].has_switch('*'));
+        assert!(fields[0].has_switch('@'));
+        assert_eq!(fields[0].switches()[0].argument(), Some("MERGEFORMAT"));
+        assert_eq!(fields[0].switches()[1].argument(), Some("MMMM d, yyyy"));
+    }
+
+    #[test]
     fn writes_and_discovers_typed_inert_merge_fields_without_merging() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
