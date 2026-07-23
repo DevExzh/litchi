@@ -23,6 +23,7 @@ const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_EMBED_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BARCODE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_SHAPE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_DATA_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_INFO_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -782,6 +783,25 @@ impl Field {
     /// refreshes a field.
     pub fn bidi_outline_field(&self) -> Result<Option<BidiOutlineField>> {
         BidiOutlineField::from_field(self)
+    }
+
+    /// Check whether this is a `SHAPE` drawing-canvas anchor field.
+    ///
+    /// Recognition is limited to stored field metadata. It never locates,
+    /// links, loads, positions, lays out, or renders a drawing or canvas, or
+    /// refreshes the field.
+    pub fn is_shape_field(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "SHAPE").is_some()
+    }
+
+    /// Parse this field as inert typed `SHAPE` drawing-canvas anchor metadata.
+    ///
+    /// Returns `Ok(None)` for fields other than `SHAPE`. The stored opaque
+    /// instruction, cached content, and dirty/lock state are metadata only;
+    /// this method never locates, links, loads, positions, lays out, or renders
+    /// a drawing or canvas, or refreshes a field.
+    pub fn shape_field(&self) -> Result<Option<ShapeField>> {
+        ShapeField::from_field(self)
     }
 
     /// Check whether this is an `ADDIN` field.
@@ -4678,6 +4698,78 @@ impl BidiOutlineField {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from document state.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
+/// A typed, inert Word `SHAPE` drawing-canvas anchor field.
+///
+/// Word uses this legacy field as a drawing-canvas anchor. This type retains
+/// opaque instruction text, a cached result, and field state only. It never
+/// locates, links, loads, positions, lays out, or renders a drawing or canvas,
+/// or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShapeField {
+    instruction: String,
+    opaque_instructions: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+}
+
+impl ShapeField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(opaque_instructions) =
+            field_instruction_remainder(field.instruction(), "SHAPE")
+        else {
+            return Ok(None);
+        };
+        if field.instruction().len() > MAX_SHAPE_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "SHAPE field instruction exceeds {MAX_SHAPE_FIELD_INSTRUCTION_BYTES} bytes"
+            )));
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            opaque_instructions: opaque_instructions.trim().to_string(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to locate or
+    /// position a drawing canvas.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return opaque stored instruction text after `SHAPE`.
+    ///
+    /// It is never parsed, interpreted, or used to link a field to a drawing,
+    /// resolve an anchor, or calculate layout.
+    pub fn opaque_instructions(&self) -> &str {
+        &self.opaque_instructions
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored metadata only and is never regenerated from a drawing
+    /// canvas.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -9163,6 +9255,49 @@ mod tests {
             false,
         );
         assert!(too_long.bidi_outline_field().is_err());
+    }
+
+    #[test]
+    fn parses_inert_shape_fields_without_linking_or_rendering_drawings() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" SHAPE \* MERGEFORMAT " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached drawing anchor</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>shape</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached bare drawing anchor</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="SHAPES"><w:r><w:t>not shape metadata</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_shape_field());
+        assert!(fields[1].is_shape_field());
+        assert!(!fields[2].is_shape_field());
+
+        let shape = fields[0].shape_field().unwrap().unwrap();
+        assert_eq!(shape.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(shape.cached_result(), Some("cached drawing anchor"));
+        assert!(shape.is_dirty());
+        assert!(shape.is_locked());
+
+        let bare = fields[1].shape_field().unwrap().unwrap();
+        assert_eq!(bare.opaque_instructions(), "");
+        assert_eq!(bare.cached_result(), Some("cached bare drawing anchor"));
+        assert!(bare.is_dirty());
+        assert!(bare.is_locked());
+        assert!(fields[2].shape_field().unwrap().is_none());
+
+        let too_long = Field::new(
+            format!(
+                "SHAPE {}",
+                "x".repeat(MAX_SHAPE_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.shape_field().is_err());
     }
 
     #[test]

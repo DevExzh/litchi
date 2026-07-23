@@ -16,8 +16,8 @@ use crate::docx::field::{
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, PrintField, QuoteField,
-    ReferencedDocumentField, SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
-    TableOfContentsField, UserIdentityField,
+    ReferencedDocumentField, ShapeField, SymbolField, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1415,6 +1415,24 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `BIDIOUTLINE` fields in the main document.
     pub fn bidi_outline_field_count(&self) -> Result<usize> {
         Ok(self.bidi_outline_fields()?.len())
+    }
+
+    /// Get typed, inert `SHAPE` drawing-canvas anchor fields in document order.
+    ///
+    /// Returned values expose only stored opaque instructions, cached content,
+    /// and dirty/lock state. This method never locates, links, loads, positions,
+    /// lays out, or renders a drawing or canvas, or refreshes a field.
+    pub fn shape_fields(&self) -> Result<Vec<ShapeField>> {
+        self.fields()?
+            .iter()
+            .map(Field::shape_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `SHAPE` drawing-canvas anchor fields.
+    pub fn shape_field_count(&self) -> Result<usize> {
+        Ok(self.shape_fields()?.len())
     }
 
     /// Get typed, inert user-identity fields in document order.
