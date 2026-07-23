@@ -7,6 +7,7 @@ use crate::docx::comment::Comment;
 use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
+use crate::docx::field::CompareField;
 use crate::docx::field::{
     AdvanceField, BibliographyField, CitationField, DdeField, DocumentVariableField,
     ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField, IndexField, LinkField,
@@ -1610,6 +1611,24 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `IF` fields.
     pub fn if_field_count(&self) -> Result<usize> {
         Ok(self.if_fields()?.len())
+    }
+
+    /// Get typed, inert `COMPARE` fields in document order.
+    ///
+    /// Returned values expose stored comparisons, cached content, and
+    /// dirty/lock state only. This method never parses or evaluates a
+    /// comparison, resolves nested field values, or refreshes a field.
+    pub fn compare_fields(&self) -> Result<Vec<CompareField>> {
+        self.fields()?
+            .iter()
+            .map(Field::compare_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `COMPARE` fields in the main document.
+    pub fn compare_field_count(&self) -> Result<usize> {
+        Ok(self.compare_fields()?.len())
     }
 
     /// Get typed, inert `ASK` and `FILLIN` fields in document order.

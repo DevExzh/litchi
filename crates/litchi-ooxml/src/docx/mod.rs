@@ -111,6 +111,7 @@ pub use custom_xml::{CustomXmlBinding, CustomXmlPart, NewCustomXmlDataStore};
 pub use document::Document;
 pub use drawing::{DrawingObject, ShapeType};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
+pub use field::CompareField;
 pub use field::{
     AddressBlockCountryInclusion, AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation,
     BibliographyField, CitationField, DdeField, DdeFieldKind, DdeRepresentation,
