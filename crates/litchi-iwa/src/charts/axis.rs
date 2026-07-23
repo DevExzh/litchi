@@ -1,9 +1,9 @@
 //! Lossless native chart-axis non-style storage and mutation.
 //!
-//! iWork stores title and scale properties in the generated extension of a
-//! chart's `TSCH.ChartAxisNonStyleArchive`. This module owns the common native
-//! object lookup and lossless wire-level access used by focused axis-property
-//! modules.
+//! iWork stores title, label, and scale properties in the generated extension
+//! of a chart's `TSCH.ChartAxisNonStyleArchive`. This module owns the common
+//! native object lookup and lossless wire-level access used by focused
+//! axis-property modules.
 
 use prost::Message;
 
@@ -25,6 +25,9 @@ const VALUE_AXIS_TITLE_VISIBLE_FIELD: u32 = 14;
 const CATEGORY_AXIS_TITLE_TEXT_FIELD: u32 = 15;
 /// `tschchartaxisvaluetitle` in `TSCH.Generated.ChartAxisNonStyleArchive`.
 const VALUE_AXIS_TITLE_TEXT_FIELD: u32 = 16;
+/// `tschchartaxiscategoryshowserieslabels` in
+/// `TSCH.Generated.ChartAxisNonStyleArchive`.
+const CATEGORY_AXIS_SERIES_NAMES_VISIBLE_FIELD: u32 = 12;
 
 /// A native chart axis exposed by iWork's Axis formatter.
 ///
@@ -194,6 +197,53 @@ pub(crate) fn remove_chart_axis_title(
     Ok(true)
 }
 
+/// Read whether iWork shows series names on a native chart category axis.
+pub(crate) fn chart_category_axis_series_names_visible(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+) -> Result<bool> {
+    axis_non_style_slot(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        ChartAxis::Category,
+    )?
+    .read(package, read_category_axis_series_names_visible)
+}
+
+/// Set whether iWork shows series names on a native chart category axis.
+pub(crate) fn set_chart_category_axis_series_names_visible(
+    package: &mut IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    visible: bool,
+) -> Result<()> {
+    let slot = axis_non_style_slot(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        ChartAxis::Category,
+    )?;
+    if slot.read(package, read_category_axis_series_names_visible)? == visible {
+        return Ok(());
+    }
+    slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
+    slot.update(package, |data| {
+        patch_category_axis_series_names_visibility(data, visible)
+    })?;
+    if slot.read(package, read_category_axis_series_names_visible)? != visible {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} category-axis series-names update failed validation"
+        )));
+    }
+    Ok(())
+}
+
 /// Decode a `TSCH.ChartAxisNonStyleArchive` and return one visible title.
 fn read_axis_non_style_title(data: &[u8], axis: ChartAxis) -> Result<Option<String>> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
@@ -214,6 +264,17 @@ fn read_axis_non_style_title(data: &[u8], axis: ChartAxis) -> Result<Option<Stri
         return Ok(None);
     }
     Ok(Some(title.unwrap_or_default()))
+}
+
+/// Decode a `TSCH.ChartAxisNonStyleArchive` category-axis series-names switch.
+fn read_category_axis_series_names_visible(data: &[u8]) -> Result<bool> {
+    let Some(extension) = generated_axis_non_style_extension(data)? else {
+        return Ok(false);
+    };
+    let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
+    Ok(generated
+        .tschchartaxiscategoryshowserieslabels
+        .unwrap_or(false))
 }
 
 pub(crate) fn axis_non_style_slot(
@@ -461,12 +522,57 @@ fn patch_axis_non_style_title(
     Ok(patched)
 }
 
+fn patch_category_axis_series_names_visibility(data: &[u8], visible: bool) -> Result<Vec<u8>> {
+    let Some(extension) = generated_axis_non_style_extension(data)? else {
+        let generated = tsch::generated::ChartAxisNonStyleArchive {
+            tschchartaxiscategoryshowserieslabels: Some(visible),
+            ..Default::default()
+        };
+        let patched = patch_length_delimited_field(
+            data,
+            GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD,
+            false,
+            Some(generated.encode_to_vec().as_slice()),
+        )?;
+        validate_patched_category_axis_series_names_visibility(&patched, visible)?;
+        return Ok(patched);
+    };
+
+    let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
+    let extension = patch_varint_field(
+        extension,
+        CATEGORY_AXIS_SERIES_NAMES_VISIBLE_FIELD,
+        generated.tschchartaxiscategoryshowserieslabels.is_some(),
+        Some(u64::from(visible)),
+    )?;
+    let patched = patch_length_delimited_field(
+        data,
+        GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD,
+        true,
+        Some(extension.as_slice()),
+    )?;
+    validate_patched_category_axis_series_names_visibility(&patched, visible)?;
+    Ok(patched)
+}
+
 fn validate_patched_axis_title(data: &[u8], axis: ChartAxis, expected: Option<&str>) -> Result<()> {
     if read_axis_non_style_title(data, axis)?.as_deref() != expected {
         return Err(Error::InvalidFormat(format!(
             "{}-axis title wire patch failed validation",
             axis.label()
         )));
+    }
+    Ok(())
+}
+
+fn validate_patched_category_axis_series_names_visibility(
+    data: &[u8],
+    expected: bool,
+) -> Result<()> {
+    if read_category_axis_series_names_visible(data)? != expected {
+        return Err(Error::InvalidFormat(
+            "category-axis series-names wire patch failed validation".to_owned(),
+        ));
     }
     Ok(())
 }
@@ -561,6 +667,51 @@ mod tests {
             None
         );
         assert_eq!(removed, original);
+    }
+
+    #[test]
+    fn category_axis_series_names_patch_retains_titles_and_unmapped_fields() {
+        let generated = tsch::generated::ChartAxisNonStyleArchive {
+            tschchartaxiscategoryshowtitle: Some(true),
+            tschchartaxiscategorytitle: Some("Month".to_owned()),
+            tschchartaxisvalueshowtitle: Some(true),
+            tschchartaxisvaluetitle: Some("Revenue".to_owned()),
+            tschchartaxiscategoryshowserieslabels: Some(false),
+            ..Default::default()
+        };
+        let original = axis_non_style_with_unknown_fields(generated);
+
+        let visible = patch_category_axis_series_names_visibility(&original, true).unwrap();
+        assert!(read_category_axis_series_names_visible(&visible).unwrap());
+        assert_eq!(
+            read_axis_non_style_title(&visible, ChartAxis::Category).unwrap(),
+            Some("Month".to_owned())
+        );
+        assert_eq!(
+            read_axis_non_style_title(&visible, ChartAxis::Value).unwrap(),
+            Some("Revenue".to_owned())
+        );
+        assert_unknown_fields_retained(&original, &visible);
+
+        let restored = patch_category_axis_series_names_visibility(&visible, false).unwrap();
+        assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn category_axis_series_names_defaults_hidden_and_creates_an_extension() {
+        let original = tsch::ChartAxisNonStyleArchive {
+            super_: Some(tss::StyleArchive::default()),
+        }
+        .encode_to_vec();
+        assert!(!read_category_axis_series_names_visible(&original).unwrap());
+
+        let visible = patch_category_axis_series_names_visibility(&original, true).unwrap();
+        assert!(read_category_axis_series_names_visible(&visible).unwrap());
+        assert!(
+            generated_axis_non_style_extension(&visible)
+                .unwrap()
+                .is_some()
+        );
     }
 
     #[test]

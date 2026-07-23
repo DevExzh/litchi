@@ -774,6 +774,77 @@ fn scratch_document_supports_native_chart_value_axis_minimum_label_visibility_cr
 }
 
 #[test]
+fn scratch_document_supports_native_chart_category_axis_series_names_visibility_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart series names").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart series names".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+
+    assert!(
+        !editor
+            .body_chart_category_axis_series_names_visible(source.drawable_object_id)
+            .unwrap()
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_category_axis_series_names_visible(source.drawable_object_id, false)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_category_axis_series_names_visible(source.drawable_object_id, true)
+        .unwrap();
+    assert!(
+        editor
+            .body_chart_category_axis_series_names_visible(source.drawable_object_id)
+            .unwrap()
+    );
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert!(
+        editor
+            .body_chart_category_axis_series_names_visible(duplicate.drawable_object_id)
+            .unwrap()
+    );
+
+    editor
+        .set_body_chart_category_axis_series_names_visible(source.drawable_object_id, false)
+        .unwrap();
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert!(
+        !reopened
+            .body_chart_category_axis_series_names_visible(source.drawable_object_id)
+            .unwrap()
+    );
+    assert!(
+        reopened
+            .body_chart_category_axis_series_names_visible(duplicate.drawable_object_id)
+            .unwrap()
+    );
+    reopened
+        .set_body_chart_category_axis_series_names_visible(source.drawable_object_id, true)
+        .unwrap();
+    assert!(
+        reopened
+            .body_chart_category_axis_series_names_visible(source.drawable_object_id)
+            .unwrap()
+    );
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
 fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
     let mut editor = PagesEditor::create_with_text("Chart axis lines").unwrap();
     let source = editor

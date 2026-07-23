@@ -53,6 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     )?;
     editor.set_body_chart_value_axis_minimum_label_visible(chart.drawable_object_id, false)?;
+    editor.set_body_chart_category_axis_series_names_visible(chart.drawable_object_id, true)?;
     editor.set_body_chart_axis_line_visible(chart.drawable_object_id, ChartAxis::Value, false)?;
     editor.set_body_chart_axis_major_gridlines_visible(
         chart.drawable_object_id,
@@ -68,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_caption(chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Pages {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, a hidden value-axis minimum label, line, and legend, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption at body UTF-16 index {}",
+        "created Pages {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption at body UTF-16 index {}",
         chart.kind, chart.drawable_object_id, chart.anchor_character_index
     );
     Ok(())
