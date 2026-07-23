@@ -45,6 +45,8 @@ pub enum FieldType {
     Dde,
     DdeAuto,
     Link,
+    Include,
+    Import,
     IncludeText,
     IncludePicture,
     Index,
@@ -631,9 +633,11 @@ pub struct LinkField<'a> {
 /// The kind of external content referenced by an RTF include field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IncludeFieldKind {
-    /// An `INCLUDETEXT` field that refers to document text and graphics.
+    /// An `INCLUDETEXT` or historical `INCLUDE` field that refers to document text
+    /// and graphics.
     Text,
-    /// An `INCLUDEPICTURE` field that refers to a graphic.
+    /// An `INCLUDEPICTURE` or historical `IMPORT` field that refers to a
+    /// graphic.
     Picture,
 }
 
@@ -659,7 +663,8 @@ pub enum ExternalIncludeOption<'a> {
 
 /// Inert metadata for legacy RTF external-content fields.
 ///
-/// This represents `INCLUDETEXT` and `INCLUDEPICTURE` field instructions.
+/// This represents `INCLUDETEXT`/`INCLUDEPICTURE` and historical
+/// `INCLUDE`/`IMPORT` field instructions.
 /// Sources, converter names, and XML options are retained as stored metadata
 /// only. This crate never opens, resolves, fetches, transforms, converts,
 /// updates, or writes back to the source.
@@ -2604,7 +2609,10 @@ impl<'a> ExternalIncludeField<'a> {
         self.instruction
     }
 
-    /// Return whether this stores an `INCLUDETEXT` or `INCLUDEPICTURE` field.
+    /// Return whether this stores a text or picture external-include field.
+    ///
+    /// Text includes are `INCLUDETEXT` or historical `INCLUDE` fields; picture
+    /// includes are `INCLUDEPICTURE` or historical `IMPORT` fields.
     pub const fn kind(&self) -> IncludeFieldKind {
         self.kind
     }
@@ -2614,10 +2622,10 @@ impl<'a> ExternalIncludeField<'a> {
         &self.source
     }
 
-    /// Return the optional `INCLUDETEXT` bookmark selector.
+    /// Return the optional text-include bookmark selector.
     ///
-    /// `INCLUDEPICTURE` fields do not define a bookmark operand, so they
-    /// always return `None` here.
+    /// `INCLUDEPICTURE` and `IMPORT` fields do not define a bookmark operand,
+    /// so they always return `None` here.
     pub fn bookmark(&self) -> Option<&str> {
         self.bookmark.as_deref()
     }
@@ -2640,14 +2648,14 @@ impl<'a> ExternalIncludeField<'a> {
         &self.options
     }
 
-    /// Whether an `INCLUDETEXT` `\\!` switch suppresses nested field updates.
+    /// Whether a text-include `\\!` switch suppresses nested field updates.
     ///
     /// This is stored metadata only; this crate never updates fields.
     pub const fn suppresses_nested_field_updates(&self) -> bool {
         self.suppress_nested_field_updates
     }
 
-    /// Whether an `INCLUDEPICTURE` `\\d` switch omits picture data.
+    /// Whether a picture-include `\\d` switch omits picture data.
     ///
     /// This is stored metadata only; this crate never retrieves a picture.
     pub const fn omits_picture_data(&self) -> bool {
@@ -4735,6 +4743,16 @@ impl<'a> Field<'a> {
                 FieldType::Link
             },
             ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("INCLUDE") =>
+            {
+                FieldType::Include
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("IMPORT") =>
+            {
+                FieldType::Import
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("INCLUDETEXT") =>
             {
                 FieldType::IncludeText
@@ -5255,13 +5273,15 @@ impl<'a> Field<'a> {
     /// written back. Malformed include instructions remain generic fields and
     /// return `None` here.
     pub fn external_include(&self) -> Option<ExternalIncludeField<'_>> {
-        if !matches!(
-            self.field_type,
-            FieldType::IncludeText | FieldType::IncludePicture
-        ) {
+        let expected_kind = match self.field_type {
+            FieldType::Include | FieldType::IncludeText => IncludeFieldKind::Text,
+            FieldType::Import | FieldType::IncludePicture => IncludeFieldKind::Picture,
+            _ => return None,
+        };
+        let parts = external_include_parts(self.instruction.as_ref())?;
+        if parts.kind != expected_kind {
             return None;
         }
-        let parts = external_include_parts(self.instruction.as_ref())?;
         Some(ExternalIncludeField {
             instruction: self.instruction.as_ref(),
             kind: parts.kind,
@@ -6658,9 +6678,13 @@ fn link_field_parts(instruction: &str) -> Option<LinkFieldParts<'_>> {
 fn external_include_parts(instruction: &str) -> Option<ExternalIncludeParts<'_>> {
     let mut tokens = tokenize(instruction).ok()?;
     let keyword = tokens.first()?;
-    let kind = if keyword.value.eq_ignore_ascii_case("INCLUDETEXT") {
+    let kind = if keyword.value.eq_ignore_ascii_case("INCLUDETEXT")
+        || keyword.value.eq_ignore_ascii_case("INCLUDE")
+    {
         IncludeFieldKind::Text
-    } else if keyword.value.eq_ignore_ascii_case("INCLUDEPICTURE") {
+    } else if keyword.value.eq_ignore_ascii_case("INCLUDEPICTURE")
+        || keyword.value.eq_ignore_ascii_case("IMPORT")
+    {
         IncludeFieldKind::Picture
     } else {
         return None;
@@ -9776,6 +9800,24 @@ mod tests {
         assert_eq!(picture.unknown_switches().len(), 1);
         assert_eq!(picture.unknown_switches()[0].name, "*");
 
+        let legacy_text =
+            Field::parse_instruction(r#"INCLUDE "missing legacy.docx" LegacySection \!"#);
+        assert_eq!(legacy_text.field_type, FieldType::Include);
+        let legacy_text = legacy_text.external_include().unwrap();
+        assert_eq!(legacy_text.kind(), IncludeFieldKind::Text);
+        assert_eq!(legacy_text.source(), "missing legacy.docx");
+        assert_eq!(legacy_text.bookmark(), Some("LegacySection"));
+        assert!(legacy_text.suppresses_nested_field_updates());
+
+        let legacy_picture =
+            Field::parse_instruction(r#"IMPORT "missing legacy.wmf" \c GraphicsFilter \d"#);
+        assert_eq!(legacy_picture.field_type, FieldType::Import);
+        let legacy_picture = legacy_picture.external_include().unwrap();
+        assert_eq!(legacy_picture.kind(), IncludeFieldKind::Picture);
+        assert_eq!(legacy_picture.source(), "missing legacy.wmf");
+        assert_eq!(legacy_picture.converter(), Some("GraphicsFilter"));
+        assert!(legacy_picture.omits_picture_data());
+
         assert!(
             Field::parse_instruction("INCLUDETEXT")
                 .external_include()
@@ -9801,6 +9843,18 @@ mod tests {
                 .external_include()
                 .is_none()
         );
+        for instruction in [r#"INCLUDES "source.docx""#, r#"IMPORTS "picture.wmf""#] {
+            let field = Field::parse_instruction(instruction);
+            assert_eq!(field.field_type, FieldType::Unknown);
+            assert!(field.external_include().is_none());
+        }
+
+        let mismatched = Field::new(
+            FieldType::Include,
+            Cow::Borrowed(r#"IMPORT "picture.wmf""#),
+            Cow::Borrowed(""),
+        );
+        assert!(mismatched.external_include().is_none());
     }
 
     #[test]
@@ -12735,13 +12789,13 @@ mod tests {
     #[test]
     fn document_discovers_external_includes_without_opening_sources() {
         let document = crate::RtfDocument::parse(
-            r#"{\rtf1\ansi Before {\field\flddirty{\*\fldinst INCLUDETEXT "missing.docx" Summary \\!}{\fldrslt cached text}}Middle {\field{\*\fldinst INCLUDEPICTURE "missing.gif" \\d}{\fldrslt cached picture}}After}"#,
+            r#"{\rtf1\ansi Before {\field\flddirty{\*\fldinst INCLUDETEXT "missing.docx" Summary \\!}{\fldrslt cached text}}Middle {\field{\*\fldinst INCLUDEPICTURE "missing.gif" \\d}{\fldrslt cached picture}}Legacy {\field{\*\fldinst INCLUDE "legacy.docx" LegacySection \\!}{\fldrslt cached legacy text}}Older {\field{\*\fldinst IMPORT "legacy.wmf" \\c GraphicsFilter \\d}{\fldrslt cached legacy picture}}After}"#,
         )
         .unwrap();
 
         let includes = document.external_includes();
-        assert_eq!(document.external_include_count(), 2);
-        assert_eq!(includes.len(), 2);
+        assert_eq!(document.external_include_count(), 4);
+        assert_eq!(includes.len(), 4);
         assert_eq!(includes[0].kind(), IncludeFieldKind::Text);
         assert_eq!(includes[0].source(), "missing.docx");
         assert_eq!(includes[0].bookmark(), Some("Summary"));
@@ -12750,7 +12804,15 @@ mod tests {
         assert_eq!(includes[1].kind(), IncludeFieldKind::Picture);
         assert_eq!(includes[1].source(), "missing.gif");
         assert!(includes[1].omits_picture_data());
-        assert_eq!(document.text(), "Before Middle After");
+        assert_eq!(includes[2].kind(), IncludeFieldKind::Text);
+        assert_eq!(includes[2].source(), "legacy.docx");
+        assert_eq!(includes[2].bookmark(), Some("LegacySection"));
+        assert!(includes[2].suppresses_nested_field_updates());
+        assert_eq!(includes[3].kind(), IncludeFieldKind::Picture);
+        assert_eq!(includes[3].source(), "legacy.wmf");
+        assert_eq!(includes[3].converter(), Some("GraphicsFilter"));
+        assert!(includes[3].omits_picture_data());
+        assert_eq!(document.text(), "Before Middle Legacy Older After");
     }
 
     #[test]
