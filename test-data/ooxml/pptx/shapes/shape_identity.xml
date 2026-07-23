@@ -1,0 +1,25 @@
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="7" name="Title"/>
+          <p:cNvSpPr/>
+          <p:nvPr><p:ph type="title"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr/>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="11" name="Body"/>
+          <p:cNvSpPr/>
+          <p:nvPr><p:ph type="body" idx="3"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr/>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>

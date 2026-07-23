@@ -310,6 +310,26 @@ impl<'a> Slide<'a> {
         Ok(self.shapes()?.into_iter().nth(index))
     }
 
+    /// Get a shape by its non-visual shape ID.
+    ///
+    /// Shape IDs are used by PowerPoint animation and timing records. Returns
+    /// None if the slide has no shape with this ID, and returns an error when
+    /// the slide contains duplicate matching IDs.
+    pub fn shape_by_id(&self, id: u32) -> Result<Option<BaseShape>> {
+        let mut matched = None;
+        for shape in self.shapes()? {
+            if shape.shape_id()? == Some(id) {
+                if matched.is_some() {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "slide contains multiple shapes with non-visual ID {id}"
+                    )));
+                }
+                matched = Some(shape);
+            }
+        }
+        Ok(matched)
+    }
+
     /// Check if the slide has any tables.
     ///
     /// # Examples

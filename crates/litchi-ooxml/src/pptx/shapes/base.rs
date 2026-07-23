@@ -147,6 +147,38 @@ impl BaseShape {
         Ok(String::new())
     }
 
+    /// Get the non-visual shape ID.
+    ///
+    /// Returns the optional numeric ID from the shape's PresentationML cNvPr
+    /// element. This ID is used by timing and animation records to refer to a
+    /// shape.
+    pub fn shape_id(&self) -> Result<Option<u32>> {
+        let mut reader = NsReader::from_reader(&self.xml_bytes[..]);
+
+        loop {
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Empty(element) | Event::Start(element)
+                    if is_presentationml_name(&namespace, element.name(), b"cNvPr") =>
+                {
+                    let Some(id) = unqualified_attribute_value(&element, b"id", decoder)? else {
+                        return Ok(None);
+                    };
+                    return id.parse::<u32>().map(Some).map_err(|_| {
+                        OoxmlError::InvalidFormat(format!("invalid non-visual shape ID '{id}'"))
+                    });
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+
+        Ok(None)
+    }
+
     /// Get the X position (left edge) in EMUs.
     pub fn left(&mut self) -> Result<i64> {
         self.ensure_geometry()?;
@@ -244,6 +276,38 @@ impl BaseShape {
         }
 
         Ok(String::new())
+    }
+
+    /// Get the placeholder index for this shape.
+    ///
+    /// Returns None when the shape is not a placeholder. When a placeholder
+    /// omits the idx attribute, this returns its OOXML default of Some(0).
+    pub fn placeholder_index(&self) -> Result<Option<u32>> {
+        let mut reader = NsReader::from_reader(&self.xml_bytes[..]);
+
+        loop {
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Empty(element) | Event::Start(element)
+                    if is_presentationml_name(&namespace, element.name(), b"ph") =>
+                {
+                    let Some(index) = unqualified_attribute_value(&element, b"idx", decoder)?
+                    else {
+                        return Ok(Some(0));
+                    };
+                    return index.parse::<u32>().map(Some).map_err(|_| {
+                        OoxmlError::InvalidFormat(format!("invalid placeholder index '{index}'"))
+                    });
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+
+        Ok(None)
     }
 
     /// Check if this shape has a text frame.
@@ -421,13 +485,15 @@ mod tests {
         let xml = br#"<q:sp xmlns:q="http://schemas.openxmlformats.org/presentationml/2006/main"
             xmlns:d="http://schemas.openxmlformats.org/drawingml/2006/main"
             xmlns:false="urn:not-office">
-            <q:nvSpPr><false:cNvPr name="ignored"/><q:cNvPr name="A &amp; B"/><q:nvPr><false:ph type="title"/><q:ph type="ctrTitle"/></q:nvPr></q:nvSpPr>
+            <q:nvSpPr><false:cNvPr name="ignored"/><q:cNvPr id="7" name="A &amp; B"/><q:nvPr><false:ph type="title"/><q:ph type="ctrTitle" idx="4"/></q:nvPr></q:nvSpPr>
             <q:spPr><d:xfrm><false:off x="999" y="999"/><d:off x="-10" y="20"/><d:ext cx="30" cy="40"/></d:xfrm></q:spPr>
         </q:sp>"#;
         let mut shape = BaseShape::new(xml.to_vec(), ShapeType::Shape);
         assert_eq!(shape.name().unwrap(), "A & B");
+        assert_eq!(shape.shape_id().unwrap(), Some(7));
         assert!(shape.is_placeholder());
         assert_eq!(shape.placeholder_type().unwrap(), "ctrTitle");
+        assert_eq!(shape.placeholder_index().unwrap(), Some(4));
         assert_eq!(shape.left().unwrap(), -10);
         assert_eq!(shape.top().unwrap(), 20);
         assert_eq!(shape.width().unwrap(), 30);
@@ -439,6 +505,8 @@ mod tests {
         let strict = br#"<s:sp xmlns:s="http://purl.oclc.org/ooxml/presentationml/main" xmlns:d="http://purl.oclc.org/ooxml/drawingml/main"><s:cNvPr name="Strict"/><d:off x="1" y="2"/><d:ext cx="3" cy="4"/></s:sp>"#;
         let mut shape = BaseShape::new(strict.to_vec(), ShapeType::Shape);
         assert_eq!(shape.name().unwrap(), "Strict");
+        assert_eq!(shape.shape_id().unwrap(), None);
+        assert_eq!(shape.placeholder_index().unwrap(), None);
         assert_eq!(shape.width().unwrap(), 3);
 
         let inherited = br#"<p:sp><p:cNvPr name="Inherited"/><a:off x="5" y="6"/><a:ext cx="7" cy="8"/></p:sp>"#;
@@ -469,11 +537,32 @@ mod tests {
         let mut shape = BaseShape::new(invalid_geometry.to_vec(), ShapeType::Shape);
         assert!(shape.left().is_err());
 
+        let invalid_shape_id = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cNvPr id="NaN"/></p:sp>"#;
+        assert!(
+            BaseShape::new(invalid_shape_id.to_vec(), ShapeType::Shape)
+                .shape_id()
+                .is_err()
+        );
+
+        let invalid_placeholder_index = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:ph idx="NaN"/></p:sp>"#;
+        assert!(
+            BaseShape::new(invalid_placeholder_index.to_vec(), ShapeType::Shape)
+                .placeholder_index()
+                .is_err()
+        );
+
         let missing_extent = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ext cx="3"/></p:sp>"#;
         assert!(
             BaseShape::new(missing_extent.to_vec(), ShapeType::Shape)
                 .width()
                 .is_err()
         );
+    }
+
+    #[test]
+    fn placeholder_index_defaults_to_zero() {
+        let xml = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:ph type="body"/></p:sp>"#;
+        let shape = BaseShape::new(xml.to_vec(), ShapeType::Shape);
+        assert_eq!(shape.placeholder_index().unwrap(), Some(0));
     }
 }
