@@ -1,0 +1,60 @@
+//! Native chart-border CRUD for Pages body charts.
+
+use super::*;
+use crate::charts::border::{
+    chart_border_visible as read_native_chart_border_visible,
+    set_chart_border_visible as set_native_chart_border_visible,
+};
+
+impl PagesEditor {
+    /// Read whether Pages shows the chart-area border for one native body chart.
+    pub fn body_chart_border_visible(&self, drawable_object_id: u64) -> Result<bool> {
+        body_chart_border_visible(self, drawable_object_id)
+    }
+
+    /// Set whether Pages shows the chart-area border for one native body chart.
+    pub fn set_body_chart_border_visible(
+        &mut self,
+        drawable_object_id: u64,
+        visible: bool,
+    ) -> Result<()> {
+        set_body_chart_border_visible(self, drawable_object_id, visible)
+    }
+}
+
+fn body_chart_border_visible(editor: &PagesEditor, drawable_object_id: u64) -> Result<bool> {
+    let graph = body_chart_graph(editor, drawable_object_id)?;
+    read_native_chart_border_visible(
+        editor.package(),
+        &graph.archive_name,
+        drawable_object_id,
+        "Pages",
+    )
+}
+
+fn set_body_chart_border_visible(
+    editor: &mut PagesEditor,
+    drawable_object_id: u64,
+    visible: bool,
+) -> Result<()> {
+    if body_chart_border_visible(editor, drawable_object_id)? == visible {
+        return Ok(());
+    }
+    let graph = body_chart_graph(editor, drawable_object_id)?;
+    let mut staged = editor.package().clone();
+    set_native_chart_border_visible(
+        &mut staged,
+        &graph.archive_name,
+        drawable_object_id,
+        "Pages",
+        visible,
+    )?;
+    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    if verified.body_chart_border_visible(drawable_object_id)? != visible {
+        return Err(Error::InvalidFormat(
+            "Pages chart border update failed validation".to_owned(),
+        ));
+    }
+    *editor = verified;
+    Ok(())
+}

@@ -10,6 +10,7 @@ mod axis_scale;
 mod axis_series_names;
 mod axis_steps;
 mod axis_tick_marks;
+mod border;
 mod caption;
 mod graph;
 mod legend;
