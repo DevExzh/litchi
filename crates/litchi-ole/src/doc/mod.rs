@@ -117,6 +117,7 @@ pub use parts::fields::{
 };
 pub use parts::fields::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
 pub use parts::fields::{DdeField, DdeFieldKind, DdeRepresentation};
+pub use parts::fields::{LinkField, LinkFormatting, LinkResultOption};
 pub use parts::glossary::{
     GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,
 };

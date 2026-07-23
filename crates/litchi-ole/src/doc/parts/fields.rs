@@ -919,6 +919,149 @@ impl DdeField {
     }
 }
 
+/// One stored result or storage switch for a Word `LINK` field.
+///
+/// These values describe a linked-object representation or whether graphic data
+/// is stored. They never cause a source to be opened, contacted, converted, or
+/// displayed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkResultOption {
+    /// The `\\b` switch requests a bitmap representation.
+    Bitmap,
+    /// The `\\d` switch omits graphic data from the document.
+    OmitGraphicData,
+    /// The `\\h` switch requests HTML-formatted text.
+    Html,
+    /// The `\\p` switch requests a picture representation.
+    Picture,
+    /// The `\\r` switch requests rich-text format.
+    RichText,
+    /// The `\\t` switch requests text-only format.
+    Text,
+    /// The `\\u` switch requests Unicode text.
+    UnicodeText,
+}
+
+/// One integral `LINK` `\\f` formatting mode.
+///
+/// ECMA-376 marks modes 1 and 3 unsupported. Those values, and values outside
+/// its defined set, are retained as metadata without applying any formatting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkFormatting {
+    /// 0: preserve formatting from the source file.
+    Source,
+    /// 2: match formatting in the destination document.
+    Destination,
+    /// 4: preserve source formatting for a SpreadsheetML workbook source.
+    SpreadsheetSource,
+    /// 5: match destination formatting for a SpreadsheetML workbook source.
+    SpreadsheetDestination,
+    /// An ECMA-376-unsupported or otherwise unrecognized integral mode.
+    Unsupported(i64),
+}
+
+/// Typed, inert metadata for a legacy Word `LINK` field.
+///
+/// [MS-DOC] §2.9.90 identifies its native field-type byte. Application type,
+/// source, item, and all result/formatting switches are retained as stored
+/// field data. This type never activates an OLE server, launches an
+/// application, opens a source, requests data, refreshes content, converts
+/// content, or executes code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkField {
+    field: Field,
+    instruction: String,
+    application_type: String,
+    source: String,
+    item: Option<String>,
+    automatic_updates: bool,
+    result_options: Vec<LinkResultOption>,
+    formatting_modes: Vec<LinkFormatting>,
+    switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl LinkField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored linked-object application type.
+    ///
+    /// Word commonly stores an OLE Programmatic Identifier here. It is never
+    /// looked up or activated by this API.
+    pub fn application_type(&self) -> &str {
+        &self.application_type
+    }
+
+    /// Return the stored source identifier without opening or resolving it.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Return the optional stored source item, such as a cell range or bookmark.
+    pub fn item(&self) -> Option<&str> {
+        self.item.as_deref()
+    }
+
+    /// Whether the stored instruction requests automatic updates.
+    ///
+    /// This is metadata only. The API never performs an update.
+    pub fn requests_automatic_updates(&self) -> bool {
+        self.automatic_updates
+    }
+
+    /// Return recognized result and storage switches in stored source order.
+    ///
+    /// When several are present, `Self::effective_result_option` reflects
+    /// Word's documented last-switch behavior. Neither method contacts the
+    /// linked source.
+    pub fn result_options(&self) -> &[LinkResultOption] {
+        &self.result_options
+    }
+
+    /// Return the effective result or storage option under Word's documented
+    /// last-switch behavior, if one was stored.
+    pub fn effective_result_option(&self) -> Option<LinkResultOption> {
+        self.result_options.last().copied()
+    }
+
+    /// Return integral `\\f` formatting modes in stored source order.
+    ///
+    /// These are metadata only; this API never formats linked content.
+    pub fn formatting_modes(&self) -> &[LinkFormatting] {
+        &self.formatting_modes
+    }
+
+    /// Return all stored field switches in source order.
+    pub fn switches(&self) -> &[MergeFieldSwitch] {
+        &self.switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from a linked source.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The stored kind of a legacy Word mail-merge counter field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MailMergeCounterKind {
@@ -1740,6 +1883,32 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `LINK` field.
+    ///
+    /// Stored application, source, item, and switch data are never used to
+    /// activate an OLE server, launch an application, open a source, request
+    /// data, refresh a field, convert content, or execute code. Malformed
+    /// instructions remain available through this generic type and return
+    /// `None` here.
+    pub fn link_field(&self) -> Option<LinkField> {
+        if self.field.field_type != FieldType::Link {
+            return None;
+        }
+        let parts = parse_link_field_parts(&self.instruction)?;
+        Some(LinkField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            application_type: parts.application_type,
+            source: parts.source,
+            item: parts.item,
+            automatic_updates: parts.automatic_updates,
+            result_options: parts.result_options,
+            formatting_modes: parts.formatting_modes,
+            switches: parts.switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed mail-merge counter.
     ///
     /// The stored kind and cached result are never used to select or count
@@ -1973,6 +2142,8 @@ const MAX_DOCUMENT_VARIABLE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_VARIABLE_FIELD_SWITCHES: usize = 64;
 const MAX_DDE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DDE_FIELD_SWITCHES: usize = 64;
+const MAX_LINK_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_LINK_FIELD_SWITCHES: usize = 64;
 const MAX_MAIL_MERGE_COUNTER_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_NEXT_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_CONDITIONAL_CONTROL_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -1994,6 +2165,16 @@ struct DdeFieldParts {
     representation: Option<DdeRepresentation>,
     omit_graphic_data: bool,
     unknown_switches: Vec<MergeFieldSwitch>,
+}
+
+struct LinkFieldParts {
+    application_type: String,
+    source: String,
+    item: Option<String>,
+    automatic_updates: bool,
+    result_options: Vec<LinkResultOption>,
+    formatting_modes: Vec<LinkFormatting>,
+    switches: Vec<MergeFieldSwitch>,
 }
 
 fn parse_macro_button_parts(instruction: &str) -> Option<(String, String)> {
@@ -2243,6 +2424,107 @@ fn parse_dde_field_parts(instruction: &str) -> Option<DdeFieldParts> {
         representation,
         omit_graphic_data,
         unknown_switches,
+    })
+}
+
+fn parse_link_field_parts(instruction: &str) -> Option<LinkFieldParts> {
+    if instruction.len() > MAX_LINK_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("LINK") {
+        return None;
+    }
+
+    let application_type = next_field_argument(instruction, &mut position).ok()??;
+    if application_type.is_empty() {
+        return None;
+    }
+    let source = next_field_argument(instruction, &mut position).ok()??;
+    if source.is_empty() {
+        return None;
+    }
+
+    skip_field_whitespace(instruction, &mut position);
+    let item = match peek_field_character(instruction, position) {
+        None | Some('\\') => None,
+        Some(_) => Some(next_field_argument(instruction, &mut position).ok()??),
+    };
+
+    let mut switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' || switches.len() >= MAX_LINK_FIELD_SWITCHES {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        switches.push(MergeFieldSwitch { name, argument });
+    }
+
+    let mut automatic_updates = false;
+    let mut result_options = Vec::new();
+    let mut formatting_modes = Vec::new();
+    for switch in &switches {
+        match switch.name {
+            'a' => {
+                if switch.argument.is_some() {
+                    return None;
+                }
+                automatic_updates = true;
+            },
+            'f' => {
+                let value = switch.argument.as_deref()?.parse::<i64>().ok()?;
+                formatting_modes.push(match value {
+                    0 => LinkFormatting::Source,
+                    2 => LinkFormatting::Destination,
+                    4 => LinkFormatting::SpreadsheetSource,
+                    5 => LinkFormatting::SpreadsheetDestination,
+                    other => LinkFormatting::Unsupported(other),
+                });
+            },
+            'b' | 'd' | 'h' | 'p' | 'r' | 't' | 'u' => {
+                if switch.argument.is_some() {
+                    return None;
+                }
+                result_options.push(match switch.name {
+                    'b' => LinkResultOption::Bitmap,
+                    'd' => LinkResultOption::OmitGraphicData,
+                    'h' => LinkResultOption::Html,
+                    'p' => LinkResultOption::Picture,
+                    'r' => LinkResultOption::RichText,
+                    't' => LinkResultOption::Text,
+                    'u' => LinkResultOption::UnicodeText,
+                    _ => unreachable!("LINK result switch was matched above"),
+                });
+            },
+            _ => {},
+        }
+    }
+
+    Some(LinkFieldParts {
+        application_type,
+        source,
+        item,
+        automatic_updates,
+        result_options,
+        formatting_modes,
+        switches,
     })
 }
 
@@ -3487,6 +3769,98 @@ mod tests {
             ..text
         };
         assert!(wrong_type.dde_link().is_none());
+    }
+
+    #[test]
+    fn link_fields_expose_cached_metadata_without_activating_sources() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::Link,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction:
+                r#" LINK Excel.Sheet.12 "missing.xlsx" "Sheet1!A1" \a \p \f 2 \f 9 \x "ignored" "#
+                    .to_string(),
+            result: Some("cached link".to_string()),
+        };
+
+        let link = text.link_field().unwrap();
+        assert_eq!(link.field(), &field);
+        assert_eq!(link.instruction(), text.instruction);
+        assert_eq!(link.application_type(), "Excel.Sheet.12");
+        assert_eq!(link.source(), "missing.xlsx");
+        assert_eq!(link.item(), Some("Sheet1!A1"));
+        assert!(link.requests_automatic_updates());
+        assert_eq!(link.result_options(), &[LinkResultOption::Picture]);
+        assert_eq!(
+            link.effective_result_option(),
+            Some(LinkResultOption::Picture)
+        );
+        assert_eq!(
+            link.formatting_modes(),
+            &[LinkFormatting::Destination, LinkFormatting::Unsupported(9)]
+        );
+        assert_eq!(link.cached_result(), Some("cached link"));
+        assert!(link.is_dirty());
+        assert!(link.is_locked());
+        assert_eq!(link.switches().len(), 5);
+        assert_eq!(link.switches()[4].name(), 'x');
+        assert_eq!(link.switches()[4].argument(), Some("ignored"));
+
+        let no_item = FieldText {
+            instruction: r#"LINK Excel.Sheet.12 "missing.xlsx" \d \b"#.to_string(),
+            ..text.clone()
+        };
+        let no_item = no_item.link_field().unwrap();
+        assert_eq!(no_item.item(), None);
+        assert_eq!(
+            no_item.result_options(),
+            &[LinkResultOption::OmitGraphicData, LinkResultOption::Bitmap]
+        );
+        assert_eq!(
+            no_item.effective_result_option(),
+            Some(LinkResultOption::Bitmap)
+        );
+
+        for instruction in [
+            r#"LINK Excel source \a value"#,
+            r#"LINK Excel source \p value"#,
+            r#"LINK Excel source \f"#,
+            r#"LINK Excel source \f not-an-integer"#,
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.link_field().is_none(), "{instruction}");
+        }
+
+        let wrong_keyword = FieldText {
+            instruction: "LINKS Excel source".to_string(),
+            ..text.clone()
+        };
+        assert!(wrong_keyword.link_field().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Dde,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.link_field().is_none());
     }
 
     #[test]

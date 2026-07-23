@@ -15,9 +15,9 @@ use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     AdvanceField, CompareField, DdeField, DocumentVariableField, Field, FieldStory, FieldText,
-    FieldsTable, GoToButtonField, IfField, MacroButtonField, MailMergeConditionalControlField,
-    MailMergeCounterField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
-    UserIdentityField,
+    FieldsTable, GoToButtonField, IfField, LinkField, MacroButtonField,
+    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
+    MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -656,6 +656,22 @@ impl Document {
     /// Get the number of typed, inert `DDE` and `DDEAUTO` fields.
     pub fn dde_link_count(&self) -> Result<usize> {
         Ok(self.dde_links()?.len())
+    }
+
+    /// Get typed, inert `LINK` fields in story and source order.
+    ///
+    /// Returned values expose only stored application type, source, item,
+    /// switch, cached-result, and field-state metadata. This method never
+    /// activates an OLE server, launches an application, opens a source,
+    /// requests data, refreshes content, converts content, or executes code.
+    pub fn link_fields(&self) -> Result<Vec<LinkField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::link_field).collect())
+    }
+
+    /// Get the number of typed, inert `LINK` fields.
+    pub fn link_field_count(&self) -> Result<usize> {
+        Ok(self.link_fields()?.len())
     }
 
     /// Get typed, inert `MERGEREC` and `MERGESEQ` fields in story and source order.
