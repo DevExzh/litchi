@@ -218,7 +218,7 @@ conversion, fonts, and image conversion are optional.
 | Animations and timing trees | ✅ | ✅ | ✅ | Shape effects, sequences, triggers, chart/diagram timing relationships, and timing metadata on slides, layouts, and masters |
 | Transitions and slide advance timing | ✅ | ✅ | ✅ | Typed base effects, including directional, corner, orientation, and wheel-spoke variants; through-black and split in/out options; slide/layout/master effective inheritance; MCE-backed custom durations; speed, sound, click, and timed advance |
 | PowerPoint 2010 transition extensions | ✅ | ✅ | ✅ | Compatibility-choice ripple effects on slides, layouts, and masters, with typed corner/center direction and extended duration; deterministic fade fallback authoring |
-| Hyperlinks and slide-jump actions | 🟡 | ✅ | ✅ | URL and slide navigation plus bounded inert click/hover action-setting inventory for PowerPoint-reserved action values and declared targets; no target is followed, opened, activated, or executed |
+| Hyperlinks and slide-jump actions | 🟡 | ✅ | ✅ | Strict/transitional hyperlink relationships, validated inline slide navigation, plus bounded inert click/hover action-setting inventory for PowerPoint-reserved action values and declared targets; no target is followed, opened, activated, or executed |
 | Classic comments | ✅ | ✅ | ✅ | Validated high-level graph, legacy adapters, authors, slide comment parts, and package-aware CRUD |
 | Modern comments | ✅ | ✅ | ✅ | Authors, anchors, replies, status, and package-aware CRUD |
 | Speaker notes and notes masters | ✅ | ✅ | ✅ | Complete notes graph load/store with resources and themes |

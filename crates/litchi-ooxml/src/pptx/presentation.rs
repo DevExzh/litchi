@@ -1,4 +1,5 @@
 /// Main presentation object - the high-level API for working with presentations.
+use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_action_settings};
 use crate::pptx::handout::HandoutMaster;
@@ -1183,25 +1184,25 @@ impl<'a> Presentation<'a> {
             let slide_part = slide.part().part();
             let rels = slide_part.rels();
 
-            // Look for hyperlink relationships
-            for rel in rels.iter() {
-                if rel.reltype()
-                    == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
-                {
-                    // External hyperlink
-                    let target = rel.target_ref();
-                    if let Ok(hyperlink) = Hyperlink::from_xml(target, None) {
-                        all_hyperlinks.push((slide_idx, hyperlink));
-                    }
+            // Look for transitional and strict hyperlink relationships.
+            for rel in rels
+                .iter()
+                .filter(|rel| matches!(rel.reltype(), rt::HYPERLINK | rt::STRICT_HYPERLINK))
+            {
+                let target = rel.target_ref();
+                if target.is_empty() {
+                    return Err(OoxmlError::InvalidRelationship(format!(
+                        "hyperlink relationship '{}' on slide {slide_idx} has an empty target",
+                        rel.r_id()
+                    )));
                 }
+                all_hyperlinks.push((slide_idx, Hyperlink::from_xml(target, None)?));
             }
 
             // Also parse inline hyperlinks from slide XML (internal slide links)
             let slide_xml = slide_part.blob();
-            if let Ok(inline_links) = Self::parse_inline_hyperlinks(slide_xml) {
-                for hyperlink in inline_links {
-                    all_hyperlinks.push((slide_idx, hyperlink));
-                }
+            for hyperlink in Self::parse_inline_hyperlinks(slide_xml)? {
+                all_hyperlinks.push((slide_idx, hyperlink));
             }
         }
 
@@ -1211,44 +1212,31 @@ impl<'a> Presentation<'a> {
     /// Parse inline hyperlinks from slide XML.
     fn parse_inline_hyperlinks(xml: &[u8]) -> Result<Vec<crate::pptx::Hyperlink>> {
         use crate::pptx::Hyperlink;
-        use quick_xml::Reader;
-        use quick_xml::events::Event;
 
-        let mut reader = Reader::from_reader(xml);
+        let mut reader = NsReader::from_reader(xml);
         reader.config_mut().trim_text(true);
-
         let mut hyperlinks = Vec::new();
-
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
-                    if e.local_name().as_ref() == b"hlinkClick" =>
+            let decoder = reader.decoder();
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            match event {
+                Event::Start(element) | Event::Empty(element)
+                    if is_drawingml_name(&namespace, element.name(), b"hlinkClick") =>
                 {
-                    let mut action = None;
-                    let mut tooltip = None;
-
-                    for attr in e.attributes().flatten() {
-                        match attr.key.as_ref() {
-                            b"action" => {
-                                action =
-                                    std::str::from_utf8(&attr.value).ok().map(|s| s.to_string());
-                            },
-                            b"tooltip" => {
-                                tooltip =
-                                    std::str::from_utf8(&attr.value).ok().map(|s| s.to_string());
-                            },
-                            _ => {},
+                    let action = unqualified_attribute_value(&element, b"action", decoder)?;
+                    let tooltip = unqualified_attribute_value(&element, b"tooltip", decoder)?;
+                    if let Some(action) = action {
+                        if action.is_empty() {
+                            return Err(OoxmlError::InvalidFormat(
+                                "inline hyperlink action cannot be empty".to_string(),
+                            ));
                         }
-                    }
-
-                    if let Some(action_str) = action
-                        && let Ok(hyperlink) = Hyperlink::from_xml(&action_str, tooltip)
-                    {
-                        hyperlinks.push(hyperlink);
+                        hyperlinks.push(Hyperlink::from_xml(&action, tooltip)?);
                     }
                 },
-                Ok(Event::Eof) => break,
-                Err(_) => break,
+                Event::Eof => break,
                 _ => {},
             }
         }
