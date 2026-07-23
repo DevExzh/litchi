@@ -1205,6 +1205,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert user-identity fields in document order.
+    ///
+    /// Stored kind, override, formatting, cached result, and field state are
+    /// exposed solely as metadata. This method never reads or modifies a host
+    /// user's identity, applies formatting, or refreshes a field.
+    pub fn user_identity_fields(&self) -> Vec<crate::UserIdentityField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::user_identity_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert user-identity fields.
+    pub fn user_identity_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.user_identity_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields in document
     /// order.
     ///

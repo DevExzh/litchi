@@ -23,6 +23,9 @@ pub enum FieldType {
     Equation,
     MacroButton,
     GoToButton,
+    UserAddress,
+    UserInitials,
+    UserName,
     Dde,
     DdeAuto,
     Link,
@@ -916,6 +919,48 @@ pub struct PromptField<'a> {
     position: usize,
 }
 
+/// The stored kind of a user-identity field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserIdentityFieldKind {
+    /// A `USERADDRESS` field.
+    Address,
+    /// A `USERINITIALS` field.
+    Initials,
+    /// A `USERNAME` field.
+    Name,
+}
+
+/// A general-formatting request stored by a user-identity field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserIdentityFormatting {
+    /// The `\\* Caps` formatting request.
+    Caps,
+    /// The `\\* FirstCap` formatting request.
+    FirstCap,
+    /// The `\\* Lower` formatting request.
+    Lower,
+    /// The `\\* Upper` formatting request.
+    Upper,
+}
+
+/// Inert metadata for a legacy RTF `USERADDRESS`, `USERINITIALS`, or `USERNAME` field.
+///
+/// ECMA-376 Part 1 §§17.16.5.69–71 define these fields. This model exposes a
+/// stored override, formatting request, and cached result only. It never reads
+/// or modifies a host user's identity, applies formatting, or refreshes a
+/// field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserIdentityField<'a> {
+    instruction: &'a str,
+    kind: UserIdentityFieldKind,
+    override_value: Option<Cow<'a, str>>,
+    formatting: Option<UserIdentityFormatting>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 /// The stored kind of a mail-merge recipient layout field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MailMergeRecipientFieldKind {
@@ -1009,6 +1054,12 @@ struct PromptFieldParts<'a> {
     prompt: Option<Cow<'a, str>>,
     default_response: Option<Cow<'a, str>>,
     prompts_once_per_mail_merge: bool,
+}
+
+struct UserIdentityFieldParts<'a> {
+    kind: UserIdentityFieldKind,
+    override_value: Option<Cow<'a, str>>,
+    formatting: Option<UserIdentityFormatting>,
 }
 
 struct MailMergeRecipientFieldParts<'a> {
@@ -2258,6 +2309,66 @@ impl<'a> PromptField<'a> {
     }
 }
 
+impl<'a> UserIdentityField<'a> {
+    /// Return the complete stored user-identity field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return whether this is an address, initials, or name field.
+    pub const fn kind(&self) -> UserIdentityFieldKind {
+        self.kind
+    }
+
+    /// Return the optional stored value that overrides the host user context.
+    ///
+    /// `Some("")` represents an explicitly supplied blank override. This
+    /// stored text is never written to, read from, or compared with a host
+    /// identity.
+    pub fn override_value(&self) -> Option<&str> {
+        self.override_value.as_deref()
+    }
+
+    /// Return the stored general-formatting request, if any.
+    ///
+    /// This request is metadata only and is never applied to an identity value.
+    pub const fn formatting(&self) -> Option<UserIdentityFormatting> {
+        self.formatting
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated from a host identity.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> MailMergeRecipientField<'a> {
     /// Return the complete stored `ADDRESSBLOCK` or `GREETINGLINE` instruction.
     pub fn instruction(&self) -> &'a str {
@@ -2425,6 +2536,21 @@ impl<'a> Field<'a> {
                 if keyword.eq_ignore_ascii_case("GOTOBUTTON") =>
             {
                 FieldType::GoToButton
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("USERADDRESS") =>
+            {
+                FieldType::UserAddress
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("USERINITIALS") =>
+            {
+                FieldType::UserInitials
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("USERNAME") =>
+            {
+                FieldType::UserName
             },
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("DDE") => {
                 FieldType::Dde
@@ -3031,6 +3157,35 @@ impl<'a> Field<'a> {
             prompt: parts.prompt,
             default_response: parts.default_response,
             prompts_once_per_mail_merge: parts.prompts_once_per_mail_merge,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed user-identity field.
+    ///
+    /// Stored override, formatting, and cached-result data are never used to
+    /// read or modify a host user's identity, apply formatting, or refresh a
+    /// field. Malformed instructions remain generic fields and return `None`
+    /// here.
+    pub fn user_identity_field(&self) -> Option<UserIdentityField<'_>> {
+        let expected_kind = match self.field_type {
+            FieldType::UserAddress => UserIdentityFieldKind::Address,
+            FieldType::UserInitials => UserIdentityFieldKind::Initials,
+            FieldType::UserName => UserIdentityFieldKind::Name,
+            _ => return None,
+        };
+        let parts = user_identity_field_parts(self.instruction.as_ref())?;
+        if parts.kind != expected_kind {
+            return None;
+        }
+        Some(UserIdentityField {
+            instruction: self.instruction.as_ref(),
+            kind: parts.kind,
+            override_value: parts.override_value,
+            formatting: parts.formatting,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
             owner: self.owner,
@@ -4496,6 +4651,62 @@ fn prompt_field_parts(instruction: &str) -> Option<PromptFieldParts<'_>> {
         prompt,
         default_response,
         prompts_once_per_mail_merge,
+    })
+}
+
+fn user_identity_field_parts(instruction: &str) -> Option<UserIdentityFieldParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    let kind = if keyword.value.eq_ignore_ascii_case("USERADDRESS") {
+        UserIdentityFieldKind::Address
+    } else if keyword.value.eq_ignore_ascii_case("USERINITIALS") {
+        UserIdentityFieldKind::Initials
+    } else if keyword.value.eq_ignore_ascii_case("USERNAME") {
+        UserIdentityFieldKind::Name
+    } else {
+        return None;
+    };
+    tokens.remove(0);
+
+    let override_value = if tokens
+        .first()
+        .is_some_and(|token| switch_name(token).is_none())
+    {
+        Some(tokens.remove(0).value)
+    } else {
+        None
+    };
+
+    let mut formatting = None;
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        if name != "*" || formatting.is_some() {
+            return None;
+        }
+        let value = tokens
+            .get(index + 1)
+            .filter(|token| switch_name(token).is_none())?
+            .value
+            .as_ref();
+        formatting = Some(if value.eq_ignore_ascii_case("Caps") {
+            UserIdentityFormatting::Caps
+        } else if value.eq_ignore_ascii_case("FirstCap") {
+            UserIdentityFormatting::FirstCap
+        } else if value.eq_ignore_ascii_case("Lower") {
+            UserIdentityFormatting::Lower
+        } else if value.eq_ignore_ascii_case("Upper") {
+            UserIdentityFormatting::Upper
+        } else {
+            return None;
+        });
+        index += 2;
+    }
+
+    Some(UserIdentityFieldParts {
+        kind,
+        override_value,
+        formatting,
     })
 }
 
@@ -6341,6 +6552,71 @@ mod tests {
     }
 
     #[test]
+    fn user_identity_fields_preserve_metadata_without_reading_host_identity() {
+        let mut address = Field::parse_instruction(r#"USERADDRESS "10 Top Secret Lane" \* Upper"#);
+        address.result = Cow::Borrowed("10 TOP SECRET LANE");
+        address.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        address.owner = FieldOwner::Body;
+        address.position = 4;
+
+        assert_eq!(address.field_type, FieldType::UserAddress);
+        let address = address.user_identity_field().unwrap();
+        assert_eq!(address.kind(), UserIdentityFieldKind::Address);
+        assert_eq!(address.override_value(), Some("10 Top Secret Lane"));
+        assert_eq!(address.formatting(), Some(UserIdentityFormatting::Upper));
+        assert_eq!(address.cached_result(), Some("10 TOP SECRET LANE"));
+        assert!(address.is_dirty());
+        assert!(address.is_locked());
+        assert_eq!(address.owner(), FieldOwner::Body);
+        assert_eq!(address.position(), 4);
+
+        let initials = Field::parse_instruction(r#"userinitials \* Lower"#);
+        assert_eq!(initials.field_type, FieldType::UserInitials);
+        let initials = initials.user_identity_field().unwrap();
+        assert_eq!(initials.kind(), UserIdentityFieldKind::Initials);
+        assert_eq!(initials.override_value(), None);
+        assert_eq!(initials.formatting(), Some(UserIdentityFormatting::Lower));
+
+        let name = Field::parse_instruction(r#"USERNAME "Ada Lovelace" \* FirstCap"#);
+        assert_eq!(name.field_type, FieldType::UserName);
+        let name = name.user_identity_field().unwrap();
+        assert_eq!(name.kind(), UserIdentityFieldKind::Name);
+        assert_eq!(name.override_value(), Some("Ada Lovelace"));
+        assert_eq!(name.formatting(), Some(UserIdentityFormatting::FirstCap));
+
+        for instruction in [
+            "USERADDRESS \\*",
+            "USERINITIALS \\* Title",
+            "USERNAME \\* Upper \\* Lower",
+            "USERNAME Ada \\l 1033",
+            "USERADDRESS Ada Lovelace",
+        ] {
+            assert!(
+                Field::parse_instruction(instruction)
+                    .user_identity_field()
+                    .is_none(),
+                "{instruction}"
+            );
+        }
+
+        let blank_override = Field::parse_instruction(r#"USERNAME "" \* Caps"#);
+        let blank_override = blank_override.user_identity_field().unwrap();
+        assert_eq!(blank_override.override_value(), Some(""));
+        assert_eq!(
+            blank_override.formatting(),
+            Some(UserIdentityFormatting::Caps)
+        );
+        assert_eq!(
+            Field::parse_instruction("USERNAMES Ada").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
     fn mail_merge_recipient_fields_preserve_layout_metadata_without_merging() {
         let mut address = Field::parse_instruction(
             r#"ADDRESSBLOCK \c 2 \d \e "United States" \e Canada \f "<<_FIRST0_>> <<_LAST0_>>" \l 1033 \* MERGEFORMAT"#,
@@ -6557,6 +6833,36 @@ mod tests {
         assert_eq!(fields[1].default_response(), Some("09:00"));
         assert_eq!(fields[1].cached_result(), Some("10:30"));
         assert_eq!(document.text(), "Before Middle After");
+    }
+
+    #[test]
+    fn document_discovers_user_identity_fields_without_reading_host_identity() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst USERADDRESS "10 Top Secret Lane" \\* Upper}{\fldrslt 10 TOP SECRET LANE}}Middle {\field{\*\fldinst USERINITIALS \\* Lower}{\fldrslt dw}}After {\field{\*\fldinst USERNAME "Ada Lovelace" \\* FirstCap}{\fldrslt Ada Lovelace}}}"#,
+        )
+        .unwrap();
+
+        let fields = document.user_identity_fields();
+        assert_eq!(document.user_identity_field_count(), 3);
+        assert_eq!(fields.len(), 3);
+        assert_eq!(fields[0].kind(), UserIdentityFieldKind::Address);
+        assert_eq!(fields[0].override_value(), Some("10 Top Secret Lane"));
+        assert_eq!(fields[0].formatting(), Some(UserIdentityFormatting::Upper));
+        assert_eq!(fields[0].cached_result(), Some("10 TOP SECRET LANE"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[1].kind(), UserIdentityFieldKind::Initials);
+        assert_eq!(fields[1].override_value(), None);
+        assert_eq!(fields[1].formatting(), Some(UserIdentityFormatting::Lower));
+        assert_eq!(fields[1].cached_result(), Some("dw"));
+        assert_eq!(fields[2].kind(), UserIdentityFieldKind::Name);
+        assert_eq!(fields[2].override_value(), Some("Ada Lovelace"));
+        assert_eq!(
+            fields[2].formatting(),
+            Some(UserIdentityFormatting::FirstCap)
+        );
+        assert_eq!(fields[2].cached_result(), Some("Ada Lovelace"));
+        assert_eq!(document.text(), "Before Middle After ");
     }
 
     #[test]

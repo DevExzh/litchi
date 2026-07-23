@@ -178,7 +178,8 @@ pub use field::{
     SectionBreak, StoryEvent, StoryField, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesEntryOption, TableOfAuthoritiesField, TableOfAuthoritiesOption,
     TableOfContentsEntryField, TableOfContentsEntryOption, TableOfContentsField,
-    TableOfContentsOption, parse_field_code,
+    TableOfContentsOption, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
+    parse_field_code,
 };
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};
