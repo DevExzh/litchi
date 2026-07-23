@@ -1,5 +1,6 @@
 /// Main presentation object - the high-level API for working with presentations.
 use crate::error::{OoxmlError, Result};
+use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
 use crate::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
 use crate::pptx::slide::{Slide, SlideMaster};
 use litchi_opc::OpcPackage;
@@ -676,6 +677,27 @@ impl<'a> Presentation<'a> {
                 .then_with(|| left.relationship_id.cmp(&right.relationship_id))
         });
         Ok(charts)
+    }
+
+    /// Discover inert InkML annotation content parts on presentation slides.
+    ///
+    /// Results retain slide and OPC relationship identity together with
+    /// bounded stored-trace counts. Ink is never rendered, recognized,
+    /// interpreted, or executed.
+    pub fn ink_annotations(&self) -> Result<Vec<PptxInkAnnotation>> {
+        let mut annotations = Vec::new();
+        let mut limits = InkLoadLimits::default();
+
+        for (slide_index, slide) in self.slides()?.iter().enumerate() {
+            annotations.extend(load_slide_ink_annotations(
+                self.package,
+                slide_index,
+                slide.part().part(),
+                &mut limits,
+            )?);
+        }
+
+        Ok(annotations)
     }
 
     /// Get basic chart information from the presentation.

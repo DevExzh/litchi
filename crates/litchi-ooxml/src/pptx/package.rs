@@ -531,6 +531,13 @@ impl Package {
         self.presentation()?.charts()
     }
 
+    /// Discover inert InkML annotation content parts on presentation slides.
+    ///
+    /// Ink payloads are never rendered, recognized, interpreted, or executed.
+    pub fn ink_annotations(&self) -> Result<Vec<crate::pptx::PptxInkAnnotation>> {
+        self.presentation()?.ink_annotations()
+    }
+
     /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payload.
     ///
     /// This validates only the declared OPC relationship graph and content
