@@ -434,6 +434,25 @@ impl Document {
         )
     }
 
+    /// Return font-face declarations stored in `content.xml`.
+    ///
+    /// This preserves stored metadata only. It does not fetch linked font
+    /// resources, load fonts, or inspect embedded font data.
+    pub fn content_font_face_declarations(&self) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        crate::font_face::parse_content_font_face_declarations(self.content.xml_content())
+    }
+
+    /// Return font-face declarations stored in `styles.xml`.
+    ///
+    /// This preserves stored metadata only. It does not fetch linked font
+    /// resources, load fonts, or inspect embedded font data.
+    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        self.styles.as_ref().map_or_else(
+            || Ok(None),
+            |styles| crate::font_face::parse_styles_font_face_declarations(styles.xml_content()),
+        )
+    }
+
     /// Parse master pages and their losslessly retained headers and footers.
     pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
         self.styles.as_ref().map_or_else(

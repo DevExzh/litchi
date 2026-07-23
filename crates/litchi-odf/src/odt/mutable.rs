@@ -341,6 +341,86 @@ impl MutableDocument {
         Ok(old)
     }
 
+    /// Return font-face declarations from the current `content.xml`.
+    ///
+    /// Linked font resources remain inert metadata. This does not fetch a URI,
+    /// load a font, or inspect embedded font data.
+    pub fn content_font_face_declarations(&self) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        self.with_content_xml(crate::font_face::parse_content_font_face_declarations)
+    }
+
+    /// Replace content-part font-face declarations and return the old value.
+    ///
+    /// This edits `content.xml` only. It does not fetch linked font resources,
+    /// load a font, or inspect embedded font data.
+    pub fn set_content_font_face_declarations(
+        &mut self,
+        declarations: &crate::OdfFontFaceDeclarations,
+    ) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        let (updated, old) = self.with_content_xml(|xml| {
+            crate::font_face::set_content_font_face_declarations_xml(xml, declarations)
+        })?;
+        self.content_xml = Some(updated);
+        Ok(old)
+    }
+
+    /// Remove content-part font-face declarations and return the old value.
+    ///
+    /// This edits `content.xml` only. Existing style references remain
+    /// verbatim so callers can manage their lifecycle separately.
+    pub fn clear_content_font_face_declarations(
+        &mut self,
+    ) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        let (updated, old) =
+            self.with_content_xml(crate::font_face::remove_content_font_face_declarations_xml)?;
+        self.content_xml = Some(updated);
+        Ok(old)
+    }
+
+    /// Return font-face declarations from the current `styles.xml`.
+    ///
+    /// Linked font resources remain inert metadata. This does not fetch a URI,
+    /// load a font, or inspect embedded font data.
+    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(None),
+            crate::font_face::parse_styles_font_face_declarations,
+        )
+    }
+
+    /// Replace styles-part font-face declarations and return the old value.
+    ///
+    /// This edits `styles.xml` only. It does not fetch linked font resources,
+    /// load a font, or inspect embedded font data.
+    pub fn set_styles_font_face_declarations(
+        &mut self,
+        declarations: &crate::OdfFontFaceDeclarations,
+    ) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        let styles = self
+            .styles_xml
+            .clone()
+            .unwrap_or_else(OdfStructure::default_styles_xml);
+        let (updated, old) =
+            crate::font_face::set_styles_font_face_declarations_xml(&styles, declarations)?;
+        self.styles_xml = Some(updated);
+        Ok(old)
+    }
+
+    /// Remove styles-part font-face declarations and return the old value.
+    ///
+    /// This edits `styles.xml` only. Existing style references remain
+    /// verbatim so callers can manage their lifecycle separately.
+    pub fn clear_styles_font_face_declarations(
+        &mut self,
+    ) -> Result<Option<crate::OdfFontFaceDeclarations>> {
+        let Some(styles) = self.styles_xml.as_deref() else {
+            return Ok(None);
+        };
+        let (updated, old) = crate::font_face::remove_styles_font_face_declarations_xml(styles)?;
+        self.styles_xml = Some(updated);
+        Ok(old)
+    }
+
     /// Return stored footnote and endnote presentation configurations.
     ///
     /// The result describes style metadata only. It never renumbers, lays out,
