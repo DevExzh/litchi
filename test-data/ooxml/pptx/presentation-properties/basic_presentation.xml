@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentationPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:webPr allowPng="1" imgSz="1920x1200" clr="browser"/>
+  <p:prnPr prnWhat="handouts6" clrMode="gray" hiddenSlides="1"/>
+  <p:showPr loop="1" showNarration="0" showAnimation="1" useTimings="1">
+    <p:kiosk restart="5"/>
+    <p:sldRg st="2" end="4"/>
+  </p:showPr>
+</p:presentationPr>

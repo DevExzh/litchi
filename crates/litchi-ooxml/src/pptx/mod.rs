@@ -195,6 +195,13 @@ pub use parts::{
     ChartStyleVariation, ChartType,
 };
 pub use presentation::{PptxChart, Presentation};
+pub use presentation_properties::{
+    BrowserSupport, ColorKind, HtmlPublishProperties, InertHtmlTarget,
+    OpaquePresentationExtension, PresentationColor, PresentationProperties,
+    PresentationPropertyExtension, PrintColorMode, PrintOutput, PrintProperties, ShowMode,
+    ShowProperties, SlideSelection, SlideShowExtension, WebColor, WebProperties, WebScreenSize,
+    load_from_package as load_presentation_properties,
+};
 pub use presentation_structure::{
     PresentationSlideReference, PresentationStructure, add_custom_show,
     add_custom_show_slide, add_section, add_section_slide, find_custom_show, find_section,
@@ -221,4 +228,9 @@ pub use tags::{
     parse_tag_list, write_tag_list,
 };
 pub use transitions::{SlideTransition, TransitionDirection, TransitionSpeed, TransitionType};
+pub use view_properties::{
+    CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
+    OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView,
+    SplitterState, ViewKind, ViewProperties, load_from_package as load_view_properties,
+};
 pub use writer::{MutablePresentation, MutableShape, MutableSlide};

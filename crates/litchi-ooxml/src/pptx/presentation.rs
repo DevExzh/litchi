@@ -742,6 +742,26 @@ impl<'a> Presentation<'a> {
         Ok(settings)
     }
 
+    /// Load typed presentation-view settings, if the package contains them.
+    ///
+    /// View settings are returned as stored document data only; this does not
+    /// alter the application's display state or follow outline-slide targets.
+    pub fn view_properties(&self) -> Result<Option<crate::pptx::view_properties::ViewProperties>> {
+        crate::pptx::view_properties::load_from_package(self.package)
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+    }
+
+    /// Load typed presentation settings, if the package contains them.
+    ///
+    /// Declared HTML publishing targets remain inert metadata and are never
+    /// opened, fetched, or otherwise activated.
+    pub fn presentation_properties(
+        &self,
+    ) -> Result<Option<crate::pptx::presentation_properties::PresentationProperties>> {
+        crate::pptx::presentation_properties::load_from_package(self.package)
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+    }
+
     /// Get basic chart information from the presentation.
     ///
     /// Returns a vector of tuples: (slide_index, chart_info).
