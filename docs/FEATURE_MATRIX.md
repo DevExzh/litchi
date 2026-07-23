@@ -216,7 +216,7 @@ conversion, fonts, and image conversion are optional.
 | SmartArt | ✅ | ✅ | ✅ | Diagram data/layout/style/color part graphs and builder support |
 | Audio, video, posters, and captions | ✅ | ✅ | ✅ | Embedded/linked media, trim/fade/bookmark metadata, and text-track parts |
 | Animations and timing trees | ✅ | ✅ | ✅ | Shape effects, sequences, triggers, and chart/diagram timing relationships |
-| Transitions and slide advance timing | ✅ | ✅ | ✅ | Typed base effects, including directional, corner, orientation, and wheel-spoke variants; through-black and split in/out options; speed, sound, click, and timed advance |
+| Transitions and slide advance timing | ✅ | ✅ | ✅ | Typed base effects, including directional, corner, orientation, and wheel-spoke variants; through-black and split in/out options; slide/layout/master effective inheritance; speed, sound, click, and timed advance |
 | PowerPoint 2010 transition extensions | 🟡 | ✅ | ❌ | Compatibility-choice ripple effects on slides, layouts, and masters, with typed corner/center direction and extended duration; no fallback authoring |
 | Hyperlinks and slide-jump actions | 🟡 | ✅ | ✅ | URL and slide navigation plus bounded inert click/hover action-setting inventory for PowerPoint-reserved action values and declared targets; no target is followed, opened, activated, or executed |
 | Classic comments | ✅ | ✅ | ✅ | Authors, slide comment parts, and package-aware CRUD |

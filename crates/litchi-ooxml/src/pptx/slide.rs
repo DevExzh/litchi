@@ -447,6 +447,21 @@ impl<'a> Slide<'a> {
         ))
     }
 
+    /// Get the transition this slide will use after inheritance is applied.
+    ///
+    /// A transition defined on the slide takes precedence over its layout and
+    /// slide master. If the slide has no transition, the layout's effective
+    /// transition is returned instead.
+    pub fn effective_transition(
+        &self,
+    ) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+        if let Some(transition) = self.transition()? {
+            return Ok(Some(transition));
+        }
+
+        self.layout()?.effective_transition()
+    }
+
     /// Get typed simple animation timing metadata for this slide.
     ///
     /// Targets are validated against shape IDs on the current slide. Unsupported
@@ -600,6 +615,21 @@ impl<'a> SlideLayout<'a> {
     /// Returns `None` if the layout has no transition.
     pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
         self.part.transition()
+    }
+
+    /// Get the transition this layout will use after inheritance is applied.
+    ///
+    /// A transition defined on the layout takes precedence over its slide
+    /// master. If the layout has no transition, the master's transition is
+    /// returned instead.
+    pub fn effective_transition(
+        &self,
+    ) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
+        if let Some(transition) = self.transition()? {
+            return Ok(Some(transition));
+        }
+
+        self.master()?.transition()
     }
 
     /// Resolve the slide master that owns this layout.
