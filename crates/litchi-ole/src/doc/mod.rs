@@ -123,6 +123,7 @@ pub use parts::fields::{DdeField, DdeFieldKind, DdeRepresentation};
 pub use parts::fields::{ExternalIncludeField, ExternalIncludeOption, IncludeFieldKind};
 pub use parts::fields::{IndexField, IndexOption};
 pub use parts::fields::{LinkField, LinkFormatting, LinkResultOption};
+pub use parts::fields::{ReferenceField, ReferenceFieldKind, ReferenceFieldOption};
 pub use parts::glossary::{
     GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,
 };

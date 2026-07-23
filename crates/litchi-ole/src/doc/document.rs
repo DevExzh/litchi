@@ -18,8 +18,8 @@ use super::parts::fields::{
     DocumentVariableField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
     GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
-    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, TableOfAuthoritiesField,
-    TableOfContentsField, UserIdentityField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, ReferenceField,
+    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -668,6 +668,25 @@ impl Document {
     /// Get the number of typed, inert generated-index (`INDEX`) fields.
     pub fn index_count(&self) -> Result<usize> {
         Ok(self.indexes()?.len())
+    }
+
+    /// Get typed, inert bookmark-reference fields in story and source order.
+    ///
+    /// Returned values expose only stored categories, bookmark names, options,
+    /// switches, cached results, and field state. This method never looks up a
+    /// bookmark, reads a referenced range, resolves a page or note number,
+    /// creates a link, calculates a relative position, or refreshes a field.
+    pub fn reference_fields(&self) -> Result<Vec<ReferenceField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::reference_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert bookmark-reference fields.
+    pub fn reference_field_count(&self) -> Result<usize> {
+        Ok(self.reference_fields()?.len())
     }
 
     /// Get typed, inert `GLOSSARY` and `AUTOTEXT` fields in story and source order.
