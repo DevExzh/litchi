@@ -53,8 +53,8 @@ pub use comment::{
     generate_comments_xml,
 };
 pub use presentation::{
-    NotesSize, PresentationConformance, PresentationDefaultTextStyle, PresentationMetadata,
-    PresentationPart, SlideSize,
+    NotesSize, PresentationConformance, PresentationDefaultTextStyle, PresentationKinsokuSettings,
+    PresentationMetadata, PresentationPart, SlideSize,
 };
 pub use slide::{
     MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,

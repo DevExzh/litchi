@@ -7,8 +7,8 @@ use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_trace
 use crate::pptx::namespace::is_presentationml_name;
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
 use crate::pptx::parts::{
-    NotesSize, PresentationDefaultTextStyle, PresentationMetadata, PresentationPart,
-    SlideMasterPart, SlidePart, SlideSize,
+    NotesSize, PresentationDefaultTextStyle, PresentationKinsokuSettings, PresentationMetadata,
+    PresentationPart, SlideMasterPart, SlidePart, SlideSize,
 };
 use crate::pptx::show_events::{
     PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events,
@@ -435,6 +435,13 @@ impl<'a> Presentation<'a> {
     /// Get the presentation-wide default text-style inventory.
     pub fn default_text_style(&self) -> Result<Option<PresentationDefaultTextStyle>> {
         self.part.default_text_style()
+    }
+
+    /// Get the presentation-wide East Asian line-breaking settings.
+    ///
+    /// Returns None when the presentation does not declare kinsoku settings.
+    pub fn kinsoku_settings(&self) -> Result<Option<PresentationKinsokuSettings>> {
+        self.part.kinsoku_settings()
     }
 
     /// Get the relationship ID of the declared handout master.

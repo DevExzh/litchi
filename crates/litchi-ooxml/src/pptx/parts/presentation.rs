@@ -292,6 +292,52 @@ impl PresentationDefaultTextStyle {
     }
 }
 
+/// Presentation-wide East Asian line-breaking settings.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PresentationKinsokuSettings {
+    language: Option<String>,
+    invalid_start_characters: String,
+    invalid_end_characters: String,
+}
+
+impl PresentationKinsokuSettings {
+    /// Return the East Asian language these settings apply to, if declared.
+    #[inline]
+    pub fn language(&self) -> Option<&str> {
+        self.language.as_deref()
+    }
+
+    /// Return characters that cannot begin a text line.
+    #[inline]
+    pub fn invalid_start_characters(&self) -> &str {
+        &self.invalid_start_characters
+    }
+
+    /// Return characters that cannot end a text line.
+    #[inline]
+    pub fn invalid_end_characters(&self) -> &str {
+        &self.invalid_end_characters
+    }
+
+    fn from_element(element: &BytesStart<'_>, decoder: Decoder) -> Result<Self> {
+        Ok(Self {
+            language: unqualified_attribute_value(element, b"lang", decoder)?,
+            invalid_start_characters: required_string_attribute(
+                element,
+                b"invalStChars",
+                decoder,
+                "kinsoku invalid start characters",
+            )?,
+            invalid_end_characters: required_string_attribute(
+                element,
+                b"invalEndChars",
+                decoder,
+                "kinsoku invalid end characters",
+            )?,
+        })
+    }
+}
+
 /// The main presentation part.
 ///
 /// This part contains the presentation-level properties and references to slides,
@@ -407,6 +453,13 @@ impl<'a> PresentationPart<'a> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.default_text_style)
     }
 
+    /// Get the presentation-wide East Asian line-breaking settings.
+    ///
+    /// Returns None when the presentation does not declare kinsoku settings.
+    pub fn kinsoku_settings(&self) -> Result<Option<PresentationKinsokuSettings>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.kinsoku_settings)
+    }
+
     /// Get the relationship ID of the declared handout master.
     ///
     /// Returns None when the presentation does not declare a handout master.
@@ -504,6 +557,7 @@ struct PresentationInfo {
     notes_size: Option<NotesSize>,
     metadata: PresentationMetadata,
     default_text_style: Option<PresentationDefaultTextStyle>,
+    kinsoku_settings: Option<PresentationKinsokuSettings>,
     handout_master_relationship_id: Option<String>,
     seen_slide_list: bool,
     seen_master_list: bool,
@@ -720,6 +774,16 @@ impl PresentationInfo {
             && is_presentationml_name(namespace, element.name(), b"defaultTextStyle")
         {
             self.begin_default_text_style()?;
+        } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"kinsoku")
+        {
+            if self.kinsoku_settings.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate PowerPoint kinsoku settings".to_string(),
+                ));
+            }
+            self.kinsoku_settings =
+                Some(PresentationKinsokuSettings::from_element(element, decoder)?);
         } else if parent == PresentationContext::DefaultTextStyle {
             self.observe_default_text_style_child(namespace, element)?;
         } else if parent == PresentationContext::SlideList
@@ -933,6 +997,16 @@ fn required_u32(
     value
         .parse::<u32>()
         .map_err(|_| OoxmlError::InvalidFormat(format!("invalid {description} value '{value}'")))
+}
+
+fn required_string_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<String> {
+    unqualified_attribute_value(element, name, decoder)?
+        .ok_or_else(|| OoxmlError::InvalidFormat(format!("missing {description} attribute")))
 }
 
 fn required_positive_i64(
@@ -1200,6 +1274,49 @@ mod tests {
     }
 
     #[test]
+    fn parses_kinsoku_settings_by_namespace() {
+        let xml = format!(
+            r#"<q:presentation xmlns:q="{P}" xmlns:f="urn:foreign">
+                <f:kinsoku lang="spoof" invalStChars="x" invalEndChars="y"/>
+                <q:kinsoku lang="ja-jp" invalStChars="、。）］" invalEndChars="（［"/>
+                <q:extLst><q:kinsoku lang="nested" invalStChars="x" invalEndChars="y"/>
+                </q:extLst>
+            </q:presentation>"#
+        );
+        let blob = part(xml);
+        let settings = PresentationPart::from_part(&blob)
+            .unwrap()
+            .kinsoku_settings()
+            .unwrap()
+            .unwrap();
+        assert_eq!(settings.language(), Some("ja-jp"));
+        assert_eq!(settings.invalid_start_characters(), "、。）］");
+        assert_eq!(settings.invalid_end_characters(), "（［");
+
+        let strict = r#"<x:presentation xmlns:x="http://purl.oclc.org/ooxml/presentationml/main">
+            <x:kinsoku invalStChars="" invalEndChars=""/></x:presentation>"#;
+        let blob = part(strict);
+        let settings = PresentationPart::from_part(&blob)
+            .unwrap()
+            .kinsoku_settings()
+            .unwrap()
+            .unwrap();
+        assert_eq!(settings.language(), None);
+        assert_eq!(settings.invalid_start_characters(), "");
+        assert_eq!(settings.invalid_end_characters(), "");
+
+        let absent = format!(r#"<p:presentation xmlns:p="{P}"></p:presentation>"#);
+        let blob = part(absent);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .kinsoku_settings()
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
     fn rejects_duplicate_default_text_style_declarations() {
         let cases = [
             format!(
@@ -1245,6 +1362,36 @@ mod tests {
                 PresentationPart::from_part(&blob)
                     .unwrap()
                     .handout_master_relationship_id()
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_kinsoku_settings() {
+        let cases = [
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:kinsoku invalEndChars="]"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:kinsoku invalStChars="["/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:f="urn:foreign"><p:kinsoku f:invalStChars="[" invalEndChars="]"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:kinsoku invalStChars="[" invalEndChars="]"/><p:kinsoku invalStChars="(" invalEndChars=")"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:kinsoku invalStChars="[" invalStChars="(" invalEndChars="]"/></p:presentation>"#
+            ),
+        ];
+        for xml in cases {
+            let blob = part(xml);
+            assert!(
+                PresentationPart::from_part(&blob)
+                    .unwrap()
+                    .kinsoku_settings()
                     .is_err()
             );
         }
