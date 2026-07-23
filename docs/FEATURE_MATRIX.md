@@ -409,7 +409,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Tables | ✅ | ✅ | ✅ | Nested tables, properties, rows, and cells |
 | Lists and outline styles | ✅ | ✅ | ✅ | Ordered/unordered lists, labels, outline levels, and alignment |
 | Sections | ✅ | ✅ | ✅ | Add, wrap, unwrap, replace, remove, and protected/linked metadata |
-| Styles and page layouts | ✅ | ✅ | ✅ | Paragraph/text/table styles, document line-numbering configuration, columns, drop caps, tab stops, and page properties; no pagination or line-number generation |
+| Styles and page layouts | ✅ | ✅ | ✅ | Paragraph/text/table styles, document line-numbering configuration, columns, drop caps, tab stops, page properties, and read-only explicit `text:page-sequence` master-page assignments; no pagination or line-number generation |
 | Master pages, headers, and footers | ✅ | ✅ | ✅ | Master-page CRUD and header/footer content/properties, including typed cached page/navigation/statistic, reference/variable/sequence, conditional/formula/DDE/meta, database, document identity/revision, sender identity/contact, and script/macro metadata; fields remain inert |
 | Hyperlinks | ✅ | ✅ | ✅ | Typed inert `text:a` insertion with XLink target/show/actuate and office/text metadata; links are never followed |
 | Footnotes and endnotes | 🟡 | ✅ | ✅ | Configurations/separators plus validated inert `text:note-body` construction, parsing, and replacement (paragraphs/lists/tables/selected drawing content); `Note::rich_body` exposes existing rich bodies as namespace-resolved nodes for structural edits, while links, fields, scripts, and macro metadata remain inert |

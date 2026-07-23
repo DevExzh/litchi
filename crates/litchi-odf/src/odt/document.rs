@@ -17,6 +17,7 @@ use std::path::Path;
 
 use super::header_footer::{MasterPage, parse_master_pages};
 use super::page_layout::{PageLayout, parse_page_layouts};
+use super::page_sequence::{OdtPageSequence, parse_page_sequence};
 
 const MAX_REFERENCE_DEPTH: usize = 4_096;
 const MAX_REFERENCES: usize = 1_000_000;
@@ -447,6 +448,14 @@ impl Document {
             || Ok(Vec::new()),
             |styles| parse_page_layouts(styles.xml_content()),
         )
+    }
+
+    /// Return the explicit master-page assignments from `text:page-sequence`, if present.
+    ///
+    /// This exposes stored page metadata only. It does not resolve master-page
+    /// styles, calculate page breaks, or paginate the document.
+    pub fn page_sequence(&self) -> Result<Option<OdtPageSequence>> {
+        parse_page_sequence(self.content.xml_content())
     }
 
     /// Return the stored document line-numbering configuration.

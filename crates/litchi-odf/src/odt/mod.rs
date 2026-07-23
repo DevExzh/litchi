@@ -69,6 +69,7 @@ mod mutable;
 mod note;
 pub(crate) use note::parse_notes;
 pub(crate) mod page_layout;
+mod page_sequence;
 mod parser;
 mod reference_mark;
 mod ruby;
