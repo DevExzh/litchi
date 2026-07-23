@@ -14,9 +14,9 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    AdvanceField, Field, FieldStory, FieldText, FieldsTable, GoToButtonField, IfField,
-    MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
-    MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
+    AdvanceField, CompareField, Field, FieldStory, FieldText, FieldsTable, GoToButtonField,
+    IfField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -691,6 +691,21 @@ impl Document {
     /// Get the number of typed, inert `IF` fields.
     pub fn if_field_count(&self) -> Result<usize> {
         Ok(self.if_fields()?.len())
+    }
+
+    /// Get typed, inert `COMPARE` fields in story and source order.
+    ///
+    /// Returned values expose only stored comparison text, cached results, and
+    /// field state. This method never parses or evaluates a comparison,
+    /// resolves nested field values, or refreshes a field result.
+    pub fn compare_fields(&self) -> Result<Vec<CompareField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::compare_field).collect())
+    }
+
+    /// Get the number of typed, inert `COMPARE` fields.
+    pub fn compare_field_count(&self) -> Result<usize> {
+        Ok(self.compare_fields()?.len())
     }
 
     /// Get typed, inert `ASK` and `FILLIN` fields in story and source order.
