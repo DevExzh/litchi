@@ -214,7 +214,7 @@ conversion, fonts, and image conversion are optional.
 | Tables | ✅ | ✅ | ✅ | Table extraction and authoring |
 | Classic and extended charts | ✅ | ✅ | ✅ | Per-slide classic-chart inventory with relationship/part identity and basic type/title/legend metadata, plus multiple chart types, chart/style/color parts, ChartEx, and embedded workbook resources |
 | SmartArt | ✅ | ✅ | ✅ | Diagram data/layout/style/color part graphs and builder support |
-| Audio, video, posters, and captions | ✅ | ✅ | ✅ | Embedded/linked media, trim/fade/bookmark metadata, and text-track parts |
+| Audio, video, posters, and captions | ✅ | ✅ | ✅ | Embedded/linked media, trim/fade/bookmark metadata, and high-level text-track inventory |
 | Animations and timing trees | ✅ | ✅ | ✅ | Shape effects, sequences, triggers, chart/diagram timing relationships, and timing metadata on slides, layouts, and masters |
 | Transitions and slide advance timing | ✅ | ✅ | ✅ | Typed base effects, including directional, corner, orientation, and wheel-spoke variants; through-black and split in/out options; slide/layout/master effective inheritance; MCE-backed custom durations; speed, sound, click, and timed advance |
 | PowerPoint 2010 transition extensions | ✅ | ✅ | ✅ | Compatibility-choice ripple effects on slides, layouts, and masters, with typed corner/center direction and extended duration; deterministic fade fallback authoring |

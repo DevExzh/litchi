@@ -1014,6 +1014,14 @@ impl<'a> Presentation<'a> {
         Ok(objects)
     }
 
+    /// Load the presentation's WebVTT caption tracks.
+    ///
+    /// Internal tracks are parsed as bounded inert text. External targets are
+    /// retained as document metadata and are never fetched.
+    pub fn caption_tracks(&self) -> Result<Vec<crate::pptx::tracks::PresentationTrack>> {
+        crate::pptx::tracks::load_presentation_tracks(self.package)
+    }
+
     /// Discover programmable tag-list parts reachable from presentation slides.
     ///
     /// Tag names and values remain inert document strings. This never follows
