@@ -22,7 +22,8 @@ use super::parts::fields::{
     InfoField, LegacyFormField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
-    ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
+    ReferenceField, ReferencedDocumentField, SequenceField, SetField, StyleReferenceField,
+    SymbolField,
     ShapeField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsEntryField,
     TableOfContentsField, UserIdentityField,
 };
@@ -1286,6 +1287,34 @@ impl Document {
     /// Get the number of typed, inert external-include fields.
     pub fn external_include_count(&self) -> Result<usize> {
         Ok(self.external_includes()?.len())
+    }
+
+    /// Get typed, inert `RD` referenced-document fields in story and source order.
+    ///
+    /// Native Word omits `RD` marker characters from `Plcfld` metadata, so this
+    /// method scans only the stored text of each document story. Returned values
+    /// expose stored sources, relative-path requests, switches, cached results,
+    /// and source positions. This method never opens, resolves, reads, imports,
+    /// refreshes, evaluates, or executes a referenced document.
+    pub fn referenced_documents(&self) -> Result<Vec<ReferencedDocumentField>> {
+        let mut references = Vec::new();
+        for story in FieldStory::ALL {
+            let Some((start, end)) = self.field_story_range_if_present(story) else {
+                continue;
+            };
+            let text = self.text_extractor.text_at_range(start, end);
+            references.extend(
+                non_plcf_field_texts(story, text)
+                    .iter()
+                    .filter_map(ReferencedDocumentField::from_non_plcf_field),
+            );
+        }
+        Ok(references)
+    }
+
+    /// Get the number of typed, inert `RD` referenced-document fields.
+    pub fn referenced_document_count(&self) -> Result<usize> {
+        Ok(self.referenced_documents()?.len())
     }
 
     /// Get typed, inert `MERGEREC` and `MERGESEQ` fields in story and source order.

@@ -208,3 +208,31 @@ fn generated_xe_document_discovers_index_entries() {
     );
     assert_eq!(document.index_entry_count().unwrap(), entries.len());
 }
+
+#[test]
+fn generated_rd_document_discovers_referenced_documents() {
+    let mut writer = DocWriter::new();
+    writer
+        .add_paragraph(concat!(
+            "\u{0013} RD \"chapters/Chapter 1.doc\" \\f \\* MERGEFORMAT ",
+            "\u{0014}cached reference\u{0015}",
+        ))
+        .unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+
+    let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+    let document = package.document().unwrap();
+    let references = document.referenced_documents().unwrap();
+    assert_eq!(references.len(), 1);
+    assert_eq!(references[0].story(), FieldStory::Main);
+    assert_eq!(references[0].source(), "chapters/Chapter 1.doc");
+    assert!(references[0].uses_relative_path());
+    assert_eq!(references[0].cached_result(), Some("cached reference"));
+    assert_eq!(references[0].switches()[0].name(), 'f');
+    assert_eq!(references[0].switches()[1].name(), '*');
+    assert_eq!(
+        document.referenced_document_count().unwrap(),
+        references.len()
+    );
+}

@@ -145,7 +145,9 @@ pub use parts::fields::{DdeField, DdeFieldKind, DdeRepresentation};
 pub use parts::fields::{ExternalIncludeField, ExternalIncludeOption, IncludeFieldKind};
 pub use parts::fields::{IndexEntryField, IndexEntryOption, IndexField, IndexOption};
 pub use parts::fields::{LinkField, LinkFormatting, LinkResultOption};
-pub use parts::fields::{ReferenceField, ReferenceFieldKind, ReferenceFieldOption};
+pub use parts::fields::{
+    ReferenceField, ReferenceFieldKind, ReferenceFieldOption, ReferencedDocumentField,
+};
 pub use parts::fields::{StyleReferenceField, StyleReferenceFieldOption};
 pub use parts::glossary::{
     GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,
