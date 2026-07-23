@@ -820,11 +820,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_real_libreoffice_angles_and_extension_stops() {
-        let angles_xml = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sd/qa/unit/data/odg/gradient-angle.fodg"
-        ));
+    fn parses_local_angles_and_extension_stops() {
+        let angles_xml = include_str!("../../../test-data/odf/drawing/opacity-angles.fodg");
         let angles = crate::FlatOpenDocument::from_bytes(angles_xml.as_bytes().to_vec()).unwrap();
         let values = angles.drawing_opacities().unwrap();
         assert_eq!(values.opacities.len(), 6);
@@ -841,10 +838,7 @@ mod tests {
             "1000grad"
         );
 
-        let stops_xml = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/oox/qa/unit/data/tdf51195_Fontwork_ellipticalGradient.fodt"
-        ));
+        let stops_xml = include_str!("../../../test-data/odf/drawing/opacity-extension-stops.fodt");
         let stops = crate::FlatOpenDocument::from_bytes(stops_xml.as_bytes().to_vec()).unwrap();
         let values = stops.drawing_opacities().unwrap();
         let value = values.get("Transparency_20_1").unwrap();

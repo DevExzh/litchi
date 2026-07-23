@@ -964,11 +964,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_real_libreoffice_linked_and_inline_resources() {
-        let linked_xml = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/shape-fill-link.fodp"
-        ));
+    fn parses_local_linked_and_inline_resources() {
+        let linked_xml = include_str!("../../../test-data/odf/drawing/fill-image-linked.fodp");
         let linked = crate::FlatOpenDocument::from_bytes(linked_xml.as_bytes().to_vec()).unwrap();
         let images = linked.drawing_fill_images().unwrap();
         assert_eq!(
@@ -982,10 +979,7 @@ mod tests {
             OdfFillImageLinkKind::InertExternal
         );
 
-        let inline_xml = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/xmloff/qa/unit/data/fill-image-base64.fodg"
-        ));
+        let inline_xml = include_str!("../../../test-data/odf/drawing/fill-image-inline.fodg");
         let inline = crate::FlatOpenDocument::from_bytes(inline_xml.as_bytes().to_vec()).unwrap();
         let images = inline.drawing_fill_images().unwrap();
         let bytes = images

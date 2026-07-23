@@ -569,11 +569,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_real_libreoffice_flat_document_through_public_api() {
-        let xml = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/filter/xml/data/sheet1.fods"
-        ));
+    fn parses_local_flat_document_through_public_api() {
+        let xml = include_str!("../../../test-data/odf/drawing/marker-flat.fods");
         let document = crate::FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         let markers = document.drawing_markers().unwrap();
         let marker = markers.get("Arrowheads_20_1").unwrap();
