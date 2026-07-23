@@ -979,6 +979,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `EMBED` fields in document field order.
+    ///
+    /// Stored opaque object instructions, cached results, and state are exposed
+    /// solely as metadata. This method never loads, inspects, deserializes,
+    /// activates, renders, or executes an embedded object, accesses an external
+    /// resource, or refreshes a field.
+    pub fn embed_fields(&self) -> Vec<crate::EmbedField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::embed_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `EMBED` fields in the document.
+    pub fn embed_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.embed_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in
     /// document field order.
     ///
