@@ -611,6 +611,11 @@ impl<'a> SlideLayoutPart<'a> {
         )
     }
 
+    /// Parse the timing metadata declared by this slide layout.
+    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
+        crate::pptx::animations::AnimationSequence::parse_slide_xml(self.xml_bytes())
+    }
+
     /// Get the transition effect inherited from this slide layout.
     ///
     /// Parses the `<p:transition>` element from the layout XML.
@@ -684,6 +689,11 @@ impl<'a> SlideMasterPart<'a> {
     /// Get the color map defined by this master.
     pub fn color_map(&self) -> Result<crate::pptx::color_map::ColorMap> {
         crate::pptx::color_map::parse_master_color_map(self.xml_bytes())
+    }
+
+    /// Parse the timing metadata declared by this slide master.
+    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
+        crate::pptx::animations::AnimationSequence::parse_slide_xml(self.xml_bytes())
     }
 
     /// Get the transition effect inherited from this slide master.

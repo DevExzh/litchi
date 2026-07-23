@@ -858,6 +858,11 @@ impl<'a> SlideLayout<'a> {
         }
     }
 
+    /// Parse the timing metadata declared by this slide layout.
+    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
+        self.part.animations()
+    }
+
     /// Get the transition effect inherited from this layout.
     ///
     /// Returns `None` if the layout has no transition.
@@ -1062,6 +1067,11 @@ impl<'a> SlideMaster<'a> {
         let color_map = self.color_map()?;
         let theme = self.theme()?;
         Ok(color_map.resolve_theme_color(&theme, slot).cloned())
+    }
+
+    /// Parse the timing metadata declared by this slide master.
+    pub fn animations(&self) -> Result<crate::pptx::animations::AnimationSequence> {
+        self.part.animations()
     }
 
     /// Get the transition effect inherited from this master.
