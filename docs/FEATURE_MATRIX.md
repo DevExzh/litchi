@@ -228,7 +228,7 @@ conversion, fonts, and image conversion are optional.
 | Custom slide shows | ✅ | ✅ | ✅ | Named subsets and graph-safe ordered CRUD |
 | Presentation/slide protection | ✅ | ✅ | ✅ | Protection and password metadata; policy is not enforced by the library |
 | Embedded fonts | ✅ | ✅ | ✅ | Payloads, obfuscation, licensing checks, and ordered CRUD |
-| Embedded OLE/package objects | 🟡 | ✅ | ❌ | Generic embedded-part discovery; no typed slide OLE authoring model |
+| Embedded OLE/package objects | 🟡 | ✅ | ❌ | Typed per-slide inert OLE inventory with shape, ProgID, relationship, and payload metadata; no OLE authoring or activation |
 | View and presentation properties, and guides | 🟡 | ✅ | ✅ | Typed package/presentation readers for view and presentation settings, with bounded serialization and extended guides |
 | Tags, changes, and revision information | 🟡 | ✅ | 🟡 | Inert programmable tags and revision/change package parts; package integration varies by part |
 | Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | PowerPoint package task-pane discovery plus bounded web-extension parsing/serialization; add-ins are never executed |

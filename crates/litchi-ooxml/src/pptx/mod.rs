@@ -76,6 +76,7 @@ pub mod modern_comment_authors;
 pub mod modern_comments;
 mod namespace;
 pub mod notes;
+pub mod ole;
 pub mod package;
 pub mod parts;
 pub mod presentation;
@@ -158,6 +159,9 @@ pub use media_parts::{
 pub use notes::{
     PptxNotesConformance, PptxNotesGraph, PptxNotesMasterResource, PptxNotesSlideResource,
     PptxNotesThemeResource, load_notes_graph, store_notes_graph,
+};
+pub use ole::{
+    PptxOleObject, PptxOleObjectMode, PptxOleObjectTarget, PptxOlePayloadKind,
 };
 pub use package::Package;
 pub use vba_project::VbaProject;

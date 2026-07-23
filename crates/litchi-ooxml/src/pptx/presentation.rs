@@ -3,6 +3,7 @@ use crate::error::{OoxmlError, Result};
 use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_action_settings};
 use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
 use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
+use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
 use crate::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
 use crate::pptx::slide::{Slide, SlideMaster};
 use litchi_opc::OpcPackage;
@@ -740,6 +741,26 @@ impl<'a> Presentation<'a> {
         }
 
         Ok(settings)
+    }
+
+    /// Discover bounded, inert OLE object shapes and declared payload targets.
+    ///
+    /// This never parses, opens, activates, renders, or executes an embedded
+    /// object or package payload.
+    pub fn ole_objects(&self) -> Result<Vec<PptxOleObject>> {
+        let mut objects = Vec::new();
+        let mut limits = OleLoadLimits::default();
+
+        for (slide_index, slide) in self.slides()?.iter().enumerate() {
+            objects.extend(load_slide_ole_objects(
+                self.package,
+                slide_index,
+                slide.part().part(),
+                &mut limits,
+            )?);
+        }
+
+        Ok(objects)
     }
 
     /// Load typed presentation-view settings, if the package contains them.

@@ -553,6 +553,14 @@ impl Package {
         self.presentation()?.action_settings()
     }
 
+    /// Discover bounded, inert OLE object shapes and declared payload targets.
+    ///
+    /// This never parses, opens, activates, renders, or executes an embedded
+    /// object or package payload.
+    pub fn ole_objects(&self) -> Result<Vec<crate::pptx::PptxOleObject>> {
+        self.presentation()?.ole_objects()
+    }
+
     /// Load typed presentation-view settings, if the package contains them.
     ///
     /// View settings are returned as stored document data only; this does not
