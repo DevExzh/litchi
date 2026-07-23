@@ -9,8 +9,9 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
-    AdvanceField, AutoNumberField, BarcodeField, BibliographyField, CitationField, DdeField,
-    DocumentVariableField, EmbedField, ExternalIncludeField, Field, GoToButtonField, IfField,
+    AdvanceField, AutoNumberField, BarcodeField, BibliographyField, BidiOutlineField,
+    CitationField, DdeField, DocumentVariableField, EmbedField, ExternalIncludeField, Field,
+    GoToButtonField, IfField,
     IndexEntryField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, PrintField, QuoteField,
@@ -1394,6 +1395,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `BARCODE` fields in the main document.
     pub fn barcode_field_count(&self) -> Result<usize> {
         Ok(self.barcode_fields()?.len())
+    }
+
+    /// Get typed, inert `BIDIOUTLINE` fields in document order.
+    ///
+    /// Returned values expose only stored opaque instructions, cached content,
+    /// and dirty/lock state. This method never reads right-to-left language,
+    /// paragraph outline, or layout state; chooses a numbering system;
+    /// calculates a result; or refreshes a field.
+    pub fn bidi_outline_fields(&self) -> Result<Vec<BidiOutlineField>> {
+        self.fields()?
+            .iter()
+            .map(Field::bidi_outline_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `BIDIOUTLINE` fields in the main document.
+    pub fn bidi_outline_field_count(&self) -> Result<usize> {
+        Ok(self.bidi_outline_fields()?.len())
     }
 
     /// Get typed, inert user-identity fields in document order.

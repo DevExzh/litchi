@@ -22,6 +22,7 @@ const MAX_AUTO_TEXT_LIST_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_EMBED_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BARCODE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_INFO_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -741,6 +742,26 @@ impl Field {
     /// generates or renders a barcode, or refreshes a field.
     pub fn barcode_field(&self) -> Result<Option<BarcodeField>> {
         BarcodeField::from_field(self)
+    }
+
+    /// Check whether this is a `BIDIOUTLINE` field.
+    ///
+    /// Recognition is limited to stored field metadata. It never reads
+    /// right-to-left language, paragraph outline, or layout state; chooses a
+    /// numbering system; calculates a result; or refreshes the field.
+    pub fn is_bidi_outline_field(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "BIDIOUTLINE").is_some()
+    }
+
+    /// Parse this field as inert typed `BIDIOUTLINE` metadata.
+    ///
+    /// Returns `Ok(None)` for fields other than `BIDIOUTLINE`. The stored opaque
+    /// instruction, cached content, and dirty/lock state are metadata only;
+    /// this method never reads right-to-left language, paragraph outline, or
+    /// layout state; chooses a numbering system; calculates a result; or
+    /// refreshes a field.
+    pub fn bidi_outline_field(&self) -> Result<Option<BidiOutlineField>> {
+        BidiOutlineField::from_field(self)
     }
 
     /// Check whether this is an `ADDIN` field.
@@ -4484,6 +4505,77 @@ impl BarcodeField {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from barcode data.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
+/// A typed, inert Word `BIDIOUTLINE` field.
+///
+/// This type retains opaque instruction text, a cached result, and field state
+/// only. It never reads right-to-left language, paragraph outline, or layout
+/// state; chooses a numbering system; calculates a result; or refreshes a
+/// field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BidiOutlineField {
+    instruction: String,
+    opaque_instructions: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+}
+
+impl BidiOutlineField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(opaque_instructions) =
+            field_instruction_remainder(field.instruction(), "BIDIOUTLINE")
+        else {
+            return Ok(None);
+        };
+        if field.instruction().len() > MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "BIDIOUTLINE field instruction exceeds {MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES} bytes"
+            )));
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            opaque_instructions: opaque_instructions.trim().to_string(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to calculate an
+    /// outline number.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return opaque stored instruction text after `BIDIOUTLINE`.
+    ///
+    /// It is never parsed, interpreted, or used to resolve language, outline,
+    /// numbering, or layout state.
+    pub fn opaque_instructions(&self) -> &str {
+        &self.opaque_instructions
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from document state.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -8818,6 +8910,55 @@ mod tests {
             false,
         );
         assert!(too_long.barcode_field().is_err());
+    }
+
+    #[test]
+    fn parses_inert_bidi_outline_fields_without_resolving_numbering_or_layout() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" BIDIOUTLINE \* MERGEFORMAT " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached bidi outline number</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>bidioutline</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached bare bidi outline</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="BIDIOUTLINES"><w:r><w:t>not bidi outline metadata</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_bidi_outline_field());
+        assert!(fields[1].is_bidi_outline_field());
+        assert!(!fields[2].is_bidi_outline_field());
+
+        let outline = fields[0].bidi_outline_field().unwrap().unwrap();
+        assert_eq!(outline.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(
+            outline.cached_result(),
+            Some("cached bidi outline number")
+        );
+        assert!(outline.is_dirty());
+        assert!(outline.is_locked());
+
+        let bare = fields[1].bidi_outline_field().unwrap().unwrap();
+        assert_eq!(bare.opaque_instructions(), "");
+        assert_eq!(
+            bare.cached_result(),
+            Some("cached bare bidi outline")
+        );
+        assert!(bare.is_dirty());
+        assert!(bare.is_locked());
+        assert!(fields[2].bidi_outline_field().unwrap().is_none());
+
+        let too_long = Field::new(
+            format!(
+                "BIDIOUTLINE {}",
+                "x".repeat(MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.bidi_outline_field().is_err());
     }
 
     #[test]
