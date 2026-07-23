@@ -338,6 +338,149 @@ impl PresentationKinsokuSettings {
     }
 }
 
+/// The arrangement of photos on individual photo-album slides.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PhotoAlbumLayout {
+    /// Stretch one picture to fill the slide.
+    FitToSlide,
+    /// Place one picture on a slide.
+    OnePicture,
+    /// Place two pictures side by side on a slide.
+    TwoPictures,
+    /// Place four pictures in a grid on a slide.
+    FourPictures,
+    /// Place one picture with a title on a slide.
+    OnePictureWithTitle,
+    /// Place two pictures with a title on a slide.
+    TwoPicturesWithTitle,
+    /// Place four pictures with a title on a slide.
+    FourPicturesWithTitle,
+}
+
+impl PhotoAlbumLayout {
+    fn from_xml_value(value: &str) -> Result<Self> {
+        match value {
+            "fitToSlide" => Ok(Self::FitToSlide),
+            "1pic" => Ok(Self::OnePicture),
+            "2pic" => Ok(Self::TwoPictures),
+            "4pic" => Ok(Self::FourPictures),
+            "1picTitle" => Ok(Self::OnePictureWithTitle),
+            "2picTitle" => Ok(Self::TwoPicturesWithTitle),
+            "4picTitle" => Ok(Self::FourPicturesWithTitle),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid photo album layout value '{value}'"
+            ))),
+        }
+    }
+}
+
+/// The common frame style applied to a photo album's pictures.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PhotoAlbumFrame {
+    /// A rectangular photo frame.
+    Rectangle,
+    /// A rounded-rectangle photo frame.
+    RoundedRectangle,
+    /// A simple white photo frame.
+    SimpleWhite,
+    /// A simple black photo frame.
+    SimpleBlack,
+    /// A compound black photo frame.
+    CompoundBlack,
+    /// A centered-shadow photo frame.
+    CenterShadow,
+    /// A soft-edge photo frame.
+    SoftEdge,
+}
+
+impl PhotoAlbumFrame {
+    fn from_xml_value(value: &str) -> Result<Self> {
+        match value {
+            "frameStyle1" => Ok(Self::Rectangle),
+            "frameStyle2" => Ok(Self::RoundedRectangle),
+            "frameStyle3" => Ok(Self::SimpleWhite),
+            "frameStyle4" => Ok(Self::SimpleBlack),
+            "frameStyle5" => Ok(Self::CompoundBlack),
+            "frameStyle6" => Ok(Self::CenterShadow),
+            "frameStyle7" => Ok(Self::SoftEdge),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid photo album frame value '{value}'"
+            ))),
+        }
+    }
+}
+
+/// Presentation-wide defaults for a photo album.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PresentationPhotoAlbum {
+    black_and_white: bool,
+    shows_captions: bool,
+    layout: PhotoAlbumLayout,
+    frame: PhotoAlbumFrame,
+}
+
+impl Default for PresentationPhotoAlbum {
+    fn default() -> Self {
+        Self {
+            black_and_white: false,
+            shows_captions: false,
+            layout: PhotoAlbumLayout::FitToSlide,
+            frame: PhotoAlbumFrame::Rectangle,
+        }
+    }
+}
+
+impl PresentationPhotoAlbum {
+    /// Whether album pictures are displayed in black and white.
+    #[inline]
+    pub const fn is_black_and_white(&self) -> bool {
+        self.black_and_white
+    }
+
+    /// Whether album pictures display captions.
+    #[inline]
+    pub const fn shows_captions(&self) -> bool {
+        self.shows_captions
+    }
+
+    /// Return the default arrangement for album pictures.
+    #[inline]
+    pub const fn layout(&self) -> PhotoAlbumLayout {
+        self.layout
+    }
+
+    /// Return the default frame style for album pictures.
+    #[inline]
+    pub const fn frame(&self) -> PhotoAlbumFrame {
+        self.frame
+    }
+
+    fn from_element(element: &BytesStart<'_>, decoder: Decoder) -> Result<Self> {
+        let mut photo_album = Self::default();
+        photo_album.black_and_white = optional_boolean_attribute(
+            element,
+            b"bw",
+            decoder,
+            "photo album bw",
+            photo_album.black_and_white,
+        )?;
+        photo_album.shows_captions = optional_boolean_attribute(
+            element,
+            b"showCaptions",
+            decoder,
+            "photo album showCaptions",
+            photo_album.shows_captions,
+        )?;
+        if let Some(value) = unqualified_attribute_value(element, b"layout", decoder)? {
+            photo_album.layout = PhotoAlbumLayout::from_xml_value(&value)?;
+        }
+        if let Some(value) = unqualified_attribute_value(element, b"frame", decoder)? {
+            photo_album.frame = PhotoAlbumFrame::from_xml_value(&value)?;
+        }
+        Ok(photo_album)
+    }
+}
+
 /// The main presentation part.
 ///
 /// This part contains the presentation-level properties and references to slides,
@@ -460,6 +603,13 @@ impl<'a> PresentationPart<'a> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.kinsoku_settings)
     }
 
+    /// Get the presentation-wide photo-album defaults.
+    ///
+    /// Returns None when the presentation is not declared as a photo album.
+    pub fn photo_album(&self) -> Result<Option<PresentationPhotoAlbum>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.photo_album)
+    }
+
     /// Get the relationship ID of the declared handout master.
     ///
     /// Returns None when the presentation does not declare a handout master.
@@ -558,6 +708,7 @@ struct PresentationInfo {
     metadata: PresentationMetadata,
     default_text_style: Option<PresentationDefaultTextStyle>,
     kinsoku_settings: Option<PresentationKinsokuSettings>,
+    photo_album: Option<PresentationPhotoAlbum>,
     handout_master_relationship_id: Option<String>,
     seen_slide_list: bool,
     seen_master_list: bool,
@@ -784,6 +935,15 @@ impl PresentationInfo {
             }
             self.kinsoku_settings =
                 Some(PresentationKinsokuSettings::from_element(element, decoder)?);
+        } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"photoAlbum")
+        {
+            if self.photo_album.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate PowerPoint photo album settings".to_string(),
+                ));
+            }
+            self.photo_album = Some(PresentationPhotoAlbum::from_element(element, decoder)?);
         } else if parent == PresentationContext::DefaultTextStyle {
             self.observe_default_text_style_child(namespace, element)?;
         } else if parent == PresentationContext::SlideList
@@ -1317,6 +1477,49 @@ mod tests {
     }
 
     #[test]
+    fn parses_photo_album_metadata_by_namespace() {
+        let xml = format!(
+            r#"<q:presentation xmlns:q="{P}" xmlns:f="urn:foreign">
+                <f:photoAlbum bw="0" showCaptions="0" layout="fitToSlide" frame="frameStyle1"/>
+                <q:photoAlbum f:bw="0" bw="1" showCaptions="true" layout="4picTitle"
+                    frame="frameStyle6"><q:extLst/></q:photoAlbum>
+                <q:extLst><q:photoAlbum bw="0" showCaptions="0" layout="1pic"
+                    frame="frameStyle1"/></q:extLst>
+            </q:presentation>"#
+        );
+        let blob = part(xml);
+        let photo_album = PresentationPart::from_part(&blob)
+            .unwrap()
+            .photo_album()
+            .unwrap()
+            .unwrap();
+        assert!(photo_album.is_black_and_white());
+        assert!(photo_album.shows_captions());
+        assert_eq!(photo_album.layout(), PhotoAlbumLayout::FourPicturesWithTitle);
+        assert_eq!(photo_album.frame(), PhotoAlbumFrame::CenterShadow);
+
+        let strict = r#"<x:presentation xmlns:x="http://purl.oclc.org/ooxml/presentationml/main">
+            <x:photoAlbum/></x:presentation>"#;
+        let blob = part(strict);
+        let photo_album = PresentationPart::from_part(&blob)
+            .unwrap()
+            .photo_album()
+            .unwrap()
+            .unwrap();
+        assert_eq!(photo_album, PresentationPhotoAlbum::default());
+
+        let absent = format!(r#"<p:presentation xmlns:p="{P}"></p:presentation>"#);
+        let blob = part(absent);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .photo_album()
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
     fn rejects_duplicate_default_text_style_declarations() {
         let cases = [
             format!(
@@ -1392,6 +1595,39 @@ mod tests {
                 PresentationPart::from_part(&blob)
                     .unwrap()
                     .kinsoku_settings()
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_photo_album_metadata() {
+        let cases = [
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:photoAlbum bw="sometimes"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:photoAlbum showCaptions="sometimes"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:photoAlbum layout="future"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:photoAlbum frame="future"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:photoAlbum/><p:photoAlbum/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:photoAlbum bw="0" bw="1"/></p:presentation>"#
+            ),
+        ];
+        for xml in cases {
+            let blob = part(xml);
+            assert!(
+                PresentationPart::from_part(&blob)
+                    .unwrap()
+                    .photo_album()
                     .is_err()
             );
         }

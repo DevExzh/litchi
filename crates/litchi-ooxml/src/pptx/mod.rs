@@ -202,10 +202,10 @@ pub use parts::{
     ChartStyleVariation, ChartType,
 };
 pub use parts::{
-    MasterVisibility, NotesSize, PresentationConformance, PresentationDefaultTextStyle,
-    PresentationKinsokuSettings, PresentationMetadata, SlideHeaderFooterVisibility,
-    SlideLayoutMetadata, SlideLayoutReference, SlideMasterTextStyle, SlideMasterTextStyles,
-    SlideSize,
+    MasterVisibility, NotesSize, PhotoAlbumFrame, PhotoAlbumLayout, PresentationConformance,
+    PresentationDefaultTextStyle, PresentationKinsokuSettings, PresentationMetadata,
+    PresentationPhotoAlbum, SlideHeaderFooterVisibility, SlideLayoutMetadata,
+    SlideLayoutReference, SlideMasterTextStyle, SlideMasterTextStyles, SlideSize,
 };
 pub use presentation::{PptxChart, PptxTagList, Presentation};
 pub use presentation_properties::{

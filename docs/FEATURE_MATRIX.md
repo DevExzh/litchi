@@ -210,7 +210,7 @@ conversion, fonts, and image conversion are optional.
 | Slides and ordering | ✅ | ✅ | ✅ | Add, delete, duplicate, move, resize, enumerate slides and their hidden state, and validate root slide/master relationships |
 | Text, text boxes, and bullets | ✅ | ✅ | ✅ | Text extraction and formatted text-box authoring, plus presentation-default text-style inventory and Kinsoku line-breaking settings |
 | Basic shapes and groups | ✅ | ✅ | ✅ | Rectangles, ellipses, text boxes, nested groups, formatting, non-visual IDs, and placeholder inventories |
-| Images and backgrounds | ✅ | ✅ | ✅ | Picture resources plus solid, gradient, pattern, and relationship-resolved picture backgrounds with slide/layout/master inheritance |
+| Images and backgrounds | ✅ | ✅ | ✅ | Picture resources, photo-album defaults, plus solid, gradient, pattern, and relationship-resolved picture backgrounds with slide/layout/master inheritance |
 | Tables | ✅ | ✅ | ✅ | Table extraction and authoring |
 | Classic and extended charts | ✅ | ✅ | ✅ | Per-slide classic-chart inventory with relationship/part identity and basic type/title/legend metadata, plus multiple chart types, chart/style/color parts, ChartEx, and embedded workbook resources |
 | SmartArt | ✅ | ✅ | ✅ | Diagram data/layout/style/color part graphs and builder support |
