@@ -121,7 +121,7 @@ pub use field::{
     DocumentInformationField, DocumentInformationFieldKind, DocumentPropertyField,
     DocumentVariableField, ExternalIncludeField, ExternalIncludeOption, Field, FieldSwitch,
     FormulaField, GoToButtonField, IfField, IncludeFieldKind, IndexEntryField, IndexField,
-    IndexSortOrder, LinkField, LinkFormatting, LinkResultOption, ListNumberField,
+    IndexSortOrder, InfoField, LinkField, LinkFormatting, LinkResultOption, ListNumberField,
     MacroButtonField,
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
     MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,

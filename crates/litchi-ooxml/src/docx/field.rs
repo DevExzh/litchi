@@ -20,6 +20,7 @@ const MAX_STYLE_REFERENCE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_LIST_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_INFO_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 
@@ -582,6 +583,26 @@ impl Field {
     /// resolves a value, or refreshes a field.
     pub fn document_property(&self) -> Result<Option<DocumentPropertyField>> {
         DocumentPropertyField::from_field(self)
+    }
+
+    /// Check whether this is an explicit legacy `INFO` field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never reads,
+    /// resolves, modifies, or writes document or template properties, or
+    /// refreshes the field.
+    pub fn is_info_field(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "INFO").is_some()
+    }
+
+    /// Parse this field as inert typed legacy `INFO` metadata.
+    ///
+    /// Returns `Ok(None)` for fields other than an explicit `INFO` field. The
+    /// result exposes the stored property selector, optional replacement value,
+    /// switches, cached content, and dirty/lock state only; it never reads,
+    /// resolves, modifies, or writes document or template properties, or
+    /// refreshes a field.
+    pub fn info_field(&self) -> Result<Option<InfoField>> {
+        InfoField::from_field(self)
     }
 
     /// Check whether this is a built-in document-information field.
@@ -2284,6 +2305,91 @@ impl DocumentPropertyField {
     /// Check whether a case-insensitive ASCII switch appears in this field.
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
+    }
+}
+
+/// Typed, inert metadata for an explicit Word `INFO` field.
+///
+/// Word permits the `INFO` keyword to be omitted, but that form overlaps
+/// standalone document-information fields such as `TITLE`. This type
+/// therefore recognizes the unambiguous explicit keyword only. It retains the
+/// stored property selector, optional replacement value, switches, cached
+/// result, and field state only. It never reads, resolves, modifies, or writes
+/// document or template properties, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InfoField {
+    instruction: String,
+    information_type: String,
+    new_value: Option<String>,
+    switches: Vec<FieldSwitch>,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+}
+
+impl InfoField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((information_type, new_value, switches)) =
+            parse_info_field_parts(field.instruction())?
+        else {
+            return Ok(None);
+        };
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            information_type,
+            new_value,
+            switches,
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored document or template property selector.
+    ///
+    /// The selector is preserved as metadata and is never looked up.
+    pub fn information_type(&self) -> &str {
+        &self.information_type
+    }
+
+    /// Return the stored optional replacement value.
+    ///
+    /// This value is never applied to a document or template property.
+    pub fn new_value(&self) -> Option<&str> {
+        self.new_value.as_deref()
+    }
+
+    /// Return preserved switches in source order without interpreting them.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from a property.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
     }
 }
 
@@ -5294,6 +5400,30 @@ fn parse_field_operand_and_switches(
     Ok(Some((operand, switches)))
 }
 
+fn parse_info_field_parts(
+    instruction: &str,
+) -> Result<Option<(String, Option<String>, Vec<FieldSwitch>)>> {
+    let Some(remainder) = field_instruction_remainder(instruction, "INFO") else {
+        return Ok(None);
+    };
+    if instruction.len() > MAX_INFO_FIELD_INSTRUCTION_BYTES {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "INFO field instruction exceeds {MAX_INFO_FIELD_INSTRUCTION_BYTES} bytes"
+        )));
+    }
+
+    let mut characters = remainder.chars().peekable();
+    let information_type = parse_next_field_argument(&mut characters, "INFO")?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat("INFO field is missing its property selector".to_string())
+        })?;
+    let new_value = parse_next_field_argument(&mut characters, "INFO")?;
+    let switches = parse_field_switches_from_characters(&mut characters, "INFO")?;
+
+    Ok(Some((information_type, new_value, switches)))
+}
+
 fn parse_macro_button_operands(instruction: &str) -> Result<Option<(String, String)>> {
     let Some(remainder) = field_instruction_remainder(instruction, "MACROBUTTON") else {
         return Ok(None);
@@ -7825,6 +7955,82 @@ mod tests {
             false,
         );
         assert!(too_long.document_property().is_err());
+    }
+
+    #[test]
+    fn parses_inert_explicit_info_fields_without_reading_or_modifying_properties() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" INFO TITLE &quot;Stored title override&quot; \* MERGEFORMAT " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached title</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>info COMMENTS "Stored comment" \@ "opaque format"</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached comment</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="INFO TEMPLATE"><w:r><w:t>cached template</w:t></w:r></w:fldSimple>
+            <w:fldSimple w:instr="INFOS TITLE"><w:r><w:t>not an info field</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 4);
+        assert!(fields[0].is_info_field());
+        assert!(fields[1].is_info_field());
+        assert!(fields[2].is_info_field());
+        assert!(!fields[3].is_info_field());
+
+        let title = fields[0].info_field().unwrap().unwrap();
+        assert_eq!(title.information_type(), "TITLE");
+        assert_eq!(title.new_value(), Some("Stored title override"));
+        assert_eq!(title.cached_result(), Some("cached title"));
+        assert!(title.is_dirty());
+        assert!(title.is_locked());
+        assert_eq!(title.switches().len(), 1);
+        assert_eq!(title.switches()[0].name(), '*');
+        assert_eq!(title.switches()[0].argument(), Some("MERGEFORMAT"));
+        assert!(title.has_switch('*'));
+
+        let comments = fields[1].info_field().unwrap().unwrap();
+        assert_eq!(comments.information_type(), "COMMENTS");
+        assert_eq!(comments.new_value(), Some("Stored comment"));
+        assert_eq!(comments.cached_result(), Some("cached comment"));
+        assert!(comments.is_dirty());
+        assert!(comments.is_locked());
+        assert_eq!(comments.switches().len(), 1);
+        assert_eq!(comments.switches()[0].name(), '@');
+        assert_eq!(comments.switches()[0].argument(), Some("opaque format"));
+
+        let template = fields[2].info_field().unwrap().unwrap();
+        assert_eq!(template.information_type(), "TEMPLATE");
+        assert_eq!(template.new_value(), None);
+        assert_eq!(template.cached_result(), Some("cached template"));
+        assert!(!template.is_dirty());
+        assert!(!template.is_locked());
+
+        assert!(fields[3].info_field().unwrap().is_none());
+        let ambiguous = Field::new(r#"TITLE "Stored title override""#.to_string(), None, false);
+        assert!(!ambiguous.is_info_field());
+        assert!(ambiguous.info_field().unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_explicit_info_fields_without_reading_or_modifying_properties() {
+        for instruction in [
+            "INFO",
+            r#"INFO "" "#,
+            r#"INFO TITLE "Stored title" unexpected"#,
+            r#"INFO TITLE "unterminated"#,
+            r#"INFO TITLE \"#,
+        ] {
+            let field = Field::new(instruction.to_string(), None, false);
+            assert!(field.info_field().is_err(), "{instruction}");
+        }
+
+        let too_long = Field::new(
+            format!("INFO {}", "x".repeat(MAX_INFO_FIELD_INSTRUCTION_BYTES)),
+            None,
+            false,
+        );
+        assert!(too_long.info_field().is_err());
     }
 
     #[test]

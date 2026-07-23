@@ -11,10 +11,11 @@ use crate::docx::field::CompareField;
 use crate::docx::field::{
     AdvanceField, AutoNumberField, BibliographyField, CitationField, DdeField,
     DocumentVariableField, ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField,
-    IndexField, LinkField, ListNumberField, MacroButtonField, MailMergeConditionalControlField,
-    MailMergeCounterField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
-    PrintField, QuoteField, ReferencedDocumentField, SymbolField, TableOfAuthoritiesEntryField,
-    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
+    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
+    MailMergeRecipientField, MergeField, PromptField, PrintField, QuoteField,
+    ReferencedDocumentField, SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
+    TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1281,6 +1282,25 @@ impl<'a> Document<'a> {
     /// Get the number of document-variable fields in the main document.
     pub fn document_variable_field_count(&self) -> Result<usize> {
         Ok(self.document_variable_fields()?.len())
+    }
+
+    /// Get typed, inert explicit legacy `INFO` fields in document order.
+    ///
+    /// Returned values expose stored property selectors, optional replacement
+    /// values, switches, cached content, and dirty/lock state only. This method
+    /// never reads, resolves, modifies, or writes document or template
+    /// properties, or refreshes a field.
+    pub fn info_fields(&self) -> Result<Vec<InfoField>> {
+        self.fields()?
+            .iter()
+            .map(Field::info_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert explicit legacy `INFO` fields.
+    pub fn info_field_count(&self) -> Result<usize> {
+        Ok(self.info_fields()?.len())
     }
 
     /// Get typed, inert `MACROBUTTON` fields in document order.
