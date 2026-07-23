@@ -103,7 +103,7 @@ impl<'a> SlidePart<'a> {
     /// Parses the `<p:transition>` element from the slide XML.
     /// Returns `None` if no transition is defined.
     pub fn transition(&self) -> Result<Option<crate::pptx::transitions::SlideTransition>> {
-        crate::pptx::transitions::SlideTransition::from_xml(self.xml_bytes())
+        crate::pptx::transitions::SlideTransition::from_xml(self.part.blob())
     }
 
     /// Parse the simple shape-animation metadata in this slide's timing tree.

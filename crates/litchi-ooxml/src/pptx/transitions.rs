@@ -3,7 +3,18 @@
 //! This module provides types and functionality for working with slide transitions,
 //! including transition types, speeds, and directions.
 
+use crate::common::xml::unqualified_attribute_value;
+use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
+use crate::pptx::namespace::is_presentationml_name;
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
+use quick_xml::reader::NsReader;
+
+const P14_NAMESPACE: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
+const P14_NAMESPACE_BYTES: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
 
 /// Slide transition type.
 ///
@@ -58,6 +69,10 @@ pub enum TransitionType {
     Newsflash,
     /// Flash transition
     Flash,
+    /// PowerPoint 2010 ripple transition.
+    ///
+    /// This compatibility-markup effect is currently read-only.
+    Ripple { direction: RippleDirection },
     /// Strips transition
     Strips { direction: TransitionDirection },
     /// Comb transition
@@ -114,6 +129,36 @@ pub enum ZoomDirection {
     In,
     /// Zoom out
     Out,
+}
+
+/// Direction used by a PowerPoint 2010 ripple transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RippleDirection {
+    /// Start at the center of the slide.
+    Center,
+    /// Start at the upper-left corner.
+    LeftUp,
+    /// Start at the upper-right corner.
+    RightUp,
+    /// Start at the lower-left corner.
+    LeftDown,
+    /// Start at the lower-right corner.
+    RightDown,
+}
+
+impl RippleDirection {
+    fn from_xml_value(value: &str) -> Result<Self> {
+        match value {
+            "center" => Ok(Self::Center),
+            "lu" => Ok(Self::LeftUp),
+            "ru" => Ok(Self::RightUp),
+            "ld" => Ok(Self::LeftDown),
+            "rd" => Ok(Self::RightDown),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid PowerPoint 2010 ripple direction '{value}'"
+            ))),
+        }
+    }
 }
 
 /// Transition speed.
@@ -254,76 +299,82 @@ impl SlideTransition {
 
     /// Parse transition from slide XML.
     pub(crate) fn from_xml(xml: &[u8]) -> Result<Option<Self>> {
-        use quick_xml::Reader;
-        use quick_xml::events::Event;
-
-        let mut reader = Reader::from_reader(xml);
-        reader.config_mut().trim_text(true);
-
+        let mut capabilities = MceCapabilities::ooxml_baseline();
+        capabilities.understand_namespace(P14_NAMESPACE);
+        let xml = process_markup_compatibility(xml, &capabilities, &MceLimits::default())?.xml;
+        let mut reader = NsReader::from_reader(xml.as_ref());
+        let mut stack = Vec::new();
         let mut transition: Option<SlideTransition> = None;
-        let mut advance_on_click = true;
-        let mut advance_after_ms: Option<u32> = None;
+        let mut selected_transition_depth = None;
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                    let tag_name = e.local_name();
+            let decoder = reader.decoder();
+            let event = reader
+                .read_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                .into_owned();
+            let resolver = reader.resolver().clone();
+            let (namespace, event) = resolver.resolve_event(event);
 
-                    if tag_name.as_ref() == b"transition" {
-                        let mut speed = TransitionSpeed::Medium;
-                        let mut duration_ms = None;
-
-                        for attr in e.attributes().flatten() {
-                            match attr.key.as_ref() {
-                                b"spd" => {
-                                    let val = std::str::from_utf8(&attr.value).unwrap_or("med");
-                                    speed = TransitionSpeed::from_xml_value(val);
-                                },
-                                b"dur" => {
-                                    if let Ok(val_str) = std::str::from_utf8(&attr.value)
-                                        && let Ok(val) = val_str.parse::<u32>()
-                                    {
-                                        duration_ms = Some(val);
-                                    }
-                                },
-                                b"advClick" => {
-                                    if let Ok(val) = std::str::from_utf8(&attr.value) {
-                                        advance_on_click = val == "1" || val == "true";
-                                    }
-                                },
-                                b"advTm" => {
-                                    if let Ok(val_str) = std::str::from_utf8(&attr.value)
-                                        && let Ok(val) = val_str.parse::<u32>()
-                                    {
-                                        advance_after_ms = Some(val);
-                                    }
-                                },
-                                _ => {},
-                            }
-                        }
-
-                        transition = Some(SlideTransition {
-                            transition_type: TransitionType::None,
-                            speed,
-                            duration_ms,
-                            advance_on_click,
-                            advance_after_ms,
-                            sound: None,
-                        });
-                    }
-
-                    // Parse specific transition types
-                    if transition.is_some() {
-                        let t_type = Self::parse_transition_type(tag_name.as_ref(), e)?;
-                        if let Some(t) = t_type
-                            && let Some(ref mut trans) = transition
+            match event {
+                Event::Start(element) => {
+                    let depth = stack.len().checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("transition XML nesting is too deep".to_string())
+                    })?;
+                    let is_transition =
+                        is_presentationml_name(&namespace, element.name(), b"transition");
+                    if is_transition && transition.is_none() {
+                        transition = Some(Self::parse_transition_attributes(
+                            &element, decoder, &resolver,
+                        )?);
+                        selected_transition_depth = Some(depth);
+                    } else if selected_transition_depth
+                        .and_then(|transition_depth| transition_depth.checked_add(1))
+                        == Some(depth)
+                    {
+                        if let Some(transition_type) =
+                            Self::parse_transition_type(&namespace, &element, decoder)?
+                            && let Some(transition) = transition.as_mut()
                         {
-                            trans.transition_type = t;
+                            transition.transition_type = transition_type;
+                        }
+                    }
+                    stack.push(is_transition);
+                },
+                Event::Empty(element) => {
+                    let depth = stack.len().checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("transition XML nesting is too deep".to_string())
+                    })?;
+                    let is_transition =
+                        is_presentationml_name(&namespace, element.name(), b"transition");
+                    if is_transition && transition.is_none() {
+                        transition = Some(Self::parse_transition_attributes(
+                            &element, decoder, &resolver,
+                        )?);
+                    } else if selected_transition_depth
+                        .and_then(|transition_depth| transition_depth.checked_add(1))
+                        == Some(depth)
+                    {
+                        if let Some(transition_type) =
+                            Self::parse_transition_type(&namespace, &element, decoder)?
+                            && let Some(transition) = transition.as_mut()
+                        {
+                            transition.transition_type = transition_type;
                         }
                     }
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+                Event::End(_) => {
+                    let is_transition = stack.pop().ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid transition XML nesting".to_string())
+                    })?;
+                    let depth = stack.len().checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("transition XML nesting is too deep".to_string())
+                    })?;
+                    if is_transition && selected_transition_depth == Some(depth) {
+                        selected_transition_depth = None;
+                    }
+                },
+                Event::Eof => break,
                 _ => {},
             }
         }
@@ -331,12 +382,71 @@ impl SlideTransition {
         Ok(transition)
     }
 
-    /// Parse transition type from XML element.
+    fn parse_transition_attributes(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
+    ) -> Result<Self> {
+        let mut speed = TransitionSpeed::Medium;
+        let mut legacy_duration_ms = None;
+        let mut extended_duration_ms = None;
+        let mut advance_on_click = true;
+        let mut advance_after_ms = None;
+
+        for attribute in element.attributes() {
+            let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            let key = attribute.key;
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            let value = value.as_ref();
+
+            if key.prefix().is_none() {
+                match key.local_name().as_ref() {
+                    b"spd" => speed = TransitionSpeed::from_xml_value(value),
+                    b"dur" => legacy_duration_ms = parse_duration_ms(value),
+                    b"advClick" => advance_on_click = value == "1" || value == "true",
+                    b"advTm" => advance_after_ms = value.parse::<u32>().ok(),
+                    _ => {},
+                }
+            } else {
+                let (namespace, _) = resolver.resolve_attribute(key);
+                if is_p14_namespace(&namespace) && key.local_name().as_ref() == b"dur" {
+                    extended_duration_ms = parse_duration_ms(value);
+                }
+            }
+        }
+
+        Ok(Self {
+            transition_type: TransitionType::None,
+            speed,
+            duration_ms: extended_duration_ms.or(legacy_duration_ms),
+            advance_on_click,
+            advance_after_ms,
+            sound: None,
+        })
+    }
+
+    /// Parse a transition effect from a direct child of `<p:transition>`.
     fn parse_transition_type(
-        tag_name: &[u8],
-        _element: &quick_xml::events::BytesStart<'_>,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
     ) -> Result<Option<TransitionType>> {
-        let t = match tag_name {
+        if is_p14_name(namespace, element.name(), b"ripple") {
+            let direction = unqualified_attribute_value(element, b"dir", decoder)?
+                .map(|value| RippleDirection::from_xml_value(&value))
+                .transpose()?
+                .unwrap_or(RippleDirection::Center);
+            return Ok(Some(TransitionType::Ripple { direction }));
+        }
+
+        let tag_name = element.local_name();
+        if !is_presentationml_name(namespace, element.name(), tag_name.as_ref()) {
+            return Ok(None);
+        }
+
+        let transition_type = match tag_name.as_ref() {
             b"cut" => Some(TransitionType::Cut),
             b"fade" => Some(TransitionType::Fade),
             b"push" => Some(TransitionType::Push {
@@ -366,7 +476,7 @@ impl SlideTransition {
             _ => None,
         };
 
-        Ok(t)
+        Ok(transition_type)
     }
 
     /// Generate XML for this transition.
@@ -475,6 +585,12 @@ impl SlideTransition {
                 xml.push_str(&spokes.to_string());
                 xml.push_str("\"/>");
             },
+            TransitionType::Ripple { .. } => {
+                return Err(OoxmlError::Other(
+                    "PowerPoint 2010 ripple transitions require a compatibility fallback and are read-only"
+                        .to_string(),
+                ));
+            },
             _ => {
                 // For other types, use fade as fallback
                 xml.push_str("<p:fade thruBlk=\"false\"/>");
@@ -497,6 +613,25 @@ impl SlideTransition {
             TransitionDirection::Out => "out",
         }
     }
+}
+
+fn parse_duration_ms(value: &str) -> Option<u32> {
+    value
+        .strip_suffix("ms")
+        .unwrap_or(value)
+        .parse::<u32>()
+        .ok()
+}
+
+fn is_p14_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value)) if *value == P14_NAMESPACE_BYTES
+    )
+}
+
+fn is_p14_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
+    name.local_name().as_ref() == local_name && is_p14_namespace(namespace)
 }
 
 #[cfg(test)]
@@ -528,5 +663,17 @@ mod tests {
         let xml = trans.to_xml().unwrap();
         assert!(xml.contains("spd=\"fast\""));
         assert!(xml.contains("<p:fade"));
+    }
+
+    #[test]
+    fn ripple_transition_requires_a_compatibility_fallback_to_write() {
+        let transition = SlideTransition::new(TransitionType::Ripple {
+            direction: RippleDirection::Center,
+        });
+
+        assert!(matches!(
+            transition.to_xml(),
+            Err(OoxmlError::Other(message)) if message.contains("read-only")
+        ));
     }
 }
