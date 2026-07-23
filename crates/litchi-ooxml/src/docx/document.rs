@@ -13,7 +13,8 @@ use crate::docx::field::{
     ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField, IndexField, LinkField,
     MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, QuoteField, ReferencedDocumentField,
-    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+    UserIdentityField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1647,6 +1648,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `QUOTE` fields in the main document.
     pub fn quote_field_count(&self) -> Result<usize> {
         Ok(self.quote_fields()?.len())
+    }
+
+    /// Get typed, inert `SYMBOL` fields in document order.
+    ///
+    /// Returned values expose stored character arguments, switches, cached
+    /// content, and dirty/lock state only. This method never maps a character
+    /// code, looks up a font, inserts a glyph, changes formatting or layout, or
+    /// refreshes a field result.
+    pub fn symbol_fields(&self) -> Result<Vec<SymbolField>> {
+        self.fields()?
+            .iter()
+            .map(Field::symbol_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `SYMBOL` fields in the main document.
+    pub fn symbol_field_count(&self) -> Result<usize> {
+        Ok(self.symbol_fields()?.len())
     }
 
     /// Get typed, inert `ASK` and `FILLIN` fields in document order.

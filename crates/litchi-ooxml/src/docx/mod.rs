@@ -124,8 +124,9 @@ pub use field::{
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
     MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
     MergeField, PromptField, PromptFieldKind, QuoteField, ReferencedDocumentField, SequenceField,
-    SetField, StyleReferenceField, StyleReferenceFieldOption, TableOfAuthoritiesEntryField,
-    TableOfAuthoritiesField, TableOfContentsField, TableOfContentsLevelRange,
+    SetField, StyleReferenceField, StyleReferenceFieldOption, SymbolField,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+    TableOfContentsLevelRange,
     TableOfContentsSwitch, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
 };
 pub use font_table::{
