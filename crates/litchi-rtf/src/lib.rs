@@ -175,7 +175,7 @@ pub use field::{
     DocumentInformationFieldKind, DocumentPropertyField, DocumentVariableField, EquationField,
     ExternalIncludeField, ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken,
     FieldOwner, FieldStatus, FieldSwitch, FieldType, FormulaField, GoToButtonField,
-    HyperlinkCode, IfField,
+    HyperlinkCode, IfField, InfoField,
     IncludeFieldKind, IndexEntryField, IndexEntryOption, IndexField, IndexOption, LinkField,
     LinkFormatting, LinkResultOption, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField,

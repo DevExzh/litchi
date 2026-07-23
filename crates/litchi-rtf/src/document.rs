@@ -1185,6 +1185,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert explicit legacy `INFO` fields in document field order.
+    ///
+    /// Property selectors, optional replacement values, switches, cached
+    /// results, and state are exposed solely as stored metadata. This method
+    /// never reads, resolves, modifies, or writes document or template
+    /// properties, or refreshes a field.
+    pub fn info_fields(&self) -> Vec<crate::InfoField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::info_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert explicit legacy `INFO` fields.
+    pub fn info_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.info_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert document-information fields in document field order.
     ///
     /// Kinds, switches, cached results, and state are exposed solely as stored

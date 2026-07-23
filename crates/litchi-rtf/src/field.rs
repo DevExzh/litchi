@@ -45,6 +45,7 @@ pub enum FieldType {
     Bibliography,
     DocumentVariable,
     DocumentProperty,
+    Info,
     DocumentInformation,
     DocumentContext,
     MergeField,
@@ -929,6 +930,26 @@ pub struct DocumentPropertyField<'a> {
     position: usize,
 }
 
+/// Inert metadata for an explicit legacy RTF `INFO` field.
+///
+/// Word permits the `INFO` keyword to be omitted, but that form overlaps
+/// standalone document-information fields such as `TITLE`. This model
+/// therefore recognizes the unambiguous explicit keyword only. It retains the
+/// stored property selector, optional replacement value, switches, cached
+/// result, and field state only. It never reads, resolves, modifies, or writes
+/// document or template properties, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InfoField<'a> {
+    instruction: &'a str,
+    information_type: Cow<'a, str>,
+    new_value: Option<Cow<'a, str>>,
+    switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 /// The built-in Word document-information field category.
 ///
 /// ECMA-376 Part 1 §17.16.5 defines these fields. This enum preserves the
@@ -1622,6 +1643,12 @@ struct DocumentVariableFieldParts<'a> {
 
 struct DocumentPropertyFieldParts<'a> {
     property_name: Cow<'a, str>,
+    switches: Vec<FieldSwitch<'a>>,
+}
+
+struct InfoFieldParts<'a> {
+    information_type: Cow<'a, str>,
+    new_value: Option<Cow<'a, str>>,
     switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -2790,6 +2817,64 @@ impl<'a> DocumentPropertyField<'a> {
     /// Return the stored document-property name without resolving it.
     pub fn property_name(&self) -> &str {
         &self.property_name
+    }
+
+    /// Return stored field switches in source order without interpreting them.
+    pub fn switches(&self) -> &[FieldSwitch<'a>] {
+        &self.switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated from a property.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
+impl<'a> InfoField<'a> {
+    /// Return the complete stored `INFO` field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored document or template property selector.
+    ///
+    /// The selector is preserved as metadata and is never looked up.
+    pub fn information_type(&self) -> &str {
+        &self.information_type
+    }
+
+    /// Return the stored optional replacement value.
+    ///
+    /// This value is never applied to a document or template property.
+    pub fn new_value(&self) -> Option<&str> {
+        self.new_value.as_deref()
     }
 
     /// Return stored field switches in source order without interpreting them.
@@ -4073,6 +4158,9 @@ impl<'a> Field<'a> {
             {
                 FieldType::DocumentProperty
             },
+            ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("INFO") => {
+                FieldType::Info
+            },
             ParsedFieldCode::Other { ref keyword, .. }
                 if DocumentInformationFieldKind::from_keyword(keyword.as_ref()).is_some() =>
             {
@@ -4650,6 +4738,30 @@ impl<'a> Field<'a> {
         Some(DocumentPropertyField {
             instruction: self.instruction.as_ref(),
             property_name: parts.property_name,
+            switches: parts.switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed explicit `INFO` field.
+    ///
+    /// Stored property selectors, optional replacement values, switches, cached
+    /// results, and field state remain metadata only. This method never reads,
+    /// resolves, modifies, or writes document or template properties, or
+    /// refreshes a field. Malformed `INFO` instructions remain generic
+    /// fields and return `None` here.
+    pub fn info_field(&self) -> Option<InfoField<'_>> {
+        if self.field_type != FieldType::Info {
+            return None;
+        }
+        let parts = info_field_parts(self.instruction.as_ref())?;
+        Some(InfoField {
+            instruction: self.instruction.as_ref(),
+            information_type: parts.information_type,
+            new_value: parts.new_value,
             switches: parts.switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
@@ -6586,6 +6698,49 @@ fn document_property_field_parts(instruction: &str) -> Option<DocumentPropertyFi
 
     Some(DocumentPropertyFieldParts {
         property_name,
+        switches,
+    })
+}
+
+fn info_field_parts(instruction: &str) -> Option<InfoFieldParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("INFO") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let information_type = tokens.first()?.value.clone();
+    if information_type.is_empty() || !is_field_operand(tokens.first()?) {
+        return None;
+    }
+    tokens.remove(0);
+
+    let new_value = tokens
+        .first()
+        .filter(|token| is_field_operand(token))
+        .map(|token| token.value.clone());
+    if new_value.is_some() {
+        tokens.remove(0);
+    }
+
+    let mut switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let value = tokens
+            .get(index + 1)
+            .filter(|token| is_field_operand(token));
+        switches.push(FieldSwitch {
+            name: Cow::Owned(name.to_string()),
+            value: value.map(|token| token.value.clone()),
+        });
+        index += 1 + usize::from(value.is_some());
+    }
+
+    Some(InfoFieldParts {
+        information_type,
+        new_value,
         switches,
     })
 }
@@ -9060,6 +9215,78 @@ mod tests {
     }
 
     #[test]
+    fn info_fields_preserve_stored_metadata_without_resolution_or_updates() {
+        let mut field = Field::parse_instruction(
+            r#"INFO TITLE "Stored title override" \* MERGEFORMAT \@ "opaque format""#,
+        );
+        field.result = Cow::Borrowed("cached title");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::Info);
+        let information = field.info_field().unwrap();
+        assert_eq!(information.instruction(), field.instruction);
+        assert_eq!(information.information_type(), "TITLE");
+        assert_eq!(information.new_value(), Some("Stored title override"));
+        assert_eq!(information.cached_result(), Some("cached title"));
+        assert!(information.is_dirty());
+        assert!(information.is_locked());
+        assert_eq!(information.owner(), FieldOwner::Body);
+        assert_eq!(information.position(), 4);
+        assert_eq!(information.switches().len(), 2);
+        assert_eq!(information.switches()[0].name, "*");
+        assert_eq!(
+            information.switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+        assert_eq!(information.switches()[1].name, "@");
+        assert_eq!(
+            information.switches()[1].value.as_deref(),
+            Some("opaque format")
+        );
+
+        let template = Field::parse_instruction("INFO TEMPLATE");
+        assert_eq!(template.field_type, FieldType::Info);
+        assert_eq!(
+            template.info_field().unwrap().information_type(),
+            "TEMPLATE"
+        );
+        assert_eq!(template.info_field().unwrap().new_value(), None);
+
+        for instruction in [
+            "INFO",
+            r#"INFO "" "#,
+            r#"INFO TITLE "Stored title" unexpected"#,
+            r#"INFO TITLE "unterminated"#,
+            r#"INFO TITLE \"#,
+        ] {
+            assert!(
+                Field::parse_instruction(instruction).info_field().is_none(),
+                "{instruction}"
+            );
+        }
+
+        assert_eq!(
+            Field::parse_instruction("INFOS TITLE").field_type,
+            FieldType::Unknown
+        );
+        assert!(Field::parse_instruction(r#"TITLE "Stored title override""#)
+            .info_field()
+            .is_none());
+        let too_long = Field::new(
+            FieldType::Info,
+            Cow::Owned(format!("INFO {}", "x".repeat(MAX_INSTRUCTION_LEN))),
+            Cow::Borrowed(""),
+        );
+        assert!(too_long.info_field().is_none());
+    }
+
+    #[test]
     fn document_information_fields_preserve_kinds_without_reading_or_calculating_values() {
         let mut field =
             Field::parse_instruction(r#"TITLE \* MERGEFORMAT \@ "opaque format""#);
@@ -10309,6 +10536,39 @@ mod tests {
         assert_eq!(fields[0].switches()[0].name, "*");
         assert_eq!(fields[0].switches()[1].name, "@");
         assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_info_fields_without_reading_or_modifying_properties() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst INFO TITLE "Stored title override" \\* MERGEFORMAT}{\fldrslt cached title}}Middle {\field\flddirty\fldlock{\*\fldinst info COMMENTS "Stored comment" \\@ "opaque format"}{\fldrslt cached comment}}After}"#,
+        )
+        .unwrap();
+
+        let fields = document.info_fields();
+        assert_eq!(document.info_field_count(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].information_type(), "TITLE");
+        assert_eq!(fields[0].new_value(), Some("Stored title override"));
+        assert_eq!(fields[0].cached_result(), Some("cached title"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[0].switches()[0].name, "*");
+        assert_eq!(
+            fields[0].switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+        assert_eq!(fields[1].information_type(), "COMMENTS");
+        assert_eq!(fields[1].new_value(), Some("Stored comment"));
+        assert_eq!(fields[1].cached_result(), Some("cached comment"));
+        assert!(fields[1].is_dirty());
+        assert!(fields[1].is_locked());
+        assert_eq!(fields[1].switches()[0].name, "@");
+        assert_eq!(
+            fields[1].switches()[0].value.as_deref(),
+            Some("opaque format")
+        );
+        assert_eq!(document.text(), "Before Middle After");
     }
 
     #[test]
