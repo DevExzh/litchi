@@ -1919,6 +1919,98 @@ impl DocumentInformationField {
     }
 }
 
+/// The built-in Word document-context field category.
+///
+/// [MS-DOC] §2.9.90 assigns the native `flt` values 0x1D and 0x1E to
+/// `FILENAME` and `TEMPLATE`. This enum preserves the stored category
+/// only; it does not read a document path, attached template, or host
+/// filesystem state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DocumentContextFieldKind {
+    FileName,
+    Template,
+}
+
+impl DocumentContextFieldKind {
+    /// The uppercase field keyword stored in a Word field instruction.
+    pub const fn field_keyword(self) -> &'static str {
+        match self {
+            Self::FileName => "FILENAME",
+            Self::Template => "TEMPLATE",
+        }
+    }
+
+    fn from_field_type(field_type: FieldType) -> Option<Self> {
+        match field_type {
+            FieldType::FileName => Some(Self::FileName),
+            FieldType::Template => Some(Self::Template),
+            _ => None,
+        }
+    }
+
+    fn from_keyword(keyword: &str) -> Option<Self> {
+        [Self::FileName, Self::Template]
+            .into_iter()
+            .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
+    }
+}
+
+/// A typed, inert legacy Word built-in document-context field.
+///
+/// This type exposes the stored native category, instruction, switches, and
+/// cached result only. It never reads a document path, attached template, or
+/// host filesystem state, resolves a value, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentContextField {
+    field: Field,
+    instruction: String,
+    kind: DocumentContextFieldKind,
+    switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl DocumentContextField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the recognized built-in document-context category.
+    pub const fn kind(&self) -> DocumentContextFieldKind {
+        self.kind
+    }
+
+    /// Return preserved switches in source order without interpreting them.
+    ///
+    /// These values remain inert source metadata and are never applied.
+    pub fn switches(&self) -> &[MergeFieldSwitch] {
+        &self.switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from a document path, attached
+    /// template, or host filesystem state.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The stored kind of a legacy Word DDE field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DdeFieldKind {
@@ -3424,6 +3516,30 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed built-in
+    /// document-context field.
+    ///
+    /// `FILENAME` and `TEMPLATE` retain only their native category, stored
+    /// switches, cached result, and field state. This method never reads a
+    /// document path, attached template, or host filesystem state, resolves a
+    /// value, or refreshes a field. Malformed instructions and mismatched
+    /// native field types remain available through this generic type and return
+    /// `None` here.
+    pub fn document_context(&self) -> Option<DocumentContextField> {
+        let native_kind = DocumentContextFieldKind::from_field_type(self.field.field_type)?;
+        let (kind, switches) = parse_document_context_field_parts(&self.instruction)?;
+        if kind != native_kind {
+            return None;
+        }
+        Some(DocumentContextField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            kind,
+            switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed `DDE` or
     /// `DDEAUTO` field.
     ///
@@ -3767,6 +3883,8 @@ const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_PROPERTY_FIELD_SWITCHES: usize = 64;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_SWITCHES: usize = 64;
+const MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_DOCUMENT_CONTEXT_FIELD_SWITCHES: usize = 64;
 const MAX_DDE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DDE_FIELD_SWITCHES: usize = 64;
 const MAX_LINK_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -4758,6 +4876,46 @@ fn parse_document_information_field_parts(
             break;
         };
         if introducer != '\\' || switches.len() >= MAX_DOCUMENT_INFORMATION_FIELD_SWITCHES {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        switches.push(MergeFieldSwitch {
+            name: name.to_ascii_lowercase(),
+            argument,
+        });
+    }
+
+    Some((kind, switches))
+}
+
+fn parse_document_context_field_parts(
+    instruction: &str,
+) -> Option<(DocumentContextFieldKind, Vec<MergeFieldSwitch>)> {
+    if instruction.len() > MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    let kind = DocumentContextFieldKind::from_keyword(&keyword)?;
+
+    let mut switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' || switches.len() >= MAX_DOCUMENT_CONTEXT_FIELD_SWITCHES {
             return None;
         }
 
@@ -7560,6 +7718,103 @@ mod tests {
             ..text
         };
         assert!(too_long.document_information().is_none());
+    }
+
+    #[test]
+    fn document_context_fields_expose_cached_metadata_without_reading_paths_or_templates() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::FileName,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r" FILENAME \p ".to_string(),
+            result: Some("cached file name".to_string()),
+        };
+
+        let context = text.document_context().unwrap();
+        assert_eq!(context.field(), &field);
+        assert_eq!(context.instruction(), text.instruction);
+        assert_eq!(context.kind(), DocumentContextFieldKind::FileName);
+        assert_eq!(context.cached_result(), Some("cached file name"));
+        assert!(context.is_dirty());
+        assert!(context.is_locked());
+        assert_eq!(context.switches().len(), 1);
+        assert_eq!(context.switches()[0].name(), 'p');
+        assert_eq!(context.switches()[0].argument(), None);
+
+        for (field_type, instruction, kind) in [
+            (
+                FieldType::FileName,
+                "FILENAME",
+                DocumentContextFieldKind::FileName,
+            ),
+            (
+                FieldType::Template,
+                "TEMPLATE",
+                DocumentContextFieldKind::Template,
+            ),
+        ] {
+            let text = FieldText {
+                field: Field {
+                    field_type,
+                    ..field.clone()
+                },
+                instruction: format!("{instruction} \\* MERGEFORMAT"),
+                ..text.clone()
+            };
+            let context = text.document_context().unwrap();
+            assert_eq!(context.kind(), kind);
+            assert_eq!(context.kind().field_keyword(), instruction);
+            assert_eq!(context.switches()[0].name(), '*');
+            assert_eq!(context.switches()[0].argument(), Some("MERGEFORMAT"));
+        }
+
+        for (field_type, instruction) in [
+            (FieldType::FileName, "FILENAME unexpected"),
+            (FieldType::Template, r#"TEMPLATE "unterminated"#),
+            (FieldType::FileName, "FILENAME \\"),
+            (FieldType::FileName, "FILENAMES"),
+        ] {
+            let malformed = FieldText {
+                field: Field {
+                    field_type,
+                    ..field.clone()
+                },
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.document_context().is_none(), "{instruction}");
+        }
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Template,
+                ..field.clone()
+            },
+            ..text.clone()
+        };
+        assert!(wrong_type.document_context().is_none());
+
+        let too_long = FieldText {
+            instruction: format!(
+                "FILENAME \\* {}",
+                "x".repeat(MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text
+        };
+        assert!(too_long.document_context().is_none());
     }
 
     #[test]
