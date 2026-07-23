@@ -575,6 +575,22 @@ impl<'a> Presentation<'a> {
         crate::web_extensions::load_web_extension_task_panes(self.package)
     }
 
+    /// Load all package-level RibbonX customizations for this presentation.
+    ///
+    /// Custom UI XML remains opaque inert data. Callback names, macros,
+    /// commands, and linked content are never invoked or resolved.
+    pub fn ribbon_customizations(&self) -> Result<Vec<crate::ribbonx::RibbonCustomization>> {
+        crate::ribbonx::load_ribbon_customizations(self.package)
+    }
+
+    /// Load the effective package-level RibbonX customization, if present.
+    ///
+    /// When both supported relationship families are present, the newer
+    /// customization takes precedence.
+    pub fn ribbon_customization(&self) -> Result<Option<crate::ribbonx::RibbonCustomization>> {
+        crate::ribbonx::load_ribbon_customization(self.package)
+    }
+
     // ========================================================================
     // Slide Access by Index
     // ========================================================================
