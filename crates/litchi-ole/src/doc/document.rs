@@ -19,7 +19,8 @@ use super::parts::fields::{
     FormulaField, GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, ReferenceField,
-    SequenceField, SetField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    SequenceField, SetField, StyleReferenceField, TableOfAuthoritiesField, TableOfContentsField,
+    UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -737,6 +738,25 @@ impl Document {
     /// Get the number of typed, inert `SEQ` fields.
     pub fn sequence_field_count(&self) -> Result<usize> {
         Ok(self.sequence_fields()?.len())
+    }
+
+    /// Get typed, inert `STYLEREF` fields in story and source order.
+    ///
+    /// Returned values expose only stored style names, options, switches, cached
+    /// results, and field state. This method never looks up styled text, searches
+    /// document stories, calculates paragraph numbers or relative positions,
+    /// resolves page layout, or refreshes a field.
+    pub fn style_reference_fields(&self) -> Result<Vec<StyleReferenceField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::style_reference_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `STYLEREF` fields.
+    pub fn style_reference_field_count(&self) -> Result<usize> {
+        Ok(self.style_reference_fields()?.len())
     }
 
     /// Get typed, inert `GLOSSARY` and `AUTOTEXT` fields in story and source order.
