@@ -1,9 +1,48 @@
 /// Main presentation object - the high-level API for working with presentations.
-use crate::error::Result;
+use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
 use crate::pptx::slide::{Slide, SlideMaster};
 use litchi_opc::OpcPackage;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
+
+/// A chart part discovered on a presentation slide.
+///
+/// The chart XML is parsed as inert document data. Its relationship and part
+/// identities are retained so callers can identify the source part precisely.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PptxChart {
+    slide_index: usize,
+    relationship_id: String,
+    part_name: PackURI,
+    info: crate::pptx::parts::ChartInfo,
+}
+
+impl PptxChart {
+    /// Return the zero-based index of the slide that owns this chart.
+    #[inline]
+    pub fn slide_index(&self) -> usize {
+        self.slide_index
+    }
+
+    /// Return the relationship ID from the owning slide to this chart part.
+    #[inline]
+    pub fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+
+    /// Return the absolute OPC part name of this chart.
+    #[inline]
+    pub fn part_name(&self) -> &PackURI {
+        &self.part_name
+    }
+
+    /// Return basic parsed chart metadata.
+    #[inline]
+    pub fn info(&self) -> &crate::pptx::parts::ChartInfo {
+        &self.info
+    }
+}
 
 /// A PowerPoint presentation.
 ///
@@ -577,7 +616,69 @@ impl<'a> Presentation<'a> {
     // Advanced Features - Charts
     // ========================================================================
 
-    /// Get all charts from the presentation.
+    /// Discover all native chart parts reachable from presentation slides.
+    ///
+    /// Each result retains the owning slide, relationship ID, and part name in
+    /// addition to basic inert chart metadata. Both transitional and strict
+    /// chart relationships are accepted.
+    pub fn charts(&self) -> Result<Vec<PptxChart>> {
+        use crate::pptx::parts::ChartPart;
+
+        let mut charts = Vec::new();
+
+        for (slide_index, slide) in self.slides()?.iter().enumerate() {
+            let slide_part = slide.part().part();
+
+            for relationship in slide_part.rels().iter() {
+                if !matches!(relationship.reltype(), rt::CHART | rt::STRICT_CHART) {
+                    continue;
+                }
+                if relationship.is_external() {
+                    return Err(OoxmlError::InvalidRelationship(format!(
+                        "chart relationship '{}' on slide {slide_index} must be internal",
+                        relationship.r_id()
+                    )));
+                }
+
+                let part_name = relationship.target_partname().map_err(|error| {
+                    OoxmlError::InvalidRelationship(format!(
+                        "invalid chart relationship '{}' on slide {slide_index}: {error}",
+                        relationship.r_id()
+                    ))
+                })?;
+                let part = self.package.get_part(&part_name).map_err(|error| {
+                    OoxmlError::PartNotFound(format!(
+                        "chart relationship '{}' on slide {slide_index} targets missing part '{}': {error}",
+                        relationship.r_id(),
+                        part_name.as_str()
+                    ))
+                })?;
+                if part.content_type() != ct::DML_CHART {
+                    return Err(OoxmlError::InvalidContentType {
+                        expected: ct::DML_CHART.to_string(),
+                        got: part.content_type().to_string(),
+                    });
+                }
+
+                let info = ChartPart::from_part(part)?.chart_info()?;
+                charts.push(PptxChart {
+                    slide_index,
+                    relationship_id: relationship.r_id().to_string(),
+                    part_name,
+                    info,
+                });
+            }
+        }
+
+        charts.sort_unstable_by(|left, right| {
+            left.slide_index
+                .cmp(&right.slide_index)
+                .then_with(|| left.relationship_id.cmp(&right.relationship_id))
+        });
+        Ok(charts)
+    }
+
+    /// Get basic chart information from the presentation.
     ///
     /// Returns a vector of tuples: (slide_index, chart_info).
     ///
@@ -598,35 +699,11 @@ impl<'a> Presentation<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn get_charts(&self) -> Result<Vec<(usize, crate::pptx::parts::ChartInfo)>> {
-        use crate::pptx::parts::ChartPart;
-
-        let mut all_charts = Vec::new();
-
-        // Iterate through all slides to find charts
-        let slides = self.slides()?;
-        for (slide_idx, slide) in slides.iter().enumerate() {
-            let slide_part = slide.part().part();
-            let rels = slide_part.rels();
-
-            // Look for chart relationships
-            for rel in rels.iter() {
-                if rel.reltype()
-                    == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart"
-                {
-                    let base_uri = slide_part.partname().base_uri();
-                    let chart_partname = PackURI::from_rel_ref(base_uri, rel.target_ref())
-                        .map_err(crate::error::OoxmlError::InvalidFormat)?;
-
-                    if let Ok(chart_part) = self.package.get_part(&chart_partname) {
-                        let chart_part = ChartPart::from_part(chart_part)?;
-                        let chart_info = chart_part.chart_info()?;
-                        all_charts.push((slide_idx, chart_info));
-                    }
-                }
-            }
-        }
-
-        Ok(all_charts)
+        Ok(self
+            .charts()?
+            .into_iter()
+            .map(|chart| (chart.slide_index, chart.info))
+            .collect())
     }
 
     // ========================================================================

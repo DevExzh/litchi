@@ -212,7 +212,7 @@ conversion, fonts, and image conversion are optional.
 | Basic shapes and groups | ✅ | ✅ | ✅ | Rectangles, ellipses, text boxes, nested groups, and formatting |
 | Images and backgrounds | ✅ | ✅ | ✅ | Picture resources plus solid, gradient, pattern, and picture backgrounds |
 | Tables | ✅ | ✅ | ✅ | Table extraction and authoring |
-| Classic and extended charts | ✅ | ✅ | ✅ | Multiple chart types, chart/style/color parts, ChartEx, and embedded workbook resources |
+| Classic and extended charts | ✅ | ✅ | ✅ | Per-slide classic-chart inventory with relationship/part identity and basic type/title/legend metadata, plus multiple chart types, chart/style/color parts, ChartEx, and embedded workbook resources |
 | SmartArt | ✅ | ✅ | ✅ | Diagram data/layout/style/color part graphs and builder support |
 | Audio, video, posters, and captions | ✅ | ✅ | ✅ | Embedded/linked media, trim/fade/bookmark metadata, and text-track parts |
 | Animations and timing trees | ✅ | ✅ | ✅ | Shape effects, sequences, triggers, and chart/diagram timing relationships |

@@ -44,7 +44,7 @@ pub enum ChartType {
 }
 
 /// Basic chart information extracted from a chart part.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChartInfo {
     /// Chart type
     pub chart_type: ChartType,

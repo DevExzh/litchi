@@ -2,7 +2,7 @@
 use crate::common::DocumentProperties;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
-use crate::pptx::presentation::Presentation;
+use crate::pptx::presentation::{PptxChart, Presentation};
 use crate::pptx::vba_project::{VbaProject, discover_vba_project};
 use crate::pptx::writer::MutablePresentation;
 use crate::ribbonx::{
@@ -521,6 +521,14 @@ impl Package {
 
         // Create and return Presentation
         Ok(Presentation::new(pres_part, &self.opc))
+    }
+
+    /// Discover all native chart parts reachable from presentation slides.
+    ///
+    /// The returned items retain their owning slide, relationship ID, and OPC
+    /// part name alongside basic inert chart metadata.
+    pub fn charts(&self) -> Result<Vec<PptxChart>> {
+        self.presentation()?.charts()
     }
 
     /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payload.

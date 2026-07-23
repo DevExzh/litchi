@@ -186,7 +186,7 @@ pub use parts::{
     ChartStyleMarkerSymbol, ChartStylePart, ChartStylePayload, ChartStyleReference,
     ChartStyleVariation, ChartType,
 };
-pub use presentation::Presentation;
+pub use presentation::{PptxChart, Presentation};
 pub use presentation_structure::{
     PresentationSlideReference, PresentationStructure, add_custom_show,
     add_custom_show_slide, add_section, add_section_slide, find_custom_show, find_section,
