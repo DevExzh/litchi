@@ -384,3 +384,81 @@ fn scratch_document_supports_native_chart_title_crud() {
             .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
     );
 }
+
+#[test]
+fn scratch_document_supports_native_chart_legend_visibility_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart legends").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart legends".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+
+    assert!(
+        editor
+            .body_chart_legend_visible(source.drawable_object_id)
+            .unwrap()
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_legend_visible(source.drawable_object_id, true)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    editor
+        .set_body_chart_legend_visible(source.drawable_object_id, false)
+        .unwrap();
+    assert!(
+        !editor
+            .body_chart_legend_visible(source.drawable_object_id)
+            .unwrap()
+    );
+
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert!(
+        !editor
+            .body_chart_legend_visible(duplicate.drawable_object_id)
+            .unwrap()
+    );
+
+    editor
+        .set_body_chart_legend_visible(source.drawable_object_id, true)
+        .unwrap();
+    assert!(
+        editor
+            .body_chart_legend_visible(source.drawable_object_id)
+            .unwrap()
+    );
+    assert!(
+        !editor
+            .body_chart_legend_visible(duplicate.drawable_object_id)
+            .unwrap()
+    );
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert!(
+        reopened
+            .body_chart_legend_visible(source.drawable_object_id)
+            .unwrap()
+    );
+    assert!(
+        !reopened
+            .body_chart_legend_visible(duplicate.drawable_object_id)
+            .unwrap()
+    );
+    reopened
+        .remove_body_chart(source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
+}

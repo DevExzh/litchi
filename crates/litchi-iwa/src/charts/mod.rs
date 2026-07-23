@@ -14,8 +14,8 @@ mod data;
 mod direction;
 mod kind;
 pub mod metadata_extractor;
+pub(crate) mod options;
 pub(crate) mod source;
-pub(crate) mod title;
 
 pub use archive::IWorkChartArchive;
 pub use data::ChartData;

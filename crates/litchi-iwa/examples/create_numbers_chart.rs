@@ -39,10 +39,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     editor.set_sheet_chart_title(sheet_id, chart.drawable_object_id, "Quarterly revenue")?;
+    editor.set_sheet_chart_legend_visible(sheet_id, chart.drawable_object_id, false)?;
     editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} chart {} with native title and caption on sheet {}",
+        "created Numbers {:?} chart {} with a native title, hidden legend, and caption on sheet {}",
         chart.kind, chart.drawable_object_id, sheet_id
     );
     Ok(())

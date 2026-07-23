@@ -114,6 +114,11 @@ save; `remove_*_chart_title` returns whether a title was visible. Chart titles
 remain independent through duplicate, delete, and package round-trip
 operations.
 
+Chart legend visibility is likewise native and typed through
+`body_chart_legend_visible`, `sheet_chart_legend_visible`, and
+`slide_chart_legend_visible`; use `set_*_chart_legend_visible` to toggle the
+same `Chart Options > Legend` switch that all three apps save.
+
 Charts also expose their native generic Object Caption control through
 `body_chart_caption`, `sheet_chart_caption`, and `slide_chart_caption`.
 `set_*_chart_caption` creates or updates the real caption text graph, while

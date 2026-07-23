@@ -27,7 +27,7 @@
 
 use crate::Result;
 use crate::bundle::Bundle;
-use crate::charts::title::read_chart_non_style_title;
+use crate::charts::options::read_chart_non_style_title;
 use crate::charts::{ChartKind, IWorkChartArchive};
 use crate::object_index::{ObjectIndex, ResolvedObject};
 use crate::protobuf::tsch;

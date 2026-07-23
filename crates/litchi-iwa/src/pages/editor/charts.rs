@@ -2,6 +2,7 @@
 
 mod caption;
 mod graph;
+mod legend;
 mod theme;
 mod title;
 

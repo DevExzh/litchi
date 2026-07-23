@@ -1,7 +1,7 @@
 //! Native title CRUD for Keynote slide charts.
 
 use super::*;
-use crate::charts::title::{
+use crate::charts::options::{
     chart_title as read_native_chart_title, remove_chart_title as remove_native_chart_title,
     set_chart_title as set_native_chart_title,
 };

@@ -38,10 +38,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     editor.set_slide_chart_title(0, chart.drawable_object_id, "Quarterly revenue")?;
+    editor.set_slide_chart_legend_visible(0, chart.drawable_object_id, false)?;
     editor.set_slide_chart_caption(0, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Keynote {:?} chart {} with native title and caption on slide {}",
+        "created Keynote {:?} chart {} with a native title, hidden legend, and caption on slide {}",
         chart.kind, chart.drawable_object_id, chart.slide_index
     );
     Ok(())
