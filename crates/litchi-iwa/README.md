@@ -137,6 +137,10 @@ File-backed images use the same typed command through `flip_body_image`,
 adjustments, and metadata; see `create_*_flipped_image` for scratch-file
 examples.
 
+File-backed movies likewise expose `flip_body_movie`, `flip_sheet_movie`, and
+`flip_slide_movie`, preserving their video and poster assets, playback settings,
+and metadata; see `create_*_flipped_movie` for scratch-file examples.
+
 ### Create Pages documents from scratch
 
 ```rust

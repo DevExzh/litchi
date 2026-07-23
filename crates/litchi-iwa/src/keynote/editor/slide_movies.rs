@@ -8,7 +8,8 @@ use crate::data_reference_registry::{
 use crate::media_playback::media_playback_settings;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, geometry_from_drawable,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
+    flip_drawable_geometry, geometry_from_drawable,
 };
 use std::time::Duration;
 
@@ -273,6 +274,35 @@ impl KeynoteEditor {
             .slide_movie_graph(slide_index, drawable_object_id)?
             .info
             .geometry)
+    }
+
+    /// Apply one native Arrange Flip operation to an ordinary file-backed slide movie.
+    ///
+    /// Returns the updated geometry after applying the same transform as the
+    /// Keynote Flip Horizontally or Flip Vertically command.
+    pub fn flip_slide_movie(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        axis: DrawableFlipAxis,
+    ) -> Result<DrawableGeometry> {
+        let source = self.require_file_movie(slide_index, drawable_object_id)?;
+        let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
+        let mut staged = self.package().clone();
+        set_movie_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_movie_geometry(slide_index, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Keynote movie flip update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Update geometry on an ordinary file-backed movie while preserving unknown wire fields.
@@ -940,6 +970,7 @@ mod tests {
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-movie";
     const POSTER: &[u8] = b"\x89PNG\r\n\x1a\nsource-built-poster";
     const REPLACEMENT_POSTER: &[u8] = b"GIF89areplacement-poster";
+    const MISSING_DRAWABLE_OBJECT_ID: u64 = u64::MAX;
     const POSITION: DrawablePoint = DrawablePoint { x: 100.0, y: 120.0 };
     const DISPLAY_SIZE: DrawableSize = DrawableSize {
         width: 640.0,
@@ -1062,6 +1093,26 @@ mod tests {
                 .unwrap(),
             changed_geometry
         );
+        let horizontally_flipped = editor
+            .flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_movie_geometry(0, created.drawable_object_id)
+                .unwrap(),
+            horizontally_flipped
+        );
+        assert_ne!(horizontally_flipped.flags, changed_geometry.flags);
+        let vertically_flipped = editor
+            .flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Vertical)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_movie_geometry(0, created.drawable_object_id)
+                .unwrap(),
+            vertically_flipped
+        );
+        assert_ne!(vertically_flipped.angle, changed_geometry.angle);
         assert_eq!(
             editor
                 .replace_slide_movie_data(0, created.drawable_object_id, REPLACEMENT_MOVIE)
@@ -1079,6 +1130,9 @@ mod tests {
         editor
             .set_slide_movie_properties(0, created.drawable_object_id, duplicate_properties.clone())
             .unwrap();
+        let source_geometry = editor
+            .flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Vertical)
+            .unwrap();
 
         let duplicate = editor
             .duplicate_slide_movie(0, created.drawable_object_id)
@@ -1091,6 +1145,16 @@ mod tests {
             duplicate.poster_image_data_identifier,
             created.poster_image_data_identifier
         );
+        assert_eq!(
+            duplicate.geometry.position,
+            source_geometry.position.map(|position| DrawablePoint {
+                x: position.x + DRAWABLE_DUPLICATE_OFFSET,
+                y: position.y + DRAWABLE_DUPLICATE_OFFSET,
+            })
+        );
+        assert_eq!(duplicate.geometry.size, source_geometry.size);
+        assert_eq!(duplicate.geometry.flags, source_geometry.flags);
+        assert_eq!(duplicate.geometry.angle, source_geometry.angle);
         assert_eq!(duplicate.properties, duplicate_properties);
         let removed_original = editor
             .remove_slide_movie(0, created.drawable_object_id)
@@ -1155,5 +1219,21 @@ mod tests {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes().unwrap(), baseline);
         }
+
+        let created = editor
+            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
+            .unwrap();
+        let before_flip = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .flip_slide_movie(0, MISSING_DRAWABLE_OBJECT_ID, DrawableFlipAxis::Horizontal,)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_flip);
+        assert!(
+            editor
+                .flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)
+                .is_ok()
+        );
     }
 }

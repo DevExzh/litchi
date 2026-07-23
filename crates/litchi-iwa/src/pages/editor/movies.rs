@@ -11,7 +11,8 @@ use crate::data_reference_registry::{
 use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
+    flip_drawable_geometry, offset_drawable_geometry,
 };
 
 mod graph;
@@ -218,6 +219,34 @@ impl PagesEditor {
     /// Read typed geometry for one body-anchored movie.
     pub fn body_movie_geometry(&self, drawable_object_id: u64) -> Result<DrawableGeometry> {
         Ok(body_movie_graph(self, drawable_object_id)?.info.geometry)
+    }
+
+    /// Apply one native Arrange Flip operation to a body-anchored movie.
+    ///
+    /// Returns the updated geometry after applying the same transform as the
+    /// Pages Flip Horizontally or Flip Vertically command.
+    pub fn flip_body_movie(
+        &mut self,
+        drawable_object_id: u64,
+        axis: DrawableFlipAxis,
+    ) -> Result<DrawableGeometry> {
+        let source = body_movie_graph(self, drawable_object_id)?;
+        let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
+        let mut staged = self.package().clone();
+        set_movie_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_movie_geometry(drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Pages movie flip update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Update movie geometry while preserving unknown movie fields.
@@ -685,6 +714,26 @@ mod tests {
                 .unwrap(),
             changed_geometry
         );
+        let horizontally_flipped = editor
+            .flip_body_movie(created.drawable_object_id, DrawableFlipAxis::Horizontal)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_movie_geometry(created.drawable_object_id)
+                .unwrap(),
+            horizontally_flipped
+        );
+        assert_ne!(horizontally_flipped.flags, changed_geometry.flags);
+        let vertically_flipped = editor
+            .flip_body_movie(created.drawable_object_id, DrawableFlipAxis::Vertical)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_movie_geometry(created.drawable_object_id)
+                .unwrap(),
+            vertically_flipped
+        );
+        assert_ne!(vertically_flipped.angle, changed_geometry.angle);
         assert_eq!(
             editor
                 .replace_body_movie_data(created.drawable_object_id, REPLACEMENT_MOVIE)
@@ -735,6 +784,9 @@ mod tests {
         editor
             .set_body_movie_properties(source.drawable_object_id, source_properties.clone())
             .unwrap();
+        let source_geometry = editor
+            .flip_body_movie(source.drawable_object_id, DrawableFlipAxis::Vertical)
+            .unwrap();
         let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
 
         let duplicate = editor
@@ -766,14 +818,14 @@ mod tests {
         );
         assert_eq!(
             duplicate.geometry.position,
-            source.geometry.position.map(|position| DrawablePoint {
+            source_geometry.position.map(|position| DrawablePoint {
                 x: position.x + BODY_DRAWABLE_DUPLICATE_OFFSET,
                 y: position.y + BODY_DRAWABLE_DUPLICATE_OFFSET,
             })
         );
-        assert_eq!(duplicate.geometry.size, source.geometry.size);
-        assert_eq!(duplicate.geometry.flags, source.geometry.flags);
-        assert_eq!(duplicate.geometry.angle, source.geometry.angle);
+        assert_eq!(duplicate.geometry.size, source_geometry.size);
+        assert_eq!(duplicate.geometry.flags, source_geometry.flags);
+        assert_eq!(duplicate.geometry.angle, source_geometry.angle);
         assert_eq!(duplicate.original_size, source.original_size);
         assert_eq!(duplicate.natural_size, source.natural_size);
         assert_eq!(duplicate.duration, source.duration);
@@ -790,7 +842,7 @@ mod tests {
             editor
                 .body_movie_geometry(source.drawable_object_id)
                 .unwrap(),
-            source.geometry
+            source_geometry
         );
         assert_eq!(
             editor
@@ -879,6 +931,12 @@ mod tests {
             .add_body_image(4, "poster.png", POSTER, POSITION, SIZE)
             .unwrap();
         let before = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .flip_body_movie(image.drawable_object_id, DrawableFlipAxis::Horizontal)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
         assert!(
             editor
                 .set_body_movie_geometry(image.drawable_object_id, DrawableGeometry::default())
