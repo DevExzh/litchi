@@ -1,7 +1,7 @@
 //! Source-built Keynote chart CRUD regression tests.
 
 use super::*;
-use crate::charts::ChartAxis;
+use crate::charts::{ChartAxis, ChartAxisBound, ChartValueAxisBounds};
 use crate::keynote::KeynoteDocumentBuilder;
 
 const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
@@ -513,6 +513,83 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
             .iter()
             .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
     );
+}
+
+#[test]
+fn scratch_presentation_supports_native_chart_value_axis_bounds_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let automatic = ChartValueAxisBounds::automatic();
+    let fixed = ChartValueAxisBounds::fixed(
+        ChartAxisBound::new(-10.0).unwrap(),
+        ChartAxisBound::new(40.0).unwrap(),
+    )
+    .unwrap();
+    let minimum_only =
+        ChartValueAxisBounds::new(Some(ChartAxisBound::new(-5.0).unwrap()), None).unwrap();
+
+    assert_eq!(
+        editor
+            .slide_chart_value_axis_bounds(0, source.drawable_object_id)
+            .unwrap(),
+        automatic
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, automatic)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, fixed)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_value_axis_bounds(0, duplicate.drawable_object_id)
+            .unwrap(),
+        fixed
+    );
+
+    editor
+        .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, minimum_only)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_value_axis_bounds(0, source.drawable_object_id)
+            .unwrap(),
+        minimum_only
+    );
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_value_axis_bounds(0, source.drawable_object_id)
+            .unwrap(),
+        minimum_only
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_value_axis_bounds(0, duplicate.drawable_object_id)
+            .unwrap(),
+        fixed
+    );
+    reopened
+        .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, automatic)
+        .unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_value_axis_bounds(0, source.drawable_object_id)
+            .unwrap(),
+        automatic
+    );
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
 }
 
 #[test]

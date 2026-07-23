@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::charts::{ChartAxis, ChartData, ChartKind};
+use litchi_iwa::charts::{ChartAxis, ChartAxisBound, ChartData, ChartKind, ChartValueAxisBounds};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -38,6 +38,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_title(chart.drawable_object_id, "Quarterly revenue")?;
     editor.set_body_chart_axis_title(chart.drawable_object_id, ChartAxis::Category, "Quarter")?;
     editor.set_body_chart_axis_title(chart.drawable_object_id, ChartAxis::Value, "Revenue")?;
+    editor.set_body_chart_value_axis_bounds(
+        chart.drawable_object_id,
+        ChartValueAxisBounds::fixed(ChartAxisBound::new(0.0)?, ChartAxisBound::new(30.0)?)?,
+    )?;
     editor.set_body_chart_axis_line_visible(chart.drawable_object_id, ChartAxis::Value, false)?;
     editor.set_body_chart_axis_major_gridlines_visible(
         chart.drawable_object_id,
@@ -53,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_caption(chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Pages {:?} chart {} with native chart and axis titles, a hidden value-axis line and legend, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption at body UTF-16 index {}",
+        "created Pages {:?} chart {} with native chart and axis titles, fixed value-axis bounds, a hidden value-axis line and legend, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption at body UTF-16 index {}",
         chart.kind, chart.drawable_object_id, chart.anchor_character_index
     );
     Ok(())

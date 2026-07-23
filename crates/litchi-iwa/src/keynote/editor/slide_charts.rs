@@ -1,6 +1,7 @@
 //! Standalone, inline-data chart CRUD for Keynote slides.
 
 mod axis;
+mod axis_bounds;
 mod axis_gridlines;
 mod axis_line;
 mod caption;

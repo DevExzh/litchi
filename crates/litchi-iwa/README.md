@@ -123,6 +123,16 @@ Numbers, and Keynote save. `Value` selects the primary value-axis object;
 titles remain independent through duplicate, delete, and package round-trip
 operations.
 
+The value-axis `Min` and `Max` fields are represented without sentinel values
+by `ChartValueAxisBounds` and `ChartAxisBound`. Read them through
+`body_chart_value_axis_bounds`, `sheet_chart_value_axis_bounds`, or
+`slide_chart_value_axis_bounds`, then use the matching
+`set_*_chart_value_axis_bounds` method to modify the native
+`Axis > Value (Y) > Axis Scale` controls. Each endpoint is independently optional (`None` means
+the app's `Auto` value); `ChartValueAxisBounds::automatic()` restores both
+endpoints, while invalid non-finite or inverted ranges are rejected before any
+package mutation.
+
 Axis-line visibility is likewise typed through
 `body_chart_axis_line_visible`, `sheet_chart_axis_line_visible`, and
 `slide_chart_axis_line_visible`; use `set_*_chart_axis_line_visible` to

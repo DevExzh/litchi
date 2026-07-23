@@ -1,7 +1,7 @@
 //! Source-built Pages chart CRUD regression tests.
 
 use super::*;
-use crate::charts::ChartAxis;
+use crate::charts::{ChartAxis, ChartAxisBound, ChartValueAxisBounds};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -521,6 +521,92 @@ fn scratch_document_supports_native_chart_axis_title_crud() {
             .iter()
             .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
     );
+}
+
+#[test]
+fn scratch_document_supports_native_chart_value_axis_bounds_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart value-axis bounds").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart value-axis bounds".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let automatic = ChartValueAxisBounds::automatic();
+    let fixed = ChartValueAxisBounds::fixed(
+        ChartAxisBound::new(-10.0).unwrap(),
+        ChartAxisBound::new(40.0).unwrap(),
+    )
+    .unwrap();
+    let minimum_only =
+        ChartValueAxisBounds::new(Some(ChartAxisBound::new(-5.0).unwrap()), None).unwrap();
+
+    assert_eq!(
+        editor
+            .body_chart_value_axis_bounds(source.drawable_object_id)
+            .unwrap(),
+        automatic
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_value_axis_bounds(source.drawable_object_id, automatic)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_value_axis_bounds(source.drawable_object_id, fixed)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_value_axis_bounds(duplicate.drawable_object_id)
+            .unwrap(),
+        fixed
+    );
+
+    editor
+        .set_body_chart_value_axis_bounds(source.drawable_object_id, minimum_only)
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_value_axis_bounds(source.drawable_object_id)
+            .unwrap(),
+        minimum_only
+    );
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_value_axis_bounds(source.drawable_object_id)
+            .unwrap(),
+        minimum_only
+    );
+    assert_eq!(
+        reopened
+            .body_chart_value_axis_bounds(duplicate.drawable_object_id)
+            .unwrap(),
+        fixed
+    );
+    reopened
+        .set_body_chart_value_axis_bounds(source.drawable_object_id, automatic)
+        .unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_value_axis_bounds(source.drawable_object_id)
+            .unwrap(),
+        automatic
+    );
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
 }
 
 #[test]
