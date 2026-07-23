@@ -8,15 +8,15 @@ use crate::package_metadata::{
     remove_component_external_references_to_object,
 };
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout, line_geometry,
-    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
-    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
-    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
-    set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
-    set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_path_source,
-    shape_shadow, shape_stroke, shape_text_layout,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
+    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
+    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout,
+    flip_drawable_geometry, line_geometry, line_path_source, line_segments_match,
+    reset_shape_effects, reset_shape_fill, reset_shape_shadow, reset_shape_stroke,
+    reset_shape_text_layout, set_shape_effects, set_shape_fill, set_shape_geometry,
+    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    set_shape_shadow, set_shape_stroke, set_shape_text_layout, shape_effects, shape_fill,
+    shape_line_endpoints, shape_path_source, shape_shadow, shape_stroke, shape_text_layout,
 };
 
 use super::text_box_create::{
@@ -639,6 +639,34 @@ impl PagesEditor {
         Ok(())
     }
 
+    /// Apply one native Arrange Flip operation to an ordinary body shape.
+    ///
+    /// Returns the updated geometry after applying the same transform as the
+    /// Pages Flip Horizontally or Flip Vertically inspector button.
+    pub fn flip_body_shape(
+        &mut self,
+        drawable_object_id: u64,
+        axis: DrawableFlipAxis,
+    ) -> Result<DrawableGeometry> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
+        let mut staged = self.package().clone();
+        set_shape_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_shape_geometry(drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Pages shape flip update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
+    }
+
     /// Read typed geometry for one ordinary body shape.
     pub fn body_shape_geometry(&self, drawable_object_id: u64) -> Result<DrawableGeometry> {
         Ok(body_shape_graph(self, drawable_object_id)?.info.geometry)
@@ -931,6 +959,26 @@ mod tests {
         assert_eq!(created.kind, PagesBodyShapeKind::Rectangle);
         assert_eq!(created.preset, Some(ShapePreset::Rectangle));
         assert_eq!(created.storage.text, "Built from typed objects");
+        let horizontally_flipped = editor
+            .flip_body_shape(created.drawable_object_id, DrawableFlipAxis::Horizontal)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_shape_geometry(created.drawable_object_id)
+                .unwrap(),
+            horizontally_flipped
+        );
+        assert_ne!(horizontally_flipped.flags, created.geometry.flags);
+        let vertically_flipped = editor
+            .flip_body_shape(created.drawable_object_id, DrawableFlipAxis::Vertical)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_shape_geometry(created.drawable_object_id)
+                .unwrap(),
+            vertically_flipped
+        );
+        assert_ne!(vertically_flipped.angle, created.geometry.angle);
         editor
             .replace_body_shape_text(created.drawable_object_id, 0..5, "Made")
             .unwrap();
@@ -1010,6 +1058,12 @@ mod tests {
         let before_cross_type = editor.to_bytes().unwrap();
         assert!(
             editor
+                .flip_body_shape(u64::MAX, DrawableFlipAxis::Horizontal)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
+        assert!(
+            editor
                 .set_body_line_segment(rectangle.drawable_object_id, LINE_START, LINE_END)
                 .is_err()
         );
@@ -1035,6 +1089,9 @@ mod tests {
         };
         editor
             .set_body_shape_properties(created.drawable_object_id, properties.clone())
+            .unwrap();
+        editor
+            .flip_body_shape(created.drawable_object_id, DrawableFlipAxis::Vertical)
             .unwrap();
         let source = editor.body_shapes().unwrap().into_iter().next().unwrap();
         let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();

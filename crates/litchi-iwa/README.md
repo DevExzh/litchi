@@ -126,6 +126,12 @@ exact permutation, while `move_*_drawable` accepts typed
 `DrawableLayerMove::{ToBack, Backward, Forward, ToFront}` commands. See the
 `create_*_stacked_shapes` examples for complete scratch-file workflows.
 
+Ordinary source-built and existing shapes expose the native Flip buttons via
+`DrawableFlipAxis::{Horizontal, Vertical}` and `flip_body_shape`,
+`flip_sheet_shape`, or `flip_slide_shape`. Each operation updates native
+geometry while retaining unrelated fields; see `create_*_flipped_shape` for
+scratch-file examples.
+
 ### Create Pages documents from scratch
 
 ```rust

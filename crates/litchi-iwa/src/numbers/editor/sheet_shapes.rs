@@ -5,16 +5,16 @@ use std::ops::Range;
 
 use super::*;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout, line_geometry,
-    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
-    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
-    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
-    set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
-    set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_line_segment,
-    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke,
-    shape_text_layout,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
+    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
+    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout,
+    flip_drawable_geometry, line_geometry, line_path_source, line_segments_match,
+    reset_shape_effects, reset_shape_fill, reset_shape_shadow, reset_shape_stroke,
+    reset_shape_text_layout, set_shape_effects, set_shape_fill, set_shape_geometry,
+    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    set_shape_shadow, set_shape_stroke, set_shape_text_layout, shape_effects, shape_fill,
+    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
+    shape_shadow, shape_stroke, shape_text_layout,
 };
 
 use super::text_box_create::{
@@ -695,6 +695,35 @@ impl NumbersEditor {
         Ok(())
     }
 
+    /// Apply one native Arrange Flip operation to an ordinary sheet shape.
+    ///
+    /// Returns the updated geometry after applying the same transform as the
+    /// Numbers Flip Horizontally or Flip Vertically inspector button.
+    pub fn flip_sheet_shape(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        axis: DrawableFlipAxis,
+    ) -> Result<DrawableGeometry> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
+        let mut staged = self.package.clone();
+        set_shape_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_shape_geometry(sheet_id, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Numbers shape flip update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
+    }
+
     /// Read typed geometry for one ordinary sheet shape.
     pub fn sheet_shape_geometry(
         &self,
@@ -1338,6 +1367,34 @@ mod tests {
         assert_eq!(created.kind, NumbersSheetShapeKind::Rectangle);
         assert_eq!(created.preset, Some(ShapePreset::Rectangle));
         assert_eq!(created.storage.text, "Built from typed objects");
+        let horizontally_flipped = editor
+            .flip_sheet_shape(
+                sheet_id,
+                created.drawable_object_id,
+                DrawableFlipAxis::Horizontal,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_shape_geometry(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            horizontally_flipped
+        );
+        assert_ne!(horizontally_flipped.flags, created.geometry.flags);
+        let vertically_flipped = editor
+            .flip_sheet_shape(
+                sheet_id,
+                created.drawable_object_id,
+                DrawableFlipAxis::Vertical,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_shape_geometry(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            vertically_flipped
+        );
+        assert_ne!(vertically_flipped.angle, created.geometry.angle);
         editor
             .replace_sheet_shape_text(sheet_id, created.drawable_object_id, 0..5, "Made")
             .unwrap();
@@ -1406,6 +1463,13 @@ mod tests {
         };
         editor
             .set_sheet_shape_properties(sheet_id, created.drawable_object_id, properties.clone())
+            .unwrap();
+        editor
+            .flip_sheet_shape(
+                sheet_id,
+                created.drawable_object_id,
+                DrawableFlipAxis::Vertical,
+            )
             .unwrap();
         let source = editor
             .sheet_shapes(sheet_id)
@@ -1538,6 +1602,12 @@ mod tests {
             .add_sheet_rectangle(sheet_id, "Not a line", POSITION, SIZE)
             .unwrap();
         let before_cross_type = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .flip_sheet_shape(sheet_id, u64::MAX, DrawableFlipAxis::Horizontal)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
         assert!(
             editor
                 .set_sheet_line_segment(

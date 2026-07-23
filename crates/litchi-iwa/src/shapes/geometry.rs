@@ -11,6 +11,9 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const NATIVE_REFLECTION_FLAG: u32 = 1 << 2;
+const HALF_TURN_DEGREES: f32 = 180.0;
+const FULL_TURN_DEGREES: f32 = 360.0;
 
 /// A drawable position in document points.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -24,6 +27,19 @@ pub struct DrawablePoint {
 pub struct DrawableSize {
     pub width: f32,
     pub height: f32,
+}
+
+/// One native Arrange flip command for a drawable.
+///
+/// The command mirrors the horizontal and vertical Flip buttons in iWork's
+/// Arrange inspector. It is an operation, rather than an independently stored
+/// state, because the native representation composes reflection with rotation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DrawableFlipAxis {
+    /// Mirror the drawable around its vertical center line.
+    Horizontal,
+    /// Mirror the drawable around its horizontal center line.
+    Vertical,
 }
 
 /// Geometry stored on an iWork drawable.
@@ -94,6 +110,37 @@ pub(crate) fn offset_drawable_geometry(
         ..geometry
     }
     .validate()
+}
+
+/// Apply one native Arrange flip operation to typed drawable geometry.
+///
+/// iWork represents both controls by toggling its reflection flag. Vertical
+/// flips additionally rotate the geometry by a half turn, preserving the
+/// visual transform when combined with any existing rotation.
+pub(crate) fn flip_drawable_geometry(
+    geometry: DrawableGeometry,
+    axis: DrawableFlipAxis,
+) -> Result<DrawableGeometry> {
+    let geometry = geometry.validate()?;
+    let flags = geometry.flags.ok_or_else(|| {
+        Error::InvalidFormat("iWork drawable geometry has no flags for an Arrange flip".to_owned())
+    })?;
+    let angle = match axis {
+        DrawableFlipAxis::Horizontal => geometry.angle,
+        DrawableFlipAxis::Vertical => Some(native_vertical_flip_angle(geometry.angle)),
+    };
+    DrawableGeometry {
+        flags: Some(flags ^ NATIVE_REFLECTION_FLAG),
+        angle,
+        ..geometry
+    }
+    .validate()
+}
+
+fn native_vertical_flip_angle(angle: Option<f32>) -> f32 {
+    let current = angle.unwrap_or_default().rem_euclid(FULL_TURN_DEGREES);
+    let flipped = (current + HALF_TURN_DEGREES).rem_euclid(FULL_TURN_DEGREES);
+    if flipped == 0.0 { 0.0 } else { flipped }
 }
 
 pub(crate) fn shape_geometry(
@@ -283,6 +330,14 @@ fn patch_size(
 mod tests {
     use super::*;
 
+    const NATIVE_BASE_DRAWABLE_FLAGS: u32 = 3;
+    const NATIVE_REFLECTED_DRAWABLE_FLAGS: u32 =
+        NATIVE_BASE_DRAWABLE_FLAGS | NATIVE_REFLECTION_FLAG;
+    const NO_ROTATION_DEGREES: f32 = 0.0;
+    const ROTATED_DRAWABLE_DEGREES: f32 = 45.0;
+    const VERTICALLY_FLIPPED_ROTATED_DRAWABLE_DEGREES: f32 =
+        ROTATED_DRAWABLE_DEGREES + HALF_TURN_DEGREES;
+
     #[test]
     fn geometry_offset_requires_a_finite_position_and_offset() {
         let geometry = DrawableGeometry {
@@ -322,6 +377,54 @@ mod tests {
                     ..geometry
                 },
                 f32::MAX,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn native_arrange_flip_encoding_matches_horizontal_and_vertical_controls() {
+        let baseline = DrawableGeometry {
+            position: Some(DrawablePoint { x: 12.0, y: 24.0 }),
+            size: Some(DrawableSize {
+                width: 100.0,
+                height: 80.0,
+            }),
+            flags: Some(NATIVE_BASE_DRAWABLE_FLAGS),
+            angle: Some(NO_ROTATION_DEGREES),
+        };
+        let horizontal = flip_drawable_geometry(baseline, DrawableFlipAxis::Horizontal).unwrap();
+        assert_eq!(horizontal.flags, Some(NATIVE_REFLECTED_DRAWABLE_FLAGS));
+        assert_eq!(horizontal.angle, Some(NO_ROTATION_DEGREES));
+
+        let vertical = flip_drawable_geometry(baseline, DrawableFlipAxis::Vertical).unwrap();
+        assert_eq!(vertical.flags, Some(NATIVE_REFLECTED_DRAWABLE_FLAGS));
+        assert_eq!(vertical.angle, Some(HALF_TURN_DEGREES));
+
+        let both = flip_drawable_geometry(horizontal, DrawableFlipAxis::Vertical).unwrap();
+        assert_eq!(both.flags, Some(NATIVE_BASE_DRAWABLE_FLAGS));
+        assert_eq!(both.angle, Some(HALF_TURN_DEGREES));
+
+        let restored = flip_drawable_geometry(both, DrawableFlipAxis::Vertical).unwrap();
+        assert_eq!(restored, horizontal);
+
+        let rotated = DrawableGeometry {
+            angle: Some(ROTATED_DRAWABLE_DEGREES),
+            ..baseline
+        };
+        let vertically_flipped_rotated =
+            flip_drawable_geometry(rotated, DrawableFlipAxis::Vertical).unwrap();
+        assert_eq!(
+            vertically_flipped_rotated.angle,
+            Some(VERTICALLY_FLIPPED_ROTATED_DRAWABLE_DEGREES)
+        );
+        assert!(
+            flip_drawable_geometry(
+                DrawableGeometry {
+                    flags: None,
+                    ..baseline
+                },
+                DrawableFlipAxis::Horizontal,
             )
             .is_err()
         );

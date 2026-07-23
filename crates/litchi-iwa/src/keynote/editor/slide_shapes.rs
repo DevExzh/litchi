@@ -5,16 +5,16 @@ use std::ops::Range;
 
 use super::*;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout, line_geometry,
-    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
-    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
-    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
-    set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
-    set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_line_segment,
-    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke,
-    shape_text_layout,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
+    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
+    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout,
+    flip_drawable_geometry, line_geometry, line_path_source, line_segments_match,
+    reset_shape_effects, reset_shape_fill, reset_shape_shadow, reset_shape_stroke,
+    reset_shape_text_layout, set_shape_effects, set_shape_fill, set_shape_geometry,
+    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    set_shape_shadow, set_shape_stroke, set_shape_text_layout, shape_effects, shape_fill,
+    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
+    shape_shadow, shape_stroke, shape_text_layout,
 };
 use crate::text::TextStorageInfo;
 
@@ -704,6 +704,35 @@ impl KeynoteEditor {
         Ok(())
     }
 
+    /// Apply one native Arrange Flip operation to an ordinary slide shape.
+    ///
+    /// Returns the updated geometry after applying the same transform as the
+    /// Keynote Flip Horizontally or Flip Vertically inspector button.
+    pub fn flip_slide_shape(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        axis: DrawableFlipAxis,
+    ) -> Result<DrawableGeometry> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
+        let mut staged = self.package().clone();
+        set_shape_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_shape_geometry(slide_index, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Keynote shape flip update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
+    }
+
     /// Read typed geometry for one ordinary slide shape.
     pub fn slide_shape_geometry(
         &self,
@@ -1302,6 +1331,26 @@ mod tests {
                 .role,
             KeynoteSlideTextRole::Shape
         );
+        let horizontally_flipped = editor
+            .flip_slide_shape(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_shape_geometry(0, created.drawable_object_id)
+                .unwrap(),
+            horizontally_flipped
+        );
+        assert_ne!(horizontally_flipped.flags, created.geometry.flags);
+        let vertically_flipped = editor
+            .flip_slide_shape(0, created.drawable_object_id, DrawableFlipAxis::Vertical)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_shape_geometry(0, created.drawable_object_id)
+                .unwrap(),
+            vertically_flipped
+        );
+        assert_ne!(vertically_flipped.angle, created.geometry.angle);
 
         editor
             .replace_slide_shape_text(0, created.drawable_object_id, 0..5, "Made")
@@ -1364,6 +1413,9 @@ mod tests {
         };
         editor
             .set_slide_shape_properties(0, created.drawable_object_id, properties.clone())
+            .unwrap();
+        editor
+            .flip_slide_shape(0, created.drawable_object_id, DrawableFlipAxis::Vertical)
             .unwrap();
         let source = editor.slide_shapes(0).unwrap().into_iter().next().unwrap();
 
@@ -1488,6 +1540,12 @@ mod tests {
             .add_slide_rectangle(0, "Not a line", POSITION, SIZE)
             .unwrap();
         let before_cross_type = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .flip_slide_shape(0, u64::MAX, DrawableFlipAxis::Horizontal)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
         assert!(
             editor
                 .set_slide_line_segment(0, rectangle.drawable_object_id, LINE_START, LINE_END,)

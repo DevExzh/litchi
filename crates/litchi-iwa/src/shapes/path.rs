@@ -22,6 +22,8 @@ const NATIVE_SINGLE_ARROW_HEAD_START_RATIO: f32 = 0.64;
 const NATIVE_DOUBLE_ARROW_HEAD_END_RATIO: f32 = 0.40;
 const NATIVE_ARROW_SHAFT_RATIO: f32 = 0.34;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const SHAPE_INFO_SHAPE_FIELD: u32 = 1;
+const SHAPE_ARCHIVE_PATH_SOURCE_FIELD: u32 = 3;
 
 /// Corner radius in the path's natural coordinate system.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -428,19 +430,23 @@ fn patch_shape_preset(data: &[u8], drawable_id: u64, preset: ShapePreset) -> Res
                 "iWork drawable {drawable_id} has no natural path size"
             ))
         })?;
-    let replacement = shape_path_source(
+    let mut replacement = shape_path_source(
         preset,
         DrawableSize {
             width: geometry.width,
             height: geometry.height,
         },
-    )?
-    .encode_to_vec();
-    let data = transform_length_delimited_field(data, 1, |shape_archive| {
+    )?;
+    if let Some(path_source) = &shape.super_.pathsource {
+        replacement.horizontal_flip = path_source.horizontal_flip;
+        replacement.vertical_flip = path_source.vertical_flip;
+    }
+    let replacement = replacement.encode_to_vec();
+    let data = transform_length_delimited_field(data, SHAPE_INFO_SHAPE_FIELD, |shape_archive| {
         let current = tsd::ShapeArchive::decode(shape_archive)?;
         patch_length_delimited_field(
             shape_archive,
-            3,
+            SHAPE_ARCHIVE_PATH_SOURCE_FIELD,
             current.pathsource.is_some(),
             Some(&replacement),
         )
@@ -1027,6 +1033,46 @@ mod tests {
                 },
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn preset_patch_retains_path_source_reflection_fields() {
+        let size = DrawableSize {
+            width: 240.0,
+            height: 120.0,
+        };
+        let mut path_source = shape_path_source(ShapePreset::Rectangle, size).unwrap();
+        path_source.horizontal_flip = Some(true);
+        path_source.vertical_flip = Some(false);
+        let shape = tswp::ShapeInfoArchive {
+            super_: tsd::ShapeArchive {
+                super_: tsd::DrawableArchive {
+                    geometry: Some(tsd::GeometryArchive {
+                        size: Some(tsp::Size {
+                            width: size.width,
+                            height: size.height,
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                pathsource: Some(path_source),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let changed = patch_shape_preset(&shape.encode_to_vec(), 42, ShapePreset::Ellipse).unwrap();
+        let changed = tswp::ShapeInfoArchive::decode(changed.as_slice()).unwrap();
+        assert_eq!(shape_preset(&changed).unwrap(), Some(ShapePreset::Ellipse));
+        assert_eq!(
+            changed.super_.pathsource.as_ref().unwrap().horizontal_flip,
+            Some(true)
+        );
+        assert_eq!(
+            changed.super_.pathsource.as_ref().unwrap().vertical_flip,
+            Some(false)
         );
     }
 
