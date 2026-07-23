@@ -28,6 +28,7 @@ pub enum FieldType {
     Embed,
     Barcode,
     BidiOutline,
+    Shape,
     AddIn,
     Control,
     HtmlControl,
@@ -381,6 +382,22 @@ pub struct BarcodeField<'a> {
 /// field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BidiOutlineField<'a> {
+    instruction: &'a str,
+    opaque_instructions: &'a str,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+/// Inert metadata for a legacy RTF `SHAPE` field.
+///
+/// Word uses this legacy field as a drawing-canvas anchor. This type retains
+/// opaque instruction text, a cached result, and field state only. It never
+/// locates, links, loads, positions, lays out, or renders a drawing or canvas,
+/// or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShapeField<'a> {
     instruction: &'a str,
     opaque_instructions: &'a str,
     cached_result: Option<&'a str>,
@@ -2140,6 +2157,57 @@ impl<'a> BidiOutlineField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from document state.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
+impl<'a> ShapeField<'a> {
+    /// Return the complete stored `SHAPE` field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to locate or
+    /// position a drawing canvas.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return opaque stored instruction text after `SHAPE`.
+    ///
+    /// It is never parsed, interpreted, or used to link a field to a drawing,
+    /// resolve an anchor, or calculate layout.
+    pub fn opaque_instructions(&self) -> &'a str {
+        self.opaque_instructions
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached metadata only and is never regenerated from a drawing
+    /// canvas.
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
@@ -4364,6 +4432,11 @@ impl<'a> Field<'a> {
             {
                 FieldType::BidiOutline
             },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("SHAPE") =>
+            {
+                FieldType::Shape
+            },
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("ADDIN") => {
                 FieldType::AddIn
             },
@@ -4722,6 +4795,26 @@ impl<'a> Field<'a> {
         }
         let opaque_instructions = bidi_outline_field_instructions(self.instruction.as_ref())?;
         Some(BidiOutlineField {
+            instruction: self.instruction.as_ref(),
+            opaque_instructions,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a `SHAPE` drawing-canvas anchor field.
+    ///
+    /// Stored opaque instructions, cached results, and field state remain
+    /// metadata only. This method never locates, links, loads, positions, lays
+    /// out, or renders a drawing or canvas, or refreshes a field.
+    pub fn shape_field(&self) -> Option<ShapeField<'_>> {
+        if self.field_type != FieldType::Shape {
+            return None;
+        }
+        let opaque_instructions = shape_field_instructions(self.instruction.as_ref())?;
+        Some(ShapeField {
             instruction: self.instruction.as_ref(),
             opaque_instructions,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
@@ -5847,6 +5940,23 @@ fn bidi_outline_field_instructions(instruction: &str) -> Option<&str> {
         return None;
     }
     let remainder = instruction.get("BIDIOUTLINE".len()..)?;
+    match remainder.chars().next() {
+        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
+        Some(_) => None,
+    }
+}
+
+fn shape_field_instructions(instruction: &str) -> Option<&str> {
+    if instruction.len() > MAX_INSTRUCTION_LEN {
+        return None;
+    }
+    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let keyword = instruction.get(.."SHAPE".len())?;
+    if !keyword.eq_ignore_ascii_case("SHAPE") {
+        return None;
+    }
+    let remainder = instruction.get("SHAPE".len()..)?;
     match remainder.chars().next() {
         None | Some('"') | Some('\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
@@ -8734,6 +8844,44 @@ mod tests {
     }
 
     #[test]
+    fn shape_fields_preserve_metadata_without_linking_or_rendering_drawings() {
+        let mut shape = Field::parse_instruction(r#"SHAPE \* MERGEFORMAT"#);
+        shape.result = Cow::Borrowed("cached drawing anchor");
+        shape.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        shape.owner = FieldOwner::Body;
+        shape.position = 4;
+
+        assert_eq!(shape.field_type, FieldType::Shape);
+        let shape = shape.shape_field().unwrap();
+        assert_eq!(shape.instruction(), r#"SHAPE \* MERGEFORMAT"#);
+        assert_eq!(shape.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(shape.cached_result(), Some("cached drawing anchor"));
+        assert!(shape.is_dirty());
+        assert!(shape.is_locked());
+        assert_eq!(shape.owner(), FieldOwner::Body);
+        assert_eq!(shape.position(), 4);
+
+        let bare = Field::parse_instruction("shape");
+        assert_eq!(bare.field_type, FieldType::Shape);
+        assert_eq!(bare.shape_field().unwrap().opaque_instructions(), "");
+        assert_eq!(
+            Field::parse_instruction("SHAPES").field_type,
+            FieldType::Unknown
+        );
+        assert!(Field::parse_instruction("SHAPES").shape_field().is_none());
+        let too_long = Field::new(
+            FieldType::Shape,
+            Cow::Owned(format!("SHAPE {}", "x".repeat(MAX_INSTRUCTION_LEN))),
+            Cow::Borrowed(""),
+        );
+        assert!(too_long.shape_field().is_none());
+    }
+
+    #[test]
     fn auto_text_fields_preserve_metadata_without_lookup_or_insertion() {
         let mut glossary =
             Field::parse_instruction(r#"GLOSSARY "Legacy Clause" \* MERGEFORMAT \q opaque"#);
@@ -11520,6 +11668,27 @@ mod tests {
             fields[1].cached_result(),
             Some("cached bare bidi outline")
         );
+        assert!(fields[1].is_dirty());
+        assert!(fields[1].is_locked());
+        assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_shape_fields_without_linking_or_rendering_drawings() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst SHAPE \\* MERGEFORMAT}{\fldrslt cached drawing anchor}}{\field\flddirty\fldlock{\*\fldinst shape}{\fldrslt cached bare drawing anchor}}After}"#,
+        )
+        .unwrap();
+
+        let fields = document.shape_fields();
+        assert_eq!(document.shape_field_count(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(fields[0].cached_result(), Some("cached drawing anchor"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[1].opaque_instructions(), "");
+        assert_eq!(fields[1].cached_result(), Some("cached bare drawing anchor"));
         assert!(fields[1].is_dirty());
         assert!(fields[1].is_locked());
         assert_eq!(document.text(), "Before After");

@@ -1042,6 +1042,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `SHAPE` drawing-canvas anchor fields in document field order.
+    ///
+    /// Stored opaque instructions, cached results, and state are metadata only.
+    /// This method never locates, links, loads, positions, lays out, or renders
+    /// a drawing or canvas, or refreshes a field.
+    pub fn shape_fields(&self) -> Vec<crate::ShapeField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::shape_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `SHAPE` drawing-canvas anchor fields.
+    pub fn shape_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.shape_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in
     /// document field order.
     ///
