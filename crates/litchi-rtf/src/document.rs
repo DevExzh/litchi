@@ -959,6 +959,28 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in
+    /// document field order.
+    ///
+    /// Stored instructions, cached results, and state are opaque metadata only.
+    /// This method never loads an add-in, instantiates a control, invokes code,
+    /// executes script, renders content, accesses an external resource, or
+    /// refreshes a field.
+    pub fn active_content_fields(&self) -> Vec<crate::ActiveContentField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::active_content_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert active-content fields in the document.
+    pub fn active_content_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.active_content_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `DDE` and `DDEAUTO` fields in document field order.
     ///
     /// Application, source, item, representation, and storage metadata are
