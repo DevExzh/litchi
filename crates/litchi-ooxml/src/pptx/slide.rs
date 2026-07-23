@@ -1,7 +1,12 @@
 /// Slide-related objects, including Slide, SlideLayout, and SlideMaster.
-use crate::error::Result;
+use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart};
 use crate::pptx::shapes::base::BaseShape;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::OpcPackage;
+
+const STRICT_SLIDE_LAYOUT_RELATIONSHIP_TYPE: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/slideLayout";
 
 /// A slide in a presentation.
 ///
@@ -558,13 +563,18 @@ impl<'a> SlideLayout<'a> {
 pub struct SlideMaster<'a> {
     /// The underlying slide master part
     part: SlideMasterPart<'a>,
+    /// Package used to resolve the master-owned layout relationships.
+    package: &'a OpcPackage,
 }
 
 impl<'a> SlideMaster<'a> {
-    /// Create a new SlideMaster from a SlideMasterPart.
+    /// Create a new SlideMaster with its owning package.
     #[inline]
-    pub(crate) fn new(part: SlideMasterPart<'a>) -> Self {
-        Self { part }
+    pub(crate) fn with_package(part: SlideMasterPart<'a>, package: &'a OpcPackage) -> Self {
+        Self {
+            part,
+            package,
+        }
     }
 
     /// Get the master name.
@@ -600,6 +610,58 @@ impl<'a> SlideMaster<'a> {
     /// the actual slide layout parts.
     pub fn slide_layout_rids(&self) -> Result<Vec<String>> {
         self.part.slide_layout_rids()
+    }
+
+    /// Resolve all slide layouts owned by this master in relationship order.
+    ///
+    /// Layout relationships must be internal PresentationML slide-layout parts.
+    pub fn slide_layouts(&self) -> Result<Vec<SlideLayout<'a>>> {
+        let package = self.package;
+        let master_part = self.part.part();
+        let relationship_ids = self.part.slide_layout_rids()?;
+        let mut layouts = Vec::with_capacity(relationship_ids.len());
+
+        for relationship_id in relationship_ids {
+            let relationship = master_part.rels().get(&relationship_id).ok_or_else(|| {
+                OoxmlError::InvalidRelationship(format!(
+                    "slide master references missing slide-layout relationship '{relationship_id}'"
+                ))
+            })?;
+            if relationship.is_external() {
+                return Err(OoxmlError::InvalidRelationship(format!(
+                    "slide-layout relationship '{relationship_id}' must be internal"
+                )));
+            }
+            if !matches!(
+                relationship.reltype(),
+                rt::SLIDE_LAYOUT | STRICT_SLIDE_LAYOUT_RELATIONSHIP_TYPE
+            ) {
+                return Err(OoxmlError::InvalidRelationship(format!(
+                    "relationship '{relationship_id}' is not a slide-layout relationship"
+                )));
+            }
+
+            let part_name = relationship.target_partname().map_err(|error| {
+                OoxmlError::InvalidRelationship(format!(
+                    "invalid slide-layout relationship '{relationship_id}': {error}"
+                ))
+            })?;
+            let layout_part = package.get_part(&part_name).map_err(|error| {
+                OoxmlError::PartNotFound(format!(
+                    "slide-layout relationship '{relationship_id}' targets missing part '{}': {error}",
+                    part_name.as_str()
+                ))
+            })?;
+            if layout_part.content_type() != ct::PML_SLIDE_LAYOUT {
+                return Err(OoxmlError::InvalidContentType {
+                    expected: ct::PML_SLIDE_LAYOUT.to_string(),
+                    got: layout_part.content_type().to_string(),
+                });
+            }
+            layouts.push(SlideLayout::new(SlideLayoutPart::from_part(layout_part)?));
+        }
+
+        Ok(layouts)
     }
 
     /// Get access to the underlying master part.

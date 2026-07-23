@@ -1,6 +1,7 @@
+use litchi_ooxml::OoxmlError;
 use litchi_ooxml::PackURI;
-use litchi_ooxml::pptx::parts::SlideLayoutPart;
 use litchi_ooxml::pptx::{Package, RippleDirection, SlideTransition, TransitionType};
+use litchi_opc::constants::relationship_type as rt;
 use tempfile::NamedTempFile;
 
 const LOCAL_P14_RIPPLE: &[u8] =
@@ -15,10 +16,48 @@ fn layout_and_master_read_local_powerpoint_2010_transition_choices() {
     let masters = presentation.slide_masters().unwrap();
     assert_ripple(&masters[0].transition().unwrap().unwrap());
 
-    let layout_name = PackURI::new("/ppt/slideLayouts/slideLayout1.xml").unwrap();
-    let layout_part =
-        SlideLayoutPart::from_part(package.opc_package().get_part(&layout_name).unwrap()).unwrap();
-    assert_ripple(&layout_part.transition().unwrap().unwrap());
+    let layouts = masters[0].slide_layouts().unwrap();
+    let layout = layouts
+        .iter()
+        .find(|layout| {
+            layout.part().part().partname().as_str() == "/ppt/slideLayouts/slideLayout1.xml"
+        })
+        .unwrap();
+    assert_ripple(&layout.transition().unwrap().unwrap());
+}
+
+#[test]
+fn master_layout_inventory_rejects_external_layout_relationships() {
+    let mut package = Package::new().unwrap();
+    let master_name = PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
+    let relationship_id = package
+        .opc_package()
+        .get_part(&master_name)
+        .unwrap()
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == rt::SLIDE_LAYOUT)
+        .unwrap()
+        .r_id()
+        .to_string();
+    let master = package
+        .opc_package_mut()
+        .get_part_mut(&master_name)
+        .unwrap();
+    master.rels_mut().remove(&relationship_id);
+    master.rels_mut().add_relationship(
+        rt::SLIDE_LAYOUT.to_string(),
+        "https://example.invalid/slide-layout.xml".to_string(),
+        relationship_id,
+        true,
+    );
+
+    let presentation = package.presentation().unwrap();
+    let masters = presentation.slide_masters().unwrap();
+    assert!(matches!(
+        masters[0].slide_layouts(),
+        Err(OoxmlError::InvalidRelationship(message)) if message.contains("must be internal")
+    ));
 }
 
 fn assert_ripple(transition: &SlideTransition) {

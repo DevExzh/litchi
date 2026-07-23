@@ -278,7 +278,7 @@ impl<'a> Presentation<'a> {
             let related_part = self.package.get_part(&target_partname)?;
 
             let master_part = SlideMasterPart::from_part(related_part)?;
-            masters.push(SlideMaster::new(master_part));
+            masters.push(SlideMaster::with_package(master_part, self.package));
         }
 
         Ok(masters)
