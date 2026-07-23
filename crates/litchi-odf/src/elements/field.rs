@@ -26,6 +26,7 @@ const MAX_DATABASE_AGGREGATE: usize = 16 * 1_048_576;
 const MAX_DATABASE_INTEGER_DIGITS: usize = 4_096;
 const MAX_DYNAMIC_FIELD_VALUE: usize = 65_536;
 const MAX_DYNAMIC_FIELD_AGGREGATE: usize = 1_048_576;
+const MAX_DROP_DOWN_LABELS: usize = 65_536;
 const MAX_META_FIELD_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_META_FIELD_DEPTH: usize = 256;
 const MAX_META_FIELD_NODES: usize = 100_000;
@@ -257,6 +258,19 @@ pub enum OdfPlaceholderType {
     TextBox,
     Image,
     Object,
+}
+
+/// One stored option in an ODF `text:drop-down` field.
+///
+/// Both attributes are optional in the ODF schema. The option itself is inert:
+/// this type only retains producer-supplied metadata and never displays a user
+/// interface or changes a selection.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct OdfDropDownLabel {
+    /// Optional producer-supplied option value.
+    pub value: Option<String>,
+    /// Optional stored selected-state flag.
+    pub current_selected: Option<bool>,
 }
 
 /// Numbering metadata for an ODF `text:sequence` field.
@@ -1555,6 +1569,16 @@ pub enum OdfDynamicTextField {
         description: Option<String>,
         display_text: String,
     },
+    /// An inert drop-down input field with stored choice metadata.
+    ///
+    /// The labels and cached selected text are retained exactly as document
+    /// metadata. No selection interface is shown and no label is selected,
+    /// changed, or resolved by this API.
+    DropDown {
+        name: String,
+        labels: Vec<OdfDropDownLabel>,
+        display_text: String,
+    },
     /// An inert table-cell formula display field.
     TableFormula {
         formula: Option<String>,
@@ -1712,6 +1736,7 @@ impl OdfDynamicTextField {
             | Self::UserFieldGet { display_text, .. }
             | Self::UserFieldInput { display_text, .. }
             | Self::TextInput { display_text, .. }
+            | Self::DropDown { display_text, .. }
             | Self::TableFormula { display_text, .. }
             | Self::Measure { display_text, .. }
             | Self::Reference { display_text, .. }
@@ -2071,6 +2096,32 @@ impl OdfDynamicTextField {
                     &mut aggregate,
                 )?;
             },
+            Self::DropDown {
+                name,
+                labels,
+                display_text,
+            } => {
+                validate_dynamic_value("text:name", Some(name), false, &mut aggregate)?;
+                if labels.len() > MAX_DROP_DOWN_LABELS {
+                    return Err(Error::InvalidFormat(format!(
+                        "text:drop-down exceeds {MAX_DROP_DOWN_LABELS} labels"
+                    )));
+                }
+                for label in labels {
+                    validate_dynamic_value(
+                        "text:label text:value",
+                        label.value.as_deref(),
+                        false,
+                        &mut aggregate,
+                    )?;
+                }
+                validate_dynamic_value(
+                    "drop-down display text",
+                    Some(display_text),
+                    false,
+                    &mut aggregate,
+                )?;
+            },
             Self::TableFormula {
                 formula,
                 data_style_name,
@@ -2407,6 +2458,41 @@ impl OdfDynamicTextField {
     /// document. Formula attributes are emitted verbatim after XML escaping and
     /// are never executed.
     pub fn to_xml_fragment(&self) -> Result<String> {
+        if let Self::DropDown {
+            name,
+            labels,
+            display_text,
+        } = self
+        {
+            self.validate()?;
+            let mut xml = String::from("<text:drop-down xmlns:text=\"");
+            xml.push_str(TEXT_DATABASE_NAMESPACE);
+            xml.push_str("\" text:name=\"");
+            push_xml_attribute(&mut xml, name);
+            xml.push('\"');
+            if labels.is_empty() && display_text.is_empty() {
+                xml.push_str("/>");
+                return Ok(xml);
+            }
+            xml.push('>');
+            for label in labels {
+                xml.push_str("<text:label");
+                if let Some(value) = label.value.as_deref() {
+                    xml.push_str(" text:value=\"");
+                    push_xml_attribute(&mut xml, value);
+                    xml.push('\"');
+                }
+                if let Some(current_selected) = label.current_selected {
+                    xml.push_str(" text:current-selected=\"");
+                    xml.push_str(if current_selected { "true" } else { "false" });
+                    xml.push('\"');
+                }
+                xml.push_str("/>");
+            }
+            push_xml_text(&mut xml, display_text);
+            xml.push_str("</text:drop-down>");
+            return Ok(xml);
+        }
         if let Self::MetaField {
             xml_id,
             data_style_name,
@@ -2452,6 +2538,7 @@ impl OdfDynamicTextField {
             Self::UserFieldGet { .. } => Element::new("text:user-field-get"),
             Self::UserFieldInput { .. } => Element::new("text:user-field-input"),
             Self::TextInput { .. } => Element::new("text:text-input"),
+            Self::DropDown { .. } => unreachable!("drop-down uses nested-label serializer"),
             Self::TableFormula { .. } => Element::new("text:table-formula"),
             Self::Measure { .. } => Element::new("text:measure"),
             Self::Reference { .. } => Element::new("text:reference-ref"),
@@ -2685,6 +2772,7 @@ impl OdfDynamicTextField {
                 }
                 element.set_text(display_text);
             },
+            Self::DropDown { .. } => unreachable!("drop-down uses nested-label serializer"),
             Self::TableFormula {
                 formula,
                 display,
@@ -3013,6 +3101,16 @@ struct ActiveDatabaseField {
     connection_depth: Option<usize>,
 }
 
+struct ActiveDropDownField {
+    depth: usize,
+    label_depth: Option<usize>,
+    display_started: bool,
+    aggregate: usize,
+    name: String,
+    labels: Vec<OdfDropDownLabel>,
+    display_text: String,
+}
+
 type DatabaseAttributes = HashMap<(String, String), String>;
 
 /// Represents a text field in the document
@@ -3094,6 +3192,7 @@ impl Field {
                 | "text:sequence"
                 | "text:expression"
                 | "text:text-input"
+                | "text:drop-down"
                 | "text:placeholder"
                 | "text:conditional-text"
                 | "text:hidden-text"
@@ -4444,14 +4543,19 @@ impl FieldParser {
         parse_database_fields(xml_content)
     }
 
-    /// Parse typed conditional, hidden, and placeholder fields without evaluating them.
+    /// Parse typed dynamic text fields without evaluating them.
     pub fn parse_dynamic_text_fields(xml_content: &str) -> Result<Vec<OdfDynamicTextField>> {
         let mut meta_fields = parse_meta_fields(xml_content)?.into_iter();
+        let mut drop_down_fields = parse_drop_down_fields(xml_content)?.into_iter();
         let mut result = Vec::new();
         for field in Self::parse_fields(xml_content)? {
             if field.field_type() == "text:meta-field" {
                 result.push(meta_fields.next().ok_or_else(|| {
                     Error::InvalidFormat("missing parsed text:meta-field".to_string())
+                })?);
+            } else if field.field_type() == "text:drop-down" {
+                result.push(drop_down_fields.next().ok_or_else(|| {
+                    Error::InvalidFormat("missing parsed text:drop-down".to_string())
                 })?);
             } else if let Some(field) = field.dynamic_text_field()? {
                 result.push(field);
@@ -4460,6 +4564,11 @@ impl FieldParser {
         if meta_fields.next().is_some() {
             return Err(Error::InvalidFormat(
                 "unmatched parsed text:meta-field".to_string(),
+            ));
+        }
+        if drop_down_fields.next().is_some() {
+            return Err(Error::InvalidFormat(
+                "unmatched parsed text:drop-down".to_string(),
             ));
         }
         Ok(result)
@@ -5120,6 +5229,7 @@ enum MetaContentGrammar {
     ParagraphOrHyperlink,
     Paragraph,
     TextOnly,
+    DropDown,
     Empty,
     Hyperlink,
     Ruby,
@@ -5150,6 +5260,15 @@ fn validate_meta_nodes(
         )));
     }
     match grammar {
+        MetaContentGrammar::DropDown => {
+            return validate_meta_drop_down(
+                nodes,
+                depth,
+                aggregate,
+                node_count,
+                display_text,
+            );
+        },
         MetaContentGrammar::Ruby => {
             return validate_meta_exact_pair(
                 nodes,
@@ -5301,6 +5420,7 @@ fn validate_meta_nodes(
                 )?;
                 let child_grammar =
                     meta_child_grammar(grammar, &element.namespace_uri, &element.local_name)?;
+                validate_meta_element_attributes_for_grammar(element, child_grammar)?;
                 validate_meta_nodes(
                     &element.children,
                     depth + 1,
@@ -5381,6 +5501,7 @@ fn validate_meta_required_element(
         )));
     }
     validate_meta_element_parts(namespace, local, &element.attributes, aggregate)?;
+    validate_meta_element_attributes_for_grammar(element, child_grammar)?;
     validate_meta_nodes(
         &element.children,
         depth + 1,
@@ -5389,6 +5510,122 @@ fn validate_meta_required_element(
         node_count,
         display_text,
     )
+}
+
+fn validate_meta_element_attributes_for_grammar(
+    element: &OdfMetaFieldElement,
+    grammar: MetaContentGrammar,
+) -> Result<()> {
+    if grammar == MetaContentGrammar::DropDown {
+        validate_meta_drop_down_attributes(&element.attributes)?;
+    }
+    Ok(())
+}
+
+fn validate_meta_drop_down(
+    nodes: &[OdfMetaFieldNode],
+    depth: usize,
+    aggregate: &mut usize,
+    node_count: &mut usize,
+    display_text: &mut String,
+) -> Result<()> {
+    let mut display_started = false;
+    let mut labels = 0usize;
+    for node in nodes {
+        *node_count = node_count.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("text:meta-field node count overflow".to_string())
+        })?;
+        if *node_count > MAX_META_FIELD_NODES {
+            return Err(Error::InvalidFormat(format!(
+                "text:meta-field exceeds {MAX_META_FIELD_NODES} content nodes"
+            )));
+        }
+        match node {
+            OdfMetaFieldNode::Text(value) => {
+                display_started = true;
+                validate_dynamic_value(
+                    "meta-field drop-down text",
+                    Some(value),
+                    false,
+                    aggregate,
+                )?;
+                display_text.push_str(value);
+            },
+            OdfMetaFieldNode::Element(element) => {
+                if display_started
+                    || element.namespace_uri != TEXT_DATABASE_NAMESPACE
+                    || element.local_name != "label"
+                {
+                    return Err(Error::InvalidFormat(
+                        "text:drop-down permits only leading text:label children".to_string(),
+                    ));
+                }
+                if !element.children.is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "text:label must be empty in text:drop-down".to_string(),
+                    ));
+                }
+                labels = labels.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("text:drop-down label count overflow".to_string())
+                })?;
+                if labels > MAX_DROP_DOWN_LABELS {
+                    return Err(Error::InvalidFormat(format!(
+                        "text:drop-down exceeds {MAX_DROP_DOWN_LABELS} labels"
+                    )));
+                }
+                validate_meta_element_parts(
+                    &element.namespace_uri,
+                    &element.local_name,
+                    &element.attributes,
+                    aggregate,
+                )?;
+                validate_meta_drop_down_label_attributes(&element.attributes)?;
+            },
+        }
+    }
+    if depth > MAX_META_FIELD_DEPTH {
+        return Err(Error::InvalidFormat(format!(
+            "text:meta-field content exceeds {MAX_META_FIELD_DEPTH} levels"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_meta_drop_down_attributes(attributes: &[OdfMetaFieldAttribute]) -> Result<()> {
+    let has_name = attributes.iter().any(|attribute| {
+        attribute.namespace_uri == TEXT_DATABASE_NAMESPACE && attribute.local_name == "name"
+    });
+    if !has_name {
+        return Err(Error::InvalidFormat(
+            "text:drop-down requires text:name".to_string(),
+        ));
+    }
+    if attributes.iter().any(|attribute| {
+        attribute.namespace_uri != TEXT_DATABASE_NAMESPACE || attribute.local_name != "name"
+    }) {
+        return Err(Error::InvalidFormat(
+            "text:drop-down only permits text:name".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_meta_drop_down_label_attributes(
+    attributes: &[OdfMetaFieldAttribute],
+) -> Result<()> {
+    for attribute in attributes {
+        if attribute.namespace_uri != TEXT_DATABASE_NAMESPACE
+            || !matches!(attribute.local_name.as_str(), "value" | "current-selected")
+        {
+            return Err(Error::InvalidFormat(
+                "text:label has an unsupported attribute".to_string(),
+            ));
+        }
+        if attribute.local_name == "current-selected" {
+            parse_drop_down_boolean(&attribute.value)?;
+        }
+    }
+    Ok(())
 }
 
 fn validate_meta_optional_listener_then(
@@ -5578,6 +5815,7 @@ fn meta_child_grammar(
             "ruby" => Ok(MetaContentGrammar::Ruby),
             "note" => Ok(MetaContentGrammar::Note),
             "execute-macro" => Ok(MetaContentGrammar::ExecuteMacro),
+            "drop-down" => Ok(MetaContentGrammar::DropDown),
             "s"
             | "tab"
             | "line-break"
@@ -6090,6 +6328,293 @@ fn parse_database_fields(xml: &str) -> Result<Vec<OdfDatabaseField>> {
     Ok(fields)
 }
 
+fn parse_drop_down_fields(xml: &str) -> Result<Vec<OdfDynamicTextField>> {
+    if xml.len() > MAX_META_FIELD_XML_BYTES {
+        return Err(Error::InvalidFormat(
+            "drop-down field XML exceeds 64 MiB".to_string(),
+        ));
+    }
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut active: Option<ActiveDropDownField> = None;
+    let mut fields = Vec::new();
+    let mut stack: Vec<(Option<String>, String)> = Vec::new();
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid drop-down field XML: {error}"))
+            })?;
+        let namespace_uri = resolved_namespace(&namespace)?;
+        match event {
+            Event::Start(ref element) => {
+                let local = utf8(element.local_name().as_ref(), "drop-down field element")?;
+                if let Some(field) = active.as_mut() {
+                    begin_drop_down_label(
+                        &reader,
+                        element,
+                        namespace_uri.as_deref(),
+                        &local,
+                        depth,
+                        field,
+                    )?;
+                } else if namespace_uri.as_deref() == Some(TEXT_DATABASE_NAMESPACE)
+                    && local == "drop-down"
+                {
+                    validate_drop_down_parent(stack.last())?;
+                    if fields.len() >= MAX_FIELDS {
+                        return Err(Error::InvalidFormat(format!(
+                            "document exceeds {MAX_FIELDS} drop-down fields"
+                        )));
+                    }
+                    let mut field = parse_drop_down_field(&reader, element)?;
+                    field.depth = depth.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("drop-down field depth overflow".to_string())
+                    })?;
+                    active = Some(field);
+                }
+                depth = checked_field_depth(depth)?;
+                stack.push((namespace_uri, local));
+            },
+            Event::Empty(ref element) => {
+                let local = utf8(element.local_name().as_ref(), "drop-down field element")?;
+                if let Some(field) = active.as_mut() {
+                    push_drop_down_label(
+                        &reader,
+                        element,
+                        namespace_uri.as_deref(),
+                        &local,
+                        depth,
+                        field,
+                    )?;
+                } else if namespace_uri.as_deref() == Some(TEXT_DATABASE_NAMESPACE)
+                    && local == "drop-down"
+                {
+                    validate_drop_down_parent(stack.last())?;
+                    if fields.len() >= MAX_FIELDS {
+                        return Err(Error::InvalidFormat(format!(
+                            "document exceeds {MAX_FIELDS} drop-down fields"
+                        )));
+                    }
+                    fields.push(finish_drop_down_field(parse_drop_down_field(
+                        &reader, element,
+                    )?)?);
+                }
+            },
+            Event::End(_) => {
+                if let Some(field) = active.as_mut() {
+                    if field.label_depth == Some(depth) {
+                        field.label_depth = None;
+                    } else if field.depth == depth {
+                        let field = active.take().expect("checked drop-down field");
+                        fields.push(finish_drop_down_field(field)?);
+                    }
+                }
+                stack.pop().ok_or_else(|| {
+                    Error::InvalidFormat("drop-down field XML stack underflow".to_string())
+                })?;
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("drop-down field XML depth underflow".to_string())
+                })?;
+            },
+            Event::Text(ref text) if active.is_some() => {
+                let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid drop-down field text: {error}"))
+                })?;
+                append_drop_down_text(
+                    active.as_mut().expect("checked drop-down field"),
+                    depth,
+                    &value,
+                )?;
+            },
+            Event::CData(ref text) if active.is_some() => {
+                let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid drop-down field CDATA: {error}"))
+                })?;
+                append_drop_down_text(
+                    active.as_mut().expect("checked drop-down field"),
+                    depth,
+                    &value,
+                )?;
+            },
+            Event::GeneralRef(ref reference) if active.is_some() => {
+                let value = decode_reference(reference, "drop-down field")?;
+                append_drop_down_text(
+                    active.as_mut().expect("checked drop-down field"),
+                    depth,
+                    &value,
+                )?;
+            },
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "DOCTYPE is not permitted in ODF drop-down field XML".to_string(),
+                ));
+            },
+            Event::PI(_) if active.is_some() => {
+                return Err(Error::InvalidFormat(
+                    "processing instructions are not permitted in text:drop-down".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if depth != 0 || active.is_some() || !stack.is_empty() {
+        return Err(Error::InvalidFormat(
+            "incomplete drop-down field XML structure".to_string(),
+        ));
+    }
+    Ok(fields)
+}
+
+fn parse_drop_down_field(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> Result<ActiveDropDownField> {
+    let mut aggregate = 0usize;
+    let attributes = drop_down_attributes(reader, element, &mut aggregate)?;
+    reject_drop_down_attributes(&attributes, &[(TEXT_DATABASE_NAMESPACE, "name")])?;
+    let name = required_drop_down_attribute(&attributes, TEXT_DATABASE_NAMESPACE, "name")?;
+    Ok(ActiveDropDownField {
+        depth: 0,
+        label_depth: None,
+        display_started: false,
+        aggregate,
+        name,
+        labels: Vec::new(),
+        display_text: String::new(),
+    })
+}
+
+fn begin_drop_down_label(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    namespace: Option<&str>,
+    local: &str,
+    depth: usize,
+    field: &mut ActiveDropDownField,
+) -> Result<()> {
+    push_drop_down_label(reader, element, namespace, local, depth, field)?;
+    field.label_depth = Some(
+        depth
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("drop-down field depth overflow".to_string()))?,
+    );
+    Ok(())
+}
+
+fn push_drop_down_label(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    namespace: Option<&str>,
+    local: &str,
+    depth: usize,
+    field: &mut ActiveDropDownField,
+) -> Result<()> {
+    if namespace != Some(TEXT_DATABASE_NAMESPACE)
+        || local != "label"
+        || field.depth != depth
+        || field.label_depth.is_some()
+        || field.display_started
+    {
+        return Err(Error::InvalidFormat(
+            "text:drop-down permits only leading empty text:label children".to_string(),
+        ));
+    }
+    if field.labels.len() >= MAX_DROP_DOWN_LABELS {
+        return Err(Error::InvalidFormat(format!(
+            "text:drop-down exceeds {MAX_DROP_DOWN_LABELS} labels"
+        )));
+    }
+    field
+        .labels
+        .push(parse_drop_down_label(reader, element, &mut field.aggregate)?);
+    Ok(())
+}
+
+fn parse_drop_down_label(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    aggregate: &mut usize,
+) -> Result<OdfDropDownLabel> {
+    let attributes = drop_down_attributes(reader, element, aggregate)?;
+    reject_drop_down_attributes(
+        &attributes,
+        &[
+            (TEXT_DATABASE_NAMESPACE, "value"),
+            (TEXT_DATABASE_NAMESPACE, "current-selected"),
+        ],
+    )?;
+    Ok(OdfDropDownLabel {
+        value: drop_down_attribute(&attributes, TEXT_DATABASE_NAMESPACE, "value")
+            .map(str::to_string),
+        current_selected: drop_down_attribute(
+            &attributes,
+            TEXT_DATABASE_NAMESPACE,
+            "current-selected",
+        )
+        .map(parse_drop_down_boolean)
+        .transpose()?,
+    })
+}
+
+fn append_drop_down_text(
+    field: &mut ActiveDropDownField,
+    depth: usize,
+    value: &str,
+) -> Result<()> {
+    if field.label_depth.is_some() || field.depth != depth {
+        return Err(Error::InvalidFormat(
+            "text:label must be empty in text:drop-down".to_string(),
+        ));
+    }
+    field.display_started = true;
+    validate_dynamic_value(
+        "drop-down display text",
+        Some(value),
+        false,
+        &mut field.aggregate,
+    )?;
+    field.display_text.push_str(value);
+    Ok(())
+}
+
+fn finish_drop_down_field(field: ActiveDropDownField) -> Result<OdfDynamicTextField> {
+    if field.label_depth.is_some() {
+        return Err(Error::InvalidFormat(
+            "unterminated text:label in text:drop-down".to_string(),
+        ));
+    }
+    let field = OdfDynamicTextField::DropDown {
+        name: field.name,
+        labels: field.labels,
+        display_text: field.display_text,
+    };
+    field.validate()?;
+    Ok(field)
+}
+
+fn validate_drop_down_parent(parent: Option<&(Option<String>, String)>) -> Result<()> {
+    if parent.is_some_and(|(namespace, local)| {
+        namespace.as_deref() == Some(TEXT_DATABASE_NAMESPACE)
+            && matches!(
+                local.as_str(),
+                "a" | "h" | "meta" | "meta-field" | "p" | "ruby-base" | "span"
+            )
+    }) {
+        Ok(())
+    } else {
+        Err(Error::InvalidFormat(
+            "text:drop-down occurs outside an ODF inline-text host".to_string(),
+        ))
+    }
+}
+
 fn parse_database_field(
     reader: &NsReader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
@@ -6296,6 +6821,85 @@ fn parse_connection_resource(
         href,
         simple_link: true,
     })
+}
+
+fn drop_down_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    aggregate: &mut usize,
+) -> Result<DatabaseAttributes> {
+    let mut attributes = HashMap::new();
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid drop-down field attribute: {error}"))
+        })?;
+        let raw = attribute.key.as_ref();
+        if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let namespace = resolved_namespace(&namespace)?.unwrap_or_default();
+        let local = utf8(local.as_ref(), "drop-down field attribute")?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid drop-down field attribute value: {error}"))
+            })?
+            .into_owned();
+        validate_dynamic_value("drop-down field attribute", Some(&value), false, aggregate)?;
+        if attributes.insert((namespace, local), value).is_some() {
+            return Err(Error::InvalidFormat(
+                "duplicate expanded drop-down field attribute".to_string(),
+            ));
+        }
+    }
+    Ok(attributes)
+}
+
+fn reject_drop_down_attributes(
+    attributes: &DatabaseAttributes,
+    allowed: &[(&str, &str)],
+) -> Result<()> {
+    for (namespace, local) in attributes.keys() {
+        if !allowed.iter().any(|(allowed_namespace, allowed_local)| {
+            namespace == allowed_namespace && local == allowed_local
+        }) {
+            return Err(Error::InvalidFormat(format!(
+                "unexpected drop-down field attribute {namespace}:{local}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn drop_down_attribute<'a>(
+    attributes: &'a DatabaseAttributes,
+    namespace: &str,
+    local: &str,
+) -> Option<&'a str> {
+    attributes
+        .get(&(namespace.to_string(), local.to_string()))
+        .map(String::as_str)
+}
+
+fn required_drop_down_attribute(
+    attributes: &DatabaseAttributes,
+    namespace: &str,
+    local: &str,
+) -> Result<String> {
+    drop_down_attribute(attributes, namespace, local)
+        .map(str::to_string)
+        .ok_or_else(|| Error::InvalidFormat(format!("text:drop-down requires text:{local}")))
+}
+
+fn parse_drop_down_boolean(value: &str) -> Result<bool> {
+    match value {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => Err(Error::InvalidFormat(format!(
+            "invalid text:current-selected boolean '{value}'"
+        ))),
+    }
 }
 
 fn database_attributes(
@@ -6709,6 +7313,115 @@ mod database_field_tests {
         assert!(canonical.contains(&format!("text:row-number=\"{beyond_u64}\"")));
         assert!(canonical.contains("text:value=\"0\""));
         assert!(!canonical.contains("+000"));
+    }
+}
+
+#[cfg(test)]
+mod drop_down_field_tests {
+    use super::*;
+
+    const PREFIX: &str = r#"<o:document-content
+        xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+        xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+        <o:body><o:text><t:p>"#;
+    const SUFFIX: &str = "</t:p></o:text></o:body></o:document-content>";
+
+    fn document(body: &str) -> String {
+        format!("{PREFIX}{body}{SUFFIX}")
+    }
+
+    fn field() -> OdfDynamicTextField {
+        OdfDynamicTextField::DropDown {
+            name: "Priority & state".to_string(),
+            labels: vec![
+                OdfDropDownLabel {
+                    value: Some("Low".to_string()),
+                    current_selected: Some(false),
+                },
+                OdfDropDownLabel {
+                    value: Some("High & urgent".to_string()),
+                    current_selected: Some(true),
+                },
+                OdfDropDownLabel::default(),
+            ],
+            display_text: "High & urgent".to_string(),
+        }
+    }
+
+    #[test]
+    fn drop_down_fields_preserve_labels_selected_state_and_cached_text() {
+        let xml = document(
+            r#"<t:drop-down t:name="Priority &amp; state"><t:label t:value="Low" t:current-selected="false"/><t:label t:value="High &amp; urgent" t:current-selected="1"></t:label><t:label/>High &amp; urgent</t:drop-down>"#,
+        );
+        assert_eq!(FieldParser::parse_dynamic_text_fields(&xml).unwrap(), vec![field()]);
+
+        let fragment = field().to_xml_fragment().unwrap();
+        assert!(fragment.contains(r#"text:name="Priority &amp; state""#));
+        assert!(fragment.contains(r#"text:current-selected="true""#));
+        assert_eq!(
+            FieldParser::parse_dynamic_text_fields(&document(&fragment)).unwrap(),
+            vec![field()]
+        );
+
+        let empty = OdfDynamicTextField::DropDown {
+            name: String::new(),
+            labels: Vec::new(),
+            display_text: String::new(),
+        };
+        assert_eq!(
+            FieldParser::parse_dynamic_text_fields(&document(&empty.to_xml_fragment().unwrap()))
+                .unwrap(),
+            vec![empty]
+        );
+
+        let with_outer_instruction = format!("<?outside test?>{}", document(&fragment));
+        assert_eq!(
+            FieldParser::parse_dynamic_text_fields(&with_outer_instruction).unwrap(),
+            vec![field()]
+        );
+    }
+
+    #[test]
+    fn drop_down_fields_follow_dynamic_field_order_and_work_inside_meta_fields() {
+        let xml = document(
+            r#"<t:date>2026-07-22</t:date><t:meta-field xml:id="meta"><t:drop-down t:name="choice"><t:label t:value="one" t:current-selected="true"/>one</t:drop-down></t:meta-field><t:time>10:00</t:time>"#,
+        );
+        let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
+        assert_eq!(fields.len(), 4);
+        assert!(matches!(fields[0], OdfDynamicTextField::Date { .. }));
+        assert!(matches!(fields[1], OdfDynamicTextField::MetaField { .. }));
+        assert!(matches!(fields[2], OdfDynamicTextField::DropDown { .. }));
+        assert!(matches!(fields[3], OdfDynamicTextField::Time { .. }));
+    }
+
+    #[test]
+    fn drop_down_fields_reject_schema_and_resource_limit_violations() {
+        for invalid in [
+            r#"<t:drop-down>missing name</t:drop-down>"#,
+            r#"<t:drop-down xmlns:x="urn:not-text" x:name="spoof">value</t:drop-down>"#,
+            r#"<t:drop-down t:name="choice" t:extra="no">value</t:drop-down>"#,
+            r#"<t:drop-down t:name="choice"><t:label>text is forbidden</t:label></t:drop-down>"#,
+            r#"<t:drop-down t:name="choice">selected<t:label t:value="late"/></t:drop-down>"#,
+            r#"<t:drop-down t:name="choice"><t:span>not a label</t:span></t:drop-down>"#,
+            r#"<t:drop-down t:name="choice"><t:label t:current-selected="maybe"/></t:drop-down>"#,
+            r#"<t:drop-down t:name="choice"><t:label t:extra="no"/></t:drop-down>"#,
+            r#"<t:drop-down t:name="choice"><?unsafe value?>value</t:drop-down>"#,
+        ] {
+            assert!(
+                FieldParser::parse_dynamic_text_fields(&document(invalid)).is_err(),
+                "accepted {invalid}"
+            );
+        }
+
+        let oversized = OdfDynamicTextField::DropDown {
+            name: "choice".to_string(),
+            labels: vec![OdfDropDownLabel {
+                value: Some("x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1)),
+                current_selected: None,
+            }],
+            display_text: String::new(),
+        };
+        assert!(oversized.validate().is_err());
     }
 }
 

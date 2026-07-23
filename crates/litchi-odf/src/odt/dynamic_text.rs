@@ -350,7 +350,10 @@ pub fn replace_dynamic_text_field_xml(
 }
 
 fn validate_meta_field_mutation(output: String, field: &OdfDynamicTextField) -> Result<String> {
-    if matches!(field, OdfDynamicTextField::MetaField { .. }) {
+    if matches!(
+        field,
+        OdfDynamicTextField::MetaField { .. } | OdfDynamicTextField::DropDown { .. }
+    ) {
         FieldParser::parse_dynamic_text_fields(&output)?;
     }
     Ok(output)
@@ -593,6 +596,7 @@ fn is_dynamic_local(local: &[u8]) -> bool {
             | b"user-field-get"
             | b"user-field-input"
             | b"text-input"
+            | b"drop-down"
             | b"table-formula"
             | b"measure"
             | b"reference-ref"

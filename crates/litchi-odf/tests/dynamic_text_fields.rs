@@ -1,9 +1,9 @@
 use litchi_odf::elements::field::{
     OdfCalculatedFieldValue, OdfCrossReferenceFormat, OdfDocumentStatisticKind,
-    OdfDynamicTextField, OdfFieldValueType, OdfFormulaFieldDisplay, OdfMeasureKind,
-    OdfNoteReferenceClass, OdfNoteReferenceFormat, OdfPlaceholderType, OdfSequenceNumberFormat,
-    OdfSequenceReferenceFormat, OdfStatisticNumberFormat, OdfUserFieldDisplay,
-    OdfVariableSetDisplay,
+    OdfDropDownLabel, OdfDynamicTextField, OdfFieldValueType, OdfFormulaFieldDisplay,
+    OdfMeasureKind, OdfNoteReferenceClass, OdfNoteReferenceFormat, OdfPlaceholderType,
+    OdfSequenceNumberFormat, OdfSequenceReferenceFormat, OdfStatisticNumberFormat,
+    OdfUserFieldDisplay, OdfVariableSetDisplay,
 };
 use litchi_odf::{Document, DocumentBuilder, MutableDocument};
 use std::io::{Cursor, Write};
@@ -579,6 +579,74 @@ fn interactive_input_fields_round_trip_all_typed_attributes() {
             vec![field]
         );
     }
+}
+
+#[test]
+fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
+    let source = document(
+        r#"<t:drop-down t:name="old"><t:label t:value="old" t:current-selected="true"/>old</t:drop-down>"#,
+    );
+    let old = OdfDynamicTextField::DropDown {
+        name: "old".to_string(),
+        labels: vec![OdfDropDownLabel {
+            value: Some("old".to_string()),
+            current_selected: Some(true),
+        }],
+        display_text: "old".to_string(),
+    };
+    assert_eq!(source.dynamic_text_fields().unwrap(), vec![old.clone()]);
+
+    let replacement = OdfDynamicTextField::DropDown {
+        name: "Priority & state".to_string(),
+        labels: vec![
+            OdfDropDownLabel {
+                value: Some("Low".to_string()),
+                current_selected: Some(false),
+            },
+            OdfDropDownLabel {
+                value: Some("High & urgent".to_string()),
+                current_selected: Some(true),
+            },
+        ],
+        display_text: "High & urgent".to_string(),
+    };
+    let mut mutable = MutableDocument::from_document(source).unwrap();
+    assert_eq!(
+        mutable
+            .replace_dynamic_text_field(0, &replacement)
+            .unwrap(),
+        old
+    );
+    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        round_trip.dynamic_text_fields().unwrap(),
+        vec![replacement.clone()]
+    );
+
+    let inserted = OdfDynamicTextField::DropDown {
+        name: "Status".to_string(),
+        labels: vec![OdfDropDownLabel {
+            value: Some("Open".to_string()),
+            current_selected: None,
+        }],
+        display_text: "Open".to_string(),
+    };
+    let mut mutable = MutableDocument::from_document(round_trip).unwrap();
+    mutable.insert_dynamic_text_field(0, &inserted).unwrap();
+    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        round_trip.dynamic_text_fields().unwrap(),
+        vec![replacement.clone(), inserted.clone()]
+    );
+    let mut mutable = MutableDocument::from_document(round_trip).unwrap();
+    assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
+    assert_eq!(
+        Document::from_bytes(mutable.to_bytes().unwrap())
+            .unwrap()
+            .dynamic_text_fields()
+            .unwrap(),
+        vec![inserted]
+    );
 }
 
 #[test]
