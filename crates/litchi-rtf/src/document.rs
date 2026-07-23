@@ -1186,12 +1186,13 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
-    /// Return typed, inert document-context fields in document field order.
+    /// Return typed, inert document-context and runtime fields in document
+    /// field order.
     ///
     /// Kinds, switches, cached results, and state are exposed solely as stored
     /// metadata. This method never reads a document path, attached template,
-    /// host filesystem state, current clock, or page layout, resolves values,
-    /// or refreshes a field.
+    /// host filesystem state or file size, current clock, or page and section
+    /// layout, resolves values, or refreshes a field.
     pub fn document_context_fields(&self) -> Vec<crate::DocumentContextField<'_>> {
         self.fields
             .iter()
@@ -1199,7 +1200,7 @@ impl<'a> RtfDocument<'a> {
             .collect()
     }
 
-    /// Return the number of typed, inert document-context fields.
+    /// Return the number of typed, inert document-context and runtime fields.
     pub fn document_context_field_count(&self) -> usize {
         self.fields
             .iter()
