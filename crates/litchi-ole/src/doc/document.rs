@@ -16,8 +16,8 @@ use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
     BarcodeField, BidiOutlineField, CompareField, DdeField, DocumentContextField,
-    DocumentInformationField, DocumentVariableField, EmbedField, ExternalIncludeField, Field,
-    FieldStory, FieldText, FieldsTable, FormulaField,
+    DocumentInformationField, DocumentPropertyField, DocumentVariableField, EmbedField,
+    ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
     GoToButtonField, IfField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
@@ -1035,6 +1035,24 @@ impl Document {
     /// Get the number of typed, inert `DOCVARIABLE` fields.
     pub fn document_variable_field_count(&self) -> Result<usize> {
         Ok(self.document_variable_fields()?.len())
+    }
+
+    /// Get typed, inert `DOCPROPERTY` fields in story and source order.
+    ///
+    /// Returned values expose only stored property names, switches, cached
+    /// results, and field state. This method never reads document properties,
+    /// resolves a value, or refreshes a field result.
+    pub fn document_property_fields(&self) -> Result<Vec<DocumentPropertyField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::document_property)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `DOCPROPERTY` fields.
+    pub fn document_property_field_count(&self) -> Result<usize> {
+        Ok(self.document_property_fields()?.len())
     }
 
     /// Get typed, inert native `INFO` fields in story and source order.
