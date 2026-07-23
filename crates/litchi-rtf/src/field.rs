@@ -27,6 +27,8 @@ pub enum FieldType {
     Print,
     Embed,
     Barcode,
+    DisplayBarcode,
+    MergeBarcode,
     BidiOutline,
     Shape,
     FormText,
@@ -429,6 +431,34 @@ pub struct EmbedField<'a> {
 pub struct BarcodeField<'a> {
     instruction: &'a str,
     barcode_instructions: &'a str,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+/// The stored kind of a modern barcode display field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BarcodeDisplayFieldKind {
+    /// A `DISPLAYBARCODE` field with directly stored barcode data.
+    DisplayBarcode,
+    /// A `MERGEBARCODE` field with a stored mail-merge data-field name.
+    MergeBarcode,
+}
+
+/// Inert metadata for an RTF `DISPLAYBARCODE` or `MERGEBARCODE` field.
+///
+/// Data arguments, barcode types, switches, cached results, and state are
+/// exposed as stored metadata only. This crate never validates barcode data or
+/// symbology; resolves a mail-merge data field; generates or renders a
+/// barcode; or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BarcodeDisplayField<'a> {
+    instruction: &'a str,
+    kind: BarcodeDisplayFieldKind,
+    data_argument: Cow<'a, str>,
+    barcode_type: Cow<'a, str>,
+    switches: Vec<FieldSwitch<'a>>,
     cached_result: Option<&'a str>,
     status: FieldStatus,
     owner: FieldOwner,
@@ -2398,6 +2428,73 @@ impl<'a> BarcodeField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from barcode data.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
+impl<'a> BarcodeDisplayField<'a> {
+    /// Return the complete stored barcode display field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return whether this stores `DISPLAYBARCODE` or `MERGEBARCODE` metadata.
+    pub const fn kind(&self) -> BarcodeDisplayFieldKind {
+        self.kind
+    }
+
+    /// Return the stored data argument.
+    ///
+    /// For `DISPLAYBARCODE`, this is direct barcode data. For `MERGEBARCODE`, it
+    /// is the stored mail-merge data-field name. Neither form is validated,
+    /// resolved, or used to generate a barcode.
+    pub fn data_argument(&self) -> &str {
+        &self.data_argument
+    }
+
+    /// Return the stored barcode-type argument.
+    ///
+    /// This value is not validated or used to select a barcode implementation.
+    pub fn barcode_type(&self) -> &str {
+        &self.barcode_type
+    }
+
+    /// Return stored field-specific and formatting switches in source order.
+    ///
+    /// Switch values are retained without validation or interpretation.
+    pub fn switches(&self) -> &[FieldSwitch<'a>] {
+        &self.switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated as a barcode.
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
@@ -4938,6 +5035,16 @@ impl<'a> Field<'a> {
                 FieldType::Barcode
             },
             ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("DISPLAYBARCODE") =>
+            {
+                FieldType::DisplayBarcode
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("MERGEBARCODE") =>
+            {
+                FieldType::MergeBarcode
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("BIDIOUTLINE") =>
             {
                 FieldType::BidiOutline
@@ -5324,6 +5431,38 @@ impl<'a> Field<'a> {
         Some(BarcodeField {
             instruction: self.instruction.as_ref(),
             barcode_instructions,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed `DISPLAYBARCODE` or
+    /// `MERGEBARCODE` field.
+    ///
+    /// Stored data arguments, barcode types, switches, cached results, and
+    /// state are metadata only. This method never validates barcode data or
+    /// symbology; resolves a mail-merge data field; generates or renders a
+    /// barcode; or refreshes a field. Malformed instructions remain generic
+    /// fields and return `None` here.
+    pub fn barcode_display_field(&self) -> Option<BarcodeDisplayField<'_>> {
+        let expected_kind = match self.field_type {
+            FieldType::DisplayBarcode => BarcodeDisplayFieldKind::DisplayBarcode,
+            FieldType::MergeBarcode => BarcodeDisplayFieldKind::MergeBarcode,
+            _ => return None,
+        };
+        let (kind, data_argument, barcode_type, switches) =
+            barcode_display_field_parts(self.instruction.as_ref())?;
+        if kind != expected_kind {
+            return None;
+        }
+        Some(BarcodeDisplayField {
+            instruction: self.instruction.as_ref(),
+            kind,
+            data_argument,
+            barcode_type,
+            switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
             owner: self.owner,
@@ -6635,6 +6774,48 @@ fn barcode_field_instructions(instruction: &str) -> Option<&str> {
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
         Some(_) => None,
     }
+}
+
+fn barcode_display_field_parts(
+    instruction: &str,
+) -> Option<(
+    BarcodeDisplayFieldKind,
+    Cow<'_, str>,
+    Cow<'_, str>,
+    Vec<FieldSwitch<'_>>,
+)> {
+    let tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    let kind = if keyword.value.eq_ignore_ascii_case("DISPLAYBARCODE") {
+        BarcodeDisplayFieldKind::DisplayBarcode
+    } else if keyword.value.eq_ignore_ascii_case("MERGEBARCODE") {
+        BarcodeDisplayFieldKind::MergeBarcode
+    } else {
+        return None;
+    };
+    let data_argument = tokens.get(1).filter(|token| is_field_operand(token))?;
+    let barcode_type = tokens.get(2).filter(|token| is_field_operand(token))?;
+
+    let mut switches = Vec::new();
+    let mut index = 3;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let value = tokens
+            .get(index + 1)
+            .filter(|token| is_field_operand(token));
+        switches.push(FieldSwitch {
+            name: Cow::Owned(name.to_string()),
+            value: value.map(|token| token.value.clone()),
+        });
+        index += 1 + usize::from(value.is_some());
+    }
+
+    Some((
+        kind,
+        data_argument.value.clone(),
+        barcode_type.value.clone(),
+        switches,
+    ))
 }
 
 fn bidi_outline_field_instructions(instruction: &str) -> Option<&str> {

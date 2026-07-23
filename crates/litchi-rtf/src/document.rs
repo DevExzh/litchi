@@ -1063,6 +1063,28 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `DISPLAYBARCODE` and `MERGEBARCODE` fields in document
+    /// field order.
+    ///
+    /// Stored data arguments, barcode types, switches, cached results, and
+    /// state are metadata only. This method never validates barcode data or
+    /// symbology; resolves a mail-merge data field; generates or renders a
+    /// barcode; or refreshes a field.
+    pub fn barcode_display_fields(&self) -> Vec<crate::BarcodeDisplayField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::barcode_display_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert barcode display fields in the document.
+    pub fn barcode_display_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.barcode_display_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `BIDIOUTLINE` fields in document field order.
     ///
     /// Stored opaque instructions, cached results, and state are metadata only.
