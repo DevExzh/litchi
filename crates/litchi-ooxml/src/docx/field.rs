@@ -17,6 +17,7 @@ const MAX_AUTO_TEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_LIST_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 
 /// A field in a Word document.
 ///
@@ -520,6 +521,26 @@ impl Field {
     /// revisions, or statistics, resolves a value, or refreshes a field.
     pub fn document_information(&self) -> Result<Option<DocumentInformationField>> {
         DocumentInformationField::from_field(self)
+    }
+
+    /// Check whether this is a built-in document-context field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never reads
+    /// a document path, attached template, or host filesystem state, resolves
+    /// a value, or refreshes the field.
+    pub fn is_document_context(&self) -> bool {
+        DocumentContextFieldKind::from_instruction(&self.instruction).is_some()
+    }
+
+    /// Parse this field as inert typed document-context metadata.
+    ///
+    /// Returns `Ok(None)` for fields outside the `FILENAME` and `TEMPLATE`
+    /// family. The result exposes only the stored kind, switches, cached
+    /// content, and dirty/lock state; it never reads a document path, attached
+    /// template, or host filesystem state, resolves a value, or refreshes a
+    /// field.
+    pub fn document_context(&self) -> Result<Option<DocumentContextField>> {
+        DocumentContextField::from_field(self)
     }
 
     /// Check whether this is a `MACROBUTTON` field.
@@ -2284,6 +2305,113 @@ impl DocumentInformationField {
     ///
     /// This is stored text only and is never regenerated from package metadata
     /// or a host user profile.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    ///
+    /// Preserved switches are inert source metadata and are never interpreted.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+}
+
+/// The built-in Word document-context field category.
+///
+/// `FILENAME` and `TEMPLATE` are defined in ECMA-376 Part 1 §17.16.5.
+/// This enum preserves the stored field kind only; it does not read a document
+/// path, attached template, or host filesystem state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DocumentContextFieldKind {
+    FileName,
+    Template,
+}
+
+impl DocumentContextFieldKind {
+    /// The uppercase field keyword stored in a Word field instruction.
+    pub const fn field_keyword(self) -> &'static str {
+        match self {
+            Self::FileName => "FILENAME",
+            Self::Template => "TEMPLATE",
+        }
+    }
+
+    fn from_instruction(instruction: &str) -> Option<Self> {
+        [Self::FileName, Self::Template]
+            .into_iter()
+            .find(|kind| field_instruction_remainder(instruction, kind.field_keyword()).is_some())
+    }
+}
+
+/// Typed, inert metadata for a built-in Word document-context field.
+///
+/// This type retains the stored kind, field switches, cached result, and field
+/// state only. It never reads a document path, attached template, or host
+/// filesystem state, resolves a value, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentContextField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    kind: DocumentContextFieldKind,
+    switches: Vec<FieldSwitch>,
+}
+
+impl DocumentContextField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(kind) = DocumentContextFieldKind::from_instruction(field.instruction()) else {
+            return Ok(None);
+        };
+        if field.instruction().len() > MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "{} field instruction exceeds {MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES} bytes",
+                kind.field_keyword()
+            )));
+        }
+        let switches = parse_field_switches(field.instruction(), kind.field_keyword())?
+            .expect("document-context recognition and parsing must agree");
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            kind,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the recognized built-in document-context category.
+    pub const fn kind(&self) -> DocumentContextFieldKind {
+        self.kind
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from a document path,
+    /// attached template, or host filesystem state.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -7007,6 +7135,97 @@ mod tests {
         assert!(
             Field::new("SAVEDATES".to_string(), None, false)
                 .document_information()
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn parses_document_context_fields_without_reading_paths_or_templates() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" FILENAME \p " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached file name</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>template \* MERGEFORMAT</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached template</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="FILENAMES"><w:r><w:t>not a file-name field</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let extracted = Field::extract_from_document(xml).unwrap();
+        assert_eq!(extracted.len(), 3);
+        assert!(extracted[0].is_document_context());
+        assert!(extracted[1].is_document_context());
+        assert!(!extracted[2].is_document_context());
+
+        let file_name = extracted[0].document_context().unwrap().unwrap();
+        assert_eq!(file_name.kind(), DocumentContextFieldKind::FileName);
+        assert_eq!(file_name.cached_result(), Some("cached file name"));
+        assert!(file_name.is_dirty());
+        assert!(file_name.is_locked());
+        assert!(file_name.has_switch('p'));
+
+        let template = extracted[1].document_context().unwrap().unwrap();
+        assert_eq!(template.kind(), DocumentContextFieldKind::Template);
+        assert_eq!(template.cached_result(), Some("cached template"));
+        assert!(template.is_dirty());
+        assert!(template.is_locked());
+        assert!(template.has_switch('*'));
+        assert!(extracted[2].document_context().unwrap().is_none());
+
+        for (instruction, kind, switch_name) in [
+            (
+                r"FILENAME \p",
+                DocumentContextFieldKind::FileName,
+                'p',
+            ),
+            (
+                r"TEMPLATE \* MERGEFORMAT",
+                DocumentContextFieldKind::Template,
+                '*',
+            ),
+        ] {
+            let cached_result = format!("cached {}", kind.field_keyword());
+            let field = Field::with_flags(
+                instruction.to_string(),
+                Some(cached_result.clone()),
+                true,
+                true,
+            );
+            let context = field.document_context().unwrap().unwrap();
+            assert_eq!(context.kind(), kind);
+            assert_eq!(context.instruction(), instruction);
+            assert_eq!(context.cached_result(), Some(cached_result.as_str()));
+            assert!(context.is_dirty());
+            assert!(context.is_locked());
+            assert!(context.has_switch(switch_name));
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_document_context_field_semantics() {
+        for instruction in [
+            "FILENAME unexpected",
+            r"TEMPLATE \",
+            r"FILENAME \ ",
+        ] {
+            let field = Field::new(instruction.to_string(), None, false);
+            assert!(field.document_context().is_err(), "{instruction}");
+        }
+
+        let too_long = Field::new(
+            format!(
+                "FILENAME \\* {}",
+                "x".repeat(MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.document_context().is_err());
+        assert!(
+            Field::new("FILENAMES".to_string(), None, false)
+                .document_context()
                 .unwrap()
                 .is_none()
         );
