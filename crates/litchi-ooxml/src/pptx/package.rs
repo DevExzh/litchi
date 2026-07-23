@@ -341,9 +341,38 @@ impl Package {
         // Add relationship from notesMaster to theme
         notes_master_part.relate_to("../theme/theme1.xml", rt::THEME);
 
-        // Add relationship from presentation to notesMaster
-        if let Ok(pres_part) = opc.get_part_mut(&pres_partname) {
-            pres_part.relate_to("notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
+        // Add relationship from presentation to notesMaster and retain its
+        // relationship ID in the required presentation-root reference.
+        let notes_master_relationship_id = opc
+            .get_part_mut(&pres_partname)
+            .map_err(|error| {
+                OoxmlError::PartNotFound(format!(
+                    "default presentation part for notes master: {error}"
+                ))
+            })?
+            .relate_to("notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
+        {
+            let presentation = opc.get_part_mut(&pres_partname).map_err(|error| {
+                OoxmlError::PartNotFound(format!(
+                    "default presentation part for notes-master reference: {error}"
+                ))
+            })?;
+            let xml = std::str::from_utf8(presentation.blob()).map_err(|error| {
+                OoxmlError::InvalidFormat(format!(
+                    "default presentation XML is not UTF-8: {error}"
+                ))
+            })?;
+            let marker = "</p:sldMasterIdLst>";
+            let replacement = format!(
+                "{marker}<p:notesMasterIdLst><p:notesMasterId r:id=\"{notes_master_relationship_id}\"/></p:notesMasterIdLst>"
+            );
+            let updated = xml.replacen(marker, &replacement, 1);
+            if updated == xml {
+                return Err(OoxmlError::InvalidFormat(
+                    "default presentation XML is missing its slide-master list".to_string(),
+                ));
+            }
+            presentation.set_blob(updated.into_bytes());
         }
         opc.add_part(Box::new(notes_master_part));
 

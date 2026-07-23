@@ -549,6 +549,14 @@ impl<'a> Presentation<'a> {
         Ok(Some(HandoutMaster::parse_xml(xml)?))
     }
 
+    /// Load the complete validated notes-master and notes-slide graph.
+    ///
+    /// Returns None when the presentation has no notes graph. Notes and theme
+    /// resources are returned as inert stored data.
+    pub fn notes_graph(&self) -> Result<Option<crate::pptx::PptxNotesGraph>> {
+        crate::pptx::load_notes_graph(self.package, self.part.part().partname())
+    }
+
     // ========================================================================
     // Slide Access by Index
     // ========================================================================

@@ -221,7 +221,7 @@ conversion, fonts, and image conversion are optional.
 | Hyperlinks and slide-jump actions | 🟡 | ✅ | ✅ | Strict/transitional hyperlink relationships, validated inline slide navigation, plus bounded inert click/hover action-setting inventory for PowerPoint-reserved action values and declared targets; no target is followed, opened, activated, or executed |
 | Classic comments | ✅ | ✅ | ✅ | Validated high-level graph, legacy adapters, authors, slide comment parts, and package-aware CRUD |
 | Modern comments | ✅ | ✅ | ✅ | Authors, anchors, replies, status, and package-aware CRUD |
-| Speaker notes and notes masters | ✅ | ✅ | ✅ | Complete notes graph load/store with resources and themes |
+| Speaker notes and notes masters | ✅ | ✅ | ✅ | High-level complete notes graph load/store with resources and themes |
 | Slide masters and layouts | 🟡 | ✅ | ❌ | Semantic reading, including master/layout shape and placeholder inventory, header/footer and master-content visibility flags, matching/type and master/layout retention metadata, typed layout-reference identifiers, master text-style level inventory, and slide/layout/master relationship resolution; no general master/layout authoring API |
 | Handout master | ✅ | ✅ | ✅ | Presentation-root relationship resolution plus layout and header/footer settings |
 | Themes | 🟡 | ✅ | ❌ | Master-, layout-, and slide-scoped validated theme resolution, typed color maps/overrides, and presentation inventory; no general theme authoring workflow |
