@@ -71,6 +71,33 @@ fn writer_round_trips_powerpoint_2010_ripple_with_fade_fallback() {
     assert!(xml.contains("<p:fade/>"));
 }
 
+#[test]
+fn writer_round_trips_custom_duration_through_compatibility_markup() {
+    let expected = SlideTransition::new(TransitionType::Fade)
+        .with_speed(TransitionSpeed::Fast)
+        .with_duration_ms(750)
+        .with_advance_on_click(false)
+        .with_advance_after_ms(1250);
+    let output = NamedTempFile::with_suffix(".pptx").unwrap();
+    let mut package = Package::new().unwrap();
+    package
+        .presentation_mut()
+        .unwrap()
+        .add_slide()
+        .unwrap()
+        .set_transition(expected.clone());
+    package.save(output.path()).unwrap();
+
+    let package = Package::open(output.path()).unwrap();
+    assert_eq!(first_transition(&package), expected);
+
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let slide = package.opc_package().get_part(&slide_name).unwrap();
+    let xml = std::str::from_utf8(slide.blob()).unwrap();
+    assert!(xml.contains(r#"p14:dur="750""#));
+    assert!(xml.contains("<mc:Fallback>"));
+}
+
 fn first_transition(package: &Package) -> litchi_ooxml::pptx::SlideTransition {
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();

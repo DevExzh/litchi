@@ -600,9 +600,12 @@ impl SlideTransition {
         if let TransitionType::Ripple { direction } = &self.transition_type {
             return Ok(self.ripple_to_xml(*direction));
         }
+        if self.duration_ms.is_some() {
+            return self.extended_duration_to_xml();
+        }
 
         let mut xml = String::with_capacity(512);
-        self.write_transition_start(&mut xml, Some("dur"));
+        self.write_transition_start(&mut xml, None);
 
         self.write_transition_type_xml(&mut xml)?;
         xml.push_str("</p:transition>");
@@ -652,6 +655,23 @@ impl SlideTransition {
         xml.push_str("<p:fade/></p:transition></mc:Fallback></mc:AlternateContent>");
 
         xml
+    }
+
+    fn extended_duration_to_xml(&self) -> Result<String> {
+        let mut xml = String::with_capacity(512);
+        xml.push_str(r#"<mc:AlternateContent xmlns:mc=""#);
+        xml.push_str(MARKUP_COMPATIBILITY_NAMESPACE);
+        xml.push_str(r#"" xmlns:p14=""#);
+        xml.push_str(P14_NAMESPACE);
+        xml.push_str(r#""><mc:Choice Requires="p14">"#);
+        self.write_transition_start(&mut xml, Some("p14:dur"));
+        self.write_transition_type_xml(&mut xml)?;
+        xml.push_str("</p:transition></mc:Choice><mc:Fallback>");
+        self.write_transition_start(&mut xml, None);
+        self.write_transition_type_xml(&mut xml)?;
+        xml.push_str("</p:transition></mc:Fallback></mc:AlternateContent>");
+
+        Ok(xml)
     }
 
     fn validate_effect_options(&self) -> Result<()> {
@@ -1048,6 +1068,25 @@ mod tests {
         let xml = trans.to_xml().unwrap();
         assert!(xml.contains("spd=\"fast\""));
         assert!(xml.contains("<p:fade"));
+    }
+
+    #[test]
+    fn custom_duration_writes_a_compatibility_choice_and_round_trips() {
+        let transition = SlideTransition::new(TransitionType::Fade)
+            .with_speed(TransitionSpeed::Fast)
+            .with_duration_ms(750)
+            .with_advance_on_click(false)
+            .with_advance_after_ms(1250);
+
+        let xml = transition.to_xml().unwrap();
+        assert!(xml.contains(r#"<mc:Choice Requires="p14">"#));
+        assert!(xml.contains(r#"p14:dur="750""#));
+        assert!(!xml.contains(r#"<p:transition spd="fast" dur="#));
+        assert!(xml.contains(
+            r#"<mc:Fallback><p:transition spd="fast" advClick="0" advTm="1250"><p:fade/>"#
+        ));
+        assert_eq!(xml.matches("<p:fade/>").count(), 2);
+        assert_eq!(parse_serialized_transition(&xml), transition);
     }
 
     #[test]
