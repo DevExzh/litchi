@@ -99,6 +99,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeTextAutoSize::ShrinkToFit,
         ),
     )?;
+    editor.set_slide_shape_title(0, created.drawable_object_id, "Typed Keynote shape")?;
+    editor.set_slide_shape_caption(
+        0,
+        created.drawable_object_id,
+        "Native title and caption created by litchi-iwa",
+    )?;
     editor.save(output)?;
     println!(
         "created Keynote {:?} {:?} {} with storage {}",

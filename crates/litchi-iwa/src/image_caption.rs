@@ -1,10 +1,10 @@
-//! Typed native archive construction shared by image title and caption editors.
+//! Typed native archive construction shared by drawable title and caption editors.
 
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tsa, tsd, tsp, tss, tswp};
-use crate::wire::patch_length_delimited_field;
+use crate::wire::{patch_length_delimited_field, transform_length_delimited_field};
 use crate::{Error, Result};
 
 pub(crate) const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
@@ -17,6 +17,8 @@ const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
 const DRAWABLE_TITLE_FIELD: u32 = 10;
 const DRAWABLE_CAPTION_FIELD: u32 = 11;
+const SHAPE_INFO_SUPER_FIELD: u32 = 1;
+const SHAPE_ARCHIVE_DRAWABLE_FIELD: u32 = 1;
 const DEFAULT_CAPTION_GEOMETRY_FLAGS: u32 = 1;
 const DEFAULT_CAPTION_ROTATION_DEGREES: f32 = 0.0;
 const DEFAULT_TEXT_WRAP_MARGIN_POINTS: f32 = 12.0;
@@ -74,7 +76,7 @@ impl DrawableCaptionKind {
     }
 }
 
-/// Existing theme objects needed to materialize a native image title or caption.
+/// Existing theme objects needed to materialize a native drawable title or caption.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct CaptionThemeStyle {
     pub(crate) stylesheet_id: u64,
@@ -114,20 +116,20 @@ impl CaptionObjectIds {
     }
 }
 
-/// Create all four native objects that back one image title or caption.
+/// Create all four native objects that back one drawable title or caption.
 #[allow(deprecated)]
 pub(crate) fn caption_objects(
     ids: CaptionObjectIds,
-    image_id: u64,
-    image_width: f32,
+    drawable_id: u64,
+    drawable_width: f32,
     text: &str,
     kind: DrawableCaptionKind,
     theme: CaptionThemeStyle,
     language: Option<&str>,
 ) -> Result<[ArchiveObject; 4]> {
-    if !image_width.is_finite() || image_width <= 0.0 {
+    if !drawable_width.is_finite() || drawable_width <= 0.0 {
         return Err(Error::InvalidFormat(
-            "native image title/caption width must be finite and greater than zero".to_owned(),
+            "native drawable title/caption width must be finite and greater than zero".to_owned(),
         ));
     }
     let style = caption_shape_style(theme, kind);
@@ -139,13 +141,13 @@ pub(crate) fn caption_objects(
                     geometry: Some(tsd::GeometryArchive {
                         position: Some(tsp::Point { x: 0.0, y: 0.0 }),
                         size: Some(tsp::Size {
-                            width: image_width,
+                            width: drawable_width,
                             height: 0.0,
                         }),
                         flags: Some(DEFAULT_CAPTION_GEOMETRY_FLAGS),
                         angle: Some(DEFAULT_CAPTION_ROTATION_DEGREES),
                     }),
-                    parent: Some(reference(image_id)),
+                    parent: Some(reference(drawable_id)),
                     exterior_text_wrap: Some(tsd::ExteriorTextWrapArchive {
                         r#type: Some(TextWrapType::Square as u32),
                         direction: Some(TextWrapDirection::BothSides as u32),
@@ -161,7 +163,7 @@ pub(crate) fn caption_objects(
                     ..Default::default()
                 },
                 style: Some(reference(ids.style)),
-                pathsource: Some(caption_path_source(image_width)),
+                pathsource: Some(caption_path_source(drawable_width)),
                 stroke_pattern_offset_distance: Some(0.0),
                 ..Default::default()
             },
@@ -236,7 +238,33 @@ pub(crate) fn patch_drawable_caption_reference(
     .map(|reference| reference.identifier);
     if actual != Some(tsp::Reference::decode(replacement.as_slice())?.identifier) {
         return Err(Error::InvalidFormat(
-            "native image title/caption reference patch failed validation".to_owned(),
+            "native drawable title/caption reference patch failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+/// Rewrite one title or caption reference inside a `TSWP.ShapeInfoArchive`
+/// without dropping unknown protobuf fields.
+pub(crate) fn patch_shape_info_caption_reference(
+    data: &[u8],
+    kind: DrawableCaptionKind,
+    replacement: u64,
+) -> Result<Vec<u8>> {
+    let data = transform_length_delimited_field(data, SHAPE_INFO_SUPER_FIELD, |shape| {
+        transform_length_delimited_field(shape, SHAPE_ARCHIVE_DRAWABLE_FIELD, |drawable| {
+            patch_drawable_caption_reference(drawable, kind, replacement)
+        })
+    })?;
+    let verified = tswp::ShapeInfoArchive::decode(data.as_slice())?;
+    let actual = match kind {
+        DrawableCaptionKind::Caption => verified.super_.super_.caption,
+        DrawableCaptionKind::Title => verified.super_.super_.title,
+    }
+    .map(|reference| reference.identifier);
+    if actual != Some(replacement) {
+        return Err(Error::InvalidFormat(
+            "native shape title/caption reference patch failed validation".to_owned(),
         ));
     }
     Ok(data)

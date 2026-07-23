@@ -150,6 +150,12 @@ controls. `*_image_title_caption` returns a shared `DrawableTitleCaption`;
 text graphs, while the corresponding `remove_*` calls return whether a value
 was present. See `create_*_image_caption` for complete source-free examples.
 
+Ordinary body, sheet, and slide shapes expose the same native controls through
+`*_shape_title_caption`, `set_*_shape_title`, `set_*_shape_caption`, and their
+matching `remove_*` methods. Shape labels remain independent through duplicate,
+delete, and package round-trip operations; the `create_*_shape` examples build
+them from scratch.
+
 File-backed movies likewise expose `flip_body_movie`, `flip_sheet_movie`, and
 `flip_slide_movie`, preserving their video and poster assets, playback settings,
 and metadata; see `create_*_flipped_movie` for scratch-file examples.

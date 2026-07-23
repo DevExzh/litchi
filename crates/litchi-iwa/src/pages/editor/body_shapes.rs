@@ -23,8 +23,10 @@ use super::text_box_create::{
     BodyTextShapeObjectIds, BodyTextShapeRole, body_text_shape_objects, body_text_storage,
 };
 
+mod caption;
 mod graph;
 
+use caption::*;
 use graph::*;
 
 /// Structural path family used by an ordinary Pages body shape.

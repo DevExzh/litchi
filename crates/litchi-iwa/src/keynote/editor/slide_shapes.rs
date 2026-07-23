@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
 use super::*;
+use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
@@ -23,9 +24,12 @@ use super::text_box_create::{
     text_box_storage, text_box_theme_styles,
 };
 
+mod caption;
+
+use caption::*;
+
 const SHAPE_MESSAGE_TYPE: u32 = 2_011;
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
-const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
 const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
 
@@ -1086,9 +1090,8 @@ fn shape_graph(
         )));
     }
     let info = shape_info(editor, &graph, slide_index, drawable_object_id, &shape)?;
-    let required = required_shape_objects(drawable_object_id, &shape)?;
+    let required = required_shape_objects(&graph, drawable_object_id, &shape)?;
     let archive = editor.package().archive(&archive_name)?;
-    validate_shape_private_objects(&archive, drawable_object_id, &shape)?;
     let object_ids = slide_create::graph::private_clone_object_ids(
         &archive,
         [drawable_object_id],
@@ -1097,7 +1100,7 @@ fn shape_graph(
     let actual = object_ids.iter().copied().collect::<HashSet<_>>();
     if actual != required || object_ids.len() != required.len() {
         return Err(Error::InvalidFormat(format!(
-            "Keynote shape {drawable_object_id} does not have an isolated four-object graph"
+            "Keynote shape {drawable_object_id} does not have an isolated private graph"
         )));
     }
     let component_id = component_identifier_for_entry(editor.package(), &archive_name)?
@@ -1113,11 +1116,6 @@ fn shape_graph(
         .copied()
         .filter(|identifier| registered.contains(identifier))
         .collect::<Vec<_>>();
-    if !registered.is_empty() && uuid_object_ids.len() != object_ids.len() {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote slide UUID map does not cover shape {drawable_object_id}"
-        )));
-    }
     Ok(SlideShapeGraph {
         slide_id: slide.slide_id,
         component_id,
@@ -1183,6 +1181,7 @@ fn shape_info(
 }
 
 fn required_shape_objects(
+    graph: &ObjectGraph,
     drawable_object_id: u64,
     shape: &tswp::ShapeInfoArchive,
 ) -> Result<HashSet<u64>> {
@@ -1195,70 +1194,25 @@ fn required_shape_objects(
                 ))
             })
     };
-    let identifiers = [
+    let caption = caption_slot_from_reference(
+        graph,
         drawable_object_id,
-        required_reference(shape.super_.super_.caption.as_ref(), "caption stand-in")?,
-        required_reference(shape.super_.super_.title.as_ref(), "title stand-in")?,
-        required_reference(shape.owned_storage.as_ref(), "storage")?,
-    ];
-    let required = identifiers.into_iter().collect::<HashSet<_>>();
-    if required.len() != identifiers.len() {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote shape {drawable_object_id} aliases private objects"
-        )));
-    }
-    Ok(required)
-}
-
-fn validate_shape_private_objects(
-    archive: &Archive,
-    drawable_object_id: u64,
-    shape: &tswp::ShapeInfoArchive,
-) -> Result<()> {
-    for (reference, label) in [
-        (shape.super_.super_.caption.as_ref(), "caption"),
-        (shape.super_.super_.title.as_ref(), "title"),
-    ] {
-        let identifier = reference
-            .map(|reference| reference.identifier)
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Keynote shape {drawable_object_id} has no {label} stand-in"
-                ))
-            })?;
-        let object = archive.object(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote shape {drawable_object_id} {label} stand-in {identifier} is missing"
-            ))
-        })?;
-        if object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == STANDIN_CAPTION_MESSAGE_TYPE)
-            .count()
-            != 1
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote shape {drawable_object_id} {label} object {identifier} must have exactly one stand-in payload"
-            )));
-        }
-    }
-    let storage_id = shape
-        .owned_storage
-        .as_ref()
-        .map(|reference| reference.identifier)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote shape {drawable_object_id} has no writable storage"
-            ))
-        })?;
-    let storage = archive.object(storage_id).ok_or_else(|| {
+        shape.super_.super_.caption,
+        DrawableCaptionKind::Caption,
+    )?;
+    let title = caption_slot_from_reference(
+        graph,
+        drawable_object_id,
+        shape.super_.super_.title,
+        DrawableCaptionKind::Title,
+    )?;
+    let storage_id = required_reference(shape.owned_storage.as_ref(), "storage")?;
+    let storage = graph.objects.get(&storage_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Keynote shape {drawable_object_id} storage {storage_id} is missing"
         ))
     })?;
     if storage
-        .messages
         .iter()
         .filter(|message| STORAGE_MESSAGE_TYPES.contains(&message.type_))
         .count()
@@ -1268,7 +1222,17 @@ fn validate_shape_private_objects(
             "Keynote shape {drawable_object_id} storage {storage_id} must have exactly one writable payload"
         )));
     }
-    Ok(())
+    let mut identifiers = vec![drawable_object_id];
+    identifiers.extend(caption.object_ids);
+    identifiers.extend(title.object_ids);
+    identifiers.push(storage_id);
+    let required = identifiers.iter().copied().collect::<HashSet<_>>();
+    if required.len() != identifiers.len() {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote shape {drawable_object_id} aliases private objects"
+        )));
+    }
+    Ok(required)
 }
 
 #[cfg(test)]

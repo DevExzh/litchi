@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
 use super::*;
+use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
@@ -20,6 +21,10 @@ use crate::shapes::{
 use super::text_box_create::{
     TextBoxObjectIds, text_box_objects, text_box_storage, text_box_theme_styles,
 };
+
+mod caption;
+
+use caption::*;
 
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
 const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
@@ -1112,15 +1117,17 @@ fn shape_graph(
             "Numbers shape {drawable_object_id} does not name sheet {sheet_id} as its parent"
         )));
     }
-    let caption_id = required_reference(
+    let caption = caption_slot_from_reference(
+        editor.package(),
         drawable_object_id,
-        shape.super_.super_.caption.as_ref(),
-        "caption stand-in",
+        shape.super_.super_.caption,
+        DrawableCaptionKind::Caption,
     )?;
-    let title_id = required_reference(
+    let title = caption_slot_from_reference(
+        editor.package(),
         drawable_object_id,
-        shape.super_.super_.title.as_ref(),
-        "title stand-in",
+        shape.super_.super_.title,
+        DrawableCaptionKind::Title,
     )?;
     let storage_id =
         required_reference(drawable_object_id, shape.owned_storage.as_ref(), "storage")?;
@@ -1134,44 +1141,33 @@ fn shape_graph(
             "Numbers shape {drawable_object_id} has inconsistent storage ownership"
         )));
     }
-    let object_ids = vec![drawable_object_id, caption_id, title_id, storage_id];
+    let mut object_ids = vec![drawable_object_id];
+    object_ids.extend(caption.object_ids);
+    object_ids.extend(title.object_ids);
+    object_ids.push(storage_id);
     if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
             "Numbers shape {drawable_object_id} aliases private objects"
         )));
     }
-    for (identifier, message_types, label) in [
-        (
-            caption_id,
-            &[STANDIN_CAPTION_MESSAGE_TYPE][..],
-            "caption stand-in",
-        ),
-        (
-            title_id,
-            &[STANDIN_CAPTION_MESSAGE_TYPE][..],
-            "title stand-in",
-        ),
-        (storage_id, STORAGE_MESSAGE_TYPES, "storage"),
-    ] {
-        if locations.get(&identifier).map(String::as_str) != Some(archive_name.as_str()) {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers shape {label} {identifier} is outside {archive_name}"
-            )));
-        }
-        let private_object = archive.object(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers shape {label} {identifier} is missing"))
-        })?;
-        if private_object
-            .messages
-            .iter()
-            .filter(|message| message_types.contains(&message.type_))
-            .count()
-            != 1
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers shape {label} {identifier} must have exactly one expected payload"
-            )));
-        }
+    if locations.get(&storage_id).map(String::as_str) != Some(archive_name.as_str()) {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers shape storage {storage_id} is outside {archive_name}"
+        )));
+    }
+    let storage = archive.object(storage_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers shape storage {storage_id} is missing"))
+    })?;
+    if storage
+        .messages
+        .iter()
+        .filter(|message| STORAGE_MESSAGE_TYPES.contains(&message.type_))
+        .count()
+        != 1
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers shape storage {storage_id} must have exactly one expected payload"
+        )));
     }
     validate_shape_ownership(editor.package(), drawable_object_id, storage_id)?;
     let component_id = component_identifier_for_entry(editor.package(), &archive_name)?
@@ -1187,11 +1183,6 @@ fn shape_graph(
         .copied()
         .filter(|identifier| registered.contains(identifier))
         .collect::<Vec<_>>();
-    if !registered.is_empty() && uuid_object_ids.len() != object_ids.len() {
-        return Err(Error::InvalidFormat(format!(
-            "Numbers component {component_id} UUID map does not cover shape {drawable_object_id}"
-        )));
-    }
     Ok(SheetShapeGraph {
         sheet_id,
         archive_name,

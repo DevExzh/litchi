@@ -17,8 +17,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let shadow = editor.slide_shape_shadow(slide.index, shape.drawable_object_id)?;
             let text_layout =
                 editor.slide_shape_text_layout(slide.index, shape.drawable_object_id)?;
+            let title_caption =
+                editor.slide_shape_title_caption(slide.index, shape.drawable_object_id)?;
             println!(
-                "slide={} shape_index={shape_index} drawable={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} effects={effects:?} shadow={shadow:?} text_layout={text_layout:?} storage={} text={:?} geometry={:?} properties={:?}",
+                "slide={} shape_index={shape_index} drawable={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} effects={effects:?} shadow={shadow:?} text_layout={text_layout:?} title_caption={title_caption:?} storage={} text={:?} geometry={:?} properties={:?}",
                 slide.index,
                 shape.drawable_object_id,
                 shape.kind,

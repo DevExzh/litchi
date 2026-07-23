@@ -86,6 +86,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeTextAutoSize::Fixed,
         ),
     )?;
+    editor.set_sheet_shape_title(sheet_id, created.drawable_object_id, "Typed Numbers shape")?;
+    editor.set_sheet_shape_caption(
+        sheet_id,
+        created.drawable_object_id,
+        "Native title and caption created by litchi-iwa",
+    )?;
     editor.save(output)?;
     println!(
         "created Numbers {:?} {:?} {} with storage {} on sheet {}",

@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
+use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{shape_line_segment, shape_path_kind, shape_preset};
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
@@ -234,23 +235,24 @@ fn body_shape_graph_from_text(
         )));
     }
 
-    let caption_id = required_reference(
+    let caption = caption_slot_from_reference(
+        editor.package(),
         drawable_object_id,
-        shape.super_.super_.caption.as_ref(),
-        "caption stand-in",
+        shape.super_.super_.caption,
+        DrawableCaptionKind::Caption,
     )?;
-    let title_id = required_reference(
+    let title = caption_slot_from_reference(
+        editor.package(),
         drawable_object_id,
-        shape.super_.super_.title.as_ref(),
-        "title stand-in",
+        shape.super_.super_.title,
+        DrawableCaptionKind::Title,
     )?;
-    let object_ids = vec![
-        drawable_object_id,
-        caption_id,
-        title_id,
-        text.storage.object_id,
-        *attachment_id,
-    ];
+    let caption_object_ids = caption.object_ids;
+    let title_object_ids = title.object_ids;
+    let mut object_ids = vec![drawable_object_id];
+    object_ids.extend(caption_object_ids.iter().copied());
+    object_ids.extend(title_object_ids.iter().copied());
+    object_ids.extend([text.storage.object_id, *attachment_id]);
     if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
             "Pages shape {drawable_object_id} reuses private graph identifiers"
@@ -258,23 +260,14 @@ fn body_shape_graph_from_text(
     }
     let archive_name = find_object_archive(editor.package(), drawable_object_id)?;
     for identifier in &object_ids {
-        if find_object_archive(editor.package(), *identifier)? != archive_name {
+        let object_archive_name = find_object_archive(editor.package(), *identifier)?;
+        if object_archive_name != archive_name {
             return Err(Error::InvalidFormat(format!(
-                "Pages shape {drawable_object_id} private graph spans multiple archives"
+                "Pages shape {drawable_object_id} private object {identifier} is in {object_archive_name}, expected {archive_name}"
             )));
         }
     }
     for (identifier, message_types, label) in [
-        (
-            caption_id,
-            &[STANDIN_CAPTION_MESSAGE_TYPE][..],
-            "caption stand-in",
-        ),
-        (
-            title_id,
-            &[STANDIN_CAPTION_MESSAGE_TYPE][..],
-            "title stand-in",
-        ),
         (text.storage.object_id, STORAGE_MESSAGE_TYPES, "storage"),
         (
             *attachment_id,
@@ -301,22 +294,15 @@ fn body_shape_graph_from_text(
 
     let registered =
         component_uuid_identifiers(editor.package(), DOCUMENT_OBJECT_ID)?.unwrap_or_default();
-    let expected_uuid_ids = [
-        drawable_object_id,
-        caption_id,
-        title_id,
-        text.storage.object_id,
-    ];
+    let mut expected_uuid_ids = vec![drawable_object_id];
+    expected_uuid_ids.extend(caption_object_ids);
+    expected_uuid_ids.extend(title_object_ids);
+    expected_uuid_ids.push(text.storage.object_id);
     let uuid_object_ids = expected_uuid_ids
         .iter()
         .copied()
         .filter(|identifier| registered.contains(identifier))
         .collect::<Vec<_>>();
-    if !registered.is_empty() && uuid_object_ids.len() != expected_uuid_ids.len() {
-        return Err(Error::InvalidFormat(format!(
-            "Pages document UUID map does not cover shape {drawable_object_id}"
-        )));
-    }
     let kind = shape_path_kind(&shape)?;
     let preset = shape_preset(&shape)?;
     let line_segment = shape_line_segment(&shape)?;
@@ -342,20 +328,6 @@ fn body_shape_graph_from_text(
         object_ids,
         uuid_object_ids,
     })
-}
-
-fn required_reference(
-    drawable_object_id: u64,
-    reference: Option<&tsp::Reference>,
-    label: &str,
-) -> Result<u64> {
-    reference
-        .map(|reference| reference.identifier)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Pages shape {drawable_object_id} has no {label} object"
-            ))
-        })
 }
 
 fn shape_payload(
