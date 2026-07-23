@@ -1364,6 +1364,112 @@ impl TableOfContentsEntryField {
     }
 }
 
+/// One recognized stored option of a legacy Word `TA` field.
+///
+/// These values describe a legal-authority entry marker. They are inert
+/// metadata only: this crate never finds cited text, changes hidden text,
+/// follows bookmarks, calculates page numbers, or generates a table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableOfAuthoritiesEntryOption {
+    /// The `\\b` switch requests bold page-number formatting.
+    BoldPageNumber,
+    /// The `\\c` authority category.
+    Category(String),
+    /// The `\\i` switch requests italic page-number formatting.
+    ItalicPageNumber,
+    /// The `\\l` long citation text.
+    LongCitation(String),
+    /// The `\\r` bookmark that marks the cited page range.
+    PageRangeBookmark(String),
+    /// The `\\s` short citation text.
+    ShortCitation(String),
+}
+
+/// Typed, inert metadata for a legacy Word table-of-authorities entry (`TA`)
+/// field.
+///
+/// MS-DOC excludes `TA` field characters from the `Plcfld` `aFld` array, so
+/// this type retains story-relative control-character positions instead of a
+/// `Field` descriptor. It exposes only the stored switches and cached result.
+/// It never finds citations, changes hidden text, follows bookmarks, calculates
+/// page numbers, generates a table of authorities, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfAuthoritiesEntryField {
+    story: FieldStory,
+    start_cp: u32,
+    separator_cp: Option<u32>,
+    end_cp: u32,
+    instruction: String,
+    options: Vec<TableOfAuthoritiesEntryOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl TableOfAuthoritiesEntryField {
+    pub(crate) fn from_non_plcf_field(field: &NonPlcfFieldText<'_>) -> Option<Self> {
+        let parts = parse_table_of_authorities_entry_field_parts(field.instruction)?;
+        Some(Self {
+            story: field.story,
+            start_cp: field.start_cp,
+            separator_cp: field.separator_cp,
+            end_cp: field.end_cp,
+            instruction: field.instruction.to_string(),
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: field.result.map(str::to_string),
+        })
+    }
+
+    /// Return the story that stores this field.
+    pub const fn story(&self) -> FieldStory {
+        self.story
+    }
+
+    /// Return the story-relative position of this field's begin character.
+    pub const fn start_position(&self) -> u32 {
+        self.start_cp
+    }
+
+    /// Return the story-relative position of this field's separator character.
+    ///
+    /// `TA` fields normally have no cached result and therefore no separator.
+    pub const fn separator_position(&self) -> Option<u32> {
+        self.separator_cp
+    }
+
+    /// Return the story-relative position of this field's end character.
+    pub const fn end_position(&self) -> u32 {
+        self.end_cp
+    }
+
+    /// Return the complete stored `TA` field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return recognized `TA` options in stored source order.
+    ///
+    /// These options are never used to find citations, calculate page numbers,
+    /// or generate a table of authorities.
+    pub fn options(&self) -> &[TableOfAuthoritiesEntryOption] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    ///
+    /// They are retained without interpretation or execution.
+    pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This value is never regenerated through pagination or field evaluation.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+}
+
 /// One recognized stored option of a legacy Word `TOA` field.
 ///
 /// These values retain how a producer configured a table of authorities. They
@@ -5191,6 +5297,8 @@ const MAX_TABLE_OF_CONTENTS_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_CONTENTS_FIELD_SWITCHES: usize = 64;
 const MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_SWITCHES: usize = 64;
+const MAX_TABLE_OF_AUTHORITIES_ENTRY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_TABLE_OF_AUTHORITIES_ENTRY_FIELD_SWITCHES: usize = 64;
 const MAX_TABLE_OF_AUTHORITIES_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_AUTHORITIES_FIELD_SWITCHES: usize = 64;
 const MAX_INDEX_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5300,6 +5408,11 @@ struct TableOfContentsFieldParts {
 struct TableOfContentsEntryFieldParts {
     entry: String,
     options: Vec<TableOfContentsEntryOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+}
+
+struct TableOfAuthoritiesEntryFieldParts {
+    options: Vec<TableOfAuthoritiesEntryOption>,
     unknown_switches: Vec<MergeFieldSwitch>,
 }
 
@@ -5655,6 +5768,71 @@ fn parse_table_of_contents_entry_field_parts(
 
     Some(TableOfContentsEntryFieldParts {
         entry,
+        options,
+        unknown_switches,
+    })
+}
+
+fn parse_table_of_authorities_entry_field_parts(
+    instruction: &str,
+) -> Option<TableOfAuthoritiesEntryFieldParts> {
+    if instruction.len() > MAX_TABLE_OF_AUTHORITIES_ENTRY_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("TA") {
+        return None;
+    }
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\'
+            || options.len() + unknown_switches.len()
+                >= MAX_TABLE_OF_AUTHORITIES_ENTRY_FIELD_SWITCHES
+        {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        match name {
+            'b' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfAuthoritiesEntryOption::BoldPageNumber);
+            },
+            'c' => options.push(TableOfAuthoritiesEntryOption::Category(argument?)),
+            'i' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfAuthoritiesEntryOption::ItalicPageNumber);
+            },
+            'l' => options.push(TableOfAuthoritiesEntryOption::LongCitation(argument?)),
+            'r' => options.push(TableOfAuthoritiesEntryOption::PageRangeBookmark(argument?)),
+            's' => options.push(TableOfAuthoritiesEntryOption::ShortCitation(argument?)),
+            _ => unknown_switches.push(MergeFieldSwitch { name, argument }),
+        }
+    }
+
+    Some(TableOfAuthoritiesEntryFieldParts {
         options,
         unknown_switches,
     })
@@ -8727,6 +8905,88 @@ mod tests {
             non_plcf_field_texts(FieldStory::Main, &too_long)
                 .iter()
                 .all(|field| TableOfContentsEntryField::from_non_plcf_field(field).is_none())
+        );
+    }
+
+    #[test]
+    fn table_of_authorities_entries_reconstruct_omitted_field_markers() {
+        let text = concat!(
+            "\u{0013} TA \\l \"Baldwin v. Alberti\" \\c 1 \\s Baldwin ",
+            "\\b \\i \\r PageRange \\* MERGEFORMAT ",
+            "\u{0014}cached authority\u{0015}",
+            "\u{0013} TAA \\l \"not an entry\"\u{0015}",
+            "\u{0013} TA"
+        );
+        let stored = non_plcf_field_texts(FieldStory::Comment, text);
+        assert_eq!(stored.len(), 2);
+
+        let entries: Vec<_> = stored
+            .iter()
+            .filter_map(TableOfAuthoritiesEntryField::from_non_plcf_field)
+            .collect();
+        assert_eq!(entries.len(), 1);
+        let entry = &entries[0];
+        assert_eq!(entry.story(), FieldStory::Comment);
+        assert_eq!(entry.start_position(), 0);
+        assert_eq!(
+            entry.instruction(),
+            " TA \\l \"Baldwin v. Alberti\" \\c 1 \\s Baldwin \\b \\i \\r PageRange \\* MERGEFORMAT "
+        );
+        assert_eq!(
+            entry.options(),
+            &[
+                TableOfAuthoritiesEntryOption::LongCitation(
+                    "Baldwin v. Alberti".to_string()
+                ),
+                TableOfAuthoritiesEntryOption::Category("1".to_string()),
+                TableOfAuthoritiesEntryOption::ShortCitation("Baldwin".to_string()),
+                TableOfAuthoritiesEntryOption::BoldPageNumber,
+                TableOfAuthoritiesEntryOption::ItalicPageNumber,
+                TableOfAuthoritiesEntryOption::PageRangeBookmark("PageRange".to_string()),
+            ]
+        );
+        assert_eq!(
+            entry.unknown_switches(),
+            &[MergeFieldSwitch {
+                name: '*',
+                argument: Some("MERGEFORMAT".to_string()),
+            }]
+        );
+        assert_eq!(entry.cached_result(), Some("cached authority"));
+        assert!(entry.separator_position().is_some());
+        assert!(entry.end_position() > entry.start_position());
+
+        let no_options = non_plcf_field_texts(FieldStory::Main, "\u{0013} TA\u{0015}");
+        let no_options =
+            TableOfAuthoritiesEntryField::from_non_plcf_field(&no_options[0]).unwrap();
+        assert!(no_options.options().is_empty());
+
+        for instruction in [
+            "TA unexpected",
+            "TA \\b unexpected",
+            "TA \\c",
+            "TA \\i unexpected",
+            "TA \\l",
+            "TA \\r",
+            "TA \\s",
+        ] {
+            let text = format!("\u{0013}{instruction}\u{0015}");
+            assert!(
+                non_plcf_field_texts(FieldStory::Main, &text)
+                    .iter()
+                    .all(|field| TableOfAuthoritiesEntryField::from_non_plcf_field(field).is_none()),
+                "{instruction}"
+            );
+        }
+
+        let too_long = format!(
+            "\u{0013}TA \\l {} \u{0015}",
+            "x".repeat(MAX_TABLE_OF_AUTHORITIES_ENTRY_FIELD_INSTRUCTION_BYTES)
+        );
+        assert!(
+            non_plcf_field_texts(FieldStory::Main, &too_long)
+                .iter()
+                .all(|field| TableOfAuthoritiesEntryField::from_non_plcf_field(field).is_none())
         );
     }
 

@@ -23,8 +23,8 @@ use super::parts::fields::{
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
     ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
-    ShapeField, TableOfAuthoritiesField, TableOfContentsEntryField, TableOfContentsField,
-    UserIdentityField,
+    ShapeField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsEntryField,
+    TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -787,6 +787,35 @@ impl Document {
     /// Get the number of typed, inert `TOA` fields.
     pub fn table_of_authorities_field_count(&self) -> Result<usize> {
         Ok(self.table_of_authorities_fields()?.len())
+    }
+
+    /// Get typed, inert `TA` table-of-authorities entry fields in story and
+    /// source order.
+    ///
+    /// Native Word omits `TA` marker characters from `Plcfld` metadata, so this
+    /// method scans only the stored text of each document story. Returned values
+    /// expose stored switches, cached results, and source positions. This method
+    /// never finds citations, changes hidden text, follows bookmarks, calculates
+    /// page numbers, generates a table of authorities, or refreshes a field.
+    pub fn table_of_authorities_entries(&self) -> Result<Vec<TableOfAuthoritiesEntryField>> {
+        let mut entries = Vec::new();
+        for story in FieldStory::ALL {
+            let Some((start, end)) = self.field_story_range_if_present(story) else {
+                continue;
+            };
+            let text = self.text_extractor.text_at_range(start, end);
+            entries.extend(
+                non_plcf_field_texts(story, text)
+                    .iter()
+                    .filter_map(TableOfAuthoritiesEntryField::from_non_plcf_field),
+            );
+        }
+        Ok(entries)
+    }
+
+    /// Get the number of typed, inert `TA` table-of-authorities entry fields.
+    pub fn table_of_authorities_entry_count(&self) -> Result<usize> {
+        Ok(self.table_of_authorities_entries()?.len())
     }
 
     /// Get typed, inert generated-index (`INDEX`) fields in story and source order.
