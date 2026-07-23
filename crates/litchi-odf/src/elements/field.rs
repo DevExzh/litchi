@@ -731,7 +731,7 @@ pub enum OdfDocumentMetadataFieldValue {
     Duration(OdfFieldDuration),
 }
 
-/// One of the seven fixed string/identity document-metadata fields.
+/// One of the nine fixed string/identity document-metadata fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OdfDocumentIdentityFieldKind {
     InitialCreator,
@@ -741,6 +741,10 @@ pub enum OdfDocumentIdentityFieldKind {
     Subject,
     Keywords,
     Creator,
+    /// The cached full name of the document author from ODF 1.2 §7.3.7.1.
+    AuthorName,
+    /// The cached initials of the document author from ODF 1.2 §7.3.7.2.
+    AuthorInitials,
 }
 
 impl OdfDocumentIdentityFieldKind {
@@ -753,6 +757,8 @@ impl OdfDocumentIdentityFieldKind {
             Self::Subject => "text:subject",
             Self::Keywords => "text:keywords",
             Self::Creator => "text:creator",
+            Self::AuthorName => "text:author-name",
+            Self::AuthorInitials => "text:author-initials",
         }
     }
 }
@@ -1485,6 +1491,9 @@ pub enum OdfDynamicTextField {
         display_text: String,
     },
     /// Fixed or live cached string metadata such as title or creator.
+    ///
+    /// Author fields retain stored text only and never read or modify host
+    /// identity data.
     DocumentIdentity {
         kind: OdfDocumentIdentityFieldKind,
         fixed: Option<bool>,
@@ -3361,7 +3370,9 @@ impl Field {
             | "text:title"
             | "text:subject"
             | "text:keywords"
-            | "text:creator" => {
+            | "text:creator"
+            | "text:author-name"
+            | "text:author-initials" => {
                 reject_unknown_field_attributes(self, &["text:fixed"])?;
                 let kind = match self.field_type() {
                     "text:initial-creator" => OdfDocumentIdentityFieldKind::InitialCreator,
@@ -3371,6 +3382,8 @@ impl Field {
                     "text:subject" => OdfDocumentIdentityFieldKind::Subject,
                     "text:keywords" => OdfDocumentIdentityFieldKind::Keywords,
                     "text:creator" => OdfDocumentIdentityFieldKind::Creator,
+                    "text:author-name" => OdfDocumentIdentityFieldKind::AuthorName,
+                    "text:author-initials" => OdfDocumentIdentityFieldKind::AuthorInitials,
                     _ => unreachable!(),
                 };
                 OdfDynamicTextField::DocumentIdentity {
@@ -6765,7 +6778,7 @@ mod document_identity_fixed_field_tests {
     }
 
     #[test]
-    fn document_identity_fixed_fields_round_trip_all_seven_standard_elements() {
+    fn document_identity_fixed_fields_round_trip_all_nine_standard_elements() {
         let kinds = [
             OdfDocumentIdentityFieldKind::InitialCreator,
             OdfDocumentIdentityFieldKind::Description,
@@ -6774,6 +6787,8 @@ mod document_identity_fixed_field_tests {
             OdfDocumentIdentityFieldKind::Subject,
             OdfDocumentIdentityFieldKind::Keywords,
             OdfDocumentIdentityFieldKind::Creator,
+            OdfDocumentIdentityFieldKind::AuthorName,
+            OdfDocumentIdentityFieldKind::AuthorInitials,
         ];
         let fields = kinds
             .into_iter()
@@ -6804,10 +6819,12 @@ mod document_identity_fixed_field_tests {
                <t:title>title</t:title>
                <t:subject>subject</t:subject>
                <t:keywords>one, two</t:keywords>
-               <t:creator>last</t:creator>"#,
+               <t:creator>last</t:creator>
+               <t:author-name>author</t:author-name>
+               <t:author-initials>au</t:author-initials>"#,
         );
         let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
-        assert_eq!(fields.len(), 7);
+        assert_eq!(fields.len(), 9);
         for field in fields {
             assert!(matches!(
                 field,
@@ -6826,6 +6843,8 @@ mod document_identity_fixed_field_tests {
             r#"<t:subject t:fixed="2">subject</t:subject>"#,
             r#"<t:keywords t:string-value="one">one</t:keywords>"#,
             r#"<t:creator t:extra="x">creator</t:creator>"#,
+            r#"<t:author-name t:display="value">author</t:author-name>"#,
+            r#"<t:author-initials t:fixed="yes">au</t:author-initials>"#,
         ];
         for body in invalid {
             assert!(
