@@ -114,13 +114,13 @@ pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::{
     AddressBlockCountryInclusion, BibliographyField, CitationField, DdeField, DdeFieldKind,
     DdeRepresentation, DocumentVariableField, ExternalIncludeField, ExternalIncludeOption, Field,
-    FieldSwitch, IfField, IncludeFieldKind, IndexEntryField, IndexField, IndexSortOrder, LinkField,
-    LinkFormatting, LinkResultOption, MacroButtonField, MailMergeConditionalControlField,
-    MailMergeConditionalControlKind, MailMergeCounterField, MailMergeCounterKind,
-    MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind, MergeField,
-    PromptField, PromptFieldKind, ReferencedDocumentField, TableOfAuthoritiesEntryField,
-    TableOfAuthoritiesField, TableOfContentsField, TableOfContentsLevelRange,
-    TableOfContentsSwitch,
+    FieldSwitch, GoToButtonField, IfField, IncludeFieldKind, IndexEntryField, IndexField,
+    IndexSortOrder, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
+    MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
+    MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
+    MergeField, PromptField, PromptFieldKind, ReferencedDocumentField,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+    TableOfContentsLevelRange, TableOfContentsSwitch,
 };
 pub use font_table::{
     EmbeddedFont, EmbeddedFontLicensing, EmbeddedFontResource, EmbeddedFontStyle, Font,

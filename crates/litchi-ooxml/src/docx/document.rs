@@ -9,7 +9,7 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
     BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
-    IfField, IndexEntryField, IndexField, LinkField, MacroButtonField,
+    GoToButtonField, IfField, IndexEntryField, IndexField, LinkField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, ReferencedDocumentField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
@@ -1297,6 +1297,24 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `MACROBUTTON` fields in the main document.
     pub fn macro_button_field_count(&self) -> Result<usize> {
         Ok(self.macro_button_fields()?.len())
+    }
+
+    /// Get typed, inert `GOTOBUTTON` fields in document order.
+    ///
+    /// Returned values expose only stored destinations, button text, cached
+    /// results, and dirty/lock state. This method never resolves a destination,
+    /// changes the insertion point, activates a jump, or refreshes a field.
+    pub fn go_to_button_fields(&self) -> Result<Vec<GoToButtonField>> {
+        self.fields()?
+            .iter()
+            .map(Field::go_to_button)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `GOTOBUTTON` fields in the main document.
+    pub fn go_to_button_field_count(&self) -> Result<usize> {
+        Ok(self.go_to_button_fields()?.len())
     }
 
     /// Get typed, inert `DDE` and `DDEAUTO` fields in document order.

@@ -398,6 +398,25 @@ impl Field {
         MacroButtonField::from_field(self)
     }
 
+    /// Check whether this is a `GOTOBUTTON` field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never
+    /// resolves a destination, changes the insertion point, or refreshes the
+    /// cached result.
+    pub fn is_go_to_button(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "GOTOBUTTON").is_some()
+    }
+
+    /// Parse this field as inert typed `GOTOBUTTON` metadata.
+    ///
+    /// Returns `Ok(None)` for non-`GOTOBUTTON` fields. The result exposes
+    /// only the stored target, button text, cached content, and dirty/lock
+    /// state; it never resolves a bookmark, page, annotation, footnote, or
+    /// other target, changes the insertion point, or refreshes a field.
+    pub fn go_to_button(&self) -> Result<Option<GoToButtonField>> {
+        GoToButtonField::from_field(self)
+    }
+
     /// Check whether this is a legacy `LINK` field.
     ///
     /// Recognition is limited to the stored field instruction. It never
@@ -2492,6 +2511,76 @@ impl MacroButtonField {
     }
 }
 
+/// A typed, inert Word `GOTOBUTTON` field.
+///
+/// ECMA-376 Part 1 §17.16.5.23 defines two stored field arguments: a
+/// destination and the text or graphic used as its button. This type exposes
+/// stored text only; it never resolves a destination, changes the insertion
+/// point, or activates a jump.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GoToButtonField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    target: String,
+    button_text: String,
+}
+
+impl GoToButtonField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((target, button_text)) = parse_go_to_button_operands(field.instruction())? else {
+            return Ok(None);
+        };
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            target,
+            button_text,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored destination without resolving or navigating to it.
+    ///
+    /// A destination can be a bookmark, page reference, annotation, footnote,
+    /// line, page, or section expression.
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    /// Return the stored text or graphic-label expression for the button.
+    ///
+    /// This is source metadata, not an activated control.
+    pub fn button_text(&self) -> &str {
+        &self.button_text
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from the destination.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
 /// Backward-compatible name for a lexical switch exposed by a TOC field.
 pub type TableOfContentsSwitch = FieldSwitch;
 
@@ -3215,6 +3304,30 @@ fn parse_macro_button_operands(instruction: &str) -> Result<Option<(String, Stri
         ));
     }
     Ok(Some((macro_name, display_text)))
+}
+
+fn parse_go_to_button_operands(instruction: &str) -> Result<Option<(String, String)>> {
+    let Some(remainder) = field_instruction_remainder(instruction, "GOTOBUTTON") else {
+        return Ok(None);
+    };
+    let mut characters = remainder.chars().peekable();
+    let target = parse_next_field_argument(&mut characters, "GOTOBUTTON")?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat("GOTOBUTTON field is missing its destination".to_string())
+        })?;
+    let button_text = parse_next_field_argument(&mut characters, "GOTOBUTTON")?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat("GOTOBUTTON field is missing its button text".to_string())
+        })?;
+    skip_field_whitespace(&mut characters);
+    if characters.next().is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "GOTOBUTTON field must contain exactly two arguments and no switches".to_string(),
+        ));
+    }
+    Ok(Some((target, button_text)))
 }
 
 fn parse_link_operands_and_switches(
@@ -4839,6 +4952,70 @@ mod tests {
             false,
         );
         assert!(unsupported_switch.macro_button().is_err());
+    }
+
+    #[test]
+    fn parses_go_to_button_fields_without_resolving_or_navigating_to_targets() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" GOTOBUTTON MyBookmark &quot;Jump to bookmark&quot; " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached bookmark button</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>GOTOBUTTON "f 2" Footnote</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached footnote button</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="GOTOBUTTONS MyBookmark Button"><w:r><w:t>not a button</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_go_to_button());
+        assert!(fields[1].is_go_to_button());
+        assert!(!fields[2].is_go_to_button());
+
+        let first = fields[0].go_to_button().unwrap().unwrap();
+        assert_eq!(first.target(), "MyBookmark");
+        assert_eq!(first.button_text(), "Jump to bookmark");
+        assert_eq!(first.cached_result(), Some("cached bookmark button"));
+        assert!(first.is_dirty());
+        assert!(first.is_locked());
+
+        let second = fields[1].go_to_button().unwrap().unwrap();
+        assert_eq!(second.target(), "f 2");
+        assert_eq!(second.button_text(), "Footnote");
+        assert_eq!(second.cached_result(), Some("cached footnote button"));
+        assert!(second.is_dirty());
+        assert!(second.is_locked());
+        assert!(fields[2].go_to_button().unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_go_to_button_field_semantics() {
+        let missing_target = Field::new("GOTOBUTTON".to_string(), None, false);
+        assert!(missing_target.go_to_button().is_err());
+
+        let empty_target = Field::new(r#"GOTOBUTTON "" Button"#.to_string(), None, false);
+        assert!(empty_target.go_to_button().is_err());
+
+        let missing_button = Field::new("GOTOBUTTON Destination".to_string(), None, false);
+        assert!(missing_button.go_to_button().is_err());
+
+        let empty_button = Field::new(r#"GOTOBUTTON Destination """#.to_string(), None, false);
+        assert!(empty_button.go_to_button().is_err());
+
+        let extra_argument = Field::new(
+            "GOTOBUTTON Destination Button unexpected".to_string(),
+            None,
+            false,
+        );
+        assert!(extra_argument.go_to_button().is_err());
+
+        let unsupported_switch = Field::new(
+            r#"GOTOBUTTON Destination Button \* MERGEFORMAT"#.to_string(),
+            None,
+            false,
+        );
+        assert!(unsupported_switch.go_to_button().is_err());
     }
 
     #[test]
