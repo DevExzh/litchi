@@ -910,7 +910,8 @@ pub struct DocumentPropertyField<'a> {
 /// The built-in Word document-information field category.
 ///
 /// ECMA-376 Part 1 §17.16.5 defines these fields. This enum preserves the
-/// stored field kind only; it does not resolve document metadata.
+/// stored field kind only; it does not resolve document metadata or calculate
+/// dates, revisions, or statistics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DocumentInformationFieldKind {
     Title,
@@ -919,6 +920,14 @@ pub enum DocumentInformationFieldKind {
     Keywords,
     Comments,
     LastSavedBy,
+    CreateDate,
+    SaveDate,
+    PrintDate,
+    RevisionNumber,
+    EditTime,
+    NumberOfPages,
+    NumberOfWords,
+    NumberOfCharacters,
 }
 
 impl DocumentInformationFieldKind {
@@ -931,6 +940,14 @@ impl DocumentInformationFieldKind {
             Self::Keywords => "KEYWORDS",
             Self::Comments => "COMMENTS",
             Self::LastSavedBy => "LASTSAVEDBY",
+            Self::CreateDate => "CREATEDATE",
+            Self::SaveDate => "SAVEDATE",
+            Self::PrintDate => "PRINTDATE",
+            Self::RevisionNumber => "REVNUM",
+            Self::EditTime => "EDITTIME",
+            Self::NumberOfPages => "NUMPAGES",
+            Self::NumberOfWords => "NUMWORDS",
+            Self::NumberOfCharacters => "NUMCHARS",
         }
     }
 
@@ -942,6 +959,14 @@ impl DocumentInformationFieldKind {
             Self::Keywords,
             Self::Comments,
             Self::LastSavedBy,
+            Self::CreateDate,
+            Self::SaveDate,
+            Self::PrintDate,
+            Self::RevisionNumber,
+            Self::EditTime,
+            Self::NumberOfPages,
+            Self::NumberOfWords,
+            Self::NumberOfCharacters,
         ]
         .into_iter()
         .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
@@ -952,7 +977,8 @@ impl DocumentInformationFieldKind {
 ///
 /// This type retains the stored kind, field switches, cached result, and field
 /// state only. It never reads document properties, reads or modifies host
-/// identity data, resolves a value, or refreshes a field.
+/// identity data, calculates dates, revisions, or statistics, resolves a
+/// value, or refreshes a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentInformationField<'a> {
     instruction: &'a str,
@@ -4090,11 +4116,11 @@ impl<'a> Field<'a> {
     /// Return inert metadata when this is a well-formed document-information
     /// field.
     ///
-    /// `TITLE`, `SUBJECT`, `AUTHOR`, `KEYWORDS`, `COMMENTS`, and
-    /// `LASTSAVEDBY` retain only their stored kind, switches, cached result,
-    /// and state. This method never reads document properties or host identity
-    /// data, resolves a value, or refreshes a field. Malformed instructions
-    /// remain generic fields and return `None` here.
+    /// Built-in document-information fields retain only their stored kind,
+    /// switches, cached result, and state. This method never reads document
+    /// properties or host identity data, calculates dates, revisions, or
+    /// statistics, resolves a value, or refreshes a field. Malformed
+    /// instructions remain generic fields and return `None` here.
     pub fn document_information(&self) -> Option<DocumentInformationField<'_>> {
         if self.field_type != FieldType::DocumentInformation {
             return None;
@@ -8164,7 +8190,7 @@ mod tests {
     }
 
     #[test]
-    fn document_information_fields_preserve_kinds_without_reading_metadata_or_identity() {
+    fn document_information_fields_preserve_kinds_without_reading_or_calculating_values() {
         let mut field =
             Field::parse_instruction(r#"TITLE \* MERGEFORMAT \@ "opaque format""#);
         field.result = Cow::Borrowed("cached title");
@@ -8204,6 +8230,14 @@ mod tests {
             ("KEYWORDS", DocumentInformationFieldKind::Keywords),
             ("COMMENTS", DocumentInformationFieldKind::Comments),
             ("LASTSAVEDBY", DocumentInformationFieldKind::LastSavedBy),
+            ("CREATEDATE", DocumentInformationFieldKind::CreateDate),
+            ("SAVEDATE", DocumentInformationFieldKind::SaveDate),
+            ("PRINTDATE", DocumentInformationFieldKind::PrintDate),
+            ("REVNUM", DocumentInformationFieldKind::RevisionNumber),
+            ("EDITTIME", DocumentInformationFieldKind::EditTime),
+            ("NUMPAGES", DocumentInformationFieldKind::NumberOfPages),
+            ("NUMWORDS", DocumentInformationFieldKind::NumberOfWords),
+            ("NUMCHARS", DocumentInformationFieldKind::NumberOfCharacters),
         ] {
             let field = Field::parse_instruction(instruction);
             assert_eq!(field.field_type, FieldType::DocumentInformation);
@@ -8230,6 +8264,11 @@ mod tests {
         );
         assert!(
             Field::parse_instruction(r"LASTSAVEDBY \* MERGEFORMAT unexpected")
+                .document_information()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction("NUMWORDS unexpected")
                 .document_information()
                 .is_none()
         );
@@ -9047,7 +9086,7 @@ mod tests {
     }
 
     #[test]
-    fn document_discovers_document_information_fields_without_reading_metadata_or_identity() {
+    fn document_discovers_document_information_fields_without_reading_or_calculating_values() {
         let document = crate::RtfDocument::parse(
             r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TITLE \\* MERGEFORMAT}{\fldrslt cached title}}Middle {\field{\*\fldinst author \\@ "opaque format"}{\fldrslt cached author}}After}"#,
         )
@@ -9069,6 +9108,28 @@ mod tests {
             Some("opaque format")
         );
         assert_eq!(document.text(), "Before Middle After");
+    }
+
+    #[test]
+    fn document_discovers_document_information_statistics_without_calculating() {
+        let document = crate::RtfDocument::parse(
+            r"{\rtf1\ansi {\field\flddirty\fldlock{\*\fldinst NUMWORDS \\* MERGEFORMAT}{\fldrslt cached words}}}",
+        )
+        .unwrap();
+
+        let fields = document.document_information_fields();
+        assert_eq!(document.document_information_field_count(), 1);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].kind(), DocumentInformationFieldKind::NumberOfWords);
+        assert_eq!(fields[0].cached_result(), Some("cached words"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[0].switches().len(), 1);
+        assert_eq!(fields[0].switches()[0].name, "*");
+        assert_eq!(
+            fields[0].switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
     }
 
     #[test]

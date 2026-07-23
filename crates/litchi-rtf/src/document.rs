@@ -1169,7 +1169,8 @@ impl<'a> RtfDocument<'a> {
     ///
     /// Kinds, switches, cached results, and state are exposed solely as stored
     /// metadata. This method never reads document properties or host identity
-    /// data, resolves values, or refreshes a field.
+    /// data, calculates dates, revisions, or statistics, resolves values, or
+    /// refreshes a field.
     pub fn document_information_fields(&self) -> Vec<crate::DocumentInformationField<'_>> {
         self.fields
             .iter()
