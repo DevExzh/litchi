@@ -451,6 +451,13 @@ impl<'a> Presentation<'a> {
         self.part.photo_album()
     }
 
+    /// Get the relationship ID of the declared smart-tags data.
+    ///
+    /// Returns None when the presentation does not declare smart tags.
+    pub fn smart_tags_relationship_id(&self) -> Result<Option<String>> {
+        self.part.smart_tags_relationship_id()
+    }
+
     /// Get the relationship ID of the declared handout master.
     ///
     /// Returns None when the presentation does not declare a handout master.

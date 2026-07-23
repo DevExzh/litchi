@@ -610,6 +610,13 @@ impl<'a> PresentationPart<'a> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.photo_album)
     }
 
+    /// Get the relationship ID of the declared smart-tags data.
+    ///
+    /// Returns None when the presentation does not declare smart tags.
+    pub fn smart_tags_relationship_id(&self) -> Result<Option<String>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.smart_tags_relationship_id)
+    }
+
     /// Get the relationship ID of the declared handout master.
     ///
     /// Returns None when the presentation does not declare a handout master.
@@ -709,6 +716,7 @@ struct PresentationInfo {
     default_text_style: Option<PresentationDefaultTextStyle>,
     kinsoku_settings: Option<PresentationKinsokuSettings>,
     photo_album: Option<PresentationPhotoAlbum>,
+    smart_tags_relationship_id: Option<String>,
     handout_master_relationship_id: Option<String>,
     seen_slide_list: bool,
     seen_master_list: bool,
@@ -944,6 +952,16 @@ impl PresentationInfo {
                 ));
             }
             self.photo_album = Some(PresentationPhotoAlbum::from_element(element, decoder)?);
+        } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"smartTags")
+        {
+            if self.smart_tags_relationship_id.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate PowerPoint smart-tags reference".to_string(),
+                ));
+            }
+            self.smart_tags_relationship_id =
+                Some(required_relationship_id(element, decoder, resolver, "smart tags")?);
         } else if parent == PresentationContext::DefaultTextStyle {
             self.observe_default_text_style_child(namespace, element)?;
         } else if parent == PresentationContext::SlideList
@@ -1520,6 +1538,49 @@ mod tests {
     }
 
     #[test]
+    fn parses_smart_tags_relationship_by_namespace() {
+        let xml = format!(
+            r#"<q:presentation xmlns:q="{P}" xmlns:rel="{R}" xmlns:f="urn:foreign">
+                <f:smartTags rel:id="spoof"/>
+                <q:smartTags f:id="wrong" rel:id="smart-tags-alpha">
+                    <q:extLst><q:smartTags rel:id="nested"/></q:extLst>
+                </q:smartTags>
+                <q:extLst><q:smartTags rel:id="extension"/></q:extLst>
+            </q:presentation>"#
+        );
+        let blob = part(xml);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .smart_tags_relationship_id()
+                .unwrap(),
+            Some("smart-tags-alpha".to_string())
+        );
+
+        let strict = r#"<x:presentation xmlns:x="http://purl.oclc.org/ooxml/presentationml/main"
+            xmlns:z="http://purl.oclc.org/ooxml/officeDocument/relationships">
+            <x:smartTags z:id="strict-smart-tags"/></x:presentation>"#;
+        let blob = part(strict);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .smart_tags_relationship_id()
+                .unwrap(),
+            Some("strict-smart-tags".to_string())
+        );
+
+        let absent = format!(r#"<p:presentation xmlns:p="{P}"></p:presentation>"#);
+        let blob = part(absent);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .smart_tags_relationship_id()
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
     fn rejects_duplicate_default_text_style_declarations() {
         let cases = [
             format!(
@@ -1538,6 +1599,33 @@ mod tests {
                 PresentationPart::from_part(&blob)
                     .unwrap()
                     .default_text_style()
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_smart_tags_references() {
+        let cases = [
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:smartTags/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:smartTags r:id=""/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}" xmlns:z="http://purl.oclc.org/ooxml/officeDocument/relationships"><p:smartTags r:id="one" z:id="two"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:smartTags r:id="one"/><p:smartTags r:id="two"/></p:presentation>"#
+            ),
+        ];
+        for xml in cases {
+            let blob = part(xml);
+            assert!(
+                PresentationPart::from_part(&blob)
+                    .unwrap()
+                    .smart_tags_relationship_id()
                     .is_err()
             );
         }
