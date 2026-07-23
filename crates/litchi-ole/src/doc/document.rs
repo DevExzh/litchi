@@ -889,8 +889,8 @@ impl Document {
     ///
     /// Returned values expose only the native category, stored switches,
     /// cached results, and field state. This method never reads a document
-    /// path, attached template, or host filesystem state, resolves values, or
-    /// refreshes a field result.
+    /// path, attached template, host filesystem state, current clock, or page
+    /// layout, resolves values, or refreshes a field result.
     pub fn document_context_fields(&self) -> Result<Vec<DocumentContextField>> {
         let fields = self.fields()?;
         Ok(fields

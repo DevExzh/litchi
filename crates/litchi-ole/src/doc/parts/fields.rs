@@ -1921,14 +1921,17 @@ impl DocumentInformationField {
 
 /// The built-in Word document-context field category.
 ///
-/// [MS-DOC] §2.9.90 assigns the native `flt` values 0x1D and 0x1E to
-/// `FILENAME` and `TEMPLATE`. This enum preserves the stored category
-/// only; it does not read a document path, attached template, or host
-/// filesystem state.
+/// [MS-DOC] §2.9.90 assigns the native `flt` values 0x1D through 0x21 to
+/// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, and `PAGE`. This enum
+/// preserves the stored category only; it does not read a document path,
+/// attached template, host filesystem state, current clock, or page layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DocumentContextFieldKind {
     FileName,
     Template,
+    Date,
+    Time,
+    Page,
 }
 
 impl DocumentContextFieldKind {
@@ -1937,6 +1940,9 @@ impl DocumentContextFieldKind {
         match self {
             Self::FileName => "FILENAME",
             Self::Template => "TEMPLATE",
+            Self::Date => "DATE",
+            Self::Time => "TIME",
+            Self::Page => "PAGE",
         }
     }
 
@@ -1944,12 +1950,21 @@ impl DocumentContextFieldKind {
         match field_type {
             FieldType::FileName => Some(Self::FileName),
             FieldType::Template => Some(Self::Template),
+            FieldType::Date => Some(Self::Date),
+            FieldType::Time => Some(Self::Time),
+            FieldType::Page => Some(Self::Page),
             _ => None,
         }
     }
 
     fn from_keyword(keyword: &str) -> Option<Self> {
-        [Self::FileName, Self::Template]
+        [
+            Self::FileName,
+            Self::Template,
+            Self::Date,
+            Self::Time,
+            Self::Page,
+        ]
             .into_iter()
             .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
     }
@@ -1958,8 +1973,9 @@ impl DocumentContextFieldKind {
 /// A typed, inert legacy Word built-in document-context field.
 ///
 /// This type exposes the stored native category, instruction, switches, and
-/// cached result only. It never reads a document path, attached template, or
-/// host filesystem state, resolves a value, or refreshes a field.
+/// cached result only. It never reads a document path, attached template, host
+/// filesystem state, current clock, or page layout, resolves a value, or
+/// refreshes a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentContextField {
     field: Field,
@@ -1995,7 +2011,7 @@ impl DocumentContextField {
     /// Return the stored cached field result, if present.
     ///
     /// This value is never regenerated from a document path, attached
-    /// template, or host filesystem state.
+    /// template, host filesystem state, current clock, or page layout.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -3519,12 +3535,12 @@ impl FieldText {
     /// Return inert typed metadata when this is a well-formed built-in
     /// document-context field.
     ///
-    /// `FILENAME` and `TEMPLATE` retain only their native category, stored
-    /// switches, cached result, and field state. This method never reads a
-    /// document path, attached template, or host filesystem state, resolves a
-    /// value, or refreshes a field. Malformed instructions and mismatched
-    /// native field types remain available through this generic type and return
-    /// `None` here.
+    /// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, and `PAGE` retain only
+    /// their native category, stored switches, cached result, and field state.
+    /// This method never reads a document path, attached template, host
+    /// filesystem state, current clock, or page layout, resolves a value, or
+    /// refreshes a field. Malformed instructions and mismatched native field
+    /// types remain available through this generic type and return `None` here.
     pub fn document_context(&self) -> Option<DocumentContextField> {
         let native_kind = DocumentContextFieldKind::from_field_type(self.field.field_type)?;
         let (kind, switches) = parse_document_context_field_parts(&self.instruction)?;
@@ -7721,7 +7737,7 @@ mod tests {
     }
 
     #[test]
-    fn document_context_fields_expose_cached_metadata_without_reading_paths_or_templates() {
+    fn document_context_fields_expose_cached_metadata_without_reading_or_calculating_values() {
         let field = Field {
             story: FieldStory::Textbox,
             start_cp: 4,
@@ -7765,6 +7781,9 @@ mod tests {
                 "TEMPLATE",
                 DocumentContextFieldKind::Template,
             ),
+            (FieldType::Date, "DATE", DocumentContextFieldKind::Date),
+            (FieldType::Time, "TIME", DocumentContextFieldKind::Time),
+            (FieldType::Page, "PAGE", DocumentContextFieldKind::Page),
         ] {
             let text = FieldText {
                 field: Field {
@@ -7786,6 +7805,8 @@ mod tests {
             (FieldType::Template, r#"TEMPLATE "unterminated"#),
             (FieldType::FileName, "FILENAME \\"),
             (FieldType::FileName, "FILENAMES"),
+            (FieldType::Page, "PAGE unexpected"),
+            (FieldType::Page, "PAGES"),
         ] {
             let malformed = FieldText {
                 field: Field {
