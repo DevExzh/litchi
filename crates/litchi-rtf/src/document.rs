@@ -939,6 +939,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `GOTOBUTTON` fields in document field order.
+    ///
+    /// Destinations, button text, cached results, and state are stored metadata
+    /// only. This method never resolves a destination, changes the insertion
+    /// point, activates a jump, or refreshes a field.
+    pub fn go_to_buttons(&self) -> Vec<crate::GoToButtonField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::go_to_button)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `GOTOBUTTON` fields in the document.
+    pub fn go_to_button_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.go_to_button().is_some())
+            .count()
+    }
+
     /// Return typed, inert `DDE` and `DDEAUTO` fields in document field order.
     ///
     /// Application, source, item, representation, and storage metadata are

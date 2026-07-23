@@ -22,6 +22,7 @@ pub enum FieldType {
     Bookmark,
     Equation,
     MacroButton,
+    GoToButton,
     Dde,
     DdeAuto,
     Link,
@@ -246,6 +247,22 @@ pub struct MacroButtonField<'a> {
     instruction: &'a str,
     macro_name: Cow<'a, str>,
     display_text: Option<Cow<'a, str>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+/// Inert metadata for a legacy RTF `GOTOBUTTON` field.
+///
+/// The destination and button text are exposed solely as stored field
+/// metadata. This crate never resolves a destination, changes the insertion
+/// point, or activates a jump.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GoToButtonField<'a> {
+    instruction: &'a str,
+    target: Cow<'a, str>,
+    button_text: Cow<'a, str>,
     cached_result: Option<&'a str>,
     status: FieldStatus,
     owner: FieldOwner,
@@ -1111,6 +1128,60 @@ impl<'a> MacroButtonField<'a> {
     }
 
     /// Return the stored field result when a producer supplied one.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
+impl<'a> GoToButtonField<'a> {
+    /// Return the complete stored `GOTOBUTTON` field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored destination without resolving or navigating to it.
+    ///
+    /// A destination can be a bookmark, page reference, annotation, footnote,
+    /// line, page, or section expression.
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    /// Return the stored text or graphic-label expression for the button.
+    ///
+    /// This is source metadata, not an activated control.
+    pub fn button_text(&self) -> &str {
+        &self.button_text
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated from the destination.
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
@@ -2350,6 +2421,11 @@ impl<'a> Field<'a> {
             {
                 FieldType::MacroButton
             },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("GOTOBUTTON") =>
+            {
+                FieldType::GoToButton
+            },
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("DDE") => {
                 FieldType::Dde
             },
@@ -2510,6 +2586,28 @@ impl<'a> Field<'a> {
             instruction: self.instruction.as_ref(),
             macro_name,
             display_text,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed `GOTOBUTTON` field.
+    ///
+    /// The destination and button text remain stored metadata only. This method
+    /// never resolves a bookmark, page, annotation, footnote, or other target,
+    /// changes the insertion point, or activates a jump. Malformed navigation
+    /// instructions remain generic fields and return `None` here.
+    pub fn go_to_button(&self) -> Option<GoToButtonField<'_>> {
+        if self.field_type != FieldType::GoToButton {
+            return None;
+        }
+        let (target, button_text) = go_to_button_parts(self.instruction.as_ref())?;
+        Some(GoToButtonField {
+            instruction: self.instruction.as_ref(),
+            target,
+            button_text,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
             owner: self.owner,
@@ -3139,6 +3237,23 @@ fn macro_button_parts(instruction: &str) -> Option<(Cow<'_, str>, Option<Cow<'_,
         )),
     };
     Some((macro_name, display_text))
+}
+
+fn go_to_button_parts(instruction: &str) -> Option<(Cow<'_, str>, Cow<'_, str>)> {
+    let tokens = tokenize(instruction).ok()?;
+    if tokens.len() != 3 || !tokens[0].value.eq_ignore_ascii_case("GOTOBUTTON") {
+        return None;
+    }
+    let target = tokens[1].value.clone();
+    let button_text = tokens[2].value.clone();
+    if target.is_empty()
+        || button_text.is_empty()
+        || switch_name(&tokens[1]).is_some()
+        || switch_name(&tokens[2]).is_some()
+    {
+        return None;
+    }
+    Some((target, button_text))
 }
 
 fn dde_field_parts(instruction: &str) -> Option<DdeFieldParts<'_>> {
@@ -5031,6 +5146,50 @@ mod tests {
     }
 
     #[test]
+    fn go_to_button_fields_expose_stored_metadata_without_navigation() {
+        let mut field = Field::parse_instruction(r#"GOTOBUTTON "f 2" "Footnote""#);
+        field.result = Cow::Borrowed("cached footnote button");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::GoToButton);
+        let button = field.go_to_button().unwrap();
+        assert_eq!(button.instruction(), r#"GOTOBUTTON "f 2" "Footnote""#);
+        assert_eq!(button.target(), "f 2");
+        assert_eq!(button.button_text(), "Footnote");
+        assert_eq!(button.cached_result(), Some("cached footnote button"));
+        assert!(button.is_dirty());
+        assert!(button.is_locked());
+        assert_eq!(button.owner(), FieldOwner::Body);
+        assert_eq!(button.position(), 4);
+
+        for instruction in [
+            "GOTOBUTTON",
+            r#"GOTOBUTTON "" Button"#,
+            "GOTOBUTTON Destination",
+            r#"GOTOBUTTON Destination """#,
+            "GOTOBUTTON Destination Button unexpected",
+            r#"GOTOBUTTON Destination Button \* MERGEFORMAT"#,
+        ] {
+            assert!(
+                Field::parse_instruction(instruction)
+                    .go_to_button()
+                    .is_none(),
+                "{instruction}"
+            );
+        }
+        assert_eq!(
+            Field::parse_instruction("GOTOBUTTONS Destination Button").field_type,
+            FieldType::Unknown
+        );
+    }
+
+    #[test]
     fn dde_fields_expose_stored_metadata_without_contacting_sources() {
         let mut field = Field::parse_instruction(
             r#"DDE Excel "C:\\no-contact\\source.xlsx" "Sheet1!R1C1:R4C4" \a \p \* MERGEFORMAT"#,
@@ -6724,6 +6883,24 @@ mod tests {
         assert_eq!(macro_buttons[0].cached_result(), Some("Click here"));
         assert!(macro_buttons[0].is_dirty());
         assert!(macro_buttons[0].is_locked());
+        assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_go_to_buttons_without_activating_them() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst GOTOBUTTON MyBookmark "Jump here"}{\fldrslt cached button}}After}"#,
+        )
+        .unwrap();
+
+        let buttons = document.go_to_buttons();
+        assert_eq!(document.go_to_button_count(), 1);
+        assert_eq!(buttons.len(), 1);
+        assert_eq!(buttons[0].target(), "MyBookmark");
+        assert_eq!(buttons[0].button_text(), "Jump here");
+        assert_eq!(buttons[0].cached_result(), Some("cached button"));
+        assert!(buttons[0].is_dirty());
+        assert!(buttons[0].is_locked());
         assert_eq!(document.text(), "Before After");
     }
 
