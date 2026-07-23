@@ -18,8 +18,8 @@ use super::parts::fields::{
     DocumentVariableField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
     FormulaField, GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
-    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, ReferenceField, SetField,
-    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, ReferenceField,
+    SequenceField, SetField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -718,6 +718,25 @@ impl Document {
     /// Get the number of typed, inert `=` formula fields.
     pub fn formula_field_count(&self) -> Result<usize> {
         Ok(self.formula_fields()?.len())
+    }
+
+    /// Get typed, inert `SEQ` fields in story and source order.
+    ///
+    /// Returned values expose only stored identifiers, optional bookmark names,
+    /// opaque tails, cached results, and field state. This method never looks
+    /// up a bookmark, increments or resets a sequence, calculates a number, or
+    /// refreshes a field.
+    pub fn sequence_fields(&self) -> Result<Vec<SequenceField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::sequence_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `SEQ` fields.
+    pub fn sequence_field_count(&self) -> Result<usize> {
+        Ok(self.sequence_fields()?.len())
     }
 
     /// Get typed, inert `GLOSSARY` and `AUTOTEXT` fields in story and source order.

@@ -107,6 +107,7 @@ pub use parts::document_properties_2003::{
 pub use parts::fields::CompareField;
 pub use parts::fields::DocumentVariableField;
 pub use parts::fields::FormulaField;
+pub use parts::fields::SequenceField;
 pub use parts::fields::SetField;
 pub use parts::fields::{ActiveContentField, ActiveContentFieldKind};
 pub use parts::fields::{
