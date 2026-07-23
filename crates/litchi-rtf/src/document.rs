@@ -1332,6 +1332,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `DATA` mail-merge source fields in document order.
+    ///
+    /// Data-source and header-source identifiers, switches, cached results, and
+    /// field state are exposed solely as stored metadata. This method never
+    /// opens, reads, connects to, resolves, or modifies either source; it never
+    /// selects a record, performs a merge, or refreshes a field result.
+    pub fn mail_merge_data_fields(&self) -> Vec<crate::MailMergeDataField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::mail_merge_data)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `DATA` mail-merge source fields.
+    pub fn mail_merge_data_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.mail_merge_data().is_some())
+            .count()
+    }
+
     /// Return typed, inert `MERGEREC` and `MERGESEQ` fields in document order.
     ///
     /// Stored kinds and cached results are exposed solely as metadata. This
