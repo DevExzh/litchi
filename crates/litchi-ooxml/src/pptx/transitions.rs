@@ -92,6 +92,14 @@ pub enum TransitionDirection {
     Up,
     /// Bottom to top
     Down,
+    /// From the upper-left corner
+    LeftUp,
+    /// From the upper-right corner
+    RightUp,
+    /// From the lower-left corner
+    LeftDown,
+    /// From the lower-right corner
+    RightDown,
     /// Horizontal (left and right)
     Horizontal,
     /// Vertical (up and down)
@@ -450,29 +458,48 @@ impl SlideTransition {
             b"cut" => Some(TransitionType::Cut),
             b"fade" => Some(TransitionType::Fade),
             b"push" => Some(TransitionType::Push {
-                direction: TransitionDirection::Left,
+                direction: parse_side_direction(element, decoder)?,
             }),
             b"wipe" => Some(TransitionType::Wipe {
-                direction: TransitionDirection::Left,
+                direction: parse_side_direction(element, decoder)?,
             }),
             b"split" => Some(TransitionType::Split {
-                direction: TransitionDirection::Horizontal,
+                direction: parse_orientation(element, b"orient", decoder)?,
+            }),
+            b"pull" => Some(TransitionType::Uncover {
+                direction: parse_eight_direction(element, decoder)?,
+            }),
+            b"cover" => Some(TransitionType::Cover {
+                direction: parse_eight_direction(element, decoder)?,
             }),
             b"dissolve" => Some(TransitionType::Dissolve),
             b"blinds" => Some(TransitionType::Blinds {
-                direction: TransitionDirection::Vertical,
+                direction: parse_orientation(element, b"dir", decoder)?,
             }),
             b"checker" => Some(TransitionType::Checker {
-                direction: TransitionDirection::Horizontal,
+                direction: parse_orientation(element, b"dir", decoder)?,
+            }),
+            b"randomBar" => Some(TransitionType::RandomBars {
+                direction: parse_orientation(element, b"dir", decoder)?,
+            }),
+            b"strips" => Some(TransitionType::Strips {
+                direction: parse_corner_direction(element, decoder)?,
+            }),
+            b"comb" => Some(TransitionType::Comb {
+                direction: parse_orientation(element, b"dir", decoder)?,
             }),
             b"circle" => Some(TransitionType::Circle),
             b"diamond" => Some(TransitionType::Diamond),
             b"plus" => Some(TransitionType::Plus),
             b"wedge" => Some(TransitionType::Wedge),
             b"zoom" => Some(TransitionType::Zoom {
-                direction: ZoomDirection::In,
+                direction: parse_zoom_direction(element, decoder)?,
+            }),
+            b"wheel" => Some(TransitionType::Wheel {
+                spokes: parse_wheel_spokes(element, decoder)?,
             }),
             b"random" => Some(TransitionType::Random),
+            b"newsflash" => Some(TransitionType::Newsflash),
             _ => None,
         };
 
@@ -528,32 +555,56 @@ impl SlideTransition {
             },
             TransitionType::Push { direction } => {
                 xml.push_str("<p:push dir=\"");
-                xml.push_str(Self::direction_to_xml(*direction));
+                xml.push_str(Self::side_direction_to_xml(*direction)?);
                 xml.push_str("\"/>");
             },
             TransitionType::Wipe { direction } => {
                 xml.push_str("<p:wipe dir=\"");
-                xml.push_str(Self::direction_to_xml(*direction));
+                xml.push_str(Self::side_direction_to_xml(*direction)?);
                 xml.push_str("\"/>");
             },
             TransitionType::Split { direction } => {
                 // Split uses "orient" not "dir" per OOXML spec
                 xml.push_str("<p:split orient=\"");
-                xml.push_str(Self::direction_to_xml(*direction));
+                xml.push_str(Self::orientation_to_xml(*direction)?);
+                xml.push_str("\"/>");
+            },
+            TransitionType::Uncover { direction } => {
+                xml.push_str("<p:pull dir=\"");
+                xml.push_str(Self::eight_direction_to_xml(*direction)?);
+                xml.push_str("\"/>");
+            },
+            TransitionType::Cover { direction } => {
+                xml.push_str("<p:cover dir=\"");
+                xml.push_str(Self::eight_direction_to_xml(*direction)?);
                 xml.push_str("\"/>");
             },
             TransitionType::Dissolve => {
                 xml.push_str("<p:dissolve/>");
             },
             TransitionType::Blinds { direction } => {
-                // Blinds uses "orient" not "dir" per OOXML spec
-                xml.push_str("<p:blinds orient=\"");
-                xml.push_str(Self::direction_to_xml(*direction));
+                xml.push_str("<p:blinds dir=\"");
+                xml.push_str(Self::orientation_to_xml(*direction)?);
                 xml.push_str("\"/>");
             },
             TransitionType::Checker { direction } => {
                 xml.push_str("<p:checker dir=\"");
-                xml.push_str(Self::direction_to_xml(*direction));
+                xml.push_str(Self::orientation_to_xml(*direction)?);
+                xml.push_str("\"/>");
+            },
+            TransitionType::RandomBars { direction } => {
+                xml.push_str("<p:randomBar dir=\"");
+                xml.push_str(Self::orientation_to_xml(*direction)?);
+                xml.push_str("\"/>");
+            },
+            TransitionType::Strips { direction } => {
+                xml.push_str("<p:strips dir=\"");
+                xml.push_str(Self::corner_direction_to_xml(*direction)?);
+                xml.push_str("\"/>");
+            },
+            TransitionType::Comb { direction } => {
+                xml.push_str("<p:comb dir=\"");
+                xml.push_str(Self::orientation_to_xml(*direction)?);
                 xml.push_str("\"/>");
             },
             TransitionType::Circle => {
@@ -564,6 +615,11 @@ impl SlideTransition {
             },
             TransitionType::Plus => {
                 xml.push_str("<p:plus/>");
+            },
+            TransitionType::Shape { shape_type } => match shape_type {
+                ShapeTransitionType::Circle => xml.push_str("<p:circle/>"),
+                ShapeTransitionType::Diamond => xml.push_str("<p:diamond/>"),
+                ShapeTransitionType::Plus => xml.push_str("<p:plus/>"),
             },
             TransitionType::Wedge => {
                 xml.push_str("<p:wedge/>");
@@ -585,32 +641,72 @@ impl SlideTransition {
                 xml.push_str(&spokes.to_string());
                 xml.push_str("\"/>");
             },
+            TransitionType::Newsflash => {
+                xml.push_str("<p:newsflash/>");
+            },
             TransitionType::Ripple { .. } => {
                 return Err(OoxmlError::Other(
                     "PowerPoint 2010 ripple transitions require a compatibility fallback and are read-only"
                         .to_string(),
                 ));
             },
-            _ => {
-                // For other types, use fade as fallback
-                xml.push_str("<p:fade thruBlk=\"false\"/>");
+            TransitionType::Reveal { .. }
+            | TransitionType::Clock { .. }
+            | TransitionType::Flash => {
+                return Err(OoxmlError::Other(
+                    "this transition type does not have a standard PresentationML writer"
+                        .to_string(),
+                ));
+            },
+            TransitionType::Other(name) => {
+                return Err(OoxmlError::Other(format!(
+                    "cannot serialize unknown transition type '{name}'"
+                )));
             },
         }
 
         Ok(())
     }
 
-    /// Convert direction to XML attribute value.
-    fn direction_to_xml(direction: TransitionDirection) -> &'static str {
+    fn side_direction_to_xml(direction: TransitionDirection) -> Result<&'static str> {
         match direction {
-            TransitionDirection::Left => "l",
-            TransitionDirection::Right => "r",
-            TransitionDirection::Up => "u",
-            TransitionDirection::Down => "d",
-            TransitionDirection::Horizontal => "horz",
-            TransitionDirection::Vertical => "vert",
-            TransitionDirection::In => "in",
-            TransitionDirection::Out => "out",
+            TransitionDirection::Left => Ok("l"),
+            TransitionDirection::Right => Ok("r"),
+            TransitionDirection::Up => Ok("u"),
+            TransitionDirection::Down => Ok("d"),
+            _ => Err(invalid_writer_direction("side", direction)),
+        }
+    }
+
+    fn orientation_to_xml(direction: TransitionDirection) -> Result<&'static str> {
+        match direction {
+            TransitionDirection::Horizontal => Ok("horz"),
+            TransitionDirection::Vertical => Ok("vert"),
+            _ => Err(invalid_writer_direction("orientation", direction)),
+        }
+    }
+
+    fn corner_direction_to_xml(direction: TransitionDirection) -> Result<&'static str> {
+        match direction {
+            TransitionDirection::LeftUp => Ok("lu"),
+            TransitionDirection::RightUp => Ok("ru"),
+            TransitionDirection::LeftDown => Ok("ld"),
+            TransitionDirection::RightDown => Ok("rd"),
+            _ => Err(invalid_writer_direction("corner", direction)),
+        }
+    }
+
+    fn eight_direction_to_xml(direction: TransitionDirection) -> Result<&'static str> {
+        match direction {
+            TransitionDirection::Left => Ok("l"),
+            TransitionDirection::Right => Ok("r"),
+            TransitionDirection::Up => Ok("u"),
+            TransitionDirection::Down => Ok("d"),
+            TransitionDirection::LeftUp => Ok("lu"),
+            TransitionDirection::RightUp => Ok("ru"),
+            TransitionDirection::LeftDown => Ok("ld"),
+            TransitionDirection::RightDown => Ok("rd"),
+            _ => Err(invalid_writer_direction("eight-way", direction)),
         }
     }
 }
@@ -621,6 +717,95 @@ fn parse_duration_ms(value: &str) -> Option<u32> {
         .unwrap_or(value)
         .parse::<u32>()
         .ok()
+}
+
+fn parse_side_direction(element: &BytesStart<'_>, decoder: Decoder) -> Result<TransitionDirection> {
+    let value =
+        unqualified_attribute_value(element, b"dir", decoder)?.unwrap_or_else(|| "l".to_string());
+    match value.as_str() {
+        "l" => Ok(TransitionDirection::Left),
+        "r" => Ok(TransitionDirection::Right),
+        "u" => Ok(TransitionDirection::Up),
+        "d" => Ok(TransitionDirection::Down),
+        _ => Err(invalid_xml_direction("side", &value)),
+    }
+}
+
+fn parse_orientation(
+    element: &BytesStart<'_>,
+    attribute: &[u8],
+    decoder: Decoder,
+) -> Result<TransitionDirection> {
+    let value = unqualified_attribute_value(element, attribute, decoder)?
+        .unwrap_or_else(|| "horz".to_string());
+    match value.as_str() {
+        "horz" => Ok(TransitionDirection::Horizontal),
+        "vert" => Ok(TransitionDirection::Vertical),
+        _ => Err(invalid_xml_direction("orientation", &value)),
+    }
+}
+
+fn parse_corner_direction(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<TransitionDirection> {
+    let value =
+        unqualified_attribute_value(element, b"dir", decoder)?.unwrap_or_else(|| "lu".to_string());
+    match value.as_str() {
+        "lu" => Ok(TransitionDirection::LeftUp),
+        "ru" => Ok(TransitionDirection::RightUp),
+        "ld" => Ok(TransitionDirection::LeftDown),
+        "rd" => Ok(TransitionDirection::RightDown),
+        _ => Err(invalid_xml_direction("corner", &value)),
+    }
+}
+
+fn parse_eight_direction(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<TransitionDirection> {
+    let value =
+        unqualified_attribute_value(element, b"dir", decoder)?.unwrap_or_else(|| "l".to_string());
+    match value.as_str() {
+        "l" => Ok(TransitionDirection::Left),
+        "r" => Ok(TransitionDirection::Right),
+        "u" => Ok(TransitionDirection::Up),
+        "d" => Ok(TransitionDirection::Down),
+        "lu" => Ok(TransitionDirection::LeftUp),
+        "ru" => Ok(TransitionDirection::RightUp),
+        "ld" => Ok(TransitionDirection::LeftDown),
+        "rd" => Ok(TransitionDirection::RightDown),
+        _ => Err(invalid_xml_direction("eight-way", &value)),
+    }
+}
+
+fn parse_zoom_direction(element: &BytesStart<'_>, decoder: Decoder) -> Result<ZoomDirection> {
+    let value =
+        unqualified_attribute_value(element, b"dir", decoder)?.unwrap_or_else(|| "in".to_string());
+    match value.as_str() {
+        "in" => Ok(ZoomDirection::In),
+        "out" => Ok(ZoomDirection::Out),
+        _ => Err(invalid_xml_direction("zoom", &value)),
+    }
+}
+
+fn parse_wheel_spokes(element: &BytesStart<'_>, decoder: Decoder) -> Result<u8> {
+    let Some(value) = unqualified_attribute_value(element, b"spokes", decoder)? else {
+        return Ok(4);
+    };
+    value.parse::<u8>().map_err(|_| {
+        OoxmlError::InvalidFormat(format!("invalid wheel transition spoke count '{value}'"))
+    })
+}
+
+fn invalid_xml_direction(kind: &str, value: &str) -> OoxmlError {
+    OoxmlError::InvalidFormat(format!("invalid {kind} transition direction '{value}'"))
+}
+
+fn invalid_writer_direction(kind: &str, direction: TransitionDirection) -> OoxmlError {
+    OoxmlError::InvalidFormat(format!(
+        "{direction:?} is not valid for a {kind} transition direction"
+    ))
 }
 
 fn is_p14_namespace(namespace: &ResolveResult<'_>) -> bool {
@@ -637,6 +822,9 @@ fn is_p14_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const STANDARD_COVER: &[u8] =
+        include_bytes!("../../../../test-data/ooxml/pptx/transitions/standard_cover.xml");
 
     #[test]
     fn test_transition_speed() {
@@ -675,5 +863,182 @@ mod tests {
             transition.to_xml(),
             Err(OoxmlError::Other(message)) if message.contains("read-only")
         ));
+    }
+
+    #[test]
+    fn parses_local_standard_cover_fixture() {
+        let transition = SlideTransition::from_xml(STANDARD_COVER).unwrap().unwrap();
+
+        assert_eq!(transition.speed, TransitionSpeed::Fast);
+        assert_eq!(transition.advance_on_click, false);
+        assert_eq!(transition.advance_after_ms, Some(750));
+        assert_eq!(
+            transition.transition_type,
+            TransitionType::Cover {
+                direction: TransitionDirection::RightDown,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_standard_transition_effects_and_directions() {
+        assert_eq!(
+            parse_effect(r#"<p:push dir="d"/>"#).transition_type,
+            TransitionType::Push {
+                direction: TransitionDirection::Down,
+            }
+        );
+        assert_eq!(
+            parse_effect(r#"<p:split orient="vert"/>"#).transition_type,
+            TransitionType::Split {
+                direction: TransitionDirection::Vertical,
+            }
+        );
+        assert_eq!(
+            parse_effect(r#"<p:pull dir="lu"/>"#).transition_type,
+            TransitionType::Uncover {
+                direction: TransitionDirection::LeftUp,
+            }
+        );
+        assert_eq!(
+            parse_effect(r#"<p:blinds dir="vert"/>"#).transition_type,
+            TransitionType::Blinds {
+                direction: TransitionDirection::Vertical,
+            }
+        );
+        assert_eq!(
+            parse_effect(r#"<p:randomBar dir="vert"/>"#).transition_type,
+            TransitionType::RandomBars {
+                direction: TransitionDirection::Vertical,
+            }
+        );
+        assert_eq!(
+            parse_effect(r#"<p:strips dir="ld"/>"#).transition_type,
+            TransitionType::Strips {
+                direction: TransitionDirection::LeftDown,
+            }
+        );
+        assert_eq!(
+            parse_effect(r#"<p:comb dir="vert"/>"#).transition_type,
+            TransitionType::Comb {
+                direction: TransitionDirection::Vertical,
+            }
+        );
+        assert_eq!(
+            parse_effect(r#"<p:wheel spokes="6"/>"#).transition_type,
+            TransitionType::Wheel { spokes: 6 }
+        );
+        assert_eq!(
+            parse_effect(r#"<p:zoom dir="out"/>"#).transition_type,
+            TransitionType::Zoom {
+                direction: ZoomDirection::Out,
+            }
+        );
+        assert_eq!(
+            parse_effect(r#"<p:newsflash/>"#).transition_type,
+            TransitionType::Newsflash
+        );
+    }
+
+    #[test]
+    fn writes_standard_transition_effects_without_fade_fallbacks() {
+        let cases = [
+            (
+                TransitionType::Push {
+                    direction: TransitionDirection::Down,
+                },
+                r#"<p:push dir="d"/>"#,
+            ),
+            (
+                TransitionType::Split {
+                    direction: TransitionDirection::Vertical,
+                },
+                r#"<p:split orient="vert"/>"#,
+            ),
+            (
+                TransitionType::Uncover {
+                    direction: TransitionDirection::LeftUp,
+                },
+                r#"<p:pull dir="lu"/>"#,
+            ),
+            (
+                TransitionType::Cover {
+                    direction: TransitionDirection::RightDown,
+                },
+                r#"<p:cover dir="rd"/>"#,
+            ),
+            (
+                TransitionType::Blinds {
+                    direction: TransitionDirection::Vertical,
+                },
+                r#"<p:blinds dir="vert"/>"#,
+            ),
+            (
+                TransitionType::RandomBars {
+                    direction: TransitionDirection::Vertical,
+                },
+                r#"<p:randomBar dir="vert"/>"#,
+            ),
+            (
+                TransitionType::Strips {
+                    direction: TransitionDirection::LeftDown,
+                },
+                r#"<p:strips dir="ld"/>"#,
+            ),
+            (
+                TransitionType::Comb {
+                    direction: TransitionDirection::Vertical,
+                },
+                r#"<p:comb dir="vert"/>"#,
+            ),
+            (
+                TransitionType::Wheel { spokes: 6 },
+                r#"<p:wheel spokes="6"/>"#,
+            ),
+            (TransitionType::Newsflash, "<p:newsflash/>"),
+            (
+                TransitionType::Shape {
+                    shape_type: ShapeTransitionType::Plus,
+                },
+                "<p:plus/>",
+            ),
+        ];
+
+        for (transition_type, expected_effect) in cases {
+            let xml = SlideTransition::new(transition_type).to_xml().unwrap();
+            assert!(
+                xml.contains(expected_effect),
+                "expected {expected_effect:?} in {xml:?}"
+            );
+            assert!(!xml.contains("<p:fade"), "unexpected fallback in {xml:?}");
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_standard_transition_directions() {
+        let xml = transition_xml(r#"<p:push dir="horz"/>"#);
+        assert!(matches!(
+            SlideTransition::from_xml(xml.as_bytes()),
+            Err(OoxmlError::InvalidFormat(message)) if message.contains("side transition direction")
+        ));
+
+        let transition = SlideTransition::new(TransitionType::Wipe {
+            direction: TransitionDirection::Horizontal,
+        });
+        assert!(matches!(
+            transition.to_xml(),
+            Err(OoxmlError::InvalidFormat(message)) if message.contains("not valid")
+        ));
+    }
+
+    fn parse_effect(effect: &str) -> SlideTransition {
+        let xml = transition_xml(effect);
+        SlideTransition::from_xml(xml.as_bytes()).unwrap().unwrap()
+    }
+
+    fn transition_xml(effect: &str) -> String {
+        format!(
+            r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:transition>{effect}</p:transition></p:sld>"#
+        )
     }
 }
