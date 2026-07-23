@@ -3,7 +3,8 @@
 use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartCornerRadius, ChartRoundedCorners, ChartValueAxisBounds,
+    ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 
@@ -644,6 +645,72 @@ fn scratch_presentation_supports_native_chart_border_crud() {
         reopened
             .slide_chart_border_visible(0, duplicate.drawable_object_id)
             .unwrap()
+    );
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let rounded = ChartRoundedCorners::new(ChartCornerRadius::new(20.0).unwrap(), true);
+    let changed = ChartRoundedCorners::new(ChartCornerRadius::new(35.0).unwrap(), false);
+
+    assert_eq!(
+        editor
+            .slide_chart_rounded_corners(0, source.drawable_object_id)
+            .unwrap(),
+        ChartRoundedCorners::NONE
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_rounded_corners(0, source.drawable_object_id, ChartRoundedCorners::NONE)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_rounded_corners(0, source.drawable_object_id, rounded)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_rounded_corners(0, source.drawable_object_id)
+            .unwrap(),
+        rounded
+    );
+
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_rounded_corners(0, duplicate.drawable_object_id)
+            .unwrap(),
+        rounded
+    );
+    editor
+        .set_slide_chart_rounded_corners(0, source.drawable_object_id, changed)
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_rounded_corners(0, source.drawable_object_id)
+            .unwrap(),
+        changed
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_rounded_corners(0, duplicate.drawable_object_id)
+            .unwrap(),
+        rounded
     );
     reopened
         .remove_slide_chart(0, source.drawable_object_id)

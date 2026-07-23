@@ -14,6 +14,7 @@ mod border;
 mod caption;
 mod graph;
 mod legend;
+mod rounded_corners;
 mod theme;
 mod title;
 

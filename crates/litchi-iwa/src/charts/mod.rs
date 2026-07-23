@@ -23,7 +23,9 @@ mod direction;
 mod kind;
 pub mod metadata_extractor;
 pub(crate) mod options;
+pub(crate) mod rounded_corners;
 pub(crate) mod source;
+pub(crate) mod style;
 
 pub use archive::IWorkChartArchive;
 pub use axis::ChartAxis;
@@ -35,6 +37,7 @@ pub use data::ChartData;
 pub use direction::ChartSeriesDirection;
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
+pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
 
 /// Locate one chart-private object and reject ambiguous cross-component IDs.
 pub(crate) fn unique_chart_object_archive_name(

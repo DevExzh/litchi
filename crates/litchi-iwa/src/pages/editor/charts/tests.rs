@@ -3,7 +3,8 @@
 use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartCornerRadius, ChartRoundedCorners, ChartValueAxisBounds,
+    ChartValueAxisScale, ChartValueAxisSteps,
 };
 
 const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
@@ -670,6 +671,81 @@ fn scratch_document_supports_native_chart_border_crud() {
         reopened
             .body_chart_border_visible(duplicate.drawable_object_id)
             .unwrap()
+    );
+    reopened
+        .remove_body_chart(source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
+}
+
+#[test]
+fn scratch_document_supports_native_chart_rounded_corner_crud() {
+    let mut editor = PagesEditor::create_with_text("Rounded chart corners").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Rounded chart corners".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let rounded = ChartRoundedCorners::new(ChartCornerRadius::new(20.0).unwrap(), true);
+    let changed = ChartRoundedCorners::new(ChartCornerRadius::new(35.0).unwrap(), false);
+
+    assert_eq!(
+        editor
+            .body_chart_rounded_corners(source.drawable_object_id)
+            .unwrap(),
+        ChartRoundedCorners::NONE
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_rounded_corners(source.drawable_object_id, ChartRoundedCorners::NONE)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_rounded_corners(source.drawable_object_id, rounded)
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_rounded_corners(source.drawable_object_id)
+            .unwrap(),
+        rounded
+    );
+
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_rounded_corners(duplicate.drawable_object_id)
+            .unwrap(),
+        rounded
+    );
+    editor
+        .set_body_chart_rounded_corners(source.drawable_object_id, changed)
+        .unwrap();
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_rounded_corners(source.drawable_object_id)
+            .unwrap(),
+        changed
+    );
+    assert_eq!(
+        reopened
+            .body_chart_rounded_corners(duplicate.drawable_object_id)
+            .unwrap(),
+        rounded
     );
     reopened
         .remove_body_chart(source.drawable_object_id)

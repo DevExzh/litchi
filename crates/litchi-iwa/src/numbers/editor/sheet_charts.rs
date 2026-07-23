@@ -14,6 +14,7 @@ mod border;
 mod caption;
 mod graph;
 mod legend;
+mod rounded_corners;
 mod theme;
 mod title;
 
@@ -536,7 +537,8 @@ mod tests {
     use super::*;
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-        ChartAxisTickMarkLocation, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+        ChartAxisTickMarkLocation, ChartCornerRadius, ChartRoundedCorners, ChartValueAxisBounds,
+        ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
 
@@ -2262,6 +2264,77 @@ mod tests {
             reopened
                 .sheet_chart_border_visible(sheet_id, duplicate.drawable_object_id)
                 .unwrap()
+        );
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_rounded_corner_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let rounded = ChartRoundedCorners::new(ChartCornerRadius::new(20.0).unwrap(), true);
+        let changed = ChartRoundedCorners::new(ChartCornerRadius::new(35.0).unwrap(), false);
+
+        assert_eq!(
+            editor
+                .sheet_chart_rounded_corners(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            ChartRoundedCorners::NONE
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_rounded_corners(
+                sheet_id,
+                source.drawable_object_id,
+                ChartRoundedCorners::NONE,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_rounded_corners(sheet_id, source.drawable_object_id, rounded)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_rounded_corners(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            rounded
+        );
+
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_rounded_corners(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            rounded
+        );
+        editor
+            .set_sheet_chart_rounded_corners(sheet_id, source.drawable_object_id, changed)
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_rounded_corners(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            changed
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_rounded_corners(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            rounded
         );
         reopened
             .remove_sheet_chart(sheet_id, source.drawable_object_id)
