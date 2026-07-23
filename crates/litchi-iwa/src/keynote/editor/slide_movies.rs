@@ -9,7 +9,7 @@ use crate::media_playback::media_playback_settings;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, geometry_from_drawable,
+    flip_drawable_geometry, geometry_from_drawable, restore_drawable_original_size,
 };
 use std::time::Duration;
 
@@ -274,6 +274,40 @@ impl KeynoteEditor {
             .slide_movie_graph(slide_index, drawable_object_id)?
             .info
             .geometry)
+    }
+
+    /// Restore a file-backed slide movie's displayed dimensions from its stored original size.
+    ///
+    /// This keeps the current position, rotation, reflection, media assets, playback,
+    /// and properties unchanged. It returns an error when the movie has no native
+    /// original-size metadata.
+    pub fn restore_slide_movie_original_size(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<DrawableGeometry> {
+        let source = self.require_file_movie(slide_index, drawable_object_id)?;
+        let original_size = source.info.original_size.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Keynote movie {drawable_object_id} has no original-size metadata"
+            ))
+        })?;
+        let geometry = restore_drawable_original_size(source.info.geometry, original_size)?;
+        let mut staged = self.package().clone();
+        set_movie_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_movie_geometry(slide_index, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Keynote movie original-size update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Apply one native Arrange Flip operation to an ordinary file-backed slide movie.
@@ -1093,6 +1127,20 @@ mod tests {
                 .unwrap(),
             changed_geometry
         );
+        let restored_original_size = editor
+            .restore_slide_movie_original_size(0, created.drawable_object_id)
+            .unwrap();
+        let expected_original_size_geometry = DrawableGeometry {
+            size: Some(NATURAL_SIZE),
+            ..changed_geometry
+        };
+        assert_eq!(restored_original_size, expected_original_size_geometry);
+        assert_eq!(
+            editor
+                .slide_movie_geometry(0, created.drawable_object_id)
+                .unwrap(),
+            expected_original_size_geometry
+        );
         let horizontally_flipped = editor
             .flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)
             .unwrap();
@@ -1227,6 +1275,12 @@ mod tests {
         assert!(
             editor
                 .flip_slide_movie(0, MISSING_DRAWABLE_OBJECT_ID, DrawableFlipAxis::Horizontal,)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_flip);
+        assert!(
+            editor
+                .restore_slide_movie_original_size(0, MISSING_DRAWABLE_OBJECT_ID)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before_flip);

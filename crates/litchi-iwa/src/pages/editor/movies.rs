@@ -12,7 +12,7 @@ use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, offset_drawable_geometry,
+    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
 
 mod graph;
@@ -219,6 +219,39 @@ impl PagesEditor {
     /// Read typed geometry for one body-anchored movie.
     pub fn body_movie_geometry(&self, drawable_object_id: u64) -> Result<DrawableGeometry> {
         Ok(body_movie_graph(self, drawable_object_id)?.info.geometry)
+    }
+
+    /// Restore a body movie's displayed dimensions from its stored original size.
+    ///
+    /// This keeps the current position, rotation, reflection, media assets, playback,
+    /// and properties unchanged. It returns an error when the movie has no native
+    /// original-size metadata.
+    pub fn restore_body_movie_original_size(
+        &mut self,
+        drawable_object_id: u64,
+    ) -> Result<DrawableGeometry> {
+        let source = body_movie_graph(self, drawable_object_id)?;
+        let original_size = source.info.original_size.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages movie {drawable_object_id} has no original-size metadata"
+            ))
+        })?;
+        let geometry = restore_drawable_original_size(source.info.geometry, original_size)?;
+        let mut staged = self.package().clone();
+        set_movie_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_movie_geometry(drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Pages movie original-size update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Apply one native Arrange Flip operation to a body-anchored movie.
@@ -610,9 +643,14 @@ mod tests {
         width: 320.0,
         height: 180.0,
     };
+    const NATURAL_SIZE: DrawableSize = DrawableSize {
+        width: 640.0,
+        height: 360.0,
+    };
 
     fn options() -> PagesMovieOptions {
         PagesMovieOptions::new(POSITION, SIZE, Duration::from_secs(8))
+            .with_natural_size(NATURAL_SIZE)
     }
 
     fn properties(description: &str) -> DrawableProperties {
@@ -637,8 +675,8 @@ mod tests {
         assert_eq!(created.anchor_character_index, anchor as u32);
         assert_eq!(created.geometry.position, Some(POSITION));
         assert_eq!(created.geometry.size, Some(SIZE));
-        assert_eq!(created.original_size, Some(SIZE));
-        assert_eq!(created.natural_size, Some(SIZE));
+        assert_eq!(created.original_size, Some(NATURAL_SIZE));
+        assert_eq!(created.natural_size, Some(NATURAL_SIZE));
         assert_eq!(created.duration, Duration::from_secs(8));
         assert_eq!(editor.body_text().unwrap(), "Quarterly report\u{fffc}");
         assert_eq!(
@@ -713,6 +751,20 @@ mod tests {
                 .body_movie_geometry(created.drawable_object_id)
                 .unwrap(),
             changed_geometry
+        );
+        let restored_original_size = editor
+            .restore_body_movie_original_size(created.drawable_object_id)
+            .unwrap();
+        let expected_original_size_geometry = DrawableGeometry {
+            size: Some(NATURAL_SIZE),
+            ..changed_geometry
+        };
+        assert_eq!(restored_original_size, expected_original_size_geometry);
+        assert_eq!(
+            editor
+                .body_movie_geometry(created.drawable_object_id)
+                .unwrap(),
+            expected_original_size_geometry
         );
         let horizontally_flipped = editor
             .flip_body_movie(created.drawable_object_id, DrawableFlipAxis::Horizontal)
@@ -934,6 +986,12 @@ mod tests {
         assert!(
             editor
                 .flip_body_movie(image.drawable_object_id, DrawableFlipAxis::Horizontal)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+        assert!(
+            editor
+                .restore_body_movie_original_size(image.drawable_object_id)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

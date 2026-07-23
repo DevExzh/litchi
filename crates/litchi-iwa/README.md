@@ -141,6 +141,13 @@ File-backed movies likewise expose `flip_body_movie`, `flip_sheet_movie`, and
 `flip_slide_movie`, preserving their video and poster assets, playback settings,
 and metadata; see `create_*_flipped_movie` for scratch-file examples.
 
+Movies with native original-size metadata can also restore just their displayed
+dimensions through `restore_body_movie_original_size`,
+`restore_sheet_movie_original_size`, or `restore_slide_movie_original_size`.
+Those operations retain the current position and transform while returning an
+error for media that has no original dimensions; see
+`create_*_original_size_movie` for scratch-file examples.
+
 ### Create Pages documents from scratch
 
 ```rust

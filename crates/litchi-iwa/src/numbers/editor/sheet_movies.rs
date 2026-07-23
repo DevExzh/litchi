@@ -11,7 +11,7 @@ use crate::data_reference_registry::{
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, offset_drawable_geometry,
+    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
 
 pub(super) mod graph;
@@ -193,6 +193,40 @@ impl NumbersEditor {
         Ok(movie_graph(self, sheet_id, drawable_object_id)?
             .info
             .geometry)
+    }
+
+    /// Restore a sheet movie's displayed dimensions from its stored original size.
+    ///
+    /// This keeps the current position, rotation, reflection, media assets, playback,
+    /// and properties unchanged. It returns an error when the movie has no native
+    /// original-size metadata.
+    pub fn restore_sheet_movie_original_size(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<DrawableGeometry> {
+        let source = movie_graph(self, sheet_id, drawable_object_id)?;
+        let original_size = source.info.original_size.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers movie {drawable_object_id} has no original-size metadata"
+            ))
+        })?;
+        let geometry = restore_drawable_original_size(source.info.geometry, original_size)?;
+        let mut staged = self.package.clone();
+        set_movie_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_movie_geometry(sheet_id, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Numbers movie original-size update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Apply one native Arrange Flip operation to an ordinary sheet movie.
@@ -581,9 +615,14 @@ mod tests {
         width: 320.0,
         height: 180.0,
     };
+    const NATURAL_SIZE: DrawableSize = DrawableSize {
+        width: 640.0,
+        height: 360.0,
+    };
 
     fn options() -> NumbersSheetMovieOptions {
         NumbersSheetMovieOptions::new(POSITION, SIZE, Duration::from_secs(8))
+            .with_natural_size(NATURAL_SIZE)
     }
 
     fn properties(description: &str) -> DrawableProperties {
@@ -618,8 +657,8 @@ mod tests {
         assert_eq!(created.sheet_id, sheet_id);
         assert_eq!(created.geometry.position, Some(POSITION));
         assert_eq!(created.geometry.size, Some(SIZE));
-        assert_eq!(created.original_size, Some(SIZE));
-        assert_eq!(created.natural_size, Some(SIZE));
+        assert_eq!(created.original_size, Some(NATURAL_SIZE));
+        assert_eq!(created.natural_size, Some(NATURAL_SIZE));
         assert_eq!(created.duration, Duration::from_secs(8));
         assert_eq!(
             editor.extract_media(created.movie_data_identifier).unwrap(),
@@ -709,6 +748,20 @@ mod tests {
                 .sheet_movie_geometry(sheet_id, created.drawable_object_id)
                 .unwrap(),
             changed_geometry
+        );
+        let restored_original_size = editor
+            .restore_sheet_movie_original_size(sheet_id, created.drawable_object_id)
+            .unwrap();
+        let expected_original_size_geometry = DrawableGeometry {
+            size: Some(NATURAL_SIZE),
+            ..changed_geometry
+        };
+        assert_eq!(restored_original_size, expected_original_size_geometry);
+        assert_eq!(
+            editor
+                .sheet_movie_geometry(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            expected_original_size_geometry
         );
         let horizontally_flipped = editor
             .flip_sheet_movie(
@@ -979,6 +1032,12 @@ mod tests {
                     image.drawable_object_id,
                     DrawableFlipAxis::Horizontal,
                 )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+        assert!(
+            editor
+                .restore_sheet_movie_original_size(sheet_id, image.drawable_object_id)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

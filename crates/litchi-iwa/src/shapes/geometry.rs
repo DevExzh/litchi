@@ -137,6 +137,31 @@ pub(crate) fn flip_drawable_geometry(
     .validate()
 }
 
+/// Restore the displayed dimensions of a drawable from stored original media dimensions.
+///
+/// Position, reflection flags, and rotation remain unchanged. Media editors use this
+/// as a deterministic typed operation corresponding to iWork's Original Size control.
+pub(crate) fn restore_drawable_original_size(
+    geometry: DrawableGeometry,
+    original_size: DrawableSize,
+) -> Result<DrawableGeometry> {
+    let geometry = geometry.validate()?;
+    if !original_size.width.is_finite()
+        || !original_size.height.is_finite()
+        || original_size.width <= 0.0
+        || original_size.height <= 0.0
+    {
+        return Err(Error::InvalidFormat(
+            "iWork drawable original size must be finite and greater than zero".to_owned(),
+        ));
+    }
+    DrawableGeometry {
+        size: Some(original_size),
+        ..geometry
+    }
+    .validate()
+}
+
 fn native_vertical_flip_angle(angle: Option<f32>) -> f32 {
     let current = angle.unwrap_or_default().rem_euclid(FULL_TURN_DEGREES);
     let flipped = (current + HALF_TURN_DEGREES).rem_euclid(FULL_TURN_DEGREES);
@@ -337,6 +362,10 @@ mod tests {
     const ROTATED_DRAWABLE_DEGREES: f32 = 45.0;
     const VERTICALLY_FLIPPED_ROTATED_DRAWABLE_DEGREES: f32 =
         ROTATED_DRAWABLE_DEGREES + HALF_TURN_DEGREES;
+    const ORIGINAL_MEDIA_SIZE: DrawableSize = DrawableSize {
+        width: 640.0,
+        height: 360.0,
+    };
 
     #[test]
     fn geometry_offset_requires_a_finite_position_and_offset() {
@@ -425,6 +454,46 @@ mod tests {
                     ..baseline
                 },
                 DrawableFlipAxis::Horizontal,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn original_size_restore_replaces_only_displayed_dimensions() {
+        let geometry = DrawableGeometry {
+            position: Some(DrawablePoint { x: 12.0, y: 24.0 }),
+            size: Some(DrawableSize {
+                width: 100.0,
+                height: 80.0,
+            }),
+            flags: Some(NATIVE_REFLECTED_DRAWABLE_FLAGS),
+            angle: Some(ROTATED_DRAWABLE_DEGREES),
+        };
+        assert_eq!(
+            restore_drawable_original_size(geometry, ORIGINAL_MEDIA_SIZE).unwrap(),
+            DrawableGeometry {
+                size: Some(ORIGINAL_MEDIA_SIZE),
+                ..geometry
+            }
+        );
+        assert!(
+            restore_drawable_original_size(
+                geometry,
+                DrawableSize {
+                    width: 0.0,
+                    height: ORIGINAL_MEDIA_SIZE.height,
+                },
+            )
+            .is_err()
+        );
+        assert!(
+            restore_drawable_original_size(
+                geometry,
+                DrawableSize {
+                    width: f32::NAN,
+                    height: ORIGINAL_MEDIA_SIZE.height,
+                },
             )
             .is_err()
         );

@@ -34,7 +34,7 @@ pub(crate) use fill::{reset_shape_fill, set_shape_fill, set_shape_image_fill_dat
 pub use geometry::{DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableSize};
 pub(crate) use geometry::{
     flip_drawable_geometry, geometry_from_drawable, offset_drawable_geometry,
-    patch_drawable_geometry, set_shape_geometry, shape_geometry,
+    patch_drawable_geometry, restore_drawable_original_size, set_shape_geometry, shape_geometry,
 };
 pub use line::LineSegment;
 pub(crate) use line::{
