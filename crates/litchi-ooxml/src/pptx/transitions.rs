@@ -139,6 +139,15 @@ pub enum ZoomDirection {
     Out,
 }
 
+/// In/out direction used by a split transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitDirection {
+    /// Move toward the center.
+    In,
+    /// Move away from the center.
+    Out,
+}
+
 /// Direction used by a PowerPoint 2010 ripple transition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RippleDirection {
@@ -231,6 +240,14 @@ pub struct SlideTransition {
     pub speed: TransitionSpeed,
     /// Duration in milliseconds (optional, overrides speed)
     pub duration_ms: Option<u32>,
+    /// Whether a cut or fade transition goes through black.
+    ///
+    /// `None` preserves an omitted attribute and therefore the OOXML default.
+    pub through_black: Option<bool>,
+    /// Explicit in/out direction for a split transition.
+    ///
+    /// `None` preserves an omitted attribute and therefore the OOXML default.
+    pub split_direction: Option<SplitDirection>,
     /// Whether to advance slide on mouse click
     pub advance_on_click: bool,
     /// Auto-advance after delay in milliseconds (None = no auto-advance)
@@ -248,12 +265,31 @@ pub struct TransitionSound {
     pub loop_sound: bool,
 }
 
+#[derive(Debug)]
+struct ParsedTransitionEffect {
+    transition_type: TransitionType,
+    through_black: Option<bool>,
+    split_direction: Option<SplitDirection>,
+}
+
+impl ParsedTransitionEffect {
+    fn new(transition_type: TransitionType) -> Self {
+        Self {
+            transition_type,
+            through_black: None,
+            split_direction: None,
+        }
+    }
+}
+
 impl Default for SlideTransition {
     fn default() -> Self {
         Self {
             transition_type: TransitionType::None,
             speed: TransitionSpeed::Medium,
             duration_ms: None,
+            through_black: None,
+            split_direction: None,
             advance_on_click: true,
             advance_after_ms: None,
             sound: None,
@@ -279,6 +315,18 @@ impl SlideTransition {
     /// Set a custom duration in milliseconds.
     pub fn with_duration_ms(mut self, duration_ms: u32) -> Self {
         self.duration_ms = Some(duration_ms);
+        self
+    }
+
+    /// Set whether a cut or fade transition goes through black.
+    pub fn with_through_black(mut self, through_black: bool) -> Self {
+        self.through_black = Some(through_black);
+        self
+    }
+
+    /// Set the in/out direction of a split transition.
+    pub fn with_split_direction(mut self, direction: SplitDirection) -> Self {
+        self.split_direction = Some(direction);
         self
     }
 
@@ -340,11 +388,11 @@ impl SlideTransition {
                         .and_then(|transition_depth| transition_depth.checked_add(1))
                         == Some(depth)
                     {
-                        if let Some(transition_type) =
+                        if let Some(effect) =
                             Self::parse_transition_type(&namespace, &element, decoder)?
                             && let Some(transition) = transition.as_mut()
                         {
-                            transition.transition_type = transition_type;
+                            transition.apply_effect(effect);
                         }
                     }
                     stack.push(is_transition);
@@ -363,11 +411,11 @@ impl SlideTransition {
                         .and_then(|transition_depth| transition_depth.checked_add(1))
                         == Some(depth)
                     {
-                        if let Some(transition_type) =
+                        if let Some(effect) =
                             Self::parse_transition_type(&namespace, &element, decoder)?
                             && let Some(transition) = transition.as_mut()
                         {
-                            transition.transition_type = transition_type;
+                            transition.apply_effect(effect);
                         }
                     }
                 },
@@ -429,10 +477,18 @@ impl SlideTransition {
             transition_type: TransitionType::None,
             speed,
             duration_ms: extended_duration_ms.or(legacy_duration_ms),
+            through_black: None,
+            split_direction: None,
             advance_on_click,
             advance_after_ms,
             sound: None,
         })
+    }
+
+    fn apply_effect(&mut self, effect: ParsedTransitionEffect) {
+        self.transition_type = effect.transition_type;
+        self.through_black = effect.through_black;
+        self.split_direction = effect.split_direction;
     }
 
     /// Parse a transition effect from a direct child of `<p:transition>`.
@@ -440,13 +496,15 @@ impl SlideTransition {
         namespace: &ResolveResult<'_>,
         element: &BytesStart<'_>,
         decoder: Decoder,
-    ) -> Result<Option<TransitionType>> {
+    ) -> Result<Option<ParsedTransitionEffect>> {
         if is_p14_name(namespace, element.name(), b"ripple") {
             let direction = unqualified_attribute_value(element, b"dir", decoder)?
                 .map(|value| RippleDirection::from_xml_value(&value))
                 .transpose()?
                 .unwrap_or(RippleDirection::Center);
-            return Ok(Some(TransitionType::Ripple { direction }));
+            return Ok(Some(ParsedTransitionEffect::new(TransitionType::Ripple {
+                direction,
+            })));
         }
 
         let tag_name = element.local_name();
@@ -503,7 +561,26 @@ impl SlideTransition {
             _ => None,
         };
 
-        Ok(transition_type)
+        let Some(transition_type) = transition_type else {
+            return Ok(None);
+        };
+        let through_black =
+            if matches!(&transition_type, TransitionType::Cut | TransitionType::Fade) {
+                parse_optional_boolean(element, b"thruBlk", decoder)?
+            } else {
+                None
+            };
+        let split_direction = if matches!(&transition_type, TransitionType::Split { .. }) {
+            parse_split_direction(element, decoder)?
+        } else {
+            None
+        };
+
+        Ok(Some(ParsedTransitionEffect {
+            transition_type,
+            through_black,
+            split_direction,
+        }))
     }
 
     /// Generate XML for this transition.
@@ -543,15 +620,45 @@ impl SlideTransition {
 
     /// Write the transition type-specific XML.
     fn write_transition_type_xml(&self, xml: &mut String) -> Result<()> {
+        if self.through_black.is_some()
+            && !matches!(
+                &self.transition_type,
+                TransitionType::Cut | TransitionType::Fade
+            )
+        {
+            return Err(OoxmlError::InvalidFormat(
+                "through-black is only valid for cut and fade transitions".to_string(),
+            ));
+        }
+        if self.split_direction.is_some()
+            && !matches!(&self.transition_type, TransitionType::Split { .. })
+        {
+            return Err(OoxmlError::InvalidFormat(
+                "split direction is only valid for split transitions".to_string(),
+            ));
+        }
+
         match &self.transition_type {
             TransitionType::None => {
                 // No transition element
             },
             TransitionType::Cut => {
-                xml.push_str("<p:cut/>");
+                xml.push_str("<p:cut");
+                if let Some(through_black) = self.through_black {
+                    xml.push_str(" thruBlk=\"");
+                    xml.push_str(boolean_to_xml(through_black));
+                    xml.push('"');
+                }
+                xml.push_str("/>");
             },
             TransitionType::Fade => {
-                xml.push_str("<p:fade thruBlk=\"false\"/>");
+                xml.push_str("<p:fade");
+                if let Some(through_black) = self.through_black {
+                    xml.push_str(" thruBlk=\"");
+                    xml.push_str(boolean_to_xml(through_black));
+                    xml.push('"');
+                }
+                xml.push_str("/>");
             },
             TransitionType::Push { direction } => {
                 xml.push_str("<p:push dir=\"");
@@ -567,7 +674,13 @@ impl SlideTransition {
                 // Split uses "orient" not "dir" per OOXML spec
                 xml.push_str("<p:split orient=\"");
                 xml.push_str(Self::orientation_to_xml(*direction)?);
-                xml.push_str("\"/>");
+                xml.push('"');
+                if let Some(split_direction) = self.split_direction {
+                    xml.push_str(" dir=\"");
+                    xml.push_str(split_direction_to_xml(split_direction));
+                    xml.push('"');
+                }
+                xml.push_str("/>");
             },
             TransitionType::Uncover { direction } => {
                 xml.push_str("<p:pull dir=\"");
@@ -789,6 +902,38 @@ fn parse_zoom_direction(element: &BytesStart<'_>, decoder: Decoder) -> Result<Zo
     }
 }
 
+fn parse_split_direction(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<Option<SplitDirection>> {
+    let Some(value) = unqualified_attribute_value(element, b"dir", decoder)? else {
+        return Ok(None);
+    };
+    match value.as_str() {
+        "in" => Ok(Some(SplitDirection::In)),
+        "out" => Ok(Some(SplitDirection::Out)),
+        _ => Err(invalid_xml_direction("split", &value)),
+    }
+}
+
+fn parse_optional_boolean(
+    element: &BytesStart<'_>,
+    attribute: &[u8],
+    decoder: Decoder,
+) -> Result<Option<bool>> {
+    let Some(value) = unqualified_attribute_value(element, attribute, decoder)? else {
+        return Ok(None);
+    };
+    match value.as_str() {
+        "1" | "true" => Ok(Some(true)),
+        "0" | "false" => Ok(Some(false)),
+        _ => Err(OoxmlError::InvalidFormat(format!(
+            "invalid boolean transition attribute '{}'",
+            value
+        ))),
+    }
+}
+
 fn parse_wheel_spokes(element: &BytesStart<'_>, decoder: Decoder) -> Result<u8> {
     let Some(value) = unqualified_attribute_value(element, b"spokes", decoder)? else {
         return Ok(4);
@@ -808,6 +953,17 @@ fn invalid_writer_direction(kind: &str, direction: TransitionDirection) -> Ooxml
     ))
 }
 
+fn boolean_to_xml(value: bool) -> &'static str {
+    if value { "1" } else { "0" }
+}
+
+fn split_direction_to_xml(direction: SplitDirection) -> &'static str {
+    match direction {
+        SplitDirection::In => "in",
+        SplitDirection::Out => "out",
+    }
+}
+
 fn is_p14_namespace(namespace: &ResolveResult<'_>) -> bool {
     matches!(
         namespace,
@@ -825,6 +981,8 @@ mod tests {
 
     const STANDARD_COVER: &[u8] =
         include_bytes!("../../../../test-data/ooxml/pptx/transitions/standard_cover.xml");
+    const STANDARD_EFFECT_OPTIONS: &[u8] =
+        include_bytes!("../../../../test-data/ooxml/pptx/transitions/standard_effect_options.xml");
 
     #[test]
     fn test_transition_speed() {
@@ -881,6 +1039,17 @@ mod tests {
     }
 
     #[test]
+    fn parses_local_standard_effect_options_fixture() {
+        let transition = SlideTransition::from_xml(STANDARD_EFFECT_OPTIONS)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(transition.transition_type, TransitionType::Fade);
+        assert_eq!(transition.through_black, Some(true));
+        assert_eq!(transition.split_direction, None);
+    }
+
+    #[test]
     fn parses_standard_transition_effects_and_directions() {
         assert_eq!(
             parse_effect(r#"<p:push dir="d"/>"#).transition_type,
@@ -888,12 +1057,14 @@ mod tests {
                 direction: TransitionDirection::Down,
             }
         );
+        let split = parse_effect(r#"<p:split orient="vert" dir="in"/>"#);
         assert_eq!(
-            parse_effect(r#"<p:split orient="vert"/>"#).transition_type,
+            split.transition_type,
             TransitionType::Split {
                 direction: TransitionDirection::Vertical,
             }
         );
+        assert_eq!(split.split_direction, Some(SplitDirection::In));
         assert_eq!(
             parse_effect(r#"<p:pull dir="lu"/>"#).transition_type,
             TransitionType::Uncover {
@@ -1015,6 +1186,29 @@ mod tests {
     }
 
     #[test]
+    fn preserves_through_black_and_split_direction_options() {
+        let fade = SlideTransition::new(TransitionType::Fade).with_through_black(true);
+        let fade_xml = fade.to_xml().unwrap();
+        assert!(fade_xml.contains(r#"<p:fade thruBlk="1"/>"#));
+        assert_eq!(
+            parse_serialized_transition(&fade_xml).through_black,
+            Some(true)
+        );
+
+        let cut = SlideTransition::new(TransitionType::Cut).with_through_black(false);
+        assert!(cut.to_xml().unwrap().contains(r#"<p:cut thruBlk="0"/>"#));
+
+        let split = SlideTransition::new(TransitionType::Split {
+            direction: TransitionDirection::Vertical,
+        })
+        .with_split_direction(SplitDirection::In);
+        let split_xml = split.to_xml().unwrap();
+        assert!(split_xml.contains(r#"<p:split orient="vert" dir="in"/>"#));
+        let parsed = parse_serialized_transition(&split_xml);
+        assert_eq!(parsed.split_direction, Some(SplitDirection::In));
+    }
+
+    #[test]
     fn rejects_invalid_standard_transition_directions() {
         let xml = transition_xml(r#"<p:push dir="horz"/>"#);
         assert!(matches!(
@@ -1031,6 +1225,25 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn rejects_effect_options_on_incompatible_transition_types() {
+        let through_black = SlideTransition::new(TransitionType::Push {
+            direction: TransitionDirection::Left,
+        })
+        .with_through_black(true);
+        assert!(matches!(
+            through_black.to_xml(),
+            Err(OoxmlError::InvalidFormat(message)) if message.contains("through-black")
+        ));
+
+        let split_direction =
+            SlideTransition::new(TransitionType::Fade).with_split_direction(SplitDirection::Out);
+        assert!(matches!(
+            split_direction.to_xml(),
+            Err(OoxmlError::InvalidFormat(message)) if message.contains("split direction")
+        ));
+    }
+
     fn parse_effect(effect: &str) -> SlideTransition {
         let xml = transition_xml(effect);
         SlideTransition::from_xml(xml.as_bytes()).unwrap().unwrap()
@@ -1040,5 +1253,12 @@ mod tests {
         format!(
             r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:transition>{effect}</p:transition></p:sld>"#
         )
+    }
+
+    fn parse_serialized_transition(xml: &str) -> SlideTransition {
+        let xml = format!(
+            r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">{xml}</p:sld>"#
+        );
+        SlideTransition::from_xml(xml.as_bytes()).unwrap().unwrap()
     }
 }

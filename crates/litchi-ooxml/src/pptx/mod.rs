@@ -236,7 +236,8 @@ pub use tags::{
     parse_tag_list, write_tag_list,
 };
 pub use transitions::{
-    RippleDirection, SlideTransition, TransitionDirection, TransitionSpeed, TransitionType,
+    RippleDirection, SlideTransition, SplitDirection, TransitionDirection, TransitionSpeed,
+    TransitionType,
 };
 pub use view_properties::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
