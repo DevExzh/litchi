@@ -176,7 +176,7 @@ pub use field::{
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
     MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
     MergeField, PageBreak, ParsedFieldCode, PromptField, PromptFieldKind, ReferenceCode,
-    SectionBreak, SetField, StoryEvent, StoryField, TableOfAuthoritiesEntryField,
+    SectionBreak, SequenceField, SetField, StoryEvent, StoryField, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesEntryOption, TableOfAuthoritiesField, TableOfAuthoritiesOption,
     TableOfContentsEntryField, TableOfContentsEntryOption, TableOfContentsField,
     TableOfContentsOption, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
