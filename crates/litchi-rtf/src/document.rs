@@ -1184,6 +1184,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `COMPARE` fields in document order.
+    ///
+    /// Stored comparisons, cached results, and field state are exposed solely
+    /// as metadata. This method never parses or evaluates a comparison,
+    /// resolves nested field values, or refreshes field results.
+    pub fn compare_fields(&self) -> Vec<crate::CompareField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::compare_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `COMPARE` fields.
+    pub fn compare_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.compare_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ASK` and `FILLIN` fields in document order.
     ///
     /// Stored prompt, bookmark, default-response, cached results, and field

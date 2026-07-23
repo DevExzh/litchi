@@ -165,6 +165,7 @@ pub use external_reference::{
     DocumentExternalReferences, MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES,
     MAX_DOCUMENT_EXTERNAL_REFERENCE_TOTAL_BYTES,
 };
+pub use field::CompareField;
 pub use field::{
     AddressBlockCountryInclusion, BibliographyField, BibliographyOption, BodyStoryEvent,
     CitationField, CitationOption, DdeField, DdeFieldKind, DdeRepresentation,
