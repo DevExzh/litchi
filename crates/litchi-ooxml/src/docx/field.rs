@@ -513,11 +513,11 @@ impl Field {
 
     /// Parse this field as inert typed document-information metadata.
     ///
-    /// Returns `Ok(None)` for fields other than `TITLE`, `SUBJECT`, `AUTHOR`,
-    /// `KEYWORDS`, `COMMENTS`, and `LASTSAVEDBY`. The result exposes only the
-    /// stored kind, switches, cached content, and dirty/lock state; it never
-    /// reads core or extended package properties, reads or modifies host
-    /// identity data, resolves a value, or refreshes a field.
+    /// Returns `Ok(None)` for fields outside the built-in document-information
+    /// family. The result exposes only the stored kind, switches, cached
+    /// content, and dirty/lock state; it never reads core or extended package
+    /// properties, reads or modifies host identity data, calculates dates,
+    /// revisions, or statistics, resolves a value, or refreshes a field.
     pub fn document_information(&self) -> Result<Option<DocumentInformationField>> {
         DocumentInformationField::from_field(self)
     }
@@ -2167,7 +2167,8 @@ impl DocumentPropertyField {
 /// The built-in Word document-information field category.
 ///
 /// These fields are defined in ECMA-376 Part 1 §17.16.5. This enum preserves
-/// the stored field kind only; it does not resolve document metadata.
+/// the stored field kind only; it does not resolve document metadata or
+/// calculate dates, revisions, or statistics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DocumentInformationFieldKind {
     Title,
@@ -2176,6 +2177,14 @@ pub enum DocumentInformationFieldKind {
     Keywords,
     Comments,
     LastSavedBy,
+    CreateDate,
+    SaveDate,
+    PrintDate,
+    RevisionNumber,
+    EditTime,
+    NumberOfPages,
+    NumberOfWords,
+    NumberOfCharacters,
 }
 
 impl DocumentInformationFieldKind {
@@ -2188,6 +2197,14 @@ impl DocumentInformationFieldKind {
             Self::Keywords => "KEYWORDS",
             Self::Comments => "COMMENTS",
             Self::LastSavedBy => "LASTSAVEDBY",
+            Self::CreateDate => "CREATEDATE",
+            Self::SaveDate => "SAVEDATE",
+            Self::PrintDate => "PRINTDATE",
+            Self::RevisionNumber => "REVNUM",
+            Self::EditTime => "EDITTIME",
+            Self::NumberOfPages => "NUMPAGES",
+            Self::NumberOfWords => "NUMWORDS",
+            Self::NumberOfCharacters => "NUMCHARS",
         }
     }
 
@@ -2199,6 +2216,14 @@ impl DocumentInformationFieldKind {
             Self::Keywords,
             Self::Comments,
             Self::LastSavedBy,
+            Self::CreateDate,
+            Self::SaveDate,
+            Self::PrintDate,
+            Self::RevisionNumber,
+            Self::EditTime,
+            Self::NumberOfPages,
+            Self::NumberOfWords,
+            Self::NumberOfCharacters,
         ]
         .into_iter()
         .find(|kind| field_instruction_remainder(instruction, kind.field_keyword()).is_some())
@@ -2209,7 +2234,8 @@ impl DocumentInformationFieldKind {
 ///
 /// This type retains the stored kind, field switches, cached result, and field
 /// state only. It never reads package properties, reads or modifies host
-/// identity data, resolves a value, or refreshes a field.
+/// identity data, calculates dates, revisions, or statistics, resolves a
+/// value, or refreshes a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentInformationField {
     instruction: String,
@@ -6841,7 +6867,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_document_information_fields_without_reading_metadata_or_identity() {
+    fn parses_document_information_fields_without_reading_or_calculating_values() {
         let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
             <w:fldSimple w:instr=" TITLE \* MERGEFORMAT " w:dirty="true" w:fldLock="on">
                 <w:r><w:t>cached title</w:t></w:r>
@@ -6898,6 +6924,38 @@ mod tests {
                 r"LASTSAVEDBY \* MERGEFORMAT",
                 DocumentInformationFieldKind::LastSavedBy,
             ),
+            (
+                r"CREATEDATE \* MERGEFORMAT",
+                DocumentInformationFieldKind::CreateDate,
+            ),
+            (
+                r"SAVEDATE \* MERGEFORMAT",
+                DocumentInformationFieldKind::SaveDate,
+            ),
+            (
+                r"PRINTDATE \* MERGEFORMAT",
+                DocumentInformationFieldKind::PrintDate,
+            ),
+            (
+                r"REVNUM \* MERGEFORMAT",
+                DocumentInformationFieldKind::RevisionNumber,
+            ),
+            (
+                r"EDITTIME \* MERGEFORMAT",
+                DocumentInformationFieldKind::EditTime,
+            ),
+            (
+                r"NUMPAGES \* MERGEFORMAT",
+                DocumentInformationFieldKind::NumberOfPages,
+            ),
+            (
+                r"NUMWORDS \* MERGEFORMAT",
+                DocumentInformationFieldKind::NumberOfWords,
+            ),
+            (
+                r"NUMCHARS \* MERGEFORMAT",
+                DocumentInformationFieldKind::NumberOfCharacters,
+            ),
         ] {
             let cached_result = format!("cached {}", kind.field_keyword());
             let field = Field::with_flags(
@@ -6923,6 +6981,7 @@ mod tests {
             r#"AUTHOR "unterminated"#,
             r"COMMENTS \",
             r"LASTSAVEDBY \* MERGEFORMAT unexpected",
+            "NUMWORDS unexpected",
         ] {
             let field = Field::new(instruction.to_string(), None, false);
             assert!(field.document_information().is_err(), "{instruction}");
@@ -6937,8 +6996,16 @@ mod tests {
             false,
         );
         assert!(too_long.document_information().is_err());
-        assert!(
+        assert_eq!(
             Field::new("SAVEDATE".to_string(), None, false)
+                .document_information()
+                .unwrap()
+                .unwrap()
+                .kind(),
+            DocumentInformationFieldKind::SaveDate
+        );
+        assert!(
+            Field::new("SAVEDATES".to_string(), None, false)
                 .document_information()
                 .unwrap()
                 .is_none()
