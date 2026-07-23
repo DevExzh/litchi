@@ -1,4 +1,4 @@
-//! Strict Word 97+ field-table (`Plcfld`) parsing.
+//! Strict structural Word 97+ field-table (`Plcfld`) parsing.
 //!
 //! Implements [MS-DOC] sections 2.8.25, 2.9.88 through 2.9.90, and 2.9.110
 //! for all seven field-bearing document stories. Field instructions and results
@@ -162,6 +162,9 @@ pub enum FieldType {
     GreetingLine,
     Shape,
     /// An identifier not listed by [MS-DOC] 2.9.90.
+    ///
+    /// The descriptor is preserved as opaque metadata so a newer producer does
+    /// not make an otherwise well-formed field table unreadable.
     Unknown(u8),
 }
 
@@ -431,13 +434,7 @@ impl FieldDescriptor {
         }
         let reserved_bits = bytes[0] >> 5;
         let value = match bytes[0] & 0x1F {
-            0x13 => {
-                let field_type = FieldType::from(bytes[1]);
-                if !field_type.is_specified() {
-                    return Err(corrupted("Fld begin marker uses an unspecified field type"));
-                }
-                FieldMarkerValue::Begin(field_type)
-            },
+            0x13 => FieldMarkerValue::Begin(FieldType::from(bytes[1])),
             0x14 => FieldMarkerValue::Separator { ignored: bytes[1] },
             0x15 => FieldMarkerValue::End(FieldEndFlags::from_byte(bytes[1])),
             _ => return Err(corrupted("Fld has an invalid field-character tag")),
@@ -8475,7 +8472,6 @@ mod tests {
             plcf(&[2, 1], &[[0x13, 0x21]]),
             plcf(&[1, 9], &[[0x13, 0x21]]),
             plcf(&[1, 3], &[[0x12, 0x21]]),
-            plcf(&[1, 3], &[[0x13, 0x04]]),
             plcf(&[1, 3], &[[0x14, 0]]),
             plcf(&[1, 3], &[[0x15, 0]]),
             plcf(&[1, 3], &[[0x13, 0x21]]),
@@ -8536,6 +8532,20 @@ mod tests {
         assert_eq!(FieldType::from(0x42), FieldType::SectionPages);
         assert_eq!(FieldType::from(0x45), FieldType::FileSize);
         assert_eq!(FieldType::from(0x04), FieldType::Unknown(0x04));
+    }
+
+    #[test]
+    fn unrecognized_field_type_is_preserved_with_valid_boundaries() {
+        let data = plcf(
+            &[1, 3, 5, 7],
+            &[[0x13, 0x4E], [0x14, 0], [0x15, 0x80]],
+        );
+        let table = FieldStoryTable::parse_plcf(FieldStory::Main, 7, &data).unwrap();
+
+        assert_eq!(table.fields().len(), 1);
+        assert_eq!(table.fields()[0].field_type, FieldType::Unknown(0x4E));
+        assert_eq!(table.fields()[0].separator_cp, Some(3));
+        assert_eq!(table.to_plcf_bytes().unwrap(), data);
     }
 
     #[test]
