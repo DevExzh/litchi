@@ -459,6 +459,15 @@ impl<'a> Presentation<'a> {
         self.part.customer_data()
     }
 
+    /// Get the validated list of custom slide shows.
+    ///
+    /// Each show retains its stable ID and the presentation slide IDs it
+    /// contains. The presentation slide relationships are validated before the
+    /// list is returned.
+    pub fn custom_shows(&self) -> Result<crate::pptx::CustomShowList> {
+        Ok(crate::pptx::load_presentation_structure(self.package)?.custom_shows)
+    }
+
     /// Get the root-level password-verification metadata.
     ///
     /// Returns None when the presentation has no modification verifier.

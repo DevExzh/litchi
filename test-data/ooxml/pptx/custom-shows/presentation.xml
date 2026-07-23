@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:sldIdLst>
+    <p:sldId id="256" r:id="rIdSlideOne"/>
+    <p:sldId id="257" r:id="rIdSlideTwo"/>
+    <p:sldId id="258" r:id="rIdSlideThree"/>
+  </p:sldIdLst>
+  <p:custShowLst>
+    <p:custShow name="Opening" id="7">
+      <p:sldLst>
+        <p:sld r:id="rIdSlideOne"/>
+        <p:sld r:id="rIdSlideThree"/>
+      </p:sldLst>
+    </p:custShow>
+    <p:custShow name="Recap" id="8">
+      <p:sldLst>
+        <p:sld r:id="rIdSlideTwo"/>
+      </p:sldLst>
+    </p:custShow>
+  </p:custShowLst>
+</p:presentation>

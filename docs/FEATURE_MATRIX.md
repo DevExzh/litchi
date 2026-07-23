@@ -226,7 +226,7 @@ conversion, fonts, and image conversion are optional.
 | Handout master | ✅ | ✅ | ✅ | Presentation-root relationship resolution plus layout and header/footer settings |
 | Themes | 🟡 | ✅ | ❌ | Master-, layout-, and slide-scoped validated theme resolution, typed color maps/overrides, and presentation inventory; no general theme authoring workflow |
 | Sections | ✅ | ✅ | ✅ | Typed section readers with stable IDs and resolved slide-index membership, plus graph-safe CRUD |
-| Custom slide shows | ✅ | ✅ | ✅ | Named subsets and graph-safe ordered CRUD |
+| Custom slide shows | ✅ | ✅ | ✅ | High-level typed inventory of named subsets, plus graph-safe ordered CRUD |
 | Presentation/slide protection | ✅ | ✅ | ✅ | Protection and password metadata, including root modification-verifier inspection; policy is not enforced by the library |
 | Embedded fonts | ✅ | ✅ | ✅ | Payloads, obfuscation, licensing checks, and ordered CRUD |
 | Embedded OLE/package objects | 🟡 | ✅ | ❌ | Typed per-slide inert OLE inventory with shape, ProgID, relationship, and payload metadata; no OLE authoring or activation |
