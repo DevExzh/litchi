@@ -488,6 +488,39 @@ impl Document {
         )
     }
 
+    /// Return named drawing fill-image definitions from `styles.xml`.
+    ///
+    /// This exposes stored common-style metadata only. It does not resolve
+    /// style use sites, follow links, load linked resources, or render images.
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::OdfDrawingFillImages> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_fill_image::parse_drawing_fill_images(styles.xml_content()),
+        )
+    }
+
+    /// Return named drawing marker definitions from `styles.xml`.
+    ///
+    /// This exposes stored common-style metadata only. It does not resolve
+    /// style use sites or render marker paths.
+    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::OdfDrawingMarkers> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_marker::parse_drawing_markers(styles.xml_content()),
+        )
+    }
+
+    /// Return named drawing opacity definitions from `styles.xml`.
+    ///
+    /// This exposes stored common-style metadata only. It does not resolve
+    /// style use sites or render opacity gradients.
+    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::OdfDrawingOpacities> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_opacity::parse_drawing_opacities(styles.xml_content()),
+        )
+    }
+
     /// Parse master pages and their losslessly retained headers and footers.
     pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
         self.styles.as_ref().map_or_else(

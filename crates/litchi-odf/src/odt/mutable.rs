@@ -456,6 +456,39 @@ impl MutableDocument {
         )
     }
 
+    /// Return named drawing fill-image definitions from current styles metadata.
+    ///
+    /// This exposes stored common-style metadata only. It does not resolve
+    /// style use sites, follow links, load linked resources, or render images.
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::OdfDrawingFillImages> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_fill_image::parse_drawing_fill_images,
+        )
+    }
+
+    /// Return named drawing marker definitions from current styles metadata.
+    ///
+    /// This exposes stored common-style metadata only. It does not resolve
+    /// style use sites or render marker paths.
+    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::OdfDrawingMarkers> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_marker::parse_drawing_markers,
+        )
+    }
+
+    /// Return named drawing opacity definitions from current styles metadata.
+    ///
+    /// This exposes stored common-style metadata only. It does not resolve
+    /// style use sites or render opacity gradients.
+    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::OdfDrawingOpacities> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_opacity::parse_drawing_opacities,
+        )
+    }
+
     /// Return stored footnote and endnote presentation configurations.
     ///
     /// The result describes style metadata only. It never renumbers, lays out,
