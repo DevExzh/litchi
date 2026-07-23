@@ -546,6 +546,13 @@ impl Package {
         self.presentation()?.laser_traces()
     }
 
+    /// Discover bounded, inert click and hover action settings on slides.
+    ///
+    /// Declared targets are never followed, opened, activated, or executed.
+    pub fn action_settings(&self) -> Result<Vec<crate::pptx::PptxActionSetting>> {
+        self.presentation()?.action_settings()
+    }
+
     /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payload.
     ///
     /// This validates only the declared OPC relationship graph and content

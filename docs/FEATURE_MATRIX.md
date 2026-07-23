@@ -217,7 +217,7 @@ conversion, fonts, and image conversion are optional.
 | Audio, video, posters, and captions | ✅ | ✅ | ✅ | Embedded/linked media, trim/fade/bookmark metadata, and text-track parts |
 | Animations and timing trees | ✅ | ✅ | ✅ | Shape effects, sequences, triggers, and chart/diagram timing relationships |
 | Transitions and slide advance timing | ✅ | ✅ | ✅ | Effects, speed, direction, sound, click, and timed advance |
-| Hyperlinks and slide-jump actions | 🟡 | ✅ | ✅ | URL and slide navigation; not every PowerPoint action verb is modeled |
+| Hyperlinks and slide-jump actions | 🟡 | ✅ | ✅ | URL and slide navigation plus bounded inert click/hover action-setting inventory for PowerPoint-reserved action values and declared targets; no target is followed, opened, activated, or executed |
 | Classic comments | ✅ | ✅ | ✅ | Authors, slide comment parts, and package-aware CRUD |
 | Modern comments | ✅ | ✅ | ✅ | Authors, anchors, replies, status, and package-aware CRUD |
 | Speaker notes and notes masters | ✅ | ✅ | ✅ | Complete notes graph load/store with resources and themes |

@@ -57,6 +57,7 @@
 //! ```
 
 mod animation_relationships;
+pub mod actions;
 pub mod animations;
 pub mod backgrounds;
 pub mod changes_information;
@@ -94,6 +95,9 @@ pub mod vba_project;
 pub mod view_properties;
 pub mod writer;
 
+pub use actions::{
+    PptxActionKind, PptxActionSetting, PptxActionTarget, PptxActionTrigger, PptxSlideShowJump,
+};
 pub use animations::{
     Animation, AnimationDirection, AnimationEffect, AnimationSequence, AnimationTrigger,
 };

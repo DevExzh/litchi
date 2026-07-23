@@ -1,5 +1,6 @@
 /// Main presentation object - the high-level API for working with presentations.
 use crate::error::{OoxmlError, Result};
+use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_action_settings};
 use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
 use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
 use crate::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
@@ -718,6 +719,27 @@ impl<'a> Presentation<'a> {
         }
 
         Ok(traces)
+    }
+
+    /// Discover bounded, inert click and hover action settings on slides.
+    ///
+    /// Declared targets remain stored metadata only. This never follows links,
+    /// opens files or presentations, runs macros or programs, plays media, or
+    /// controls a slide show.
+    pub fn action_settings(&self) -> Result<Vec<PptxActionSetting>> {
+        let mut settings = Vec::new();
+        let mut limits = ActionLoadLimits::default();
+
+        for (slide_index, slide) in self.slides()?.iter().enumerate() {
+            settings.extend(load_slide_action_settings(
+                self.package,
+                slide_index,
+                slide.part().part(),
+                &mut limits,
+            )?);
+        }
+
+        Ok(settings)
     }
 
     /// Get basic chart information from the presentation.
