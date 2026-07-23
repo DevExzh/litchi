@@ -4,7 +4,7 @@ use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_actio
 use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
 use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
-use crate::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
+use crate::pptx::parts::{NotesSize, PresentationPart, SlideMasterPart, SlidePart, SlideSize};
 use crate::pptx::show_events::{
     PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events,
 };
@@ -378,6 +378,19 @@ impl<'a> Presentation<'a> {
             (Some(w), Some(h)) => Ok(Some((w, h))),
             _ => Ok(None),
         }
+    }
+
+    /// Get the presentation slide surface dimensions and declared size type.
+    ///
+    /// This preserves the declared type value in addition to the dimensions
+    /// returned by slide_size.
+    pub fn slide_size_metadata(&self) -> Result<Option<SlideSize>> {
+        self.part.slide_size()
+    }
+
+    /// Get the notes and handout surface dimensions.
+    pub fn notes_size(&self) -> Result<Option<NotesSize>> {
+        self.part.notes_size()
     }
 
     // ========================================================================

@@ -11,6 +11,58 @@ use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use std::sync::Arc;
 
+/// The presentation slide surface dimensions and declared size type.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SlideSize {
+    width: i64,
+    height: i64,
+    size_type: Option<String>,
+}
+
+impl SlideSize {
+    /// Return the slide width in EMUs.
+    #[inline]
+    pub const fn width(&self) -> i64 {
+        self.width
+    }
+
+    /// Return the slide height in EMUs.
+    #[inline]
+    pub const fn height(&self) -> i64 {
+        self.height
+    }
+
+    /// Return the size type declared on the presentation, if present.
+    ///
+    /// The raw value is preserved so documents with future size types remain
+    /// inspectable.
+    #[inline]
+    pub fn size_type(&self) -> Option<&str> {
+        self.size_type.as_deref()
+    }
+}
+
+/// The notes and handout surface dimensions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotesSize {
+    width: i64,
+    height: i64,
+}
+
+impl NotesSize {
+    /// Return the notes surface width in EMUs.
+    #[inline]
+    pub const fn width(&self) -> i64 {
+        self.width
+    }
+
+    /// Return the notes surface height in EMUs.
+    #[inline]
+    pub const fn height(&self) -> i64 {
+        self.height
+    }
+}
+
 /// The main presentation part.
 ///
 /// This part contains the presentation-level properties and references to slides,
@@ -82,7 +134,7 @@ impl<'a> PresentationPart<'a> {
     pub fn slide_width(&self) -> Result<Option<i64>> {
         Ok(PresentationInfo::parse(self.xml_bytes())?
             .slide_size
-            .map(|(width, _)| width))
+            .map(|size| size.width()))
     }
 
     /// Get the slide height in EMUs (English Metric Units).
@@ -99,7 +151,21 @@ impl<'a> PresentationPart<'a> {
     pub fn slide_height(&self) -> Result<Option<i64>> {
         Ok(PresentationInfo::parse(self.xml_bytes())?
             .slide_size
-            .map(|(_, height)| height))
+            .map(|size| size.height()))
+    }
+
+    /// Get the presentation slide surface dimensions and declared size type.
+    ///
+    /// Returns None if the slide size is not defined.
+    pub fn slide_size(&self) -> Result<Option<SlideSize>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.slide_size)
+    }
+
+    /// Get the notes and handout surface dimensions.
+    ///
+    /// Returns None if the notes size is not defined.
+    pub fn notes_size(&self) -> Result<Option<NotesSize>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.notes_size)
     }
 
     /// Get the relationship IDs of all slides in presentation order.
@@ -186,7 +252,8 @@ enum PresentationContext {
 struct PresentationInfo {
     slides: Vec<(u32, String)>,
     masters: Vec<(u32, String)>,
-    slide_size: Option<(i64, i64)>,
+    slide_size: Option<SlideSize>,
+    notes_size: Option<NotesSize>,
     seen_slide_list: bool,
     seen_master_list: bool,
 }
@@ -356,7 +423,23 @@ impl PresentationInfo {
             }
             let width = required_positive_i64(element, b"cx", decoder, "slide width")?;
             let height = required_positive_i64(element, b"cy", decoder, "slide height")?;
-            self.slide_size = Some((width, height));
+            let size_type = unqualified_attribute_value(element, b"type", decoder)?;
+            self.slide_size = Some(SlideSize {
+                width,
+                height,
+                size_type,
+            });
+        } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"notesSz")
+        {
+            if self.notes_size.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate PowerPoint notes size".to_string(),
+                ));
+            }
+            let width = required_positive_i64(element, b"cx", decoder, "notes width")?;
+            let height = required_positive_i64(element, b"cy", decoder, "notes height")?;
+            self.notes_size = Some(NotesSize { width, height });
         } else if parent == PresentationContext::SlideList
             && is_presentationml_name(namespace, element.name(), b"sldId")
         {
@@ -479,7 +562,8 @@ mod tests {
                     <q:sldMasterId id="2147483648" f:id="7" rel:id="master-alpha"/></q:sldMasterIdLst>
                 <q:sldIdLst><q:sldId id="256" f:id="1" rel:id="slide-alpha"/>
                     <q:sldId id="257" rel:id="slide-beta"/><f:sldId id="258" rel:id="spoof"/></q:sldIdLst>
-                <f:sldSz cx="1" cy="1"/><q:sldSz cx="9144000" cy="5143500"/>
+                <f:sldSz cx="1" cy="1"/><q:sldSz cx="9144000" cy="5143500" type="screen16x9"/>
+                <f:notesSz cx="1" cy="1"/><q:notesSz cx="6858000" cy="9144000"/>
             </q:presentation>"#
         );
         let blob = part(xml);
@@ -492,6 +576,13 @@ mod tests {
         assert_eq!(presentation.slide_master_rids().unwrap(), ["master-alpha"]);
         assert_eq!(presentation.slide_width().unwrap(), Some(9_144_000));
         assert_eq!(presentation.slide_height().unwrap(), Some(5_143_500));
+        let slide_size = presentation.slide_size().unwrap().unwrap();
+        assert_eq!(slide_size.width(), 9_144_000);
+        assert_eq!(slide_size.height(), 5_143_500);
+        assert_eq!(slide_size.size_type(), Some("screen16x9"));
+        let notes_size = presentation.notes_size().unwrap().unwrap();
+        assert_eq!(notes_size.width(), 6_858_000);
+        assert_eq!(notes_size.height(), 9_144_000);
     }
 
     #[test]
@@ -500,11 +591,18 @@ mod tests {
             xmlns:z="http://purl.oclc.org/ooxml/officeDocument/relationships">
             <x:sldMasterIdLst><x:sldMasterId id="2147483648" z:id="m"/></x:sldMasterIdLst>
             <x:sldIdLst><x:sldId id="256" z:id="s"/></x:sldIdLst>
-            <x:sldSz cx="1" cy="2"/></x:presentation>"#;
+            <x:sldSz cx="1" cy="2"/><x:notesSz cx="3" cy="4"/></x:presentation>"#;
         let blob = part(xml);
         let presentation = PresentationPart::from_part(&blob).unwrap();
         assert_eq!(presentation.slide_rids().unwrap(), ["s"]);
         assert_eq!(presentation.slide_master_rids().unwrap(), ["m"]);
+        assert_eq!(
+            presentation.slide_size().unwrap().unwrap().size_type(),
+            None
+        );
+        let notes_size = presentation.notes_size().unwrap().unwrap();
+        assert_eq!(notes_size.width(), 3);
+        assert_eq!(notes_size.height(), 4);
     }
 
     #[test]
@@ -535,6 +633,11 @@ mod tests {
             ),
             format!(r#"<p:presentation xmlns:p="{P}"><p:sldSz cx="0" cy="1"/></p:presentation>"#),
             format!(r#"<p:presentation xmlns:p="{P}"><p:sldSz cx="1"/></p:presentation>"#),
+            format!(r#"<p:presentation xmlns:p="{P}"><p:notesSz cx="0" cy="1"/></p:presentation>"#),
+            format!(r#"<p:presentation xmlns:p="{P}"><p:notesSz cx="1"/></p:presentation>"#),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:notesSz cx="1" cy="2"/><p:notesSz cx="3" cy="4"/></p:presentation>"#
+            ),
             format!(r#"<p:presentation xmlns:p="{P}"><p:sldIdLst/><p:sldIdLst/></p:presentation>"#),
             format!(r#"<p:presentation xmlns:p="{P}"><p:sldSz cx="1" cy="2"/>"#),
         ];
