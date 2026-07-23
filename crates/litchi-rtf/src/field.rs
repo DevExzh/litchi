@@ -44,6 +44,7 @@ pub enum FieldType {
     Bibliography,
     DocumentVariable,
     DocumentProperty,
+    DocumentInformation,
     MergeField,
     MergeRecord,
     MergeSequence,
@@ -906,6 +907,63 @@ pub struct DocumentPropertyField<'a> {
     position: usize,
 }
 
+/// The built-in Word document-information field category.
+///
+/// ECMA-376 Part 1 §17.16.5 defines these fields. This enum preserves the
+/// stored field kind only; it does not resolve document metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DocumentInformationFieldKind {
+    Title,
+    Subject,
+    Author,
+    Keywords,
+    Comments,
+    LastSavedBy,
+}
+
+impl DocumentInformationFieldKind {
+    /// The uppercase field keyword stored in a Word field instruction.
+    pub const fn field_keyword(self) -> &'static str {
+        match self {
+            Self::Title => "TITLE",
+            Self::Subject => "SUBJECT",
+            Self::Author => "AUTHOR",
+            Self::Keywords => "KEYWORDS",
+            Self::Comments => "COMMENTS",
+            Self::LastSavedBy => "LASTSAVEDBY",
+        }
+    }
+
+    fn from_keyword(keyword: &str) -> Option<Self> {
+        [
+            Self::Title,
+            Self::Subject,
+            Self::Author,
+            Self::Keywords,
+            Self::Comments,
+            Self::LastSavedBy,
+        ]
+        .into_iter()
+        .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
+    }
+}
+
+/// Inert metadata for a legacy RTF built-in Word document-information field.
+///
+/// This type retains the stored kind, field switches, cached result, and field
+/// state only. It never reads document properties, reads or modifies host
+/// identity data, resolves a value, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentInformationField<'a> {
+    instruction: &'a str,
+    kind: DocumentInformationFieldKind,
+    switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 /// Inert metadata for a legacy RTF `MERGEFIELD` field.
 ///
 /// This model retains the stored merge-field name, switches, and cached result
@@ -1351,6 +1409,11 @@ struct DocumentVariableFieldParts<'a> {
 
 struct DocumentPropertyFieldParts<'a> {
     property_name: Cow<'a, str>,
+    switches: Vec<FieldSwitch<'a>>,
+}
+
+struct DocumentInformationFieldParts<'a> {
+    kind: DocumentInformationFieldKind,
     switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -2489,6 +2552,56 @@ impl<'a> DocumentPropertyField<'a> {
     }
 }
 
+impl<'a> DocumentInformationField<'a> {
+    /// Return the complete stored document-information field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the recognized built-in document-information category.
+    pub const fn kind(&self) -> DocumentInformationFieldKind {
+        self.kind
+    }
+
+    /// Return stored field switches in source order without interpreting them.
+    pub fn switches(&self) -> &[FieldSwitch<'a>] {
+        &self.switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated from document
+    /// metadata or a host user profile.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> MergeField<'a> {
     /// Return the complete stored `MERGEFIELD` field instruction.
     pub fn instruction(&self) -> &'a str {
@@ -3430,6 +3543,11 @@ impl<'a> Field<'a> {
                 FieldType::DocumentProperty
             },
             ParsedFieldCode::Other { ref keyword, .. }
+                if DocumentInformationFieldKind::from_keyword(keyword.as_ref()).is_some() =>
+            {
+                FieldType::DocumentInformation
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("MERGEFIELD") =>
             {
                 FieldType::MergeField
@@ -3961,6 +4079,30 @@ impl<'a> Field<'a> {
         Some(DocumentPropertyField {
             instruction: self.instruction.as_ref(),
             property_name: parts.property_name,
+            switches: parts.switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed document-information
+    /// field.
+    ///
+    /// `TITLE`, `SUBJECT`, `AUTHOR`, `KEYWORDS`, `COMMENTS`, and
+    /// `LASTSAVEDBY` retain only their stored kind, switches, cached result,
+    /// and state. This method never reads document properties or host identity
+    /// data, resolves a value, or refreshes a field. Malformed instructions
+    /// remain generic fields and return `None` here.
+    pub fn document_information(&self) -> Option<DocumentInformationField<'_>> {
+        if self.field_type != FieldType::DocumentInformation {
+            return None;
+        }
+        let parts = document_information_field_parts(self.instruction.as_ref())?;
+        Some(DocumentInformationField {
+            instruction: self.instruction.as_ref(),
+            kind: parts.kind,
             switches: parts.switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
@@ -5734,6 +5876,31 @@ fn document_property_field_parts(instruction: &str) -> Option<DocumentPropertyFi
         property_name,
         switches,
     })
+}
+
+fn document_information_field_parts(
+    instruction: &str,
+) -> Option<DocumentInformationFieldParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    let kind = DocumentInformationFieldKind::from_keyword(keyword.value.as_ref())?;
+    tokens.remove(0);
+
+    let mut switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let value = tokens
+            .get(index + 1)
+            .filter(|token| is_field_operand(token));
+        switches.push(FieldSwitch {
+            name: Cow::Owned(name.to_string()),
+            value: value.map(|token| token.value.clone()),
+        });
+        index += 1 + usize::from(value.is_some());
+    }
+
+    Some(DocumentInformationFieldParts { kind, switches })
 }
 
 fn merge_field_parts(instruction: &str) -> Option<MergeFieldParts<'_>> {
@@ -7997,6 +8164,88 @@ mod tests {
     }
 
     #[test]
+    fn document_information_fields_preserve_kinds_without_reading_metadata_or_identity() {
+        let mut field =
+            Field::parse_instruction(r#"TITLE \* MERGEFORMAT \@ "opaque format""#);
+        field.result = Cow::Borrowed("cached title");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::DocumentInformation);
+        let information = field.document_information().unwrap();
+        assert_eq!(information.instruction(), field.instruction);
+        assert_eq!(information.kind(), DocumentInformationFieldKind::Title);
+        assert_eq!(information.cached_result(), Some("cached title"));
+        assert!(information.is_dirty());
+        assert!(information.is_locked());
+        assert_eq!(information.owner(), FieldOwner::Body);
+        assert_eq!(information.position(), 4);
+        assert_eq!(information.switches().len(), 2);
+        assert_eq!(information.switches()[0].name, "*");
+        assert_eq!(
+            information.switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+        assert_eq!(information.switches()[1].name, "@");
+        assert_eq!(
+            information.switches()[1].value.as_deref(),
+            Some("opaque format")
+        );
+
+        for (instruction, kind) in [
+            ("TITLE", DocumentInformationFieldKind::Title),
+            ("SUBJECT", DocumentInformationFieldKind::Subject),
+            ("AUTHOR", DocumentInformationFieldKind::Author),
+            ("KEYWORDS", DocumentInformationFieldKind::Keywords),
+            ("COMMENTS", DocumentInformationFieldKind::Comments),
+            ("LASTSAVEDBY", DocumentInformationFieldKind::LastSavedBy),
+        ] {
+            let field = Field::parse_instruction(instruction);
+            assert_eq!(field.field_type, FieldType::DocumentInformation);
+            let information = field.document_information().unwrap();
+            assert_eq!(information.kind(), kind);
+            assert_eq!(information.kind().field_keyword(), instruction);
+            assert!(information.switches().is_empty());
+        }
+
+        assert!(
+            Field::parse_instruction("TITLE unexpected")
+                .document_information()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"AUTHOR "unterminated"#)
+                .document_information()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction("COMMENTS \\")
+                .document_information()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r"LASTSAVEDBY \* MERGEFORMAT unexpected")
+                .document_information()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction("AUTHORS").field_type,
+            FieldType::Unknown
+        );
+        let too_long = Field::new(
+            FieldType::DocumentInformation,
+            Cow::Owned(format!("TITLE {}", "x".repeat(MAX_INSTRUCTION_LEN))),
+            Cow::Borrowed(""),
+        );
+        assert!(too_long.document_information().is_none());
+    }
+
+    #[test]
     fn merge_fields_preserve_names_without_merging() {
         let mut field = Field::parse_instruction(
             r#"MERGEFIELD "Customer Region" \b "Dear " \f "!" \* MERGEFORMAT"#,
@@ -8795,6 +9044,31 @@ mod tests {
         assert_eq!(fields[0].switches()[0].name, "*");
         assert_eq!(fields[0].switches()[1].name, "@");
         assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_document_information_fields_without_reading_metadata_or_identity() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TITLE \\* MERGEFORMAT}{\fldrslt cached title}}Middle {\field{\*\fldinst author \\@ "opaque format"}{\fldrslt cached author}}After}"#,
+        )
+        .unwrap();
+
+        let fields = document.document_information_fields();
+        assert_eq!(document.document_information_field_count(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].kind(), DocumentInformationFieldKind::Title);
+        assert_eq!(fields[0].cached_result(), Some("cached title"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[0].switches()[0].name, "*");
+        assert_eq!(fields[1].kind(), DocumentInformationFieldKind::Author);
+        assert_eq!(fields[1].cached_result(), Some("cached author"));
+        assert_eq!(fields[1].switches()[0].name, "@");
+        assert_eq!(
+            fields[1].switches()[0].value.as_deref(),
+            Some("opaque format")
+        );
+        assert_eq!(document.text(), "Before Middle After");
     }
 
     #[test]

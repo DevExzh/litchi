@@ -1165,6 +1165,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert document-information fields in document field order.
+    ///
+    /// Kinds, switches, cached results, and state are exposed solely as stored
+    /// metadata. This method never reads document properties or host identity
+    /// data, resolves values, or refreshes a field.
+    pub fn document_information_fields(&self) -> Vec<crate::DocumentInformationField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::document_information)
+            .collect()
+    }
+
+    /// Return the number of typed, inert document-information fields.
+    pub fn document_information_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.document_information().is_some())
+            .count()
+    }
+
     /// Return typed, inert `MERGEFIELD` fields in document field order.
     ///
     /// Field names, switches, and cached results are exposed solely as stored
