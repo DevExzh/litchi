@@ -18,8 +18,8 @@ use crate::docx::field::{
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, PrintField, PrivateField, QuoteField,
-    ReferencedDocumentField, SequenceField, SetField, ShapeField, StyleReferenceField,
-    SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
+    ReferencedDocumentField, ReferenceField, SequenceField, SetField, ShapeField,
+    StyleReferenceField, SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
     TableOfContentsEntryField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
@@ -1959,6 +1959,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `COMPARE` fields in the main document.
     pub fn compare_field_count(&self) -> Result<usize> {
         Ok(self.compare_fields()?.len())
+    }
+
+    /// Get typed, inert bookmark-reference fields in document order.
+    ///
+    /// Returned values expose stored kinds, targets, options, unknown switches,
+    /// cached content, and dirty/lock state only. This method never looks up a
+    /// bookmark, reads a referenced range or note, resolves a page number,
+    /// creates a link, calculates a relative position, or refreshes a field.
+    pub fn reference_fields(&self) -> Result<Vec<ReferenceField>> {
+        self.fields()?
+            .iter()
+            .map(Field::reference_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert bookmark-reference fields in the main document.
+    pub fn reference_field_count(&self) -> Result<usize> {
+        Ok(self.reference_fields()?.len())
     }
 
     /// Get typed, inert `SET` fields in document order.

@@ -32,6 +32,7 @@ const MAX_INFO_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_REFERENCE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 
 /// A field in a Word document.
 ///
@@ -322,6 +323,27 @@ impl Field {
     /// values, or refreshes a field.
     pub fn compare_field(&self) -> Result<Option<CompareField>> {
         CompareField::from_field(self)
+    }
+
+    /// Check whether this is a bookmark-reference field.
+    ///
+    /// This recognizes `REF`, `PAGEREF`, `FTNREF`, and `NOTEREF` stored
+    /// instructions. It never looks up a bookmark, reads a referenced range or
+    /// note, resolves a page number, creates a link, calculates a relative
+    /// position, or refreshes the result.
+    pub fn is_reference_field(&self) -> bool {
+        ReferenceFieldKind::from_instruction(&self.instruction).is_some()
+    }
+
+    /// Parse this field as inert bookmark-reference metadata.
+    ///
+    /// Returns `Ok(None)` for fields other than `REF`, `PAGEREF`, `FTNREF`, and
+    /// `NOTEREF`. The stored kind, target, options, unknown switches, cached
+    /// content, and dirty/lock state are metadata only; this method never looks
+    /// up a bookmark, reads a referenced range or note, resolves a page number,
+    /// creates a link, calculates a relative position, or refreshes a field.
+    pub fn reference_field(&self) -> Result<Option<ReferenceField>> {
+        ReferenceField::from_field(self)
     }
 
     /// Check whether this is a `SET` field.
@@ -4039,6 +4061,244 @@ impl CompareField {
     }
 }
 
+/// The stored category of a Word bookmark-reference field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReferenceFieldKind {
+    /// A `REF` field.
+    Reference,
+    /// A `PAGEREF` field.
+    PageReference,
+    /// A historical `FTNREF` field.
+    FootnoteReference,
+    /// A `NOTEREF` field.
+    NoteReference,
+}
+
+impl ReferenceFieldKind {
+    fn from_instruction(instruction: &str) -> Option<(Self, &'static str)> {
+        for (kind, field_type) in [
+            (Self::Reference, "REF"),
+            (Self::PageReference, "PAGEREF"),
+            (Self::FootnoteReference, "FTNREF"),
+            (Self::NoteReference, "NOTEREF"),
+        ] {
+            if field_instruction_remainder(instruction, field_type).is_some() {
+                return Some((kind, field_type));
+            }
+        }
+        None
+    }
+
+    fn is_note_reference(self) -> bool {
+        matches!(self, Self::FootnoteReference | Self::NoteReference)
+    }
+}
+
+/// One recognized stored option of a Word bookmark-reference field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReferenceFieldOption {
+    /// The `\d` `REF` separator between sequence and page numbers.
+    SequencePageSeparator(String),
+    /// The `\f` `REF` request for referenced note or comment content.
+    ReferencedNoteContent,
+    /// The `\h` request for a link to the stored bookmark.
+    Hyperlink,
+    /// The `\n` `REF` request for a paragraph number without context.
+    ParagraphNumberWithoutContext,
+    /// The `\p` request for relative-position text.
+    RelativePosition,
+    /// The `\r` `REF` request for a paragraph number in relative context.
+    ParagraphNumberRelativeContext,
+    /// The `\t` `REF` request to suppress non-number text.
+    SuppressNonNumberText,
+    /// The `\w` `REF` request for a paragraph number in full context.
+    ParagraphNumberFullContext,
+    /// The `\f` `FTNREF` or `NOTEREF` request to format the note mark.
+    NoteMarkFormatting,
+}
+
+/// A typed, inert Word bookmark-reference field.
+///
+/// This model preserves only stored categories, targets, options, switches,
+/// cached results, and field state. It never looks up a bookmark, reads a
+/// referenced range or note, resolves a page number, creates a link,
+/// calculates a relative position, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReferenceField {
+    instruction: String,
+    kind: ReferenceFieldKind,
+    bookmark: String,
+    options: Vec<ReferenceFieldOption>,
+    unknown_switches: Vec<FieldSwitch>,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+}
+
+impl ReferenceField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((kind, field_type)) = ReferenceFieldKind::from_instruction(field.instruction())
+        else {
+            return Ok(None);
+        };
+        if field.instruction().len() > MAX_REFERENCE_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "{field_type} field instruction exceeds {MAX_REFERENCE_FIELD_INSTRUCTION_BYTES} bytes"
+            )));
+        }
+        let Some((bookmark, switches)) =
+            parse_field_operand_and_switches(field.instruction(), field_type)?
+        else {
+            unreachable!("bookmark-reference recognition and parsing must agree");
+        };
+        let bookmark = bookmark
+            .filter(|bookmark| !bookmark.is_empty())
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!(
+                    "{field_type} field is missing its bookmark target"
+                ))
+            })?;
+
+        let mut options = Vec::new();
+        let mut unknown_switches = Vec::new();
+        for switch in switches {
+            match switch.name {
+                'd' if kind == ReferenceFieldKind::Reference => {
+                    let separator = switch.argument.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "REF \\d switch requires a separator".to_string(),
+                        )
+                    })?;
+                    options.push(ReferenceFieldOption::SequencePageSeparator(separator));
+                },
+                'f' if kind == ReferenceFieldKind::Reference => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "REF \\f switch does not take an argument".to_string(),
+                        ));
+                    }
+                    options.push(ReferenceFieldOption::ReferencedNoteContent);
+                },
+                'f' if kind.is_note_reference() => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "{field_type} \\f switch does not take an argument"
+                        )));
+                    }
+                    options.push(ReferenceFieldOption::NoteMarkFormatting);
+                },
+                'h' => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "{field_type} \\h switch does not take an argument"
+                        )));
+                    }
+                    options.push(ReferenceFieldOption::Hyperlink);
+                },
+                'n' if kind == ReferenceFieldKind::Reference => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "REF \\n switch does not take an argument".to_string(),
+                        ));
+                    }
+                    options.push(ReferenceFieldOption::ParagraphNumberWithoutContext);
+                },
+                'p' => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "{field_type} \\p switch does not take an argument"
+                        )));
+                    }
+                    options.push(ReferenceFieldOption::RelativePosition);
+                },
+                'r' if kind == ReferenceFieldKind::Reference => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "REF \\r switch does not take an argument".to_string(),
+                        ));
+                    }
+                    options.push(ReferenceFieldOption::ParagraphNumberRelativeContext);
+                },
+                't' if kind == ReferenceFieldKind::Reference => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "REF \\t switch does not take an argument".to_string(),
+                        ));
+                    }
+                    options.push(ReferenceFieldOption::SuppressNonNumberText);
+                },
+                'w' if kind == ReferenceFieldKind::Reference => {
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "REF \\w switch does not take an argument".to_string(),
+                        ));
+                    }
+                    options.push(ReferenceFieldOption::ParagraphNumberFullContext);
+                },
+                _ => unknown_switches.push(switch),
+            }
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            kind,
+            bookmark,
+            options,
+            unknown_switches,
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored reference-field category.
+    pub const fn kind(&self) -> ReferenceFieldKind {
+        self.kind
+    }
+
+    /// Return the stored bookmark or note target without resolving it.
+    pub fn bookmark(&self) -> &str {
+        &self.bookmark
+    }
+
+    /// Return recognized stored options in source order.
+    ///
+    /// This metadata is never used to navigate, resolve, or activate a link.
+    pub fn options(&self) -> &[ReferenceFieldOption] {
+        &self.options
+    }
+
+    /// Return unrecognized stored switches in source order.
+    ///
+    /// They are retained without interpretation or execution.
+    pub fn unknown_switches(&self) -> &[FieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated by resolving a
+    /// bookmark, page number, or note reference.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
 /// The stored kind of a prompt field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptFieldKind {
@@ -7727,6 +7987,136 @@ mod tests {
     fn rejects_compare_fields_without_comparisons() {
         let missing = Field::new("COMPARE".to_string(), None, false);
         assert!(missing.compare_field().is_err());
+    }
+
+    #[test]
+    fn parses_inert_bookmark_reference_fields_without_resolution_or_navigation() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" REF &quot;Target Bookmark&quot; \d &quot;-&quot; \f \h \n \p \r \t \w \* MERGEFORMAT \q opaque " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached reference</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>pageref PageTarget \h \p</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>12 above</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr=" FTNREF FootnoteTarget \p \f ">
+                <w:r><w:t>1 above</w:t></w:r>
+            </w:fldSimple>
+            <w:fldSimple w:instr=" NOTEREF EndnoteTarget \p \f " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>i above</w:t></w:r>
+            </w:fldSimple>
+            <w:fldSimple w:instr=" REFS Target "><w:r><w:t>not a reference</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 5);
+        assert!(fields[0].is_reference_field());
+        assert!(fields[1].is_reference_field());
+        assert!(fields[2].is_reference_field());
+        assert!(fields[3].is_reference_field());
+        assert!(!fields[4].is_reference_field());
+
+        let reference = fields[0].reference_field().unwrap().unwrap();
+        assert_eq!(reference.kind(), ReferenceFieldKind::Reference);
+        assert_eq!(reference.bookmark(), "Target Bookmark");
+        assert_eq!(
+            reference.options(),
+            &[
+                ReferenceFieldOption::SequencePageSeparator("-".to_string()),
+                ReferenceFieldOption::ReferencedNoteContent,
+                ReferenceFieldOption::Hyperlink,
+                ReferenceFieldOption::ParagraphNumberWithoutContext,
+                ReferenceFieldOption::RelativePosition,
+                ReferenceFieldOption::ParagraphNumberRelativeContext,
+                ReferenceFieldOption::SuppressNonNumberText,
+                ReferenceFieldOption::ParagraphNumberFullContext,
+            ]
+        );
+        assert_eq!(reference.unknown_switches().len(), 2);
+        assert_eq!(reference.unknown_switches()[0].name(), '*');
+        assert_eq!(
+            reference.unknown_switches()[0].argument(),
+            Some("MERGEFORMAT")
+        );
+        assert_eq!(reference.unknown_switches()[1].name(), 'q');
+        assert_eq!(reference.unknown_switches()[1].argument(), Some("opaque"));
+        assert_eq!(reference.cached_result(), Some("cached reference"));
+        assert!(reference.is_dirty());
+        assert!(reference.is_locked());
+
+        let page_reference = fields[1].reference_field().unwrap().unwrap();
+        assert_eq!(page_reference.kind(), ReferenceFieldKind::PageReference);
+        assert_eq!(page_reference.bookmark(), "PageTarget");
+        assert_eq!(
+            page_reference.options(),
+            &[
+                ReferenceFieldOption::Hyperlink,
+                ReferenceFieldOption::RelativePosition,
+            ]
+        );
+        assert_eq!(page_reference.cached_result(), Some("12 above"));
+        assert!(page_reference.is_dirty());
+        assert!(page_reference.is_locked());
+
+        let footnote_reference = fields[2].reference_field().unwrap().unwrap();
+        assert_eq!(
+            footnote_reference.kind(),
+            ReferenceFieldKind::FootnoteReference
+        );
+        assert_eq!(footnote_reference.bookmark(), "FootnoteTarget");
+        assert_eq!(
+            footnote_reference.options(),
+            &[
+                ReferenceFieldOption::RelativePosition,
+                ReferenceFieldOption::NoteMarkFormatting,
+            ]
+        );
+        assert_eq!(footnote_reference.cached_result(), Some("1 above"));
+
+        let note_reference = fields[3].reference_field().unwrap().unwrap();
+        assert_eq!(note_reference.kind(), ReferenceFieldKind::NoteReference);
+        assert_eq!(note_reference.bookmark(), "EndnoteTarget");
+        assert_eq!(
+            note_reference.options(),
+            &[
+                ReferenceFieldOption::RelativePosition,
+                ReferenceFieldOption::NoteMarkFormatting,
+            ]
+        );
+        assert_eq!(note_reference.cached_result(), Some("i above"));
+        assert!(note_reference.is_dirty());
+        assert!(note_reference.is_locked());
+        assert!(fields[4].reference_field().unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_bookmark_reference_fields_without_resolution_or_navigation() {
+        for instruction in [
+            "REF",
+            r#"REF ""#,
+            r#"REF Bookmark \d"#,
+            r#"REF Bookmark \f unexpected"#,
+            r#"PAGEREF Bookmark \h unexpected"#,
+            r#"NOTEREF Bookmark \f unexpected"#,
+            r#"FTNREF Bookmark \p unexpected"#,
+        ] {
+            let field = Field::new(instruction.to_string(), None, false);
+            assert!(field.reference_field().is_err(), "{instruction}");
+        }
+
+        let too_long = Field::new(
+            format!(
+                "REF {}",
+                "x".repeat(MAX_REFERENCE_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.reference_field().is_err());
+
+        let not_reference = Field::new(r#"REFS Bookmark"#.to_string(), None, false);
+        assert!(!not_reference.is_reference_field());
+        assert!(not_reference.reference_field().unwrap().is_none());
     }
 
     #[test]

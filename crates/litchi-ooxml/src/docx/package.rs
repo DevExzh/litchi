@@ -3647,6 +3647,100 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_bookmark_reference_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            for (instruction, cached_result) in [
+                (
+                    r#"REF "Target Bookmark" \d "-" \f \h \n \p \r \t \w"#,
+                    "cached reference",
+                ),
+                (r#"PAGEREF PageTarget \h \p"#, "12 above"),
+                (r#"FTNREF FootnoteTarget \p \f"#, "1 above"),
+                (r#"NOTEREF EndnoteTarget \p \f"#, "i above"),
+            ] {
+                document.add_paragraph().add_field(
+                    crate::docx::writer::MutableField::with_result(
+                        instruction.to_string(),
+                        cached_result.to_string(),
+                    ),
+                );
+            }
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let references = document.reference_fields().unwrap();
+        assert_eq!(document.reference_field_count().unwrap(), 4);
+        assert_eq!(references.len(), 4);
+
+        assert_eq!(
+            references[0].kind(),
+            crate::docx::ReferenceFieldKind::Reference
+        );
+        assert_eq!(references[0].bookmark(), "Target Bookmark");
+        assert_eq!(
+            references[0].options(),
+            &[
+                crate::docx::ReferenceFieldOption::SequencePageSeparator("-".to_string()),
+                crate::docx::ReferenceFieldOption::ReferencedNoteContent,
+                crate::docx::ReferenceFieldOption::Hyperlink,
+                crate::docx::ReferenceFieldOption::ParagraphNumberWithoutContext,
+                crate::docx::ReferenceFieldOption::RelativePosition,
+                crate::docx::ReferenceFieldOption::ParagraphNumberRelativeContext,
+                crate::docx::ReferenceFieldOption::SuppressNonNumberText,
+                crate::docx::ReferenceFieldOption::ParagraphNumberFullContext,
+            ]
+        );
+        assert_eq!(references[0].cached_result(), Some("cached reference"));
+
+        assert_eq!(
+            references[1].kind(),
+            crate::docx::ReferenceFieldKind::PageReference
+        );
+        assert_eq!(references[1].bookmark(), "PageTarget");
+        assert_eq!(
+            references[1].options(),
+            &[
+                crate::docx::ReferenceFieldOption::Hyperlink,
+                crate::docx::ReferenceFieldOption::RelativePosition,
+            ]
+        );
+        assert_eq!(references[1].cached_result(), Some("12 above"));
+
+        assert_eq!(
+            references[2].kind(),
+            crate::docx::ReferenceFieldKind::FootnoteReference
+        );
+        assert_eq!(references[2].bookmark(), "FootnoteTarget");
+        assert_eq!(
+            references[2].options(),
+            &[
+                crate::docx::ReferenceFieldOption::RelativePosition,
+                crate::docx::ReferenceFieldOption::NoteMarkFormatting,
+            ]
+        );
+        assert_eq!(references[2].cached_result(), Some("1 above"));
+
+        assert_eq!(
+            references[3].kind(),
+            crate::docx::ReferenceFieldKind::NoteReference
+        );
+        assert_eq!(references[3].bookmark(), "EndnoteTarget");
+        assert_eq!(
+            references[3].options(),
+            &[
+                crate::docx::ReferenceFieldOption::RelativePosition,
+                crate::docx::ReferenceFieldOption::NoteMarkFormatting,
+            ]
+        );
+        assert_eq!(references[3].cached_result(), Some("i above"));
+    }
+
+    #[test]
     fn writes_and_discovers_inert_prompt_fields_without_displaying_prompts() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
