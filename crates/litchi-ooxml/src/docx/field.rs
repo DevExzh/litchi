@@ -15,6 +15,7 @@ const MAX_SEQUENCE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_STYLE_REFERENCE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_LIST_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 
 /// A field in a Word document.
 ///
@@ -480,6 +481,24 @@ impl Field {
     /// field.
     pub fn document_variable(&self) -> Result<Option<DocumentVariableField>> {
         DocumentVariableField::from_field(self)
+    }
+
+    /// Check whether this is a `DOCPROPERTY` field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never reads
+    /// a package property, resolves a value, or refreshes the field.
+    pub fn is_document_property(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "DOCPROPERTY").is_some()
+    }
+
+    /// Parse this field as inert typed document-property metadata.
+    ///
+    /// Returns `Ok(None)` for non-`DOCPROPERTY` fields. The result exposes the
+    /// stored property name, switches, cached content, and dirty/lock state
+    /// only; it never reads core, extended, or custom package properties,
+    /// resolves a value, or refreshes a field.
+    pub fn document_property(&self) -> Result<Option<DocumentPropertyField>> {
+        DocumentPropertyField::from_field(self)
     }
 
     /// Check whether this is a `MACROBUTTON` field.
@@ -2024,6 +2043,96 @@ impl DocumentVariableField {
     ///
     /// DOCVARIABLE has no field-specific switches. Preserved switches are
     /// inert source metadata and are never interpreted.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+}
+
+/// A typed, inert Word `DOCPROPERTY` field.
+///
+/// ECMA-376 Part 1 §17.16.5.14 defines one stored document-property name
+/// followed by optional field switches. This type exposes that persisted
+/// metadata and the cached result only. It never reads core, extended, or
+/// custom package properties, resolves a value, or refreshes the field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentPropertyField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    property_name: String,
+    switches: Vec<FieldSwitch>,
+}
+
+impl DocumentPropertyField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        if !field.is_document_property() {
+            return Ok(None);
+        }
+        if field.instruction().len() > MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "DOCPROPERTY field instruction exceeds {MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES} bytes"
+            )));
+        }
+        let Some((property_name, switches)) =
+            parse_field_operand_and_switches(field.instruction(), "DOCPROPERTY")?
+        else {
+            unreachable!("document-property recognition and parsing must agree");
+        };
+        let property_name = property_name.ok_or_else(|| {
+            OoxmlError::InvalidFormat("DOCPROPERTY field is missing its property name".to_string())
+        })?;
+        if property_name.is_empty() {
+            return Err(OoxmlError::InvalidFormat(
+                "DOCPROPERTY field property name is empty".to_string(),
+            ));
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            property_name,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored document-property name without resolving it.
+    pub fn property_name(&self) -> &str {
+        &self.property_name
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from a property.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    ///
+    /// Preserved switches are inert source metadata and are never interpreted.
     pub fn switches(&self) -> &[FieldSwitch] {
         &self.switches
     }
@@ -6523,6 +6632,70 @@ mod tests {
         let unexpected_operand =
             Field::new("DOCVARIABLE Customer unexpected".to_string(), None, false);
         assert!(unexpected_operand.document_variable().is_err());
+    }
+
+    #[test]
+    fn parses_document_property_fields_without_resolving_values() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" DOCPROPERTY &quot;Project Name&quot; \* MERGEFORMAT \@ &quot;MMMM d, yyyy&quot; " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached project</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>docproperty Revision</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached revision</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="DOCPROPERTYS ProjectName"><w:r><w:t>not a property</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_document_property());
+        assert!(fields[1].is_document_property());
+        assert!(!fields[2].is_document_property());
+
+        let project = fields[0].document_property().unwrap().unwrap();
+        assert_eq!(project.property_name(), "Project Name");
+        assert_eq!(project.cached_result(), Some("cached project"));
+        assert!(project.is_dirty());
+        assert!(project.is_locked());
+        assert_eq!(project.switches().len(), 2);
+        assert_eq!(project.switches()[0].name(), '*');
+        assert_eq!(project.switches()[0].argument(), Some("MERGEFORMAT"));
+        assert_eq!(project.switches()[1].name(), '@');
+        assert_eq!(project.switches()[1].argument(), Some("MMMM d, yyyy"));
+        assert!(project.has_switch('*'));
+        assert!(project.has_switch('@'));
+
+        let revision = fields[1].document_property().unwrap().unwrap();
+        assert_eq!(revision.property_name(), "Revision");
+        assert_eq!(revision.cached_result(), Some("cached revision"));
+        assert!(revision.is_dirty());
+        assert!(revision.is_locked());
+        assert!(revision.switches().is_empty());
+        assert!(fields[2].document_property().unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_document_property_field_semantics() {
+        for instruction in [
+            r#"DOCPROPERTY \* MERGEFORMAT"#,
+            r#"DOCPROPERTY """#,
+            "DOCPROPERTY Project unexpected",
+            r#"DOCPROPERTY Project \"#,
+        ] {
+            let field = Field::new(instruction.to_string(), None, false);
+            assert!(field.document_property().is_err(), "{instruction}");
+        }
+
+        let too_long = Field::new(
+            format!(
+                "DOCPROPERTY {}",
+                "x".repeat(MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.document_property().is_err());
     }
 
     #[test]
