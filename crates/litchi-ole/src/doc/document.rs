@@ -899,13 +899,14 @@ impl Document {
         Ok(self.document_information_fields()?.len())
     }
 
-    /// Get typed, inert built-in document-context fields in story and source
-    /// order.
+    /// Get typed, inert built-in document-context and runtime fields in story
+    /// and source order.
     ///
     /// Returned values expose only the native category, stored switches,
     /// cached results, and field state. This method never reads a document
-    /// path, attached template, host filesystem state, current clock, or page
-    /// layout, resolves values, or refreshes a field result.
+    /// path, attached template, host filesystem state or file size, current
+    /// clock, or page and section layout, resolves values, or refreshes a field
+    /// result.
     pub fn document_context_fields(&self) -> Result<Vec<DocumentContextField>> {
         let fields = self.fields()?;
         Ok(fields
@@ -914,7 +915,8 @@ impl Document {
             .collect())
     }
 
-    /// Get the number of typed, inert built-in document-context fields.
+    /// Get the number of typed, inert built-in document-context and runtime
+    /// fields.
     pub fn document_context_field_count(&self) -> Result<usize> {
         Ok(self.document_context_fields()?.len())
     }

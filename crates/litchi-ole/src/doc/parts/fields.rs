@@ -1973,12 +1973,13 @@ impl DocumentInformationField {
     }
 }
 
-/// The built-in Word document-context field category.
+/// The built-in Word document-context and runtime field category.
 ///
 /// [MS-DOC] §2.9.90 assigns the native `flt` values 0x1D through 0x21 to
-/// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, and `PAGE`. This enum
-/// preserves the stored category only; it does not read a document path,
-/// attached template, host filesystem state, current clock, or page layout.
+/// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, and `PAGE`, and values 0x41, 0x42, and
+/// 0x45 to `SECTION`, `SECTIONPAGES`, and `FILESIZE`. This enum preserves the stored
+/// category only; it does not read a document path, attached template, host
+/// filesystem state or file size, current clock, or page and section layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DocumentContextFieldKind {
     FileName,
@@ -1986,6 +1987,9 @@ pub enum DocumentContextFieldKind {
     Date,
     Time,
     Page,
+    FileSize,
+    Section,
+    SectionPages,
 }
 
 impl DocumentContextFieldKind {
@@ -1997,6 +2001,9 @@ impl DocumentContextFieldKind {
             Self::Date => "DATE",
             Self::Time => "TIME",
             Self::Page => "PAGE",
+            Self::FileSize => "FILESIZE",
+            Self::Section => "SECTION",
+            Self::SectionPages => "SECTIONPAGES",
         }
     }
 
@@ -2007,6 +2014,9 @@ impl DocumentContextFieldKind {
             FieldType::Date => Some(Self::Date),
             FieldType::Time => Some(Self::Time),
             FieldType::Page => Some(Self::Page),
+            FieldType::FileSize => Some(Self::FileSize),
+            FieldType::Section => Some(Self::Section),
+            FieldType::SectionPages => Some(Self::SectionPages),
             _ => None,
         }
     }
@@ -2018,18 +2028,21 @@ impl DocumentContextFieldKind {
             Self::Date,
             Self::Time,
             Self::Page,
+            Self::FileSize,
+            Self::Section,
+            Self::SectionPages,
         ]
             .into_iter()
             .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
     }
 }
 
-/// A typed, inert legacy Word built-in document-context field.
+/// A typed, inert legacy Word built-in document-context or runtime field.
 ///
 /// This type exposes the stored native category, instruction, switches, and
 /// cached result only. It never reads a document path, attached template, host
-/// filesystem state, current clock, or page layout, resolves a value, or
-/// refreshes a field.
+/// filesystem state or file size, current clock, or page and section layout,
+/// resolves a value, or refreshes a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentContextField {
     field: Field,
@@ -2050,7 +2063,7 @@ impl DocumentContextField {
         &self.instruction
     }
 
-    /// Return the recognized built-in document-context category.
+    /// Return the recognized built-in document-context or runtime category.
     pub const fn kind(&self) -> DocumentContextFieldKind {
         self.kind
     }
@@ -2065,7 +2078,8 @@ impl DocumentContextField {
     /// Return the stored cached field result, if present.
     ///
     /// This value is never regenerated from a document path, attached
-    /// template, host filesystem state, current clock, or page layout.
+    /// template, host filesystem state or file size, current clock, or page
+    /// and section layout.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -3607,14 +3621,15 @@ impl FieldText {
     }
 
     /// Return inert typed metadata when this is a well-formed built-in
-    /// document-context field.
+    /// document-context or runtime field.
     ///
-    /// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, and `PAGE` retain only
-    /// their native category, stored switches, cached result, and field state.
-    /// This method never reads a document path, attached template, host
-    /// filesystem state, current clock, or page layout, resolves a value, or
-    /// refreshes a field. Malformed instructions and mismatched native field
-    /// types remain available through this generic type and return `None` here.
+    /// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, `PAGE`, `FILESIZE`, `SECTION`, and
+    /// `SECTIONPAGES` retain only their native category, stored switches, cached result,
+    /// and field state. This method never reads a document path, attached
+    /// template, host filesystem state or file size, current clock, or page
+    /// and section layout, resolves a value, or refreshes a field. Malformed
+    /// instructions and mismatched native field types remain available through
+    /// this generic type and return `None` here.
     pub fn document_context(&self) -> Option<DocumentContextField> {
         let native_kind = DocumentContextFieldKind::from_field_type(self.field.field_type)?;
         let (kind, switches) = parse_document_context_field_parts(&self.instruction)?;
@@ -6182,6 +6197,8 @@ mod tests {
     fn field_type_mapping_covers_specified_and_unknown_values() {
         assert_eq!(FieldType::from(0x3A), FieldType::EmbeddedObject);
         assert_eq!(FieldType::from(0x58), FieldType::Hyperlink);
+        assert_eq!(FieldType::from(0x41), FieldType::Section);
+        assert_eq!(FieldType::from(0x42), FieldType::SectionPages);
         assert_eq!(FieldType::from(0x45), FieldType::FileSize);
         assert_eq!(FieldType::from(0x04), FieldType::Unknown(0x04));
     }
@@ -7977,6 +7994,21 @@ mod tests {
             (FieldType::Date, "DATE", DocumentContextFieldKind::Date),
             (FieldType::Time, "TIME", DocumentContextFieldKind::Time),
             (FieldType::Page, "PAGE", DocumentContextFieldKind::Page),
+            (
+                FieldType::FileSize,
+                "FILESIZE",
+                DocumentContextFieldKind::FileSize,
+            ),
+            (
+                FieldType::Section,
+                "SECTION",
+                DocumentContextFieldKind::Section,
+            ),
+            (
+                FieldType::SectionPages,
+                "SECTIONPAGES",
+                DocumentContextFieldKind::SectionPages,
+            ),
         ] {
             let text = FieldText {
                 field: Field {
@@ -8000,6 +8032,8 @@ mod tests {
             (FieldType::FileName, "FILENAMES"),
             (FieldType::Page, "PAGE unexpected"),
             (FieldType::Page, "PAGES"),
+            (FieldType::SectionPages, "SECTIONPAGES unexpected"),
+            (FieldType::Section, "SECTIONPAGE"),
         ] {
             let malformed = FieldText {
                 field: Field {
