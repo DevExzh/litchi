@@ -1021,6 +1021,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `BIDIOUTLINE` fields in document field order.
+    ///
+    /// Stored opaque instructions, cached results, and state are metadata only.
+    /// This method never reads right-to-left language, paragraph outline, or
+    /// layout state; chooses a numbering system; calculates a result; or
+    /// refreshes a field.
+    pub fn bidi_outline_fields(&self) -> Vec<crate::BidiOutlineField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::bidi_outline_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `BIDIOUTLINE` fields in the document.
+    pub fn bidi_outline_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.bidi_outline_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in
     /// document field order.
     ///
