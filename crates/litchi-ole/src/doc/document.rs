@@ -16,8 +16,8 @@ use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     AdvanceField, CompareField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
     FieldStory, FieldText, FieldsTable, GoToButtonField, IfField, LinkField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
-    MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
+    MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -622,6 +622,25 @@ impl Document {
     /// Get the number of typed, inert `MERGEFIELD` fields.
     pub fn merge_field_count(&self) -> Result<usize> {
         Ok(self.merge_fields()?.len())
+    }
+
+    /// Get typed, inert `DATA` mail-merge source fields in story and source order.
+    ///
+    /// Returned values expose only stored data-source, header-source, switch,
+    /// cached-result, and field-state metadata. This method never opens, reads,
+    /// connects to, resolves, or modifies a source; it never selects a record,
+    /// performs a merge, or refreshes a field result.
+    pub fn mail_merge_data_fields(&self) -> Result<Vec<MailMergeDataField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::mail_merge_data)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `DATA` mail-merge source fields.
+    pub fn mail_merge_data_field_count(&self) -> Result<usize> {
+        Ok(self.mail_merge_data_fields()?.len())
     }
 
     /// Get typed, inert `DOCVARIABLE` fields in story and source order.
