@@ -9,7 +9,10 @@
 //! - Legend text
 //! - Grid data (row/column names and values)
 
+use crate::{Error, IWorkPackage, Result};
+
 mod archive;
+pub(crate) mod axis;
 mod data;
 mod direction;
 mod kind;
@@ -18,7 +21,29 @@ pub(crate) mod options;
 pub(crate) mod source;
 
 pub use archive::IWorkChartArchive;
+pub use axis::ChartAxis;
 pub use data::ChartData;
 pub use direction::ChartSeriesDirection;
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
+
+/// Locate one chart-private object and reject ambiguous cross-component IDs.
+pub(crate) fn unique_chart_object_archive_name(
+    package: &IWorkPackage,
+    identifier: u64,
+    object_label: &str,
+) -> Result<String> {
+    let mut archive_name = None;
+    for name in package.iwa_entry_names() {
+        if package.archive(name)?.object(identifier).is_none() {
+            continue;
+        }
+        if archive_name.replace(name.to_owned()).is_some() {
+            return Err(Error::Archive(format!(
+                "{object_label} {identifier} occurs in multiple IWA components"
+            )));
+        }
+    }
+    archive_name
+        .ok_or_else(|| Error::InvalidFormat(format!("{object_label} {identifier} is missing")))
+}

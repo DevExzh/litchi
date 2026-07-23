@@ -1,5 +1,6 @@
 //! Standalone, inline-data chart CRUD for Keynote slides.
 
+mod axis;
 mod caption;
 mod graph;
 mod legend;

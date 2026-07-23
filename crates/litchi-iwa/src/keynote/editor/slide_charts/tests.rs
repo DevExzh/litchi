@@ -1,6 +1,7 @@
 //! Source-built Keynote chart CRUD regression tests.
 
 use super::*;
+use crate::charts::ChartAxis;
 use crate::keynote::KeynoteDocumentBuilder;
 
 const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
@@ -371,6 +372,136 @@ fn scratch_presentation_supports_native_chart_title_crud() {
             .slide_chart_title(0, duplicate.drawable_object_id)
             .unwrap(),
         Some("Revenue by region".to_owned())
+    );
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(
+        reopened
+            .slide_charts(0)
+            .unwrap()
+            .iter()
+            .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+    );
+}
+
+#[test]
+fn scratch_presentation_supports_native_chart_axis_title_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert_eq!(
+            editor
+                .slide_chart_axis_title(0, source.drawable_object_id, axis)
+                .unwrap(),
+            None
+        );
+    }
+    editor
+        .set_slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Category, "Month")
+        .unwrap();
+    editor
+        .set_slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Value, "Revenue")
+        .unwrap();
+
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    for (axis, title) in [
+        (ChartAxis::Category, "Month"),
+        (ChartAxis::Value, "Revenue"),
+    ] {
+        assert_eq!(
+            editor
+                .slide_chart_axis_title(0, source.drawable_object_id, axis)
+                .unwrap()
+                .as_deref(),
+            Some(title)
+        );
+        assert_eq!(
+            editor
+                .slide_chart_axis_title(0, duplicate.drawable_object_id, axis)
+                .unwrap()
+                .as_deref(),
+            Some(title)
+        );
+    }
+
+    editor
+        .set_slide_chart_axis_title(
+            0,
+            source.drawable_object_id,
+            ChartAxis::Category,
+            "Updated month",
+        )
+        .unwrap();
+    editor
+        .set_slide_chart_axis_title(
+            0,
+            source.drawable_object_id,
+            ChartAxis::Value,
+            "Updated revenue",
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Category)
+            .unwrap()
+            .as_deref(),
+        Some("Updated month")
+    );
+    assert_eq!(
+        editor
+            .slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Value)
+            .unwrap()
+            .as_deref(),
+        Some("Updated revenue")
+    );
+    assert_eq!(
+        editor
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Category)
+            .unwrap()
+            .as_deref(),
+        Some("Month")
+    );
+    assert_eq!(
+        editor
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .unwrap()
+            .as_deref(),
+        Some("Revenue")
+    );
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            editor
+                .remove_slide_chart_axis_title(0, source.drawable_object_id, axis)
+                .unwrap()
+        );
+        assert!(
+            !editor
+                .remove_slide_chart_axis_title(0, source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Category)
+            .unwrap()
+            .as_deref(),
+        Some("Month")
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .unwrap()
+            .as_deref(),
+        Some("Revenue")
     );
     reopened
         .remove_slide_chart(0, duplicate.drawable_object_id)

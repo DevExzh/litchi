@@ -1,5 +1,6 @@
 //! Standalone, inline-data chart CRUD for Numbers sheets.
 
+mod axis;
 mod caption;
 mod graph;
 mod legend;
@@ -523,6 +524,7 @@ fn update_chart_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::charts::ChartAxis;
     use crate::numbers::NumbersDocumentBuilder;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 120.0 };
@@ -902,6 +904,147 @@ mod tests {
                 .sheet_chart_title(sheet_id, duplicate.drawable_object_id)
                 .unwrap(),
             Some("Revenue by region".to_owned())
+        );
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(
+            reopened
+                .sheet_charts(sheet_id)
+                .unwrap()
+                .iter()
+                .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+        );
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_axis_title_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert_eq!(
+                editor
+                    .sheet_chart_axis_title(sheet_id, source.drawable_object_id, axis)
+                    .unwrap(),
+                None
+            );
+        }
+        editor
+            .set_sheet_chart_axis_title(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Category,
+                "Month",
+            )
+            .unwrap();
+        editor
+            .set_sheet_chart_axis_title(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Value,
+                "Revenue",
+            )
+            .unwrap();
+
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        for (axis, title) in [
+            (ChartAxis::Category, "Month"),
+            (ChartAxis::Value, "Revenue"),
+        ] {
+            assert_eq!(
+                editor
+                    .sheet_chart_axis_title(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+                    .as_deref(),
+                Some(title)
+            );
+            assert_eq!(
+                editor
+                    .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, axis)
+                    .unwrap()
+                    .as_deref(),
+                Some(title)
+            );
+        }
+
+        editor
+            .set_sheet_chart_axis_title(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Category,
+                "Updated month",
+            )
+            .unwrap();
+        editor
+            .set_sheet_chart_axis_title(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Value,
+                "Updated revenue",
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_axis_title(sheet_id, source.drawable_object_id, ChartAxis::Category)
+                .unwrap()
+                .as_deref(),
+            Some("Updated month")
+        );
+        assert_eq!(
+            editor
+                .sheet_chart_axis_title(sheet_id, source.drawable_object_id, ChartAxis::Value)
+                .unwrap()
+                .as_deref(),
+            Some("Updated revenue")
+        );
+        assert_eq!(
+            editor
+                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, ChartAxis::Category)
+                .unwrap()
+                .as_deref(),
+            Some("Month")
+        );
+        assert_eq!(
+            editor
+                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, ChartAxis::Value)
+                .unwrap()
+                .as_deref(),
+            Some("Revenue")
+        );
+
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert!(
+                editor
+                    .remove_sheet_chart_axis_title(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+            );
+            assert!(
+                !editor
+                    .remove_sheet_chart_axis_title(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+            );
+        }
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, ChartAxis::Category)
+                .unwrap()
+                .as_deref(),
+            Some("Month")
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, ChartAxis::Value)
+                .unwrap()
+                .as_deref(),
+            Some("Revenue")
         );
         reopened
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)

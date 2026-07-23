@@ -1,5 +1,6 @@
 //! Standalone, inline-data chart CRUD for Pages body attachments.
 
+mod axis;
 mod caption;
 mod graph;
 mod legend;

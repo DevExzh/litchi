@@ -114,6 +114,15 @@ save; `remove_*_chart_title` returns whether a title was visible. Chart titles
 remain independent through duplicate, delete, and package round-trip
 operations.
 
+The native Axis formatter is available through the typed
+`ChartAxis::{Category, Value}` selector. Use `body_chart_axis_title`,
+`sheet_chart_axis_title`, or `slide_chart_axis_title` to read an axis name,
+then `set_*_chart_axis_title` or `remove_*_chart_axis_title` to update the
+same `Axis > Category (X) / Value (Y) > Axis Name` controls that Pages,
+Numbers, and Keynote save. `Value` selects the primary value-axis object;
+titles remain independent through duplicate, delete, and package round-trip
+operations.
+
 Chart legend visibility is likewise native and typed through
 `body_chart_legend_visible`, `sheet_chart_legend_visible`, and
 `slide_chart_legend_visible`; use `set_*_chart_legend_visible` to toggle the

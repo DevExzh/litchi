@@ -1,6 +1,7 @@
 //! Source-built Pages chart CRUD regression tests.
 
 use super::*;
+use crate::charts::ChartAxis;
 
 const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -372,6 +373,143 @@ fn scratch_document_supports_native_chart_title_crud() {
             .body_chart_title(duplicate.drawable_object_id)
             .unwrap(),
         Some("Revenue by region".to_owned())
+    );
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(
+        reopened
+            .body_charts()
+            .unwrap()
+            .iter()
+            .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+    );
+}
+
+#[test]
+fn scratch_document_supports_native_chart_axis_title_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart axis titles").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart axis titles".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert_eq!(
+            editor
+                .body_chart_axis_title(source.drawable_object_id, axis)
+                .unwrap(),
+            None
+        );
+    }
+    editor
+        .set_body_chart_axis_title(source.drawable_object_id, ChartAxis::Category, "Month")
+        .unwrap();
+    editor
+        .set_body_chart_axis_title(source.drawable_object_id, ChartAxis::Value, "Revenue")
+        .unwrap();
+
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    for (axis, title) in [
+        (ChartAxis::Category, "Month"),
+        (ChartAxis::Value, "Revenue"),
+    ] {
+        assert_eq!(
+            editor
+                .body_chart_axis_title(source.drawable_object_id, axis)
+                .unwrap()
+                .as_deref(),
+            Some(title)
+        );
+        assert_eq!(
+            editor
+                .body_chart_axis_title(duplicate.drawable_object_id, axis)
+                .unwrap()
+                .as_deref(),
+            Some(title)
+        );
+    }
+
+    editor
+        .set_body_chart_axis_title(
+            source.drawable_object_id,
+            ChartAxis::Category,
+            "Updated month",
+        )
+        .unwrap();
+    editor
+        .set_body_chart_axis_title(
+            source.drawable_object_id,
+            ChartAxis::Value,
+            "Updated revenue",
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_axis_title(source.drawable_object_id, ChartAxis::Category)
+            .unwrap()
+            .as_deref(),
+        Some("Updated month")
+    );
+    assert_eq!(
+        editor
+            .body_chart_axis_title(source.drawable_object_id, ChartAxis::Value)
+            .unwrap()
+            .as_deref(),
+        Some("Updated revenue")
+    );
+    assert_eq!(
+        editor
+            .body_chart_axis_title(duplicate.drawable_object_id, ChartAxis::Category)
+            .unwrap()
+            .as_deref(),
+        Some("Month")
+    );
+    assert_eq!(
+        editor
+            .body_chart_axis_title(duplicate.drawable_object_id, ChartAxis::Value)
+            .unwrap()
+            .as_deref(),
+        Some("Revenue")
+    );
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            editor
+                .remove_body_chart_axis_title(source.drawable_object_id, axis)
+                .unwrap()
+        );
+        assert!(
+            !editor
+                .remove_body_chart_axis_title(source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_axis_title(duplicate.drawable_object_id, ChartAxis::Category)
+            .unwrap()
+            .as_deref(),
+        Some("Month")
+    );
+    assert_eq!(
+        reopened
+            .body_chart_axis_title(duplicate.drawable_object_id, ChartAxis::Value)
+            .unwrap()
+            .as_deref(),
+        Some("Revenue")
     );
     reopened
         .remove_body_chart(duplicate.drawable_object_id)

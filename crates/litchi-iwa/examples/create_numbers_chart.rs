@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::charts::{ChartData, ChartKind};
+use litchi_iwa::charts::{ChartAxis, ChartData, ChartKind};
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -39,11 +39,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     editor.set_sheet_chart_title(sheet_id, chart.drawable_object_id, "Quarterly revenue")?;
+    editor.set_sheet_chart_axis_title(
+        sheet_id,
+        chart.drawable_object_id,
+        ChartAxis::Category,
+        "Quarter",
+    )?;
+    editor.set_sheet_chart_axis_title(
+        sheet_id,
+        chart.drawable_object_id,
+        ChartAxis::Value,
+        "Revenue",
+    )?;
     editor.set_sheet_chart_legend_visible(sheet_id, chart.drawable_object_id, false)?;
     editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} chart {} with a native title, hidden legend, and caption on sheet {}",
+        "created Numbers {:?} chart {} with native chart and axis titles, a hidden legend, and a caption on sheet {}",
         chart.kind, chart.drawable_object_id, sheet_id
     );
     Ok(())

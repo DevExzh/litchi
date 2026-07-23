@@ -10,6 +10,7 @@ use prost::Message;
 use crate::archive::RawMessage;
 use crate::charts::IWorkChartArchive;
 use crate::charts::source::{CHART_MESSAGE_TYPE, CHART_NON_STYLE_MESSAGE_TYPE};
+use crate::charts::unique_chart_object_archive_name;
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
@@ -212,7 +213,8 @@ fn chart_non_style_slot(
                 "{drawable_label} chart {drawable_object_id} has no chart non-style"
             ))
         })?;
-    let archive_name = unique_object_archive_name(package, non_style_id)?;
+    let archive_name =
+        unique_chart_object_archive_name(package, non_style_id, "chart non-style object")?;
     let archive = package.archive(&archive_name)?;
     let non_style_object = archive.object(non_style_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -451,23 +453,6 @@ fn generated_chart_non_style_extension(data: &[u8]) -> Result<Option<&[u8]>> {
         )));
     }
     Ok(Some(&data[extension.payload_start..extension.end]))
-}
-
-fn unique_object_archive_name(package: &IWorkPackage, identifier: u64) -> Result<String> {
-    let mut archive_name = None;
-    for name in package.iwa_entry_names() {
-        if package.archive(name)?.object(identifier).is_none() {
-            continue;
-        }
-        if archive_name.replace(name.to_owned()).is_some() {
-            return Err(Error::Archive(format!(
-                "chart non-style object {identifier} occurs in multiple IWA components"
-            )));
-        }
-    }
-    archive_name.ok_or_else(|| {
-        Error::InvalidFormat(format!("chart non-style object {identifier} is missing"))
-    })
 }
 
 #[cfg(test)]
