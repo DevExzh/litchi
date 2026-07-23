@@ -588,6 +588,104 @@ fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
 }
 
 #[test]
+fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart major gridlines").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart major gridlines".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+
+    assert!(
+        !editor
+            .body_chart_axis_major_gridlines_visible(source.drawable_object_id, ChartAxis::Category)
+            .unwrap()
+    );
+    assert!(
+        editor
+            .body_chart_axis_major_gridlines_visible(source.drawable_object_id, ChartAxis::Value)
+            .unwrap()
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_axis_major_gridlines_visible(
+            source.drawable_object_id,
+            ChartAxis::Category,
+            false,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_axis_major_gridlines_visible(
+            source.drawable_object_id,
+            ChartAxis::Category,
+            true,
+        )
+        .unwrap();
+    editor
+        .set_body_chart_axis_major_gridlines_visible(
+            source.drawable_object_id,
+            ChartAxis::Value,
+            false,
+        )
+        .unwrap();
+
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert_eq!(
+            editor
+                .body_chart_axis_major_gridlines_visible(duplicate.drawable_object_id, axis)
+                .unwrap(),
+            axis == ChartAxis::Category
+        );
+    }
+
+    editor
+        .set_body_chart_axis_major_gridlines_visible(
+            source.drawable_object_id,
+            ChartAxis::Category,
+            false,
+        )
+        .unwrap();
+    editor
+        .set_body_chart_axis_major_gridlines_visible(
+            source.drawable_object_id,
+            ChartAxis::Value,
+            true,
+        )
+        .unwrap();
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert_eq!(
+            reopened
+                .body_chart_axis_major_gridlines_visible(source.drawable_object_id, axis)
+                .unwrap(),
+            axis == ChartAxis::Value
+        );
+        assert_eq!(
+            reopened
+                .body_chart_axis_major_gridlines_visible(duplicate.drawable_object_id, axis)
+                .unwrap(),
+            axis == ChartAxis::Category
+        );
+    }
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
 fn scratch_document_supports_native_chart_legend_visibility_crud() {
     let mut editor = PagesEditor::create_with_text("Chart legends").unwrap();
     let source = editor

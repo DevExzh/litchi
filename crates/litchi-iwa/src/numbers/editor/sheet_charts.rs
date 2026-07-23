@@ -1,6 +1,7 @@
 //! Standalone, inline-data chart CRUD for Numbers sheets.
 
 mod axis;
+mod axis_gridlines;
 mod axis_line;
 mod caption;
 mod graph;
@@ -1108,6 +1109,121 @@ mod tests {
                 !reopened
                     .sheet_chart_axis_line_visible(sheet_id, duplicate.drawable_object_id, axis)
                     .unwrap()
+            );
+        }
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_axis_major_gridline_visibility_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+
+        assert!(
+            !editor
+                .sheet_chart_axis_major_gridlines_visible(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartAxis::Category,
+                )
+                .unwrap()
+        );
+        assert!(
+            editor
+                .sheet_chart_axis_major_gridlines_visible(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartAxis::Value,
+                )
+                .unwrap()
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_axis_major_gridlines_visible(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Category,
+                false,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_axis_major_gridlines_visible(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Category,
+                true,
+            )
+            .unwrap();
+        editor
+            .set_sheet_chart_axis_major_gridlines_visible(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Value,
+                false,
+            )
+            .unwrap();
+
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert_eq!(
+                editor
+                    .sheet_chart_axis_major_gridlines_visible(
+                        sheet_id,
+                        duplicate.drawable_object_id,
+                        axis,
+                    )
+                    .unwrap(),
+                axis == ChartAxis::Category
+            );
+        }
+
+        editor
+            .set_sheet_chart_axis_major_gridlines_visible(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Category,
+                false,
+            )
+            .unwrap();
+        editor
+            .set_sheet_chart_axis_major_gridlines_visible(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Value,
+                true,
+            )
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert_eq!(
+                reopened
+                    .sheet_chart_axis_major_gridlines_visible(
+                        sheet_id,
+                        source.drawable_object_id,
+                        axis,
+                    )
+                    .unwrap(),
+                axis == ChartAxis::Value
+            );
+            assert_eq!(
+                reopened
+                    .sheet_chart_axis_major_gridlines_visible(
+                        sheet_id,
+                        duplicate.drawable_object_id,
+                        axis,
+                    )
+                    .unwrap(),
+                axis == ChartAxis::Category
             );
         }
         reopened

@@ -131,6 +131,16 @@ three apps save. Source-built charts default both primary axis lines to
 visible, and each axis remains independently configurable through duplicate
 and package round-trip operations.
 
+Major-gridline visibility uses the parallel
+`body_chart_axis_major_gridlines_visible`,
+`sheet_chart_axis_major_gridlines_visible`, and
+`slide_chart_axis_major_gridlines_visible` APIs, with
+`set_*_chart_axis_major_gridlines_visible` updating the native
+`Axis > Category (X) / Value (Y) > Gridlines / Major Gridlines` state. New
+column charts match iWork's native defaults: category-axis major gridlines are
+hidden and value-axis major gridlines are visible. Each axis remains independent
+through duplicate and package round-trip operations.
+
 Chart legend visibility is likewise native and typed through
 `body_chart_legend_visible`, `sheet_chart_legend_visible`, and
 `slide_chart_legend_visible`; use `set_*_chart_legend_visible` to toggle the

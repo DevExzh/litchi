@@ -571,6 +571,108 @@ fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
 }
 
 #[test]
+fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    assert!(
+        !editor
+            .slide_chart_axis_major_gridlines_visible(
+                0,
+                source.drawable_object_id,
+                ChartAxis::Category,
+            )
+            .unwrap()
+    );
+    assert!(
+        editor
+            .slide_chart_axis_major_gridlines_visible(
+                0,
+                source.drawable_object_id,
+                ChartAxis::Value
+            )
+            .unwrap()
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_axis_major_gridlines_visible(
+            0,
+            source.drawable_object_id,
+            ChartAxis::Category,
+            false,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_axis_major_gridlines_visible(
+            0,
+            source.drawable_object_id,
+            ChartAxis::Category,
+            true,
+        )
+        .unwrap();
+    editor
+        .set_slide_chart_axis_major_gridlines_visible(
+            0,
+            source.drawable_object_id,
+            ChartAxis::Value,
+            false,
+        )
+        .unwrap();
+
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert_eq!(
+            editor
+                .slide_chart_axis_major_gridlines_visible(0, duplicate.drawable_object_id, axis)
+                .unwrap(),
+            axis == ChartAxis::Category
+        );
+    }
+
+    editor
+        .set_slide_chart_axis_major_gridlines_visible(
+            0,
+            source.drawable_object_id,
+            ChartAxis::Category,
+            false,
+        )
+        .unwrap();
+    editor
+        .set_slide_chart_axis_major_gridlines_visible(
+            0,
+            source.drawable_object_id,
+            ChartAxis::Value,
+            true,
+        )
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert_eq!(
+            reopened
+                .slide_chart_axis_major_gridlines_visible(0, source.drawable_object_id, axis)
+                .unwrap(),
+            axis == ChartAxis::Value
+        );
+        assert_eq!(
+            reopened
+                .slide_chart_axis_major_gridlines_visible(0, duplicate.drawable_object_id, axis)
+                .unwrap(),
+            axis == ChartAxis::Category
+        );
+    }
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
 fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor

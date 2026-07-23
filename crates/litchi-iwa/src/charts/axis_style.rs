@@ -1,9 +1,9 @@
-//! Lossless native chart-axis line visibility storage and mutation.
+//! Lossless native chart-axis style-switch storage and mutation.
 //!
-//! iWork stores category- and value-axis line switches in the generated
+//! iWork stores axis-line and major-gridline switches in the generated
 //! extension of a chart's `TSCH.ChartAxisStyleArchive`. This module identifies
 //! the primary native axis-style object, preserves both protobuf layers
-//! losslessly, and changes only the requested axis-line field.
+//! losslessly, and changes only the requested style switch.
 
 use prost::Message;
 
@@ -22,6 +22,74 @@ const GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD: u32 = 10_000;
 const CATEGORY_AXIS_LINE_VISIBLE_FIELD: u32 = 24;
 /// `tschchartaxisvalueshowaxis` in `TSCH.Generated.ChartAxisStyleArchive`.
 const VALUE_AXIS_LINE_VISIBLE_FIELD: u32 = 25;
+/// `tschchartaxiscategoryshowmajorgridlines` in
+/// `TSCH.Generated.ChartAxisStyleArchive`.
+const CATEGORY_MAJOR_GRIDLINES_VISIBLE_FIELD: u32 = 27;
+/// `tschchartaxisvalueshowmajorgridlines` in
+/// `TSCH.Generated.ChartAxisStyleArchive`.
+const VALUE_MAJOR_GRIDLINES_VISIBLE_FIELD: u32 = 28;
+
+/// One boolean chart-axis style switch with an explicit native field mapping.
+#[derive(Debug, Clone, Copy)]
+enum AxisStyleSwitch {
+    Line,
+    MajorGridlines,
+}
+
+impl AxisStyleSwitch {
+    const fn field(self, axis: ChartAxis) -> u32 {
+        match (self, axis) {
+            (Self::Line, ChartAxis::Category) => CATEGORY_AXIS_LINE_VISIBLE_FIELD,
+            (Self::Line, ChartAxis::Value) => VALUE_AXIS_LINE_VISIBLE_FIELD,
+            (Self::MajorGridlines, ChartAxis::Category) => CATEGORY_MAJOR_GRIDLINES_VISIBLE_FIELD,
+            (Self::MajorGridlines, ChartAxis::Value) => VALUE_MAJOR_GRIDLINES_VISIBLE_FIELD,
+        }
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Line => "line",
+            Self::MajorGridlines => "major gridlines",
+        }
+    }
+
+    fn visible(
+        self,
+        generated: &tsch::generated::ChartAxisStyleArchive,
+        axis: ChartAxis,
+    ) -> Option<bool> {
+        match (self, axis) {
+            (Self::Line, ChartAxis::Category) => generated.tschchartaxiscategoryshowaxis,
+            (Self::Line, ChartAxis::Value) => generated.tschchartaxisvalueshowaxis,
+            (Self::MajorGridlines, ChartAxis::Category) => {
+                generated.tschchartaxiscategoryshowmajorgridlines
+            },
+            (Self::MajorGridlines, ChartAxis::Value) => {
+                generated.tschchartaxisvalueshowmajorgridlines
+            },
+        }
+    }
+
+    fn set(
+        self,
+        generated: &mut tsch::generated::ChartAxisStyleArchive,
+        axis: ChartAxis,
+        visible: bool,
+    ) {
+        match (self, axis) {
+            (Self::Line, ChartAxis::Category) => {
+                generated.tschchartaxiscategoryshowaxis = Some(visible)
+            },
+            (Self::Line, ChartAxis::Value) => generated.tschchartaxisvalueshowaxis = Some(visible),
+            (Self::MajorGridlines, ChartAxis::Category) => {
+                generated.tschchartaxiscategoryshowmajorgridlines = Some(visible)
+            },
+            (Self::MajorGridlines, ChartAxis::Value) => {
+                generated.tschchartaxisvalueshowmajorgridlines = Some(visible)
+            },
+        }
+    }
+}
 
 /// The single mutable native axis-style payload for one chart axis.
 #[derive(Debug)]
@@ -39,14 +107,14 @@ pub(crate) fn chart_axis_line_visible(
     drawable_label: &str,
     axis: ChartAxis,
 ) -> Result<bool> {
-    axis_style_slot(
+    chart_axis_style_switch_visible(
         package,
         chart_archive_name,
         drawable_object_id,
         drawable_label,
         axis,
-    )?
-    .read(package, |data| read_axis_style_line_visibility(data, axis))
+        AxisStyleSwitch::Line,
+    )
 }
 
 /// Set whether iWork shows one native chart-axis line.
@@ -58,6 +126,84 @@ pub(crate) fn set_chart_axis_line_visible(
     axis: ChartAxis,
     visible: bool,
 ) -> Result<()> {
+    set_chart_axis_style_switch_visible(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+        AxisStyleSwitch::Line,
+        visible,
+    )
+}
+
+/// Read whether iWork shows major gridlines for one native chart axis.
+pub(crate) fn chart_axis_major_gridlines_visible(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+) -> Result<bool> {
+    chart_axis_style_switch_visible(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+        AxisStyleSwitch::MajorGridlines,
+    )
+}
+
+/// Set whether iWork shows major gridlines for one native chart axis.
+pub(crate) fn set_chart_axis_major_gridlines_visible(
+    package: &mut IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+    visible: bool,
+) -> Result<()> {
+    set_chart_axis_style_switch_visible(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+        AxisStyleSwitch::MajorGridlines,
+        visible,
+    )
+}
+
+fn chart_axis_style_switch_visible(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+    style_switch: AxisStyleSwitch,
+) -> Result<bool> {
+    axis_style_slot(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+    )?
+    .read(package, |data| {
+        read_axis_style_switch_visibility(data, axis, style_switch)
+    })
+}
+
+fn set_chart_axis_style_switch_visible(
+    package: &mut IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+    style_switch: AxisStyleSwitch,
+    visible: bool,
+) -> Result<()> {
     let slot = axis_style_slot(
         package,
         chart_archive_name,
@@ -65,33 +211,40 @@ pub(crate) fn set_chart_axis_line_visible(
         drawable_label,
         axis,
     )?;
-    if slot.read(package, |data| read_axis_style_line_visibility(data, axis))? == visible {
+    if slot.read(package, |data| {
+        read_axis_style_switch_visibility(data, axis, style_switch)
+    })? == visible
+    {
         return Ok(());
     }
     slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
     slot.update(package, |data| {
-        patch_axis_style_line_visibility(data, axis, visible)
+        patch_axis_style_switch_visibility(data, axis, style_switch, visible)
     })?;
-    if slot.read(package, |data| read_axis_style_line_visibility(data, axis))? != visible {
+    if slot.read(package, |data| {
+        read_axis_style_switch_visibility(data, axis, style_switch)
+    })? != visible
+    {
         return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} {}-axis line update failed validation",
-            axis.label()
+            "{drawable_label} chart {drawable_object_id} {}-axis {} update failed validation",
+            axis.label(),
+            style_switch.label()
         )));
     }
     Ok(())
 }
 
-/// Decode a `TSCH.ChartAxisStyleArchive` and return its native axis-line switch.
-fn read_axis_style_line_visibility(data: &[u8], axis: ChartAxis) -> Result<bool> {
+/// Decode a `TSCH.ChartAxisStyleArchive` and return one native style switch.
+fn read_axis_style_switch_visibility(
+    data: &[u8],
+    axis: ChartAxis,
+    style_switch: AxisStyleSwitch,
+) -> Result<bool> {
     let Some(extension) = generated_axis_style_extension(data)? else {
         return Ok(false);
     };
     let generated = tsch::generated::ChartAxisStyleArchive::decode(extension)?;
-    let visible = match axis {
-        ChartAxis::Category => generated.tschchartaxiscategoryshowaxis,
-        ChartAxis::Value => generated.tschchartaxisvalueshowaxis,
-    };
-    Ok(visible.unwrap_or(false))
+    Ok(style_switch.visible(&generated, axis).unwrap_or(false))
 }
 
 fn axis_style_slot(
@@ -265,17 +418,15 @@ impl AxisStyleSlot {
     }
 }
 
-fn patch_axis_style_line_visibility(
+fn patch_axis_style_switch_visibility(
     data: &[u8],
     axis: ChartAxis,
+    style_switch: AxisStyleSwitch,
     visible: bool,
 ) -> Result<Vec<u8>> {
     let Some(extension) = generated_axis_style_extension(data)? else {
         let mut generated = tsch::generated::ChartAxisStyleArchive::default();
-        match axis {
-            ChartAxis::Category => generated.tschchartaxiscategoryshowaxis = Some(visible),
-            ChartAxis::Value => generated.tschchartaxisvalueshowaxis = Some(visible),
-        }
+        style_switch.set(&mut generated, axis, visible);
         let encoded = generated.encode_to_vec();
         let patched = patch_length_delimited_field(
             data,
@@ -283,18 +434,15 @@ fn patch_axis_style_line_visibility(
             false,
             Some(encoded.as_slice()),
         )?;
-        validate_patched_axis_line_visibility(&patched, axis, visible)?;
+        validate_patched_axis_style_switch(&patched, axis, style_switch, visible)?;
         return Ok(patched);
     };
 
     let generated = tsch::generated::ChartAxisStyleArchive::decode(extension)?;
-    let visible_present = match axis {
-        ChartAxis::Category => generated.tschchartaxiscategoryshowaxis.is_some(),
-        ChartAxis::Value => generated.tschchartaxisvalueshowaxis.is_some(),
-    };
+    let visible_present = style_switch.visible(&generated, axis).is_some();
     let extension = patch_varint_field(
         extension,
-        axis_line_visible_field(axis),
+        style_switch.field(axis),
         visible_present,
         Some(u64::from(visible)),
     )?;
@@ -304,26 +452,21 @@ fn patch_axis_style_line_visibility(
         true,
         Some(extension.as_slice()),
     )?;
-    validate_patched_axis_line_visibility(&patched, axis, visible)?;
+    validate_patched_axis_style_switch(&patched, axis, style_switch, visible)?;
     Ok(patched)
 }
 
-fn axis_line_visible_field(axis: ChartAxis) -> u32 {
-    match axis {
-        ChartAxis::Category => CATEGORY_AXIS_LINE_VISIBLE_FIELD,
-        ChartAxis::Value => VALUE_AXIS_LINE_VISIBLE_FIELD,
-    }
-}
-
-fn validate_patched_axis_line_visibility(
+fn validate_patched_axis_style_switch(
     data: &[u8],
     axis: ChartAxis,
+    style_switch: AxisStyleSwitch,
     expected: bool,
 ) -> Result<()> {
-    if read_axis_style_line_visibility(data, axis)? != expected {
+    if read_axis_style_switch_visibility(data, axis, style_switch)? != expected {
         return Err(Error::InvalidFormat(format!(
-            "{}-axis line wire patch failed validation",
-            axis.label()
+            "{}-axis {} wire patch failed validation",
+            axis.label(),
+            style_switch.label()
         )));
     }
     Ok(())
@@ -370,45 +513,113 @@ mod tests {
         };
         let original = axis_style_with_unknown_fields(generated);
 
-        let visible =
-            patch_axis_style_line_visibility(&original, ChartAxis::Category, true).unwrap();
-        assert!(read_axis_style_line_visibility(&visible, ChartAxis::Category).unwrap());
-        assert!(read_axis_style_line_visibility(&visible, ChartAxis::Value).unwrap());
+        let visible = patch_axis_style_switch_visibility(
+            &original,
+            ChartAxis::Category,
+            AxisStyleSwitch::Line,
+            true,
+        )
+        .unwrap();
+        assert!(
+            read_axis_style_switch_visibility(&visible, ChartAxis::Category, AxisStyleSwitch::Line)
+                .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(&visible, ChartAxis::Value, AxisStyleSwitch::Line)
+                .unwrap()
+        );
         assert_unknown_fields_retained(&original, &visible);
 
-        let restored =
-            patch_axis_style_line_visibility(&visible, ChartAxis::Category, false).unwrap();
+        let restored = patch_axis_style_switch_visibility(
+            &visible,
+            ChartAxis::Category,
+            AxisStyleSwitch::Line,
+            false,
+        )
+        .unwrap();
         assert_eq!(restored, original);
     }
 
     #[test]
-    fn value_axis_line_patch_retains_category_line_and_unmapped_fields() {
+    fn major_gridline_patch_retains_axis_lines_and_unmapped_fields() {
         let generated = tsch::generated::ChartAxisStyleArchive {
             tschchartaxiscategoryshowaxis: Some(true),
             tschchartaxisvalueshowaxis: Some(false),
+            tschchartaxiscategoryshowmajorgridlines: Some(false),
+            tschchartaxisvalueshowmajorgridlines: Some(true),
             ..Default::default()
         };
         let original = axis_style_with_unknown_fields(generated);
 
-        let visible = patch_axis_style_line_visibility(&original, ChartAxis::Value, true).unwrap();
-        assert!(read_axis_style_line_visibility(&visible, ChartAxis::Category).unwrap());
-        assert!(read_axis_style_line_visibility(&visible, ChartAxis::Value).unwrap());
+        let visible = patch_axis_style_switch_visibility(
+            &original,
+            ChartAxis::Category,
+            AxisStyleSwitch::MajorGridlines,
+            true,
+        )
+        .unwrap();
+        assert!(
+            read_axis_style_switch_visibility(
+                &visible,
+                ChartAxis::Category,
+                AxisStyleSwitch::MajorGridlines,
+            )
+            .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(&visible, ChartAxis::Category, AxisStyleSwitch::Line)
+                .unwrap()
+        );
+        assert!(
+            !read_axis_style_switch_visibility(&visible, ChartAxis::Value, AxisStyleSwitch::Line)
+                .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(
+                &visible,
+                ChartAxis::Value,
+                AxisStyleSwitch::MajorGridlines,
+            )
+            .unwrap()
+        );
         assert_unknown_fields_retained(&original, &visible);
 
-        let restored = patch_axis_style_line_visibility(&visible, ChartAxis::Value, false).unwrap();
+        let restored = patch_axis_style_switch_visibility(
+            &visible,
+            ChartAxis::Category,
+            AxisStyleSwitch::MajorGridlines,
+            false,
+        )
+        .unwrap();
         assert_eq!(restored, original);
     }
 
     #[test]
-    fn axis_line_patch_creates_a_style_extension_when_missing() {
+    fn style_switch_patch_creates_a_style_extension_when_missing() {
         let original = tsch::ChartAxisStyleArchive {
             super_: Some(tss::StyleArchive::default()),
         }
         .encode_to_vec();
 
-        let visible = patch_axis_style_line_visibility(&original, ChartAxis::Value, true).unwrap();
-        assert!(read_axis_style_line_visibility(&visible, ChartAxis::Value).unwrap());
-        assert!(!read_axis_style_line_visibility(&visible, ChartAxis::Category).unwrap());
+        let visible = patch_axis_style_switch_visibility(
+            &original,
+            ChartAxis::Value,
+            AxisStyleSwitch::MajorGridlines,
+            true,
+        )
+        .unwrap();
+        assert!(
+            read_axis_style_switch_visibility(
+                &visible,
+                ChartAxis::Value,
+                AxisStyleSwitch::MajorGridlines,
+            )
+            .unwrap()
+        );
+        assert!(
+            !read_axis_style_switch_visibility(&visible, ChartAxis::Value, AxisStyleSwitch::Line)
+                .unwrap()
+        );
     }
 
     fn axis_style_with_unknown_fields(

@@ -51,11 +51,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ChartAxis::Value,
         false,
     )?;
+    editor.set_slide_chart_axis_major_gridlines_visible(
+        0,
+        chart.drawable_object_id,
+        ChartAxis::Value,
+        false,
+    )?;
     editor.set_slide_chart_legend_visible(0, chart.drawable_object_id, false)?;
     editor.set_slide_chart_caption(0, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Keynote {:?} chart {} with native chart and axis titles, a hidden value-axis line and legend, and a caption on slide {}",
+        "created Keynote {:?} chart {} with native chart and axis titles, a hidden value-axis line, value-axis major gridlines, and legend, and a caption on slide {}",
         chart.kind, chart.drawable_object_id, chart.slide_index
     );
     Ok(())

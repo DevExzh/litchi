@@ -57,11 +57,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ChartAxis::Value,
         false,
     )?;
+    editor.set_sheet_chart_axis_major_gridlines_visible(
+        sheet_id,
+        chart.drawable_object_id,
+        ChartAxis::Value,
+        false,
+    )?;
     editor.set_sheet_chart_legend_visible(sheet_id, chart.drawable_object_id, false)?;
     editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} chart {} with native chart and axis titles, a hidden value-axis line and legend, and a caption on sheet {}",
+        "created Numbers {:?} chart {} with native chart and axis titles, a hidden value-axis line, value-axis major gridlines, and legend, and a caption on sheet {}",
         chart.kind, chart.drawable_object_id, sheet_id
     );
     Ok(())
