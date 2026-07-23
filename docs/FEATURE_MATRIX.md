@@ -230,7 +230,7 @@ conversion, fonts, and image conversion are optional.
 | Embedded fonts | ✅ | ✅ | ✅ | Payloads, obfuscation, licensing checks, and ordered CRUD |
 | Embedded OLE/package objects | 🟡 | ✅ | ❌ | Typed per-slide inert OLE inventory with shape, ProgID, relationship, and payload metadata; no OLE authoring or activation |
 | View and presentation properties, and guides | 🟡 | ✅ | ✅ | Typed package/presentation readers for view and presentation settings, with bounded serialization and extended guides |
-| Tags, changes, and revision information | 🟡 | ✅ | 🟡 | Inert programmable tags plus package/presentation revision/change readers and add-only validated package storage |
+| Tags, changes, and revision information | 🟡 | ✅ | 🟡 | Inert programmable tags with slide-aware package/presentation inventory, plus revision/change readers and add-only validated package storage |
 | Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | PowerPoint package task-pane discovery plus bounded web-extension parsing/serialization; add-ins are never executed |
 | Ink annotations | 🟡 | ✅ | ❌ | Bounded inert InkML content-part inventory with slide/relationship/part identity and stored trace counts; no handwriting recognition, rendering, mutation, or execution |
 | Laser pointer traces | 🟡 | ✅ | ❌ | Bounded inert PowerPoint 2010 slide-show trace inventory with stored time offsets and coordinates; never replayed, rendered, interpolated, or mutated |

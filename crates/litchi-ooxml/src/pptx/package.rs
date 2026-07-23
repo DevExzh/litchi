@@ -2,7 +2,7 @@
 use crate::common::DocumentProperties;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
-use crate::pptx::presentation::{PptxChart, Presentation};
+use crate::pptx::presentation::{PptxChart, PptxTagList, Presentation};
 use crate::pptx::vba_project::{VbaProject, discover_vba_project};
 use crate::pptx::writer::MutablePresentation;
 use crate::ribbonx::{
@@ -559,6 +559,14 @@ impl Package {
     /// object or package payload.
     pub fn ole_objects(&self) -> Result<Vec<crate::pptx::PptxOleObject>> {
         self.presentation()?.ole_objects()
+    }
+
+    /// Discover programmable tag-list parts reachable from presentation slides.
+    ///
+    /// Tag names and values remain inert document strings and are never
+    /// evaluated, opened, followed as relationships, or executed.
+    pub fn tag_lists(&self) -> Result<Vec<PptxTagList>> {
+        self.presentation()?.tag_lists()
     }
 
     /// Load typed presentation-view settings, if the package contains them.

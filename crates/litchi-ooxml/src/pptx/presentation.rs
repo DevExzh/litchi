@@ -6,6 +6,7 @@ use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_trace
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
 use crate::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
 use crate::pptx::slide::{Slide, SlideMaster};
+use crate::pptx::tags::{SlideTagList, TagList};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
@@ -45,6 +46,55 @@ impl PptxChart {
     #[inline]
     pub fn info(&self) -> &crate::pptx::parts::ChartInfo {
         &self.info
+    }
+}
+
+/// A programmable tag-list part discovered on a presentation slide.
+///
+/// Tag names and values are retained only as inert document strings. They are
+/// never interpreted as XML, paths, commands, or relationship targets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PptxTagList {
+    slide_index: usize,
+    tag_list_index: usize,
+    value: SlideTagList,
+}
+
+impl PptxTagList {
+    /// Return the zero-based index of the slide that owns this tag-list part.
+    #[inline]
+    pub fn slide_index(&self) -> usize {
+        self.slide_index
+    }
+
+    /// Return the zero-based source-order index of this tag-list on its slide.
+    #[inline]
+    pub fn tag_list_index(&self) -> usize {
+        self.tag_list_index
+    }
+
+    /// Return the relationship ID from the owning slide to this tag-list part.
+    #[inline]
+    pub fn relationship_id(&self) -> &str {
+        self.value.relationship_id()
+    }
+
+    /// Return the absolute OPC part name of this tag-list part.
+    #[inline]
+    pub fn part_name(&self) -> &str {
+        self.value.part_name()
+    }
+
+    /// Return the parsed inert programmable tags.
+    #[inline]
+    pub fn tag_list(&self) -> &TagList {
+        self.value.tag_list()
+    }
+
+    /// Return the underlying slide-scoped tag-list value.
+    #[inline]
+    pub fn as_slide_tag_list(&self) -> &SlideTagList {
+        &self.value
     }
 }
 
@@ -761,6 +811,26 @@ impl<'a> Presentation<'a> {
         }
 
         Ok(objects)
+    }
+
+    /// Discover programmable tag-list parts reachable from presentation slides.
+    ///
+    /// Tag names and values remain inert document strings. This never follows
+    /// values as paths or relationships, evaluates markup, or executes commands.
+    pub fn tag_lists(&self) -> Result<Vec<PptxTagList>> {
+        let mut tag_lists = Vec::new();
+
+        for (slide_index, slide) in self.slides()?.iter().enumerate() {
+            tag_lists.extend(slide.tag_lists()?.into_iter().enumerate().map(
+                |(tag_list_index, value)| PptxTagList {
+                    slide_index,
+                    tag_list_index,
+                    value,
+                },
+            ));
+        }
+
+        Ok(tag_lists)
     }
 
     /// Load typed presentation-view settings, if the package contains them.

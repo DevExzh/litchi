@@ -198,7 +198,7 @@ pub use parts::{
     ChartStyleMarkerSymbol, ChartStylePart, ChartStylePayload, ChartStyleReference,
     ChartStyleVariation, ChartType,
 };
-pub use presentation::{PptxChart, Presentation};
+pub use presentation::{PptxChart, PptxTagList, Presentation};
 pub use presentation_properties::{
     BrowserSupport, ColorKind, HtmlPublishProperties, InertHtmlTarget,
     OpaquePresentationExtension, PresentationColor, PresentationProperties,
