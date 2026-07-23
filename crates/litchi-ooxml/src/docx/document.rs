@@ -12,7 +12,7 @@ use crate::docx::field::{
     AdvanceField, BibliographyField, CitationField, DdeField, DocumentVariableField,
     ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField, IndexField, LinkField,
     MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
-    MailMergeRecipientField, MergeField, PromptField, ReferencedDocumentField,
+    MailMergeRecipientField, MergeField, PromptField, QuoteField, ReferencedDocumentField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
@@ -1629,6 +1629,24 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `COMPARE` fields in the main document.
     pub fn compare_field_count(&self) -> Result<usize> {
         Ok(self.compare_fields()?.len())
+    }
+
+    /// Get typed, inert `QUOTE` fields in document order.
+    ///
+    /// Returned values expose stored text arguments, switches, cached content,
+    /// and dirty/lock state only. This method never interprets character codes,
+    /// expands nested fields, inserts text, or refreshes a field result.
+    pub fn quote_fields(&self) -> Result<Vec<QuoteField>> {
+        self.fields()?
+            .iter()
+            .map(Field::quote_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `QUOTE` fields in the main document.
+    pub fn quote_field_count(&self) -> Result<usize> {
+        Ok(self.quote_fields()?.len())
     }
 
     /// Get typed, inert `ASK` and `FILLIN` fields in document order.

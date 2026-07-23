@@ -123,8 +123,8 @@ pub use field::{
     IndexSortOrder, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
     MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
-    MergeField, PromptField, PromptFieldKind, ReferencedDocumentField, SequenceField, SetField,
-    StyleReferenceField, StyleReferenceFieldOption, TableOfAuthoritiesEntryField,
+    MergeField, PromptField, PromptFieldKind, QuoteField, ReferencedDocumentField, SequenceField,
+    SetField, StyleReferenceField, StyleReferenceFieldOption, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesField, TableOfContentsField, TableOfContentsLevelRange,
     TableOfContentsSwitch, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
 };
