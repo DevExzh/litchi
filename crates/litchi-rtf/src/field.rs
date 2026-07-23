@@ -259,6 +259,59 @@ pub struct Field<'a> {
     pub range_end: usize,
 }
 
+/// Inert metadata for an RTF `HYPERLINK` field.
+///
+/// Targets, bookmarks, display options, cached results, and state are exposed
+/// as stored metadata only. This crate never resolves, opens, fetches,
+/// validates, or activates a target; changes the insertion point; or refreshes
+/// a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HyperlinkField<'a> {
+    instruction: &'a str,
+    external_target: Option<Cow<'a, str>>,
+    bookmark: Option<Cow<'a, str>>,
+    screen_tip: Option<Cow<'a, str>>,
+    target_frame: Option<Cow<'a, str>>,
+    coordinates: Option<Cow<'a, str>>,
+    new_window: bool,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+/// The stored kind of an RTF cross-reference field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReferenceFieldKind {
+    /// A `REF` field.
+    Reference,
+    /// A `PAGEREF` field.
+    PageReference,
+    /// A `NOTEREF` field.
+    NoteReference,
+}
+
+/// Inert metadata for an RTF `REF`, `PAGEREF`, or `NOTEREF` field.
+///
+/// Bookmark names, switches, cached results, and state are exposed as stored
+/// metadata only. This crate never looks up a bookmark, calculates a page or
+/// note number, inserts text, changes layout, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReferenceField<'a> {
+    instruction: &'a str,
+    kind: ReferenceFieldKind,
+    bookmark: Cow<'a, str>,
+    hyperlink: bool,
+    position: bool,
+    footnote_mark: bool,
+    unknown_switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position_in_story: usize,
+}
+
 /// Inert metadata for a legacy RTF `EQ` field.
 ///
 /// The expression is retained exactly as field-instruction text after the
@@ -1885,6 +1938,149 @@ struct LinkFieldParts<'a> {
     result_options: Vec<LinkResultOption>,
     formatting_modes: Vec<LinkFormatting>,
     unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+impl<'a> HyperlinkField<'a> {
+    /// Return the complete stored `HYPERLINK` field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the external target, if one was stored.
+    pub fn external_target(&self) -> Option<&str> {
+        self.external_target.as_deref()
+    }
+
+    /// Return the local bookmark target, if one was stored.
+    pub fn bookmark(&self) -> Option<&str> {
+        self.bookmark.as_deref()
+    }
+
+    /// Return the stored screen-tip text, if any.
+    pub fn screen_tip(&self) -> Option<&str> {
+        self.screen_tip.as_deref()
+    }
+
+    /// Return the stored target frame, if any.
+    pub fn target_frame(&self) -> Option<&str> {
+        self.target_frame.as_deref()
+    }
+
+    /// Return the stored image-map coordinates, if any.
+    pub fn coordinates(&self) -> Option<&str> {
+        self.coordinates.as_deref()
+    }
+
+    /// Whether the instruction requests a new window.
+    pub const fn opens_in_new_window(&self) -> bool {
+        self.new_window
+    }
+
+    /// Return switches not recognized by this API in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated or activated.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
+impl<'a> ReferenceField<'a> {
+    /// Return the complete stored cross-reference field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored cross-reference field kind.
+    pub const fn kind(&self) -> ReferenceFieldKind {
+        self.kind
+    }
+
+    /// Return the stored bookmark name.
+    pub fn bookmark(&self) -> &str {
+        &self.bookmark
+    }
+
+    /// Whether the instruction requests a hyperlink result.
+    pub const fn has_hyperlink(&self) -> bool {
+        self.hyperlink
+    }
+
+    /// Whether the instruction requests a relative-position result.
+    pub const fn includes_relative_position(&self) -> bool {
+        self.position
+    }
+
+    /// Whether the instruction requests a footnote-mark result.
+    pub const fn includes_footnote_mark(&self) -> bool {
+        self.footnote_mark
+    }
+
+    /// Return switches not recognized by this API in source order.
+    pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position_in_story
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
 }
 
 impl<'a> EquationField<'a> {
@@ -6279,6 +6475,71 @@ impl<'a> Field<'a> {
 
     pub fn clear_page_breaks(&mut self) {
         self.result_events.retain(|event| !matches!(event, StoryEvent::PageBreak(_)));
+    }
+
+    /// Return inert metadata when this is a well-formed `HYPERLINK` field.
+    ///
+    /// Targets, bookmarks, display options, cached results, and state are
+    /// stored metadata only. This method never resolves, opens, fetches,
+    /// validates, or activates a target; changes the insertion point; or
+    /// refreshes a field. Malformed `HYPERLINK` instructions remain generic fields
+    /// and return `None` here.
+    pub fn hyperlink(&self) -> Option<HyperlinkField<'_>> {
+        if self.field_type != FieldType::Hyperlink {
+            return None;
+        }
+        let ParsedFieldCode::Hyperlink(code) = self.parsed_code() else {
+            return None;
+        };
+        Some(HyperlinkField {
+            instruction: self.instruction.as_ref(),
+            external_target: code.external_target,
+            bookmark: code.bookmark,
+            screen_tip: code.screen_tip,
+            target_frame: code.target_frame,
+            coordinates: code.coordinates,
+            new_window: code.new_window,
+            unknown_switches: code.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed `REF`, `PAGEREF`, or
+    /// `NOTEREF` field.
+    ///
+    /// Bookmark names, switches, cached results, and state are stored metadata
+    /// only. This method never looks up a bookmark, calculates a page or note
+    /// number, inserts text, changes layout, or refreshes a field. Malformed
+    /// instructions remain generic fields and return `None` here.
+    pub fn reference_field(&self) -> Option<ReferenceField<'_>> {
+        let (kind, code) = match (self.field_type, self.parsed_code()) {
+            (FieldType::Reference, ParsedFieldCode::Reference(code)) => {
+                (ReferenceFieldKind::Reference, code)
+            },
+            (FieldType::PageReference, ParsedFieldCode::PageReference(code)) => {
+                (ReferenceFieldKind::PageReference, code)
+            },
+            (FieldType::NoteReference, ParsedFieldCode::NoteReference(code)) => {
+                (ReferenceFieldKind::NoteReference, code)
+            },
+            _ => return None,
+        };
+        Some(ReferenceField {
+            instruction: self.instruction.as_ref(),
+            kind,
+            bookmark: code.bookmark,
+            hyperlink: code.hyperlink,
+            position: code.position,
+            footnote_mark: code.footnote_mark,
+            unknown_switches: code.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position_in_story: self.position,
+        })
     }
 
     /// Parse this field's instruction into bounded, typed semantics.

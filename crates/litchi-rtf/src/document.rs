@@ -901,6 +901,48 @@ impl<'a> RtfDocument<'a> {
         &self.fields
     }
 
+    /// Return typed, inert `HYPERLINK` fields in document field order.
+    ///
+    /// Targets, bookmarks, display options, cached results, and state are
+    /// stored metadata only. This method never resolves, opens, fetches,
+    /// validates, or activates a target; changes the insertion point; or
+    /// refreshes a field.
+    pub fn hyperlinks(&self) -> Vec<crate::HyperlinkField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::hyperlink)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `HYPERLINK` fields in the document.
+    pub fn hyperlink_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.hyperlink().is_some())
+            .count()
+    }
+
+    /// Return typed, inert `REF`, `PAGEREF`, and `NOTEREF` fields in document
+    /// field order.
+    ///
+    /// Bookmark names, switches, cached results, and state are stored metadata
+    /// only. This method never looks up a bookmark, calculates a page or note
+    /// number, inserts text, changes layout, or refreshes a field.
+    pub fn reference_fields(&self) -> Vec<crate::ReferenceField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::reference_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert cross-reference fields in the document.
+    pub fn reference_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.reference_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert legacy `EQ` fields in document field order.
     ///
     /// Expressions and cached results are exposed as stored metadata only. This
