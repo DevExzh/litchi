@@ -981,6 +981,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `GLOSSARY` and `AUTOTEXT` fields in document field order.
+    ///
+    /// Stored entry names, switches, cached results, and state are metadata
+    /// only. This method never looks up a building block, reads a template,
+    /// inserts content, changes bookmarks, accesses an external resource, or
+    /// refreshes a field.
+    pub fn auto_text_fields(&self) -> Vec<crate::AutoTextField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::auto_text_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert building-block fields in the document.
+    pub fn auto_text_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.auto_text_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `DDE` and `DDEAUTO` fields in document field order.
     ///
     /// Application, source, item, representation, and storage metadata are

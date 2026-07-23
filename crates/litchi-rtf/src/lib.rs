@@ -167,13 +167,13 @@ pub use external_reference::{
 };
 pub use field::CompareField;
 pub use field::{
-    ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, BibliographyField,
-    BibliographyOption, BodyStoryEvent, CitationField, CitationOption, DdeField, DdeFieldKind,
-    DdeRepresentation, DocumentVariableField, EquationField, ExternalIncludeField,
-    ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
-    FieldSwitch, FieldType, FormulaField, GoToButtonField, HyperlinkCode, IfField,
-    IncludeFieldKind, IndexEntryField, IndexEntryOption, IndexField, IndexOption, LinkField,
-    LinkFormatting, LinkResultOption, MacroButtonField,
+    ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AutoTextField,
+    AutoTextFieldKind, BibliographyField, BibliographyOption, BodyStoryEvent, CitationField,
+    CitationOption, DdeField, DdeFieldKind, DdeRepresentation, DocumentVariableField,
+    EquationField, ExternalIncludeField, ExternalIncludeOption, Field, FieldCodeError,
+    FieldCodeToken, FieldOwner, FieldStatus, FieldSwitch, FieldType, FormulaField, GoToButtonField,
+    HyperlinkCode, IfField, IncludeFieldKind, IndexEntryField, IndexEntryOption, IndexField,
+    IndexOption, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
     MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
     MergeField, PageBreak, ParsedFieldCode, PromptField, PromptFieldKind, ReferenceCode,
