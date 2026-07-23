@@ -1579,6 +1579,18 @@ pub enum OdfDynamicTextField {
         labels: Vec<OdfDropDownLabel>,
         display_text: String,
     },
+    /// An inert inline script declaration.
+    ///
+    /// Linked targets and embedded payloads are retained as document metadata
+    /// only. This API never opens, resolves, or executes either form.
+    Script {
+        /// Optional inert external script reference.
+        href: Option<String>,
+        /// Optional producer-supplied script-language identifier.
+        language: Option<String>,
+        /// The stored inline script payload, if any.
+        content: String,
+    },
     /// An inert table-cell formula display field.
     TableFormula {
         formula: Option<String>,
@@ -1758,6 +1770,7 @@ impl OdfDynamicTextField {
             | Self::DocumentIdentity { display_text, .. }
             | Self::Sender { display_text, .. }
             | Self::UserDefinedMetadata { display_text, .. } => display_text,
+            Self::Script { content, .. } => content,
             Self::MetaField { content, .. } => content.display_text(),
         }
     }
@@ -2122,6 +2135,30 @@ impl OdfDynamicTextField {
                     &mut aggregate,
                 )?;
             },
+            Self::Script {
+                href,
+                language,
+                content,
+            } => {
+                validate_dynamic_value("xlink:href", href.as_deref(), false, &mut aggregate)?;
+                validate_dynamic_value(
+                    "script:language",
+                    language.as_deref(),
+                    false,
+                    &mut aggregate,
+                )?;
+                validate_dynamic_value(
+                    "inline script content",
+                    Some(content),
+                    false,
+                    &mut aggregate,
+                )?;
+                if href.is_some() && !content.is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "text:script cannot combine xlink:href with inline content".to_string(),
+                    ));
+                }
+            },
             Self::TableFormula {
                 formula,
                 data_style_name,
@@ -2458,6 +2495,39 @@ impl OdfDynamicTextField {
     /// document. Formula attributes are emitted verbatim after XML escaping and
     /// are never executed.
     pub fn to_xml_fragment(&self) -> Result<String> {
+        if let Self::Script {
+            href,
+            language,
+            content,
+        } = self
+        {
+            self.validate()?;
+            let mut xml = String::from("<text:script xmlns:text=\"");
+            xml.push_str(TEXT_DATABASE_NAMESPACE);
+            xml.push('"');
+            if let Some(href) = href {
+                xml.push_str(" xmlns:xlink=\"");
+                xml.push_str(XLINK_NAMESPACE);
+                xml.push_str("\" xlink:type=\"simple\" xlink:href=\"");
+                push_xml_attribute(&mut xml, href);
+                xml.push('"');
+            }
+            if let Some(language) = language {
+                xml.push_str(" xmlns:script=\"");
+                xml.push_str(SCRIPT_NAMESPACE);
+                xml.push_str("\" script:language=\"");
+                push_xml_attribute(&mut xml, language);
+                xml.push('"');
+            }
+            if content.is_empty() {
+                xml.push_str("/>");
+            } else {
+                xml.push('>');
+                push_xml_text(&mut xml, content);
+                xml.push_str("</text:script>");
+            }
+            return Ok(xml);
+        }
         if let Self::DropDown {
             name,
             labels,
@@ -2539,6 +2609,7 @@ impl OdfDynamicTextField {
             Self::UserFieldInput { .. } => Element::new("text:user-field-input"),
             Self::TextInput { .. } => Element::new("text:text-input"),
             Self::DropDown { .. } => unreachable!("drop-down uses nested-label serializer"),
+            Self::Script { .. } => unreachable!("script uses a namespace-aware serializer"),
             Self::TableFormula { .. } => Element::new("text:table-formula"),
             Self::Measure { .. } => Element::new("text:measure"),
             Self::Reference { .. } => Element::new("text:reference-ref"),
@@ -2773,6 +2844,7 @@ impl OdfDynamicTextField {
                 element.set_text(display_text);
             },
             Self::DropDown { .. } => unreachable!("drop-down uses nested-label serializer"),
+            Self::Script { .. } => unreachable!("script uses a namespace-aware serializer"),
             Self::TableFormula {
                 formula,
                 display,
@@ -3193,6 +3265,7 @@ impl Field {
                 | "text:expression"
                 | "text:text-input"
                 | "text:drop-down"
+                | "text:script"
                 | "text:placeholder"
                 | "text:conditional-text"
                 | "text:hidden-text"
@@ -3282,6 +3355,49 @@ impl Field {
                 condition: required_field_attribute(self, "text:condition")?.to_owned(),
                 is_hidden: optional_field_bool(self, "text:is-hidden")?,
                 display_text: text(),
+            },
+            "text:script" => {
+                reject_unknown_field_attributes(
+                    self,
+                    &["xlink:type", "xlink:href", "script:language"],
+                )?;
+                let href = match (
+                    self.element.get_attribute("xlink:type"),
+                    self.element.get_attribute("xlink:href"),
+                ) {
+                    (None, None) => None,
+                    (Some("simple"), Some(href)) => Some(href.to_owned()),
+                    (Some("simple"), None) => {
+                        return Err(Error::InvalidFormat(
+                            "text:script xlink:type requires xlink:href".to_string(),
+                        ));
+                    },
+                    (None, Some(_)) => {
+                        return Err(Error::InvalidFormat(
+                            "text:script xlink:href requires xlink:type='simple'".to_string(),
+                        ));
+                    },
+                    (Some(kind), Some(_)) => {
+                        return Err(Error::InvalidFormat(format!(
+                            "text:script xlink:type must be 'simple', got '{kind}'"
+                        )));
+                    },
+                    (Some(kind), None) => {
+                        return Err(Error::InvalidFormat(format!(
+                            "text:script xlink:type must be 'simple', got '{kind}'"
+                        )));
+                    },
+                };
+                let result = OdfDynamicTextField::Script {
+                    href,
+                    language: self
+                        .element
+                        .get_attribute("script:language")
+                        .map(str::to_owned),
+                    content: text(),
+                };
+                result.validate()?;
+                result
             },
             "text:dde-connection" => OdfDynamicTextField::DdeConnection {
                 connection_name: required_field_attribute(self, "text:connection-name")?.to_owned(),
@@ -4433,6 +4549,14 @@ impl FieldParser {
                     for field in &mut active {
                         field.depth += 1;
                     }
+                    if active
+                        .iter()
+                        .any(|field| field.element.tag_name() == "text:script")
+                    {
+                        return Err(Error::InvalidFormat(
+                            "text:script cannot contain child elements".to_string(),
+                        ));
+                    }
                     if text_element {
                         for field in &mut active {
                             append_text_control(&reader, source, &mut field.text)?;
@@ -4460,6 +4584,15 @@ impl FieldParser {
                             next_order += 1;
                         }
                     }
+                },
+                Event::Empty(_)
+                    if active
+                        .iter()
+                        .any(|field| field.element.tag_name() == "text:script") =>
+                {
+                    return Err(Error::InvalidFormat(
+                        "text:script cannot contain child elements".to_string(),
+                    ));
                 },
                 Event::Empty(ref source) if text_element => {
                     for field in &mut active {
@@ -4523,6 +4656,24 @@ impl FieldParser {
                         field.element.set_text(&field.text);
                         fields.push((field.order, Field::from_element(field.element)?));
                     }
+                },
+                Event::DocType(_)
+                    if active
+                        .iter()
+                        .any(|field| field.element.tag_name() == "text:script") =>
+                {
+                    return Err(Error::InvalidFormat(
+                        "DOCTYPE is not permitted in text:script".to_string(),
+                    ));
+                },
+                Event::PI(_)
+                    if active
+                        .iter()
+                        .any(|field| field.element.tag_name() == "text:script") =>
+                {
+                    return Err(Error::InvalidFormat(
+                        "processing instructions are not permitted in text:script".to_string(),
+                    ));
                 },
                 Event::Eof => break,
                 _ => {},
@@ -7313,6 +7464,104 @@ mod database_field_tests {
         assert!(canonical.contains(&format!("text:row-number=\"{beyond_u64}\"")));
         assert!(canonical.contains("text:value=\"0\""));
         assert!(!canonical.contains("+000"));
+    }
+}
+
+#[cfg(test)]
+mod script_field_tests {
+    use super::*;
+
+    const PREFIX: &str = r#"<o:document-content
+        xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+        xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+        xmlns:l="http://www.w3.org/1999/xlink"
+        xmlns:s="urn:oasis:names:tc:opendocument:xmlns:script:1.0">
+        <o:body><o:text><t:p>"#;
+    const SUFFIX: &str = "</t:p></o:text></o:body></o:document-content>";
+
+    fn document(body: &str) -> String {
+        format!("{PREFIX}{body}{SUFFIX}")
+    }
+
+    fn embedded_field() -> OdfDynamicTextField {
+        OdfDynamicTextField::Script {
+            href: None,
+            language: Some("application/javascript".to_string()),
+            content: "alert('stored & inert');".to_string(),
+        }
+    }
+
+    fn linked_field() -> OdfDynamicTextField {
+        OdfDynamicTextField::Script {
+            href: Some("https://example.invalid/scripts/main.js?one=1&two=2".to_string()),
+            language: Some("application/javascript".to_string()),
+            content: String::new(),
+        }
+    }
+
+    #[test]
+    fn script_fields_preserve_inert_links_languages_and_payloads() {
+        let embedded = document(
+            r#"<t:script s:language="application/javascript">alert('stored &amp; inert');</t:script>"#,
+        );
+        assert_eq!(
+            FieldParser::parse_dynamic_text_fields(&embedded).unwrap(),
+            vec![embedded_field()]
+        );
+
+        let fragment = linked_field().to_xml_fragment().unwrap();
+        assert!(fragment.contains(r#"xlink:type="simple""#));
+        assert!(fragment.contains(r#"script:language="application/javascript""#));
+        assert!(fragment.contains("one=1&amp;two=2"));
+        assert_eq!(
+            FieldParser::parse_dynamic_text_fields(&document(&fragment)).unwrap(),
+            vec![linked_field()]
+        );
+
+        let embedded_fragment = embedded_field().to_xml_fragment().unwrap();
+        assert_eq!(
+            FieldParser::parse_dynamic_text_fields(&document(&embedded_fragment)).unwrap(),
+            vec![embedded_field()]
+        );
+
+        let empty = OdfDynamicTextField::Script {
+            href: None,
+            language: None,
+            content: String::new(),
+        };
+        let empty_fragment = empty.to_xml_fragment().unwrap();
+        assert!(empty_fragment.ends_with("/>"));
+        assert_eq!(
+            FieldParser::parse_dynamic_text_fields(&document(&empty_fragment)).unwrap(),
+            vec![empty]
+        );
+    }
+
+    #[test]
+    fn script_fields_reject_invalid_link_metadata_and_nested_content() {
+        for invalid in [
+            r#"<t:script l:href="https://example.invalid">payload</t:script>"#,
+            r#"<t:script l:type="simple">payload</t:script>"#,
+            r#"<t:script l:type="extended" l:href="https://example.invalid">payload</t:script>"#,
+            r#"<t:script l:type="simple" l:href="https://example.invalid" l:actuate="onLoad">payload</t:script>"#,
+            r#"<t:script l:type="simple" l:href="https://example.invalid">payload</t:script>"#,
+            r#"<t:script xmlns:fake="urn:not-xlink" fake:type="simple" fake:href="https://example.invalid">payload</t:script>"#,
+            r#"<t:script><t:span>nested</t:span></t:script>"#,
+            r#"<t:script><foreign:node xmlns:foreign="urn:foreign"/></t:script>"#,
+            r#"<t:script>before<?unsafe data?>after</t:script>"#,
+        ] {
+            assert!(
+                FieldParser::parse_dynamic_text_fields(&document(invalid)).is_err(),
+                "accepted {invalid}"
+            );
+        }
+
+        let oversized = OdfDynamicTextField::Script {
+            href: None,
+            language: None,
+            content: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
+        };
+        assert!(oversized.to_xml_fragment().is_err());
     }
 }
 

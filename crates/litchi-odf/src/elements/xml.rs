@@ -10,6 +10,7 @@ pub(crate) const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns
 pub(crate) const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 pub(crate) const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 pub(crate) const NUMBER_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0";
+pub(crate) const SCRIPT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
 pub(crate) const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 pub(crate) const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 pub(crate) const DC_NAMESPACE: &[u8] = b"http://purl.org/dc/elements/1.1/";
@@ -86,6 +87,9 @@ pub(crate) fn copy_canonical_attributes(
             },
             ResolveResult::Bound(Namespace(uri)) if uri == NUMBER_NAMESPACE => {
                 format!("number:{local_name}")
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == SCRIPT_NAMESPACE => {
+                format!("script:{local_name}")
             },
             ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => {
                 format!("xlink:{local_name}")

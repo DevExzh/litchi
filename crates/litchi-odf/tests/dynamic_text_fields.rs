@@ -650,6 +650,56 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
 }
 
 #[test]
+fn inline_script_metadata_round_trips_and_supports_namespace_aware_mutation() {
+    let source = document(
+        r#"<t:script xmlns:l="http://www.w3.org/1999/xlink" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:script:1.0" l:type="simple" l:href="https://example.invalid/never-open?one=1&amp;two=2" s:language="application/javascript"/>"#,
+    );
+    let old = OdfDynamicTextField::Script {
+        href: Some("https://example.invalid/never-open?one=1&two=2".to_string()),
+        language: Some("application/javascript".to_string()),
+        content: String::new(),
+    };
+    assert_eq!(source.dynamic_text_fields().unwrap(), vec![old.clone()]);
+
+    let replacement = OdfDynamicTextField::Script {
+        href: None,
+        language: Some("text/x-basic".to_string()),
+        content: "REM stored macro payload".to_string(),
+    };
+    let mut mutable = MutableDocument::from_document(source).unwrap();
+    assert_eq!(
+        mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
+        old
+    );
+    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        round_trip.dynamic_text_fields().unwrap(),
+        vec![replacement.clone()]
+    );
+
+    let inserted = OdfDynamicTextField::Script {
+        href: Some("vnd.example:stored-only".to_string()),
+        language: None,
+        content: String::new(),
+    };
+    let mut mutable = MutableDocument::from_document(round_trip).unwrap();
+    mutable.insert_dynamic_text_field(0, &inserted).unwrap();
+    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        round_trip.dynamic_text_fields().unwrap(),
+        vec![replacement.clone(), inserted.clone()]
+    );
+    assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
+    assert_eq!(
+        Document::from_bytes(mutable.to_bytes().unwrap())
+            .unwrap()
+            .dynamic_text_fields()
+            .unwrap(),
+        vec![inserted]
+    );
+}
+
+#[test]
 fn variable_input_round_trips_every_odf_value_type() {
     for value_type in [
         OdfFieldValueType::Float,
