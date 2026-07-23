@@ -122,6 +122,7 @@ pub use parts::fields::InfoField;
 pub use parts::fields::{LegacyFormField, LegacyFormFieldKind};
 pub use parts::fields::ListNumberField;
 pub use parts::fields::PrintField;
+pub use parts::fields::PrivateField;
 pub use parts::fields::QuoteField;
 pub use parts::fields::SequenceField;
 pub use parts::fields::SetField;

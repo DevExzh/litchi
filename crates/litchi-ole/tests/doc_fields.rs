@@ -236,3 +236,31 @@ fn generated_rd_document_discovers_referenced_documents() {
         references.len()
     );
 }
+
+#[test]
+fn generated_private_document_discovers_private_fields() {
+    let mut writer = DocWriter::new();
+    writer
+        .add_paragraph(concat!(
+            "\u{0013} PRIVATE \"converter payload\" \\* MERGEFORMAT ",
+            "\u{0014}cached private payload\u{0015}",
+        ))
+        .unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+
+    let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+    let document = package.document().unwrap();
+    let private_fields = document.private_fields().unwrap();
+    assert_eq!(private_fields.len(), 1);
+    assert_eq!(private_fields[0].story(), FieldStory::Main);
+    assert_eq!(
+        private_fields[0].opaque_instructions(),
+        "\"converter payload\" \\* MERGEFORMAT"
+    );
+    assert_eq!(
+        private_fields[0].cached_result(),
+        Some("cached private payload")
+    );
+    assert_eq!(document.private_field_count().unwrap(), private_fields.len());
+}

@@ -21,9 +21,9 @@ use super::parts::fields::{
     FormulaField, GoToButtonField, HyperlinkField, IfField, IndexEntryField, IndexField,
     InfoField, LegacyFormField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
-    MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
-    ReferenceField, ReferencedDocumentField, SequenceField, SetField, StyleReferenceField,
-    SymbolField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PrivateField,
+    PromptField, QuoteField, ReferenceField, ReferencedDocumentField, SequenceField, SetField,
+    StyleReferenceField, SymbolField,
     ShapeField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsEntryField,
     TableOfContentsField, UserIdentityField,
 };
@@ -1315,6 +1315,35 @@ impl Document {
     /// Get the number of typed, inert `RD` referenced-document fields.
     pub fn referenced_document_count(&self) -> Result<usize> {
         Ok(self.referenced_documents()?.len())
+    }
+
+    /// Get typed, inert `PRIVATE` conversion-data fields in story and source order.
+    ///
+    /// Native Word omits `PRIVATE` marker characters from `Plcfld` metadata, so
+    /// this method scans only the stored text of each document story. Returned
+    /// values expose opaque instructions, cached results, and source positions.
+    /// This method never converts a document, interprets field data, reveals
+    /// hidden content, changes layout, or refreshes a field. `PRIVATE` is not
+    /// treated as a confidentiality mechanism.
+    pub fn private_fields(&self) -> Result<Vec<PrivateField>> {
+        let mut private_fields = Vec::new();
+        for story in FieldStory::ALL {
+            let Some((start, end)) = self.field_story_range_if_present(story) else {
+                continue;
+            };
+            let text = self.text_extractor.text_at_range(start, end);
+            private_fields.extend(
+                non_plcf_field_texts(story, text)
+                    .iter()
+                    .filter_map(PrivateField::from_non_plcf_field),
+            );
+        }
+        Ok(private_fields)
+    }
+
+    /// Get the number of typed, inert `PRIVATE` conversion-data fields.
+    pub fn private_field_count(&self) -> Result<usize> {
+        Ok(self.private_fields()?.len())
     }
 
     /// Get typed, inert `MERGEREC` and `MERGESEQ` fields in story and source order.
