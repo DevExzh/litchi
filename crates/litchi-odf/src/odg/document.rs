@@ -419,6 +419,51 @@ impl DrawingDocument {
         self.package.variable_declarations()
     }
 
+    /// Inspect named drawing fill-image definitions without resolving style use sites.
+    ///
+    /// Links remain stored metadata: this does not follow them, load linked
+    /// resources, or render images.
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::OdfDrawingFillImages> {
+        self.package.drawing_fill_images()
+    }
+
+    /// Inspect named legacy and SVG drawing gradients without resolving style use sites.
+    ///
+    /// This does not render gradients.
+    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::OdfDrawingGradients> {
+        self.package.drawing_gradients()
+    }
+
+    /// Inspect named drawing hatch definitions without resolving style use sites.
+    ///
+    /// This does not render hatches.
+    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::OdfDrawingHatches> {
+        self.package.drawing_hatches()
+    }
+
+    /// Inspect named drawing marker definitions without resolving style use sites.
+    ///
+    /// This does not render marker paths.
+    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::OdfDrawingMarkers> {
+        self.package.drawing_markers()
+    }
+
+    /// Inspect named drawing opacity definitions without resolving style use sites.
+    ///
+    /// This does not render opacity gradients.
+    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::OdfDrawingOpacities> {
+        self.package.drawing_opacities()
+    }
+
+    /// Inspect named drawing stroke-dash definitions without resolving style use sites.
+    ///
+    /// This does not render strokes.
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<crate::drawing_stroke_dash::OdfDrawingStrokeDashes> {
+        self.package.drawing_stroke_dashes()
+    }
+
     /// Extract the complete format-specific OpenDocument metadata model.
     pub fn odf_metadata(&self) -> Result<Option<OdfMetadata>> {
         self.package.odf_metadata()
