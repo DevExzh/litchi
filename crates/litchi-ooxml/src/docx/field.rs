@@ -543,22 +543,24 @@ impl Field {
         DocumentInformationField::from_field(self)
     }
 
-    /// Check whether this is a built-in document-context field.
+    /// Check whether this is a built-in document-context or runtime field.
     ///
     /// Recognition is limited to the stored field instruction. It never reads
-    /// a document path, attached template, host filesystem state, current
-    /// clock, or page layout, resolves a value, or refreshes the field.
+    /// a document path, attached template, host filesystem state or file size,
+    /// current clock, or page and section layout, resolves a value, or refreshes
+    /// the field.
     pub fn is_document_context(&self) -> bool {
         DocumentContextFieldKind::from_instruction(&self.instruction).is_some()
     }
 
-    /// Parse this field as inert typed document-context metadata.
+    /// Parse this field as inert typed document-context or runtime metadata.
     ///
     /// Returns `Ok(None)` for fields outside the `FILENAME`, `TEMPLATE`, `DATE`,
-    /// `TIME`, and `PAGE` family. The result exposes only the stored kind,
-    /// switches, cached content, and dirty/lock state; it never reads a
-    /// document path, attached template, host filesystem state, current clock,
-    /// or page layout, resolves a value, or refreshes a field.
+    /// `TIME`, `PAGE`, `FILESIZE`, `SECTION`, and `SECTIONPAGES` family. The
+    /// result exposes only the stored kind, switches, cached content, and
+    /// dirty/lock state; it never reads a document path, attached template,
+    /// host filesystem state or file size, current clock, or page and section
+    /// layout, resolves a value, or refreshes a field.
     pub fn document_context(&self) -> Result<Option<DocumentContextField>> {
         DocumentContextField::from_field(self)
     }
@@ -2352,12 +2354,13 @@ impl DocumentInformationField {
     }
 }
 
-/// The built-in Word document-context field category.
+/// The built-in Word document-context and runtime field category.
 ///
-/// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, and `PAGE` are defined in
-/// ECMA-376 Part 1 §17.16.5. This enum preserves the stored field kind only;
-/// it does not read a document path, attached template, host filesystem state,
-/// current clock, or page layout.
+/// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, `PAGE`, `FILESIZE`, `SECTION`, and
+/// `SECTIONPAGES` are defined in ECMA-376 Part 1 §17.16.5. This enum preserves
+/// the stored field kind only; it does not read a document path, attached
+/// template, host filesystem state or file size, current clock, or page and
+/// section layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DocumentContextFieldKind {
     FileName,
@@ -2365,6 +2368,9 @@ pub enum DocumentContextFieldKind {
     Date,
     Time,
     Page,
+    FileSize,
+    Section,
+    SectionPages,
 }
 
 impl DocumentContextFieldKind {
@@ -2376,6 +2382,9 @@ impl DocumentContextFieldKind {
             Self::Date => "DATE",
             Self::Time => "TIME",
             Self::Page => "PAGE",
+            Self::FileSize => "FILESIZE",
+            Self::Section => "SECTION",
+            Self::SectionPages => "SECTIONPAGES",
         }
     }
 
@@ -2386,18 +2395,21 @@ impl DocumentContextFieldKind {
             Self::Date,
             Self::Time,
             Self::Page,
+            Self::FileSize,
+            Self::Section,
+            Self::SectionPages,
         ]
             .into_iter()
             .find(|kind| field_instruction_remainder(instruction, kind.field_keyword()).is_some())
     }
 }
 
-/// Typed, inert metadata for a built-in Word document-context field.
+/// Typed, inert metadata for a built-in Word document-context or runtime field.
 ///
 /// This type retains the stored kind, field switches, cached result, and field
 /// state only. It never reads a document path, attached template, host
-/// filesystem state, current clock, or page layout, resolves a value, or
-/// refreshes a field.
+/// filesystem state or file size, current clock, or page and section layout,
+/// resolves a value, or refreshes a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentContextField {
     instruction: String,
@@ -2437,7 +2449,7 @@ impl DocumentContextField {
         &self.instruction
     }
 
-    /// Return the recognized built-in document-context category.
+    /// Return the recognized built-in document-context or runtime category.
     pub const fn kind(&self) -> DocumentContextFieldKind {
         self.kind
     }
@@ -2445,7 +2457,8 @@ impl DocumentContextField {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from a document path,
-    /// attached template, host filesystem state, current clock, or page layout.
+    /// attached template, host filesystem state or file size, current clock,
+    /// or page and section layout.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -7319,7 +7332,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_document_context_fields_without_reading_paths_or_templates() {
+    fn parses_document_context_fields_without_reading_paths_files_or_layout() {
         let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
             <w:fldSimple w:instr=" FILENAME \p " w:dirty="true" w:fldLock="on">
                 <w:r><w:t>cached file name</w:t></w:r>
@@ -7329,13 +7342,17 @@ mod tests {
             <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
             <w:r><w:t>cached template</w:t></w:r>
             <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr=" SECTIONPAGES \* MERGEFORMAT " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached section pages</w:t></w:r>
+            </w:fldSimple>
             <w:fldSimple w:instr="FILENAMES"><w:r><w:t>not a file-name field</w:t></w:r></w:fldSimple>
         </w:p></w:body></w:document>"#;
         let extracted = Field::extract_from_document(xml).unwrap();
-        assert_eq!(extracted.len(), 3);
+        assert_eq!(extracted.len(), 4);
         assert!(extracted[0].is_document_context());
         assert!(extracted[1].is_document_context());
-        assert!(!extracted[2].is_document_context());
+        assert!(extracted[2].is_document_context());
+        assert!(!extracted[3].is_document_context());
 
         let file_name = extracted[0].document_context().unwrap().unwrap();
         assert_eq!(file_name.kind(), DocumentContextFieldKind::FileName);
@@ -7350,7 +7367,14 @@ mod tests {
         assert!(template.is_dirty());
         assert!(template.is_locked());
         assert!(template.has_switch('*'));
-        assert!(extracted[2].document_context().unwrap().is_none());
+
+        let section_pages = extracted[2].document_context().unwrap().unwrap();
+        assert_eq!(section_pages.kind(), DocumentContextFieldKind::SectionPages);
+        assert_eq!(section_pages.cached_result(), Some("cached section pages"));
+        assert!(section_pages.is_dirty());
+        assert!(section_pages.is_locked());
+        assert!(section_pages.has_switch('*'));
+        assert!(extracted[3].document_context().unwrap().is_none());
 
         for (instruction, kind, switch_name) in [
             (
@@ -7378,6 +7402,21 @@ mod tests {
                 DocumentContextFieldKind::Page,
                 '*',
             ),
+            (
+                r"FILESIZE \* MERGEFORMAT",
+                DocumentContextFieldKind::FileSize,
+                '*',
+            ),
+            (
+                r"SECTION \* MERGEFORMAT",
+                DocumentContextFieldKind::Section,
+                '*',
+            ),
+            (
+                r"SECTIONPAGES \* MERGEFORMAT",
+                DocumentContextFieldKind::SectionPages,
+                '*',
+            ),
         ] {
             let cached_result = format!("cached {}", kind.field_keyword());
             let field = Field::with_flags(
@@ -7403,6 +7442,7 @@ mod tests {
             r"TEMPLATE \",
             r"FILENAME \ ",
             "PAGE unexpected",
+            "SECTIONPAGES unexpected",
         ] {
             let field = Field::new(instruction.to_string(), None, false);
             assert!(field.document_context().is_err(), "{instruction}");
@@ -7425,6 +7465,12 @@ mod tests {
         );
         assert!(
             Field::new("PAGES".to_string(), None, false)
+                .document_context()
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            Field::new("SECTIONPAGE".to_string(), None, false)
                 .document_context()
                 .unwrap()
                 .is_none()
