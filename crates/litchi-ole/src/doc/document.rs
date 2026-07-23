@@ -22,7 +22,7 @@ use super::parts::fields::{
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
     ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
-    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    ShapeField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -683,6 +683,21 @@ impl Document {
     /// Get the number of typed, inert `BIDIOUTLINE` fields.
     pub fn bidi_outline_field_count(&self) -> Result<usize> {
         Ok(self.bidi_outline_fields()?.len())
+    }
+
+    /// Get typed, inert `SHAPE` drawing-canvas anchor fields in story and source order.
+    ///
+    /// Returned values expose only stored opaque instructions, cached results,
+    /// and field state. This method never locates, links, loads, positions,
+    /// lays out, or renders a drawing or canvas, or refreshes a field.
+    pub fn shape_fields(&self) -> Result<Vec<ShapeField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::shape_field).collect())
+    }
+
+    /// Get the number of typed, inert `SHAPE` drawing-canvas anchor fields.
+    pub fn shape_field_count(&self) -> Result<usize> {
+        Ok(self.shape_fields()?.len())
     }
 
     /// Get typed, inert `TOC` fields in story and source order.

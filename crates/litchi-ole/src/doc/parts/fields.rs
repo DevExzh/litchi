@@ -931,6 +931,62 @@ impl BidiOutlineField {
     }
 }
 
+/// Typed, inert metadata for a legacy Word `SHAPE` field.
+///
+/// [MS-DOC] §2.9.90 identifies native `SHAPE` fields with type `0x5F`.
+/// Word uses this legacy field as a drawing-canvas anchor. This type retains
+/// opaque instruction text, a cached result, and field-marker state only. It
+/// never locates, links, loads, positions, lays out, or renders a drawing or
+/// canvas, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShapeField {
+    field: Field,
+    instruction: String,
+    opaque_instructions: String,
+    cached_result: Option<String>,
+}
+
+impl ShapeField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored `SHAPE` field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to locate or
+    /// position a drawing canvas.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return opaque stored instruction text after `SHAPE`.
+    ///
+    /// It is never parsed, interpreted, or used to link a field to a drawing,
+    /// resolve an anchor, or calculate layout.
+    pub fn opaque_instructions(&self) -> &str {
+        &self.opaque_instructions
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is cached metadata only and is never regenerated from a
+    /// drawing canvas.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// One recognized stored option of a legacy Word `TOC` field.
 ///
 /// These values retain how a producer configured a table of contents. They
@@ -3849,6 +3905,26 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a native `SHAPE` field.
+    ///
+    /// Stored opaque instructions, cached results, and field-marker state
+    /// remain metadata only. This method never locates, links, loads,
+    /// positions, lays out, or renders a drawing or canvas, or refreshes a
+    /// field. Malformed instructions remain available through this generic type
+    /// and return `None` here.
+    pub fn shape_field(&self) -> Option<ShapeField> {
+        if self.field.field_type != FieldType::Shape {
+            return None;
+        }
+        let opaque_instructions = parse_shape_field_instructions(&self.instruction)?;
+        Some(ShapeField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            opaque_instructions,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed bookmark-reference field.
     ///
     /// Stored bookmark names, options, and cached results are never used to
@@ -4639,6 +4715,7 @@ const MAX_PRINT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_EMBED_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BARCODE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_SHAPE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_SWITCHES: usize = 64;
 const MAX_AUTO_NUMBER_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5297,6 +5374,19 @@ fn parse_bidi_outline_field_instructions(instruction: &str) -> Option<String> {
     let mut position = 0;
     let keyword = next_field_argument(instruction, &mut position).ok()??;
     if !keyword.eq_ignore_ascii_case("BIDIOUTLINE") {
+        return None;
+    }
+    Some(instruction.get(position..)?.trim().to_string())
+}
+
+fn parse_shape_field_instructions(instruction: &str) -> Option<String> {
+    if instruction.len() > MAX_SHAPE_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("SHAPE") {
         return None;
     }
     Some(instruction.get(position..)?.trim().to_string())
@@ -7096,6 +7186,8 @@ mod tests {
         assert_eq!(FieldType::BarCode.as_u8(), 0x3F);
         assert_eq!(FieldType::from(0x5C), FieldType::BidiOutline);
         assert_eq!(FieldType::BidiOutline.as_u8(), 0x5C);
+        assert_eq!(FieldType::from(0x5F), FieldType::Shape);
+        assert_eq!(FieldType::Shape.as_u8(), 0x5F);
         assert_eq!(FieldType::from(0x58), FieldType::Hyperlink);
         assert_eq!(FieldType::from(0x34), FieldType::AutoNumOutline);
         assert_eq!(FieldType::from(0x35), FieldType::AutoNumLegal);
@@ -7605,6 +7697,73 @@ mod tests {
             ..text
         };
         assert!(wrong_type.bidi_outline_field().is_none());
+    }
+
+    #[test]
+    fn shape_fields_preserve_metadata_without_linking_or_rendering_drawings() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::Shape,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" SHAPE \* MERGEFORMAT "#.to_string(),
+            result: Some("cached drawing anchor".to_string()),
+        };
+
+        let shape = text.shape_field().unwrap();
+        assert_eq!(shape.field(), &field);
+        assert_eq!(shape.instruction(), text.instruction);
+        assert_eq!(shape.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(shape.cached_result(), Some("cached drawing anchor"));
+        assert!(shape.is_dirty());
+        assert!(shape.is_locked());
+
+        let bare = FieldText {
+            instruction: "shape".to_string(),
+            result: Some("cached bare drawing anchor".to_string()),
+            ..text.clone()
+        };
+        let bare = bare.shape_field().unwrap();
+        assert_eq!(bare.opaque_instructions(), "");
+        assert_eq!(bare.cached_result(), Some("cached bare drawing anchor"));
+
+        for instruction in [r#"SHAPES"#, r#"SHAPEANCHOR"#] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.shape_field().is_none(), "{instruction}");
+        }
+
+        let too_long = FieldText {
+            instruction: format!(
+                "SHAPE {}",
+                "x".repeat(MAX_SHAPE_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text.clone()
+        };
+        assert!(too_long.shape_field().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Equation,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.shape_field().is_none());
     }
 
     #[test]
