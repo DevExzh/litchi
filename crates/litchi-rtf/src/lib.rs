@@ -181,6 +181,7 @@ pub use field::{
     TableOfContentsOption, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
     parse_field_code,
 };
+pub use field::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
 pub use form_field::{FormField, FormFieldType, FormTextType};
 pub use generated_list_marker::{GeneratedListMarker, GeneratedListMarkerKind};

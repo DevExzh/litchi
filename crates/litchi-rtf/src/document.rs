@@ -1225,6 +1225,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `ADVANCE` fields in document order.
+    ///
+    /// Stored point adjustments, cached results, and field state are exposed
+    /// solely as metadata. This method never moves text, changes layout,
+    /// reflows content, or refreshes field results.
+    pub fn advance_fields(&self) -> Vec<crate::AdvanceField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::advance_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `ADVANCE` fields.
+    pub fn advance_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.advance_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields in document
     /// order.
     ///
