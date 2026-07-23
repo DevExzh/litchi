@@ -10,6 +10,8 @@ fn presentation_sections_include_slide_membership() {
     let package = package_with_presentation_xml();
     let presentation = package.presentation().unwrap();
 
+    assert_eq!(presentation.slide_ids().unwrap(), [256, 257, 258]);
+
     let sections = presentation.sections().unwrap();
     assert_eq!(sections.sections().len(), 2);
     assert_eq!(sections.sections()[0].name.as_deref(), Some("Opening"));

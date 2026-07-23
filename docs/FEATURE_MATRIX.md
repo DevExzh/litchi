@@ -207,7 +207,7 @@ conversion, fonts, and image conversion are optional.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Open/create/save | ✅ | ✅ | ✅ | Path and in-memory package workflows |
-| Slides and ordering | ✅ | ✅ | ✅ | Add, delete, duplicate, move, resize, enumerate slides and their hidden state, and validate root slide/master relationships |
+| Slides and ordering | ✅ | ✅ | ✅ | Add, delete, duplicate, move, resize, enumerate slides and stable IDs, expose hidden state, and validate root slide/master relationships |
 | Text, text boxes, and bullets | ✅ | ✅ | ✅ | Text extraction and formatted text-box authoring, plus presentation-default text-style inventory and Kinsoku line-breaking settings |
 | Basic shapes and groups | ✅ | ✅ | ✅ | Rectangles, ellipses, text boxes, nested groups, formatting, non-visual IDs, and placeholder inventories |
 | Images and backgrounds | ✅ | ✅ | ✅ | Picture resources, photo-album defaults, plus solid, gradient, pattern, and relationship-resolved picture backgrounds with slide/layout/master inheritance |

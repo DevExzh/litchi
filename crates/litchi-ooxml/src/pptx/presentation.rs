@@ -253,6 +253,14 @@ impl<'a> Presentation<'a> {
         self.part.slide_count()
     }
 
+    /// Get stable presentation slide identifiers in document order.
+    ///
+    /// These identifiers are used by features such as custom slide shows and
+    /// PowerPoint 2010 sections.
+    pub fn slide_ids(&self) -> Result<Vec<u32>> {
+        self.part.slide_ids()
+    }
+
     /// Get the slide width in EMUs (English Metric Units).
     ///
     /// Returns None if the slide size is not defined.
