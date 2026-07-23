@@ -1947,15 +1947,15 @@ impl ReferencedDocumentField {
 
         let mut relative_path = false;
         for switch in &switches {
-            if switch.name == 'p' {
+            if switch.name == 'f' {
                 if switch.argument.is_some() {
                     return Err(OoxmlError::InvalidFormat(
-                        "RD \\\\p switch does not take an argument".to_string(),
+                        "RD \\\\f switch does not take an argument".to_string(),
                     ));
                 }
                 if relative_path {
                     return Err(OoxmlError::InvalidFormat(
-                        "RD \\\\p switch cannot be repeated".to_string(),
+                        "RD \\\\f switch cannot be repeated".to_string(),
                     ));
                 }
                 relative_path = true;
@@ -1998,7 +1998,8 @@ impl ReferencedDocumentField {
         &self.source
     }
 
-    /// Whether the stored RD instruction requests a path relative to this document.
+    /// Whether the stored RD instruction's `\\f` switch requests a path relative to this
+    /// document.
     ///
     /// This is metadata only. The API never resolves the path.
     pub fn uses_relative_path(&self) -> bool {
@@ -9462,7 +9463,7 @@ mod tests {
     #[test]
     fn parses_inert_referenced_document_fields_without_opening_sources() {
         let field = Field::with_flags(
-            r#"RD "C:\\Manual\\Chapters\\Chapter 1.docx" \p \* MERGEFORMAT"#.to_string(),
+            r#"RD "C:\\Manual\\Chapters\\Chapter 1.docx" \f \* MERGEFORMAT"#.to_string(),
             Some("cached RD result".to_string()),
             true,
             true,
@@ -9475,7 +9476,7 @@ mod tests {
         assert!(reference.is_dirty());
         assert!(reference.is_locked());
         assert_eq!(reference.switches().len(), 2);
-        assert_eq!(reference.switches()[0].name(), 'p');
+        assert_eq!(reference.switches()[0].name(), 'f');
         assert_eq!(reference.switches()[1].name(), '*');
         assert_eq!(reference.switches()[1].argument(), Some("MERGEFORMAT"));
 
@@ -9494,15 +9495,21 @@ mod tests {
                 .is_err()
         );
         assert!(
-            Field::new(r#"RD "chapter.docx" \p relative"#.to_string(), None, false)
+            Field::new(r#"RD "chapter.docx" \f relative"#.to_string(), None, false)
                 .referenced_document()
                 .is_err()
         );
         assert!(
-            Field::new(r#"RD "chapter.docx" \p \p"#.to_string(), None, false)
+            Field::new(r#"RD "chapter.docx" \f \f"#.to_string(), None, false)
                 .referenced_document()
                 .is_err()
         );
+        let unknown = Field::new(r#"RD "chapter.docx" \p"#.to_string(), None, false)
+            .referenced_document()
+            .unwrap()
+            .unwrap();
+        assert!(!unknown.uses_relative_path());
+        assert_eq!(unknown.switches()[0].name(), 'p');
         let not_rd = Field::new(r#"RDX "chapter.docx""#.to_string(), None, false);
         assert!(!not_rd.is_referenced_document());
         assert!(not_rd.referenced_document().unwrap().is_none());

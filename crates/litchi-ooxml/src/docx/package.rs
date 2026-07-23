@@ -4062,7 +4062,7 @@ mod tests {
             let document = package.document_mut().unwrap();
             let relative = document.add_paragraph();
             relative.add_field(crate::docx::writer::MutableField::with_result(
-                r#"RD "C:\\Manual\\Chapters\\Chapter 1.docx" \p"#.to_string(),
+                r#"RD "C:\\Manual\\Chapters\\Chapter 1.docx" \f"#.to_string(),
                 "cached relative reference".to_string(),
             ));
             let absolute = document.add_paragraph();
