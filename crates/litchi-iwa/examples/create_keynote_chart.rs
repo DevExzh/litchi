@@ -3,8 +3,8 @@
 use std::env;
 
 use litchi_iwa::charts::{
-    ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartData,
-    ChartKind, ChartValueAxisBounds, ChartValueAxisSteps,
+    ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
+    ChartAxisTickMarkLocation, ChartData, ChartKind, ChartValueAxisBounds, ChartValueAxisSteps,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
@@ -75,6 +75,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ChartAxis::Category,
         false,
     )?;
+    editor.set_slide_chart_axis_tick_mark_location(
+        0,
+        chart.drawable_object_id,
+        ChartAxis::Category,
+        ChartAxisTickMarkLocation::Outside,
+    )?;
     editor.set_slide_chart_axis_line_visible(
         0,
         chart.drawable_object_id,
@@ -97,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_chart_caption(0, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Keynote {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, hidden category-axis labels and minor tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
+        "created Keynote {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
         chart.kind, chart.drawable_object_id, chart.slide_index
     );
     Ok(())

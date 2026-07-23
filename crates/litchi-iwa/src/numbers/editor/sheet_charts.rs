@@ -534,7 +534,7 @@ mod tests {
     use super::*;
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-        ChartValueAxisBounds, ChartValueAxisSteps,
+        ChartAxisTickMarkLocation, ChartValueAxisBounds, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
 
@@ -1864,6 +1864,157 @@ mod tests {
                     .unwrap()
             );
         }
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_axis_tick_mark_location_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert_eq!(
+                editor
+                    .sheet_chart_axis_tick_mark_location(sheet_id, source.drawable_object_id, axis,)
+                    .unwrap(),
+                ChartAxisTickMarkLocation::Centered
+            );
+        }
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_axis_tick_mark_location(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Category,
+                ChartAxisTickMarkLocation::Centered,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_axis_tick_mark_location(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Category,
+                ChartAxisTickMarkLocation::None,
+            )
+            .unwrap();
+        editor
+            .set_sheet_chart_axis_tick_mark_location(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Value,
+                ChartAxisTickMarkLocation::Outside,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_axis_tick_mark_location(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartAxis::Category,
+                )
+                .unwrap(),
+            ChartAxisTickMarkLocation::None
+        );
+        assert_eq!(
+            editor
+                .sheet_chart_axis_tick_mark_location(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartAxis::Value,
+                )
+                .unwrap(),
+            ChartAxisTickMarkLocation::Outside
+        );
+
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_axis_tick_mark_location(
+                    sheet_id,
+                    duplicate.drawable_object_id,
+                    ChartAxis::Category,
+                )
+                .unwrap(),
+            ChartAxisTickMarkLocation::None
+        );
+        assert_eq!(
+            editor
+                .sheet_chart_axis_tick_mark_location(
+                    sheet_id,
+                    duplicate.drawable_object_id,
+                    ChartAxis::Value,
+                )
+                .unwrap(),
+            ChartAxisTickMarkLocation::Outside
+        );
+
+        editor
+            .set_sheet_chart_axis_tick_mark_location(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Category,
+                ChartAxisTickMarkLocation::Inside,
+            )
+            .unwrap();
+        editor
+            .set_sheet_chart_axis_tick_mark_location(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Value,
+                ChartAxisTickMarkLocation::Centered,
+            )
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_axis_tick_mark_location(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartAxis::Category,
+                )
+                .unwrap(),
+            ChartAxisTickMarkLocation::Inside
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_axis_tick_mark_location(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartAxis::Value,
+                )
+                .unwrap(),
+            ChartAxisTickMarkLocation::Centered
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_axis_tick_mark_location(
+                    sheet_id,
+                    duplicate.drawable_object_id,
+                    ChartAxis::Category,
+                )
+                .unwrap(),
+            ChartAxisTickMarkLocation::None
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_axis_tick_mark_location(
+                    sheet_id,
+                    duplicate.drawable_object_id,
+                    ChartAxis::Value,
+                )
+                .unwrap(),
+            ChartAxisTickMarkLocation::Outside
+        );
         reopened
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
             .unwrap();

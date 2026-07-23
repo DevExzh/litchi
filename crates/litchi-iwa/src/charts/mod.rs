@@ -27,6 +27,7 @@ pub use archive::IWorkChartArchive;
 pub use axis::ChartAxis;
 pub use axis_bounds::{ChartAxisBound, ChartValueAxisBounds};
 pub use axis_steps::{ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartValueAxisSteps};
+pub use axis_style::ChartAxisTickMarkLocation;
 pub use data::ChartData;
 pub use direction::ChartSeriesDirection;
 pub use kind::ChartKind;

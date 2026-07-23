@@ -1,7 +1,7 @@
-//! Lossless native chart-axis style-switch storage and mutation.
+//! Lossless native chart-axis style storage and mutation.
 //!
-//! iWork stores axis-line, gridline, tick-mark, and value-axis minimum-label
-//! switches in the generated extension of a chart's
+//! iWork stores axis-line, gridline, tick-mark visibility and location, and
+//! value-axis minimum-label switches in the generated extension of a chart's
 //! `TSCH.ChartAxisStyleArchive`. This module identifies the primary native
 //! axis-style object, preserves both protobuf layers losslessly, and changes
 //! only the requested style switch.
@@ -16,6 +16,51 @@ use crate::charts::unique_chart_object_archive_name;
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
+
+/// Where iWork draws the major tick marks for one chart axis.
+///
+/// The known values correspond to the Tick Marks pop-up in Pages, Numbers,
+/// and Keynote. `Unsupported` preserves a future native integer without
+/// collapsing it into a different location.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
+pub enum ChartAxisTickMarkLocation {
+    /// Draw no major tick marks.
+    None,
+    /// Draw tick marks toward the chart's plot area.
+    Inside,
+    /// Draw tick marks centered on the axis line.
+    #[default]
+    Centered,
+    /// Draw tick marks away from the chart's plot area.
+    Outside,
+    /// Preserve an unrecognized native iWork value.
+    Unsupported(i32),
+}
+
+impl ChartAxisTickMarkLocation {
+    /// Decode the integer stored by the iWork protobuf schema.
+    pub const fn from_raw(value: i32) -> Self {
+        match value {
+            0 => Self::None,
+            1 => Self::Inside,
+            2 => Self::Centered,
+            3 => Self::Outside,
+            value => Self::Unsupported(value),
+        }
+    }
+
+    /// Return the integer used by the iWork protobuf schema.
+    pub const fn into_raw(self) -> i32 {
+        match self {
+            Self::None => 0,
+            Self::Inside => 1,
+            Self::Centered => 2,
+            Self::Outside => 3,
+            Self::Unsupported(value) => value,
+        }
+    }
+}
 
 /// Proto2 extension holding the generated chart-axis style properties.
 const GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD: u32 = 10_000;
@@ -41,6 +86,12 @@ const CATEGORY_MINOR_TICK_MARKS_VISIBLE_FIELD: u32 = 34;
 /// `tschchartaxisvalueshowminortickmarks` in
 /// `TSCH.Generated.ChartAxisStyleArchive`.
 const VALUE_MINOR_TICK_MARKS_VISIBLE_FIELD: u32 = 35;
+/// `tschchartaxiscategorytickmarklocation` in
+/// `TSCH.Generated.ChartAxisStyleArchive`.
+const CATEGORY_TICK_MARK_LOCATION_FIELD: u32 = 36;
+/// `tschchartaxisvaluetickmarklocation` in
+/// `TSCH.Generated.ChartAxisStyleArchive`.
+const VALUE_TICK_MARK_LOCATION_FIELD: u32 = 37;
 /// `tschchartaxisvalueshowminimumlabel` in
 /// `TSCH.Generated.ChartAxisStyleArchive`.
 const VALUE_AXIS_MINIMUM_LABEL_VISIBLE_FIELD: u32 = 31;
@@ -323,6 +374,56 @@ pub(crate) fn set_chart_axis_minor_tick_marks_visible(
     )
 }
 
+/// Read where iWork draws major tick marks for one native chart axis.
+pub(crate) fn chart_axis_tick_mark_location(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+) -> Result<ChartAxisTickMarkLocation> {
+    axis_style_slot(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+    )?
+    .read(package, |data| read_axis_tick_mark_location(data, axis))
+}
+
+/// Set where iWork draws major tick marks for one native chart axis.
+pub(crate) fn set_chart_axis_tick_mark_location(
+    package: &mut IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+    location: ChartAxisTickMarkLocation,
+) -> Result<()> {
+    let slot = axis_style_slot(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+    )?;
+    if slot.read(package, |data| read_axis_tick_mark_location(data, axis))? == location {
+        return Ok(());
+    }
+    slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
+    slot.update(package, |data| {
+        patch_axis_tick_mark_location(data, axis, location)
+    })?;
+    if slot.read(package, |data| read_axis_tick_mark_location(data, axis))? != location {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} {}-axis tick-mark-location update failed validation",
+            axis.label(),
+        )));
+    }
+    Ok(())
+}
+
 /// Read whether iWork shows the minimum label on a native chart value axis.
 pub(crate) fn chart_value_axis_minimum_label_visible(
     package: &IWorkPackage,
@@ -434,6 +535,34 @@ fn read_axis_style_switch_visibility(
     Ok(style_switch
         .visible(&generated, axis)
         .unwrap_or_else(|| style_switch.default_visible()))
+}
+
+/// Decode the native major-tick-mark location for one chart axis.
+fn read_axis_tick_mark_location(data: &[u8], axis: ChartAxis) -> Result<ChartAxisTickMarkLocation> {
+    let Some(extension) = generated_axis_style_extension(data)? else {
+        return Ok(ChartAxisTickMarkLocation::default());
+    };
+    let generated = tsch::generated::ChartAxisStyleArchive::decode(extension)?;
+    Ok(axis_tick_mark_location(&generated, axis)
+        .map(ChartAxisTickMarkLocation::from_raw)
+        .unwrap_or_default())
+}
+
+const fn tick_mark_location_field(axis: ChartAxis) -> u32 {
+    match axis {
+        ChartAxis::Category => CATEGORY_TICK_MARK_LOCATION_FIELD,
+        ChartAxis::Value => VALUE_TICK_MARK_LOCATION_FIELD,
+    }
+}
+
+fn axis_tick_mark_location(
+    generated: &tsch::generated::ChartAxisStyleArchive,
+    axis: ChartAxis,
+) -> Option<i32> {
+    match axis {
+        ChartAxis::Category => generated.tschchartaxiscategorytickmarklocation,
+        ChartAxis::Value => generated.tschchartaxisvaluetickmarklocation,
+    }
 }
 
 fn axis_style_slot(
@@ -646,6 +775,50 @@ fn patch_axis_style_switch_visibility(
     Ok(patched)
 }
 
+fn patch_axis_tick_mark_location(
+    data: &[u8],
+    axis: ChartAxis,
+    location: ChartAxisTickMarkLocation,
+) -> Result<Vec<u8>> {
+    let Some(extension) = generated_axis_style_extension(data)? else {
+        let mut generated = tsch::generated::ChartAxisStyleArchive::default();
+        match axis {
+            ChartAxis::Category => {
+                generated.tschchartaxiscategorytickmarklocation = Some(location.into_raw())
+            },
+            ChartAxis::Value => {
+                generated.tschchartaxisvaluetickmarklocation = Some(location.into_raw())
+            },
+        }
+        let encoded = generated.encode_to_vec();
+        let patched = patch_length_delimited_field(
+            data,
+            GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD,
+            false,
+            Some(encoded.as_slice()),
+        )?;
+        validate_patched_axis_tick_mark_location(&patched, axis, location)?;
+        return Ok(patched);
+    };
+
+    let generated = tsch::generated::ChartAxisStyleArchive::decode(extension)?;
+    let location_present = axis_tick_mark_location(&generated, axis).is_some();
+    let extension = patch_varint_field(
+        extension,
+        tick_mark_location_field(axis),
+        location_present,
+        Some(location.into_raw() as u64),
+    )?;
+    let patched = patch_length_delimited_field(
+        data,
+        GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD,
+        true,
+        Some(extension.as_slice()),
+    )?;
+    validate_patched_axis_tick_mark_location(&patched, axis, location)?;
+    Ok(patched)
+}
+
 fn validate_patched_axis_style_switch(
     data: &[u8],
     axis: ChartAxis,
@@ -657,6 +830,20 @@ fn validate_patched_axis_style_switch(
             "{}-axis {} wire patch failed validation",
             axis.label(),
             style_switch.label()
+        )));
+    }
+    Ok(())
+}
+
+fn validate_patched_axis_tick_mark_location(
+    data: &[u8],
+    axis: ChartAxis,
+    expected: ChartAxisTickMarkLocation,
+) -> Result<()> {
+    if read_axis_tick_mark_location(data, axis)? != expected {
+        return Err(Error::InvalidFormat(format!(
+            "{}-axis tick-mark-location wire patch failed validation",
+            axis.label(),
         )));
     }
     Ok(())
@@ -967,6 +1154,125 @@ mod tests {
             );
             assert!(generated_axis_style_extension(&hidden).unwrap().is_some());
         }
+    }
+
+    #[test]
+    fn tick_mark_locations_round_trip_known_and_future_native_values() {
+        let known = [
+            (0, ChartAxisTickMarkLocation::None),
+            (1, ChartAxisTickMarkLocation::Inside),
+            (2, ChartAxisTickMarkLocation::Centered),
+            (3, ChartAxisTickMarkLocation::Outside),
+        ];
+        for (raw, location) in known {
+            assert_eq!(ChartAxisTickMarkLocation::from_raw(raw), location);
+            assert_eq!(location.into_raw(), raw);
+        }
+        assert_eq!(
+            ChartAxisTickMarkLocation::default(),
+            ChartAxisTickMarkLocation::Centered
+        );
+
+        const FUTURE_LOCATION: i32 = 9_001;
+        assert_eq!(
+            ChartAxisTickMarkLocation::from_raw(FUTURE_LOCATION),
+            ChartAxisTickMarkLocation::Unsupported(FUTURE_LOCATION)
+        );
+        assert_eq!(
+            ChartAxisTickMarkLocation::Unsupported(FUTURE_LOCATION).into_raw(),
+            FUTURE_LOCATION
+        );
+    }
+
+    #[test]
+    fn tick_mark_location_patch_retains_other_axis_and_unmapped_fields() {
+        let generated = tsch::generated::ChartAxisStyleArchive {
+            tschchartaxiscategorytickmarklocation: Some(ChartAxisTickMarkLocation::None.into_raw()),
+            tschchartaxisvaluetickmarklocation: Some(ChartAxisTickMarkLocation::Inside.into_raw()),
+            tschchartaxisvalueshowminorgridlines: Some(true),
+            ..Default::default()
+        };
+        let original = axis_style_with_unknown_fields(generated);
+
+        let outside = patch_axis_tick_mark_location(
+            &original,
+            ChartAxis::Category,
+            ChartAxisTickMarkLocation::Outside,
+        )
+        .unwrap();
+        assert_eq!(
+            read_axis_tick_mark_location(&outside, ChartAxis::Category).unwrap(),
+            ChartAxisTickMarkLocation::Outside
+        );
+        assert_eq!(
+            read_axis_tick_mark_location(&outside, ChartAxis::Value).unwrap(),
+            ChartAxisTickMarkLocation::Inside
+        );
+        assert!(
+            read_axis_style_switch_visibility(
+                &outside,
+                ChartAxis::Value,
+                AxisStyleSwitch::MinorGridlines,
+            )
+            .unwrap()
+        );
+        assert_unknown_fields_retained(&original, &outside);
+
+        let restored = patch_axis_tick_mark_location(
+            &outside,
+            ChartAxis::Category,
+            ChartAxisTickMarkLocation::None,
+        )
+        .unwrap();
+        assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn tick_mark_location_defaults_centered_and_can_create_a_style_extension() {
+        let original = tsch::ChartAxisStyleArchive {
+            super_: Some(tss::StyleArchive::default()),
+        }
+        .encode_to_vec();
+
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert_eq!(
+                read_axis_tick_mark_location(&original, axis).unwrap(),
+                ChartAxisTickMarkLocation::Centered
+            );
+            let none =
+                patch_axis_tick_mark_location(&original, axis, ChartAxisTickMarkLocation::None)
+                    .unwrap();
+            assert_eq!(
+                read_axis_tick_mark_location(&none, axis).unwrap(),
+                ChartAxisTickMarkLocation::None
+            );
+            assert!(generated_axis_style_extension(&none).unwrap().is_some());
+        }
+    }
+
+    #[test]
+    fn tick_mark_location_preserves_future_native_values() {
+        const FUTURE_LOCATION: i32 = 9_001;
+        let original = axis_style_with_unknown_fields(tsch::generated::ChartAxisStyleArchive {
+            tschchartaxisvaluetickmarklocation: Some(FUTURE_LOCATION),
+            ..Default::default()
+        });
+        assert_eq!(
+            read_axis_tick_mark_location(&original, ChartAxis::Value).unwrap(),
+            ChartAxisTickMarkLocation::Unsupported(FUTURE_LOCATION)
+        );
+
+        let patched = patch_axis_tick_mark_location(
+            &original,
+            ChartAxis::Value,
+            ChartAxisTickMarkLocation::Outside,
+        )
+        .unwrap();
+        assert_eq!(
+            read_axis_tick_mark_location(&patched, ChartAxis::Value).unwrap(),
+            ChartAxisTickMarkLocation::Outside
+        );
+        assert_unknown_fields_retained(&original, &patched);
     }
 
     #[test]
