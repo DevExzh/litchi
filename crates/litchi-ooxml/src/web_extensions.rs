@@ -1087,16 +1087,18 @@ mod tests {
     use litchi_opc::PackURI;
     use litchi_opc::part::XmlPart;
 
-    const LO_OMEX_DOCX: &[u8] = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlimport/data/n820504.docx"
-    );
-    const LO_REGISTRY_DOCX: &[u8] = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx"
-    );
+    const LOCAL_OMEX_EXTENSION: &[u8] =
+        include_bytes!("../../../test-data/ooxml/web_extensions/omex_webextension.xml");
+    const LOCAL_REGISTRY_EXTENSION: &[u8] =
+        include_bytes!("../../../test-data/ooxml/web_extensions/registry_webextension.xml");
+    const LOCAL_VISIBLE_TASK_PANES: &[u8] =
+        include_bytes!("../../../test-data/ooxml/web_extensions/visible_taskpanes.xml");
+    const LOCAL_HIDDEN_TASK_PANES: &[u8] =
+        include_bytes!("../../../test-data/ooxml/web_extensions/hidden_taskpanes.xml");
 
     #[test]
-    fn loads_libreoffice_omex_and_registry_fixtures_inertly() {
-        let omex = OpcPackage::from_bytes(LO_OMEX_DOCX).unwrap();
+    fn loads_local_omex_and_registry_fixtures_inertly() {
+        let omex = local_fixture_package(LOCAL_VISIBLE_TASK_PANES, LOCAL_OMEX_EXTENSION);
         let panes = load_web_extension_task_panes(&omex).unwrap().unwrap();
         assert_eq!(panes.panes.len(), 1);
         assert_eq!(
@@ -1105,7 +1107,8 @@ mod tests {
         );
         assert!(panes.panes[0].visible);
 
-        let registry = OpcPackage::from_bytes(LO_REGISTRY_DOCX).unwrap();
+        let registry =
+            local_fixture_package(LOCAL_HIDDEN_TASK_PANES, LOCAL_REGISTRY_EXTENSION);
         let panes = load_web_extension_task_panes(&registry).unwrap().unwrap();
         assert_eq!(
             panes.panes[0].web_extension.reference.store_type,
@@ -1234,6 +1237,34 @@ mod tests {
                 extension_xml,
             )));
         }
+        package
+    }
+
+    fn local_fixture_package(task_panes_xml: &[u8], extension_xml: &[u8]) -> OpcPackage {
+        let mut package = OpcPackage::new();
+        package.rels_mut().add_relationship(
+            TASK_PANES_RELATIONSHIP_TYPE.into(),
+            "webextensions/taskpanes.xml".into(),
+            "rIdTaskPanes".into(),
+            false,
+        );
+        let mut task_panes_part = XmlPart::new(
+            PackURI::new("/webextensions/taskpanes.xml").unwrap(),
+            TASK_PANES_CONTENT_TYPE.into(),
+            task_panes_xml.to_vec(),
+        );
+        task_panes_part.rels_mut().add_relationship(
+            WEB_EXTENSION_RELATIONSHIP_TYPE.into(),
+            "webextension1.xml".into(),
+            "rId1".into(),
+            false,
+        );
+        package.add_part(Box::new(task_panes_part));
+        package.add_part(Box::new(XmlPart::new(
+            PackURI::new("/webextensions/webextension1.xml").unwrap(),
+            WEB_EXTENSION_CONTENT_TYPE.into(),
+            extension_xml.to_vec(),
+        )));
         package
     }
 

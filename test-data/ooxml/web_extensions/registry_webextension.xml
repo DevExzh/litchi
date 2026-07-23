@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<we:webextension xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" id="{00000000-0000-0000-0000-000000000002}" frozen="false">
+  <we:reference id="local-registry" version="1.0.0.0" storeType="Registry"/>
+  <we:properties/>
+  <we:bindings/>
+</we:webextension>

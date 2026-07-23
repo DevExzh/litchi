@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<wetp:taskpanes xmlns:wetp="http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <wetp:taskpane dockstate="right" visibility="true" width="320" row="0" locked="false">
+    <wetp:webextensionref r:id="rId1"/>
+  </wetp:taskpane>
+</wetp:taskpanes>

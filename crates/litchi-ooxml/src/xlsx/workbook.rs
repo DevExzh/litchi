@@ -31,6 +31,7 @@ use crate::ribbonx::{
     RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
     load_ribbon_customizations, store_ribbon_customization,
 };
+use crate::web_extensions::{WebExtensionTaskPanes, load_web_extension_task_panes};
 use crate::xlsx::external_links::{
     ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
     build_external_link_part_with_conformance, load_external_link,
@@ -273,6 +274,13 @@ impl Workbook {
     pub fn vba_project(&self) -> crate::error::Result<Option<VbaProject>> {
         let workbook = self.package.get_part(&self.workbook_uri)?;
         discover_vba_project(&self.package, workbook)
+    }
+
+    /// Load persisted Office Add-in task-pane metadata without activating add-ins.
+    pub fn web_extension_task_panes(
+        &self,
+    ) -> crate::error::Result<Option<WebExtensionTaskPanes>> {
+        load_web_extension_task_panes(&self.package)
     }
 
     /// Load all package-level RibbonX customizations without invoking callbacks.

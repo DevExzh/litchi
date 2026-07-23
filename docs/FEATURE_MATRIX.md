@@ -124,7 +124,7 @@ conversion, fonts, and image conversion are optional.
 | Drawing/VML shapes | 🟡 | ✅ | ❌ | Shape extraction is available; general-purpose shape authoring is not |
 | Embedded fonts | ✅ | ✅ | ✅ | Font table, payloads, obfuscation, licensing checks, and ordered CRUD |
 | Embedded OLE/package objects | 🟡 | ✅ | ❌ | Package-level embedded-part discovery; no DOCX object graph authoring |
-| Web extensions/Office Add-ins | 🟡 | 🟡 | 🟡 | Bounded task-pane and web-extension parsing/serialization; add-ins are never executed |
+| Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | Word package task-pane discovery plus bounded web-extension parsing/serialization; add-ins are never executed |
 | Themes | ✅ | ✅ | ✅ | Theme colors, fonts, and related package parts |
 | Document protection | 🟡 | ✅ | ✅ | Protection settings and hashes; the library does not enforce editing policy |
 | Table of contents | 🟡 | ✅ | ✅ | Typed inert discovery of simple/complex TOC fields, switches, cached results, and dirty/lock state plus field/content authoring; no pagination or automatic refresh |
@@ -184,6 +184,7 @@ conversion, fonts, and image conversion are optional.
 | Connections and query tables | ✅ | ✅ | ✅ | Typed package CRUD; external queries are never executed |
 | OLE objects | ✅ | ✅ | ✅ | Worksheet object metadata, anchors, payload resources, and package graph |
 | ActiveX controls | 🟡 | ✅ | ❌ | Typed control/property discovery; no worksheet control authoring graph |
+| Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | Workbook package task-pane discovery plus bounded web-extension parsing/serialization; add-ins are never executed |
 | XML maps | 🟡 | ✅ | ✅ | Typed inert MapInfo/schema/data-binding package CRUD with strict/transitional relationships; mappings, schema locations, and bound files are never resolved or executed |
 | Volatile dependencies | 🟡 | ✅ | ✅ | Typed inert workbook-scoped RTD/OLAP dependency package CRUD; never contacts servers/connections or evaluates formulas |
 | Data model/custom data/XLDM | 🟡 | ✅ | ✅ | Inert model/custom-data package storage plus bounded XLDM inspection/writing |
@@ -230,7 +231,7 @@ conversion, fonts, and image conversion are optional.
 | Embedded OLE/package objects | 🟡 | ✅ | ❌ | Generic embedded-part discovery; no typed slide OLE authoring model |
 | View properties and guides | 🟡 | ✅ | ✅ | Typed serialization for views and extended guides; package integration is bounded |
 | Tags, changes, and revision information | 🟡 | ✅ | 🟡 | Inert programmable tags and revision/change package parts; package integration varies by part |
-| Web extensions/Office Add-ins | 🟡 | 🟡 | 🟡 | Bounded task-pane parsing/serialization; add-ins are never executed |
+| Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | PowerPoint package task-pane discovery plus bounded web-extension parsing/serialization; add-ins are never executed |
 | Ink annotations | ❌ | ❌ | ❌ | Not implemented |
 | VBA projects/PPTM macros | 🟡 | 🟡 | ❌ | PPTM/PPSM/POTM main parts and the MS-OFFMACRO2 Presentation → VBA Project relationship graph are validated as inert metadata; payload contents are never inspected, parsed, or executed by this API, and no macro authoring exists |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |

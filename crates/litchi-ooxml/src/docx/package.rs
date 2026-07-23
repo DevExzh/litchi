@@ -38,6 +38,7 @@ use crate::ribbonx::{
     RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
     load_ribbon_customizations, store_ribbon_customization,
 };
+use crate::web_extensions::{WebExtensionTaskPanes, load_web_extension_task_panes};
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
 use litchi_opc::OpcPackage;
@@ -626,6 +627,11 @@ impl Package {
     pub fn vba_project(&self) -> Result<Option<VbaProject>> {
         let document = self.opc.main_document_part()?;
         discover_vba_project(&self.opc, document)
+    }
+
+    /// Load persisted Office Add-in task-pane metadata without activating add-ins.
+    pub fn web_extension_task_panes(&self) -> Result<Option<WebExtensionTaskPanes>> {
+        load_web_extension_task_panes(&self.opc)
     }
 
     /// Load all package-level RibbonX customizations without invoking callbacks.
