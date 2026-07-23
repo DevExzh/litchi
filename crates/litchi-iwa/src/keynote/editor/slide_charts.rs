@@ -4,6 +4,7 @@ mod axis;
 mod axis_bounds;
 mod axis_gridlines;
 mod axis_line;
+mod axis_minimum_label;
 mod axis_steps;
 mod caption;
 mod graph;

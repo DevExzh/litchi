@@ -1,9 +1,9 @@
 //! Lossless native chart-axis style-switch storage and mutation.
 //!
-//! iWork stores axis-line, major-gridline, and minor-gridline switches in the
-//! generated extension of a chart's `TSCH.ChartAxisStyleArchive`. This module
-//! identifies the primary native axis-style object, preserves both protobuf
-//! layers losslessly, and changes only the requested style switch.
+//! iWork stores axis-line, gridline, and value-axis minimum-label switches in
+//! the generated extension of a chart's `TSCH.ChartAxisStyleArchive`. This
+//! module identifies the primary native axis-style object, preserves both
+//! protobuf layers losslessly, and changes only the requested style switch.
 
 use prost::Message;
 
@@ -34,6 +34,9 @@ const CATEGORY_MINOR_GRIDLINES_VISIBLE_FIELD: u32 = 32;
 /// `tschchartaxisvalueshowminorgridlines` in
 /// `TSCH.Generated.ChartAxisStyleArchive`.
 const VALUE_MINOR_GRIDLINES_VISIBLE_FIELD: u32 = 33;
+/// `tschchartaxisvalueshowminimumlabel` in
+/// `TSCH.Generated.ChartAxisStyleArchive`.
+const VALUE_AXIS_MINIMUM_LABEL_VISIBLE_FIELD: u32 = 31;
 
 /// One boolean chart-axis style switch with an explicit native field mapping.
 #[derive(Debug, Clone, Copy)]
@@ -41,9 +44,19 @@ enum AxisStyleSwitch {
     Line,
     MajorGridlines,
     MinorGridlines,
+    ValueMinimumLabel,
 }
 
 impl AxisStyleSwitch {
+    fn validate_axis(self, axis: ChartAxis) -> Result<()> {
+        if matches!((self, axis), (Self::ValueMinimumLabel, ChartAxis::Category)) {
+            return Err(Error::InvalidFormat(
+                "chart minimum-value labels are only available on the value axis".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
     const fn field(self, axis: ChartAxis) -> u32 {
         match (self, axis) {
             (Self::Line, ChartAxis::Category) => CATEGORY_AXIS_LINE_VISIBLE_FIELD,
@@ -52,6 +65,7 @@ impl AxisStyleSwitch {
             (Self::MajorGridlines, ChartAxis::Value) => VALUE_MAJOR_GRIDLINES_VISIBLE_FIELD,
             (Self::MinorGridlines, ChartAxis::Category) => CATEGORY_MINOR_GRIDLINES_VISIBLE_FIELD,
             (Self::MinorGridlines, ChartAxis::Value) => VALUE_MINOR_GRIDLINES_VISIBLE_FIELD,
+            (Self::ValueMinimumLabel, _) => VALUE_AXIS_MINIMUM_LABEL_VISIBLE_FIELD,
         }
     }
 
@@ -60,6 +74,14 @@ impl AxisStyleSwitch {
             Self::Line => "line",
             Self::MajorGridlines => "major gridlines",
             Self::MinorGridlines => "minor gridlines",
+            Self::ValueMinimumLabel => "minimum value label",
+        }
+    }
+
+    const fn default_visible(self) -> bool {
+        match self {
+            Self::ValueMinimumLabel => true,
+            Self::Line | Self::MajorGridlines | Self::MinorGridlines => false,
         }
     }
 
@@ -83,6 +105,7 @@ impl AxisStyleSwitch {
             (Self::MinorGridlines, ChartAxis::Value) => {
                 generated.tschchartaxisvalueshowminorgridlines
             },
+            (Self::ValueMinimumLabel, _) => generated.tschchartaxisvalueshowminimumlabel,
         }
     }
 
@@ -108,6 +131,9 @@ impl AxisStyleSwitch {
             },
             (Self::MinorGridlines, ChartAxis::Value) => {
                 generated.tschchartaxisvalueshowminorgridlines = Some(visible)
+            },
+            (Self::ValueMinimumLabel, _) => {
+                generated.tschchartaxisvalueshowminimumlabel = Some(visible)
             },
         }
     }
@@ -235,6 +261,42 @@ pub(crate) fn set_chart_axis_minor_gridlines_visible(
     )
 }
 
+/// Read whether iWork shows the minimum label on a native chart value axis.
+pub(crate) fn chart_value_axis_minimum_label_visible(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+) -> Result<bool> {
+    chart_axis_style_switch_visible(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        ChartAxis::Value,
+        AxisStyleSwitch::ValueMinimumLabel,
+    )
+}
+
+/// Set whether iWork shows the minimum label on a native chart value axis.
+pub(crate) fn set_chart_value_axis_minimum_label_visible(
+    package: &mut IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    visible: bool,
+) -> Result<()> {
+    set_chart_axis_style_switch_visible(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        ChartAxis::Value,
+        AxisStyleSwitch::ValueMinimumLabel,
+        visible,
+    )
+}
+
 fn chart_axis_style_switch_visible(
     package: &IWorkPackage,
     chart_archive_name: &str,
@@ -243,6 +305,7 @@ fn chart_axis_style_switch_visible(
     axis: ChartAxis,
     style_switch: AxisStyleSwitch,
 ) -> Result<bool> {
+    style_switch.validate_axis(axis)?;
     axis_style_slot(
         package,
         chart_archive_name,
@@ -264,6 +327,7 @@ fn set_chart_axis_style_switch_visible(
     style_switch: AxisStyleSwitch,
     visible: bool,
 ) -> Result<()> {
+    style_switch.validate_axis(axis)?;
     let slot = axis_style_slot(
         package,
         chart_archive_name,
@@ -300,11 +364,14 @@ fn read_axis_style_switch_visibility(
     axis: ChartAxis,
     style_switch: AxisStyleSwitch,
 ) -> Result<bool> {
+    style_switch.validate_axis(axis)?;
     let Some(extension) = generated_axis_style_extension(data)? else {
-        return Ok(false);
+        return Ok(style_switch.default_visible());
     };
     let generated = tsch::generated::ChartAxisStyleArchive::decode(extension)?;
-    Ok(style_switch.visible(&generated, axis).unwrap_or(false))
+    Ok(style_switch
+        .visible(&generated, axis)
+        .unwrap_or_else(|| style_switch.default_visible()))
 }
 
 fn axis_style_slot(
@@ -484,6 +551,7 @@ fn patch_axis_style_switch_visibility(
     style_switch: AxisStyleSwitch,
     visible: bool,
 ) -> Result<Vec<u8>> {
+    style_switch.validate_axis(axis)?;
     let Some(extension) = generated_axis_style_extension(data)? else {
         let mut generated = tsch::generated::ChartAxisStyleArchive::default();
         style_switch.set(&mut generated, axis, visible);
@@ -727,6 +795,92 @@ mod tests {
     }
 
     #[test]
+    fn value_axis_minimum_label_patch_retains_other_style_switches_and_unmapped_fields() {
+        let generated = tsch::generated::ChartAxisStyleArchive {
+            tschchartaxisvalueshowaxis: Some(true),
+            tschchartaxisvalueshowmajorgridlines: Some(true),
+            tschchartaxisvalueshowminimumlabel: Some(true),
+            ..Default::default()
+        };
+        let original = axis_style_with_unknown_fields(generated);
+
+        let hidden = patch_axis_style_switch_visibility(
+            &original,
+            ChartAxis::Value,
+            AxisStyleSwitch::ValueMinimumLabel,
+            false,
+        )
+        .unwrap();
+        assert!(
+            !read_axis_style_switch_visibility(
+                &hidden,
+                ChartAxis::Value,
+                AxisStyleSwitch::ValueMinimumLabel,
+            )
+            .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(&hidden, ChartAxis::Value, AxisStyleSwitch::Line)
+                .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(
+                &hidden,
+                ChartAxis::Value,
+                AxisStyleSwitch::MajorGridlines,
+            )
+            .unwrap()
+        );
+        assert_unknown_fields_retained(&original, &hidden);
+
+        let restored = patch_axis_style_switch_visibility(
+            &hidden,
+            ChartAxis::Value,
+            AxisStyleSwitch::ValueMinimumLabel,
+            true,
+        )
+        .unwrap();
+        assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn value_axis_minimum_label_defaults_visible_when_missing_from_an_extension() {
+        let original = axis_style_with_unknown_fields(tsch::generated::ChartAxisStyleArchive {
+            tschchartaxisvalueshowaxis: Some(true),
+            ..Default::default()
+        });
+        assert!(
+            read_axis_style_switch_visibility(
+                &original,
+                ChartAxis::Value,
+                AxisStyleSwitch::ValueMinimumLabel,
+            )
+            .unwrap()
+        );
+
+        let hidden = patch_axis_style_switch_visibility(
+            &original,
+            ChartAxis::Value,
+            AxisStyleSwitch::ValueMinimumLabel,
+            false,
+        )
+        .unwrap();
+        assert!(
+            !read_axis_style_switch_visibility(
+                &hidden,
+                ChartAxis::Value,
+                AxisStyleSwitch::ValueMinimumLabel,
+            )
+            .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(&hidden, ChartAxis::Value, AxisStyleSwitch::Line)
+                .unwrap()
+        );
+        assert_unknown_fields_retained(&original, &hidden);
+    }
+
+    #[test]
     fn style_switch_patch_creates_a_style_extension_when_missing() {
         let original = tsch::ChartAxisStyleArchive {
             super_: Some(tss::StyleArchive::default()),
@@ -751,6 +905,22 @@ mod tests {
         assert!(
             !read_axis_style_switch_visibility(&visible, ChartAxis::Value, AxisStyleSwitch::Line)
                 .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(
+                &original,
+                ChartAxis::Value,
+                AxisStyleSwitch::ValueMinimumLabel,
+            )
+            .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(
+                &original,
+                ChartAxis::Category,
+                AxisStyleSwitch::ValueMinimumLabel,
+            )
+            .is_err()
         );
     }
 

@@ -678,6 +678,68 @@ fn scratch_presentation_supports_native_chart_value_axis_steps_crud() {
 }
 
 #[test]
+fn scratch_presentation_supports_native_chart_value_axis_minimum_label_visibility_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    assert!(
+        editor
+            .slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id)
+            .unwrap()
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id, true)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id, false)
+        .unwrap();
+    assert!(
+        !editor
+            .slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id)
+            .unwrap()
+    );
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert!(
+        !editor
+            .slide_chart_value_axis_minimum_label_visible(0, duplicate.drawable_object_id)
+            .unwrap()
+    );
+
+    editor
+        .set_slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id, true)
+        .unwrap();
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert!(
+        reopened
+            .slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id)
+            .unwrap()
+    );
+    assert!(
+        !reopened
+            .slide_chart_value_axis_minimum_label_visible(0, duplicate.drawable_object_id)
+            .unwrap()
+    );
+    reopened
+        .set_slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id, false)
+        .unwrap();
+    assert!(
+        !reopened
+            .slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id)
+            .unwrap()
+    );
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
 fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor

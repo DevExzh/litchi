@@ -362,6 +362,7 @@ fn default_axis_style() -> tsch::generated::ChartAxisStyleArchive {
         tschchartaxiscategoryshowlastlabel: Some(true),
         tschchartaxisvalueshowmajorgridlines: Some(true),
         tschchartaxiscategoryshowmajorgridlines: Some(false),
+        tschchartaxisvalueshowminimumlabel: Some(true),
         ..Default::default()
     }
 }

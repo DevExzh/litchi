@@ -61,6 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ChartAxisMinorStepCount::new(2)?,
         ),
     )?;
+    editor.set_slide_chart_value_axis_minimum_label_visible(0, chart.drawable_object_id, false)?;
     editor.set_slide_chart_axis_line_visible(
         0,
         chart.drawable_object_id,
@@ -83,7 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_chart_caption(0, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Keynote {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, a hidden value-axis line and legend, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
+        "created Keynote {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, a hidden value-axis minimum label, line, and legend, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
         chart.kind, chart.drawable_object_id, chart.slide_index
     );
     Ok(())

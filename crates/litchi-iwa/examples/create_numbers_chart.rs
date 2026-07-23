@@ -67,6 +67,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ChartAxisMinorStepCount::new(2)?,
         ),
     )?;
+    editor.set_sheet_chart_value_axis_minimum_label_visible(
+        sheet_id,
+        chart.drawable_object_id,
+        false,
+    )?;
     editor.set_sheet_chart_axis_line_visible(
         sheet_id,
         chart.drawable_object_id,
@@ -89,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, a hidden value-axis line and legend, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on sheet {}",
+        "created Numbers {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, a hidden value-axis minimum label, line, and legend, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on sheet {}",
         chart.kind, chart.drawable_object_id, sheet_id
     );
     Ok(())
