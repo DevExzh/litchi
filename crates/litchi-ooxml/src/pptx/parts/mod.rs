@@ -52,7 +52,10 @@ pub use comment::{
     Comment, CommentAuthor, CommentAuthorsPart, CommentsPart, generate_comment_authors_xml,
     generate_comments_xml,
 };
-pub use presentation::{NotesSize, PresentationDefaultTextStyle, PresentationPart, SlideSize};
+pub use presentation::{
+    NotesSize, PresentationConformance, PresentationDefaultTextStyle, PresentationMetadata,
+    PresentationPart, SlideSize,
+};
 pub use slide::{
     MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,
     SlideLayoutReference, SlideMasterPart, SlideMasterTextStyle, SlideMasterTextStyles, SlidePart,

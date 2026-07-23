@@ -67,6 +67,204 @@ impl NotesSize {
     }
 }
 
+/// The effective conformance class for a presentation root.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PresentationConformance {
+    /// The standard transitional conformance class.
+    Transitional,
+    /// The strict conformance class.
+    Strict,
+}
+
+impl Default for PresentationConformance {
+    fn default() -> Self {
+        Self::Transitional
+    }
+}
+
+/// Root-level presentation behavior and document settings with schema defaults applied.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PresentationMetadata {
+    server_zoom: i32,
+    first_slide_number: i32,
+    show_special_placeholders_on_title_slide: bool,
+    right_to_left: bool,
+    remove_personal_info_on_save: bool,
+    compatibility_mode: bool,
+    strict_first_and_last_chars: bool,
+    embed_true_type_fonts: bool,
+    save_subset_fonts: bool,
+    auto_compress_pictures: bool,
+    bookmark_id_seed: u32,
+    conformance: PresentationConformance,
+}
+
+impl Default for PresentationMetadata {
+    fn default() -> Self {
+        Self {
+            server_zoom: 50_000,
+            first_slide_number: 1,
+            show_special_placeholders_on_title_slide: true,
+            right_to_left: false,
+            remove_personal_info_on_save: false,
+            compatibility_mode: false,
+            strict_first_and_last_chars: true,
+            embed_true_type_fonts: false,
+            save_subset_fonts: false,
+            auto_compress_pictures: true,
+            bookmark_id_seed: 1,
+            conformance: PresentationConformance::Transitional,
+        }
+    }
+}
+
+impl PresentationMetadata {
+    /// Return the server zoom in DrawingML thousandths of a percent.
+    #[inline]
+    pub const fn server_zoom(&self) -> i32 {
+        self.server_zoom
+    }
+
+    /// Return the effective first slide number.
+    #[inline]
+    pub const fn first_slide_number(&self) -> i32 {
+        self.first_slide_number
+    }
+
+    /// Whether title slides show their special header and footer placeholders.
+    #[inline]
+    pub const fn shows_special_placeholders_on_title_slide(&self) -> bool {
+        self.show_special_placeholders_on_title_slide
+    }
+
+    /// Whether the presentation user interface is right-to-left.
+    #[inline]
+    pub const fn is_right_to_left(&self) -> bool {
+        self.right_to_left
+    }
+
+    /// Whether personal information is removed when the document is saved.
+    #[inline]
+    pub const fn removes_personal_info_on_save(&self) -> bool {
+        self.remove_personal_info_on_save
+    }
+
+    /// Whether compatibility mode is enabled.
+    #[inline]
+    pub const fn is_compatibility_mode(&self) -> bool {
+        self.compatibility_mode
+    }
+
+    /// Whether strict first and last Japanese line characters are used.
+    #[inline]
+    pub const fn uses_strict_first_and_last_chars(&self) -> bool {
+        self.strict_first_and_last_chars
+    }
+
+    /// Whether TrueType fonts are embedded automatically.
+    #[inline]
+    pub const fn embeds_true_type_fonts(&self) -> bool {
+        self.embed_true_type_fonts
+    }
+
+    /// Whether only used font glyphs are saved for embedded fonts.
+    #[inline]
+    pub const fn saves_subset_fonts(&self) -> bool {
+        self.save_subset_fonts
+    }
+
+    /// Whether pictures are compressed automatically.
+    #[inline]
+    pub const fn automatically_compresses_pictures(&self) -> bool {
+        self.auto_compress_pictures
+    }
+
+    /// Return the next bookmark identifier seed.
+    #[inline]
+    pub const fn bookmark_id_seed(&self) -> u32 {
+        self.bookmark_id_seed
+    }
+
+    /// Return the document conformance class.
+    #[inline]
+    pub const fn conformance(&self) -> PresentationConformance {
+        self.conformance
+    }
+
+    fn from_root_element(element: &BytesStart<'_>, decoder: Decoder) -> Result<Self> {
+        let mut metadata = Self::default();
+        metadata.server_zoom = optional_i32_attribute(
+            element,
+            b"serverZoom",
+            decoder,
+            "presentation server zoom",
+            metadata.server_zoom,
+        )?;
+        metadata.first_slide_number = optional_i32_attribute(
+            element,
+            b"firstSlideNum",
+            decoder,
+            "first slide number",
+            metadata.first_slide_number,
+        )?;
+        metadata.show_special_placeholders_on_title_slide = optional_boolean_attribute(
+            element,
+            b"showSpecialPlsOnTitleSld",
+            decoder,
+            "showSpecialPlsOnTitleSld",
+            metadata.show_special_placeholders_on_title_slide,
+        )?;
+        metadata.right_to_left =
+            optional_boolean_attribute(element, b"rtl", decoder, "rtl", metadata.right_to_left)?;
+        metadata.remove_personal_info_on_save = optional_boolean_attribute(
+            element,
+            b"removePersonalInfoOnSave",
+            decoder,
+            "removePersonalInfoOnSave",
+            metadata.remove_personal_info_on_save,
+        )?;
+        metadata.compatibility_mode = optional_boolean_attribute(
+            element,
+            b"compatMode",
+            decoder,
+            "compatMode",
+            metadata.compatibility_mode,
+        )?;
+        metadata.strict_first_and_last_chars = optional_boolean_attribute(
+            element,
+            b"strictFirstAndLastChars",
+            decoder,
+            "strictFirstAndLastChars",
+            metadata.strict_first_and_last_chars,
+        )?;
+        metadata.embed_true_type_fonts = optional_boolean_attribute(
+            element,
+            b"embedTrueTypeFonts",
+            decoder,
+            "embedTrueTypeFonts",
+            metadata.embed_true_type_fonts,
+        )?;
+        metadata.save_subset_fonts = optional_boolean_attribute(
+            element,
+            b"saveSubsetFonts",
+            decoder,
+            "saveSubsetFonts",
+            metadata.save_subset_fonts,
+        )?;
+        metadata.auto_compress_pictures = optional_boolean_attribute(
+            element,
+            b"autoCompressPictures",
+            decoder,
+            "autoCompressPictures",
+            metadata.auto_compress_pictures,
+        )?;
+        metadata.bookmark_id_seed =
+            optional_bookmark_id_seed(element, decoder, metadata.bookmark_id_seed)?;
+        metadata.conformance = optional_conformance(element, decoder, metadata.conformance)?;
+        Ok(metadata)
+    }
+}
+
 /// The declared paragraph-level inventory for a presentation default text style.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct PresentationDefaultTextStyle {
@@ -199,6 +397,11 @@ impl<'a> PresentationPart<'a> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.notes_size)
     }
 
+    /// Get the root-level presentation behavior and document settings.
+    pub fn metadata(&self) -> Result<PresentationMetadata> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.metadata)
+    }
+
     /// Get the presentation-wide default text-style inventory.
     pub fn default_text_style(&self) -> Result<Option<PresentationDefaultTextStyle>> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.default_text_style)
@@ -291,6 +494,7 @@ struct PresentationInfo {
     masters: Vec<(u32, String)>,
     slide_size: Option<SlideSize>,
     notes_size: Option<NotesSize>,
+    metadata: PresentationMetadata,
     default_text_style: Option<PresentationDefaultTextStyle>,
     seen_slide_list: bool,
     seen_master_list: bool,
@@ -322,6 +526,7 @@ impl PresentationInfo {
                                     .to_string(),
                             ));
                         }
+                        info.metadata = PresentationMetadata::from_root_element(&element, decoder)?;
                         stack.push(PresentationContext::Presentation);
                         continue;
                     }
@@ -586,6 +791,76 @@ fn drawingml_text_style_level(
     Some(level - b'0')
 }
 
+fn optional_i32_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+    default: i32,
+) -> Result<i32> {
+    let Some(value) = unqualified_attribute_value(element, name, decoder)? else {
+        return Ok(default);
+    };
+    value
+        .parse::<i32>()
+        .map_err(|_| OoxmlError::InvalidFormat(format!("invalid {description} value '{value}'")))
+}
+
+fn optional_boolean_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+    default: bool,
+) -> Result<bool> {
+    let Some(value) = unqualified_attribute_value(element, name, decoder)? else {
+        return Ok(default);
+    };
+    match value.as_str() {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => Err(OoxmlError::InvalidFormat(format!(
+            "invalid presentation {description} value '{value}'"
+        ))),
+    }
+}
+
+fn optional_bookmark_id_seed(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    default: u32,
+) -> Result<u32> {
+    let Some(value) = unqualified_attribute_value(element, b"bookmarkIdSeed", decoder)? else {
+        return Ok(default);
+    };
+    let seed = value.parse::<u32>().map_err(|_| {
+        OoxmlError::InvalidFormat(format!("invalid bookmark ID seed value '{value}'"))
+    })?;
+    if !(1..2_147_483_648).contains(&seed) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "bookmark ID seed {seed} is outside the valid range"
+        )));
+    }
+    Ok(seed)
+}
+
+fn optional_conformance(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    default: PresentationConformance,
+) -> Result<PresentationConformance> {
+    let Some(value) = unqualified_attribute_value(element, b"conformance", decoder)? else {
+        return Ok(default);
+    };
+    match value.as_str() {
+        "transitional" => Ok(PresentationConformance::Transitional),
+        "strict" => Ok(PresentationConformance::Strict),
+        _ => Err(OoxmlError::InvalidFormat(format!(
+            "invalid presentation conformance value '{value}'"
+        ))),
+    }
+}
+
 fn required_relationship_id(
     element: &BytesStart<'_>,
     decoder: Decoder,
@@ -736,6 +1011,61 @@ mod tests {
         let blob = part(xml);
         let presentation = PresentationPart::from_part(&blob).unwrap();
         assert_eq!(presentation.slide_rids().unwrap(), ["real"]);
+    }
+
+    #[test]
+    fn parses_presentation_root_metadata_and_defaults() {
+        let xml = format!(
+            r#"<p:presentation xmlns:p="{P}" serverZoom="87500" firstSlideNum="-3"
+                showSpecialPlsOnTitleSld="0" rtl="true" removePersonalInfoOnSave="1"
+                compatMode="false" strictFirstAndLastChars="0" embedTrueTypeFonts="true"
+                saveSubsetFonts="1" autoCompressPictures="false" bookmarkIdSeed="2147483647"
+                conformance="strict"></p:presentation>"#
+        );
+        let blob = part(xml);
+        let metadata = PresentationPart::from_part(&blob).unwrap().metadata().unwrap();
+        assert_eq!(metadata.server_zoom(), 87_500);
+        assert_eq!(metadata.first_slide_number(), -3);
+        assert!(!metadata.shows_special_placeholders_on_title_slide());
+        assert!(metadata.is_right_to_left());
+        assert!(metadata.removes_personal_info_on_save());
+        assert!(!metadata.is_compatibility_mode());
+        assert!(!metadata.uses_strict_first_and_last_chars());
+        assert!(metadata.embeds_true_type_fonts());
+        assert!(metadata.saves_subset_fonts());
+        assert!(!metadata.automatically_compresses_pictures());
+        assert_eq!(metadata.bookmark_id_seed(), 2_147_483_647);
+        assert_eq!(metadata.conformance(), PresentationConformance::Strict);
+
+        let defaults = format!(r#"<p:presentation xmlns:p="{P}"></p:presentation>"#);
+        let blob = part(defaults);
+        let metadata = PresentationPart::from_part(&blob).unwrap().metadata().unwrap();
+        assert_eq!(metadata, PresentationMetadata::default());
+        assert_eq!(
+            metadata.conformance(),
+            PresentationConformance::Transitional
+        );
+    }
+
+    #[test]
+    fn presentation_root_metadata_rejects_invalid_attributes() {
+        let cases = [
+            format!(r#"<p:presentation xmlns:p="{P}" serverZoom="invalid"></p:presentation>"#),
+            format!(r#"<p:presentation xmlns:p="{P}" firstSlideNum="2147483648"></p:presentation>"#),
+            format!(r#"<p:presentation xmlns:p="{P}" rtl="sometimes"></p:presentation>"#),
+            format!(r#"<p:presentation xmlns:p="{P}" bookmarkIdSeed="0"></p:presentation>"#),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" bookmarkIdSeed="2147483648"></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" conformance="future"></p:presentation>"#
+            ),
+            format!(r#"<p:presentation xmlns:p="{P}" rtl="1" rtl="0"></p:presentation>"#),
+        ];
+        for xml in cases {
+            let blob = part(xml);
+            assert!(PresentationPart::from_part(&blob).unwrap().metadata().is_err());
+        }
     }
 
     #[test]
