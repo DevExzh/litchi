@@ -88,6 +88,69 @@ impl Spreadsheet {
         self.styles.as_ref().map(Styles::xml_content)
     }
 
+    /// Inspect named drawing fill-image definitions from spreadsheet styles.
+    ///
+    /// Links remain stored metadata: this does not follow them, load linked
+    /// resources, or render images.
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::OdfDrawingFillImages> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_fill_image::parse_drawing_fill_images(styles.xml_content()),
+        )
+    }
+
+    /// Inspect named legacy and SVG drawing gradients from spreadsheet styles.
+    ///
+    /// This does not resolve style use sites or render gradients.
+    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::OdfDrawingGradients> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_gradient::parse_drawing_gradients(styles.xml_content()),
+        )
+    }
+
+    /// Inspect named drawing hatch definitions from spreadsheet styles.
+    ///
+    /// This does not resolve style use sites or render hatches.
+    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::OdfDrawingHatches> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_hatch::parse_drawing_hatches(styles.xml_content()),
+        )
+    }
+
+    /// Inspect named drawing marker definitions from spreadsheet styles.
+    ///
+    /// This does not resolve style use sites or render marker paths.
+    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::OdfDrawingMarkers> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_marker::parse_drawing_markers(styles.xml_content()),
+        )
+    }
+
+    /// Inspect named drawing opacity definitions from spreadsheet styles.
+    ///
+    /// This does not resolve style use sites or render opacity gradients.
+    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::OdfDrawingOpacities> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_opacity::parse_drawing_opacities(styles.xml_content()),
+        )
+    }
+
+    /// Inspect named drawing stroke-dash definitions from spreadsheet styles.
+    ///
+    /// This does not resolve style use sites or render strokes.
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<crate::drawing_stroke_dash::OdfDrawingStrokeDashes> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_stroke_dash::parse_drawing_stroke_dashes(styles.xml_content()),
+        )
+    }
+
     /// Open an ODS spreadsheet from a file path.
     ///
     /// # Arguments
