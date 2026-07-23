@@ -1000,6 +1000,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `BARCODE` fields in document field order.
+    ///
+    /// Stored opaque barcode instructions, cached results, and state are
+    /// metadata only. This method never parses or validates barcode data or
+    /// symbology, generates or renders a barcode, accesses an external
+    /// resource, or refreshes a field.
+    pub fn barcode_fields(&self) -> Vec<crate::BarcodeField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::barcode_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `BARCODE` fields in the document.
+    pub fn barcode_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.barcode_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in
     /// document field order.
     ///

@@ -26,6 +26,7 @@ pub enum FieldType {
     GoToButton,
     Print,
     Embed,
+    Barcode,
     AddIn,
     Control,
     HtmlControl,
@@ -348,6 +349,22 @@ pub struct PrintField<'a> {
 pub struct EmbedField<'a> {
     instruction: &'a str,
     object_instructions: &'a str,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+/// Inert metadata for a legacy RTF `BARCODE` field.
+///
+/// This type retains opaque barcode-instruction text, a cached result, and
+/// field state only. It never parses or validates barcode data or symbology,
+/// generates or renders a barcode, accesses an external resource, or refreshes
+/// a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BarcodeField<'a> {
+    instruction: &'a str,
+    barcode_instructions: &'a str,
     cached_result: Option<&'a str>,
     status: FieldStatus,
     owner: FieldOwner,
@@ -1980,6 +1997,56 @@ impl<'a> EmbedField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from an object.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
+impl<'a> BarcodeField<'a> {
+    /// Return the complete stored `BARCODE` field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to generate or
+    /// render a barcode.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored opaque barcode-instruction text after `BARCODE`.
+    ///
+    /// It is never parsed, validated, interpreted, or used to generate or
+    /// render barcode content.
+    pub fn barcode_instructions(&self) -> &'a str {
+        self.barcode_instructions
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated from barcode data.
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
@@ -4138,6 +4205,11 @@ impl<'a> Field<'a> {
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("EMBED") => {
                 FieldType::Embed
             },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("BARCODE") =>
+            {
+                FieldType::Barcode
+            },
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("ADDIN") => {
                 FieldType::AddIn
             },
@@ -4453,6 +4525,27 @@ impl<'a> Field<'a> {
         Some(EmbedField {
             instruction: self.instruction.as_ref(),
             object_instructions,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a `BARCODE` field.
+    ///
+    /// Stored opaque barcode instructions, cached results, and field state
+    /// remain metadata only. This method never parses or validates barcode data
+    /// or symbology, generates or renders a barcode, accesses an external
+    /// resource, or refreshes a field.
+    pub fn barcode_field(&self) -> Option<BarcodeField<'_>> {
+        if self.field_type != FieldType::Barcode {
+            return None;
+        }
+        let barcode_instructions = barcode_field_instructions(self.instruction.as_ref())?;
+        Some(BarcodeField {
+            instruction: self.instruction.as_ref(),
+            barcode_instructions,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
             owner: self.owner,
@@ -5518,6 +5611,23 @@ fn embed_field_instructions(instruction: &str) -> Option<&str> {
         return None;
     }
     let remainder = instruction.get("EMBED".len()..)?;
+    match remainder.chars().next() {
+        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
+        Some(_) => None,
+    }
+}
+
+fn barcode_field_instructions(instruction: &str) -> Option<&str> {
+    if instruction.len() > MAX_INSTRUCTION_LEN {
+        return None;
+    }
+    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let keyword = instruction.get(.."BARCODE".len())?;
+    if !keyword.eq_ignore_ascii_case("BARCODE") {
+        return None;
+    }
+    let remainder = instruction.get("BARCODE".len()..)?;
     match remainder.chars().next() {
         None | Some('"') | Some('\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
@@ -8265,6 +8375,61 @@ mod tests {
     }
 
     #[test]
+    fn barcode_fields_preserve_opaque_metadata_without_decoding_or_rendering() {
+        let mut barcode =
+            Field::parse_instruction(r#"BARCODE "4901234567894" EAN13 \h 1440 \* MERGEFORMAT"#);
+        barcode.result = Cow::Borrowed("cached barcode");
+        barcode.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        barcode.owner = FieldOwner::Body;
+        barcode.position = 4;
+
+        assert_eq!(barcode.field_type, FieldType::Barcode);
+        let barcode = barcode.barcode_field().unwrap();
+        assert_eq!(
+            barcode.instruction(),
+            r#"BARCODE "4901234567894" EAN13 \h 1440 \* MERGEFORMAT"#
+        );
+        assert_eq!(
+            barcode.barcode_instructions(),
+            r#""4901234567894" EAN13 \h 1440 \* MERGEFORMAT"#
+        );
+        assert_eq!(barcode.cached_result(), Some("cached barcode"));
+        assert!(barcode.is_dirty());
+        assert!(barcode.is_locked());
+        assert_eq!(barcode.owner(), FieldOwner::Body);
+        assert_eq!(barcode.position(), 4);
+
+        let code_39 = Field::parse_instruction(r#"barcode "ABC-123" CODE39 \d"#);
+        assert_eq!(code_39.field_type, FieldType::Barcode);
+        assert_eq!(
+            code_39.barcode_field().unwrap().barcode_instructions(),
+            r#""ABC-123" CODE39 \d"#
+        );
+
+        let bare = Field::parse_instruction("BARCODE");
+        assert_eq!(bare.barcode_field().unwrap().barcode_instructions(), "");
+        assert_eq!(
+            Field::parse_instruction("BARCODES 4901234567894").field_type,
+            FieldType::Unknown
+        );
+        assert!(
+            Field::parse_instruction("BARCODES 4901234567894")
+                .barcode_field()
+                .is_none()
+        );
+        let too_long = Field::new(
+            FieldType::Barcode,
+            Cow::Owned(format!("BARCODE {}", "x".repeat(MAX_INSTRUCTION_LEN))),
+            Cow::Borrowed(""),
+        );
+        assert!(too_long.barcode_field().is_none());
+    }
+
+    #[test]
     fn auto_text_fields_preserve_metadata_without_lookup_or_insertion() {
         let mut glossary =
             Field::parse_instruction(r#"GLOSSARY "Legacy Clause" \* MERGEFORMAT \q opaque"#);
@@ -10936,6 +11101,33 @@ mod tests {
             r#""Equation.DSMT4" \d"#
         );
         assert_eq!(fields[1].cached_result(), Some("cached equation object"));
+        assert!(fields[1].is_dirty());
+        assert!(fields[1].is_locked());
+        assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_barcode_fields_without_decoding_or_rendering() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst BARCODE "4901234567894" EAN13 \\h 1440}{\fldrslt cached EAN13 barcode}}{\field\flddirty\fldlock{\*\fldinst barcode "ABC-123" CODE39 \\d}{\fldrslt cached Code39 barcode}}After}"#,
+        )
+        .unwrap();
+
+        let fields = document.barcode_fields();
+        assert_eq!(document.barcode_field_count(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(
+            fields[0].barcode_instructions(),
+            r#""4901234567894" EAN13 \h 1440"#
+        );
+        assert_eq!(fields[0].cached_result(), Some("cached EAN13 barcode"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(
+            fields[1].barcode_instructions(),
+            r#""ABC-123" CODE39 \d"#
+        );
+        assert_eq!(fields[1].cached_result(), Some("cached Code39 barcode"));
         assert!(fields[1].is_dirty());
         assert!(fields[1].is_locked());
         assert_eq!(document.text(), "Before After");
