@@ -16,8 +16,8 @@ use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
     CompareField, DdeField, DocumentContextField, DocumentInformationField, DocumentVariableField,
-    ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField, GoToButtonField,
-    IfField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
+    EmbedField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
+    GoToButtonField, IfField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
     ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
@@ -631,6 +631,22 @@ impl Document {
     /// Get the number of typed, inert `PRINT` fields.
     pub fn print_field_count(&self) -> Result<usize> {
         Ok(self.print_fields()?.len())
+    }
+
+    /// Get typed, inert `EMBED` fields in story and source order.
+    ///
+    /// Returned values expose only stored opaque object instructions, cached
+    /// results, and field state. This method never loads, inspects,
+    /// deserializes, activates, renders, or executes an embedded object,
+    /// accesses an external resource, or refreshes a field.
+    pub fn embed_fields(&self) -> Result<Vec<EmbedField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::embed_field).collect())
+    }
+
+    /// Get the number of typed, inert `EMBED` fields.
+    pub fn embed_field_count(&self) -> Result<usize> {
+        Ok(self.embed_fields()?.len())
     }
 
     /// Get typed, inert `TOC` fields in story and source order.

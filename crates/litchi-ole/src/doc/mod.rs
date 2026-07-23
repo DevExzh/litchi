@@ -112,6 +112,7 @@ pub use parts::fields::{
 };
 pub use parts::fields::DocumentPropertyField;
 pub use parts::fields::DocumentVariableField;
+pub use parts::fields::EmbedField;
 pub use parts::fields::FormulaField;
 pub use parts::fields::InfoField;
 pub use parts::fields::ListNumberField;

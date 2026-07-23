@@ -764,6 +764,61 @@ impl PrintField {
     }
 }
 
+/// Typed, inert metadata for a legacy Word `EMBED` field.
+///
+/// [MS-DOC] §2.9.90 identifies native `EMBED` fields with type `0x3A`.
+/// This type retains opaque object-instruction text, a cached result, and
+/// field-marker state only. It never loads, inspects, deserializes, activates,
+/// renders, or executes an embedded object, accesses an external resource, or
+/// refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmbedField {
+    field: Field,
+    instruction: String,
+    object_instructions: String,
+    cached_result: Option<String>,
+}
+
+impl EmbedField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored `EMBED` field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to load or
+    /// activate an object.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored opaque object-instruction text after `EMBED`.
+    ///
+    /// It is never parsed, used to locate an object, or used to load, inspect,
+    /// deserialize, activate, render, or execute object content.
+    pub fn object_instructions(&self) -> &str {
+        &self.object_instructions
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is cached text only and is never regenerated from an object.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// One recognized stored option of a legacy Word `TOC` field.
 ///
 /// These values retain how a producer configured a table of contents. They
@@ -3621,6 +3676,27 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a native `EMBED` field.
+    ///
+    /// Stored opaque object instructions, cached results, and field-marker
+    /// state remain metadata only. This method never loads, inspects,
+    /// deserializes, activates, renders, or executes an embedded object,
+    /// accesses an external resource, or refreshes a field. Malformed
+    /// instructions remain available through this generic type and return
+    /// `None` here.
+    pub fn embed_field(&self) -> Option<EmbedField> {
+        if self.field.field_type != FieldType::EmbeddedObject {
+            return None;
+        }
+        let object_instructions = parse_embed_field_instructions(&self.instruction)?;
+        Some(EmbedField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            object_instructions,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed bookmark-reference field.
     ///
     /// Stored bookmark names, options, and cached results are never used to
@@ -4408,6 +4484,7 @@ const MAX_FORMULA_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_QUOTE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_QUOTE_FIELD_SWITCHES: usize = 64;
 const MAX_PRINT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_EMBED_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_SWITCHES: usize = 64;
 const MAX_AUTO_NUMBER_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5027,6 +5104,19 @@ fn parse_print_field_instructions(instruction: &str) -> Option<String> {
     let mut position = 0;
     let keyword = next_field_argument(instruction, &mut position).ok()??;
     if !keyword.eq_ignore_ascii_case("PRINT") {
+        return None;
+    }
+    Some(instruction.get(position..)?.trim().to_string())
+}
+
+fn parse_embed_field_instructions(instruction: &str) -> Option<String> {
+    if instruction.len() > MAX_EMBED_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("EMBED") {
         return None;
     }
     Some(instruction.get(position..)?.trim().to_string())
@@ -6821,6 +6911,7 @@ mod tests {
         assert_eq!(FieldType::from(0x0E), FieldType::Info);
         assert_eq!(FieldType::Info.as_u8(), 0x0E);
         assert_eq!(FieldType::from(0x3A), FieldType::EmbeddedObject);
+        assert_eq!(FieldType::EmbeddedObject.as_u8(), 0x3A);
         assert_eq!(FieldType::from(0x58), FieldType::Hyperlink);
         assert_eq!(FieldType::from(0x34), FieldType::AutoNumOutline);
         assert_eq!(FieldType::from(0x35), FieldType::AutoNumLegal);
@@ -7094,6 +7185,89 @@ mod tests {
             ..text
         };
         assert!(wrong_type.print_field().is_none());
+    }
+
+    #[test]
+    fn embed_fields_preserve_opaque_metadata_without_loading_or_activating_objects() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::EmbeddedObject,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" EMBED Excel.Sheet.12 \* MERGEFORMAT "#.to_string(),
+            result: Some("cached worksheet object".to_string()),
+        };
+
+        let embedded = text.embed_field().unwrap();
+        assert_eq!(embedded.field(), &field);
+        assert_eq!(embedded.instruction(), text.instruction);
+        assert_eq!(
+            embedded.object_instructions(),
+            r#"Excel.Sheet.12 \* MERGEFORMAT"#
+        );
+        assert_eq!(embedded.cached_result(), Some("cached worksheet object"));
+        assert!(embedded.is_dirty());
+        assert!(embedded.is_locked());
+
+        let equation = FieldText {
+            instruction: r#"embed "Equation.DSMT4" \d"#.to_string(),
+            result: Some("cached equation object".to_string()),
+            ..text.clone()
+        };
+        let equation = equation.embed_field().unwrap();
+        assert_eq!(
+            equation.object_instructions(),
+            r#""Equation.DSMT4" \d"#
+        );
+        assert_eq!(equation.cached_result(), Some("cached equation object"));
+
+        let bare = FieldText {
+            instruction: "EMBED".to_string(),
+            result: None,
+            ..text.clone()
+        };
+        assert_eq!(bare.embed_field().unwrap().object_instructions(), "");
+
+        for instruction in [
+            r#"EMBEDS Excel.Sheet.12"#,
+            r#"EMBEDDED Excel.Sheet.12"#,
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.embed_field().is_none(), "{instruction}");
+        }
+
+        let too_long = FieldText {
+            instruction: format!(
+                "EMBED {}",
+                "x".repeat(MAX_EMBED_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text.clone()
+        };
+        assert!(too_long.embed_field().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Equation,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.embed_field().is_none());
     }
 
     #[test]
