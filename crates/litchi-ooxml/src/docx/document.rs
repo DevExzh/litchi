@@ -19,7 +19,7 @@ use crate::docx::field::{
     MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, PrintField, PrivateField, QuoteField,
     ReferencedDocumentField, ShapeField, SymbolField, TableOfAuthoritiesEntryField,
-    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    TableOfAuthoritiesField, TableOfContentsEntryField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1680,6 +1680,25 @@ impl<'a> Document<'a> {
     /// Get the number of table-of-contents fields in the main document.
     pub fn table_of_contents_count(&self) -> Result<usize> {
         Ok(self.table_of_contents()?.len())
+    }
+
+    /// Get typed, inert table-of-contents entry (`TC`) fields in document order.
+    ///
+    /// Returned fields expose only stored entry text, list identifiers, levels,
+    /// page-number omission requests, switches, cached content, and dirty/lock
+    /// state. This method never changes hidden text, calculates page numbers,
+    /// generates a table of contents, or refreshes fields.
+    pub fn table_of_contents_entries(&self) -> Result<Vec<TableOfContentsEntryField>> {
+        self.fields()?
+            .iter()
+            .map(Field::table_of_contents_entry)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert table-of-contents entry fields.
+    pub fn table_of_contents_entry_count(&self) -> Result<usize> {
+        Ok(self.table_of_contents_entries()?.len())
     }
 
     /// Get typed, inert table-of-authorities fields in document order.

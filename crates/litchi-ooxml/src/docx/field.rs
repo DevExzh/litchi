@@ -31,6 +31,7 @@ const MAX_MAIL_MERGE_DATA_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_INFO_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 
 /// A field in a Word document.
 ///
@@ -1114,6 +1115,25 @@ impl Field {
     /// it never evaluates the field or refreshes its cached content.
     pub fn table_of_contents(&self) -> Result<Option<TableOfContentsField>> {
         TableOfContentsField::from_field(self)
+    }
+
+    /// Check whether this is a `TC` (Table of Contents Entry) field.
+    ///
+    /// TC markers remain stored data only. Recognizing one never changes
+    /// hidden-text state, calculates a page number, or generates a table of
+    /// contents.
+    pub fn is_table_of_contents_entry(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "TC").is_some()
+    }
+
+    /// Parse this field as an inert typed table-of-contents entry marker.
+    ///
+    /// Returns `Ok(None)` for non-`TC` fields. The returned model preserves
+    /// the stored entry text, switches, cached result, and dirty/lock state
+    /// only; it never changes hidden text, calculates page numbers, generates
+    /// a table of contents, or refreshes a field.
+    pub fn table_of_contents_entry(&self) -> Result<Option<TableOfContentsEntryField>> {
+        TableOfContentsEntryField::from_field(self)
     }
 
     /// Check whether this is a `TOA` (Table of Authorities) field.
@@ -5623,6 +5643,133 @@ impl TableOfContentsField {
     }
 }
 
+/// A typed, inert Word table-of-contents entry (`TC`) field.
+///
+/// A TC marker stores one entry for a table of contents or a similar list.
+/// This model exposes only that stored entry, switches, and cached result. It
+/// never changes hidden-text state, calculates page numbers, generates a table
+/// of contents, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfContentsEntryField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    entry: String,
+    switches: Vec<FieldSwitch>,
+}
+
+impl TableOfContentsEntryField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        if !field.is_table_of_contents_entry() {
+            return Ok(None);
+        }
+        if field.instruction().len() > MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "TC field instruction exceeds {MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES} bytes"
+            )));
+        }
+        let Some((entry, switches)) =
+            parse_field_operand_and_switches(field.instruction(), "TC")?
+        else {
+            unreachable!("table-of-contents entry recognition and parsing must agree");
+        };
+        let entry = entry.ok_or_else(|| {
+            OoxmlError::InvalidFormat("TC field is missing its entry text".to_string())
+        })?;
+        if entry.is_empty() {
+            return Err(OoxmlError::InvalidFormat(
+                "TC field entry text is empty".to_string(),
+            ));
+        }
+        for switch in &switches {
+            match switch.name {
+                'f' | 'l' if switch.argument.is_none() => {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "TC \\{} switch requires an argument",
+                        switch.name
+                    )));
+                },
+                'n' if switch.argument.is_some() => {
+                    return Err(OoxmlError::InvalidFormat(
+                        "TC \\n switch does not take an argument".to_string(),
+                    ));
+                },
+                _ => {},
+            }
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            entry,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored text marked for a table of contents.
+    ///
+    /// This is metadata only and is never inserted into generated content.
+    pub fn entry(&self) -> &str {
+        &self.entry
+    }
+
+    /// Return the cached visible result, if a producer stored one.
+    ///
+    /// TC fields normally display no result, and this API never generates one.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+
+    /// Return the optional `\\f` contents-list identifier.
+    ///
+    /// The identifier is preserved as stored metadata and is never used to
+    /// select or generate a contents list.
+    pub fn list_identifier(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'f', "TC")
+    }
+
+    /// Return the optional `\\l` entry level without calculating its style.
+    pub fn level(&self) -> Result<Option<&str>> {
+        optional_field_switch_argument(&self.switches, 'l', "TC")
+    }
+
+    /// Whether the stored `\\n` switch omits the entry's page number.
+    ///
+    /// This records producer intent only; no page number is calculated or
+    /// changed.
+    pub fn omits_page_number(&self) -> bool {
+        self.has_switch('n')
+    }
+}
+
 /// A typed, inert Word table-of-authorities (`TOA`) field.
 ///
 /// A TOA collects stored `TA` citation-marker fields into a rendered list.
@@ -8726,6 +8873,77 @@ mod tests {
             second.heading_style_levels().unwrap(),
             vec![TableOfContentsLevelRange::new(2, 4).unwrap()]
         );
+    }
+
+    #[test]
+    fn parses_table_of_contents_entry_fields_without_generating_contents() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" TC &quot;Illustration 1&quot; \f i \l 4 \n \* MERGEFORMAT " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached entry</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>tc&quot;Appendix A&quot;\l 2</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached appendix</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="TCC &quot;not an entry&quot;"><w:r><w:t>not a TC field</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_table_of_contents_entry());
+        assert!(fields[1].is_table_of_contents_entry());
+        assert!(!fields[2].is_table_of_contents_entry());
+
+        let illustration = fields[0].table_of_contents_entry().unwrap().unwrap();
+        assert_eq!(illustration.entry(), "Illustration 1");
+        assert_eq!(illustration.cached_result(), Some("cached entry"));
+        assert!(illustration.is_dirty());
+        assert!(illustration.is_locked());
+        assert_eq!(illustration.list_identifier().unwrap(), Some("i"));
+        assert_eq!(illustration.level().unwrap(), Some("4"));
+        assert!(illustration.omits_page_number());
+        assert_eq!(illustration.switches()[3].name(), '*');
+        assert_eq!(illustration.switches()[3].argument(), Some("MERGEFORMAT"));
+
+        let appendix = fields[1].table_of_contents_entry().unwrap().unwrap();
+        assert_eq!(appendix.entry(), "Appendix A");
+        assert_eq!(appendix.cached_result(), Some("cached appendix"));
+        assert!(appendix.is_dirty());
+        assert!(appendix.is_locked());
+        assert_eq!(appendix.list_identifier().unwrap(), None);
+        assert_eq!(appendix.level().unwrap(), Some("2"));
+        assert!(!appendix.omits_page_number());
+
+        assert!(fields[2].table_of_contents_entry().unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_table_of_contents_entry_field_semantics() {
+        for instruction in [
+            "TC",
+            r#"TC """#,
+            r#"TC "entry" unexpected"#,
+            r#"TC "entry" \f"#,
+            r#"TC "entry" \l"#,
+            r#"TC "entry" \n unexpected"#,
+        ] {
+            let field = Field::new(instruction.to_string(), None, false);
+            assert!(field.table_of_contents_entry().is_err(), "{instruction}");
+        }
+
+        let too_long = Field::new(
+            format!(
+                "TC {}",
+                "x".repeat(MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.table_of_contents_entry().is_err());
+
+        let not_entry = Field::new(r#"TCC "entry""#.to_string(), None, false);
+        assert!(!not_entry.is_table_of_contents_entry());
+        assert!(not_entry.table_of_contents_entry().unwrap().is_none());
     }
 
     #[test]

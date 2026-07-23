@@ -131,8 +131,8 @@ pub use field::{
     QuoteField, ReferencedDocumentField, SequenceField,
     SetField, ShapeField, StyleReferenceField, StyleReferenceFieldOption,
     SymbolField,
-    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
-    TableOfContentsLevelRange,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsEntryField,
+    TableOfContentsField, TableOfContentsLevelRange,
     TableOfContentsSwitch, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
 };
 pub use font_table::{

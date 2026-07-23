@@ -3179,6 +3179,32 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_typed_table_of_contents_entry_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let entry = document.add_paragraph();
+            entry.add_field(crate::docx::writer::MutableField::with_result(
+                r#"TC "Illustration 1" \f i \l 4 \n"#.to_string(),
+                "cached entry".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let entries = document.table_of_contents_entries().unwrap();
+        assert_eq!(document.table_of_contents_entry_count().unwrap(), 1);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].entry(), "Illustration 1");
+        assert_eq!(entries[0].cached_result(), Some("cached entry"));
+        assert_eq!(entries[0].list_identifier().unwrap(), Some("i"));
+        assert_eq!(entries[0].level().unwrap(), Some("4"));
+        assert!(entries[0].omits_page_number());
+    }
+
+    #[test]
     fn writes_and_discovers_typed_table_of_authorities_fields() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
