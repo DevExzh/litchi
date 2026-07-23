@@ -115,6 +115,7 @@ pub use parts::fields::FormulaField;
 pub use parts::fields::QuoteField;
 pub use parts::fields::SequenceField;
 pub use parts::fields::SetField;
+pub use parts::fields::SymbolField;
 pub use parts::fields::{ActiveContentField, ActiveContentFieldKind};
 pub use parts::fields::{
     AddressBlockCountryInclusion, Field, FieldBoundary, FieldDescriptor, FieldEndFlags,

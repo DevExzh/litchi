@@ -19,8 +19,8 @@ use super::parts::fields::{
     Field, FieldStory, FieldText, FieldsTable, FormulaField, GoToButtonField, IfField, IndexField,
     LinkField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
     MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
-    QuoteField, ReferenceField, SequenceField, SetField, StyleReferenceField, TableOfAuthoritiesField,
-    TableOfContentsField, UserIdentityField,
+    QuoteField, ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
+    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -734,6 +734,22 @@ impl Document {
     /// Get the number of typed, inert `QUOTE` fields.
     pub fn quote_field_count(&self) -> Result<usize> {
         Ok(self.quote_fields()?.len())
+    }
+
+    /// Get typed, inert `SYMBOL` fields in story and source order.
+    ///
+    /// Returned values expose only stored character arguments, switches, cached
+    /// results, and field state. This method never maps a character code, looks
+    /// up a font, inserts a glyph, changes formatting or layout, or refreshes a
+    /// field.
+    pub fn symbol_fields(&self) -> Result<Vec<SymbolField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::symbol_field).collect())
+    }
+
+    /// Get the number of typed, inert `SYMBOL` fields.
+    pub fn symbol_field_count(&self) -> Result<usize> {
+        Ok(self.symbol_fields()?.len())
     }
 
     /// Get typed, inert `SEQ` fields in story and source order.
