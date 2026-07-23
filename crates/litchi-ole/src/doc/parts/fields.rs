@@ -899,6 +899,105 @@ impl TableOfAuthoritiesField {
     }
 }
 
+/// One recognized stored option of a legacy Word `INDEX` field.
+///
+/// These values retain how a producer configured an index. They are metadata
+/// only: this crate never scans index markers, reads bookmarks, calculates
+/// page numbers, sorts entries, paginates, generates an index, or refreshes a
+/// field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndexOption {
+    /// The `\\b` bookmark that bounds included entries.
+    Bookmark(String),
+    /// The `\\c` requested number of index columns.
+    Columns(String),
+    /// The `\\d` separator between sequence and page numbers.
+    SequencePageSeparator(String),
+    /// The `\\e` separator between an entry and its first page number.
+    EntryPageNumberSeparator(String),
+    /// The `\\f` entry type that selects matching index markers.
+    EntryType(String),
+    /// The `\\g` separator between the start and end of a page range.
+    PageRangeSeparator(String),
+    /// The `\\h` heading text for each index-letter set.
+    Heading(String),
+    /// The `\\k` separator between an entry and its cross reference.
+    CrossReferenceSeparator(String),
+    /// The `\\l` separator between page numbers in a page-number list.
+    PageNumberSeparator(String),
+    /// Word's `\\o` East Asian sort-order extension, retained verbatim.
+    EastAsianSortOrder(String),
+    /// The `\\p` range of entry initial letters to include.
+    LetterRange(String),
+    /// The `\\r` switch runs subentries into their main-entry line.
+    RunIn,
+    /// The `\\s` sequence identifier whose number prefixes page numbers.
+    SequenceIdentifier(String),
+    /// The `\\y` switch enables yomi text for index entries.
+    UseYomi,
+    /// The `\\z` language identifier used to generate the index.
+    LanguageId(String),
+}
+
+/// Typed, inert metadata for a legacy Word `INDEX` field.
+///
+/// [MS-DOC] §2.9.90 maps native `INDEX` field markers to ECMA-376 Part 1
+/// §17.16.5.29. This type exposes only stored configuration, unrecognized
+/// switches, cached result, and field state. It never scans index markers,
+/// reads bookmarks, calculates page numbers, sorts entries, paginates,
+/// generates an index, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexField {
+    field: Field,
+    instruction: String,
+    options: Vec<IndexOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl IndexField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored `INDEX` field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return recognized stored configuration options in source order.
+    ///
+    /// This metadata is never used to sort, generate, or update an index.
+    pub fn options(&self) -> &[IndexOption] {
+        &self.options
+    }
+
+    /// Return unrecognized stored switches in source order.
+    ///
+    /// They are retained without interpretation or execution.
+    pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated through pagination or field evaluation.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The stored category of a legacy Word building-block field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AutoTextFieldKind {
@@ -2477,6 +2576,26 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `INDEX` field.
+    ///
+    /// Stored configuration and cached results are never used to scan index
+    /// markers, read bookmarks, calculate page numbers, sort entries,
+    /// paginate, generate an index, or refresh a field. Malformed instructions
+    /// remain available through this generic type and return `None` here.
+    pub fn index(&self) -> Option<IndexField> {
+        if self.field.field_type != FieldType::Index {
+            return None;
+        }
+        let parts = parse_index_field_parts(&self.instruction)?;
+        Some(IndexField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed `GLOSSARY` or
     /// `AUTOTEXT` field.
     ///
@@ -2911,6 +3030,8 @@ const MAX_TABLE_OF_CONTENTS_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_CONTENTS_FIELD_SWITCHES: usize = 64;
 const MAX_TABLE_OF_AUTHORITIES_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_AUTHORITIES_FIELD_SWITCHES: usize = 64;
+const MAX_INDEX_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_INDEX_FIELD_SWITCHES: usize = 64;
 const MAX_AUTO_TEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_FIELD_SWITCHES: usize = 64;
 const MAX_AUTO_TEXT_LIST_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -2973,6 +3094,11 @@ struct TableOfContentsFieldParts {
 
 struct TableOfAuthoritiesFieldParts {
     options: Vec<TableOfAuthoritiesOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+}
+
+struct IndexFieldParts {
+    options: Vec<IndexOption>,
     unknown_switches: Vec<MergeFieldSwitch>,
 }
 
@@ -3322,6 +3448,76 @@ fn parse_table_of_authorities_field_parts(
     }
 
     Some(TableOfAuthoritiesFieldParts {
+        options,
+        unknown_switches,
+    })
+}
+
+fn parse_index_field_parts(instruction: &str) -> Option<IndexFieldParts> {
+    if instruction.len() > MAX_INDEX_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("INDEX") {
+        return None;
+    }
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' || options.len() + unknown_switches.len() >= MAX_INDEX_FIELD_SWITCHES
+        {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        match name {
+            'b' => options.push(IndexOption::Bookmark(argument.clone()?)),
+            'c' => options.push(IndexOption::Columns(argument.clone()?)),
+            'd' => options.push(IndexOption::SequencePageSeparator(argument.clone()?)),
+            'e' => options.push(IndexOption::EntryPageNumberSeparator(argument.clone()?)),
+            'f' => options.push(IndexOption::EntryType(argument.clone()?)),
+            'g' => options.push(IndexOption::PageRangeSeparator(argument.clone()?)),
+            'h' => options.push(IndexOption::Heading(argument.clone()?)),
+            'k' => options.push(IndexOption::CrossReferenceSeparator(argument.clone()?)),
+            'l' => options.push(IndexOption::PageNumberSeparator(argument.clone()?)),
+            'o' => options.push(IndexOption::EastAsianSortOrder(argument.clone()?)),
+            'p' => options.push(IndexOption::LetterRange(argument.clone()?)),
+            'r' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(IndexOption::RunIn);
+            },
+            's' => options.push(IndexOption::SequenceIdentifier(argument.clone()?)),
+            'y' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(IndexOption::UseYomi);
+            },
+            'z' => options.push(IndexOption::LanguageId(argument.clone()?)),
+            _ => unknown_switches.push(MergeFieldSwitch { name, argument }),
+        }
+    }
+
+    Some(IndexFieldParts {
         options,
         unknown_switches,
     })
@@ -4951,6 +5147,101 @@ mod tests {
             ..text
         };
         assert!(wrong_type.table_of_authorities().is_none());
+    }
+
+    #[test]
+    fn index_fields_preserve_stored_configuration_without_generation() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::Index,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" INDEX \b "Scope Bookmark" \c 2 \d "-" \e ", " \f A \g "–" \h A \k "; " \l ", " \o S \p "A-D" \r \s Chapter \y \z 1033 \* MERGEFORMAT \q opaque "#.to_string(),
+            result: Some("cached index".to_string()),
+        };
+
+        let index = text.index().unwrap();
+        assert_eq!(index.field(), &field);
+        assert_eq!(index.instruction(), text.instruction);
+        assert_eq!(
+            index.options(),
+            &[
+                IndexOption::Bookmark("Scope Bookmark".to_string()),
+                IndexOption::Columns("2".to_string()),
+                IndexOption::SequencePageSeparator("-".to_string()),
+                IndexOption::EntryPageNumberSeparator(", ".to_string()),
+                IndexOption::EntryType("A".to_string()),
+                IndexOption::PageRangeSeparator("–".to_string()),
+                IndexOption::Heading("A".to_string()),
+                IndexOption::CrossReferenceSeparator("; ".to_string()),
+                IndexOption::PageNumberSeparator(", ".to_string()),
+                IndexOption::EastAsianSortOrder("S".to_string()),
+                IndexOption::LetterRange("A-D".to_string()),
+                IndexOption::RunIn,
+                IndexOption::SequenceIdentifier("Chapter".to_string()),
+                IndexOption::UseYomi,
+                IndexOption::LanguageId("1033".to_string()),
+            ]
+        );
+        assert_eq!(
+            index.unknown_switches(),
+            &[
+                MergeFieldSwitch {
+                    name: '*',
+                    argument: Some("MERGEFORMAT".to_string()),
+                },
+                MergeFieldSwitch {
+                    name: 'q',
+                    argument: Some("opaque".to_string()),
+                },
+            ]
+        );
+        assert_eq!(index.cached_result(), Some("cached index"));
+        assert!(index.is_dirty());
+        assert!(index.is_locked());
+
+        for instruction in [
+            "INDEX \\b",
+            "INDEX \\o",
+            r"INDEX \r unexpected",
+            r"INDEX \y unexpected",
+            "INDEX unexpected",
+            "INDEX \\",
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.index().is_none(), "{instruction}");
+        }
+
+        let wrong_keyword = FieldText {
+            field: field.clone(),
+            instruction: "INDEXES \\b Bookmark".to_string(),
+            result: None,
+        };
+        assert!(wrong_keyword.index().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::TableOfContents,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.index().is_none());
     }
 
     #[test]

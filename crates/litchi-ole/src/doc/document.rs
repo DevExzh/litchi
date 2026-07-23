@@ -16,9 +16,10 @@ use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoTextField, AutoTextListField, CompareField, DdeField,
     DocumentVariableField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
-    GoToButtonField, IfField, LinkField, MacroButtonField, MailMergeConditionalControlField,
-    MailMergeCounterField, MailMergeDataField, MailMergeNextField, MailMergeRecipientField,
-    MergeField, PromptField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
+    MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, TableOfAuthoritiesField,
+    TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -651,6 +652,22 @@ impl Document {
     /// Get the number of typed, inert `TOA` fields.
     pub fn table_of_authorities_field_count(&self) -> Result<usize> {
         Ok(self.table_of_authorities_fields()?.len())
+    }
+
+    /// Get typed, inert generated-index (`INDEX`) fields in story and source order.
+    ///
+    /// Returned values expose only stored configuration, unrecognized switches,
+    /// cached results, and field state. This method never scans index markers,
+    /// reads bookmarks, calculates page numbers, sorts entries, paginates,
+    /// generates an index, or refreshes a field.
+    pub fn indexes(&self) -> Result<Vec<IndexField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::index).collect())
+    }
+
+    /// Get the number of typed, inert generated-index (`INDEX`) fields.
+    pub fn index_count(&self) -> Result<usize> {
+        Ok(self.indexes()?.len())
     }
 
     /// Get typed, inert `GLOSSARY` and `AUTOTEXT` fields in story and source order.
