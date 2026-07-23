@@ -132,6 +132,11 @@ Ordinary source-built and existing shapes expose the native Flip buttons via
 geometry while retaining unrelated fields; see `create_*_flipped_shape` for
 scratch-file examples.
 
+File-backed images use the same typed command through `flip_body_image`,
+`flip_sheet_image`, or `flip_slide_image`, preserving their embedded asset,
+adjustments, and metadata; see `create_*_flipped_image` for scratch-file
+examples.
+
 ### Create Pages documents from scratch
 
 ```rust

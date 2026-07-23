@@ -10,7 +10,8 @@ use crate::data_reference_registry::{
 use crate::image_adjustments::replace_image_adjustments;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
+    flip_drawable_geometry, offset_drawable_geometry,
 };
 
 mod graph;
@@ -165,6 +166,34 @@ impl PagesEditor {
     /// Read geometry for one body-anchored image.
     pub fn body_image_geometry(&self, drawable_object_id: u64) -> Result<DrawableGeometry> {
         Ok(body_image_graph(self, drawable_object_id)?.info.geometry)
+    }
+
+    /// Apply one native Arrange Flip operation to a body-anchored image.
+    ///
+    /// Returns the updated geometry after applying the same transform as the
+    /// Pages Flip Horizontally or Flip Vertically command.
+    pub fn flip_body_image(
+        &mut self,
+        drawable_object_id: u64,
+        axis: DrawableFlipAxis,
+    ) -> Result<DrawableGeometry> {
+        let source = body_image_graph(self, drawable_object_id)?;
+        let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
+        let mut staged = self.package().clone();
+        set_image_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_image_geometry(drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Pages image flip update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Update body-image geometry while preserving unknown image fields.
@@ -552,6 +581,26 @@ mod tests {
                 .unwrap(),
             changed_geometry
         );
+        let horizontally_flipped = editor
+            .flip_body_image(created.drawable_object_id, DrawableFlipAxis::Horizontal)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_image_geometry(created.drawable_object_id)
+                .unwrap(),
+            horizontally_flipped
+        );
+        assert_ne!(horizontally_flipped.flags, changed_geometry.flags);
+        let vertically_flipped = editor
+            .flip_body_image(created.drawable_object_id, DrawableFlipAxis::Vertical)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_image_geometry(created.drawable_object_id)
+                .unwrap(),
+            vertically_flipped
+        );
+        assert_ne!(vertically_flipped.angle, changed_geometry.angle);
 
         let changed_properties = DrawableProperties {
             hyperlink_url: Some("https://example.test/pages-image".to_owned()),
@@ -651,6 +700,9 @@ mod tests {
         editor
             .set_body_image_properties(source.drawable_object_id, source_properties.clone())
             .unwrap();
+        let source_geometry = editor
+            .flip_body_image(source.drawable_object_id, DrawableFlipAxis::Vertical)
+            .unwrap();
         let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
 
         let duplicate = editor
@@ -683,14 +735,14 @@ mod tests {
         assert_eq!(duplicate.properties, source_properties);
         assert_eq!(
             duplicate.geometry.position,
-            source.geometry.position.map(|position| DrawablePoint {
+            source_geometry.position.map(|position| DrawablePoint {
                 x: position.x + BODY_DRAWABLE_DUPLICATE_OFFSET,
                 y: position.y + BODY_DRAWABLE_DUPLICATE_OFFSET,
             })
         );
-        assert_eq!(duplicate.geometry.size, source.geometry.size);
-        assert_eq!(duplicate.geometry.flags, source.geometry.flags);
-        assert_eq!(duplicate.geometry.angle, source.geometry.angle);
+        assert_eq!(duplicate.geometry.size, source_geometry.size);
+        assert_eq!(duplicate.geometry.flags, source_geometry.flags);
+        assert_eq!(duplicate.geometry.angle, source_geometry.angle);
 
         let moved_duplicate = DrawableGeometry {
             position: Some(DrawablePoint { x: 312.0, y: 264.0 }),
@@ -703,7 +755,7 @@ mod tests {
             editor
                 .body_image_geometry(source.drawable_object_id)
                 .unwrap(),
-            source.geometry
+            source_geometry
         );
         assert_eq!(
             editor
@@ -800,6 +852,13 @@ mod tests {
         let created = editor
             .add_body_image(4, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
             .unwrap();
+        let before_flip = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .flip_body_image(999, DrawableFlipAxis::Horizontal)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_flip);
         let before_properties = editor.to_bytes().unwrap();
         assert!(
             editor

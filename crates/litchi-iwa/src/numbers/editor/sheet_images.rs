@@ -9,7 +9,8 @@ use crate::data_reference_registry::{
 };
 use crate::image_adjustments::replace_image_adjustments;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, offset_drawable_geometry,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
+    flip_drawable_geometry, offset_drawable_geometry,
 };
 
 mod graph;
@@ -140,6 +141,35 @@ impl NumbersEditor {
         Ok(image_graph(self, sheet_id, drawable_object_id)?
             .info
             .geometry)
+    }
+
+    /// Apply one native Arrange Flip operation to an ordinary sheet image.
+    ///
+    /// Returns the updated geometry after applying the same transform as the
+    /// Numbers Flip Horizontally or Flip Vertically command.
+    pub fn flip_sheet_image(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        axis: DrawableFlipAxis,
+    ) -> Result<DrawableGeometry> {
+        let source = image_graph(self, sheet_id, drawable_object_id)?;
+        let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
+        let mut staged = self.package.clone();
+        set_image_geometry(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_image_geometry(sheet_id, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Numbers image flip update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(geometry)
     }
 
     /// Update image position, size, flags, and rotation while preserving
@@ -534,6 +564,34 @@ mod tests {
                 .unwrap(),
             changed_geometry
         );
+        let horizontally_flipped = editor
+            .flip_sheet_image(
+                sheet_id,
+                created.drawable_object_id,
+                DrawableFlipAxis::Horizontal,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_image_geometry(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            horizontally_flipped
+        );
+        assert_ne!(horizontally_flipped.flags, changed_geometry.flags);
+        let vertically_flipped = editor
+            .flip_sheet_image(
+                sheet_id,
+                created.drawable_object_id,
+                DrawableFlipAxis::Vertical,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_image_geometry(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            vertically_flipped
+        );
+        assert_ne!(vertically_flipped.angle, changed_geometry.angle);
 
         let changed_properties = DrawableProperties {
             hyperlink_url: Some("https://example.test/numbers-image".to_owned()),
@@ -653,6 +711,13 @@ mod tests {
                 source_properties.clone(),
             )
             .unwrap();
+        let source_geometry = editor
+            .flip_sheet_image(
+                sheet_id,
+                source.drawable_object_id,
+                DrawableFlipAxis::Vertical,
+            )
+            .unwrap();
 
         let duplicate = editor
             .duplicate_sheet_image(sheet_id, source.drawable_object_id)
@@ -684,14 +749,14 @@ mod tests {
         assert_eq!(duplicate.properties, source_properties);
         assert_eq!(
             duplicate.geometry.position,
-            source.geometry.position.map(|position| DrawablePoint {
+            source_geometry.position.map(|position| DrawablePoint {
                 x: position.x + DRAWABLE_DUPLICATE_OFFSET,
                 y: position.y + DRAWABLE_DUPLICATE_OFFSET,
             })
         );
-        assert_eq!(duplicate.geometry.size, source.geometry.size);
-        assert_eq!(duplicate.geometry.flags, source.geometry.flags);
-        assert_eq!(duplicate.geometry.angle, source.geometry.angle);
+        assert_eq!(duplicate.geometry.size, source_geometry.size);
+        assert_eq!(duplicate.geometry.flags, source_geometry.flags);
+        assert_eq!(duplicate.geometry.angle, source_geometry.angle);
 
         let moved_duplicate = DrawableGeometry {
             position: Some(DrawablePoint { x: 640.0, y: 360.0 }),
@@ -704,7 +769,7 @@ mod tests {
             editor
                 .sheet_image_geometry(sheet_id, source.drawable_object_id)
                 .unwrap(),
-            source.geometry
+            source_geometry
         );
         assert_eq!(
             editor
@@ -808,6 +873,13 @@ mod tests {
         let created = editor
             .add_sheet_image(sheet_id, "lena.png", &original, IMAGE_POSITION, IMAGE_SIZE)
             .unwrap();
+        let before_flip = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .flip_sheet_image(sheet_id, 999, DrawableFlipAxis::Horizontal)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_flip);
         let before_properties = editor.to_bytes().unwrap();
         assert!(
             editor
