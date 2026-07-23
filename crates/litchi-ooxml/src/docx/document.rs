@@ -13,7 +13,7 @@ use crate::docx::field::{
     DocumentVariableField, ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField,
     IndexField, LinkField, ListNumberField, MacroButtonField, MailMergeConditionalControlField,
     MailMergeCounterField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
-    QuoteField, ReferencedDocumentField, SymbolField, TableOfAuthoritiesEntryField,
+    PrintField, QuoteField, ReferencedDocumentField, SymbolField, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
@@ -1317,6 +1317,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `GOTOBUTTON` fields in the main document.
     pub fn go_to_button_field_count(&self) -> Result<usize> {
         Ok(self.go_to_button_fields()?.len())
+    }
+
+    /// Get typed, inert `PRINT` fields in document order.
+    ///
+    /// Returned values expose only stored printer-instruction text, cached
+    /// results, and dirty/lock state. This method never interprets control
+    /// codes, opens a printer, sends output, changes print settings, or
+    /// refreshes a field.
+    pub fn print_fields(&self) -> Result<Vec<PrintField>> {
+        self.fields()?
+            .iter()
+            .map(Field::print_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `PRINT` fields in the main document.
+    pub fn print_field_count(&self) -> Result<usize> {
+        Ok(self.print_fields()?.len())
     }
 
     /// Get typed, inert user-identity fields in document order.
