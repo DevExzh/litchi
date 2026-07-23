@@ -1,8 +1,14 @@
 //! Typed construction and discovery of body-anchored Pages image graphs.
 
 use super::*;
+use crate::DrawableTitleCaption;
 use crate::IWorkThemeArchive;
 use crate::image_adjustments::image_adjustments_from_archive;
+use crate::image_caption::{
+    CAPTION_INFO_MESSAGE_TYPE, CAPTION_PLACEMENT_MESSAGE_TYPE, CaptionObjectIds, CaptionThemeStyle,
+    DrawableCaptionKind, SHAPE_STYLE_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE, caption_objects,
+    patch_drawable_caption_reference, replace_object_reference, standin_caption_object,
+};
 use crate::shapes::{
     drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
@@ -95,6 +101,13 @@ pub(super) struct BodyImageGraph {
     pub(super) data_references: Vec<(u64, u64)>,
 }
 
+#[derive(Debug, Clone)]
+pub(super) struct ImageCaptionSlot {
+    pub(super) reference_id: u64,
+    pub(super) storage_id: Option<u64>,
+    object_ids: Vec<u64>,
+}
+
 pub(super) fn image_creation_values(options: PagesImageOptions) -> Result<DrawableGeometry> {
     if !options.natural_size.width.is_finite()
         || !options.natural_size.height.is_finite()
@@ -138,6 +151,55 @@ pub(super) fn image_style_id(package: &IWorkPackage, root: &DocumentArchive) -> 
         .and_then(|presets| presets.image_style_presets.into_iter().next())
         .map(|reference| reference.identifier)
         .ok_or_else(|| Error::InvalidFormat("Pages theme has no image style preset".to_owned()))
+}
+
+pub(super) fn image_caption_theme(
+    package: &IWorkPackage,
+    root: &DocumentArchive,
+) -> Result<(CaptionThemeStyle, Option<String>)> {
+    let theme_id = root
+        .theme
+        .as_ref()
+        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?
+        .identifier;
+    let archive_name = find_object_archive(package, theme_id)?;
+    let archive = package.archive(&archive_name)?;
+    let object = archive
+        .object(theme_id)
+        .ok_or_else(|| Error::InvalidFormat(format!("Pages theme {theme_id} is missing")))?;
+    let message = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == THEME_MESSAGE_TYPE)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!("Pages theme {theme_id} has no theme payload"))
+        })?;
+    let theme = IWorkThemeArchive::decode(&message.data)?;
+    let stylesheet_id = theme
+        .base
+        .document_stylesheet
+        .ok_or_else(|| Error::InvalidFormat("Pages theme has no stylesheet".to_owned()))?
+        .identifier;
+    let paragraph_style_id = theme
+        .extensions
+        .application
+        .ok_or_else(|| Error::InvalidFormat("Pages theme has no application presets".to_owned()))?
+        .caption_style_presets
+        .into_iter()
+        .next()
+        .map(|reference| reference.identifier)
+        .ok_or_else(|| {
+            Error::InvalidFormat("Pages theme has no caption style preset".to_owned())
+        })?;
+    find_object_archive(package, stylesheet_id)?;
+    find_object_archive(package, paragraph_style_id)?;
+    Ok((
+        CaptionThemeStyle {
+            stylesheet_id,
+            paragraph_style_id,
+        },
+        root.super_.document_language.clone(),
+    ))
 }
 
 pub(super) fn body_image_infos(editor: &PagesEditor) -> Result<Vec<PagesImageInfo>> {
@@ -289,17 +351,13 @@ pub(super) fn body_image_graph(
         )));
     }
     let mut object_ids = vec![drawable_object_id];
-    for reference in [image.super_.title, image.super_.caption]
-        .into_iter()
-        .flatten()
-    {
-        decode_typed_package_object::<tsd::StandinCaptionArchive>(
-            editor.package(),
-            reference.identifier,
-            STANDIN_CAPTION_MESSAGE_TYPE,
-            "TSD.StandinCaptionArchive",
-        )?;
-        object_ids.push(reference.identifier);
+    for (reference, kind) in [
+        (image.super_.title, DrawableCaptionKind::Title),
+        (image.super_.caption, DrawableCaptionKind::Caption),
+    ] {
+        object_ids.extend(
+            image_caption_slot_from_reference(editor.package(), reference, kind)?.object_ids,
+        );
     }
     object_ids.push(*attachment_id);
     if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
@@ -356,6 +414,230 @@ pub(super) fn body_image_graph(
         uuid_object_ids,
         data_references,
     })
+}
+
+pub(super) fn image_title_caption(
+    editor: &PagesEditor,
+    drawable_object_id: u64,
+) -> Result<DrawableTitleCaption> {
+    body_image_graph(editor, drawable_object_id)?;
+    let image: tsd::ImageArchive = decode_typed_package_object(
+        editor.package(),
+        drawable_object_id,
+        IMAGE_MESSAGE_TYPE,
+        "TSD.ImageArchive",
+    )?;
+    let title = image_caption_slot_from_reference(
+        editor.package(),
+        image.super_.title,
+        DrawableCaptionKind::Title,
+    )?;
+    let caption = image_caption_slot_from_reference(
+        editor.package(),
+        image.super_.caption,
+        DrawableCaptionKind::Caption,
+    )?;
+    let text_editor = IWorkTextEditor::from_package(editor.package().clone());
+    Ok(DrawableTitleCaption {
+        title: title
+            .storage_id
+            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .transpose()?,
+        caption: caption
+            .storage_id
+            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .transpose()?,
+    })
+}
+
+pub(super) fn image_caption_slot(
+    editor: &PagesEditor,
+    drawable_object_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<ImageCaptionSlot> {
+    body_image_graph(editor, drawable_object_id)?;
+    let image: tsd::ImageArchive = decode_typed_package_object(
+        editor.package(),
+        drawable_object_id,
+        IMAGE_MESSAGE_TYPE,
+        "TSD.ImageArchive",
+    )?;
+    let reference = match kind {
+        DrawableCaptionKind::Caption => image.super_.caption,
+        DrawableCaptionKind::Title => image.super_.title,
+    };
+    image_caption_slot_from_reference(editor.package(), reference, kind)
+}
+
+fn image_caption_slot_from_reference(
+    package: &IWorkPackage,
+    reference: Option<tsp::Reference>,
+    kind: DrawableCaptionKind,
+) -> Result<ImageCaptionSlot> {
+    let reference_id = reference
+        .ok_or_else(|| {
+            Error::InvalidFormat("Pages image has no title/caption reference".to_owned())
+        })?
+        .identifier;
+    if object_has_message_type(package, reference_id, CAPTION_INFO_MESSAGE_TYPE)? {
+        let info: crate::protobuf::tsa::CaptionInfoArchive = decode_typed_package_object(
+            package,
+            reference_id,
+            CAPTION_INFO_MESSAGE_TYPE,
+            "TSA.CaptionInfoArchive",
+        )?;
+        if info.child_info_kind != Some(kind.native_kind()) {
+            return Err(Error::InvalidFormat(format!(
+                "Pages title/caption object {reference_id} has the wrong native kind"
+            )));
+        }
+        let storage_id = info
+            .super_
+            .owned_storage
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages title/caption object {reference_id} has no text storage"
+                ))
+            })?
+            .identifier;
+        let style_id = info
+            .super_
+            .super_
+            .style
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages title/caption object {reference_id} has no shape style"
+                ))
+            })?
+            .identifier;
+        let placement_id = info
+            .placement
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages title/caption object {reference_id} has no placement"
+                ))
+            })?
+            .identifier;
+        for (identifier, message_type, type_name) in [
+            (style_id, SHAPE_STYLE_MESSAGE_TYPE, "TSWP.ShapeStyleArchive"),
+            (storage_id, STORAGE_MESSAGE_TYPE, "TSWP.StorageArchive"),
+            (
+                placement_id,
+                CAPTION_PLACEMENT_MESSAGE_TYPE,
+                "TSA.CaptionPlacementArchive",
+            ),
+        ] {
+            if !object_has_message_type(package, identifier, message_type)? {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages title/caption object {reference_id} references invalid {type_name} {identifier}"
+                )));
+            }
+        }
+        return Ok(ImageCaptionSlot {
+            reference_id,
+            storage_id: Some(storage_id),
+            object_ids: vec![reference_id, style_id, storage_id, placement_id],
+        });
+    }
+    decode_typed_package_object::<tsd::StandinCaptionArchive>(
+        package,
+        reference_id,
+        STANDIN_CAPTION_MESSAGE_TYPE,
+        "TSD.StandinCaptionArchive",
+    )?;
+    Ok(ImageCaptionSlot {
+        reference_id,
+        storage_id: None,
+        object_ids: vec![reference_id],
+    })
+}
+
+pub(super) fn insert_image_caption(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    image_id: u64,
+    old_reference_id: u64,
+    image_width: f32,
+    text: &str,
+    kind: DrawableCaptionKind,
+    theme: CaptionThemeStyle,
+    language: Option<&str>,
+    ids: CaptionObjectIds,
+) -> Result<()> {
+    let objects = caption_objects(ids, image_id, image_width, text, kind, theme, language)?;
+    package.update_archive(archive_name, |archive| {
+        for object in objects {
+            archive.insert_object(object)?;
+        }
+        replace_image_caption_reference(archive, image_id, old_reference_id, ids.info, kind)
+    })
+}
+
+pub(super) fn insert_image_caption_standin(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    image_id: u64,
+    old_reference_id: u64,
+    kind: DrawableCaptionKind,
+    standin_id: u64,
+) -> Result<()> {
+    let standin = standin_caption_object(standin_id)?;
+    package.update_archive(archive_name, |archive| {
+        archive.insert_object(standin)?;
+        replace_image_caption_reference(archive, image_id, old_reference_id, standin_id, kind)
+    })
+}
+
+fn replace_image_caption_reference(
+    archive: &mut crate::archive::Archive,
+    image_id: u64,
+    old_reference_id: u64,
+    replacement_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<()> {
+    let object = archive
+        .object_mut(image_id)
+        .ok_or_else(|| Error::InvalidFormat(format!("Pages image object {image_id} is missing")))?;
+    let indexes = object
+        .messages
+        .iter()
+        .enumerate()
+        .filter(|(_, message)| message.type_ == IMAGE_MESSAGE_TYPE)
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let [message_index] = indexes.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "Pages image {image_id} must have exactly one ImageArchive payload"
+        )));
+    };
+    let original = object.messages[*message_index].data.as_slice();
+    let current = tsd::ImageArchive::decode(original)?;
+    let current_reference_id = match kind {
+        DrawableCaptionKind::Caption => current.super_.caption,
+        DrawableCaptionKind::Title => current.super_.title,
+    }
+    .map(|reference| reference.identifier);
+    if current_reference_id != Some(old_reference_id) {
+        return Err(Error::InvalidFormat(format!(
+            "Pages image {image_id} title/caption reference changed unexpectedly"
+        )));
+    }
+    let data = transform_length_delimited_field(original, 1, |drawable| {
+        patch_drawable_caption_reference(drawable, kind, replacement_id)
+    })?;
+    object.replace_message(
+        *message_index,
+        RawMessage {
+            type_: IMAGE_MESSAGE_TYPE,
+            data,
+        },
+    )?;
+    replace_object_reference(
+        &mut object.archive_info.message_infos[*message_index].object_references,
+        old_reference_id,
+        replacement_id,
+    );
+    Ok(())
 }
 
 fn image_info(

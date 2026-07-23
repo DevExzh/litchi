@@ -8,6 +8,7 @@ use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::image_adjustments::replace_image_adjustments;
+use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
@@ -316,6 +317,46 @@ impl PagesEditor {
         Ok(())
     }
 
+    /// Read the native title and caption attached to one body image.
+    pub fn body_image_title_caption(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<crate::DrawableTitleCaption> {
+        image_title_caption(self, drawable_object_id)
+    }
+
+    /// Create or replace one body image's native title.
+    pub fn set_body_image_title(&mut self, drawable_object_id: u64, title: &str) -> Result<()> {
+        set_body_image_caption(self, drawable_object_id, title, DrawableCaptionKind::Title)
+    }
+
+    /// Remove one body image's native title.
+    ///
+    /// Returns whether a title was present. Native iWork removal preserves the
+    /// prior title graph for undo history and attaches a fresh empty stand-in.
+    pub fn remove_body_image_title(&mut self, drawable_object_id: u64) -> Result<bool> {
+        remove_body_image_caption(self, drawable_object_id, DrawableCaptionKind::Title)
+    }
+
+    /// Create or replace one body image's native caption.
+    pub fn set_body_image_caption(&mut self, drawable_object_id: u64, caption: &str) -> Result<()> {
+        set_body_image_caption(
+            self,
+            drawable_object_id,
+            caption,
+            DrawableCaptionKind::Caption,
+        )
+    }
+
+    /// Remove one body image's native caption.
+    ///
+    /// Returns whether a caption was present. Native iWork removal preserves
+    /// the prior caption graph for undo history and attaches a fresh empty
+    /// stand-in.
+    pub fn remove_body_image_caption(&mut self, drawable_object_id: u64) -> Result<bool> {
+        remove_body_image_caption(self, drawable_object_id, DrawableCaptionKind::Caption)
+    }
+
     /// Read the basic controls in iWork's Image inspector for one body image.
     pub fn body_image_adjustments(&self, drawable_object_id: u64) -> Result<ImageAdjustments> {
         Ok(body_image_graph(self, drawable_object_id)?
@@ -580,6 +621,111 @@ impl PagesEditor {
     }
 }
 
+fn set_body_image_caption(
+    editor: &mut PagesEditor,
+    drawable_object_id: u64,
+    text: &str,
+    kind: DrawableCaptionKind,
+) -> Result<()> {
+    let source = body_image_graph(editor, drawable_object_id)?;
+    let slot = image_caption_slot(editor, drawable_object_id, kind)?;
+    let before = image_title_caption(editor, drawable_object_id)?;
+    let staged = if let Some(storage_id) = slot.storage_id {
+        let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
+        text_editor.set_text(storage_id, text)?;
+        text_editor.into_package()
+    } else {
+        let root = root_document(editor.package())?;
+        let (theme, language) = image_caption_theme(editor.package(), &root)?;
+        let image_width = source
+            .info
+            .geometry
+            .size
+            .ok_or_else(|| Error::InvalidFormat("Pages image has no displayed size".to_owned()))?
+            .width;
+        let ids = CaptionObjectIds::allocate(next_object_identifier(editor.package())?)?;
+        let mut staged = editor.package().clone();
+        insert_image_caption(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            slot.reference_id,
+            image_width,
+            text,
+            kind,
+            theme,
+            language.as_deref(),
+            ids,
+        )?;
+        add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &ids.all())?;
+        set_package_last_object_identifier(&mut staged, ids.last())?;
+        staged
+    };
+    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let actual = verified.body_image_title_caption(drawable_object_id)?;
+    let expected = match kind {
+        DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
+            title: before.title,
+            caption: Some(text.to_owned()),
+        },
+        DrawableCaptionKind::Title => crate::DrawableTitleCaption {
+            title: Some(text.to_owned()),
+            caption: before.caption,
+        },
+    };
+    if actual != expected {
+        return Err(Error::InvalidFormat(
+            "Pages image title/caption update failed validation".to_owned(),
+        ));
+    }
+    *editor = verified;
+    Ok(())
+}
+
+fn remove_body_image_caption(
+    editor: &mut PagesEditor,
+    drawable_object_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<bool> {
+    let source = body_image_graph(editor, drawable_object_id)?;
+    let slot = image_caption_slot(editor, drawable_object_id, kind)?;
+    if slot.storage_id.is_none() {
+        return Ok(false);
+    }
+    let before = image_title_caption(editor, drawable_object_id)?;
+    let standin_id = next_object_identifier(editor.package())?;
+    let mut staged = editor.package().clone();
+    insert_image_caption_standin(
+        &mut staged,
+        &source.archive_name,
+        drawable_object_id,
+        slot.reference_id,
+        kind,
+        standin_id,
+    )?;
+    add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &[standin_id])?;
+    set_package_last_object_identifier(&mut staged, standin_id)?;
+    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let actual = verified.body_image_title_caption(drawable_object_id)?;
+    let expected = match kind {
+        DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
+            title: before.title,
+            caption: None,
+        },
+        DrawableCaptionKind::Title => crate::DrawableTitleCaption {
+            title: None,
+            caption: before.caption,
+        },
+    };
+    if actual != expected {
+        return Err(Error::InvalidFormat(
+            "Pages image title/caption removal failed validation".to_owned(),
+        ));
+    }
+    *editor = verified;
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -769,6 +915,81 @@ mod tests {
     }
 
     #[test]
+    fn scratch_document_supports_native_image_title_caption_crud() {
+        let original = fixture("test-data/images/png/lena.png");
+        let mut editor = PagesEditor::create_with_text("Image labels").unwrap();
+        let image = editor
+            .add_body_image(
+                "Image labels".encode_utf16().count(),
+                "lena.png",
+                &original,
+                options(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            editor
+                .body_image_title_caption(image.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption::default()
+        );
+        editor
+            .set_body_image_title(image.drawable_object_id, "Quarterly portrait")
+            .unwrap();
+        editor
+            .set_body_image_caption(image.drawable_object_id, "Revenue report")
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_image_title_caption(image.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption {
+                title: Some("Quarterly portrait".to_owned()),
+                caption: Some("Revenue report".to_owned()),
+            }
+        );
+
+        editor
+            .set_body_image_title(image.drawable_object_id, "Updated portrait")
+            .unwrap();
+        assert!(
+            editor
+                .remove_body_image_caption(image.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            !editor
+                .remove_body_image_caption(image.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            editor
+                .remove_body_image_title(image.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .body_image_title_caption(image.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption::default()
+        );
+
+        editor
+            .set_body_image_caption(image.drawable_object_id, "Recreated caption")
+            .unwrap();
+        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body_image_title_caption(image.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption {
+                title: None,
+                caption: Some("Recreated caption".to_owned()),
+            }
+        );
+    }
+
+    #[test]
     fn scratch_document_supports_native_image_duplication() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
@@ -789,6 +1010,12 @@ mod tests {
         };
         editor
             .set_body_image_properties(source.drawable_object_id, source_properties.clone())
+            .unwrap();
+        editor
+            .set_body_image_title(source.drawable_object_id, "Source title")
+            .unwrap();
+        editor
+            .set_body_image_caption(source.drawable_object_id, "Source caption")
             .unwrap();
         let source_geometry = editor
             .flip_body_image(source.drawable_object_id, DrawableFlipAxis::Vertical)
@@ -825,6 +1052,15 @@ mod tests {
         assert_eq!(duplicate.original_size, source.original_size);
         assert_eq!(duplicate.natural_size, source.natural_size);
         assert_eq!(duplicate.properties, source_properties);
+        assert_eq!(
+            editor
+                .body_image_title_caption(duplicate.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption {
+                title: Some("Source title".to_owned()),
+                caption: Some("Source caption".to_owned()),
+            }
+        );
         assert_eq!(
             duplicate.geometry.position,
             source_geometry.position.map(|position| DrawablePoint {

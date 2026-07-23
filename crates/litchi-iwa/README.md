@@ -144,6 +144,12 @@ Those operations retain the current position and transform while returning an
 error for media that has no original dimensions; see
 `create_*_original_size_image` for scratch-file examples.
 
+Pages, Numbers, and Keynote image APIs also expose their native title/caption
+controls. `*_image_title_caption` returns a shared `DrawableTitleCaption`;
+`set_*_image_title` and `set_*_image_caption` create or update the typed native
+text graphs, while the corresponding `remove_*` calls return whether a value
+was present. See `create_*_image_caption` for complete source-free examples.
+
 File-backed movies likewise expose `flip_body_movie`, `flip_sheet_movie`, and
 `flip_slide_movie`, preserving their video and poster assets, playback settings,
 and metadata; see `create_*_flipped_movie` for scratch-file examples.
@@ -321,6 +327,8 @@ let source = pages.add_body_image(
         DrawableSize { width: 300.0, height: 225.0 },
     ),
 )?;
+pages.set_body_image_title(source.drawable_object_id, "Quarterly revenue")?;
+pages.set_body_image_caption(source.drawable_object_id, "North America, Q4")?;
 let duplicate_anchor = pages.body_text()?.encode_utf16().count();
 let duplicate = pages.duplicate_body_image(source.drawable_object_id, duplicate_anchor)?;
 assert_eq!(duplicate.image_data_identifier, source.image_data_identifier);
@@ -513,6 +521,8 @@ let source = numbers.add_sheet_image(
         DrawableSize { width: 320.0, height: 240.0 },
     ),
 )?;
+numbers.set_sheet_image_title(sheet_id, source.drawable_object_id, "Quarterly revenue")?;
+numbers.set_sheet_image_caption(sheet_id, source.drawable_object_id, "North America, Q4")?;
 let duplicate = numbers.duplicate_sheet_image(sheet_id, source.drawable_object_id)?;
 assert_eq!(duplicate.image_data_identifier, source.image_data_identifier);
 numbers.save("created-with-image.numbers")?;
@@ -741,6 +751,8 @@ let source = keynote.add_slide_image(
         DrawableSize { width: 512.0, height: 512.0 },
     ),
 )?;
+keynote.set_slide_image_title(0, source.drawable_object_id, "Quarterly revenue")?;
+keynote.set_slide_image_caption(0, source.drawable_object_id, "North America, Q4")?;
 let duplicate = keynote.duplicate_slide_image(0, source.drawable_object_id)?;
 assert_eq!(duplicate.image_data_identifier, source.image_data_identifier);
 keynote.save("created-with-image.key")?;

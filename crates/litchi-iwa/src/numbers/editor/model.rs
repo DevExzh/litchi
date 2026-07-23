@@ -3,6 +3,7 @@
 use super::*;
 
 const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
+const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 pub(super) fn numbers_document(package: &IWorkPackage) -> Result<tn::DocumentArchive> {
     let archive = package.archive("Index/Document.iwa")?;
     let object = archive
@@ -591,6 +592,32 @@ pub(super) fn remap_numbers_storage_wire(
     Ok(data)
 }
 
+#[allow(deprecated)]
+fn remap_numbers_caption_info_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
+    const REFERENCE_PATHS: &[&[u32]] = &[
+        &[1, 1, 1, 2],
+        &[1, 1, 1, 6],
+        &[1, 1, 1, 9],
+        &[1, 1, 1, 10],
+        &[1, 1, 1, 11],
+        &[1, 1, 2],
+        &[1, 2],
+        &[1, 3],
+        &[1, 4],
+        &[2],
+    ];
+    let mut expected = crate::protobuf::tsa::CaptionInfoArchive::decode(data)?;
+    remap_numbers_shape(&mut expected.super_, remap);
+    remap_numbers_reference(&mut expected.placement, remap);
+    let data = remap_numbers_reference_paths(data, REFERENCE_PATHS, remap)?;
+    if crate::protobuf::tsa::CaptionInfoArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers CaptionInfoArchive wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn clone_numbers_drawable_graph_object(
     source: &ArchiveObject,
     remap: &HashMap<u64, u64>,
@@ -627,6 +654,7 @@ pub(super) fn clone_numbers_drawable_graph_object(
             IMAGE_MESSAGE_TYPE => remap_numbers_image_wire(&message.data, remap)?,
             MOVIE_MESSAGE_TYPE => remap_numbers_movie_wire(&message.data, remap)?,
             2_001 | 2_022 => remap_numbers_storage_wire(&message.data, remap)?,
+            CAPTION_INFO_MESSAGE_TYPE => remap_numbers_caption_info_wire(&message.data, remap)?,
             STANDIN_CAPTION_MESSAGE_TYPE => message.data.clone(),
             _ => {
                 if info

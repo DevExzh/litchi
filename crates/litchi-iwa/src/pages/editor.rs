@@ -60,6 +60,7 @@ const PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2011;
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
@@ -2517,6 +2518,32 @@ fn remap_pages_attachment_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result
     Ok(data)
 }
 
+#[allow(deprecated)]
+fn remap_pages_caption_info_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
+    const REFERENCE_PATHS: &[&[u32]] = &[
+        &[1, 1, 1, 2],
+        &[1, 1, 1, 6],
+        &[1, 1, 1, 9],
+        &[1, 1, 1, 10],
+        &[1, 1, 1, 11],
+        &[1, 1, 2],
+        &[1, 2],
+        &[1, 3],
+        &[1, 4],
+        &[2],
+    ];
+    let mut expected = crate::protobuf::tsa::CaptionInfoArchive::decode(data)?;
+    remap_pages_shape(&mut expected.super_, remap);
+    remap_optional_pages_reference(&mut expected.placement, remap);
+    let data = remap_pages_reference_paths(data, REFERENCE_PATHS, remap)?;
+    if crate::protobuf::tsa::CaptionInfoArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Pages CaptionInfoArchive wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 fn clone_pages_drawable_graph_object(
     source: &ArchiveObject,
     remap: &HashMap<u64, u64>,
@@ -2551,6 +2578,7 @@ fn clone_pages_drawable_graph_object(
             MOVIE_MESSAGE_TYPE => remap_pages_movie_wire(&message.data, remap)?,
             2001 | 2022 => remap_pages_storage_wire(&message.data, remap)?,
             DRAWABLE_ATTACHMENT_MESSAGE_TYPE => remap_pages_attachment_wire(&message.data, remap)?,
+            CAPTION_INFO_MESSAGE_TYPE => remap_pages_caption_info_wire(&message.data, remap)?,
             STANDIN_CAPTION_MESSAGE_TYPE => message.data.clone(),
             _ => {
                 if info

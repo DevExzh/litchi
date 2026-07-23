@@ -2,10 +2,16 @@
 
 use super::*;
 use crate::image_adjustments::image_adjustments_from_archive;
+use crate::image_caption::{
+    CAPTION_INFO_MESSAGE_TYPE, CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind,
+    caption_objects, patch_drawable_caption_reference, replace_object_reference,
+    standin_caption_object,
+};
 use crate::shapes::{
     drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
 };
+use crate::{DrawableTitleCaption, IWorkThemeArchive};
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
@@ -75,6 +81,14 @@ pub(super) struct ImageCreationContext {
     pub(super) archive_name: String,
     pub(super) style_id: u64,
     pub(super) stylesheet_component_id: u64,
+    pub(super) caption_theme: CaptionThemeStyle,
+    pub(super) language: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ImageCaptionSlot {
+    pub(super) reference_id: u64,
+    pub(super) storage_id: Option<u64>,
 }
 
 pub(super) struct SlideImageGraph {
@@ -156,12 +170,44 @@ pub(super) fn image_creation_context(
                 "Keynote stylesheet component {stylesheet_archive} is not registered"
             ))
         })?;
+    let caption_theme = caption_theme_style(&graph, show.theme.identifier, stylesheet_id)?;
     Ok(ImageCreationContext {
         slide_id: slide.slide_id,
         component_id,
         archive_name,
         style_id,
         stylesheet_component_id,
+        caption_theme,
+        language: document.super_.document_language,
+    })
+}
+
+fn caption_theme_style(
+    graph: &ObjectGraph,
+    theme_id: u64,
+    stylesheet_id: u64,
+) -> Result<CaptionThemeStyle> {
+    let theme =
+        IWorkThemeArchive::decode(graph.message_data_type(theme_id, 10, "KN.ThemeArchive")?)?;
+    let paragraph_style_id = theme
+        .extensions
+        .application
+        .ok_or_else(|| Error::InvalidFormat("Keynote theme has no application presets".to_owned()))?
+        .caption_style_presets
+        .into_iter()
+        .next()
+        .map(|reference| reference.identifier)
+        .ok_or_else(|| {
+            Error::InvalidFormat("Keynote theme has no caption style preset".to_owned())
+        })?;
+    if !graph.objects.contains_key(&paragraph_style_id) {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote caption paragraph style {paragraph_style_id} is missing"
+        )));
+    }
+    Ok(CaptionThemeStyle {
+        stylesheet_id,
+        paragraph_style_id,
     })
 }
 
@@ -215,6 +261,194 @@ pub(super) fn require_file_image(
         )));
     }
     Ok(graph)
+}
+
+pub(super) fn image_title_caption(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    drawable_object_id: u64,
+) -> Result<DrawableTitleCaption> {
+    require_file_image(editor, slide_index, drawable_object_id)?;
+    let graph = ObjectGraph::read(editor.package())?;
+    let image: tsd::ImageArchive =
+        graph.decode_type(drawable_object_id, IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")?;
+    Ok(DrawableTitleCaption {
+        title: image_caption_slot_from_reference(
+            &graph,
+            image.super_.title,
+            DrawableCaptionKind::Title,
+        )?
+        .storage_id
+        .map(|storage_id| graph.storage_text(storage_id))
+        .transpose()?,
+        caption: image_caption_slot_from_reference(
+            &graph,
+            image.super_.caption,
+            DrawableCaptionKind::Caption,
+        )?
+        .storage_id
+        .map(|storage_id| graph.storage_text(storage_id))
+        .transpose()?,
+    })
+}
+
+pub(super) fn image_caption_slot(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    drawable_object_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<ImageCaptionSlot> {
+    require_file_image(editor, slide_index, drawable_object_id)?;
+    let graph = ObjectGraph::read(editor.package())?;
+    let image: tsd::ImageArchive =
+        graph.decode_type(drawable_object_id, IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")?;
+    let reference = match kind {
+        DrawableCaptionKind::Caption => image.super_.caption,
+        DrawableCaptionKind::Title => image.super_.title,
+    };
+    image_caption_slot_from_reference(&graph, reference, kind)
+}
+
+fn image_caption_slot_from_reference(
+    graph: &ObjectGraph,
+    reference: Option<tsp::Reference>,
+    kind: DrawableCaptionKind,
+) -> Result<ImageCaptionSlot> {
+    let reference_id = reference
+        .ok_or_else(|| {
+            Error::InvalidFormat("Keynote image has no title/caption reference".to_owned())
+        })?
+        .identifier;
+    let messages = graph.objects.get(&reference_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Keynote title/caption object {reference_id} is missing"
+        ))
+    })?;
+    if messages
+        .iter()
+        .any(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)
+    {
+        let info: crate::protobuf::tsa::CaptionInfoArchive = graph.decode_type(
+            reference_id,
+            CAPTION_INFO_MESSAGE_TYPE,
+            "TSA.CaptionInfoArchive",
+        )?;
+        if info.child_info_kind != Some(kind.native_kind()) {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote title/caption object {reference_id} has the wrong native kind"
+            )));
+        }
+        let storage_id = info
+            .super_
+            .owned_storage
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote title/caption object {reference_id} has no text storage"
+                ))
+            })?
+            .identifier;
+        return Ok(ImageCaptionSlot {
+            reference_id,
+            storage_id: Some(storage_id),
+        });
+    }
+    graph.decode_type::<tsd::StandinCaptionArchive>(
+        reference_id,
+        STANDIN_CAPTION_MESSAGE_TYPE,
+        "TSD.StandinCaptionArchive",
+    )?;
+    Ok(ImageCaptionSlot {
+        reference_id,
+        storage_id: None,
+    })
+}
+
+pub(super) fn insert_image_caption(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    image_id: u64,
+    old_reference_id: u64,
+    image_width: f32,
+    text: &str,
+    kind: DrawableCaptionKind,
+    theme: CaptionThemeStyle,
+    language: Option<&str>,
+    ids: CaptionObjectIds,
+) -> Result<()> {
+    let objects = caption_objects(ids, image_id, image_width, text, kind, theme, language)?;
+    package.update_archive(archive_name, |archive| {
+        for object in objects {
+            archive.insert_object(object)?;
+        }
+        replace_image_caption_reference(archive, image_id, old_reference_id, ids.info, kind)
+    })
+}
+
+pub(super) fn insert_image_caption_standin(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    image_id: u64,
+    old_reference_id: u64,
+    kind: DrawableCaptionKind,
+    standin_id: u64,
+) -> Result<()> {
+    let standin = standin_caption_object(standin_id)?;
+    package.update_archive(archive_name, |archive| {
+        archive.insert_object(standin)?;
+        replace_image_caption_reference(archive, image_id, old_reference_id, standin_id, kind)
+    })
+}
+
+fn replace_image_caption_reference(
+    archive: &mut Archive,
+    image_id: u64,
+    old_reference_id: u64,
+    replacement_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<()> {
+    let object = archive.object_mut(image_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Keynote image object {image_id} is missing"))
+    })?;
+    let indexes = object
+        .messages
+        .iter()
+        .enumerate()
+        .filter(|(_, message)| message.type_ == IMAGE_MESSAGE_TYPE)
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let [message_index] = indexes.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote image {image_id} must have exactly one ImageArchive payload"
+        )));
+    };
+    let original = object.messages[*message_index].data.as_slice();
+    let current = tsd::ImageArchive::decode(original)?;
+    let current_reference_id = match kind {
+        DrawableCaptionKind::Caption => current.super_.caption,
+        DrawableCaptionKind::Title => current.super_.title,
+    }
+    .map(|reference| reference.identifier);
+    if current_reference_id != Some(old_reference_id) {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote image {image_id} title/caption reference changed unexpectedly"
+        )));
+    }
+    let data = transform_length_delimited_field(original, 1, |drawable| {
+        patch_drawable_caption_reference(drawable, kind, replacement_id)
+    })?;
+    object.replace_message(
+        *message_index,
+        RawMessage {
+            type_: IMAGE_MESSAGE_TYPE,
+            data,
+        },
+    )?;
+    replace_object_reference(
+        &mut object.archive_info.message_infos[*message_index].object_references,
+        old_reference_id,
+        replacement_id,
+    );
+    Ok(())
 }
 
 pub(super) fn image_graph(

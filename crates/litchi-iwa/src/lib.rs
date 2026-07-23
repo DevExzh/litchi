@@ -135,6 +135,7 @@ pub mod drawable_order;
 pub mod identity;
 /// Typed native controls for basic image adjustments.
 pub mod image_adjustments;
+mod image_caption;
 pub mod media;
 /// Shared movie and audio playback settings.
 pub mod media_playback;
@@ -187,6 +188,7 @@ pub use media::{
 pub use media_playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;
+pub use shapes::DrawableTitleCaption;
 pub use snappy::SnappyStream;
 pub use structured::{CellValue, Section, Slide, StructuredData, Table};
 pub use text::{

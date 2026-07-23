@@ -7,6 +7,7 @@
 //! purely visual elements. This module helps extract meaningful content
 //! from these elements.
 
+mod caption;
 mod color;
 mod effects;
 mod fill;
@@ -21,6 +22,7 @@ mod text_columns;
 pub mod text_extractor;
 mod text_layout;
 
+pub use caption::DrawableTitleCaption;
 pub use color::{RgbColorSpace, RgbaColor};
 pub(crate) use color::{color_from_native, color_to_native};
 pub use effects::{ShapeEffects, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity};

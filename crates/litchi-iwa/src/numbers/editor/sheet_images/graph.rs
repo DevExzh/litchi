@@ -1,8 +1,14 @@
 //! Typed construction and discovery of sheet-owned Numbers image graphs.
 
 use super::*;
+use crate::DrawableTitleCaption;
 use crate::IWorkThemeArchive;
 use crate::image_adjustments::image_adjustments_from_archive;
+use crate::image_caption::{
+    CAPTION_INFO_MESSAGE_TYPE, CAPTION_PLACEMENT_MESSAGE_TYPE, CaptionObjectIds, CaptionThemeStyle,
+    DrawableCaptionKind, SHAPE_STYLE_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE, caption_objects,
+    patch_drawable_caption_reference, replace_object_reference, standin_caption_object,
+};
 use crate::shapes::{
     drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
@@ -72,6 +78,15 @@ pub(super) struct ImageCreationContext {
     pub(super) component_id: u64,
     pub(super) style_id: u64,
     pub(super) stylesheet_component_id: u64,
+    pub(super) caption_theme: CaptionThemeStyle,
+    pub(super) language: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct ImageCaptionSlot {
+    pub(super) reference_id: u64,
+    pub(super) storage_id: Option<u64>,
+    object_ids: Vec<u64>,
 }
 
 pub(super) struct SheetImageGraph {
@@ -110,6 +125,11 @@ pub(super) fn image_creation_context(
     let (archive_name, _, _) = numbers_sheet(editor.package(), sheet_id)?;
     let document = numbers_document(editor.package())?;
     let style_id = image_style_id(editor.package(), document.theme.identifier)?;
+    let caption_theme = image_caption_theme(
+        editor.package(),
+        document.theme.identifier,
+        document.stylesheet.identifier,
+    )?;
     let component_id = component_identifier_for_entry(editor.package(), &archive_name)?
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -133,6 +153,8 @@ pub(super) fn image_creation_context(
         component_id,
         style_id,
         stylesheet_component_id,
+        caption_theme,
+        language: document.super_.document_language,
     })
 }
 
@@ -161,6 +183,56 @@ fn image_style_id(package: &IWorkPackage, theme_id: u64) -> Result<u64> {
         .and_then(|presets| presets.image_style_presets.into_iter().next())
         .map(|reference| reference.identifier)
         .ok_or_else(|| Error::InvalidFormat("Numbers theme has no image style preset".to_owned()))
+}
+
+fn image_caption_theme(
+    package: &IWorkPackage,
+    theme_id: u64,
+    stylesheet_id: u64,
+) -> Result<CaptionThemeStyle> {
+    let locations = object_locations(package)?;
+    let archive_name = locations.get(&theme_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers theme object {theme_id} is missing"))
+    })?;
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(theme_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers theme object {theme_id} is missing"))
+    })?;
+    let messages = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == NUMBERS_THEME_MESSAGE_TYPE)
+        .collect::<Vec<_>>();
+    let [message] = messages.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers theme object {theme_id} must have exactly one theme payload"
+        )));
+    };
+    let paragraph_style_id = IWorkThemeArchive::decode(&message.data)?
+        .extensions
+        .application
+        .ok_or_else(|| Error::InvalidFormat("Numbers theme has no application presets".to_owned()))?
+        .caption_style_presets
+        .into_iter()
+        .next()
+        .map(|reference| reference.identifier)
+        .ok_or_else(|| {
+            Error::InvalidFormat("Numbers theme has no caption style preset".to_owned())
+        })?;
+    for (identifier, label) in [
+        (stylesheet_id, "stylesheet"),
+        (paragraph_style_id, "caption paragraph style"),
+    ] {
+        if !locations.contains_key(&identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {label} object {identifier} is missing"
+            )));
+        }
+    }
+    Ok(CaptionThemeStyle {
+        stylesheet_id,
+        paragraph_style_id,
+    })
 }
 
 pub(super) fn image_infos(
@@ -250,24 +322,16 @@ pub(super) fn image_graph(
             "Numbers image {drawable_object_id} is not owned by sheet {sheet_id}"
         )));
     }
-    let title_id = image
-        .super_
-        .title
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Numbers image {drawable_object_id} has no title stand-in"
-            ))
-        })?
-        .identifier;
-    let caption_id = image
-        .super_
-        .caption
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Numbers image {drawable_object_id} has no caption stand-in"
-            ))
-        })?
-        .identifier;
+    let title = image_caption_slot_from_reference(
+        editor.package(),
+        image.super_.title,
+        DrawableCaptionKind::Title,
+    )?;
+    let caption = image_caption_slot_from_reference(
+        editor.package(),
+        image.super_.caption,
+        DrawableCaptionKind::Caption,
+    )?;
     let style_id = image
         .style
         .ok_or_else(|| {
@@ -281,34 +345,22 @@ pub(super) fn image_graph(
             "Numbers image {drawable_object_id} style {style_id} is missing"
         )));
     }
-    let object_ids = vec![drawable_object_id, title_id, caption_id];
+    let mut object_ids = vec![drawable_object_id];
+    object_ids.extend(title.object_ids.iter().copied());
+    object_ids.extend(caption.object_ids.iter().copied());
     if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
             "Numbers image {drawable_object_id} reuses private graph identifiers"
         )));
     }
-    for identifier in [title_id, caption_id] {
+    for &identifier in &object_ids[1..] {
         if locations.get(&identifier).map(String::as_str) != Some(archive_name.as_str()) {
             return Err(Error::InvalidFormat(format!(
                 "Numbers image {drawable_object_id} private graph spans multiple archives"
             )));
         }
-        let standin = archive.object(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers image stand-in {identifier} is missing"))
-        })?;
-        if standin
-            .messages
-            .iter()
-            .filter(|message| message.type_ == STANDIN_CAPTION_MESSAGE_TYPE)
-            .count()
-            != 1
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers image stand-in {identifier} is malformed"
-            )));
-        }
     }
-    let mut allowed_references = [sheet_id, title_id, caption_id, style_id]
+    let mut allowed_references = [sheet_id, title.reference_id, caption.reference_id, style_id]
         .into_iter()
         .collect::<HashSet<_>>();
     allowed_references.extend(image.super_.comment.map(|reference| reference.identifier));
@@ -379,6 +431,287 @@ pub(super) fn image_graph(
         uuid_object_ids,
         data_references,
     })
+}
+
+pub(super) fn image_title_caption(
+    editor: &NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+) -> Result<DrawableTitleCaption> {
+    image_graph(editor, sheet_id, drawable_object_id)?;
+    let image = image_archive(editor.package(), drawable_object_id)?;
+    let title = image_caption_slot_from_reference(
+        editor.package(),
+        image.super_.title,
+        DrawableCaptionKind::Title,
+    )?;
+    let caption = image_caption_slot_from_reference(
+        editor.package(),
+        image.super_.caption,
+        DrawableCaptionKind::Caption,
+    )?;
+    let text_editor = IWorkTextEditor::from_package(editor.package().clone());
+    Ok(DrawableTitleCaption {
+        title: title
+            .storage_id
+            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .transpose()?,
+        caption: caption
+            .storage_id
+            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .transpose()?,
+    })
+}
+
+pub(super) fn image_caption_slot(
+    editor: &NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<ImageCaptionSlot> {
+    image_graph(editor, sheet_id, drawable_object_id)?;
+    let image = image_archive(editor.package(), drawable_object_id)?;
+    let reference = match kind {
+        DrawableCaptionKind::Caption => image.super_.caption,
+        DrawableCaptionKind::Title => image.super_.title,
+    };
+    image_caption_slot_from_reference(editor.package(), reference, kind)
+}
+
+fn image_archive(package: &IWorkPackage, identifier: u64) -> Result<tsd::ImageArchive> {
+    let locations = object_locations(package)?;
+    let archive_name = locations
+        .get(&identifier)
+        .ok_or_else(|| Error::InvalidFormat(format!("Numbers image {identifier} is missing")))?;
+    let archive = package.archive(archive_name)?;
+    let object = archive
+        .object(identifier)
+        .ok_or_else(|| Error::InvalidFormat(format!("Numbers image {identifier} is missing")))?;
+    let messages = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == IMAGE_MESSAGE_TYPE)
+        .collect::<Vec<_>>();
+    let [message] = messages.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers image {identifier} must have exactly one image payload"
+        )));
+    };
+    tsd::ImageArchive::decode(message.data.as_slice()).map_err(Into::into)
+}
+
+fn image_caption_slot_from_reference(
+    package: &IWorkPackage,
+    reference: Option<tsp::Reference>,
+    kind: DrawableCaptionKind,
+) -> Result<ImageCaptionSlot> {
+    let reference_id = reference
+        .ok_or_else(|| {
+            Error::InvalidFormat("Numbers image has no title/caption reference".to_owned())
+        })?
+        .identifier;
+    let locations = object_locations(package)?;
+    let archive_name = locations.get(&reference_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers title/caption object {reference_id} is missing"
+        ))
+    })?;
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(reference_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers title/caption object {reference_id} is missing"
+        ))
+    })?;
+    if object
+        .messages
+        .iter()
+        .any(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)
+    {
+        let messages = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        let [message] = messages.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers title/caption object {reference_id} repeats its caption payload"
+            )));
+        };
+        let info = crate::protobuf::tsa::CaptionInfoArchive::decode(message.data.as_slice())?;
+        if info.child_info_kind != Some(kind.native_kind()) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers title/caption object {reference_id} has the wrong native kind"
+            )));
+        }
+        let storage_id = info
+            .super_
+            .owned_storage
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers title/caption object {reference_id} has no text storage"
+                ))
+            })?
+            .identifier;
+        let style_id = info
+            .super_
+            .super_
+            .style
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers title/caption object {reference_id} has no shape style"
+                ))
+            })?
+            .identifier;
+        let placement_id = info
+            .placement
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers title/caption object {reference_id} has no placement"
+                ))
+            })?
+            .identifier;
+        for (identifier, message_type, type_name) in [
+            (style_id, SHAPE_STYLE_MESSAGE_TYPE, "TSWP.ShapeStyleArchive"),
+            (storage_id, STORAGE_MESSAGE_TYPE, "TSWP.StorageArchive"),
+            (
+                placement_id,
+                CAPTION_PLACEMENT_MESSAGE_TYPE,
+                "TSA.CaptionPlacementArchive",
+            ),
+        ] {
+            let Some(object_archive_name) = locations.get(&identifier) else {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers title/caption object {reference_id} references missing {type_name} {identifier}"
+                )));
+            };
+            let archive = package.archive(object_archive_name)?;
+            let object = archive.object(identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers title/caption object {reference_id} references missing {type_name} {identifier}"
+                ))
+            })?;
+            if object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == message_type)
+                .count()
+                != 1
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers title/caption object {reference_id} references malformed {type_name} {identifier}"
+                )));
+            }
+        }
+        return Ok(ImageCaptionSlot {
+            reference_id,
+            storage_id: Some(storage_id),
+            object_ids: vec![reference_id, style_id, storage_id, placement_id],
+        });
+    }
+    if object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == STANDIN_CAPTION_MESSAGE_TYPE)
+        .count()
+        != 1
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers title/caption stand-in {reference_id} is malformed"
+        )));
+    }
+    Ok(ImageCaptionSlot {
+        reference_id,
+        storage_id: None,
+        object_ids: vec![reference_id],
+    })
+}
+
+pub(super) fn insert_image_caption(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    image_id: u64,
+    old_reference_id: u64,
+    image_width: f32,
+    text: &str,
+    kind: DrawableCaptionKind,
+    theme: CaptionThemeStyle,
+    language: Option<&str>,
+    ids: CaptionObjectIds,
+) -> Result<()> {
+    let objects = caption_objects(ids, image_id, image_width, text, kind, theme, language)?;
+    package.update_archive(archive_name, |archive| {
+        for object in objects {
+            archive.insert_object(object)?;
+        }
+        replace_image_caption_reference(archive, image_id, old_reference_id, ids.info, kind)
+    })
+}
+
+pub(super) fn insert_image_caption_standin(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    image_id: u64,
+    old_reference_id: u64,
+    kind: DrawableCaptionKind,
+    standin_id: u64,
+) -> Result<()> {
+    let standin = standin_caption_object(standin_id)?;
+    package.update_archive(archive_name, |archive| {
+        archive.insert_object(standin)?;
+        replace_image_caption_reference(archive, image_id, old_reference_id, standin_id, kind)
+    })
+}
+
+fn replace_image_caption_reference(
+    archive: &mut crate::archive::Archive,
+    image_id: u64,
+    old_reference_id: u64,
+    replacement_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<()> {
+    let object = archive.object_mut(image_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers image object {image_id} is missing"))
+    })?;
+    let indexes = object
+        .messages
+        .iter()
+        .enumerate()
+        .filter(|(_, message)| message.type_ == IMAGE_MESSAGE_TYPE)
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let [message_index] = indexes.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers image {image_id} must have exactly one ImageArchive payload"
+        )));
+    };
+    let original = object.messages[*message_index].data.as_slice();
+    let current = tsd::ImageArchive::decode(original)?;
+    let current_reference_id = match kind {
+        DrawableCaptionKind::Caption => current.super_.caption,
+        DrawableCaptionKind::Title => current.super_.title,
+    }
+    .map(|reference| reference.identifier);
+    if current_reference_id != Some(old_reference_id) {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers image {image_id} title/caption reference changed unexpectedly"
+        )));
+    }
+    let data = transform_length_delimited_field(original, 1, |drawable| {
+        patch_drawable_caption_reference(drawable, kind, replacement_id)
+    })?;
+    object.replace_message(
+        *message_index,
+        RawMessage {
+            type_: IMAGE_MESSAGE_TYPE,
+            data,
+        },
+    )?;
+    replace_object_reference(
+        &mut object.archive_info.message_infos[*message_index].object_references,
+        old_reference_id,
+        replacement_id,
+    );
+    Ok(())
 }
 
 fn image_info(
