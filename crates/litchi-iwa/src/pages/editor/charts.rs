@@ -6,6 +6,7 @@ mod axis_gridlines;
 mod axis_labels;
 mod axis_line;
 mod axis_minimum_label;
+mod axis_scale;
 mod axis_series_names;
 mod axis_steps;
 mod axis_tick_marks;

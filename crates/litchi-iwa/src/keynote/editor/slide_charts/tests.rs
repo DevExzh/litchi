@@ -3,7 +3,7 @@
 use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartValueAxisBounds, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 
@@ -1375,4 +1375,71 @@ fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
         .remove_slide_chart(0, duplicate.drawable_object_id)
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_chart_value_axis_scale_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    assert_eq!(
+        editor
+            .slide_chart_value_axis_scale(0, source.drawable_object_id)
+            .unwrap(),
+        ChartValueAxisScale::Linear
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, ChartValueAxisScale::Linear)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_value_axis_scale(
+            0,
+            source.drawable_object_id,
+            ChartValueAxisScale::Logarithmic,
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_value_axis_scale(0, source.drawable_object_id)
+            .unwrap(),
+        ChartValueAxisScale::Logarithmic
+    );
+
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_value_axis_scale(0, duplicate.drawable_object_id)
+            .unwrap(),
+        ChartValueAxisScale::Logarithmic
+    );
+    editor
+        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, ChartValueAxisScale::Linear)
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_value_axis_scale(0, source.drawable_object_id)
+            .unwrap(),
+        ChartValueAxisScale::Linear
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_value_axis_scale(0, duplicate.drawable_object_id)
+            .unwrap(),
+        ChartValueAxisScale::Logarithmic
+    );
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
 }

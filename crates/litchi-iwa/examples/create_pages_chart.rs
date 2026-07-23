@@ -4,7 +4,8 @@ use std::env;
 
 use litchi_iwa::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartData, ChartKind, ChartValueAxisBounds, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartData, ChartKind, ChartValueAxisBounds, ChartValueAxisScale,
+    ChartValueAxisSteps,
 };
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
@@ -43,7 +44,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_axis_title(chart.drawable_object_id, ChartAxis::Value, "Revenue")?;
     editor.set_body_chart_value_axis_bounds(
         chart.drawable_object_id,
-        ChartValueAxisBounds::fixed(ChartAxisBound::new(0.0)?, ChartAxisBound::new(30.0)?)?,
+        ChartValueAxisBounds::fixed(ChartAxisBound::new(1.0)?, ChartAxisBound::new(30.0)?)?,
+    )?;
+    editor.set_body_chart_value_axis_scale(
+        chart.drawable_object_id,
+        ChartValueAxisScale::Logarithmic,
     )?;
     editor.set_body_chart_value_axis_steps(
         chart.drawable_object_id,
@@ -84,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_caption(chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Pages {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption at body UTF-16 index {}",
+        "created Pages {:?} chart {} with native chart and axis titles, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption at body UTF-16 index {}",
         chart.kind, chart.drawable_object_id, chart.anchor_character_index
     );
     Ok(())

@@ -4,7 +4,8 @@ use std::env;
 
 use litchi_iwa::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartData, ChartKind, ChartValueAxisBounds, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartData, ChartKind, ChartValueAxisBounds, ChartValueAxisScale,
+    ChartValueAxisSteps,
 };
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
@@ -57,7 +58,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_chart_value_axis_bounds(
         sheet_id,
         chart.drawable_object_id,
-        ChartValueAxisBounds::fixed(ChartAxisBound::new(0.0)?, ChartAxisBound::new(30.0)?)?,
+        ChartValueAxisBounds::fixed(ChartAxisBound::new(1.0)?, ChartAxisBound::new(30.0)?)?,
+    )?;
+    editor.set_sheet_chart_value_axis_scale(
+        sheet_id,
+        chart.drawable_object_id,
+        ChartValueAxisScale::Logarithmic,
     )?;
     editor.set_sheet_chart_value_axis_steps(
         sheet_id,
@@ -117,7 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on sheet {}",
+        "created Numbers {:?} chart {} with native chart and axis titles, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on sheet {}",
         chart.kind, chart.drawable_object_id, sheet_id
     );
     Ok(())

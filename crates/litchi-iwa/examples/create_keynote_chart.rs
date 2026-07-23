@@ -4,7 +4,8 @@ use std::env;
 
 use litchi_iwa::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartData, ChartKind, ChartValueAxisBounds, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartData, ChartKind, ChartValueAxisBounds, ChartValueAxisScale,
+    ChartValueAxisSteps,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
@@ -51,7 +52,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_chart_value_axis_bounds(
         0,
         chart.drawable_object_id,
-        ChartValueAxisBounds::fixed(ChartAxisBound::new(0.0)?, ChartAxisBound::new(30.0)?)?,
+        ChartValueAxisBounds::fixed(ChartAxisBound::new(1.0)?, ChartAxisBound::new(30.0)?)?,
+    )?;
+    editor.set_slide_chart_value_axis_scale(
+        0,
+        chart.drawable_object_id,
+        ChartValueAxisScale::Logarithmic,
     )?;
     editor.set_slide_chart_value_axis_steps(
         0,
@@ -103,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_chart_caption(0, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Keynote {:?} chart {} with native chart and axis titles, fixed value-axis bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
+        "created Keynote {:?} chart {} with native chart and axis titles, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
         chart.kind, chart.drawable_object_id, chart.slide_index
     );
     Ok(())
