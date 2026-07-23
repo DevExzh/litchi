@@ -1189,8 +1189,9 @@ impl<'a> RtfDocument<'a> {
     /// Return typed, inert document-context fields in document field order.
     ///
     /// Kinds, switches, cached results, and state are exposed solely as stored
-    /// metadata. This method never reads a document path, attached template, or
-    /// host filesystem state, resolves values, or refreshes a field.
+    /// metadata. This method never reads a document path, attached template,
+    /// host filesystem state, current clock, or page layout, resolves values,
+    /// or refreshes a field.
     pub fn document_context_fields(&self) -> Vec<crate::DocumentContextField<'_>> {
         self.fields
             .iter()

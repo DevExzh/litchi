@@ -993,13 +993,17 @@ pub struct DocumentInformationField<'a> {
 
 /// The built-in Word document-context field category.
 ///
-/// `FILENAME` and `TEMPLATE` are defined in ECMA-376 Part 1 §17.16.5.
-/// This enum preserves the stored field kind only; it does not read a document
-/// path, attached template, or host filesystem state.
+/// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, and `PAGE` are defined in
+/// ECMA-376 Part 1 §17.16.5. This enum preserves the stored field kind only;
+/// it does not read a document path, attached template, host filesystem state,
+/// current clock, or page layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DocumentContextFieldKind {
     FileName,
     Template,
+    Date,
+    Time,
+    Page,
 }
 
 impl DocumentContextFieldKind {
@@ -1008,11 +1012,20 @@ impl DocumentContextFieldKind {
         match self {
             Self::FileName => "FILENAME",
             Self::Template => "TEMPLATE",
+            Self::Date => "DATE",
+            Self::Time => "TIME",
+            Self::Page => "PAGE",
         }
     }
 
     fn from_keyword(keyword: &str) -> Option<Self> {
-        [Self::FileName, Self::Template]
+        [
+            Self::FileName,
+            Self::Template,
+            Self::Date,
+            Self::Time,
+            Self::Page,
+        ]
             .into_iter()
             .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
     }
@@ -1021,8 +1034,9 @@ impl DocumentContextFieldKind {
 /// Inert metadata for a legacy RTF built-in Word document-context field.
 ///
 /// This type retains the stored kind, field switches, cached result, and field
-/// state only. It never reads a document path, attached template, or host
-/// filesystem state, resolves a value, or refreshes a field.
+/// state only. It never reads a document path, attached template, host
+/// filesystem state, current clock, or page layout, resolves a value, or
+/// refreshes a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentContextField<'a> {
     instruction: &'a str,
@@ -2696,7 +2710,7 @@ impl<'a> DocumentContextField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from a document path,
-    /// attached template, or host filesystem state.
+    /// attached template, host filesystem state, current clock, or page layout.
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
@@ -4243,16 +4257,25 @@ impl<'a> Field<'a> {
 
     /// Return inert metadata when this is a well-formed document-context field.
     ///
-    /// `FILENAME` and `TEMPLATE` retain only their stored kind, switches,
-    /// cached result, and state. This method never reads a document path,
-    /// attached template, or host filesystem state, resolves a value, or
-    /// refreshes a field. Malformed instructions remain generic fields and
-    /// return `None` here.
+    /// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, and `PAGE` retain only their
+    /// stored kind, switches, cached result, and state. This method never reads
+    /// a document path, attached template, host filesystem state, current
+    /// clock, or page layout, resolves a value, or refreshes a field. Malformed
+    /// instructions remain generic fields and return `None` here.
     pub fn document_context(&self) -> Option<DocumentContextField<'_>> {
-        if self.field_type != FieldType::DocumentContext {
+        let parts = document_context_field_parts(self.instruction.as_ref())?;
+        if !matches!(
+            (self.field_type, parts.kind),
+            (
+                FieldType::DocumentContext,
+                DocumentContextFieldKind::FileName | DocumentContextFieldKind::Template
+            ) | (
+                FieldType::Date,
+                DocumentContextFieldKind::Date | DocumentContextFieldKind::Time
+            ) | (FieldType::Page, DocumentContextFieldKind::Page)
+        ) {
             return None;
         }
-        let parts = document_context_field_parts(self.instruction.as_ref())?;
         Some(DocumentContextField {
             instruction: self.instruction.as_ref(),
             kind: parts.kind,
@@ -8435,7 +8458,7 @@ mod tests {
     }
 
     #[test]
-    fn document_context_fields_preserve_kinds_without_reading_paths_or_templates() {
+    fn document_context_fields_preserve_kinds_without_reading_or_calculating_values() {
         let mut field = Field::parse_instruction(r"FILENAME \p");
         field.result = Cow::Borrowed("cached file name");
         field.status = FieldStatus {
@@ -8459,12 +8482,23 @@ mod tests {
         assert_eq!(context.switches()[0].name, "p");
         assert_eq!(context.switches()[0].value, None);
 
-        for (instruction, kind) in [
-            ("FILENAME", DocumentContextFieldKind::FileName),
-            ("TEMPLATE", DocumentContextFieldKind::Template),
+        for (instruction, kind, field_type) in [
+            (
+                "FILENAME",
+                DocumentContextFieldKind::FileName,
+                FieldType::DocumentContext,
+            ),
+            (
+                "TEMPLATE",
+                DocumentContextFieldKind::Template,
+                FieldType::DocumentContext,
+            ),
+            ("DATE", DocumentContextFieldKind::Date, FieldType::Date),
+            ("TIME", DocumentContextFieldKind::Time, FieldType::Date),
+            ("PAGE", DocumentContextFieldKind::Page, FieldType::Page),
         ] {
             let field = Field::parse_instruction(instruction);
-            assert_eq!(field.field_type, FieldType::DocumentContext);
+            assert_eq!(field.field_type, field_type);
             let context = field.document_context().unwrap();
             assert_eq!(context.kind(), kind);
             assert_eq!(context.kind().field_keyword(), instruction);
@@ -8486,8 +8520,17 @@ mod tests {
                 .document_context()
                 .is_none()
         );
+        assert!(
+            Field::parse_instruction("PAGE unexpected")
+                .document_context()
+                .is_none()
+        );
         assert_eq!(
             Field::parse_instruction("FILENAMES").field_type,
+            FieldType::Unknown
+        );
+        assert_eq!(
+            Field::parse_instruction("PAGES").field_type,
             FieldType::Unknown
         );
         let too_long = Field::new(
@@ -9347,7 +9390,7 @@ mod tests {
     }
 
     #[test]
-    fn document_discovers_document_context_fields_without_reading_paths_or_templates() {
+    fn document_discovers_document_context_fields_without_reading_or_calculating_values() {
         let document = crate::RtfDocument::parse(
             r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst FILENAME \\p}{\fldrslt cached file name}}Middle {\field{\*\fldinst TEMPLATE \\* MERGEFORMAT}{\fldrslt cached template}}After}",
         )
@@ -9366,6 +9409,24 @@ mod tests {
         assert_eq!(fields[1].switches()[0].name, "*");
         assert_eq!(fields[1].switches()[0].value.as_deref(), Some("MERGEFORMAT"));
         assert_eq!(document.text(), "Before Middle After");
+    }
+
+    #[test]
+    fn document_discovers_document_context_page_fields_without_calculation() {
+        let document = crate::RtfDocument::parse(
+            r"{\rtf1\ansi {\field\flddirty\fldlock{\*\fldinst PAGE \\* MERGEFORMAT}{\fldrslt cached page}}}",
+        )
+        .unwrap();
+
+        let fields = document.document_context_fields();
+        assert_eq!(document.document_context_field_count(), 1);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].kind(), DocumentContextFieldKind::Page);
+        assert_eq!(fields[0].cached_result(), Some("cached page"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[0].switches()[0].name, "*");
+        assert_eq!(fields[0].switches()[0].value.as_deref(), Some("MERGEFORMAT"));
     }
 
     #[test]
