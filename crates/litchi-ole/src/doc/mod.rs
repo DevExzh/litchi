@@ -106,6 +106,7 @@ pub use parts::document_properties_2003::{
 };
 pub use parts::fields::CompareField;
 pub use parts::fields::DocumentVariableField;
+pub use parts::fields::{ActiveContentField, ActiveContentFieldKind};
 pub use parts::fields::{
     AddressBlockCountryInclusion, Field, FieldBoundary, FieldDescriptor, FieldEndFlags,
     FieldMarker, FieldMarkerValue, FieldStory, FieldStoryTable, FieldText, FieldType, FieldsTable,

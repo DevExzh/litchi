@@ -14,10 +14,11 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    AdvanceField, CompareField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
-    FieldStory, FieldText, FieldsTable, GoToButtonField, IfField, LinkField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
-    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
+    ActiveContentField, AdvanceField, CompareField, DdeField, DocumentVariableField,
+    ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, GoToButtonField, IfField,
+    LinkField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
+    MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
+    UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -592,6 +593,25 @@ impl Document {
     /// Get the number of typed, inert `MACROBUTTON` fields.
     pub fn macro_button_field_count(&self) -> Result<usize> {
         Ok(self.macro_button_fields()?.len())
+    }
+
+    /// Get typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in story and source order.
+    ///
+    /// Returned values expose only stored kind, instruction, cached-result, and
+    /// field-state metadata. This method never loads an add-in, instantiates a
+    /// control, invokes code, executes script, renders content, or accesses an
+    /// external resource.
+    pub fn active_content_fields(&self) -> Result<Vec<ActiveContentField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::active_content_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert add-in and control fields.
+    pub fn active_content_field_count(&self) -> Result<usize> {
+        Ok(self.active_content_fields()?.len())
     }
 
     /// Get typed, inert `GOTOBUTTON` fields in story and source order.
