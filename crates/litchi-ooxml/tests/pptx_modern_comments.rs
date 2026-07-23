@@ -1,0 +1,99 @@
+use litchi_ooxml::pptx::Package;
+use litchi_ooxml::pptx::modern_comment_authors::{
+    MODERN_COMMENT_AUTHOR_CONTENT_TYPE, MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE,
+    ModernCommentAuthorList,
+};
+use litchi_ooxml::pptx::modern_comments::{
+    MODERN_COMMENT_CONTENT_TYPE, MODERN_COMMENT_RELATIONSHIP_TYPE, ModernCommentList,
+};
+use litchi_ooxml::{OoxmlError, PackURI};
+use litchi_opc::constants::content_type as ct;
+use litchi_opc::part::BlobPart;
+
+const SLIDE_XML: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/modern-comments/slide.xml");
+
+#[test]
+fn presentation_loads_the_modern_comment_graph() {
+    let package = package_with_modern_comments();
+    let graph = package.presentation().unwrap().modern_comments().unwrap();
+
+    let authors = graph.authors.unwrap();
+    assert_eq!(authors.relationship_id, "rIdModernAuthors");
+    assert_eq!(authors.part_name, "/ppt/commentAuthors.xml");
+    assert!(authors.authors.authors.is_empty());
+    assert_eq!(graph.comments.len(), 1);
+    assert_eq!(graph.comments[0].slide_part_name, "/ppt/slides/slide1.xml");
+    assert_eq!(graph.comments[0].relationship_id, "rIdModernComments");
+    assert_eq!(graph.comments[0].part_name, "/ppt/comments/comment1.xml");
+    assert!(graph.comments[0].comments.comments.is_empty());
+}
+
+#[test]
+fn presentation_modern_comments_reject_external_author_relationships() {
+    let mut package = package_with_modern_comments();
+    let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
+    let presentation = package
+        .opc_package_mut()
+        .get_part_mut(&presentation_name)
+        .unwrap();
+    presentation.rels_mut().remove("rIdModernAuthors");
+    presentation.rels_mut().add_relationship(
+        MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE.to_string(),
+        "https://example.invalid/authors.xml".to_string(),
+        "rIdModernAuthors".to_string(),
+        true,
+    );
+
+    assert!(matches!(
+        package.presentation().unwrap().modern_comments(),
+        Err(OoxmlError::InvalidFormat(message)) if message.contains("cannot be external")
+    ));
+}
+
+fn package_with_modern_comments() -> Package {
+    let mut package = Package::new().unwrap();
+    let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let authors_name = PackURI::new("/ppt/commentAuthors.xml").unwrap();
+    let comments_name = PackURI::new("/ppt/comments/comment1.xml").unwrap();
+
+    {
+        let presentation = package
+            .opc_package_mut()
+            .get_part_mut(&presentation_name)
+            .unwrap();
+        presentation.rels_mut().add_relationship(
+            MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE.to_string(),
+            "commentAuthors.xml".to_string(),
+            "rIdModernAuthors".to_string(),
+            false,
+        );
+    }
+    package.opc_package_mut().add_part(Box::new(BlobPart::new(
+        slide_name.clone(),
+        ct::PML_SLIDE.to_string(),
+        SLIDE_XML.to_vec(),
+    )));
+    package.opc_package_mut().add_part(Box::new(BlobPart::new(
+        authors_name,
+        MODERN_COMMENT_AUTHOR_CONTENT_TYPE.to_string(),
+        ModernCommentAuthorList::default().to_xml().unwrap(),
+    )));
+    package.opc_package_mut().add_part(Box::new(BlobPart::new(
+        comments_name,
+        MODERN_COMMENT_CONTENT_TYPE.to_string(),
+        ModernCommentList::default().to_xml().unwrap(),
+    )));
+    package
+        .opc_package_mut()
+        .get_part_mut(&slide_name)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            MODERN_COMMENT_RELATIONSHIP_TYPE.to_string(),
+            "../comments/comment1.xml".to_string(),
+            "rIdModernComments".to_string(),
+            false,
+        );
+    package
+}

@@ -220,7 +220,7 @@ conversion, fonts, and image conversion are optional.
 | PowerPoint 2010 transition extensions | ✅ | ✅ | ✅ | Compatibility-choice ripple effects on slides, layouts, and masters, with typed corner/center direction and extended duration; deterministic fade fallback authoring |
 | Hyperlinks and slide-jump actions | 🟡 | ✅ | ✅ | Strict/transitional hyperlink relationships, validated inline slide navigation, plus bounded inert click/hover action-setting inventory for PowerPoint-reserved action values and declared targets; no target is followed, opened, activated, or executed |
 | Classic comments | ✅ | ✅ | ✅ | Validated high-level graph, legacy adapters, authors, slide comment parts, and package-aware CRUD |
-| Modern comments | ✅ | ✅ | ✅ | Authors, anchors, replies, status, and package-aware CRUD |
+| Modern comments | ✅ | ✅ | ✅ | High-level validated graph, authors, anchors, replies, status, and package-aware CRUD |
 | Speaker notes and notes masters | ✅ | ✅ | ✅ | High-level complete notes graph load/store with resources and themes |
 | Slide masters and layouts | 🟡 | ✅ | ❌ | Semantic reading, including master/layout shape and placeholder inventory, header/footer and master-content visibility flags, matching/type and master/layout retention metadata, typed layout-reference identifiers, master text-style level inventory, and slide/layout/master relationship resolution; no general master/layout authoring API |
 | Handout master | ✅ | ✅ | ✅ | Presentation-root relationship resolution plus layout and header/footer settings |
