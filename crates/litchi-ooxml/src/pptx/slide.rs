@@ -3,7 +3,7 @@ use crate::error::{OoxmlError, Result};
 use crate::pptx::color_map::{ColorMap, ColorMapOverride, ColorMapSlot};
 use crate::pptx::parts::{
     MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,
-    SlideLayoutReference, SlideMasterPart, SlidePart, ThemePart,
+    SlideLayoutReference, SlideMasterPart, SlideMasterTextStyles, SlidePart, ThemePart,
 };
 use crate::pptx::shapes::base::BaseShape;
 use litchi_opc::OpcPackage;
@@ -1042,6 +1042,11 @@ impl<'a> SlideMaster<'a> {
     /// Get local header and footer placeholder visibility for this master.
     pub fn header_footer(&self) -> Result<Option<SlideHeaderFooterVisibility>> {
         self.part.header_footer()
+    }
+
+    /// Get the text-style inventories declared by this master.
+    pub fn text_styles(&self) -> Result<Option<SlideMasterTextStyles>> {
+        self.part.text_styles()
     }
 
     /// Get all shapes defined by this slide master.

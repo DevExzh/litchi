@@ -203,7 +203,7 @@ pub use parts::{
 };
 pub use parts::{
     MasterVisibility, NotesSize, SlideHeaderFooterVisibility, SlideLayoutMetadata,
-    SlideLayoutReference, SlideSize,
+    SlideLayoutReference, SlideMasterTextStyle, SlideMasterTextStyles, SlideSize,
 };
 pub use presentation::{PptxChart, PptxTagList, Presentation};
 pub use presentation_properties::{

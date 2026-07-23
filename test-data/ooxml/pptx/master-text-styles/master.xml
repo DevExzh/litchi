@@ -1,0 +1,18 @@
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree/>
+  </p:cSld>
+  <p:txStyles>
+    <p:titleStyle>
+      <a:lvl1pPr/>
+      <a:lvl2pPr/>
+    </p:titleStyle>
+    <p:bodyStyle>
+      <a:defPPr/>
+      <a:lvl1pPr/>
+      <a:lvl9pPr/>
+    </p:bodyStyle>
+    <p:otherStyle/>
+  </p:txStyles>
+</p:sldMaster>

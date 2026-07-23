@@ -55,6 +55,6 @@ pub use comment::{
 pub use presentation::{NotesSize, PresentationPart, SlideSize};
 pub use slide::{
     MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,
-    SlideLayoutReference, SlideMasterPart, SlidePart,
+    SlideLayoutReference, SlideMasterPart, SlideMasterTextStyle, SlideMasterTextStyles, SlidePart,
 };
 pub use theme::{Theme, ThemeColor, ThemeFont, ThemePart};

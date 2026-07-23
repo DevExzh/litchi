@@ -11,8 +11,12 @@ use crate::pptx::shapes::base::{BaseShape, ShapeType};
 use crate::pptx::shapes::textframe::extract_drawingml_text;
 use litchi_opc::part::Part;
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::sync::Arc;
+
+const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
 fn processed(part: &dyn Part) -> Result<Arc<Vec<u8>>> {
     Ok(match crate::common::mce::process_ooxml(part.blob())? {
@@ -210,6 +214,61 @@ impl SlideLayoutReference {
     #[inline]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
+    }
+}
+
+/// The declared paragraph-level inventory for one slide-master text style.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SlideMasterTextStyle {
+    has_default_paragraph_properties: bool,
+    levels: Vec<u8>,
+}
+
+impl SlideMasterTextStyle {
+    /// Whether the style declares default paragraph properties.
+    #[inline]
+    pub const fn has_default_paragraph_properties(&self) -> bool {
+        self.has_default_paragraph_properties
+    }
+
+    /// Return the declared paragraph levels in document order.
+    #[inline]
+    pub fn levels(&self) -> &[u8] {
+        &self.levels
+    }
+
+    /// Whether the style declares the requested paragraph level.
+    #[inline]
+    pub fn has_level(&self, level: u8) -> bool {
+        self.levels.contains(&level)
+    }
+}
+
+/// The title, body, and other text-style inventories declared by a slide master.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SlideMasterTextStyles {
+    title_style: Option<SlideMasterTextStyle>,
+    body_style: Option<SlideMasterTextStyle>,
+    other_style: Option<SlideMasterTextStyle>,
+}
+
+impl SlideMasterTextStyles {
+    /// Return the title-text style inventory, when declared.
+    #[inline]
+    pub fn title_style(&self) -> Option<&SlideMasterTextStyle> {
+        self.title_style.as_ref()
+    }
+
+    /// Return the body-text style inventory, when declared.
+    #[inline]
+    pub fn body_style(&self) -> Option<&SlideMasterTextStyle> {
+        self.body_style.as_ref()
+    }
+
+    /// Return the other-text style inventory, when declared.
+    #[inline]
+    pub fn other_style(&self) -> Option<&SlideMasterTextStyle> {
+        self.other_style.as_ref()
     }
 }
 
@@ -472,6 +531,273 @@ fn store_slide_layout_reference(
     }
     references.push(reference);
     Ok(())
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MasterTextStyleKind {
+    Title,
+    Body,
+    Other,
+}
+
+fn parse_slide_master_text_styles(xml: &[u8]) -> Result<Option<SlideMasterTextStyles>> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut text_styles = None;
+    let mut text_styles_depth = None;
+    let mut active_style = None;
+
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("slide master XML nesting is too deep".to_string())
+                })?;
+                if depth == 1 {
+                    if saw_root {
+                        return Err(OoxmlError::InvalidFormat(
+                            "slide master XML has multiple roots".to_string(),
+                        ));
+                    }
+                    require_presentationml_root(
+                        &namespace,
+                        &element,
+                        b"sldMaster",
+                        "slide master",
+                    )?;
+                    saw_root = true;
+                } else if depth == 2
+                    && is_presentationml_name(&namespace, element.name(), b"txStyles")
+                {
+                    if text_styles.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "slide master has multiple text-style elements".to_string(),
+                        ));
+                    }
+                    text_styles = Some(SlideMasterTextStyles::default());
+                    text_styles_depth = Some(depth);
+                } else if text_styles_depth == Some(2) && depth == 3 {
+                    if let Some(kind) = master_text_style_kind(&namespace, element.name()) {
+                        begin_master_text_style(
+                            text_styles.as_mut().ok_or_else(|| {
+                                OoxmlError::InvalidFormat(
+                                    "missing slide master text styles".to_string(),
+                                )
+                            })?,
+                            kind,
+                        )?;
+                        active_style = Some((kind, depth));
+                    }
+                } else if let Some((kind, style_depth)) = active_style
+                    && depth == style_depth + 1
+                {
+                    observe_master_text_style_child(
+                        text_styles.as_mut().ok_or_else(|| {
+                            OoxmlError::InvalidFormat(
+                                "missing slide master text styles".to_string(),
+                            )
+                        })?,
+                        kind,
+                        &namespace,
+                        &element,
+                    )?;
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    if saw_root {
+                        return Err(OoxmlError::InvalidFormat(
+                            "slide master XML has multiple roots".to_string(),
+                        ));
+                    }
+                    require_presentationml_root(
+                        &namespace,
+                        &element,
+                        b"sldMaster",
+                        "slide master",
+                    )?;
+                    saw_root = true;
+                } else if depth == 1
+                    && is_presentationml_name(&namespace, element.name(), b"txStyles")
+                {
+                    if text_styles.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "slide master has multiple text-style elements".to_string(),
+                        ));
+                    }
+                    text_styles = Some(SlideMasterTextStyles::default());
+                } else if text_styles_depth == Some(2) && depth == 2 {
+                    if let Some(kind) = master_text_style_kind(&namespace, element.name()) {
+                        begin_master_text_style(
+                            text_styles.as_mut().ok_or_else(|| {
+                                OoxmlError::InvalidFormat(
+                                    "missing slide master text styles".to_string(),
+                                )
+                            })?,
+                            kind,
+                        )?;
+                    }
+                } else if let Some((kind, style_depth)) = active_style
+                    && depth == style_depth
+                {
+                    observe_master_text_style_child(
+                        text_styles.as_mut().ok_or_else(|| {
+                            OoxmlError::InvalidFormat(
+                                "missing slide master text styles".to_string(),
+                            )
+                        })?,
+                        kind,
+                        &namespace,
+                        &element,
+                    )?;
+                }
+            },
+            Event::End(element) => {
+                if let Some((kind, style_depth)) = active_style
+                    && depth == style_depth
+                {
+                    if master_text_style_kind(&namespace, element.name()) != Some(kind) {
+                        return Err(OoxmlError::InvalidFormat(
+                            "invalid slide master text-style closure".to_string(),
+                        ));
+                    }
+                    active_style = None;
+                }
+                if text_styles_depth == Some(depth)
+                    && is_presentationml_name(&namespace, element.name(), b"txStyles")
+                {
+                    text_styles_depth = None;
+                }
+                if depth == 1 && !is_presentationml_name(&namespace, element.name(), b"sldMaster") {
+                    return Err(OoxmlError::InvalidFormat(
+                        "invalid slide master XML root closure".to_string(),
+                    ));
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid slide master XML nesting".to_string())
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if depth != 0 || !saw_root {
+        return Err(OoxmlError::InvalidFormat(
+            "unterminated slide master XML".to_string(),
+        ));
+    }
+    Ok(text_styles)
+}
+
+fn master_text_style_kind(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+) -> Option<MasterTextStyleKind> {
+    if !is_presentationml_name(namespace, name, b"titleStyle")
+        && !is_presentationml_name(namespace, name, b"bodyStyle")
+        && !is_presentationml_name(namespace, name, b"otherStyle")
+    {
+        return None;
+    }
+    match name.local_name().as_ref() {
+        b"titleStyle" => Some(MasterTextStyleKind::Title),
+        b"bodyStyle" => Some(MasterTextStyleKind::Body),
+        b"otherStyle" => Some(MasterTextStyleKind::Other),
+        _ => None,
+    }
+}
+
+fn begin_master_text_style(
+    text_styles: &mut SlideMasterTextStyles,
+    kind: MasterTextStyleKind,
+) -> Result<()> {
+    let slot = master_text_style_slot(text_styles, kind);
+    if slot.is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "slide master has duplicate text style".to_string(),
+        ));
+    }
+    *slot = Some(SlideMasterTextStyle::default());
+    Ok(())
+}
+
+fn observe_master_text_style_child(
+    text_styles: &mut SlideMasterTextStyles,
+    kind: MasterTextStyleKind,
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> Result<()> {
+    let style = master_text_style_slot(text_styles, kind)
+        .as_mut()
+        .ok_or_else(|| OoxmlError::InvalidFormat("missing slide master text style".to_string()))?;
+    if is_drawingml_name(namespace, element, b"defPPr") {
+        if style.has_default_paragraph_properties {
+            return Err(OoxmlError::InvalidFormat(
+                "slide master text style has duplicate default paragraph properties".to_string(),
+            ));
+        }
+        style.has_default_paragraph_properties = true;
+    } else if let Some(level) = drawingml_text_style_level(namespace, element) {
+        if style.levels.contains(&level) {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "slide master text style has duplicate level {level}"
+            )));
+        }
+        style.levels.push(level);
+    }
+    Ok(())
+}
+
+fn master_text_style_slot(
+    text_styles: &mut SlideMasterTextStyles,
+    kind: MasterTextStyleKind,
+) -> &mut Option<SlideMasterTextStyle> {
+    match kind {
+        MasterTextStyleKind::Title => &mut text_styles.title_style,
+        MasterTextStyleKind::Body => &mut text_styles.body_style,
+        MasterTextStyleKind::Other => &mut text_styles.other_style,
+    }
+}
+
+fn is_drawingml_name(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+) -> bool {
+    if element.name().local_name().as_ref() != local_name {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE
+        },
+        ResolveResult::Unknown(prefix) => prefix.as_slice() == b"a",
+        ResolveResult::Unbound => false,
+    }
+}
+
+fn drawingml_text_style_level(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> Option<u8> {
+    let local_name = element.name().local_name();
+    let local_name = local_name.as_ref();
+    if local_name.len() != 7 || !local_name.starts_with(b"lvl") || !local_name.ends_with(b"pPr") {
+        return None;
+    }
+    let level = local_name[3];
+    if !(b'1'..=b'9').contains(&level) || !is_drawingml_name(namespace, element, local_name) {
+        return None;
+    }
+    Some(level - b'0')
 }
 
 fn parse_header_footer_visibility(
@@ -870,6 +1196,11 @@ impl<'a> SlideMasterPart<'a> {
         parse_header_footer_visibility(self.xml_bytes(), b"sldMaster", "slide master")
     }
 
+    /// Get the text-style inventories declared by this master.
+    pub fn text_styles(&self) -> Result<Option<SlideMasterTextStyles>> {
+        parse_slide_master_text_styles(self.xml_bytes())
+    }
+
     /// Get all shapes defined by this master.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
         parse_shapes(self.xml_bytes())
@@ -1087,6 +1418,47 @@ mod tests {
                     .slide_layout_references()
                     .is_err()
             );
+        }
+    }
+
+    #[test]
+    fn master_text_styles_support_strict_namespaces_and_absence() {
+        let strict_master = r#"<q:sldMaster xmlns:q="http://purl.oclc.org/ooxml/presentationml/main"
+            xmlns:d="http://purl.oclc.org/ooxml/drawingml/main"><q:cSld/><q:txStyles>
+            <q:titleStyle><d:defPPr/><d:lvl1pPr/></q:titleStyle>
+            </q:txStyles></q:sldMaster>"#;
+        let styles = parse_slide_master_text_styles(strict_master.as_bytes())
+            .unwrap()
+            .unwrap();
+        let title = styles.title_style().unwrap();
+        assert!(title.has_default_paragraph_properties());
+        assert_eq!(title.levels(), [1]);
+        assert!(styles.body_style().is_none());
+        assert!(styles.other_style().is_none());
+
+        let no_text_styles = format!(r#"<p:sldMaster xmlns:p="{P}"><p:cSld/></p:sldMaster>"#);
+        assert_eq!(
+            parse_slide_master_text_styles(no_text_styles.as_bytes()).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn master_text_styles_reject_duplicate_declarations() {
+        let cases = [
+            format!(r#"<p:sldMaster xmlns:p="{P}"><p:txStyles/><p:txStyles/></p:sldMaster>"#),
+            format!(
+                r#"<p:sldMaster xmlns:p="{P}"><p:txStyles><p:titleStyle/><p:titleStyle/></p:txStyles></p:sldMaster>"#
+            ),
+            format!(
+                r#"<p:sldMaster xmlns:p="{P}" xmlns:a="{A}"><p:txStyles><p:titleStyle><a:lvl1pPr/><a:lvl1pPr/></p:titleStyle></p:txStyles></p:sldMaster>"#
+            ),
+            format!(
+                r#"<p:sldMaster xmlns:p="{P}" xmlns:a="{A}"><p:txStyles><p:bodyStyle><a:defPPr/><a:defPPr/></p:bodyStyle></p:txStyles></p:sldMaster>"#
+            ),
+        ];
+        for xml in cases {
+            assert!(parse_slide_master_text_styles(xml.as_bytes()).is_err());
         }
     }
 
