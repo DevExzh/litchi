@@ -673,6 +673,68 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
 }
 
 #[test]
+fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            !editor
+                .slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_axis_minor_gridlines_visible(
+            0,
+            source.drawable_object_id,
+            ChartAxis::Category,
+            false,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        editor
+            .set_slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis, true)
+            .unwrap();
+    }
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            editor
+                .slide_chart_axis_minor_gridlines_visible(0, duplicate.drawable_object_id, axis)
+                .unwrap()
+        );
+        editor
+            .set_slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis, false)
+            .unwrap();
+    }
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            !reopened
+                .slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis)
+                .unwrap()
+        );
+        assert!(
+            reopened
+                .slide_chart_axis_minor_gridlines_visible(0, duplicate.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
 fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor

@@ -1,9 +1,9 @@
 //! Lossless native chart-axis style-switch storage and mutation.
 //!
-//! iWork stores axis-line and major-gridline switches in the generated
-//! extension of a chart's `TSCH.ChartAxisStyleArchive`. This module identifies
-//! the primary native axis-style object, preserves both protobuf layers
-//! losslessly, and changes only the requested style switch.
+//! iWork stores axis-line, major-gridline, and minor-gridline switches in the
+//! generated extension of a chart's `TSCH.ChartAxisStyleArchive`. This module
+//! identifies the primary native axis-style object, preserves both protobuf
+//! layers losslessly, and changes only the requested style switch.
 
 use prost::Message;
 
@@ -28,12 +28,19 @@ const CATEGORY_MAJOR_GRIDLINES_VISIBLE_FIELD: u32 = 27;
 /// `tschchartaxisvalueshowmajorgridlines` in
 /// `TSCH.Generated.ChartAxisStyleArchive`.
 const VALUE_MAJOR_GRIDLINES_VISIBLE_FIELD: u32 = 28;
+/// `tschchartaxiscategoryshowminorgridlines` in
+/// `TSCH.Generated.ChartAxisStyleArchive`.
+const CATEGORY_MINOR_GRIDLINES_VISIBLE_FIELD: u32 = 32;
+/// `tschchartaxisvalueshowminorgridlines` in
+/// `TSCH.Generated.ChartAxisStyleArchive`.
+const VALUE_MINOR_GRIDLINES_VISIBLE_FIELD: u32 = 33;
 
 /// One boolean chart-axis style switch with an explicit native field mapping.
 #[derive(Debug, Clone, Copy)]
 enum AxisStyleSwitch {
     Line,
     MajorGridlines,
+    MinorGridlines,
 }
 
 impl AxisStyleSwitch {
@@ -43,6 +50,8 @@ impl AxisStyleSwitch {
             (Self::Line, ChartAxis::Value) => VALUE_AXIS_LINE_VISIBLE_FIELD,
             (Self::MajorGridlines, ChartAxis::Category) => CATEGORY_MAJOR_GRIDLINES_VISIBLE_FIELD,
             (Self::MajorGridlines, ChartAxis::Value) => VALUE_MAJOR_GRIDLINES_VISIBLE_FIELD,
+            (Self::MinorGridlines, ChartAxis::Category) => CATEGORY_MINOR_GRIDLINES_VISIBLE_FIELD,
+            (Self::MinorGridlines, ChartAxis::Value) => VALUE_MINOR_GRIDLINES_VISIBLE_FIELD,
         }
     }
 
@@ -50,6 +59,7 @@ impl AxisStyleSwitch {
         match self {
             Self::Line => "line",
             Self::MajorGridlines => "major gridlines",
+            Self::MinorGridlines => "minor gridlines",
         }
     }
 
@@ -66,6 +76,12 @@ impl AxisStyleSwitch {
             },
             (Self::MajorGridlines, ChartAxis::Value) => {
                 generated.tschchartaxisvalueshowmajorgridlines
+            },
+            (Self::MinorGridlines, ChartAxis::Category) => {
+                generated.tschchartaxiscategoryshowminorgridlines
+            },
+            (Self::MinorGridlines, ChartAxis::Value) => {
+                generated.tschchartaxisvalueshowminorgridlines
             },
         }
     }
@@ -86,6 +102,12 @@ impl AxisStyleSwitch {
             },
             (Self::MajorGridlines, ChartAxis::Value) => {
                 generated.tschchartaxisvalueshowmajorgridlines = Some(visible)
+            },
+            (Self::MinorGridlines, ChartAxis::Category) => {
+                generated.tschchartaxiscategoryshowminorgridlines = Some(visible)
+            },
+            (Self::MinorGridlines, ChartAxis::Value) => {
+                generated.tschchartaxisvalueshowminorgridlines = Some(visible)
             },
         }
     }
@@ -171,6 +193,44 @@ pub(crate) fn set_chart_axis_major_gridlines_visible(
         drawable_label,
         axis,
         AxisStyleSwitch::MajorGridlines,
+        visible,
+    )
+}
+
+/// Read whether iWork shows minor gridlines for one native chart axis.
+pub(crate) fn chart_axis_minor_gridlines_visible(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+) -> Result<bool> {
+    chart_axis_style_switch_visible(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+        AxisStyleSwitch::MinorGridlines,
+    )
+}
+
+/// Set whether iWork shows minor gridlines for one native chart axis.
+pub(crate) fn set_chart_axis_minor_gridlines_visible(
+    package: &mut IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+    visible: bool,
+) -> Result<()> {
+    set_chart_axis_style_switch_visible(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+        AxisStyleSwitch::MinorGridlines,
         visible,
     )
 }
@@ -588,6 +648,78 @@ mod tests {
             &visible,
             ChartAxis::Category,
             AxisStyleSwitch::MajorGridlines,
+            false,
+        )
+        .unwrap();
+        assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn minor_gridline_patch_retains_other_style_switches_and_unmapped_fields() {
+        let generated = tsch::generated::ChartAxisStyleArchive {
+            tschchartaxiscategoryshowaxis: Some(true),
+            tschchartaxisvalueshowaxis: Some(false),
+            tschchartaxiscategoryshowmajorgridlines: Some(false),
+            tschchartaxisvalueshowmajorgridlines: Some(true),
+            tschchartaxiscategoryshowminorgridlines: Some(false),
+            tschchartaxisvalueshowminorgridlines: Some(true),
+            ..Default::default()
+        };
+        let original = axis_style_with_unknown_fields(generated);
+
+        let visible = patch_axis_style_switch_visibility(
+            &original,
+            ChartAxis::Category,
+            AxisStyleSwitch::MinorGridlines,
+            true,
+        )
+        .unwrap();
+        assert!(
+            read_axis_style_switch_visibility(
+                &visible,
+                ChartAxis::Category,
+                AxisStyleSwitch::MinorGridlines,
+            )
+            .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(&visible, ChartAxis::Category, AxisStyleSwitch::Line)
+                .unwrap()
+        );
+        assert!(
+            !read_axis_style_switch_visibility(&visible, ChartAxis::Value, AxisStyleSwitch::Line)
+                .unwrap()
+        );
+        assert!(
+            !read_axis_style_switch_visibility(
+                &visible,
+                ChartAxis::Category,
+                AxisStyleSwitch::MajorGridlines,
+            )
+            .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(
+                &visible,
+                ChartAxis::Value,
+                AxisStyleSwitch::MajorGridlines,
+            )
+            .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(
+                &visible,
+                ChartAxis::Value,
+                AxisStyleSwitch::MinorGridlines,
+            )
+            .unwrap()
+        );
+        assert_unknown_fields_retained(&original, &visible);
+
+        let restored = patch_axis_style_switch_visibility(
+            &visible,
+            ChartAxis::Category,
+            AxisStyleSwitch::MinorGridlines,
             false,
         )
         .unwrap();

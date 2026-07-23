@@ -141,6 +141,15 @@ column charts match iWork's native defaults: category-axis major gridlines are
 hidden and value-axis major gridlines are visible. Each axis remains independent
 through duplicate and package round-trip operations.
 
+Minor-gridline visibility is independently typed through
+`body_chart_axis_minor_gridlines_visible`,
+`sheet_chart_axis_minor_gridlines_visible`, and
+`slide_chart_axis_minor_gridlines_visible`; use
+`set_*_chart_axis_minor_gridlines_visible` for the native
+`Axis > Category (X) / Value (Y) > Minor Gridlines` control. New column charts
+start with minor gridlines hidden on both primary axes, and duplicate and
+package round-trip operations keep each axis independent.
+
 Chart legend visibility is likewise native and typed through
 `body_chart_legend_visible`, `sheet_chart_legend_visible`, and
 `slide_chart_legend_visible`; use `set_*_chart_legend_visible` to toggle the
