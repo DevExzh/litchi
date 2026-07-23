@@ -420,7 +420,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Variables and declarations | ✅ | ✅ | ✅ | Typed declarations and mutation |
 | Ruby annotations | 🟡 | ✅ | 🟡 | Typed `text:ruby` insertion, named ruby styles, and mutable CRUD; append or validate a UTF-8 range wholly inside one text/CDATA/entity node without splitting surrounding markup |
 | TOC, indexes, and source marks | 🟡 | ✅ | ✅ | Typed structures and cached-body authoring; no pagination or automatic regeneration |
-| Bibliography records | 🟡 | ✅ | ✅ | Inert bibliography configuration/records and source marks |
+| Bibliography records | 🟡 | ✅ | ✅ | Typed bibliography policy inspection/mutation plus inert records and source marks; no automatic entry generation or citation resolution |
 | Images and drawing frames | 🟡 | ✅ | 🟡 | Semantic discovery and resource replacement/removal; arbitrary drawing authoring is limited |
 | Embedded charts | ✅ | ✅ | ✅ | Package-subdocument/inline chart add, replace, and remove |
 | Embedded objects and MathML | 🟡 | ✅ | 🟡 | Semantic discovery and resource mutation; formulas/objects remain inert |

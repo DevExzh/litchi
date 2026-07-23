@@ -1,6 +1,6 @@
 //! Bounded OpenDocument bibliography configuration metadata.
 
-use crate::{OdfVariableBody, OdfVariablePart, OdfVariableScope};
+use crate::{FlatOpenDocument, OdfVariablePart, OpenDocumentPackage};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -148,10 +148,8 @@ impl OdfBibliographySortKey {
 }
 
 /// Document-wide bibliography formatting and ordering policy.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct OdfBibliographyConfiguration {
-    pub part: OdfVariablePart,
-    pub scope: OdfVariableScope,
     pub prefix: Option<String>,
     pub suffix: Option<String>,
     pub numbered_entries: Option<bool>,
@@ -173,21 +171,46 @@ impl OdfBibliographyConfiguration {
         self.sort_by_position.unwrap_or(true)
     }
 
+    /// Validate serializable bibliography policy metadata.
+    pub fn validate(&self) -> Result<()> {
+        if self.sort_keys.len() > MAX_SORT_KEYS {
+            return invalid("bibliography configuration has too many sort keys");
+        }
+        for (value, context) in [
+            (&self.prefix, "bibliography prefix"),
+            (&self.suffix, "bibliography suffix"),
+            (&self.sort_algorithm, "bibliography sort algorithm"),
+        ] {
+            if let Some(value) = value {
+                checked_value(value, context)?;
+            }
+        }
+        if let Some(value) = &self.language {
+            validate_language_code(value, "fo:language")?;
+        }
+        if let Some(value) = &self.country {
+            validate_alphanumeric_code(value, "fo:country")?;
+        }
+        if let Some(value) = &self.script {
+            validate_alphanumeric_code(value, "fo:script")?;
+        }
+        if let Some(value) = &self.rfc_language_tag {
+            validate_language_tag(value)?;
+        }
+        Ok(())
+    }
+
     /// Serialize the document-level bibliography policy and ordered sort keys.
     ///
     /// This fragment belongs in an ODF styles declaration context; it is not a
     /// child of `text:bibliography-source`.
     pub fn to_xml_fragment(&self) -> Result<String> {
-        if self.sort_keys.len() > MAX_SORT_KEYS {
-            return invalid("bibliography configuration has too many sort keys");
-        }
+        self.validate()?;
         let mut attributes = Vec::<(&str, &str, String)>::new();
         if let Some(value) = &self.prefix {
-            checked_value(value, "bibliography prefix")?;
             attributes.push((TEXT, "prefix", value.clone()));
         }
         if let Some(value) = &self.suffix {
-            checked_value(value, "bibliography suffix")?;
             attributes.push((TEXT, "suffix", value.clone()));
         }
         if let Some(value) = self.numbered_entries {
@@ -197,23 +220,18 @@ impl OdfBibliographyConfiguration {
             attributes.push((TEXT, "sort-by-position", value.to_string()));
         }
         if let Some(value) = &self.language {
-            validate_language_code(value, "fo:language")?;
             attributes.push((FO, "language", value.clone()));
         }
         if let Some(value) = &self.country {
-            validate_alphanumeric_code(value, "fo:country")?;
             attributes.push((FO, "country", value.clone()));
         }
         if let Some(value) = &self.script {
-            validate_alphanumeric_code(value, "fo:script")?;
             attributes.push((FO, "script", value.clone()));
         }
         if let Some(value) = &self.rfc_language_tag {
-            validate_language_tag(value)?;
             attributes.push((STYLE, "rfc-language-tag", value.clone()));
         }
         if let Some(value) = &self.sort_algorithm {
-            checked_value(value, "bibliography sort algorithm")?;
             attributes.push((TEXT, "sort-algorithm", value.clone()));
         }
         attributes.sort_by(|left, right| (left.0, left.1).cmp(&(right.0, right.1)));
@@ -322,6 +340,12 @@ struct ActiveConfiguration {
 }
 
 type Attributes = HashMap<(String, String), String>;
+
+pub(crate) fn parse_bibliography_configuration(
+    xml: &str,
+) -> Result<Option<OdfBibliographyConfiguration>> {
+    parse_bibliography_configuration_parts(&[(xml, OdfVariablePart::Styles)])
+}
 
 pub(crate) fn parse_bibliography_configuration_parts(
     parts: &[(&str, OdfVariablePart)],
@@ -444,7 +468,9 @@ fn parse_part(
                         aggregate,
                         &mut temporary,
                     )?;
-                    *result = Some(temporary.expect("configuration created").value);
+                    let configuration = temporary.expect("configuration created").value;
+                    configuration.validate()?;
+                    *result = Some(configuration);
                 }
             },
             Event::End(_) => {
@@ -455,7 +481,9 @@ fn parse_part(
                     .as_ref()
                     .is_some_and(|configuration| configuration.depth == depth)
                 {
-                    *result = Some(active.take().expect("checked configuration").value);
+                    let configuration = active.take().expect("checked configuration").value;
+                    configuration.validate()?;
+                    *result = Some(configuration);
                 }
                 depth = depth
                     .checked_sub(1)
@@ -499,6 +527,206 @@ fn parse_part(
     Ok(())
 }
 
+#[derive(Clone)]
+struct XmlSpan {
+    start: usize,
+    end: usize,
+}
+
+enum StylesSite {
+    Content(usize),
+    Empty(XmlSpan, String),
+}
+
+fn event_start(xml: &str, end: usize) -> Result<usize> {
+    xml[..end]
+        .rfind('<')
+        .ok_or_else(|| make_error("invalid bibliography XML event boundary"))
+}
+
+fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
+    if xml.len() > MAX_XML_BYTES {
+        return invalid("bibliography configuration XML exceeds 64 MiB");
+    }
+    parse_bibliography_configuration(xml)?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut stack = Vec::<Frame>::new();
+    let mut target = None;
+    let mut open_target = None::<(usize, usize)>;
+    let mut styles_site = None;
+
+    loop {
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|source| {
+                make_error(format!(
+                    "invalid bibliography configuration XML while locating mutation site: {source}"
+                ))
+            })?;
+        let namespace = namespace_uri(&resolved)?;
+        match event {
+            Event::Start(ref element) => {
+                let end = reader.buffer_position() as usize;
+                let start = event_start(xml, end)?;
+                let local = decode(element.local_name().as_ref(), "element name")?;
+                reject_spoofed_name(namespace.as_deref(), &local)?;
+                let depth = stack
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| make_error("bibliography configuration depth overflow"))?;
+                if namespace.as_deref() == Some(TEXT)
+                    && local == "bibliography-configuration"
+                    && matches!(
+                        stack.last(),
+                        Some(parent)
+                            if parent.namespace.as_deref() == Some(OFFICE)
+                                && parent.local == "styles"
+                    )
+                {
+                    open_target = Some((depth, start));
+                }
+                stack.push(Frame { namespace, local });
+            },
+            Event::Empty(ref element) => {
+                let end = reader.buffer_position() as usize;
+                let start = event_start(xml, end)?;
+                let local = decode(element.local_name().as_ref(), "element name")?;
+                reject_spoofed_name(namespace.as_deref(), &local)?;
+                if namespace.as_deref() == Some(TEXT)
+                    && local == "bibliography-configuration"
+                    && matches!(
+                        stack.last(),
+                        Some(parent)
+                            if parent.namespace.as_deref() == Some(OFFICE)
+                                && parent.local == "styles"
+                    )
+                {
+                    target = Some(XmlSpan { start, end });
+                }
+                if namespace.as_deref() == Some(OFFICE) && local == "styles" {
+                    if styles_site.is_some() {
+                        return invalid("multiple office:styles elements are not supported");
+                    }
+                    styles_site = Some(StylesSite::Empty(
+                        XmlSpan { start, end },
+                        decode(element.name().as_ref(), "office:styles QName")?,
+                    ));
+                }
+            },
+            Event::End(_) => {
+                let end = reader.buffer_position() as usize;
+                let start = event_start(xml, end)?;
+                let depth = stack.len();
+                if open_target.is_some_and(|(target_depth, _)| target_depth == depth) {
+                    let (_, target_start) = open_target.take().expect("target depth checked");
+                    target = Some(XmlSpan {
+                        start: target_start,
+                        end,
+                    });
+                }
+                if matches!(
+                    stack.last(),
+                    Some(parent)
+                        if parent.namespace.as_deref() == Some(OFFICE)
+                            && parent.local == "styles"
+                ) {
+                    if styles_site.is_some() {
+                        return invalid("multiple office:styles elements are not supported");
+                    }
+                    styles_site = Some(StylesSite::Content(start));
+                }
+                stack
+                    .pop()
+                    .ok_or_else(|| make_error("bibliography configuration stack underflow"))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if !stack.is_empty() || open_target.is_some() {
+        return invalid("incomplete bibliography configuration XML structure");
+    }
+    Ok((
+        target,
+        styles_site.ok_or_else(|| make_error("document has no office:styles element"))?,
+    ))
+}
+
+/// Insert or replace the document-wide bibliography configuration without
+/// rewriting unrelated styles XML.
+pub(crate) fn set_bibliography_configuration_xml(
+    xml: &str,
+    configuration: &OdfBibliographyConfiguration,
+) -> Result<String> {
+    configuration.validate()?;
+    let (target, site) = locate_bibliography_configuration(xml)?;
+    let fragment = configuration.to_xml_fragment()?;
+    if let Some(span) = target {
+        return Ok(format!(
+            "{}{}{}",
+            &xml[..span.start],
+            fragment,
+            &xml[span.end..]
+        ));
+    }
+    match site {
+        StylesSite::Content(insertion) => Ok(format!(
+            "{}{}{}",
+            &xml[..insertion],
+            fragment,
+            &xml[insertion..]
+        )),
+        StylesSite::Empty(span, qname) => {
+            let raw = &xml[span.start..span.end];
+            let slash = raw
+                .rfind("/>")
+                .ok_or_else(|| make_error("invalid empty office:styles element"))?;
+            Ok(format!(
+                "{}{}>{}</{}>{}",
+                &xml[..span.start],
+                &raw[..slash],
+                fragment,
+                qname,
+                &xml[span.end..]
+            ))
+        },
+    }
+}
+
+/// Remove the document-wide bibliography configuration without rewriting
+/// unrelated styles XML.
+pub(crate) fn remove_bibliography_configuration_xml(xml: &str) -> Result<String> {
+    let (target, _) = locate_bibliography_configuration(xml)?;
+    let Some(span) = target else {
+        return Ok(xml.to_string());
+    };
+    Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
+}
+
+impl OpenDocumentPackage {
+    /// Return the stored document-wide bibliography formatting policy.
+    ///
+    /// The policy is metadata in `styles.xml`. This method does not generate
+    /// bibliography entries, resolve citations, or access external sources.
+    pub fn bibliography_configuration(&self) -> Result<Option<OdfBibliographyConfiguration>> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(None), |xml| parse_bibliography_configuration(&xml))
+    }
+}
+
+impl FlatOpenDocument {
+    /// Return the stored document-wide bibliography formatting policy.
+    ///
+    /// The policy is metadata in the flat document's `office:styles` element.
+    /// This method does not generate bibliography entries or resolve citations.
+    pub fn bibliography_configuration(&self) -> Result<Option<OdfBibliographyConfiguration>> {
+        parse_bibliography_configuration_parts(&[(self.xml(), OdfVariablePart::Flat)])
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn start_configuration(
     reader: &NsReader<&[u8]>,
@@ -513,11 +741,14 @@ fn start_configuration(
     if result.is_some() {
         return invalid("duplicate document bibliography configuration");
     }
+    if part == OdfVariablePart::Content {
+        return invalid("bibliography configuration must reside in styles metadata");
+    }
     let parent = stack
         .last()
         .ok_or_else(|| make_error("misplaced bibliography configuration"))?;
-    if parent.namespace.as_deref() != Some(OFFICE) || parent.local != "text" {
-        return invalid("bibliography configuration must be a direct office:text child");
+    if parent.namespace.as_deref() != Some(OFFICE) || parent.local != "styles" {
+        return invalid("bibliography configuration must be a direct office:styles child");
     }
     let attributes = collect_attributes(reader, element, aggregate)?;
     reject_unexpected(
@@ -535,8 +766,6 @@ fn start_configuration(
         ],
     )?;
     let configuration = OdfBibliographyConfiguration {
-        part,
-        scope: OdfVariableScope::Body(OdfVariableBody::Text),
         prefix: get_owned(&attributes, TEXT, "prefix"),
         suffix: get_owned(&attributes, TEXT, "suffix"),
         numbered_entries: get(&attributes, TEXT, "numbered-entries")
@@ -692,14 +921,13 @@ fn make_error(message: impl Into<String>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::variable_declaration::parse_variable_declaration_parts;
 
-    const PREFIX: &str = r#"<o:document-content
+    const PREFIX: &str = r#"<o:document-styles
         xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
         xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
         xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
-        xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:body><o:text>"#;
-    const SUFFIX: &str = "</o:text></o:body></o:document-content>";
+        xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:styles>"#;
+    const SUFFIX: &str = "</o:styles><o:automatic-styles/><o:master-styles/></o:document-styles>";
 
     #[test]
     fn parses_complete_bibliography_policy_and_ordered_keys() {
@@ -713,9 +941,7 @@ mod tests {
                 <t:sort-key t:key="isbn"/>
             </t:bibliography-configuration>{SUFFIX}"#
         );
-        let inventory =
-            parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content)]).unwrap();
-        let configuration = inventory.bibliography_configuration.unwrap();
+        let configuration = parse_bibliography_configuration(&xml).unwrap().unwrap();
         assert_eq!(configuration.prefix.as_deref(), Some("["));
         assert!(configuration.effective_numbered_entries());
         assert!(!configuration.effective_sort_by_position());
@@ -731,9 +957,7 @@ mod tests {
     #[test]
     fn applies_effective_defaults_and_accepts_empty_configuration() {
         let xml = format!(r#"{PREFIX}<t:bibliography-configuration/>{SUFFIX}"#);
-        let parsed =
-            parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content)]).unwrap();
-        let configuration = parsed.bibliography_configuration.unwrap();
+        let configuration = parse_bibliography_configuration(&xml).unwrap().unwrap();
         assert!(!configuration.effective_numbered_entries());
         assert!(configuration.effective_sort_by_position());
         assert!(configuration.sort_keys.is_empty());
@@ -752,10 +976,83 @@ mod tests {
         for body in bodies {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
             assert!(
-                parse_variable_declaration_parts(&[(xml.as_str(), OdfVariablePart::Content,)])
-                    .is_err(),
+                parse_bibliography_configuration(&xml).is_err(),
                 "accepted {body}"
             );
         }
+    }
+
+    #[test]
+    fn rejects_configuration_outside_styles_metadata() {
+        let xml = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+            <o:body><o:text><t:bibliography-configuration/></o:text></o:body>
+        </o:document-content>"#;
+        assert!(
+            parse_bibliography_configuration_parts(&[(xml, OdfVariablePart::Content)]).is_err()
+        );
+    }
+
+    #[test]
+    fn flat_document_reads_configuration_from_styles_metadata() {
+        let xml = r#"<o:document
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+            o:mimetype="application/vnd.oasis.opendocument.text">
+            <o:styles><t:bibliography-configuration t:prefix="["/></o:styles>
+            <o:body><o:text/></o:body>
+        </o:document>"#;
+        let document = FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
+        assert_eq!(
+            document.bibliography_configuration().unwrap(),
+            Some(OdfBibliographyConfiguration {
+                prefix: Some("[".to_string()),
+                ..Default::default()
+            })
+        );
+    }
+
+    #[test]
+    fn replaces_and_removes_only_bibliography_metadata() {
+        let original = format!(r#"{PREFIX}<s:style s:name="Keep"/>{SUFFIX}"#);
+        let configuration = OdfBibliographyConfiguration {
+            prefix: Some("[".to_string()),
+            suffix: Some("]".to_string()),
+            numbered_entries: Some(true),
+            sort_keys: vec![OdfBibliographySortKey {
+                field: OdfBibliographyField::Author,
+                ascending: Some(false),
+            }],
+            ..Default::default()
+        };
+        let inserted = set_bibliography_configuration_xml(&original, &configuration).unwrap();
+        assert!(inserted.contains(r#"<s:style s:name="Keep"/>"#));
+        assert_eq!(
+            parse_bibliography_configuration(&inserted).unwrap(),
+            Some(configuration.clone())
+        );
+
+        let removed = remove_bibliography_configuration_xml(&inserted).unwrap();
+        assert!(removed.contains(r#"<s:style s:name="Keep"/>"#));
+        assert_eq!(parse_bibliography_configuration(&removed).unwrap(), None);
+    }
+
+    #[test]
+    fn inserts_into_an_empty_styles_element() {
+        let original = r#"<o:document-styles
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+            <o:styles/>
+        </o:document-styles>"#;
+        let configuration = OdfBibliographyConfiguration {
+            prefix: Some("[".to_string()),
+            ..Default::default()
+        };
+        let inserted = set_bibliography_configuration_xml(original, &configuration).unwrap();
+        assert_eq!(
+            parse_bibliography_configuration(&inserted).unwrap(),
+            Some(configuration)
+        );
     }
 }

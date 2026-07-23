@@ -673,7 +673,7 @@ pub struct OdfVariableDeclarations {
     pub dde_connections: Vec<crate::OdfDdeConnectionDeclaration>,
     /// Validated references to DDE declarations in document order.
     pub dde_connection_uses: Vec<crate::OdfDdeConnectionUse>,
-    /// Optional document-wide bibliography formatting and sorting policy.
+    /// Optional document-wide bibliography formatting and sorting policy from styles metadata.
     pub bibliography_configuration: Option<crate::OdfBibliographyConfiguration>,
 }
 

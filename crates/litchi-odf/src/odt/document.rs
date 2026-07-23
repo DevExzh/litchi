@@ -462,6 +462,23 @@ impl Document {
         )
     }
 
+    /// Return the stored document-wide bibliography formatting policy.
+    ///
+    /// This styles metadata remains inert: the API does not generate
+    /// bibliography entries, resolve citations, or access external sources.
+    pub fn bibliography_configuration(
+        &self,
+    ) -> Result<Option<crate::OdfBibliographyConfiguration>> {
+        self.styles.as_ref().map_or_else(
+            || Ok(None),
+            |styles| {
+                crate::bibliography_configuration::parse_bibliography_configuration(
+                    styles.xml_content(),
+                )
+            },
+        )
+    }
+
     /// Return the explicit master-page assignments from `text:page-sequence`, if present.
     ///
     /// This exposes stored page metadata only. It does not resolve master-page

@@ -418,6 +418,58 @@ impl MutableDocument {
         Ok(old)
     }
 
+    /// Return the stored document-wide bibliography formatting policy.
+    ///
+    /// The policy is styles metadata only. It is never used to generate
+    /// bibliography entries, resolve citations, or access external sources.
+    pub fn bibliography_configuration(
+        &self,
+    ) -> Result<Option<crate::OdfBibliographyConfiguration>> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(None),
+            crate::bibliography_configuration::parse_bibliography_configuration,
+        )
+    }
+
+    /// Insert or replace the document-wide bibliography formatting policy.
+    ///
+    /// This edits `styles.xml` only and returns the prior policy. It does not
+    /// regenerate bibliography entries or modify bibliography marks.
+    pub fn set_bibliography_configuration(
+        &mut self,
+        configuration: &crate::OdfBibliographyConfiguration,
+    ) -> Result<Option<crate::OdfBibliographyConfiguration>> {
+        configuration.validate()?;
+        let old = self.bibliography_configuration()?;
+        let styles = self
+            .styles_xml
+            .clone()
+            .unwrap_or_else(OdfStructure::default_styles_xml);
+        self.styles_xml = Some(
+            crate::bibliography_configuration::set_bibliography_configuration_xml(
+                &styles,
+                configuration,
+            )?,
+        );
+        Ok(old)
+    }
+
+    /// Remove the document-wide bibliography formatting policy.
+    ///
+    /// This edits styles metadata only. Existing bibliography entries and
+    /// source marks are preserved verbatim.
+    pub fn clear_bibliography_configuration(
+        &mut self,
+    ) -> Result<Option<crate::OdfBibliographyConfiguration>> {
+        let old = self.bibliography_configuration()?;
+        let Some(styles) = self.styles_xml.as_deref() else {
+            return Ok(None);
+        };
+        self.styles_xml =
+            Some(crate::bibliography_configuration::remove_bibliography_configuration_xml(styles)?);
+        Ok(old)
+    }
+
     /// Return stored document line-numbering configuration from current styles.
     ///
     /// The result is presentation metadata only. It is never used to paginate
