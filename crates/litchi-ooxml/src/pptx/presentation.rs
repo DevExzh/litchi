@@ -557,6 +557,14 @@ impl<'a> Presentation<'a> {
         crate::pptx::load_notes_graph(self.package, self.part.part().partname())
     }
 
+    /// Discover attached VBA-project metadata without inspecting its payload.
+    ///
+    /// The project binary remains opaque and inert. This validates only its
+    /// declared package relationship graph and content type.
+    pub fn vba_project(&self) -> Result<Option<crate::pptx::VbaProject>> {
+        crate::pptx::vba_project::discover_vba_project(self.package, self.part.part())
+    }
+
     // ========================================================================
     // Slide Access by Index
     // ========================================================================
