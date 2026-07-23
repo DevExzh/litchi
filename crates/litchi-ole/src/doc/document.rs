@@ -19,7 +19,7 @@ use super::parts::fields::{
     Field, FieldStory, FieldText, FieldsTable, FormulaField, GoToButtonField, IfField, IndexField,
     LinkField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
     MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
-    ReferenceField, SequenceField, SetField, StyleReferenceField, TableOfAuthoritiesField,
+    QuoteField, ReferenceField, SequenceField, SetField, StyleReferenceField, TableOfAuthoritiesField,
     TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
@@ -719,6 +719,21 @@ impl Document {
     /// Get the number of typed, inert `=` formula fields.
     pub fn formula_field_count(&self) -> Result<usize> {
         Ok(self.formula_fields()?.len())
+    }
+
+    /// Get typed, inert `QUOTE` fields in story and source order.
+    ///
+    /// Returned values expose only stored text arguments, switches, cached
+    /// results, and field state. This method never interprets character codes,
+    /// expands nested fields, inserts text, or refreshes a field.
+    pub fn quote_fields(&self) -> Result<Vec<QuoteField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::quote_field).collect())
+    }
+
+    /// Get the number of typed, inert `QUOTE` fields.
+    pub fn quote_field_count(&self) -> Result<usize> {
+        Ok(self.quote_fields()?.len())
     }
 
     /// Get typed, inert `SEQ` fields in story and source order.
