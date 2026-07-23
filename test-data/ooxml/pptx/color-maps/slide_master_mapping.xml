@@ -1,0 +1,4 @@
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sld>

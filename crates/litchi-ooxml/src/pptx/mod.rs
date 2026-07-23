@@ -61,6 +61,7 @@ pub mod actions;
 pub mod animations;
 pub mod backgrounds;
 pub mod changes_information;
+pub mod color_map;
 pub mod comments;
 pub mod customshow;
 pub mod embedded_fonts;
@@ -110,6 +111,7 @@ pub use changes_information::{
     DocumentChangeDescriptor, DocumentChangeKind, DocumentChangesList, load_changes_information,
     store_changes_information,
 };
+pub use color_map::{ColorMap, ColorMapOverride, ColorMapSlot, ThemeColorRole};
 pub use comments::{
     PresentationComment, PresentationCommentAuthor, PresentationCommentConformance,
     PresentationComments, SlideCommentList, add_presentation_comment,

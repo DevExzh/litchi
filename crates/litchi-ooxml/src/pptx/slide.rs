@@ -1,5 +1,6 @@
 /// Slide-related objects, including Slide, SlideLayout, and SlideMaster.
 use crate::error::{OoxmlError, Result};
+use crate::pptx::color_map::{ColorMap, ColorMapOverride, ColorMapSlot};
 use crate::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart, ThemePart};
 use crate::pptx::shapes::base::BaseShape;
 use litchi_opc::OpcPackage;
@@ -267,6 +268,34 @@ impl<'a> Slide<'a> {
     /// Get all placeholder shapes on this slide.
     pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
         self.part.placeholders()
+    }
+
+    /// Get the color-map override declared directly on this slide.
+    pub fn color_map_override(&self) -> Result<Option<ColorMapOverride>> {
+        self.part.color_map_override()
+    }
+
+    /// Resolve the color map this slide uses.
+    ///
+    /// A local master mapping selects the owning master's map. A local override
+    /// is used directly. When the slide has no local mapping, the layout's
+    /// effective map is used.
+    pub fn effective_color_map(&self) -> Result<ColorMap> {
+        match self.color_map_override()? {
+            Some(ColorMapOverride::Master) => self.master()?.color_map(),
+            Some(ColorMapOverride::Override(color_map)) => Ok(color_map),
+            None => self.layout()?.effective_color_map(),
+        }
+    }
+
+    /// Resolve a theme color through this slide's effective color map.
+    pub fn effective_theme_color(
+        &self,
+        slot: ColorMapSlot,
+    ) -> Result<Option<crate::pptx::parts::ThemeColor>> {
+        let color_map = self.effective_color_map()?;
+        let theme = self.theme()?;
+        Ok(color_map.resolve_theme_color(&theme, slot).cloned())
     }
 
     /// Get the number of shapes on this slide.
@@ -783,6 +812,22 @@ impl<'a> SlideLayout<'a> {
         self.part.placeholders()
     }
 
+    /// Get the color-map override declared directly on this slide layout.
+    pub fn color_map_override(&self) -> Result<Option<ColorMapOverride>> {
+        self.part.color_map_override()
+    }
+
+    /// Resolve the color map this layout uses.
+    ///
+    /// A local master mapping or no local mapping uses the owning master's
+    /// color map. A local override is used directly.
+    pub fn effective_color_map(&self) -> Result<ColorMap> {
+        match self.color_map_override()? {
+            Some(ColorMapOverride::Override(color_map)) => Ok(color_map),
+            Some(ColorMapOverride::Master) | None => self.master()?.color_map(),
+        }
+    }
+
     /// Get the transition effect inherited from this layout.
     ///
     /// Returns `None` if the layout has no transition.
@@ -962,6 +1007,21 @@ impl<'a> SlideMaster<'a> {
     /// Get all placeholder shapes defined by this slide master.
     pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
         self.part.placeholders()
+    }
+
+    /// Get the color map defined by this slide master.
+    pub fn color_map(&self) -> Result<ColorMap> {
+        self.part.color_map()
+    }
+
+    /// Resolve a theme color through this master's color map.
+    pub fn theme_color(
+        &self,
+        slot: ColorMapSlot,
+    ) -> Result<Option<crate::pptx::parts::ThemeColor>> {
+        let color_map = self.color_map()?;
+        let theme = self.theme()?;
+        Ok(color_map.resolve_theme_color(&theme, slot).cloned())
     }
 
     /// Get the transition effect inherited from this master.

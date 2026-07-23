@@ -114,6 +114,11 @@ impl<'a> SlidePart<'a> {
         Ok(filter_placeholders(self.shapes()?))
     }
 
+    /// Get the color-map override declared by this slide.
+    pub fn color_map_override(&self) -> Result<Option<crate::pptx::color_map::ColorMapOverride>> {
+        crate::pptx::color_map::parse_color_map_override(self.xml_bytes(), b"sld", "slide")
+    }
+
     /// Get the transition effect for this slide.
     ///
     /// Parses the `<p:transition>` element from the slide XML.
@@ -171,6 +176,15 @@ impl<'a> SlideLayoutPart<'a> {
     /// Get all placeholder shapes defined by this layout.
     pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
         Ok(filter_placeholders(self.shapes()?))
+    }
+
+    /// Get the color-map override declared by this layout.
+    pub fn color_map_override(&self) -> Result<Option<crate::pptx::color_map::ColorMapOverride>> {
+        crate::pptx::color_map::parse_color_map_override(
+            self.xml_bytes(),
+            b"sldLayout",
+            "slide layout",
+        )
     }
 
     /// Get the transition effect inherited from this slide layout.
@@ -231,6 +245,11 @@ impl<'a> SlideMasterPart<'a> {
     /// Get all placeholder shapes defined by this master.
     pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
         Ok(filter_placeholders(self.shapes()?))
+    }
+
+    /// Get the color map defined by this master.
+    pub fn color_map(&self) -> Result<crate::pptx::color_map::ColorMap> {
+        crate::pptx::color_map::parse_master_color_map(self.xml_bytes())
     }
 
     /// Get the transition effect inherited from this slide master.
