@@ -10,7 +10,8 @@ use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
     AdvanceField, AutoNumberField, BarcodeField, BibliographyField, BidiOutlineField,
-    CitationField, DdeField, DocumentVariableField, EmbedField, ExternalIncludeField, Field,
+    CitationField, DatabaseField, DdeField, DocumentVariableField, EmbedField,
+    ExternalIncludeField, Field,
     GoToButtonField, IfField,
     IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
@@ -1472,6 +1473,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `PRIVATE` conversion-data fields.
     pub fn private_field_count(&self) -> Result<usize> {
         Ok(self.private_fields()?.len())
+    }
+
+    /// Get typed, inert `DATABASE` query fields in document order.
+    ///
+    /// Returned values expose only stored opaque instructions, cached content,
+    /// and dirty/lock state. This method never opens a data source or database,
+    /// uses connection information, executes SQL, generates or inserts a table,
+    /// changes layout, or refreshes a field.
+    pub fn database_fields(&self) -> Result<Vec<DatabaseField>> {
+        self.fields()?
+            .iter()
+            .map(Field::database_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `DATABASE` query fields.
+    pub fn database_field_count(&self) -> Result<usize> {
+        Ok(self.database_fields()?.len())
     }
 
     /// Get typed, inert user-identity fields in document order.
