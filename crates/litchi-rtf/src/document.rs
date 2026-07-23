@@ -1145,6 +1145,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `DOCPROPERTY` fields in document field order.
+    ///
+    /// Property names, switches, cached results, and state are exposed solely
+    /// as stored metadata. This method never reads core, extended, or custom
+    /// document properties, resolves values, or refreshes a field.
+    pub fn document_property_fields(&self) -> Vec<crate::DocumentPropertyField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::document_property)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `DOCPROPERTY` fields in the document.
+    pub fn document_property_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.document_property().is_some())
+            .count()
+    }
+
     /// Return typed, inert `MERGEFIELD` fields in document field order.
     ///
     /// Field names, switches, and cached results are exposed solely as stored

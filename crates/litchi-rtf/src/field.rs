@@ -43,6 +43,7 @@ pub enum FieldType {
     Citation,
     Bibliography,
     DocumentVariable,
+    DocumentProperty,
     MergeField,
     MergeRecord,
     MergeSequence,
@@ -888,6 +889,23 @@ pub struct DocumentVariableField<'a> {
     position: usize,
 }
 
+/// Inert metadata for a legacy RTF `DOCPROPERTY` field.
+///
+/// ECMA-376 Part 1 §17.16.5.14 defines one stored document-property name
+/// followed by optional field switches. This model retains that name, switches,
+/// and cached result only. It never reads core, extended, or custom document
+/// properties, resolves a value, or refreshes the field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentPropertyField<'a> {
+    instruction: &'a str,
+    property_name: Cow<'a, str>,
+    switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 /// Inert metadata for a legacy RTF `MERGEFIELD` field.
 ///
 /// This model retains the stored merge-field name, switches, and cached result
@@ -1329,6 +1347,11 @@ struct BibliographyParts<'a> {
 struct DocumentVariableFieldParts<'a> {
     variable_name: Cow<'a, str>,
     unknown_switches: Vec<FieldSwitch<'a>>,
+}
+
+struct DocumentPropertyFieldParts<'a> {
+    property_name: Cow<'a, str>,
+    switches: Vec<FieldSwitch<'a>>,
 }
 
 struct MergeFieldParts<'a> {
@@ -2417,6 +2440,55 @@ impl<'a> DocumentVariableField<'a> {
     }
 }
 
+impl<'a> DocumentPropertyField<'a> {
+    /// Return the complete stored `DOCPROPERTY` field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the stored document-property name without resolving it.
+    pub fn property_name(&self) -> &str {
+        &self.property_name
+    }
+
+    /// Return stored field switches in source order without interpreting them.
+    pub fn switches(&self) -> &[FieldSwitch<'a>] {
+        &self.switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated from a property.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> MergeField<'a> {
     /// Return the complete stored `MERGEFIELD` field instruction.
     pub fn instruction(&self) -> &'a str {
@@ -3353,6 +3425,11 @@ impl<'a> Field<'a> {
                 FieldType::DocumentVariable
             },
             ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("DOCPROPERTY") =>
+            {
+                FieldType::DocumentProperty
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("MERGEFIELD") =>
             {
                 FieldType::MergeField
@@ -3863,6 +3940,28 @@ impl<'a> Field<'a> {
             instruction: self.instruction.as_ref(),
             variable_name: parts.variable_name,
             unknown_switches: parts.unknown_switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed `DOCPROPERTY` field.
+    ///
+    /// The stored property name is never resolved against core, extended, or
+    /// custom document properties, and the cached result is never refreshed.
+    /// Malformed `DOCPROPERTY` instructions remain generic fields and return
+    /// `None` here.
+    pub fn document_property(&self) -> Option<DocumentPropertyField<'_>> {
+        if self.field_type != FieldType::DocumentProperty {
+            return None;
+        }
+        let parts = document_property_field_parts(self.instruction.as_ref())?;
+        Some(DocumentPropertyField {
+            instruction: self.instruction.as_ref(),
+            property_name: parts.property_name,
+            switches: parts.switches,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
             owner: self.owner,
@@ -5600,6 +5699,40 @@ fn document_variable_field_parts(instruction: &str) -> Option<DocumentVariableFi
     Some(DocumentVariableFieldParts {
         variable_name,
         unknown_switches,
+    })
+}
+
+fn document_property_field_parts(instruction: &str) -> Option<DocumentPropertyFieldParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    if !keyword.value.eq_ignore_ascii_case("DOCPROPERTY") {
+        return None;
+    }
+    tokens.remove(0);
+
+    let property_name = tokens.first()?.value.clone();
+    if property_name.is_empty() || !is_field_operand(tokens.first()?) {
+        return None;
+    }
+    tokens.remove(0);
+
+    let mut switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let value = tokens
+            .get(index + 1)
+            .filter(|token| is_field_operand(token));
+        switches.push(FieldSwitch {
+            name: Cow::Owned(name.to_string()),
+            value: value.map(|token| token.value.clone()),
+        });
+        index += 1 + usize::from(value.is_some());
+    }
+
+    Some(DocumentPropertyFieldParts {
+        property_name,
+        switches,
     })
 }
 
@@ -7782,6 +7915,88 @@ mod tests {
     }
 
     #[test]
+    fn document_property_fields_preserve_names_without_resolution() {
+        let mut field = Field::parse_instruction(
+            r#"DOCPROPERTY "Project Name" \* MERGEFORMAT \@ "MMMM d, yyyy""#,
+        );
+        field.result = Cow::Borrowed("cached project");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::DocumentProperty);
+        let property = field.document_property().unwrap();
+        assert_eq!(property.instruction(), field.instruction);
+        assert_eq!(property.property_name(), "Project Name");
+        assert_eq!(property.cached_result(), Some("cached project"));
+        assert!(property.is_dirty());
+        assert!(property.is_locked());
+        assert_eq!(property.owner(), FieldOwner::Body);
+        assert_eq!(property.position(), 4);
+        assert_eq!(property.switches().len(), 2);
+        assert_eq!(property.switches()[0].name, "*");
+        assert_eq!(
+            property.switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
+        assert_eq!(property.switches()[1].name, "@");
+        assert_eq!(
+            property.switches()[1].value.as_deref(),
+            Some("MMMM d, yyyy")
+        );
+
+        assert!(
+            Field::parse_instruction("DOCPROPERTY")
+                .document_property()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"DOCPROPERTY \"#)
+                .document_property()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"DOCPROPERTY \* MERGEFORMAT"#)
+                .document_property()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"DOCPROPERTY """#)
+                .document_property()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction("DOCPROPERTY Project unexpected")
+                .document_property()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"DOCPROPERTY Project \"#)
+                .document_property()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"DOCPROPERTY Project \* \"#)
+                .document_property()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction("DOCPROPERTYS Project").field_type,
+            FieldType::Unknown
+        );
+        let too_long = Field::new(
+            FieldType::DocumentProperty,
+            Cow::Owned(format!("DOCPROPERTY {}", "x".repeat(MAX_INSTRUCTION_LEN))),
+            Cow::Borrowed(""),
+        );
+        assert!(too_long.document_property().is_none());
+    }
+
+    #[test]
     fn merge_fields_preserve_names_without_merging() {
         let mut field = Field::parse_instruction(
             r#"MERGEFIELD "Customer Region" \b "Dear " \f "!" \* MERGEFORMAT"#,
@@ -8559,6 +8774,26 @@ mod tests {
         assert!(fields[0].is_dirty());
         assert!(fields[0].is_locked());
         assert!(document.document_variables().is_empty());
+        assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_document_property_fields_without_resolving_them() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DOCPROPERTY "Project Name" \\* MERGEFORMAT \\@ "MMMM d, yyyy"}{\fldrslt cached project}}After}"#,
+        )
+        .unwrap();
+
+        let fields = document.document_property_fields();
+        assert_eq!(document.document_property_field_count(), 1);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].property_name(), "Project Name");
+        assert_eq!(fields[0].cached_result(), Some("cached project"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[0].switches().len(), 2);
+        assert_eq!(fields[0].switches()[0].name, "*");
+        assert_eq!(fields[0].switches()[1].name, "@");
         assert_eq!(document.text(), "Before After");
     }
 
