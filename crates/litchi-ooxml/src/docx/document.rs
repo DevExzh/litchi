@@ -13,7 +13,7 @@ use crate::docx::field::{
     BarcodeField, BibliographyField, BidiOutlineField, CitationField, DatabaseField, DdeField,
     DocumentContextField, DocumentInformationField, DocumentPropertyField, DocumentVariableField,
     EmbedField, EquationField, ExternalIncludeField, Field, FormulaField, GoToButtonField,
-    IfField,
+    HyperlinkField, IfField,
     IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
@@ -944,11 +944,11 @@ impl<'a> Document<'a> {
             .map(|(_, f)| f))
     }
 
-    /// Get all hyperlinks in the document.
+    /// Get all `<w:hyperlink>` element hyperlinks in the document.
     ///
-    /// Returns a vector of `Hyperlink` objects representing all hyperlinks
-    /// found in the document. Both external hyperlinks (to URLs) and internal
-    /// hyperlinks (to bookmarks) are included.
+    /// Returns external URL and internal bookmark links stored as
+    /// `<w:hyperlink>` elements. `HYPERLINK` field instructions are exposed
+    /// separately by `Self::hyperlink_fields`.
     ///
     /// # Examples
     ///
@@ -977,7 +977,7 @@ impl<'a> Document<'a> {
         Hyperlink::extract_from_document(xml_bytes, rels)
     }
 
-    /// Get the number of hyperlinks in the document.
+    /// Get the number of `<w:hyperlink>` element hyperlinks in the document.
     ///
     /// # Examples
     ///
@@ -1234,6 +1234,24 @@ impl<'a> Document<'a> {
     /// ```
     pub fn field_count(&self) -> Result<usize> {
         Ok(self.fields()?.len())
+    }
+
+    /// Get typed, inert `HYPERLINK` fields in document order.
+    ///
+    /// Returned values expose stored targets, bookmarks, display metadata,
+    /// switches, cached content, and dirty/lock state only. This method never
+    /// opens, resolves, follows, activates, or refreshes a link.
+    pub fn hyperlink_fields(&self) -> Result<Vec<HyperlinkField>> {
+        self.fields()?
+            .iter()
+            .map(Field::hyperlink_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `HYPERLINK` fields in the main document.
+    pub fn hyperlink_field_count(&self) -> Result<usize> {
+        Ok(self.hyperlink_fields()?.len())
     }
 
     /// Get typed, inert bibliography citation (`CITATION`) fields in document order.

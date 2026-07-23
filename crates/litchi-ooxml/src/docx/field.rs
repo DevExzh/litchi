@@ -34,6 +34,7 @@ const MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_REFERENCE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_EQUATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_HYPERLINK_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 
 /// A field in a Word document.
 ///
@@ -419,6 +420,24 @@ impl Field {
     /// parses, calculates, formats, renders, or refreshes an equation.
     pub fn equation(&self) -> Result<Option<EquationField>> {
         EquationField::from_field(self)
+    }
+
+    /// Check whether this is a `HYPERLINK` field.
+    ///
+    /// Recognition is limited to stored field metadata. It never opens,
+    /// resolves, follows, or refreshes a hyperlink target.
+    pub fn is_hyperlink_field(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "HYPERLINK").is_some()
+    }
+
+    /// Parse this field as inert `HYPERLINK` metadata.
+    ///
+    /// Returns `Ok(None)` for fields other than `HYPERLINK`. The stored target,
+    /// bookmark, tooltip, frame, coordinates, switches, cached content, and
+    /// dirty/lock state are metadata only; this method never opens, resolves,
+    /// follows, activates, or refreshes a link.
+    pub fn hyperlink_field(&self) -> Result<Option<HyperlinkField>> {
+        HyperlinkField::from_field(self)
     }
 
     /// Check whether this is a `QUOTE` text-insertion field.
@@ -3618,6 +3637,186 @@ impl EquationField {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from equation syntax.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
+/// A typed, inert Word `HYPERLINK` field.
+///
+/// This type retains only stored link metadata, a cached result, and field
+/// state. It never opens, resolves, follows, activates, or refreshes a link.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HyperlinkField {
+    instruction: String,
+    external_target: Option<String>,
+    bookmark: Option<String>,
+    screen_tip: Option<String>,
+    target_frame: Option<String>,
+    coordinates: Option<String>,
+    opens_new_window: bool,
+    unknown_switches: Vec<FieldSwitch>,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+}
+
+impl HyperlinkField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        if !field.is_hyperlink_field() {
+            return Ok(None);
+        }
+        if field.instruction().len() > MAX_HYPERLINK_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "HYPERLINK field instruction exceeds {MAX_HYPERLINK_FIELD_INSTRUCTION_BYTES} bytes"
+            )));
+        }
+        let Some((external_target, switches)) =
+            parse_field_operand_and_switches(field.instruction(), "HYPERLINK")?
+        else {
+            unreachable!("hyperlink-field recognition and parsing must agree");
+        };
+        let external_target = external_target
+            .map(|target| {
+                (!target.is_empty()).then_some(target).ok_or_else(|| {
+                    OoxmlError::InvalidFormat(
+                        "HYPERLINK external target must not be empty".to_string(),
+                    )
+                })
+            })
+            .transpose()?;
+
+        let mut bookmark = None;
+        let mut screen_tip = None;
+        let mut target_frame = None;
+        let mut coordinates = None;
+        let mut opens_new_window = false;
+        let mut unknown_switches = Vec::new();
+        for switch in switches {
+            let (slot, switch_name) = match switch.name {
+                'l' => (&mut bookmark, 'l'),
+                'o' => (&mut screen_tip, 'o'),
+                't' => (&mut target_frame, 't'),
+                'm' => (&mut coordinates, 'm'),
+                'n' => {
+                    if opens_new_window {
+                        return Err(OoxmlError::InvalidFormat(
+                            "HYPERLINK field has duplicate \\n switches".to_string(),
+                        ));
+                    }
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "HYPERLINK \\n switch does not take an argument".to_string(),
+                        ));
+                    }
+                    opens_new_window = true;
+                    continue;
+                },
+                _ => {
+                    unknown_switches.push(switch);
+                    continue;
+                },
+            };
+            let value = switch.argument.ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!(
+                    "HYPERLINK \\{switch_name} switch requires an argument"
+                ))
+            })?;
+            if value.is_empty() {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "HYPERLINK \\{switch_name} switch argument must not be empty"
+                )));
+            }
+            if slot.replace(value).is_some() {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "HYPERLINK field has duplicate \\{switch_name} switches"
+                )));
+            }
+        }
+        if external_target.is_none() && bookmark.is_none() {
+            return Err(OoxmlError::InvalidFormat(
+                "HYPERLINK field requires an external target or \\l bookmark".to_string(),
+            ));
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            external_target,
+            bookmark,
+            screen_tip,
+            target_frame,
+            coordinates,
+            opens_new_window,
+            unknown_switches,
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored external target without resolving or opening it.
+    pub fn external_target(&self) -> Option<&str> {
+        self.external_target.as_deref()
+    }
+
+    /// Return the stored internal bookmark target without resolving it.
+    pub fn bookmark(&self) -> Option<&str> {
+        self.bookmark.as_deref()
+    }
+
+    /// Return the stored screen-tip text, if present.
+    ///
+    /// This is metadata only and is never displayed by the library.
+    pub fn screen_tip(&self) -> Option<&str> {
+        self.screen_tip.as_deref()
+    }
+
+    /// Return the stored target frame, if present.
+    ///
+    /// This is metadata only and is never used to open a window or frame.
+    pub fn target_frame(&self) -> Option<&str> {
+        self.target_frame.as_deref()
+    }
+
+    /// Return the stored image-map coordinates, if present.
+    ///
+    /// This is metadata only and is never used for hit testing or navigation.
+    pub fn coordinates(&self) -> Option<&str> {
+        self.coordinates.as_deref()
+    }
+
+    /// Whether the field requests opening the target in a new window.
+    ///
+    /// This records producer intent only; no window is opened.
+    pub fn opens_new_window(&self) -> bool {
+        self.opens_new_window
+    }
+
+    /// Return unrecognized stored switches in source order.
+    ///
+    /// They are retained without interpretation or execution.
+    pub fn unknown_switches(&self) -> &[FieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated by resolving a link.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -8406,6 +8605,87 @@ mod tests {
         let not_equation = Field::new("EQUAL 1 + 1".to_string(), None, false);
         assert!(!not_equation.is_equation());
         assert!(not_equation.equation().unwrap().is_none());
+    }
+
+    #[test]
+    fn parses_inert_hyperlink_fields_without_opening_or_following_them() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" HYPERLINK &quot;https://example.test/a b&quot; \l &quot;_Toc1&quot; \o &quot;Stored tip&quot; \t &quot;_blank&quot; \m &quot;0,0,100,20&quot; \n \* MERGEFORMAT \q opaque " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached external link</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>hyperlink \l &quot;JumpTarget&quot;</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached internal link</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="HYPERLINKER &quot;https://example.test&quot;"><w:r><w:t>not a link field</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(fields[0].is_hyperlink_field());
+        assert!(fields[1].is_hyperlink_field());
+        assert!(!fields[2].is_hyperlink_field());
+
+        let external = fields[0].hyperlink_field().unwrap().unwrap();
+        assert_eq!(external.external_target(), Some("https://example.test/a b"));
+        assert_eq!(external.bookmark(), Some("_Toc1"));
+        assert_eq!(external.screen_tip(), Some("Stored tip"));
+        assert_eq!(external.target_frame(), Some("_blank"));
+        assert_eq!(external.coordinates(), Some("0,0,100,20"));
+        assert!(external.opens_new_window());
+        assert_eq!(external.unknown_switches().len(), 2);
+        assert_eq!(external.unknown_switches()[0].name(), '*');
+        assert_eq!(
+            external.unknown_switches()[0].argument(),
+            Some("MERGEFORMAT")
+        );
+        assert_eq!(external.unknown_switches()[1].name(), 'q');
+        assert_eq!(external.unknown_switches()[1].argument(), Some("opaque"));
+        assert_eq!(external.cached_result(), Some("cached external link"));
+        assert!(external.is_dirty());
+        assert!(external.is_locked());
+
+        let internal = fields[1].hyperlink_field().unwrap().unwrap();
+        assert_eq!(internal.external_target(), None);
+        assert_eq!(internal.bookmark(), Some("JumpTarget"));
+        assert_eq!(internal.cached_result(), Some("cached internal link"));
+        assert!(internal.is_dirty());
+        assert!(internal.is_locked());
+        assert!(fields[2].hyperlink_field().unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_hyperlink_fields_without_resolving_targets() {
+        for instruction in [
+            "HYPERLINK",
+            r#"HYPERLINK ""#,
+            r#"HYPERLINK \l ""#,
+            r#"HYPERLINK "https://example.test" \l First \l Second"#,
+            r#"HYPERLINK "https://example.test" \o"#,
+            r#"HYPERLINK "https://example.test" \n unexpected"#,
+            r#"HYPERLINK "https://example.test" \n \n"#,
+        ] {
+            let field = Field::new(instruction.to_string(), None, false);
+            assert!(field.hyperlink_field().is_err(), "{instruction}");
+        }
+
+        let too_long = Field::new(
+            format!(
+                "HYPERLINK {}",
+                "x".repeat(MAX_HYPERLINK_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.hyperlink_field().is_err());
+
+        let not_hyperlink = Field::new(
+            r#"HYPERLINKER "https://example.test""#.to_string(),
+            None,
+            false,
+        );
+        assert!(!not_hyperlink.is_hyperlink_field());
+        assert!(not_hyperlink.hyperlink_field().unwrap().is_none());
     }
 
     #[test]

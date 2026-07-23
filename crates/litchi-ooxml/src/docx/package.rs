@@ -3774,6 +3774,47 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_hyperlink_fields_without_opening_them() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            for (instruction, cached_result) in [
+                (
+                    r#"HYPERLINK "https://example.test/a b" \l "_Toc1" \o "Stored tip" \t "_blank" \m "0,0,100,20" \n"#,
+                    "cached external link",
+                ),
+                (r#"HYPERLINK \l "JumpTarget""#, "cached internal link"),
+            ] {
+                document.add_paragraph().add_field(
+                    crate::docx::writer::MutableField::with_result(
+                        instruction.to_string(),
+                        cached_result.to_string(),
+                    ),
+                );
+            }
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        assert_eq!(document.hyperlink_count().unwrap(), 0);
+        let fields = document.hyperlink_fields().unwrap();
+        assert_eq!(document.hyperlink_field_count().unwrap(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].external_target(), Some("https://example.test/a b"));
+        assert_eq!(fields[0].bookmark(), Some("_Toc1"));
+        assert_eq!(fields[0].screen_tip(), Some("Stored tip"));
+        assert_eq!(fields[0].target_frame(), Some("_blank"));
+        assert_eq!(fields[0].coordinates(), Some("0,0,100,20"));
+        assert!(fields[0].opens_new_window());
+        assert_eq!(fields[0].cached_result(), Some("cached external link"));
+        assert_eq!(fields[1].external_target(), None);
+        assert_eq!(fields[1].bookmark(), Some("JumpTarget"));
+        assert_eq!(fields[1].cached_result(), Some("cached internal link"));
+    }
+
+    #[test]
     fn writes_and_discovers_inert_prompt_fields_without_displaying_prompts() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
