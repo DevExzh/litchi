@@ -565,6 +565,16 @@ impl<'a> Presentation<'a> {
         crate::pptx::vba_project::discover_vba_project(self.package, self.part.part())
     }
 
+    /// Load persisted Office Add-in task-pane metadata without activation.
+    ///
+    /// Add-ins, manifests, catalog entries, and linked content are never
+    /// located, opened, fetched, or executed.
+    pub fn web_extension_task_panes(
+        &self,
+    ) -> Result<Option<crate::web_extensions::WebExtensionTaskPanes>> {
+        crate::web_extensions::load_web_extension_task_panes(self.package)
+    }
+
     // ========================================================================
     // Slide Access by Index
     // ========================================================================
