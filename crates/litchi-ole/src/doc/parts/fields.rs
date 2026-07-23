@@ -875,6 +875,62 @@ impl BarcodeField {
     }
 }
 
+/// Typed, inert metadata for a legacy Word `BIDIOUTLINE` field.
+///
+/// [MS-DOC] §2.9.90 identifies native `BIDIOUTLINE` fields with type
+/// `0x5C`. This type retains opaque instruction text, a cached result, and
+/// field-marker state only. It never reads right-to-left language, paragraph
+/// outline, or layout state; chooses a numbering system; calculates a result;
+/// or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BidiOutlineField {
+    field: Field,
+    instruction: String,
+    opaque_instructions: String,
+    cached_result: Option<String>,
+}
+
+impl BidiOutlineField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored `BIDIOUTLINE` field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to calculate an
+    /// outline number.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return opaque stored instruction text after `BIDIOUTLINE`.
+    ///
+    /// It is never parsed, interpreted, or used to resolve language, outline,
+    /// numbering, or layout state.
+    pub fn opaque_instructions(&self) -> &str {
+        &self.opaque_instructions
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is cached text only and is never regenerated from document
+    /// state.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// One recognized stored option of a legacy Word `TOC` field.
 ///
 /// These values retain how a producer configured a table of contents. They
@@ -3773,6 +3829,26 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a native `BIDIOUTLINE` field.
+    ///
+    /// Stored opaque instructions, cached results, and field-marker state
+    /// remain metadata only. This method never reads right-to-left language,
+    /// paragraph outline, or layout state; chooses a numbering system;
+    /// calculates a result; or refreshes a field. Malformed instructions remain
+    /// available through this generic type and return `None` here.
+    pub fn bidi_outline_field(&self) -> Option<BidiOutlineField> {
+        if self.field.field_type != FieldType::BidiOutline {
+            return None;
+        }
+        let opaque_instructions = parse_bidi_outline_field_instructions(&self.instruction)?;
+        Some(BidiOutlineField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            opaque_instructions,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed bookmark-reference field.
     ///
     /// Stored bookmark names, options, and cached results are never used to
@@ -4562,6 +4638,7 @@ const MAX_QUOTE_FIELD_SWITCHES: usize = 64;
 const MAX_PRINT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_EMBED_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BARCODE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_SWITCHES: usize = 64;
 const MAX_AUTO_NUMBER_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5207,6 +5284,19 @@ fn parse_barcode_field_instructions(instruction: &str) -> Option<String> {
     let mut position = 0;
     let keyword = next_field_argument(instruction, &mut position).ok()??;
     if !keyword.eq_ignore_ascii_case("BARCODE") {
+        return None;
+    }
+    Some(instruction.get(position..)?.trim().to_string())
+}
+
+fn parse_bidi_outline_field_instructions(instruction: &str) -> Option<String> {
+    if instruction.len() > MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("BIDIOUTLINE") {
         return None;
     }
     Some(instruction.get(position..)?.trim().to_string())
@@ -7004,6 +7094,8 @@ mod tests {
         assert_eq!(FieldType::EmbeddedObject.as_u8(), 0x3A);
         assert_eq!(FieldType::from(0x3F), FieldType::BarCode);
         assert_eq!(FieldType::BarCode.as_u8(), 0x3F);
+        assert_eq!(FieldType::from(0x5C), FieldType::BidiOutline);
+        assert_eq!(FieldType::BidiOutline.as_u8(), 0x5C);
         assert_eq!(FieldType::from(0x58), FieldType::Hyperlink);
         assert_eq!(FieldType::from(0x34), FieldType::AutoNumOutline);
         assert_eq!(FieldType::from(0x35), FieldType::AutoNumLegal);
@@ -7443,6 +7535,76 @@ mod tests {
             ..text
         };
         assert!(wrong_type.barcode_field().is_none());
+    }
+
+    #[test]
+    fn bidi_outline_fields_preserve_metadata_without_resolving_numbering_or_layout() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::BidiOutline,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" BIDIOUTLINE \* MERGEFORMAT "#.to_string(),
+            result: Some("cached bidi outline number".to_string()),
+        };
+
+        let outline = text.bidi_outline_field().unwrap();
+        assert_eq!(outline.field(), &field);
+        assert_eq!(outline.instruction(), text.instruction);
+        assert_eq!(outline.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(
+            outline.cached_result(),
+            Some("cached bidi outline number")
+        );
+        assert!(outline.is_dirty());
+        assert!(outline.is_locked());
+
+        let bare = FieldText {
+            instruction: "bidioutline".to_string(),
+            result: Some("cached bare bidi outline".to_string()),
+            ..text.clone()
+        };
+        let bare = bare.bidi_outline_field().unwrap();
+        assert_eq!(bare.opaque_instructions(), "");
+        assert_eq!(bare.cached_result(), Some("cached bare bidi outline"));
+
+        for instruction in [r#"BIDIOUTLINES"#, r#"BIDIOUTLINED"#] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.bidi_outline_field().is_none(), "{instruction}");
+        }
+
+        let too_long = FieldText {
+            instruction: format!(
+                "BIDIOUTLINE {}",
+                "x".repeat(MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text.clone()
+        };
+        assert!(too_long.bidi_outline_field().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Equation,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.bidi_outline_field().is_none());
     }
 
     #[test]

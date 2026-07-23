@@ -15,9 +15,9 @@ use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
-    BarcodeField, CompareField, DdeField, DocumentContextField, DocumentInformationField,
-    DocumentVariableField, EmbedField, ExternalIncludeField, Field, FieldStory, FieldText,
-    FieldsTable, FormulaField,
+    BarcodeField, BidiOutlineField, CompareField, DdeField, DocumentContextField,
+    DocumentInformationField, DocumentVariableField, EmbedField, ExternalIncludeField, Field,
+    FieldStory, FieldText, FieldsTable, FormulaField,
     GoToButtonField, IfField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
@@ -664,6 +664,25 @@ impl Document {
     /// Get the number of typed, inert `BARCODE` fields.
     pub fn barcode_field_count(&self) -> Result<usize> {
         Ok(self.barcode_fields()?.len())
+    }
+
+    /// Get typed, inert `BIDIOUTLINE` fields in story and source order.
+    ///
+    /// Returned values expose only stored opaque instructions, cached results,
+    /// and field state. This method never reads right-to-left language,
+    /// paragraph outline, or layout state; chooses a numbering system;
+    /// calculates a result; or refreshes a field.
+    pub fn bidi_outline_fields(&self) -> Result<Vec<BidiOutlineField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::bidi_outline_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `BIDIOUTLINE` fields.
+    pub fn bidi_outline_field_count(&self) -> Result<usize> {
+        Ok(self.bidi_outline_fields()?.len())
     }
 
     /// Get typed, inert `TOC` fields in story and source order.
