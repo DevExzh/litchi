@@ -417,6 +417,45 @@ impl Field {
         GoToButtonField::from_field(self)
     }
 
+    /// Check whether this is a `USERADDRESS` field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never reads
+    /// the current user's address or refreshes the cached result.
+    pub fn is_user_address(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "USERADDRESS").is_some()
+    }
+
+    /// Check whether this is a `USERINITIALS` field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never reads
+    /// the current user's initials or refreshes the cached result.
+    pub fn is_user_initials(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "USERINITIALS").is_some()
+    }
+
+    /// Check whether this is a `USERNAME` field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never reads
+    /// the current user's name or refreshes the cached result.
+    pub fn is_user_name(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "USERNAME").is_some()
+    }
+
+    /// Check whether this is a `USERADDRESS`, `USERINITIALS`, or `USERNAME` field.
+    pub fn is_user_identity_field(&self) -> bool {
+        self.is_user_address() || self.is_user_initials() || self.is_user_name()
+    }
+
+    /// Parse this field as inert typed user-identity metadata.
+    ///
+    /// Returns `Ok(None)` for fields other than `USERADDRESS`, `USERINITIALS`, and
+    /// `USERNAME`. The result exposes only stored override, formatting,
+    /// cached-content, and dirty/lock metadata; it never reads or modifies a
+    /// host user's identity or refreshes a field.
+    pub fn user_identity_field(&self) -> Result<Option<UserIdentityField>> {
+        UserIdentityField::from_field(self)
+    }
+
     /// Check whether this is a legacy `LINK` field.
     ///
     /// Recognition is limited to the stored field instruction. It never
@@ -2581,6 +2620,110 @@ impl GoToButtonField {
     }
 }
 
+/// The stored kind of a user-identity field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserIdentityFieldKind {
+    /// A `USERADDRESS` field.
+    Address,
+    /// A `USERINITIALS` field.
+    Initials,
+    /// A `USERNAME` field.
+    Name,
+}
+
+/// A general-formatting request stored by a user-identity field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserIdentityFormatting {
+    /// The `\\* Caps` formatting request.
+    Caps,
+    /// The `\\* FirstCap` formatting request.
+    FirstCap,
+    /// The `\\* Lower` formatting request.
+    Lower,
+    /// The `\\* Upper` formatting request.
+    Upper,
+}
+
+/// A typed, inert Word `USERADDRESS`, `USERINITIALS`, or `USERNAME` field.
+///
+/// ECMA-376 Part 1 §§17.16.5.69–71 define these fields. This type exposes a
+/// stored override, formatting request, and cached result only. It never reads
+/// or modifies a host user's identity, applies formatting, or refreshes a
+/// field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserIdentityField {
+    instruction: String,
+    kind: UserIdentityFieldKind,
+    override_value: Option<String>,
+    formatting: Option<UserIdentityFormatting>,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+}
+
+impl UserIdentityField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some((kind, override_value, formatting)) =
+            parse_user_identity_field_parts(field.instruction())?
+        else {
+            return Ok(None);
+        };
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            kind,
+            override_value,
+            formatting,
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return whether this is an address, initials, or name field.
+    pub fn kind(&self) -> UserIdentityFieldKind {
+        self.kind
+    }
+
+    /// Return the optional stored value that overrides the host user context.
+    ///
+    /// `Some("")` represents an explicitly supplied blank override. This
+    /// stored text is never written to, read from, or compared with a host
+    /// identity.
+    pub fn override_value(&self) -> Option<&str> {
+        self.override_value.as_deref()
+    }
+
+    /// Return the stored general-formatting request, if any.
+    ///
+    /// This request is metadata only and is never applied to an identity value.
+    pub fn formatting(&self) -> Option<UserIdentityFormatting> {
+        self.formatting
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from a host identity.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
 /// Backward-compatible name for a lexical switch exposed by a TOC field.
 pub type TableOfContentsSwitch = FieldSwitch;
 
@@ -3328,6 +3471,65 @@ fn parse_go_to_button_operands(instruction: &str) -> Result<Option<(String, Stri
         ));
     }
     Ok(Some((target, button_text)))
+}
+
+fn parse_user_identity_field_parts(
+    instruction: &str,
+) -> Result<
+    Option<(
+        UserIdentityFieldKind,
+        Option<String>,
+        Option<UserIdentityFormatting>,
+    )>,
+> {
+    let (kind, field_type, remainder) =
+        if let Some(remainder) = field_instruction_remainder(instruction, "USERADDRESS") {
+            (UserIdentityFieldKind::Address, "USERADDRESS", remainder)
+        } else if let Some(remainder) = field_instruction_remainder(instruction, "USERINITIALS") {
+            (UserIdentityFieldKind::Initials, "USERINITIALS", remainder)
+        } else if let Some(remainder) = field_instruction_remainder(instruction, "USERNAME") {
+            (UserIdentityFieldKind::Name, "USERNAME", remainder)
+        } else {
+            return Ok(None);
+        };
+
+    let mut characters = remainder.chars().peekable();
+    let override_value = parse_next_field_argument(&mut characters, field_type)?;
+    let switches = parse_field_switches_from_characters(&mut characters, field_type)?;
+    let mut formatting = None;
+    for switch in switches {
+        if switch.name != '*' {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "{field_type} field has an unsupported \\{} switch",
+                switch.name
+            )));
+        }
+        if formatting.is_some() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "{field_type} field repeats its \\* switch"
+            )));
+        }
+        let argument = switch.argument.ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!(
+                "{field_type} \\* switch requires a general-formatting argument"
+            ))
+        })?;
+        formatting = Some(if argument.eq_ignore_ascii_case("Caps") {
+            UserIdentityFormatting::Caps
+        } else if argument.eq_ignore_ascii_case("FirstCap") {
+            UserIdentityFormatting::FirstCap
+        } else if argument.eq_ignore_ascii_case("Lower") {
+            UserIdentityFormatting::Lower
+        } else if argument.eq_ignore_ascii_case("Upper") {
+            UserIdentityFormatting::Upper
+        } else {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "{field_type} \\* switch must be Caps, FirstCap, Lower, or Upper"
+            )));
+        });
+    }
+
+    Ok(Some((kind, override_value, formatting)))
 }
 
 fn parse_link_operands_and_switches(
@@ -5016,6 +5218,82 @@ mod tests {
             false,
         );
         assert!(unsupported_switch.go_to_button().is_err());
+    }
+
+    #[test]
+    fn parses_user_identity_fields_without_reading_host_identity() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" USERADDRESS &quot;10 Top Secret Lane&quot; \* Upper " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>10 TOP SECRET LANE</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>userinitials \* Lower</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>dw</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="USERNAME &quot;Ada Lovelace&quot; \* FirstCap"><w:r><w:t>Ada Lovelace</w:t></w:r></w:fldSimple>
+            <w:fldSimple w:instr="USERNAMES Ada"><w:r><w:t>not a user identity field</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 4);
+        assert!(fields[0].is_user_address());
+        assert!(fields[0].is_user_identity_field());
+        assert!(fields[1].is_user_initials());
+        assert!(fields[1].is_user_identity_field());
+        assert!(fields[2].is_user_name());
+        assert!(fields[2].is_user_identity_field());
+        assert!(!fields[3].is_user_identity_field());
+
+        let address = fields[0].user_identity_field().unwrap().unwrap();
+        assert_eq!(address.kind(), UserIdentityFieldKind::Address);
+        assert_eq!(address.override_value(), Some("10 Top Secret Lane"));
+        assert_eq!(address.formatting(), Some(UserIdentityFormatting::Upper));
+        assert_eq!(address.cached_result(), Some("10 TOP SECRET LANE"));
+        assert!(address.is_dirty());
+        assert!(address.is_locked());
+
+        let initials = fields[1].user_identity_field().unwrap().unwrap();
+        assert_eq!(initials.kind(), UserIdentityFieldKind::Initials);
+        assert_eq!(initials.override_value(), None);
+        assert_eq!(initials.formatting(), Some(UserIdentityFormatting::Lower));
+        assert_eq!(initials.cached_result(), Some("dw"));
+        assert!(initials.is_dirty());
+        assert!(initials.is_locked());
+
+        let name = fields[2].user_identity_field().unwrap().unwrap();
+        assert_eq!(name.kind(), UserIdentityFieldKind::Name);
+        assert_eq!(name.override_value(), Some("Ada Lovelace"));
+        assert_eq!(name.formatting(), Some(UserIdentityFormatting::FirstCap));
+        assert_eq!(name.cached_result(), Some("Ada Lovelace"));
+        assert!(!name.is_dirty());
+        assert!(!name.is_locked());
+        assert!(fields[3].user_identity_field().unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_user_identity_field_semantics() {
+        let missing_format = Field::new("USERADDRESS \\*".to_string(), None, false);
+        assert!(missing_format.user_identity_field().is_err());
+
+        let unsupported_format = Field::new("USERINITIALS \\* Title".to_string(), None, false);
+        assert!(unsupported_format.user_identity_field().is_err());
+
+        let duplicate_format = Field::new("USERNAME \\* Upper \\* Lower".to_string(), None, false);
+        assert!(duplicate_format.user_identity_field().is_err());
+
+        let unsupported_switch = Field::new("USERNAME Ada \\l 1033".to_string(), None, false);
+        assert!(unsupported_switch.user_identity_field().is_err());
+
+        let unexpected_text = Field::new("USERADDRESS Ada Lovelace".to_string(), None, false);
+        assert!(unexpected_text.user_identity_field().is_err());
+
+        let blank_override = Field::new(r#"USERNAME "" \* Caps"#.to_string(), None, false);
+        let blank_override = blank_override.user_identity_field().unwrap().unwrap();
+        assert_eq!(blank_override.override_value(), Some(""));
+        assert_eq!(
+            blank_override.formatting(),
+            Some(UserIdentityFormatting::Caps)
+        );
     }
 
     #[test]

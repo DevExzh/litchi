@@ -12,7 +12,7 @@ use crate::docx::field::{
     GoToButtonField, IfField, IndexEntryField, IndexField, LinkField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, ReferencedDocumentField,
-    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1315,6 +1315,24 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `GOTOBUTTON` fields in the main document.
     pub fn go_to_button_field_count(&self) -> Result<usize> {
         Ok(self.go_to_button_fields()?.len())
+    }
+
+    /// Get typed, inert user-identity fields in document order.
+    ///
+    /// Returned values expose only stored kind, override, formatting, cached
+    /// content, and dirty/lock state. This method never reads or modifies a host
+    /// user's identity, applies formatting, or refreshes a field.
+    pub fn user_identity_fields(&self) -> Result<Vec<UserIdentityField>> {
+        self.fields()?
+            .iter()
+            .map(Field::user_identity_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert user-identity fields in the main document.
+    pub fn user_identity_field_count(&self) -> Result<usize> {
+        Ok(self.user_identity_fields()?.len())
     }
 
     /// Get typed, inert `DDE` and `DDEAUTO` fields in document order.

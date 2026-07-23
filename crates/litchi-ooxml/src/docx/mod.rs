@@ -120,7 +120,8 @@ pub use field::{
     MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
     MergeField, PromptField, PromptFieldKind, ReferencedDocumentField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
-    TableOfContentsLevelRange, TableOfContentsSwitch,
+    TableOfContentsLevelRange, TableOfContentsSwitch, UserIdentityField, UserIdentityFieldKind,
+    UserIdentityFormatting,
 };
 pub use font_table::{
     EmbeddedFont, EmbeddedFontLicensing, EmbeddedFontResource, EmbeddedFontStyle, Font,
