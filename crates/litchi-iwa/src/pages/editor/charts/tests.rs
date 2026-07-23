@@ -1157,6 +1157,90 @@ fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() 
 }
 
 #[test]
+fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart minor tick marks").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart minor tick marks".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            editor
+                .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_axis_minor_tick_marks_visible(
+            source.drawable_object_id,
+            ChartAxis::Category,
+            true,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        editor
+            .set_body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis, false)
+            .unwrap();
+        assert!(
+            !editor
+                .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            !editor
+                .body_chart_axis_minor_tick_marks_visible(duplicate.drawable_object_id, axis)
+                .unwrap()
+        );
+        editor
+            .set_body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis, true)
+            .unwrap();
+    }
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            reopened
+                .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
+                .unwrap()
+        );
+        assert!(
+            !reopened
+                .body_chart_axis_minor_tick_marks_visible(duplicate.drawable_object_id, axis)
+                .unwrap()
+        );
+        reopened
+            .set_body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis, false)
+            .unwrap();
+        assert!(
+            !reopened
+                .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
 fn scratch_document_supports_native_chart_legend_visibility_crud() {
     let mut editor = PagesEditor::create_with_text("Chart legends").unwrap();
     let source = editor

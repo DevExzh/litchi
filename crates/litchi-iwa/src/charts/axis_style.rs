@@ -1,9 +1,10 @@
 //! Lossless native chart-axis style-switch storage and mutation.
 //!
-//! iWork stores axis-line, gridline, and value-axis minimum-label switches in
-//! the generated extension of a chart's `TSCH.ChartAxisStyleArchive`. This
-//! module identifies the primary native axis-style object, preserves both
-//! protobuf layers losslessly, and changes only the requested style switch.
+//! iWork stores axis-line, gridline, tick-mark, and value-axis minimum-label
+//! switches in the generated extension of a chart's
+//! `TSCH.ChartAxisStyleArchive`. This module identifies the primary native
+//! axis-style object, preserves both protobuf layers losslessly, and changes
+//! only the requested style switch.
 
 use prost::Message;
 
@@ -34,6 +35,12 @@ const CATEGORY_MINOR_GRIDLINES_VISIBLE_FIELD: u32 = 32;
 /// `tschchartaxisvalueshowminorgridlines` in
 /// `TSCH.Generated.ChartAxisStyleArchive`.
 const VALUE_MINOR_GRIDLINES_VISIBLE_FIELD: u32 = 33;
+/// `tschchartaxiscategoryshowminortickmarks` in
+/// `TSCH.Generated.ChartAxisStyleArchive`.
+const CATEGORY_MINOR_TICK_MARKS_VISIBLE_FIELD: u32 = 34;
+/// `tschchartaxisvalueshowminortickmarks` in
+/// `TSCH.Generated.ChartAxisStyleArchive`.
+const VALUE_MINOR_TICK_MARKS_VISIBLE_FIELD: u32 = 35;
 /// `tschchartaxisvalueshowminimumlabel` in
 /// `TSCH.Generated.ChartAxisStyleArchive`.
 const VALUE_AXIS_MINIMUM_LABEL_VISIBLE_FIELD: u32 = 31;
@@ -44,6 +51,7 @@ enum AxisStyleSwitch {
     Line,
     MajorGridlines,
     MinorGridlines,
+    MinorTickMarks,
     ValueMinimumLabel,
 }
 
@@ -65,6 +73,8 @@ impl AxisStyleSwitch {
             (Self::MajorGridlines, ChartAxis::Value) => VALUE_MAJOR_GRIDLINES_VISIBLE_FIELD,
             (Self::MinorGridlines, ChartAxis::Category) => CATEGORY_MINOR_GRIDLINES_VISIBLE_FIELD,
             (Self::MinorGridlines, ChartAxis::Value) => VALUE_MINOR_GRIDLINES_VISIBLE_FIELD,
+            (Self::MinorTickMarks, ChartAxis::Category) => CATEGORY_MINOR_TICK_MARKS_VISIBLE_FIELD,
+            (Self::MinorTickMarks, ChartAxis::Value) => VALUE_MINOR_TICK_MARKS_VISIBLE_FIELD,
             (Self::ValueMinimumLabel, _) => VALUE_AXIS_MINIMUM_LABEL_VISIBLE_FIELD,
         }
     }
@@ -74,6 +84,7 @@ impl AxisStyleSwitch {
             Self::Line => "line",
             Self::MajorGridlines => "major gridlines",
             Self::MinorGridlines => "minor gridlines",
+            Self::MinorTickMarks => "minor tick marks",
             Self::ValueMinimumLabel => "minimum value label",
         }
     }
@@ -81,6 +92,7 @@ impl AxisStyleSwitch {
     const fn default_visible(self) -> bool {
         match self {
             Self::ValueMinimumLabel => true,
+            Self::MinorTickMarks => true,
             Self::Line | Self::MajorGridlines | Self::MinorGridlines => false,
         }
     }
@@ -104,6 +116,12 @@ impl AxisStyleSwitch {
             },
             (Self::MinorGridlines, ChartAxis::Value) => {
                 generated.tschchartaxisvalueshowminorgridlines
+            },
+            (Self::MinorTickMarks, ChartAxis::Category) => {
+                generated.tschchartaxiscategoryshowminortickmarks
+            },
+            (Self::MinorTickMarks, ChartAxis::Value) => {
+                generated.tschchartaxisvalueshowminortickmarks
             },
             (Self::ValueMinimumLabel, _) => generated.tschchartaxisvalueshowminimumlabel,
         }
@@ -131,6 +149,12 @@ impl AxisStyleSwitch {
             },
             (Self::MinorGridlines, ChartAxis::Value) => {
                 generated.tschchartaxisvalueshowminorgridlines = Some(visible)
+            },
+            (Self::MinorTickMarks, ChartAxis::Category) => {
+                generated.tschchartaxiscategoryshowminortickmarks = Some(visible)
+            },
+            (Self::MinorTickMarks, ChartAxis::Value) => {
+                generated.tschchartaxisvalueshowminortickmarks = Some(visible)
             },
             (Self::ValueMinimumLabel, _) => {
                 generated.tschchartaxisvalueshowminimumlabel = Some(visible)
@@ -257,6 +281,44 @@ pub(crate) fn set_chart_axis_minor_gridlines_visible(
         drawable_label,
         axis,
         AxisStyleSwitch::MinorGridlines,
+        visible,
+    )
+}
+
+/// Read whether iWork shows minor tick marks for one native chart axis.
+pub(crate) fn chart_axis_minor_tick_marks_visible(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+) -> Result<bool> {
+    chart_axis_style_switch_visible(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+        AxisStyleSwitch::MinorTickMarks,
+    )
+}
+
+/// Set whether iWork shows minor tick marks for one native chart axis.
+pub(crate) fn set_chart_axis_minor_tick_marks_visible(
+    package: &mut IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    axis: ChartAxis,
+    visible: bool,
+) -> Result<()> {
+    set_chart_axis_style_switch_visible(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        axis,
+        AxisStyleSwitch::MinorTickMarks,
         visible,
     )
 }
@@ -792,6 +854,119 @@ mod tests {
         )
         .unwrap();
         assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn minor_tick_mark_patch_retains_other_style_switches_and_unmapped_fields() {
+        let generated = tsch::generated::ChartAxisStyleArchive {
+            tschchartaxiscategoryshowaxis: Some(true),
+            tschchartaxisvalueshowaxis: Some(false),
+            tschchartaxiscategoryshowmajorgridlines: Some(false),
+            tschchartaxisvalueshowmajorgridlines: Some(true),
+            tschchartaxiscategoryshowminortickmarks: Some(true),
+            tschchartaxisvalueshowminortickmarks: Some(true),
+            ..Default::default()
+        };
+        let original = axis_style_with_unknown_fields(generated);
+
+        let hidden = patch_axis_style_switch_visibility(
+            &original,
+            ChartAxis::Category,
+            AxisStyleSwitch::MinorTickMarks,
+            false,
+        )
+        .unwrap();
+        assert!(
+            !read_axis_style_switch_visibility(
+                &hidden,
+                ChartAxis::Category,
+                AxisStyleSwitch::MinorTickMarks,
+            )
+            .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(
+                &hidden,
+                ChartAxis::Value,
+                AxisStyleSwitch::MinorTickMarks,
+            )
+            .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(&hidden, ChartAxis::Category, AxisStyleSwitch::Line)
+                .unwrap()
+        );
+        assert!(
+            read_axis_style_switch_visibility(
+                &hidden,
+                ChartAxis::Value,
+                AxisStyleSwitch::MajorGridlines,
+            )
+            .unwrap()
+        );
+        assert_unknown_fields_retained(&original, &hidden);
+
+        let restored = patch_axis_style_switch_visibility(
+            &hidden,
+            ChartAxis::Category,
+            AxisStyleSwitch::MinorTickMarks,
+            true,
+        )
+        .unwrap();
+        assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn minor_tick_marks_default_visible_when_missing_from_an_extension() {
+        let original = axis_style_with_unknown_fields(tsch::generated::ChartAxisStyleArchive {
+            tschchartaxisvalueshowaxis: Some(true),
+            ..Default::default()
+        });
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert!(
+                read_axis_style_switch_visibility(&original, axis, AxisStyleSwitch::MinorTickMarks)
+                    .unwrap()
+            );
+            let hidden = patch_axis_style_switch_visibility(
+                &original,
+                axis,
+                AxisStyleSwitch::MinorTickMarks,
+                false,
+            )
+            .unwrap();
+            assert!(
+                !read_axis_style_switch_visibility(&hidden, axis, AxisStyleSwitch::MinorTickMarks,)
+                    .unwrap()
+            );
+            assert_unknown_fields_retained(&original, &hidden);
+        }
+    }
+
+    #[test]
+    fn minor_tick_marks_default_visible_and_hidden_setting_creates_a_style_extension() {
+        let original = tsch::ChartAxisStyleArchive {
+            super_: Some(tss::StyleArchive::default()),
+        }
+        .encode_to_vec();
+
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert!(
+                read_axis_style_switch_visibility(&original, axis, AxisStyleSwitch::MinorTickMarks)
+                    .unwrap()
+            );
+            let hidden = patch_axis_style_switch_visibility(
+                &original,
+                axis,
+                AxisStyleSwitch::MinorTickMarks,
+                false,
+            )
+            .unwrap();
+            assert!(
+                !read_axis_style_switch_visibility(&hidden, axis, AxisStyleSwitch::MinorTickMarks,)
+                    .unwrap()
+            );
+            assert!(generated_axis_style_extension(&hidden).unwrap().is_some());
+        }
     }
 
     #[test]
