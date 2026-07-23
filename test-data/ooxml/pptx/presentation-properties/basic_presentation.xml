@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:presentationPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+<p:presentationPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">
   <p:webPr allowPng="1" imgSz="1920x1200" clr="browser"/>
   <p:prnPr prnWhat="handouts6" clrMode="gray" hiddenSlides="1"/>
   <p:showPr loop="1" showNarration="0" showAnimation="1" useTimings="1">
     <p:kiosk restart="5"/>
     <p:sldRg st="2" end="4"/>
+    <p:extLst>
+      <p:ext uri="{F99C55AA-B7CB-42B0-86F8-08522FDF87E8}">
+        <p14:browseMode showStatus="0"/>
+      </p:ext>
+    </p:extLst>
   </p:showPr>
 </p:presentationPr>

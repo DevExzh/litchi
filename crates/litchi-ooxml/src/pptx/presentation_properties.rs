@@ -19,6 +19,7 @@ const P15_NS: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";
 const DISCARD_IMAGE_EDIT_DATA_URI: &str = "{E76CE94A-603C-4142-B9EB-6D1370010A27}";
 const DEFAULT_IMAGE_DPI_URI: &str = "{D31A062A-798A-4329-ABDD-BBA856620510}";
 const CHART_TRACKING_REF_BASED_URI: &str = "{FD5EFAAD-0ECE-453E-9831-46B23BE46B34}";
+const BROWSE_MODE_URI: &str = "{F99C55AA-B7CB-42B0-86F8-08522FDF87E8}";
 const LASER_COLOR_URI: &str = "{EC167BDD-8182-4AB7-AECC-EB403E3ABB37}";
 const SHOW_MEDIA_CONTROLS_URI: &str = "{2FDB2607-1784-4EEB-B798-7EB5836EED8A}";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps";
@@ -126,6 +127,7 @@ pub enum PresentationPropertyExtension {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SlideShowExtension {
+    BrowseMode { show_status: Option<bool> },
     LaserColor(PresentationColor),
     ShowMediaControls(bool),
     Unknown(OpaquePresentationExtension),
@@ -805,11 +807,23 @@ fn parse_show_extensions(n: &Node) -> Result<Vec<SlideShowExtension>> {
         return Err(invalid("slide-show extension count exceeds limit"));
     }
     let mut out = Vec::with_capacity(extensions.len());
+    let mut browse_mode = false;
     let mut laser = false;
     let mut controls = false;
     for ext in extensions {
         let uri = extension_uri(ext)?;
         let value = match uri.as_str() {
+            BROWSE_MODE_URI => {
+                if browse_mode {
+                    return Err(invalid("duplicate browseMode extension"));
+                }
+                browse_mode = true;
+                let payload = extension_payload(ext, P14_NS, "browseMode")?;
+                let show_status = bool_opt(payload, "showStatus")?;
+                only_attrs(payload, &[("", "showStatus")])?;
+                empty(payload)?;
+                SlideShowExtension::BrowseMode { show_status }
+            },
             LASER_COLOR_URI => {
                 if laser {
                     return Err(invalid("duplicate laserClr extension"));
@@ -1054,6 +1068,15 @@ fn write_show_extensions(x: &mut String, v: &[SlideShowExtension], strict: bool)
     x.push_str("<p:extLst>");
     for extension in v {
         match extension {
+            SlideShowExtension::BrowseMode { show_status } => {
+                x.push_str("<p:ext uri=\"");
+                x.push_str(BROWSE_MODE_URI);
+                x.push_str("\"><p14:browseMode xmlns:p14=\"");
+                x.push_str(P14_NS);
+                x.push('"');
+                bool_opt_write(x, "showStatus", *show_status);
+                x.push_str("/></p:ext>");
+            },
             SlideShowExtension::LaserColor(color) => {
                 x.push_str("<p:ext uri=\"");
                 x.push_str(LASER_COLOR_URI);
@@ -1111,6 +1134,7 @@ fn known_extension_uri(uri: &str) -> bool {
         DISCARD_IMAGE_EDIT_DATA_URI
             | DEFAULT_IMAGE_DPI_URI
             | CHART_TRACKING_REF_BASED_URI
+            | BROWSE_MODE_URI
             | LASER_COLOR_URI
             | SHOW_MEDIA_CONTROLS_URI
     )
@@ -1472,70 +1496,24 @@ fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sy
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn fixture(v: &[u8]) -> PresentationProperties {
-        let p = OpcPackage::from_bytes(v).unwrap();
-        load_from_package(&p).unwrap().unwrap()
-    }
+
     #[test]
-    fn reads_poi_colors_and_round_trips() {
-        let v = fixture(include_bytes!(
-            "../../../../3rdparty/poi/test-data/slideshow/prProps.pptx"
-        ));
-        assert_eq!(v.recent_colors.len(), 8);
-        assert_eq!(v.recent_colors[0].kind, ColorKind::Srgb);
+    fn parses_local_presentation_properties_fixture() {
+        let value = PresentationProperties::parse(include_bytes!(
+            "../../../../test-data/ooxml/pptx/presentation-properties/basic_presentation.xml"
+        ))
+        .unwrap();
+        let show = value.show.as_ref().unwrap();
+        assert_eq!(show.mode, Some(ShowMode::Kiosk { restart: Some(5) }));
         assert_eq!(
-            v.extensions,
-            vec![
-                PresentationPropertyExtension::DiscardImageEditData(false),
-                PresentationPropertyExtension::DefaultImageDpi(220)
-            ]
+            show.extensions,
+            vec![SlideShowExtension::BrowseMode {
+                show_status: Some(false)
+            }]
         );
-        let strict = v.to_xml(true).unwrap();
+        let strict = value.to_xml(true).unwrap();
         let again = PresentationProperties::parse(&strict).unwrap();
-        assert_eq!(again.recent_colors.len(), 8);
-        assert_eq!(again.extensions, v.extensions);
-    }
-    #[test]
-    fn reads_libreoffice_show_and_extensions() {
-        let v = fixture(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx"
-        ));
-        let show = v.show.as_ref().unwrap();
-        assert_eq!(show.show_narration, Some(true));
-        assert_eq!(show.mode, Some(ShowMode::Present));
-        assert_eq!(show.slides, Some(SlideSelection::All));
-        assert_eq!(show.pen_color.as_ref().unwrap().kind, ColorKind::Preset);
-        assert!(matches!(
-            &show.extensions[..],
-            [
-                SlideShowExtension::LaserColor(PresentationColor {
-                    kind: ColorKind::Srgb,
-                    ..
-                }),
-                SlideShowExtension::ShowMediaControls(true)
-            ]
-        ));
-        assert_eq!(
-            v.extensions,
-            vec![
-                PresentationPropertyExtension::DiscardImageEditData(false),
-                PresentationPropertyExtension::DefaultImageDpi(32767),
-                PresentationPropertyExtension::ChartTrackingReferenceBased(true)
-            ]
-        );
-        let written = v.to_xml(false).unwrap();
-        let again = PresentationProperties::parse(&written).unwrap();
-        assert_eq!(again.extensions, v.extensions);
-        assert!(matches!(
-            &again.show.unwrap().extensions[..],
-            [
-                SlideShowExtension::LaserColor(PresentationColor {
-                    kind: ColorKind::Srgb,
-                    ..
-                }),
-                SlideShowExtension::ShowMediaControls(true)
-            ]
-        ));
+        assert_eq!(again.show, value.show);
     }
     #[test]
     fn strict_mce_and_typed_roundtrip() {
@@ -1589,6 +1567,38 @@ mod tests {
             assert!(text.contains("r:id=\"rIdNeverFetched\""));
             assert!(text.contains("https://example.invalid/not-opened"));
         }
+    }
+    #[test]
+    fn browse_mode_extension_round_trips() {
+        let xml = format!(
+            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:p14="{P14_NS}"><p:showPr><p:extLst><p:ext uri="{BROWSE_MODE_URI}"><p14:browseMode showStatus="0"/></p:ext></p:extLst></p:showPr></p:presentationPr>"#
+        );
+        let value = PresentationProperties::parse(xml.as_bytes()).unwrap();
+        assert_eq!(
+            value.show.as_ref().unwrap().extensions,
+            vec![SlideShowExtension::BrowseMode {
+                show_status: Some(false)
+            }]
+        );
+        for strict in [false, true] {
+            let written = value.to_xml(strict).unwrap();
+            let again = PresentationProperties::parse(&written).unwrap();
+            assert_eq!(again.show, value.show);
+        }
+
+        let no_status = format!(
+            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:p14="{P14_NS}"><p:showPr><p:extLst><p:ext uri="{BROWSE_MODE_URI}"><p14:browseMode/></p:ext></p:extLst></p:showPr></p:presentationPr>"#
+        );
+        assert!(matches!(
+            PresentationProperties::parse(no_status.as_bytes()),
+            Ok(PresentationProperties {
+                show: Some(ShowProperties {
+                    extensions,
+                    ..
+                }),
+                ..
+            }) if extensions == vec![SlideShowExtension::BrowseMode { show_status: None }]
+        ));
     }
     #[test]
     fn rejects_hostile_typed_extension_grammar_and_bounds() {

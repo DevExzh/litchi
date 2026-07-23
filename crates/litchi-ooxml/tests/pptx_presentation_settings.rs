@@ -1,5 +1,5 @@
 use litchi_ooxml::pptx::{
-    Package, PrintColorMode, PrintOutput, ShowMode, SlideSelection, ViewKind,
+    Package, PrintColorMode, PrintOutput, ShowMode, SlideSelection, SlideShowExtension, ViewKind,
 };
 use litchi_ooxml::{OoxmlError, PackURI};
 
@@ -38,6 +38,12 @@ fn package_and_presentation_load_local_settings() {
     );
     let show = presentation_properties.show.as_ref().unwrap();
     assert_eq!(show.mode, Some(ShowMode::Kiosk { restart: Some(5) }));
+    assert_eq!(
+        show.extensions,
+        vec![SlideShowExtension::BrowseMode {
+            show_status: Some(false)
+        }]
+    );
     assert_eq!(
         show.slides,
         Some(SlideSelection::Range { start: 2, end: 4 })
