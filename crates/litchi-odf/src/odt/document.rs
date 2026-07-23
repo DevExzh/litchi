@@ -450,6 +450,18 @@ impl Document {
         )
     }
 
+    /// Return the stored footnote and endnote presentation configurations.
+    ///
+    /// These style declarations are retained as metadata only. This API does
+    /// not renumber notes, resolve style references, or render continuation
+    /// notices.
+    pub fn notes_configurations(&self) -> Result<crate::OdfNotesConfigurations> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::parse_notes_configurations(styles.xml_content()),
+        )
+    }
+
     /// Return the explicit master-page assignments from `text:page-sequence`, if present.
     ///
     /// This exposes stored page metadata only. It does not resolve master-page

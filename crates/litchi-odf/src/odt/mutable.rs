@@ -341,6 +341,83 @@ impl MutableDocument {
         Ok(old)
     }
 
+    /// Return stored footnote and endnote presentation configurations.
+    ///
+    /// The result describes style metadata only. It never renumbers, lays out,
+    /// or renders notes.
+    pub fn notes_configurations(&self) -> Result<crate::OdfNotesConfigurations> {
+        self.styles_xml
+            .as_deref()
+            .map_or_else(|| Ok(Default::default()), crate::parse_notes_configurations)
+    }
+
+    /// Insert or replace one stored footnote or endnote configuration.
+    ///
+    /// This edits `styles.xml` only and returns the prior configuration for the
+    /// same note class. It never changes note anchors, citations, or numbering.
+    pub fn set_notes_configuration(
+        &mut self,
+        configuration: &crate::OdfNotesConfiguration,
+    ) -> Result<Option<crate::OdfNotesConfiguration>> {
+        configuration.validate()?;
+        let old = self
+            .notes_configurations()?
+            .get(configuration.note_class)
+            .cloned();
+        let styles = self
+            .styles_xml
+            .clone()
+            .unwrap_or_else(OdfStructure::default_styles_xml);
+        self.styles_xml = Some(crate::set_notes_configuration_xml(&styles, configuration)?);
+        Ok(old)
+    }
+
+    /// Replace both stored note-class configurations and return the old values.
+    ///
+    /// An absent class is removed from `styles.xml`. This updates metadata only and
+    /// never recalculates citations, sequence numbers, or page layout.
+    pub fn set_notes_configurations(
+        &mut self,
+        configurations: &crate::OdfNotesConfigurations,
+    ) -> Result<crate::OdfNotesConfigurations> {
+        configurations.validate()?;
+        let old = self.notes_configurations()?;
+        if self.styles_xml.is_none()
+            && configurations.footnote.is_none()
+            && configurations.endnote.is_none()
+        {
+            return Ok(old);
+        }
+        let mut styles = self
+            .styles_xml
+            .clone()
+            .unwrap_or_else(OdfStructure::default_styles_xml);
+        for note_class in crate::OdfNoteClass::ALL {
+            styles = match configurations.get(note_class) {
+                Some(configuration) => crate::set_notes_configuration_xml(&styles, configuration)?,
+                None => crate::remove_notes_configuration_xml(&styles, note_class)?,
+            };
+        }
+        self.styles_xml = Some(styles);
+        Ok(old)
+    }
+
+    /// Remove one stored note-class configuration and return its prior value.
+    ///
+    /// This edits style metadata only. Existing notes and their cached citations
+    /// are preserved verbatim.
+    pub fn clear_notes_configuration(
+        &mut self,
+        note_class: crate::OdfNoteClass,
+    ) -> Result<Option<crate::OdfNotesConfiguration>> {
+        let old = self.notes_configurations()?.get(note_class).cloned();
+        let Some(styles) = self.styles_xml.as_deref() else {
+            return Ok(None);
+        };
+        self.styles_xml = Some(crate::remove_notes_configuration_xml(styles, note_class)?);
+        Ok(old)
+    }
+
     /// Return stored document line-numbering configuration from current styles.
     ///
     /// The result is presentation metadata only. It is never used to paginate
