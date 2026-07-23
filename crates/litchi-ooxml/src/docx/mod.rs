@@ -114,11 +114,11 @@ pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::CompareField;
 pub use field::{
     ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AdvanceField,
-    AdvanceFieldAdjustment, AdvanceFieldOperation, BibliographyField, CitationField, DdeField,
-    DdeFieldKind, DdeRepresentation, DocumentVariableField, ExternalIncludeField,
-    ExternalIncludeOption, Field, FieldSwitch, FormulaField, GoToButtonField, IfField,
-    IncludeFieldKind, IndexEntryField, IndexField, IndexSortOrder, LinkField, LinkFormatting,
-    LinkResultOption, MacroButtonField,
+    AdvanceFieldAdjustment, AdvanceFieldOperation, AutoTextField, AutoTextFieldKind,
+    BibliographyField, CitationField, DdeField, DdeFieldKind, DdeRepresentation,
+    DocumentVariableField, ExternalIncludeField, ExternalIncludeOption, Field, FieldSwitch,
+    FormulaField, GoToButtonField, IfField, IncludeFieldKind, IndexEntryField, IndexField,
+    IndexSortOrder, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
     MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
     MergeField, PromptField, PromptFieldKind, ReferencedDocumentField, SequenceField, SetField,
