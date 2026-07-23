@@ -732,6 +732,64 @@ impl MergeField {
     }
 }
 
+/// A typed, inert legacy Word `DOCVARIABLE` field.
+///
+/// [MS-DOC] §2.9.90 identifies its native field-type byte, and ECMA-376 Part
+/// 1 §17.16.5.15 defines `DOCVARIABLE` with one document-variable name.
+/// This type exposes the stored name, any preserved switches, and cached result
+/// only. It never reads document variables, resolves a value, or refreshes a
+/// field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentVariableField {
+    field: Field,
+    instruction: String,
+    variable_name: String,
+    unknown_switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl DocumentVariableField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored document-variable name without resolving it.
+    pub fn variable_name(&self) -> &str {
+        &self.variable_name
+    }
+
+    /// Return preserved switches in source order without interpreting them.
+    ///
+    /// `DOCVARIABLE` has no field-specific switches. These values remain
+    /// inert source metadata and are never applied.
+    pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from a document variable.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The stored kind of a legacy Word mail-merge counter field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MailMergeCounterKind {
@@ -1501,6 +1559,27 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `DOCVARIABLE`
+    /// field.
+    ///
+    /// The stored variable name, switches, and cached result are never resolved
+    /// against document variables or refreshed. Malformed instructions remain
+    /// available through this generic type and return `None` here.
+    pub fn document_variable(&self) -> Option<DocumentVariableField> {
+        if self.field.field_type != FieldType::DocumentVariable {
+            return None;
+        }
+        let (variable_name, unknown_switches) =
+            parse_document_variable_field_parts(&self.instruction)?;
+        Some(DocumentVariableField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            variable_name,
+            unknown_switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed mail-merge counter.
     ///
     /// The stored kind and cached result are never used to select or count
@@ -1730,6 +1809,8 @@ const MAX_MACRO_BUTTON_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_GO_TO_BUTTON_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MERGE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MERGE_FIELD_SWITCHES: usize = 64;
+const MAX_DOCUMENT_VARIABLE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_DOCUMENT_VARIABLE_FIELD_SWITCHES: usize = 64;
 const MAX_MAIL_MERGE_COUNTER_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_NEXT_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_CONDITIONAL_CONTROL_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -1843,6 +1924,53 @@ fn parse_merge_field_parts(instruction: &str) -> Option<(String, Vec<MergeFieldS
     }
 
     Some((field_name, switches))
+}
+
+fn parse_document_variable_field_parts(
+    instruction: &str,
+) -> Option<(String, Vec<MergeFieldSwitch>)> {
+    if instruction.len() > MAX_DOCUMENT_VARIABLE_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("DOCVARIABLE") {
+        return None;
+    }
+
+    let variable_name = next_field_argument(instruction, &mut position).ok()??;
+    if variable_name.is_empty() {
+        return None;
+    }
+
+    let mut unknown_switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' || unknown_switches.len() >= MAX_DOCUMENT_VARIABLE_FIELD_SWITCHES {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        unknown_switches.push(MergeFieldSwitch {
+            name: name.to_ascii_lowercase(),
+            argument,
+        });
+    }
+
+    Some((variable_name, unknown_switches))
 }
 
 fn parse_mail_merge_counter_kind(instruction: &str) -> Option<MailMergeCounterKind> {
@@ -2927,6 +3055,82 @@ mod tests {
             ..text
         };
         assert!(wrong_type.merge_field().is_none());
+    }
+
+    #[test]
+    fn document_variable_fields_expose_cached_metadata_without_resolution() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::DocumentVariable,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" DOCVARIABLE "Customer Region" \* MERGEFORMAT "#.to_string(),
+            result: Some("cached region".to_string()),
+        };
+
+        let variable = text.document_variable().unwrap();
+        assert_eq!(variable.field(), &field);
+        assert_eq!(variable.instruction(), text.instruction);
+        assert_eq!(variable.variable_name(), "Customer Region");
+        assert_eq!(variable.cached_result(), Some("cached region"));
+        assert!(variable.is_dirty());
+        assert!(variable.is_locked());
+        assert_eq!(variable.unknown_switches().len(), 1);
+        assert_eq!(variable.unknown_switches()[0].name(), '*');
+        assert_eq!(
+            variable.unknown_switches()[0].argument(),
+            Some("MERGEFORMAT")
+        );
+
+        let compact = FieldText {
+            instruction: r#"DOCVARIABLE"Customer Name"\*MERGEFORMAT"#.to_string(),
+            ..text.clone()
+        };
+        let compact_variable = compact.document_variable().unwrap();
+        assert_eq!(compact_variable.variable_name(), "Customer Name");
+        assert_eq!(
+            compact_variable.unknown_switches()[0].argument(),
+            Some("MERGEFORMAT")
+        );
+
+        let missing_name = FieldText {
+            instruction: r#"DOCVARIABLE \* MERGEFORMAT"#.to_string(),
+            ..text.clone()
+        };
+        assert!(missing_name.document_variable().is_none());
+
+        let unexpected_operand = FieldText {
+            instruction: "DOCVARIABLE Customer unexpected".to_string(),
+            ..text.clone()
+        };
+        assert!(unexpected_operand.document_variable().is_none());
+
+        let wrong_keyword = FieldText {
+            instruction: "DOCVARIABLES Customer".to_string(),
+            ..text.clone()
+        };
+        assert!(wrong_keyword.document_variable().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::MergeField,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.document_variable().is_none());
     }
 
     #[test]

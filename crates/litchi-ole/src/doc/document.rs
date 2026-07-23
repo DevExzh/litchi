@@ -14,9 +14,10 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    AdvanceField, CompareField, Field, FieldStory, FieldText, FieldsTable, GoToButtonField,
-    IfField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
-    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
+    AdvanceField, CompareField, DocumentVariableField, Field, FieldStory, FieldText, FieldsTable,
+    GoToButtonField, IfField, MacroButtonField, MailMergeConditionalControlField,
+    MailMergeCounterField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
+    UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -621,6 +622,24 @@ impl Document {
     /// Get the number of typed, inert `MERGEFIELD` fields.
     pub fn merge_field_count(&self) -> Result<usize> {
         Ok(self.merge_fields()?.len())
+    }
+
+    /// Get typed, inert `DOCVARIABLE` fields in story and source order.
+    ///
+    /// Returned values expose only stored variable names, switches, cached
+    /// results, and field state. This method never reads document variables,
+    /// resolves a value, or refreshes a field result.
+    pub fn document_variable_fields(&self) -> Result<Vec<DocumentVariableField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::document_variable)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `DOCVARIABLE` fields.
+    pub fn document_variable_field_count(&self) -> Result<usize> {
+        Ok(self.document_variable_fields()?.len())
     }
 
     /// Get typed, inert `MERGEREC` and `MERGESEQ` fields in story and source order.
