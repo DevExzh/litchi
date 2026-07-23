@@ -987,6 +987,80 @@ impl ShapeField {
     }
 }
 
+/// The stored kind of a legacy Word form-code field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LegacyFormFieldKind {
+    /// A `FORMTEXT` text-box form field.
+    Text,
+    /// A `FORMCHECKBOX` checkbox form field.
+    CheckBox,
+    /// A `FORMDROPDOWN` drop-down-list form field.
+    DropDown,
+}
+
+/// Typed, inert metadata for a legacy Word form-code field.
+///
+/// [MS-DOC] §2.9.90 identifies native `FORMTEXT`, `FORMCHECKBOX`, and
+/// `FORMDROPDOWN` fields with types `0x46`, `0x47`, and `0x53`. This type
+/// retains only the stored kind, opaque instruction text, cached result, and
+/// field-marker state. It never reads associated form properties, fills a form,
+/// changes a selection or checkbox state, invokes entry or exit macros, or
+/// refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LegacyFormField {
+    field: Field,
+    instruction: String,
+    kind: LegacyFormFieldKind,
+    opaque_instructions: String,
+    cached_result: Option<String>,
+}
+
+impl LegacyFormField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to change a form
+    /// field.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return whether this is a text, checkbox, or drop-down form-code field.
+    pub const fn kind(&self) -> LegacyFormFieldKind {
+        self.kind
+    }
+
+    /// Return opaque stored instruction text after the form-code keyword.
+    ///
+    /// It is never parsed, interpreted, or used to fill a form, change a
+    /// checkbox or selection, or invoke a macro.
+    pub fn opaque_instructions(&self) -> &str {
+        &self.opaque_instructions
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is cached metadata only and is never regenerated from form
+    /// state.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// One recognized stored option of a legacy Word `TOC` field.
 ///
 /// These values retain how a producer configured a table of contents. They
@@ -3925,6 +3999,31 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a native legacy form-code field.
+    ///
+    /// Stored kind, opaque instructions, cached results, and field-marker state
+    /// remain metadata only. This method never reads associated form
+    /// properties, fills a form, changes a selection or checkbox state, invokes
+    /// entry or exit macros, or refreshes a field. Malformed instructions remain
+    /// available through this generic type and return `None` here.
+    pub fn legacy_form_field(&self) -> Option<LegacyFormField> {
+        let (kind, keyword) = match self.field.field_type {
+            FieldType::FormText => (LegacyFormFieldKind::Text, "FORMTEXT"),
+            FieldType::FormCheckbox => (LegacyFormFieldKind::CheckBox, "FORMCHECKBOX"),
+            FieldType::FormDropdown => (LegacyFormFieldKind::DropDown, "FORMDROPDOWN"),
+            _ => return None,
+        };
+        let opaque_instructions =
+            parse_legacy_form_field_instructions(&self.instruction, keyword)?;
+        Some(LegacyFormField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            kind,
+            opaque_instructions,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed bookmark-reference field.
     ///
     /// Stored bookmark names, options, and cached results are never used to
@@ -4716,6 +4815,7 @@ const MAX_EMBED_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BARCODE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_BIDI_OUTLINE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SHAPE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_LEGACY_FORM_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_SWITCHES: usize = 64;
 const MAX_AUTO_NUMBER_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5387,6 +5487,22 @@ fn parse_shape_field_instructions(instruction: &str) -> Option<String> {
     let mut position = 0;
     let keyword = next_field_argument(instruction, &mut position).ok()??;
     if !keyword.eq_ignore_ascii_case("SHAPE") {
+        return None;
+    }
+    Some(instruction.get(position..)?.trim().to_string())
+}
+
+fn parse_legacy_form_field_instructions(
+    instruction: &str,
+    expected_keyword: &str,
+) -> Option<String> {
+    if instruction.len() > MAX_LEGACY_FORM_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case(expected_keyword) {
         return None;
     }
     Some(instruction.get(position..)?.trim().to_string())
@@ -7188,6 +7304,12 @@ mod tests {
         assert_eq!(FieldType::BidiOutline.as_u8(), 0x5C);
         assert_eq!(FieldType::from(0x5F), FieldType::Shape);
         assert_eq!(FieldType::Shape.as_u8(), 0x5F);
+        assert_eq!(FieldType::from(0x46), FieldType::FormText);
+        assert_eq!(FieldType::FormText.as_u8(), 0x46);
+        assert_eq!(FieldType::from(0x47), FieldType::FormCheckbox);
+        assert_eq!(FieldType::FormCheckbox.as_u8(), 0x47);
+        assert_eq!(FieldType::from(0x53), FieldType::FormDropdown);
+        assert_eq!(FieldType::FormDropdown.as_u8(), 0x53);
         assert_eq!(FieldType::from(0x58), FieldType::Hyperlink);
         assert_eq!(FieldType::from(0x34), FieldType::AutoNumOutline);
         assert_eq!(FieldType::from(0x35), FieldType::AutoNumLegal);
@@ -7764,6 +7886,94 @@ mod tests {
             ..text
         };
         assert!(wrong_type.shape_field().is_none());
+    }
+
+    #[test]
+    fn legacy_form_fields_preserve_metadata_without_filling_or_executing() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::FormText,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" FORMTEXT \* MERGEFORMAT "#.to_string(),
+            result: Some("cached text field".to_string()),
+        };
+
+        let text_field = text.legacy_form_field().unwrap();
+        assert_eq!(text_field.field(), &field);
+        assert_eq!(text_field.kind(), LegacyFormFieldKind::Text);
+        assert_eq!(text_field.instruction(), text.instruction);
+        assert_eq!(text_field.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(text_field.cached_result(), Some("cached text field"));
+        assert!(text_field.is_dirty());
+        assert!(text_field.is_locked());
+
+        let checkbox = FieldText {
+            field: Field {
+                field_type: FieldType::FormCheckbox,
+                ..field.clone()
+            },
+            instruction: "formcheckbox".to_string(),
+            result: Some("cached checkbox".to_string()),
+        };
+        let checkbox = checkbox.legacy_form_field().unwrap();
+        assert_eq!(checkbox.kind(), LegacyFormFieldKind::CheckBox);
+        assert_eq!(checkbox.opaque_instructions(), "");
+        assert_eq!(checkbox.cached_result(), Some("cached checkbox"));
+
+        let drop_down = FieldText {
+            field: Field {
+                field_type: FieldType::FormDropdown,
+                ..field.clone()
+            },
+            instruction: r#" FORMDROPDOWN \* MERGEFORMAT "#.to_string(),
+            result: Some("cached drop-down selection".to_string()),
+        };
+        let drop_down = drop_down.legacy_form_field().unwrap();
+        assert_eq!(drop_down.kind(), LegacyFormFieldKind::DropDown);
+        assert_eq!(drop_down.opaque_instructions(), r#"\* MERGEFORMAT"#);
+        assert_eq!(
+            drop_down.cached_result(),
+            Some("cached drop-down selection")
+        );
+
+        for instruction in [r#"FORMTEXTUAL"#, r#"FORMCHECKBOX"#] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.legacy_form_field().is_none(), "{instruction}");
+        }
+
+        let too_long = FieldText {
+            instruction: format!(
+                "FORMTEXT {}",
+                "x".repeat(MAX_LEGACY_FORM_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text.clone()
+        };
+        assert!(too_long.legacy_form_field().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Equation,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.legacy_form_field().is_none());
     }
 
     #[test]

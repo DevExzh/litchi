@@ -18,7 +18,8 @@ use super::parts::fields::{
     BarcodeField, BidiOutlineField, CompareField, DdeField, DocumentContextField,
     DocumentInformationField, DocumentVariableField, EmbedField, ExternalIncludeField, Field,
     FieldStory, FieldText, FieldsTable, FormulaField,
-    GoToButtonField, IfField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
+    GoToButtonField, IfField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
+    MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
     ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
@@ -698,6 +699,25 @@ impl Document {
     /// Get the number of typed, inert `SHAPE` drawing-canvas anchor fields.
     pub fn shape_field_count(&self) -> Result<usize> {
         Ok(self.shape_fields()?.len())
+    }
+
+    /// Get typed, inert legacy form-code fields in story and source order.
+    ///
+    /// Returned values expose only stored text/checkbox/drop-down kind, opaque
+    /// instructions, cached results, and field state. This method never reads
+    /// form properties, fills a form, changes a selection or checkbox state,
+    /// invokes entry or exit macros, or refreshes a field.
+    pub fn legacy_form_fields(&self) -> Result<Vec<LegacyFormField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::legacy_form_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert legacy form-code fields.
+    pub fn legacy_form_field_count(&self) -> Result<usize> {
+        Ok(self.legacy_form_fields()?.len())
     }
 
     /// Get typed, inert `TOC` fields in story and source order.
