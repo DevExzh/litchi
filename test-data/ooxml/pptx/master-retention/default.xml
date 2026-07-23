@@ -1,0 +1,5 @@
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld name="Default master">
+    <p:spTree/>
+  </p:cSld>
+</p:sldMaster>

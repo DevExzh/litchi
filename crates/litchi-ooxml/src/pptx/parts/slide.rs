@@ -211,6 +211,11 @@ fn parse_slide_layout_metadata(xml: &[u8]) -> Result<SlideLayoutMetadata> {
     SlideLayoutMetadata::from_element(&element, decoder)
 }
 
+fn parse_slide_master_preserve(xml: &[u8]) -> Result<bool> {
+    let (element, decoder) = read_root_element(xml, b"sldMaster", "slide master")?;
+    parse_boolean_attribute(&element, b"preserve", decoder, "slide master", false)
+}
+
 fn read_root_element(
     xml: &[u8],
     root_name: &[u8],
@@ -503,6 +508,11 @@ impl<'a> SlideMasterPart<'a> {
         presentation_name(self.xml_bytes())
     }
 
+    /// Whether this slide master is retained after its dependent slides are removed.
+    pub fn is_preserved(&self) -> Result<bool> {
+        parse_slide_master_preserve(self.xml_bytes())
+    }
+
     /// Get all shapes defined by this master.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
         parse_shapes(self.xml_bytes())
@@ -771,5 +781,26 @@ mod tests {
 
         let wrong_root = format!(r#"<p:sld xmlns:p="{P}"><p:cSld/></p:sld>"#);
         assert!(parse_slide_layout_metadata(wrong_root.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn slide_master_preserve_defaults_to_false_and_supports_strict_namespaces() {
+        let default_master = format!(r#"<p:sldMaster xmlns:p="{P}"><p:cSld/></p:sldMaster>"#);
+        assert!(!parse_slide_master_preserve(default_master.as_bytes()).unwrap());
+
+        let strict_master = r#"<q:sldMaster
+            xmlns:q="http://purl.oclc.org/ooxml/presentationml/main"
+            preserve="true"><q:cSld/></q:sldMaster>"#;
+        assert!(parse_slide_master_preserve(strict_master.as_bytes()).unwrap());
+    }
+
+    #[test]
+    fn slide_master_preserve_rejects_invalid_values_and_roots() {
+        let invalid_value =
+            format!(r#"<p:sldMaster xmlns:p="{P}" preserve="sometimes"><p:cSld/></p:sldMaster>"#);
+        assert!(parse_slide_master_preserve(invalid_value.as_bytes()).is_err());
+
+        let wrong_root = format!(r#"<p:sld xmlns:p="{P}"><p:cSld/></p:sld>"#);
+        assert!(parse_slide_master_preserve(wrong_root.as_bytes()).is_err());
     }
 }

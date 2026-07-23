@@ -1023,6 +1023,11 @@ impl<'a> SlideMaster<'a> {
         self.part.name()
     }
 
+    /// Whether this slide master is retained after its dependent slides are removed.
+    pub fn is_preserved(&self) -> Result<bool> {
+        self.part.is_preserved()
+    }
+
     /// Get all shapes defined by this slide master.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
         self.part.shapes()

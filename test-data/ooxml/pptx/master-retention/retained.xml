@@ -1,0 +1,6 @@
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    preserve="1">
+  <p:cSld name="Retained master">
+    <p:spTree/>
+  </p:cSld>
+</p:sldMaster>
