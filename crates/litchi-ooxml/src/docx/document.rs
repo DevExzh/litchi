@@ -9,12 +9,12 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
-    AdvanceField, BibliographyField, CitationField, DdeField, DocumentVariableField,
-    ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField, IndexField, LinkField,
-    MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
-    MailMergeRecipientField, MergeField, PromptField, QuoteField, ReferencedDocumentField,
-    SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
-    UserIdentityField,
+    AdvanceField, AutoNumberField, BibliographyField, CitationField, DdeField,
+    DocumentVariableField, ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField,
+    IndexField, LinkField, MacroButtonField, MailMergeConditionalControlField,
+    MailMergeCounterField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
+    QuoteField, ReferencedDocumentField, SymbolField, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -1667,6 +1667,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `SYMBOL` fields in the main document.
     pub fn symbol_field_count(&self) -> Result<usize> {
         Ok(self.symbol_fields()?.len())
+    }
+
+    /// Get typed, inert legacy automatic-numbering fields in document order.
+    ///
+    /// Returned values expose stored kinds, switches, cached content, and
+    /// dirty/lock state only. This method never calculates paragraph numbers,
+    /// reads heading or style state, changes paragraphs or layout, or refreshes
+    /// a field result.
+    pub fn auto_number_fields(&self) -> Result<Vec<AutoNumberField>> {
+        self.fields()?
+            .iter()
+            .map(Field::auto_number_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert legacy automatic-numbering fields.
+    pub fn auto_number_field_count(&self) -> Result<usize> {
+        Ok(self.auto_number_fields()?.len())
     }
 
     /// Get typed, inert `ASK` and `FILLIN` fields in document order.

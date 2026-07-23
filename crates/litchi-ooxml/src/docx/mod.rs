@@ -114,7 +114,8 @@ pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::CompareField;
 pub use field::{
     ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AdvanceField,
-    AdvanceFieldAdjustment, AdvanceFieldOperation, AutoTextField, AutoTextFieldKind,
+    AdvanceFieldAdjustment, AdvanceFieldOperation, AutoNumberField, AutoNumberFieldKind,
+    AutoTextField, AutoTextFieldKind,
     AutoTextListField, AutoTextListOption, BibliographyField, CitationField, DdeField,
     DdeFieldKind, DdeRepresentation, DocumentContextField, DocumentContextFieldKind,
     DocumentInformationField, DocumentInformationFieldKind, DocumentPropertyField,
