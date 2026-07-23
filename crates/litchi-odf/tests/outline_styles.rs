@@ -55,10 +55,8 @@ fn flat_document_exposes_outline_styles_without_interpreting_headings() {
 }
 
 #[test]
-fn parses_bundled_libreoffice_outline_style() {
-    let xml = include_str!(
-        "../../../3rdparty/libreoffice-core/xmloff/qa/unit/data/tdf162691_handle_polar.fodt"
-    );
+fn parses_local_outline_fixture_with_tenth_level_extension() {
+    let xml = include_str!("../../../test-data/odf/odt/outline-ten-level-extension.fodt");
     let parsed = parse_outline_styles(xml).unwrap();
     let outline = parsed.get("Outline").unwrap();
     assert_eq!(outline.levels.len(), 10);
