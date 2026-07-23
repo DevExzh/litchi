@@ -674,12 +674,13 @@ impl Document {
         Ok(self.link_fields()?.len())
     }
 
-    /// Get typed, inert `INCLUDETEXT` and `INCLUDEPICTURE` fields in story and source order.
+    /// Get typed, inert external-include fields in story and source order.
     ///
-    /// Returned values expose only stored source, bookmark, converter,
-    /// XML-option, cached-result, and field-state metadata. This method never
-    /// opens, resolves, imports, fetches, refreshes, transforms, converts,
-    /// evaluates, or executes an external source.
+    /// Returned values cover `INCLUDETEXT`/`INCLUDEPICTURE` and their historical
+    /// `INCLUDE`/`IMPORT` aliases. They expose only stored source, bookmark,
+    /// converter, XML-option, cached-result, and field-state metadata. This
+    /// method never opens, resolves, imports, fetches, refreshes, transforms,
+    /// converts, evaluates, or executes an external source.
     pub fn external_includes(&self) -> Result<Vec<ExternalIncludeField>> {
         let fields = self.fields()?;
         Ok(fields
@@ -688,7 +689,7 @@ impl Document {
             .collect())
     }
 
-    /// Get the number of typed, inert `INCLUDETEXT` and `INCLUDEPICTURE` fields.
+    /// Get the number of typed, inert external-include fields.
     pub fn external_include_count(&self) -> Result<usize> {
         Ok(self.external_includes()?.len())
     }
