@@ -1470,6 +1470,120 @@ impl TableOfAuthoritiesEntryField {
     }
 }
 
+/// One recognized stored option of a legacy Word `XE` field.
+///
+/// These values identify how an index marker participates in an `INDEX` field.
+/// They are inert metadata only: this crate never changes hidden text,
+/// calculates page numbers, follows bookmarks, or generates an index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndexEntryOption {
+    /// The `\\b` switch requests bold page-number formatting.
+    BoldPageNumber,
+    /// The `\\f` entry type that selects this marker.
+    EntryType(String),
+    /// The `\\i` switch requests italic page-number formatting.
+    ItalicPageNumber,
+    /// The `\\r` bookmark that marks a page range.
+    PageRangeBookmark(String),
+    /// The `\\t` text that replaces a page number with a cross reference.
+    CrossReference(String),
+    /// The `\\y` yomi sorting text.
+    Yomi(String),
+}
+
+/// Typed, inert metadata for a legacy Word index-entry (`XE`) field.
+///
+/// MS-DOC excludes `XE` field characters from the `Plcfld` `aFld` array, so
+/// this type retains story-relative control-character positions instead of a
+/// `Field` descriptor. It exposes only the stored entry, switches, and cached
+/// result. It never changes hidden text, resolves a bookmark, calculates page
+/// numbers, sorts entries, generates an index, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexEntryField {
+    story: FieldStory,
+    start_cp: u32,
+    separator_cp: Option<u32>,
+    end_cp: u32,
+    instruction: String,
+    entry: String,
+    options: Vec<IndexEntryOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl IndexEntryField {
+    pub(crate) fn from_non_plcf_field(field: &NonPlcfFieldText<'_>) -> Option<Self> {
+        let parts = parse_index_entry_field_parts(field.instruction)?;
+        Some(Self {
+            story: field.story,
+            start_cp: field.start_cp,
+            separator_cp: field.separator_cp,
+            end_cp: field.end_cp,
+            instruction: field.instruction.to_string(),
+            entry: parts.entry,
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: field.result.map(str::to_string),
+        })
+    }
+
+    /// Return the story that stores this field.
+    pub const fn story(&self) -> FieldStory {
+        self.story
+    }
+
+    /// Return the story-relative position of this field's begin character.
+    pub const fn start_position(&self) -> u32 {
+        self.start_cp
+    }
+
+    /// Return the story-relative position of this field's separator character.
+    ///
+    /// `XE` fields normally have no cached result and therefore no separator.
+    pub const fn separator_position(&self) -> Option<u32> {
+        self.separator_cp
+    }
+
+    /// Return the story-relative position of this field's end character.
+    pub const fn end_position(&self) -> u32 {
+        self.end_cp
+    }
+
+    /// Return the complete stored `XE` field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored text marked for an index.
+    ///
+    /// This is metadata only and is never inserted into generated content.
+    pub fn entry(&self) -> &str {
+        &self.entry
+    }
+
+    /// Return recognized `XE` options in stored source order.
+    ///
+    /// These options are never used to change hidden text, resolve bookmarks,
+    /// calculate pages, or generate an index.
+    pub fn options(&self) -> &[IndexEntryOption] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    ///
+    /// They are retained without interpretation or execution.
+    pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This value is never regenerated through pagination or field evaluation.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+}
+
 /// One recognized stored option of a legacy Word `TOA` field.
 ///
 /// These values retain how a producer configured a table of authorities. They
@@ -5299,6 +5413,8 @@ const MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_SWITCHES: usize = 64;
 const MAX_TABLE_OF_AUTHORITIES_ENTRY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_AUTHORITIES_ENTRY_FIELD_SWITCHES: usize = 64;
+const MAX_INDEX_ENTRY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_INDEX_ENTRY_FIELD_SWITCHES: usize = 64;
 const MAX_TABLE_OF_AUTHORITIES_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_AUTHORITIES_FIELD_SWITCHES: usize = 64;
 const MAX_INDEX_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5413,6 +5529,12 @@ struct TableOfContentsEntryFieldParts {
 
 struct TableOfAuthoritiesEntryFieldParts {
     options: Vec<TableOfAuthoritiesEntryOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+}
+
+struct IndexEntryFieldParts {
+    entry: String,
+    options: Vec<IndexEntryOption>,
     unknown_switches: Vec<MergeFieldSwitch>,
 }
 
@@ -5833,6 +5955,78 @@ fn parse_table_of_authorities_entry_field_parts(
     }
 
     Some(TableOfAuthoritiesEntryFieldParts {
+        options,
+        unknown_switches,
+    })
+}
+
+fn parse_index_entry_field_parts(instruction: &str) -> Option<IndexEntryFieldParts> {
+    if instruction.len() > MAX_INDEX_ENTRY_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("XE") {
+        return None;
+    }
+
+    skip_field_whitespace(instruction, &mut position);
+    if matches!(peek_field_character(instruction, position), None | Some('\\')) {
+        return None;
+    }
+    let entry = next_field_argument(instruction, &mut position).ok()??;
+    if entry.is_empty() {
+        return None;
+    }
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\'
+            || options.len() + unknown_switches.len() >= MAX_INDEX_ENTRY_FIELD_SWITCHES
+        {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        match name {
+            'b' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(IndexEntryOption::BoldPageNumber);
+            },
+            'f' => options.push(IndexEntryOption::EntryType(argument?)),
+            'i' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(IndexEntryOption::ItalicPageNumber);
+            },
+            'r' => options.push(IndexEntryOption::PageRangeBookmark(argument?)),
+            't' => options.push(IndexEntryOption::CrossReference(argument?)),
+            'y' => options.push(IndexEntryOption::Yomi(argument?)),
+            _ => unknown_switches.push(MergeFieldSwitch { name, argument }),
+        }
+    }
+
+    Some(IndexEntryFieldParts {
+        entry,
         options,
         unknown_switches,
     })
@@ -8987,6 +9181,88 @@ mod tests {
             non_plcf_field_texts(FieldStory::Main, &too_long)
                 .iter()
                 .all(|field| TableOfAuthoritiesEntryField::from_non_plcf_field(field).is_none())
+        );
+    }
+
+    #[test]
+    fn index_entries_reconstruct_omitted_field_markers() {
+        let text = concat!(
+            "\u{0013} XE \"Office Open XML:Syntax\" \\b \\f Intro \\i ",
+            "\\r PageRange \\t \"See syntax\" \\y Office \\* MERGEFORMAT ",
+            "\u{0014}cached entry\u{0015}",
+            "\u{0013} XER \"not an entry\"\u{0015}",
+            "\u{0013} XE \"missing end\""
+        );
+        let stored = non_plcf_field_texts(FieldStory::Endnote, text);
+        assert_eq!(stored.len(), 2);
+
+        let entries: Vec<_> = stored
+            .iter()
+            .filter_map(IndexEntryField::from_non_plcf_field)
+            .collect();
+        assert_eq!(entries.len(), 1);
+        let entry = &entries[0];
+        assert_eq!(entry.story(), FieldStory::Endnote);
+        assert_eq!(entry.start_position(), 0);
+        assert_eq!(
+            entry.instruction(),
+            " XE \"Office Open XML:Syntax\" \\b \\f Intro \\i \\r PageRange \\t \"See syntax\" \\y Office \\* MERGEFORMAT "
+        );
+        assert_eq!(entry.entry(), "Office Open XML:Syntax");
+        assert_eq!(
+            entry.options(),
+            &[
+                IndexEntryOption::BoldPageNumber,
+                IndexEntryOption::EntryType("Intro".to_string()),
+                IndexEntryOption::ItalicPageNumber,
+                IndexEntryOption::PageRangeBookmark("PageRange".to_string()),
+                IndexEntryOption::CrossReference("See syntax".to_string()),
+                IndexEntryOption::Yomi("Office".to_string()),
+            ]
+        );
+        assert_eq!(
+            entry.unknown_switches(),
+            &[MergeFieldSwitch {
+                name: '*',
+                argument: Some("MERGEFORMAT".to_string()),
+            }]
+        );
+        assert_eq!(entry.cached_result(), Some("cached entry"));
+        assert!(entry.separator_position().is_some());
+        assert!(entry.end_position() > entry.start_position());
+
+        let no_options = non_plcf_field_texts(FieldStory::Main, "\u{0013} XE entry\u{0015}");
+        let no_options = IndexEntryField::from_non_plcf_field(&no_options[0]).unwrap();
+        assert!(no_options.options().is_empty());
+
+        for instruction in [
+            "XE",
+            "XE \\f Intro",
+            "XE entry unexpected",
+            "XE entry \\b unexpected",
+            "XE entry \\f",
+            "XE entry \\i unexpected",
+            "XE entry \\r",
+            "XE entry \\t",
+            "XE entry \\y",
+        ] {
+            let text = format!("\u{0013}{instruction}\u{0015}");
+            assert!(
+                non_plcf_field_texts(FieldStory::Main, &text)
+                    .iter()
+                    .all(|field| IndexEntryField::from_non_plcf_field(field).is_none()),
+                "{instruction}"
+            );
+        }
+
+        let too_long = format!(
+            "\u{0013}XE {} \u{0015}",
+            "x".repeat(MAX_INDEX_ENTRY_FIELD_INSTRUCTION_BYTES)
+        );
+        assert!(
+            non_plcf_field_texts(FieldStory::Main, &too_long)
+                .iter()
+                .all(|field| IndexEntryField::from_non_plcf_field(field).is_none())
         );
     }
 

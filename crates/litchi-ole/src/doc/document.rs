@@ -18,8 +18,8 @@ use super::parts::fields::{
     AutoTextListField, BarcodeField, BidiOutlineField, CompareField, DdeField,
     DocumentContextField, DocumentInformationField, DocumentPropertyField, DocumentVariableField,
     EmbedField, EquationField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
-    FormulaField, GoToButtonField, HyperlinkField, IfField, IndexField, InfoField,
-    LegacyFormField, LinkField, ListNumberField, MacroButtonField,
+    FormulaField, GoToButtonField, HyperlinkField, IfField, IndexEntryField, IndexField,
+    InfoField, LegacyFormField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
     ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
@@ -832,6 +832,34 @@ impl Document {
     /// Get the number of typed, inert generated-index (`INDEX`) fields.
     pub fn index_count(&self) -> Result<usize> {
         Ok(self.indexes()?.len())
+    }
+
+    /// Get typed, inert `XE` index-entry fields in story and source order.
+    ///
+    /// Native Word omits `XE` marker characters from `Plcfld` metadata, so this
+    /// method scans only the stored text of each document story. Returned values
+    /// expose stored entries, switches, cached results, and source positions.
+    /// This method never changes hidden text, resolves bookmarks, calculates
+    /// page numbers, sorts entries, generates an index, or refreshes a field.
+    pub fn index_entries(&self) -> Result<Vec<IndexEntryField>> {
+        let mut entries = Vec::new();
+        for story in FieldStory::ALL {
+            let Some((start, end)) = self.field_story_range_if_present(story) else {
+                continue;
+            };
+            let text = self.text_extractor.text_at_range(start, end);
+            entries.extend(
+                non_plcf_field_texts(story, text)
+                    .iter()
+                    .filter_map(IndexEntryField::from_non_plcf_field),
+            );
+        }
+        Ok(entries)
+    }
+
+    /// Get the number of typed, inert `XE` index-entry fields.
+    pub fn index_entry_count(&self) -> Result<usize> {
+        Ok(self.index_entries()?.len())
     }
 
     /// Get typed, inert bookmark-reference fields in story and source order.

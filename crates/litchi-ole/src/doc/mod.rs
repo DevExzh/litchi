@@ -143,7 +143,7 @@ pub use parts::fields::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperat
 pub use parts::fields::{AutoTextField, AutoTextFieldKind, AutoTextListField, AutoTextListOption};
 pub use parts::fields::{DdeField, DdeFieldKind, DdeRepresentation};
 pub use parts::fields::{ExternalIncludeField, ExternalIncludeOption, IncludeFieldKind};
-pub use parts::fields::{IndexField, IndexOption};
+pub use parts::fields::{IndexEntryField, IndexEntryOption, IndexField, IndexOption};
 pub use parts::fields::{LinkField, LinkFormatting, LinkResultOption};
 pub use parts::fields::{ReferenceField, ReferenceFieldKind, ReferenceFieldOption};
 pub use parts::fields::{StyleReferenceField, StyleReferenceFieldOption};

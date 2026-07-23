@@ -1,4 +1,6 @@
-use litchi_ole::doc::{FieldStory, FieldType, Package, TableOfAuthoritiesEntryOption};
+use litchi_ole::doc::{
+    FieldStory, FieldType, IndexEntryOption, Package, TableOfAuthoritiesEntryOption,
+};
 use litchi_ole::doc::writer::DocWriter;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -172,4 +174,37 @@ fn generated_ta_document_discovers_table_of_authorities_entries() {
         document.table_of_authorities_entry_count().unwrap(),
         entries.len()
     );
+}
+
+#[test]
+fn generated_xe_document_discovers_index_entries() {
+    let mut writer = DocWriter::new();
+    writer
+        .add_paragraph(concat!(
+            "\u{0013} XE \"Office Open XML:Syntax\" \\b \\f Intro \\i ",
+            "\\r PageRange \\t \"See syntax\" \\y Office \u{0014}cached entry\u{0015}",
+        ))
+        .unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+
+    let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+    let document = package.document().unwrap();
+    let entries = document.index_entries().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].story(), FieldStory::Main);
+    assert_eq!(entries[0].entry(), "Office Open XML:Syntax");
+    assert_eq!(entries[0].cached_result(), Some("cached entry"));
+    assert_eq!(
+        entries[0].options(),
+        &[
+            IndexEntryOption::BoldPageNumber,
+            IndexEntryOption::EntryType("Intro".to_string()),
+            IndexEntryOption::ItalicPageNumber,
+            IndexEntryOption::PageRangeBookmark("PageRange".to_string()),
+            IndexEntryOption::CrossReference("See syntax".to_string()),
+            IndexEntryOption::Yomi("Office".to_string()),
+        ]
+    );
+    assert_eq!(document.index_entry_count().unwrap(), entries.len());
 }
