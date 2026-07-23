@@ -1,6 +1,7 @@
 /// Slide parts and related types.
 ///
 /// This module contains parts for slides, slide layouts, and slide masters.
+use crate::common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{
     is_presentationml_name, presentation_name, relationship_attribute_value,
@@ -9,7 +10,7 @@ use crate::pptx::namespace::{
 use crate::pptx::shapes::base::{BaseShape, ShapeType};
 use crate::pptx::shapes::textframe::extract_drawingml_text;
 use litchi_opc::part::Part;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 use std::sync::Arc;
 
@@ -57,6 +58,160 @@ fn filter_placeholders(shapes: Vec<BaseShape>) -> Vec<BaseShape> {
         .into_iter()
         .filter(BaseShape::is_placeholder)
         .collect()
+}
+
+/// Master-content visibility settings declared by a slide or slide layout.
+///
+/// PresentationML defaults both settings to true when their corresponding
+/// attributes are omitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MasterVisibility {
+    show_master_shapes: bool,
+    show_master_placeholder_animations: bool,
+}
+
+impl MasterVisibility {
+    /// Whether shapes from the slide master are shown.
+    #[inline]
+    pub const fn shows_master_shapes(&self) -> bool {
+        self.show_master_shapes
+    }
+
+    /// Whether animations on placeholders from the slide master are shown.
+    #[inline]
+    pub const fn shows_master_placeholder_animations(&self) -> bool {
+        self.show_master_placeholder_animations
+    }
+
+    fn from_element(
+        element: &BytesStart<'_>,
+        decoder: quick_xml::encoding::Decoder,
+        root_label: &str,
+    ) -> Result<Self> {
+        Ok(Self {
+            show_master_shapes: parse_visibility_attribute(
+                element,
+                b"showMasterSp",
+                decoder,
+                root_label,
+            )?,
+            show_master_placeholder_animations: parse_visibility_attribute(
+                element,
+                b"showMasterPhAnim",
+                decoder,
+                root_label,
+            )?,
+        })
+    }
+}
+
+impl Default for MasterVisibility {
+    fn default() -> Self {
+        Self {
+            show_master_shapes: true,
+            show_master_placeholder_animations: true,
+        }
+    }
+}
+
+fn parse_master_visibility(
+    xml: &[u8],
+    root_name: &[u8],
+    root_label: &str,
+) -> Result<MasterVisibility> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut visibility = None;
+
+    loop {
+        let decoder = reader.decoder();
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat(
+                        "master-visibility XML nesting is too deep".to_string(),
+                    )
+                })?;
+                if depth == 1 {
+                    if visibility.is_some() {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "{root_label} master-visibility XML has multiple roots"
+                        )));
+                    }
+                    require_master_visibility_root(&namespace, &element, root_name, root_label)?;
+                    visibility = Some(MasterVisibility::from_element(
+                        &element, decoder, root_label,
+                    )?);
+                }
+            },
+            Event::Empty(element) if depth == 0 => {
+                if visibility.is_some() {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "{root_label} master-visibility XML has multiple roots"
+                    )));
+                }
+                require_master_visibility_root(&namespace, &element, root_name, root_label)?;
+                visibility = Some(MasterVisibility::from_element(
+                    &element, decoder, root_label,
+                )?);
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid master-visibility XML nesting".to_string())
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if depth != 0 {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "unterminated {root_label} master-visibility XML"
+        )));
+    }
+    visibility.ok_or_else(|| {
+        OoxmlError::InvalidFormat(format!(
+            "{root_label} master-visibility XML has no root element"
+        ))
+    })
+}
+
+fn require_master_visibility_root(
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    root_name: &[u8],
+    root_label: &str,
+) -> Result<()> {
+    if is_presentationml_name(namespace, element.name(), root_name) {
+        Ok(())
+    } else {
+        Err(OoxmlError::InvalidFormat(format!(
+            "{root_label} master-visibility XML must have a PresentationML {root_label} root"
+        )))
+    }
+}
+
+fn parse_visibility_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: quick_xml::encoding::Decoder,
+    root_label: &str,
+) -> Result<bool> {
+    let Some(value) = unqualified_attribute_value(element, name, decoder)? else {
+        return Ok(true);
+    };
+    match value.as_str() {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => Err(OoxmlError::InvalidFormat(format!(
+            "{root_label} has invalid {} value '{value}'",
+            String::from_utf8_lossy(name)
+        ))),
+    }
 }
 
 /// A slide part.
@@ -112,6 +267,11 @@ impl<'a> SlidePart<'a> {
     /// Parse and return all placeholder shapes on this slide.
     pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
         Ok(filter_placeholders(self.shapes()?))
+    }
+
+    /// Get the flags controlling whether master content is shown on this slide.
+    pub fn master_visibility(&self) -> Result<MasterVisibility> {
+        parse_master_visibility(self.xml_bytes(), b"sld", "slide")
     }
 
     /// Get the color-map override declared by this slide.
@@ -176,6 +336,11 @@ impl<'a> SlideLayoutPart<'a> {
     /// Get all placeholder shapes defined by this layout.
     pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
         Ok(filter_placeholders(self.shapes()?))
+    }
+
+    /// Get the flags controlling whether master content is shown on this layout.
+    pub fn master_visibility(&self) -> Result<MasterVisibility> {
+        parse_master_visibility(self.xml_bytes(), b"sldLayout", "slide layout")
     }
 
     /// Get the color-map override declared by this layout.
@@ -425,5 +590,34 @@ mod tests {
         let blob = part("/ppt/slideMasters/slideMaster1.xml", xml);
         let master = SlideMasterPart::from_part(&blob).unwrap();
         assert!(master.slide_layout_rids().is_err());
+    }
+
+    #[test]
+    fn master_visibility_defaults_to_true_and_supports_strict_namespaces() {
+        let default_slide = format!(r#"<p:sld xmlns:p="{P}"><p:cSld/></p:sld>"#);
+        let visibility =
+            parse_master_visibility(default_slide.as_bytes(), b"sld", "slide").unwrap();
+        assert_eq!(visibility, MasterVisibility::default());
+        assert!(visibility.shows_master_shapes());
+        assert!(visibility.shows_master_placeholder_animations());
+
+        let strict_layout = r#"<q:sldLayout
+            xmlns:q="http://purl.oclc.org/ooxml/presentationml/main"
+            showMasterSp="0" showMasterPhAnim="1"><q:cSld/></q:sldLayout>"#;
+        let visibility =
+            parse_master_visibility(strict_layout.as_bytes(), b"sldLayout", "slide layout")
+                .unwrap();
+        assert!(!visibility.shows_master_shapes());
+        assert!(visibility.shows_master_placeholder_animations());
+    }
+
+    #[test]
+    fn master_visibility_rejects_invalid_values_and_roots() {
+        let invalid_value =
+            format!(r#"<p:sld xmlns:p="{P}" showMasterSp="sometimes"><p:cSld/></p:sld>"#);
+        assert!(parse_master_visibility(invalid_value.as_bytes(), b"sld", "slide").is_err());
+
+        let wrong_root = format!(r#"<p:sldLayout xmlns:p="{P}"><p:cSld/></p:sldLayout>"#);
+        assert!(parse_master_visibility(wrong_root.as_bytes(), b"sld", "slide").is_err());
     }
 }

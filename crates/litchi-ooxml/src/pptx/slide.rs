@@ -1,7 +1,9 @@
 /// Slide-related objects, including Slide, SlideLayout, and SlideMaster.
 use crate::error::{OoxmlError, Result};
 use crate::pptx::color_map::{ColorMap, ColorMapOverride, ColorMapSlot};
-use crate::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart, ThemePart};
+use crate::pptx::parts::{
+    MasterVisibility, SlideLayoutPart, SlideMasterPart, SlidePart, ThemePart,
+};
 use crate::pptx::shapes::base::BaseShape;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -268,6 +270,11 @@ impl<'a> Slide<'a> {
     /// Get all placeholder shapes on this slide.
     pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
         self.part.placeholders()
+    }
+
+    /// Get the flags controlling whether master content is shown on this slide.
+    pub fn master_visibility(&self) -> Result<MasterVisibility> {
+        self.part.master_visibility()
     }
 
     /// Get the color-map override declared directly on this slide.
@@ -810,6 +817,11 @@ impl<'a> SlideLayout<'a> {
     /// Get all placeholder shapes defined by this slide layout.
     pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
         self.part.placeholders()
+    }
+
+    /// Get the flags controlling whether master content is shown on this layout.
+    pub fn master_visibility(&self) -> Result<MasterVisibility> {
+        self.part.master_visibility()
     }
 
     /// Get the color-map override declared directly on this slide layout.

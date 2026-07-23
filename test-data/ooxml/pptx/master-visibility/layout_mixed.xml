@@ -1,0 +1,6 @@
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    showMasterSp="true" showMasterPhAnim="0">
+  <p:cSld name="Layout with mixed master visibility">
+    <p:spTree/>
+  </p:cSld>
+</p:sldLayout>
