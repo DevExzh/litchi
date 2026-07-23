@@ -202,7 +202,8 @@ pub use parts::{
     ChartStyleVariation, ChartType,
 };
 pub use parts::{
-    MasterVisibility, NotesSize, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideSize,
+    MasterVisibility, NotesSize, SlideHeaderFooterVisibility, SlideLayoutMetadata,
+    SlideLayoutReference, SlideSize,
 };
 pub use presentation::{PptxChart, PptxTagList, Presentation};
 pub use presentation_properties::{

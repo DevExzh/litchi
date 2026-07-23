@@ -3,7 +3,7 @@ use crate::error::{OoxmlError, Result};
 use crate::pptx::color_map::{ColorMap, ColorMapOverride, ColorMapSlot};
 use crate::pptx::parts::{
     MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,
-    SlideMasterPart, SlidePart, ThemePart,
+    SlideLayoutReference, SlideMasterPart, SlidePart, ThemePart,
 };
 use crate::pptx::shapes::base::BaseShape;
 use litchi_opc::OpcPackage;
@@ -1143,6 +1143,11 @@ impl<'a> SlideMaster<'a> {
         }
 
         ThemePart::from_part(theme_part)?.theme()
+    }
+
+    /// Get the typed slide-layout entries declared by this master.
+    pub fn slide_layout_references(&self) -> Result<Vec<SlideLayoutReference>> {
+        self.part.slide_layout_references()
     }
 
     /// Get the relationship IDs of all slide layouts in this master.

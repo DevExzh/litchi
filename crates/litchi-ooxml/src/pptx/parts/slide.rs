@@ -192,6 +192,27 @@ impl Default for SlideLayoutMetadata {
     }
 }
 
+/// A slide-layout entry declared by a slide master.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlideLayoutReference {
+    layout_id: Option<u32>,
+    relationship_id: String,
+}
+
+impl SlideLayoutReference {
+    /// Return the stable layout ID, when the master declares one.
+    #[inline]
+    pub const fn layout_id(&self) -> Option<u32> {
+        self.layout_id
+    }
+
+    /// Return the relationship ID used to locate the layout part.
+    #[inline]
+    pub fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+}
+
 /// Header and footer placeholder visibility declared by a master or layout.
 ///
 /// PresentationML defaults all four settings to true when their corresponding
@@ -278,6 +299,179 @@ fn parse_slide_layout_metadata(xml: &[u8]) -> Result<SlideLayoutMetadata> {
 fn parse_slide_master_preserve(xml: &[u8]) -> Result<bool> {
     let (element, decoder) = read_root_element(xml, b"sldMaster", "slide master")?;
     parse_boolean_attribute(&element, b"preserve", decoder, "slide master", false)
+}
+
+fn parse_slide_layout_references(xml: &[u8]) -> Result<Vec<SlideLayoutReference>> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut saw_layout_list = false;
+    let mut layout_list_depth = None;
+    let mut references = Vec::new();
+
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("slide master XML nesting is too deep".to_string())
+                })?;
+                if depth == 1 {
+                    if saw_root {
+                        return Err(OoxmlError::InvalidFormat(
+                            "slide master XML has multiple roots".to_string(),
+                        ));
+                    }
+                    require_presentationml_root(
+                        &namespace,
+                        &element,
+                        b"sldMaster",
+                        "slide master",
+                    )?;
+                    saw_root = true;
+                } else if depth == 2
+                    && is_presentationml_name(&namespace, element.name(), b"sldLayoutIdLst")
+                {
+                    if saw_layout_list {
+                        return Err(OoxmlError::InvalidFormat(
+                            "slide master has multiple slide-layout ID lists".to_string(),
+                        ));
+                    }
+                    saw_layout_list = true;
+                    layout_list_depth = Some(depth);
+                } else if layout_list_depth == Some(2)
+                    && depth == 3
+                    && is_presentationml_name(&namespace, element.name(), b"sldLayoutId")
+                {
+                    store_slide_layout_reference(
+                        &mut references,
+                        parse_slide_layout_reference(&element, decoder, &resolver)?,
+                    )?;
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    if saw_root {
+                        return Err(OoxmlError::InvalidFormat(
+                            "slide master XML has multiple roots".to_string(),
+                        ));
+                    }
+                    require_presentationml_root(
+                        &namespace,
+                        &element,
+                        b"sldMaster",
+                        "slide master",
+                    )?;
+                    saw_root = true;
+                } else if depth == 1
+                    && is_presentationml_name(&namespace, element.name(), b"sldLayoutIdLst")
+                {
+                    if saw_layout_list {
+                        return Err(OoxmlError::InvalidFormat(
+                            "slide master has multiple slide-layout ID lists".to_string(),
+                        ));
+                    }
+                    saw_layout_list = true;
+                } else if layout_list_depth == Some(2)
+                    && depth == 2
+                    && is_presentationml_name(&namespace, element.name(), b"sldLayoutId")
+                {
+                    store_slide_layout_reference(
+                        &mut references,
+                        parse_slide_layout_reference(&element, decoder, &resolver)?,
+                    )?;
+                }
+            },
+            Event::End(element) => {
+                if depth == 1 && !is_presentationml_name(&namespace, element.name(), b"sldMaster") {
+                    return Err(OoxmlError::InvalidFormat(
+                        "invalid slide master XML root closure".to_string(),
+                    ));
+                }
+                if layout_list_depth == Some(depth)
+                    && is_presentationml_name(&namespace, element.name(), b"sldLayoutIdLst")
+                {
+                    layout_list_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid slide master XML nesting".to_string())
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if depth != 0 || !saw_root {
+        return Err(OoxmlError::InvalidFormat(
+            "unterminated slide master XML".to_string(),
+        ));
+    }
+    Ok(references)
+}
+
+fn parse_slide_layout_reference(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    resolver: &quick_xml::name::NamespaceResolver,
+) -> Result<SlideLayoutReference> {
+    let layout_id = unqualified_attribute_value(element, b"id", decoder)?
+        .map(|value| {
+            value.parse::<u32>().map_err(|_| {
+                OoxmlError::InvalidFormat(format!("invalid slide-layout ID value '{value}'"))
+            })
+        })
+        .transpose()?;
+    if layout_id.is_some_and(|id| id < 2_147_483_648) {
+        return Err(OoxmlError::InvalidFormat(
+            "slide-layout ID is below 2147483648".to_string(),
+        ));
+    }
+    let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat("slide-layout entry is missing r:id".to_string())
+        })?;
+    if relationship_id.is_empty() {
+        return Err(OoxmlError::InvalidFormat(
+            "empty slide-layout relationship ID".to_string(),
+        ));
+    }
+    Ok(SlideLayoutReference {
+        layout_id,
+        relationship_id,
+    })
+}
+
+fn store_slide_layout_reference(
+    references: &mut Vec<SlideLayoutReference>,
+    reference: SlideLayoutReference,
+) -> Result<()> {
+    if let Some(layout_id) = reference.layout_id
+        && references
+            .iter()
+            .any(|existing| existing.layout_id == Some(layout_id))
+    {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "duplicate slide-layout ID {layout_id}"
+        )));
+    }
+    if references
+        .iter()
+        .any(|existing| existing.relationship_id == reference.relationship_id)
+    {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "duplicate slide-layout relationship ID '{}'",
+            reference.relationship_id
+        )));
+    }
+    references.push(reference);
+    Ok(())
 }
 
 fn parse_header_footer_visibility(
@@ -712,41 +906,18 @@ impl<'a> SlideMasterPart<'a> {
         crate::pptx::backgrounds::SlideBackground::from_xml(self.xml_bytes())
     }
 
+    /// Get the typed slide-layout entries declared by this master.
+    pub fn slide_layout_references(&self) -> Result<Vec<SlideLayoutReference>> {
+        parse_slide_layout_references(self.xml_bytes())
+    }
+
     /// Get the relationship IDs of all slide layouts in this master.
     pub fn slide_layout_rids(&self) -> Result<Vec<String>> {
-        let mut reader = NsReader::from_reader(self.xml_bytes());
-
-        let mut rids = Vec::new();
-
-        loop {
-            let decoder = reader.decoder();
-            let event = reader
-                .read_event()
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?
-                .into_owned();
-            let resolver = reader.resolver().clone();
-            let (namespace, event) = resolver.resolve_event(event);
-            match event {
-                Event::Start(element) | Event::Empty(element)
-                    if is_presentationml_name(&namespace, element.name(), b"sldLayoutId") =>
-                {
-                    if let Some(rid) =
-                        relationship_attribute_value(&element, b"id", decoder, &resolver)?
-                    {
-                        if rid.is_empty() {
-                            return Err(OoxmlError::InvalidFormat(
-                                "empty slide-layout relationship ID".to_string(),
-                            ));
-                        }
-                        rids.push(rid);
-                    }
-                },
-                Event::Eof => break,
-                _ => {},
-            }
-        }
-
-        Ok(rids)
+        Ok(self
+            .slide_layout_references()?
+            .into_iter()
+            .map(|reference| reference.relationship_id)
+            .collect())
     }
 
     /// Get the underlying OPC part.
@@ -824,12 +995,29 @@ mod tests {
             xmlns:rel="http://purl.oclc.org/ooxml/officeDocument/relationships"
             xmlns:f="urn:foreign"><x:cSld name="Strict"/>
             <x:sldLayoutIdLst><f:sldLayoutId rel:id="spoof"/>
-                <x:sldLayoutId f:id="wrong" rel:id="layout-alpha"/>
+                <x:sldLayoutId id="2147483648" f:id="wrong" rel:id="layout-alpha"/>
             </x:sldLayoutIdLst></x:sldMaster>"#;
         let blob = part("/ppt/slideMasters/slideMaster1.xml", xml);
         let master = SlideMasterPart::from_part(&blob).unwrap();
         assert_eq!(master.name().unwrap(), "Strict");
+        let references = master.slide_layout_references().unwrap();
+        assert_eq!(references.len(), 1);
+        assert_eq!(references[0].layout_id(), Some(2_147_483_648));
+        assert_eq!(references[0].relationship_id(), "layout-alpha");
         assert_eq!(master.slide_layout_rids().unwrap(), ["layout-alpha"]);
+
+        let without_layout_id = format!(
+            r#"<p:sldMaster xmlns:p="{P}" xmlns:r="{R}"><p:sldLayoutIdLst>
+                <p:sldLayoutId r:id="layout-beta"/></p:sldLayoutIdLst></p:sldMaster>"#
+        );
+        let blob = part("/ppt/slideMasters/slideMaster2.xml", without_layout_id);
+        let reference = SlideMasterPart::from_part(&blob)
+            .unwrap()
+            .slide_layout_references()
+            .unwrap()
+            .remove(0);
+        assert_eq!(reference.layout_id(), None);
+        assert_eq!(reference.relationship_id(), "layout-beta");
     }
 
     #[test]
@@ -864,11 +1052,42 @@ mod tests {
     fn duplicate_relationship_attributes_are_rejected() {
         let xml = format!(
             r#"<p:sldMaster xmlns:p="{P}" xmlns:r="{R}" xmlns:q="{R}">
-                <p:sldLayoutId r:id="one" q:id="two"/></p:sldMaster>"#
+                <p:sldLayoutIdLst><p:sldLayoutId r:id="one" q:id="two"/>
+                </p:sldLayoutIdLst></p:sldMaster>"#
         );
         let blob = part("/ppt/slideMasters/slideMaster1.xml", xml);
         let master = SlideMasterPart::from_part(&blob).unwrap();
         assert!(master.slide_layout_rids().is_err());
+    }
+
+    #[test]
+    fn slide_layout_references_reject_malformed_entries() {
+        let cases = [
+            format!(
+                r#"<p:sldMaster xmlns:p="{P}"><p:sldLayoutIdLst><p:sldLayoutId id="2147483648"/></p:sldLayoutIdLst></p:sldMaster>"#
+            ),
+            format!(
+                r#"<p:sldMaster xmlns:p="{P}" xmlns:r="{R}"><p:sldLayoutIdLst><p:sldLayoutId id="2147483647" r:id="one"/></p:sldLayoutIdLst></p:sldMaster>"#
+            ),
+            format!(
+                r#"<p:sldMaster xmlns:p="{P}" xmlns:r="{R}"><p:sldLayoutIdLst><p:sldLayoutId id="2147483648" r:id="one"/><p:sldLayoutId id="2147483648" r:id="two"/></p:sldLayoutIdLst></p:sldMaster>"#
+            ),
+            format!(
+                r#"<p:sldMaster xmlns:p="{P}" xmlns:r="{R}"><p:sldLayoutIdLst><p:sldLayoutId id="2147483648" r:id="one"/><p:sldLayoutId id="2147483649" r:id="one"/></p:sldLayoutIdLst></p:sldMaster>"#
+            ),
+            format!(
+                r#"<p:sldMaster xmlns:p="{P}"><p:sldLayoutIdLst/><p:sldLayoutIdLst/></p:sldMaster>"#
+            ),
+        ];
+        for xml in cases {
+            let blob = part("/ppt/slideMasters/slideMaster1.xml", xml);
+            assert!(
+                SlideMasterPart::from_part(&blob)
+                    .unwrap()
+                    .slide_layout_references()
+                    .is_err()
+            );
+        }
     }
 
     #[test]

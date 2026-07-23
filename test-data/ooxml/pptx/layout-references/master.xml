@@ -1,0 +1,9 @@
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree/>
+  </p:cSld>
+  <p:sldLayoutIdLst>
+    <p:sldLayoutId id="2147483648" r:id="rId1"/>
+  </p:sldLayoutIdLst>
+</p:sldMaster>
