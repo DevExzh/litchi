@@ -12,7 +12,8 @@ use crate::docx::field::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
     BarcodeField, BibliographyField, BidiOutlineField, CitationField, DatabaseField, DdeField,
     DocumentContextField, DocumentInformationField, DocumentPropertyField, DocumentVariableField,
-    EmbedField, ExternalIncludeField, Field, FormulaField, GoToButtonField, IfField,
+    EmbedField, EquationField, ExternalIncludeField, Field, FormulaField, GoToButtonField,
+    IfField,
     IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
@@ -2015,6 +2016,24 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert formula fields in the main document.
     pub fn formula_field_count(&self) -> Result<usize> {
         Ok(self.formula_fields()?.len())
+    }
+
+    /// Get typed, inert `EQ` equation fields in document order.
+    ///
+    /// Returned values expose stored expressions, cached content, and dirty/lock
+    /// state only. This method never parses, calculates, formats, renders, or
+    /// refreshes an equation.
+    pub fn equations(&self) -> Result<Vec<EquationField>> {
+        self.fields()?
+            .iter()
+            .map(Field::equation)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `EQ` fields in the main document.
+    pub fn equation_count(&self) -> Result<usize> {
+        Ok(self.equations()?.len())
     }
 
     /// Get typed, inert `SEQ` fields in document order.

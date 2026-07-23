@@ -3741,6 +3741,39 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_equation_fields_without_calculation_or_rendering() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            for (instruction, cached_result) in [
+                (r#"EQ \o\ac(\fs24 Q,\fs16 R)"#, "cached equation"),
+                (r#"EQ \f(1,2)"#, "1/2"),
+                ("EQ", ""),
+            ] {
+                document.add_paragraph().add_field(
+                    crate::docx::writer::MutableField::with_result(
+                        instruction.to_string(),
+                        cached_result.to_string(),
+                    ),
+                );
+            }
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let equations = document.equations().unwrap();
+        assert_eq!(document.equation_count().unwrap(), 3);
+        assert_eq!(equations.len(), 3);
+        assert_eq!(equations[0].expression(), r#"\o\ac(\fs24 Q,\fs16 R)"#);
+        assert_eq!(equations[0].cached_result(), Some("cached equation"));
+        assert_eq!(equations[1].expression(), r#"\f(1,2)"#);
+        assert_eq!(equations[1].cached_result(), Some("1/2"));
+        assert_eq!(equations[2].expression(), "");
+    }
+
+    #[test]
     fn writes_and_discovers_inert_prompt_fields_without_displaying_prompts() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
