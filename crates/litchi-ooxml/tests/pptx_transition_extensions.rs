@@ -1,4 +1,6 @@
-use litchi_ooxml::pptx::{Package, RippleDirection, TransitionSpeed, TransitionType};
+use litchi_ooxml::pptx::{
+    Package, RippleDirection, SlideTransition, TransitionSpeed, TransitionType,
+};
 use litchi_ooxml::{OoxmlError, PackURI};
 use tempfile::NamedTempFile;
 
@@ -37,6 +39,36 @@ fn slide_transition_rejects_invalid_powerpoint_2010_ripple_direction() {
         slides[0].transition(),
         Err(OoxmlError::InvalidFormat(message)) if message.contains("ripple direction")
     ));
+}
+
+#[test]
+fn writer_round_trips_powerpoint_2010_ripple_with_fade_fallback() {
+    let expected = SlideTransition::new(TransitionType::Ripple {
+        direction: RippleDirection::LeftDown,
+    })
+    .with_speed(TransitionSpeed::Slow)
+    .with_duration_ms(1500)
+    .with_advance_on_click(false)
+    .with_advance_after_ms(4250);
+    let output = NamedTempFile::with_suffix(".pptx").unwrap();
+    let mut package = Package::new().unwrap();
+    package
+        .presentation_mut()
+        .unwrap()
+        .add_slide()
+        .unwrap()
+        .set_transition(expected.clone());
+    package.save(output.path()).unwrap();
+
+    let package = Package::open(output.path()).unwrap();
+    assert_eq!(first_transition(&package), expected);
+
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let slide = package.opc_package().get_part(&slide_name).unwrap();
+    let xml = std::str::from_utf8(slide.blob()).unwrap();
+    assert!(xml.contains("<mc:AlternateContent"));
+    assert!(xml.contains(r#"<p14:ripple dir="ld"/>"#));
+    assert!(xml.contains("<p:fade/>"));
 }
 
 fn first_transition(package: &Package) -> litchi_ooxml::pptx::SlideTransition {

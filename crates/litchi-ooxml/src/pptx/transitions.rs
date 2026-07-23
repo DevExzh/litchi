@@ -15,6 +15,8 @@ use quick_xml::reader::NsReader;
 
 const P14_NAMESPACE: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 const P14_NAMESPACE_BYTES: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+const MARKUP_COMPATIBILITY_NAMESPACE: &str =
+    "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
 /// Slide transition type.
 ///
@@ -69,9 +71,7 @@ pub enum TransitionType {
     Newsflash,
     /// Flash transition
     Flash,
-    /// PowerPoint 2010 ripple transition.
-    ///
-    /// This compatibility-markup effect is currently read-only.
+    /// PowerPoint 2010 ripple transition with a fade compatibility fallback.
     Ripple { direction: RippleDirection },
     /// Strips transition
     Strips { direction: TransitionDirection },
@@ -174,6 +174,16 @@ impl RippleDirection {
             _ => Err(OoxmlError::InvalidFormat(format!(
                 "invalid PowerPoint 2010 ripple direction '{value}'"
             ))),
+        }
+    }
+
+    fn to_xml_value(self) -> &'static str {
+        match self {
+            Self::Center => "center",
+            Self::LeftUp => "lu",
+            Self::RightUp => "ru",
+            Self::LeftDown => "ld",
+            Self::RightDown => "rd",
         }
     }
 }
@@ -585,15 +595,31 @@ impl SlideTransition {
 
     /// Generate XML for this transition.
     pub(crate) fn to_xml(&self) -> Result<String> {
-        let mut xml = String::with_capacity(512);
+        self.validate_effect_options()?;
 
+        if let TransitionType::Ripple { direction } = &self.transition_type {
+            return Ok(self.ripple_to_xml(*direction));
+        }
+
+        let mut xml = String::with_capacity(512);
+        self.write_transition_start(&mut xml, Some("dur"));
+
+        self.write_transition_type_xml(&mut xml)?;
+        xml.push_str("</p:transition>");
+
+        Ok(xml)
+    }
+
+    fn write_transition_start(&self, xml: &mut String, duration_attribute: Option<&str>) {
         xml.push_str(r#"<p:transition"#);
         xml.push_str(r#" spd=""#);
         xml.push_str(self.speed.to_xml_value());
         xml.push('"');
 
-        if let Some(dur) = self.duration_ms {
-            xml.push_str(r#" dur=""#);
+        if let (Some(duration_attribute), Some(dur)) = (duration_attribute, self.duration_ms) {
+            xml.push(' ');
+            xml.push_str(duration_attribute);
+            xml.push_str(r#"=""#);
             xml.push_str(&dur.to_string());
             xml.push('"');
         }
@@ -609,17 +635,26 @@ impl SlideTransition {
         }
 
         xml.push('>');
-
-        // Add transition type XML
-        self.write_transition_type_xml(&mut xml)?;
-
-        xml.push_str("</p:transition>");
-
-        Ok(xml)
     }
 
-    /// Write the transition type-specific XML.
-    fn write_transition_type_xml(&self, xml: &mut String) -> Result<()> {
+    fn ripple_to_xml(&self, direction: RippleDirection) -> String {
+        let mut xml = String::with_capacity(512);
+        xml.push_str(r#"<mc:AlternateContent xmlns:mc=""#);
+        xml.push_str(MARKUP_COMPATIBILITY_NAMESPACE);
+        xml.push_str(r#"" xmlns:p14=""#);
+        xml.push_str(P14_NAMESPACE);
+        xml.push_str(r#""><mc:Choice Requires="p14">"#);
+        self.write_transition_start(&mut xml, Some("p14:dur"));
+        xml.push_str(r#"<p14:ripple dir=""#);
+        xml.push_str(direction.to_xml_value());
+        xml.push_str(r#""/></p:transition></mc:Choice><mc:Fallback>"#);
+        self.write_transition_start(&mut xml, None);
+        xml.push_str("<p:fade/></p:transition></mc:Fallback></mc:AlternateContent>");
+
+        xml
+    }
+
+    fn validate_effect_options(&self) -> Result<()> {
         if self.through_black.is_some()
             && !matches!(
                 &self.transition_type,
@@ -638,6 +673,11 @@ impl SlideTransition {
             ));
         }
 
+        Ok(())
+    }
+
+    /// Write the transition type-specific XML.
+    fn write_transition_type_xml(&self, xml: &mut String) -> Result<()> {
         match &self.transition_type {
             TransitionType::None => {
                 // No transition element
@@ -759,8 +799,7 @@ impl SlideTransition {
             },
             TransitionType::Ripple { .. } => {
                 return Err(OoxmlError::Other(
-                    "PowerPoint 2010 ripple transitions require a compatibility fallback and are read-only"
-                        .to_string(),
+                    "ripple transitions must be emitted through compatibility markup".to_string(),
                 ));
             },
             TransitionType::Reveal { .. }
@@ -1012,15 +1051,24 @@ mod tests {
     }
 
     #[test]
-    fn ripple_transition_requires_a_compatibility_fallback_to_write() {
+    fn ripple_transition_writes_a_compatibility_choice_and_round_trips() {
         let transition = SlideTransition::new(TransitionType::Ripple {
-            direction: RippleDirection::Center,
-        });
+            direction: RippleDirection::LeftDown,
+        })
+        .with_speed(TransitionSpeed::Slow)
+        .with_duration_ms(1500)
+        .with_advance_on_click(false)
+        .with_advance_after_ms(4250);
 
-        assert!(matches!(
-            transition.to_xml(),
-            Err(OoxmlError::Other(message)) if message.contains("read-only")
+        let xml = transition.to_xml().unwrap();
+        assert!(xml.contains(r#"<mc:AlternateContent"#));
+        assert!(xml.contains(r#"<mc:Choice Requires="p14">"#));
+        assert!(xml.contains(r#"p14:dur="1500""#));
+        assert!(xml.contains(r#"<p14:ripple dir="ld"/>"#));
+        assert!(xml.contains(
+            r#"<mc:Fallback><p:transition spd="slow" advClick="0" advTm="4250"><p:fade/>"#
         ));
+        assert_eq!(parse_serialized_transition(&xml), transition);
     }
 
     #[test]
