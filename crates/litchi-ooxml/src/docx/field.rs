@@ -16,6 +16,7 @@ const MAX_STYLE_REFERENCE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_LIST_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 
 /// A field in a Word document.
 ///
@@ -499,6 +500,26 @@ impl Field {
     /// resolves a value, or refreshes a field.
     pub fn document_property(&self) -> Result<Option<DocumentPropertyField>> {
         DocumentPropertyField::from_field(self)
+    }
+
+    /// Check whether this is a built-in document-information field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never reads
+    /// package metadata or host identity data, resolves a value, or refreshes
+    /// the field.
+    pub fn is_document_information(&self) -> bool {
+        DocumentInformationFieldKind::from_instruction(&self.instruction).is_some()
+    }
+
+    /// Parse this field as inert typed document-information metadata.
+    ///
+    /// Returns `Ok(None)` for fields other than `TITLE`, `SUBJECT`, `AUTHOR`,
+    /// `KEYWORDS`, `COMMENTS`, and `LASTSAVEDBY`. The result exposes only the
+    /// stored kind, switches, cached content, and dirty/lock state; it never
+    /// reads core or extended package properties, reads or modifies host
+    /// identity data, resolves a value, or refreshes a field.
+    pub fn document_information(&self) -> Result<Option<DocumentInformationField>> {
+        DocumentInformationField::from_field(self)
     }
 
     /// Check whether this is a `MACROBUTTON` field.
@@ -2116,6 +2137,127 @@ impl DocumentPropertyField {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from a property.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Return the field switches in source order.
+    ///
+    /// Preserved switches are inert source metadata and are never interpreted.
+    pub fn switches(&self) -> &[FieldSwitch] {
+        &self.switches
+    }
+
+    /// Check whether a case-insensitive ASCII switch appears in this field.
+    pub fn has_switch(&self, name: char) -> bool {
+        has_field_switch(&self.switches, name)
+    }
+}
+
+/// The built-in Word document-information field category.
+///
+/// These fields are defined in ECMA-376 Part 1 §17.16.5. This enum preserves
+/// the stored field kind only; it does not resolve document metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DocumentInformationFieldKind {
+    Title,
+    Subject,
+    Author,
+    Keywords,
+    Comments,
+    LastSavedBy,
+}
+
+impl DocumentInformationFieldKind {
+    /// The uppercase field keyword stored in a Word field instruction.
+    pub const fn field_keyword(self) -> &'static str {
+        match self {
+            Self::Title => "TITLE",
+            Self::Subject => "SUBJECT",
+            Self::Author => "AUTHOR",
+            Self::Keywords => "KEYWORDS",
+            Self::Comments => "COMMENTS",
+            Self::LastSavedBy => "LASTSAVEDBY",
+        }
+    }
+
+    fn from_instruction(instruction: &str) -> Option<Self> {
+        [
+            Self::Title,
+            Self::Subject,
+            Self::Author,
+            Self::Keywords,
+            Self::Comments,
+            Self::LastSavedBy,
+        ]
+        .into_iter()
+        .find(|kind| field_instruction_remainder(instruction, kind.field_keyword()).is_some())
+    }
+}
+
+/// Typed, inert metadata for a built-in Word document-information field.
+///
+/// This type retains the stored kind, field switches, cached result, and field
+/// state only. It never reads package properties, reads or modifies host
+/// identity data, resolves a value, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentInformationField {
+    instruction: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+    kind: DocumentInformationFieldKind,
+    switches: Vec<FieldSwitch>,
+}
+
+impl DocumentInformationField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(kind) = DocumentInformationFieldKind::from_instruction(field.instruction()) else {
+            return Ok(None);
+        };
+        if field.instruction().len() > MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "{} field instruction exceeds {MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES} bytes",
+                kind.field_keyword()
+            )));
+        }
+        let switches = parse_field_switches(field.instruction(), kind.field_keyword())?
+            .expect("document-information recognition and parsing must agree");
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+            kind,
+            switches,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the recognized built-in document-information category.
+    pub const fn kind(&self) -> DocumentInformationFieldKind {
+        self.kind
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from package metadata
+    /// or a host user profile.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -6696,6 +6838,111 @@ mod tests {
             false,
         );
         assert!(too_long.document_property().is_err());
+    }
+
+    #[test]
+    fn parses_document_information_fields_without_reading_metadata_or_identity() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" TITLE \* MERGEFORMAT " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached title</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>author \@ "opaque format"</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached author</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="AUTHORS"><w:r><w:t>not an author field</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let extracted = Field::extract_from_document(xml).unwrap();
+        assert_eq!(extracted.len(), 3);
+        assert!(extracted[0].is_document_information());
+        assert!(extracted[1].is_document_information());
+        assert!(!extracted[2].is_document_information());
+
+        let title = extracted[0].document_information().unwrap().unwrap();
+        assert_eq!(title.kind(), DocumentInformationFieldKind::Title);
+        assert_eq!(title.cached_result(), Some("cached title"));
+        assert!(title.is_dirty());
+        assert!(title.is_locked());
+        assert_eq!(title.switches()[0].name(), '*');
+        assert_eq!(title.switches()[0].argument(), Some("MERGEFORMAT"));
+
+        let author = extracted[1].document_information().unwrap().unwrap();
+        assert_eq!(author.kind(), DocumentInformationFieldKind::Author);
+        assert_eq!(author.cached_result(), Some("cached author"));
+        assert!(author.is_dirty());
+        assert!(author.is_locked());
+        assert!(author.has_switch('@'));
+        assert_eq!(author.switches()[0].argument(), Some("opaque format"));
+        assert!(extracted[2].document_information().unwrap().is_none());
+
+        for (instruction, kind) in [
+            (r"TITLE \* MERGEFORMAT", DocumentInformationFieldKind::Title),
+            (
+                r"SUBJECT \* MERGEFORMAT",
+                DocumentInformationFieldKind::Subject,
+            ),
+            (
+                r"AUTHOR \* MERGEFORMAT",
+                DocumentInformationFieldKind::Author,
+            ),
+            (
+                r"KEYWORDS \* MERGEFORMAT",
+                DocumentInformationFieldKind::Keywords,
+            ),
+            (
+                r"COMMENTS \* MERGEFORMAT",
+                DocumentInformationFieldKind::Comments,
+            ),
+            (
+                r"LASTSAVEDBY \* MERGEFORMAT",
+                DocumentInformationFieldKind::LastSavedBy,
+            ),
+        ] {
+            let cached_result = format!("cached {}", kind.field_keyword());
+            let field = Field::with_flags(
+                instruction.to_string(),
+                Some(cached_result.clone()),
+                true,
+                true,
+            );
+            let information = field.document_information().unwrap().unwrap();
+            assert_eq!(information.kind(), kind);
+            assert_eq!(information.instruction(), instruction);
+            assert_eq!(information.cached_result(), Some(cached_result.as_str()));
+            assert!(information.is_dirty());
+            assert!(information.is_locked());
+            assert_eq!(information.switches()[0].name(), '*');
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_document_information_field_semantics() {
+        for instruction in [
+            "TITLE unexpected",
+            r#"AUTHOR "unterminated"#,
+            r"COMMENTS \",
+            r"LASTSAVEDBY \* MERGEFORMAT unexpected",
+        ] {
+            let field = Field::new(instruction.to_string(), None, false);
+            assert!(field.document_information().is_err(), "{instruction}");
+        }
+
+        let too_long = Field::new(
+            format!(
+                "TITLE \\* {}",
+                "x".repeat(MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.document_information().is_err());
+        assert!(
+            Field::new("SAVEDATE".to_string(), None, false)
+                .document_information()
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
