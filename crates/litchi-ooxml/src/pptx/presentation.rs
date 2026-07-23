@@ -722,10 +722,18 @@ impl<'a> Presentation<'a> {
     // Advanced Features - Comments
     // ========================================================================
 
+    /// Load the typed, validated legacy comment graph.
+    ///
+    /// Returns None when the presentation does not contain legacy comments.
+    /// Comment text and extension payloads remain inert document data.
+    pub fn comments(&self) -> Result<Option<crate::pptx::PresentationComments>> {
+        crate::pptx::load_presentation_comments(self.package)
+    }
+
     /// Get all comments from the presentation.
     ///
     /// Returns a vector of tuples: (slide_index, comment).
-    /// Returns empty vector if no comments are found or comment authors are not available.
+    /// Returns an empty vector when the presentation has no legacy comments.
     ///
     /// # Examples
     ///
@@ -741,38 +749,43 @@ impl<'a> Presentation<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn get_comments(&self) -> Result<Vec<(usize, crate::pptx::parts::Comment)>> {
-        use crate::pptx::parts::CommentsPart;
-
+        let Some(comments) = self.comments()? else {
+            return Ok(Vec::new());
+        };
+        let slide_indices = self
+            .slides()?
+            .into_iter()
+            .enumerate()
+            .map(|(slide_index, slide)| {
+                (slide.part().part().partname().to_string(), slide_index)
+            })
+            .collect::<std::collections::HashMap<_, _>>();
         let mut all_comments = Vec::new();
-
-        // Iterate through all slides to find comments
-        let slides = self.slides()?;
-        for (slide_idx, slide) in slides.iter().enumerate() {
-            let slide_part = slide.part().part();
-            let rels = slide_part.rels();
-
-            // Look for comments relationship
-            for rel in rels.iter() {
-                if rel.reltype()
-                    == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments"
-                {
-                    // Get the comments part
-                    let base_uri = slide_part.partname().base_uri();
-                    let comments_partname = PackURI::from_rel_ref(base_uri, rel.target_ref())
-                        .map_err(crate::error::OoxmlError::InvalidFormat)?;
-
-                    if let Ok(comments_part) = self.package.get_part(&comments_partname) {
-                        let comments_part = CommentsPart::from_part(comments_part)?;
-                        let comments = comments_part.comments()?;
-
-                        for comment in comments {
-                            all_comments.push((slide_idx, comment));
-                        }
-                    }
-                }
-            }
+        for slide_comments in comments.slides {
+            let slide_index = slide_indices
+                .get(&slide_comments.slide_part_name)
+                .copied()
+                .ok_or_else(|| {
+                    OoxmlError::InvalidFormat(format!(
+                        "comment graph references undeclared slide part '{}'",
+                        slide_comments.slide_part_name
+                    ))
+                })?;
+            all_comments.extend(slide_comments.comments.into_iter().map(|comment| {
+                (
+                    slide_index,
+                    crate::pptx::parts::Comment {
+                        author_id: comment.author_id,
+                        text: comment.text,
+                        x: comment.x,
+                        y: comment.y,
+                        datetime: comment.date_time,
+                        index: Some(comment.index),
+                    },
+                )
+            }));
         }
-
+        all_comments.sort_by_key(|(slide_index, _)| *slide_index);
         Ok(all_comments)
     }
 
@@ -794,28 +807,16 @@ impl<'a> Presentation<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn get_comment_authors(&self) -> Result<Vec<crate::pptx::parts::CommentAuthor>> {
-        use crate::pptx::parts::CommentAuthorsPart;
-
-        let pres_part = self.part.part();
-        let rels = pres_part.rels();
-
-        // Look for comment authors relationship
-        for rel in rels.iter() {
-            if rel.reltype()
-                == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors"
-            {
-                let base_uri = pres_part.partname().base_uri();
-                let authors_partname = PackURI::from_rel_ref(base_uri, rel.target_ref())
-                    .map_err(crate::error::OoxmlError::InvalidFormat)?;
-
-                if let Ok(authors_part) = self.package.get_part(&authors_partname) {
-                    let authors_part = CommentAuthorsPart::from_part(authors_part)?;
-                    return authors_part.authors();
-                }
-            }
-        }
-
-        Ok(Vec::new())
+        let Some(comments) = self.comments()? else {
+            return Ok(Vec::new());
+        };
+        Ok(comments
+            .authors
+            .into_iter()
+            .map(|author| {
+                crate::pptx::parts::CommentAuthor::new(author.id, author.name, author.initials)
+            })
+            .collect())
     }
 
     // ========================================================================
