@@ -17,7 +17,7 @@ use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
     BarcodeField, BidiOutlineField, CompareField, DdeField, DocumentContextField,
     DocumentInformationField, DocumentPropertyField, DocumentVariableField, EmbedField,
-    ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
+    EquationField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
     GoToButtonField, IfField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
@@ -823,6 +823,24 @@ impl Document {
     /// Get the number of typed, inert `=` formula fields.
     pub fn formula_field_count(&self) -> Result<usize> {
         Ok(self.formula_fields()?.len())
+    }
+
+    /// Get typed, inert `EQ` equation fields in story and source order.
+    ///
+    /// Returned values expose stored opaque expressions, cached results, and
+    /// field state only. This method never parses, calculates, formats,
+    /// renders, or refreshes an equation.
+    pub fn equations(&self) -> Result<Vec<EquationField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::equation_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `EQ` fields.
+    pub fn equation_count(&self) -> Result<usize> {
+        Ok(self.equations()?.len())
     }
 
     /// Get typed, inert `QUOTE` fields in story and source order.

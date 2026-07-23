@@ -115,6 +115,7 @@ pub use parts::fields::DocumentVariableField;
 pub use parts::fields::BarcodeField;
 pub use parts::fields::BidiOutlineField;
 pub use parts::fields::EmbedField;
+pub use parts::fields::EquationField;
 pub use parts::fields::FormulaField;
 pub use parts::fields::InfoField;
 pub use parts::fields::{LegacyFormField, LegacyFormFieldKind};

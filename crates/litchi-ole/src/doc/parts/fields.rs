@@ -1567,6 +1567,56 @@ impl FormulaField {
     }
 }
 
+/// Typed, inert metadata for a legacy Word `EQ` equation field.
+///
+/// [MS-DOC] §2.9.90 maps native `EQ` field markers to ECMA-376 Part 4
+/// §14.10.4.6. This type exposes only the stored opaque equation expression,
+/// cached result, and field state. It never parses, calculates, formats,
+/// renders, or refreshes an equation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EquationField {
+    field: Field,
+    instruction: String,
+    expression: String,
+    cached_result: Option<String>,
+}
+
+impl EquationField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the opaque equation expression after the `EQ` keyword.
+    ///
+    /// This syntax is never parsed, calculated, formatted, or rendered.
+    pub fn expression(&self) -> &str {
+        &self.expression
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from equation syntax.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// Typed, inert metadata for a legacy Word `QUOTE` field.
 ///
 /// [MS-DOC] §2.9.90 maps native `QUOTE` field markers to ECMA-376 Part 1
@@ -4091,6 +4141,24 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `EQ` field.
+    ///
+    /// Stored equation syntax and cached results are never parsed, calculated,
+    /// formatted, rendered, or refreshed. Malformed instructions remain
+    /// available through this generic type and return `None` here.
+    pub fn equation_field(&self) -> Option<EquationField> {
+        if self.field.field_type != FieldType::Equation {
+            return None;
+        }
+        let expression = parse_equation_field_expression(&self.instruction)?;
+        Some(EquationField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            expression,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed `QUOTE` field.
     ///
     /// Stored text, switches, and cached results are never used to interpret
@@ -4808,6 +4876,7 @@ const MAX_REFERENCE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_REFERENCE_FIELD_SWITCHES: usize = 64;
 const MAX_SET_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_FORMULA_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_EQUATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_QUOTE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_QUOTE_FIELD_SWITCHES: usize = 64;
 const MAX_PRINT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5425,6 +5494,19 @@ fn parse_formula_field_formula(instruction: &str) -> Option<Option<String>> {
 
     let formula = instruction.trim().strip_prefix('=')?.trim();
     Some((!formula.is_empty()).then_some(formula.to_string()))
+}
+
+fn parse_equation_field_expression(instruction: &str) -> Option<String> {
+    if instruction.len() > MAX_EQUATION_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("EQ") {
+        return None;
+    }
+    Some(instruction.get(position..)?.trim().to_string())
 }
 
 fn parse_print_field_instructions(instruction: &str) -> Option<String> {
@@ -8538,6 +8620,71 @@ mod tests {
             ..text
         };
         assert!(wrong_type.formula_field().is_none());
+    }
+
+    #[test]
+    fn equation_fields_preserve_opaque_expressions_without_calculation_or_rendering() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::Equation,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" eQ \\o\\ac(\\fs24 Q,\\fs16 R)"#.to_string(),
+            result: Some("cached equation".to_string()),
+        };
+
+        let equation = text.equation_field().unwrap();
+        assert_eq!(equation.field(), &field);
+        assert_eq!(equation.instruction(), text.instruction);
+        assert_eq!(equation.expression(), r#"\\o\\ac(\\fs24 Q,\\fs16 R)"#);
+        assert_eq!(equation.cached_result(), Some("cached equation"));
+        assert!(equation.is_dirty());
+        assert!(equation.is_locked());
+
+        let empty = FieldText {
+            instruction: "EQ".to_string(),
+            result: None,
+            ..text.clone()
+        };
+        assert_eq!(empty.equation_field().unwrap().expression(), "");
+
+        for instruction in ["", "EQUAL 1 + 1", "FORMULA 1 + 1"] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.equation_field().is_none(), "{instruction}");
+        }
+
+        let too_long = FieldText {
+            instruction: format!(
+                "EQ {}",
+                "x".repeat(MAX_EQUATION_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text.clone()
+        };
+        assert!(too_long.equation_field().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Formula,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.equation_field().is_none());
     }
 
     #[test]
