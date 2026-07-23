@@ -524,6 +524,70 @@ fn scratch_document_supports_native_chart_axis_title_crud() {
 }
 
 #[test]
+fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart axis lines").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart axis lines".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            editor
+                .body_chart_axis_line_visible(source.drawable_object_id, axis)
+                .unwrap()
+        );
+        editor
+            .set_body_chart_axis_line_visible(source.drawable_object_id, axis, false)
+            .unwrap();
+        assert!(
+            !editor
+                .body_chart_axis_line_visible(source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            !editor
+                .body_chart_axis_line_visible(duplicate.drawable_object_id, axis)
+                .unwrap()
+        );
+        editor
+            .set_body_chart_axis_line_visible(source.drawable_object_id, axis, true)
+            .unwrap();
+    }
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            reopened
+                .body_chart_axis_line_visible(source.drawable_object_id, axis)
+                .unwrap()
+        );
+        assert!(
+            !reopened
+                .body_chart_axis_line_visible(duplicate.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
 fn scratch_document_supports_native_chart_legend_visibility_crud() {
     let mut editor = PagesEditor::create_with_text("Chart legends").unwrap();
     let source = editor

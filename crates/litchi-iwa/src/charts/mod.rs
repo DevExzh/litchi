@@ -13,6 +13,7 @@ use crate::{Error, IWorkPackage, Result};
 
 mod archive;
 pub(crate) mod axis;
+pub(crate) mod axis_line;
 mod data;
 mod direction;
 mod kind;

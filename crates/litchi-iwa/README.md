@@ -123,6 +123,14 @@ Numbers, and Keynote save. `Value` selects the primary value-axis object;
 titles remain independent through duplicate, delete, and package round-trip
 operations.
 
+Axis-line visibility is likewise typed through
+`body_chart_axis_line_visible`, `sheet_chart_axis_line_visible`, and
+`slide_chart_axis_line_visible`; use `set_*_chart_axis_line_visible` to
+update the same `Axis > Category (X) / Value (Y) > Axis Line` switch that all
+three apps save. Source-built charts default both primary axis lines to
+visible, and each axis remains independently configurable through duplicate
+and package round-trip operations.
+
 Chart legend visibility is likewise native and typed through
 `body_chart_legend_visible`, `sheet_chart_legend_visible`, and
 `slide_chart_legend_visible`; use `set_*_chart_legend_visible` to toggle the

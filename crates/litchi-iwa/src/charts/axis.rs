@@ -26,7 +26,7 @@ const CATEGORY_AXIS_TITLE_TEXT_FIELD: u32 = 15;
 /// `tschchartaxisvaluetitle` in `TSCH.Generated.ChartAxisNonStyleArchive`.
 const VALUE_AXIS_TITLE_TEXT_FIELD: u32 = 16;
 
-/// A native chart axis with a user-visible title.
+/// A native chart axis exposed by iWork's Axis formatter.
 ///
 /// [`Self::Value`] addresses the primary value-axis object. iWork charts can
 /// retain additional value-axis objects for specialized chart types, but the
@@ -60,7 +60,7 @@ impl ChartAxis {
         }
     }
 
-    const fn label(self) -> &'static str {
+    pub(crate) const fn label(self) -> &'static str {
         match self {
             Self::Category => "category",
             Self::Value => "value",
@@ -71,6 +71,17 @@ impl ChartAxis {
         let references = match self {
             Self::Category => &chart.category_axis_nonstyles,
             Self::Value => &chart.value_axis_nonstyles,
+        };
+        references
+            .first()
+            .map(|reference| reference.identifier)
+            .filter(|identifier| *identifier != 0)
+    }
+
+    pub(crate) fn primary_style_identifier(self, chart: &tsch::ChartArchive) -> Option<u64> {
+        let references = match self {
+            Self::Category => &chart.category_axis_styles,
+            Self::Value => &chart.value_axis_styles,
         };
         references
             .first()

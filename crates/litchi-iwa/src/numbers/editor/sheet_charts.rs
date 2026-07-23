@@ -1,6 +1,7 @@
 //! Standalone, inline-data chart CRUD for Numbers sheets.
 
 mod axis;
+mod axis_line;
 mod caption;
 mod graph;
 mod legend;
@@ -1056,6 +1057,62 @@ mod tests {
                 .iter()
                 .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
         );
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_axis_line_visibility_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert!(
+                editor
+                    .sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+            );
+            editor
+                .set_sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis, false)
+                .unwrap();
+            assert!(
+                !editor
+                    .sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+            );
+        }
+
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert!(
+                !editor
+                    .sheet_chart_axis_line_visible(sheet_id, duplicate.drawable_object_id, axis)
+                    .unwrap()
+            );
+            editor
+                .set_sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis, true)
+                .unwrap();
+        }
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert!(
+                reopened
+                    .sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+            );
+            assert!(
+                !reopened
+                    .sheet_chart_axis_line_visible(sheet_id, duplicate.drawable_object_id, axis)
+                    .unwrap()
+            );
+        }
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
     }
 
     #[test]
