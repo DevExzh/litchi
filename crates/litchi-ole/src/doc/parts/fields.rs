@@ -11,6 +11,9 @@ const FLD_SIZE: usize = 2;
 const CP_SIZE: usize = 4;
 const MAX_PLCFLD_BYTES: usize = 64 * 1024 * 1024;
 const MAX_FIELD_MARKERS: usize = 1_000_000;
+const FIELD_BEGIN_CHARACTER: char = '\u{0013}';
+const FIELD_SEPARATOR_CHARACTER: char = '\u{0014}';
+const FIELD_END_CHARACTER: char = '\u{0015}';
 
 /// A Word subdocument with its own field-character PLCF.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -528,6 +531,97 @@ pub struct FieldText {
     pub instruction: String,
     /// Stored cached result text, if the field has a separator.
     pub result: Option<String>,
+}
+
+/// Stored text for a field whose characters are intentionally absent from a
+/// `Plcfld` table.
+///
+/// MS-DOC excludes several marker-field types, including `TC`, from the
+/// `aFld` array. This internal representation reconstructs their text ranges
+/// directly from their stored field characters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NonPlcfFieldText<'a> {
+    pub story: FieldStory,
+    pub start_cp: u32,
+    pub separator_cp: Option<u32>,
+    pub end_cp: u32,
+    pub instruction: &'a str,
+    pub result: Option<&'a str>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct OpenNonPlcfField {
+    start_cp: u32,
+    instruction_start_byte: usize,
+    separator_cp: Option<u32>,
+    separator_start_byte: Option<usize>,
+    result_start_byte: Option<usize>,
+}
+
+/// Reconstruct balanced stored fields from the control characters embedded in
+/// one story's text.
+///
+/// This is deliberately independent of `Plcfld`: callers use it only for
+/// field kinds MS-DOC explicitly omits from that table. Unbalanced marker
+/// characters are ignored so malformed opaque text does not prevent the
+/// document from opening.
+pub(crate) fn non_plcf_field_texts(
+    story: FieldStory,
+    text: &str,
+) -> Vec<NonPlcfFieldText<'_>> {
+    let mut fields = Vec::new();
+    let mut open_fields = Vec::new();
+    let mut cp = 0u32;
+    let mut begin_count = 0usize;
+
+    for (byte_index, character) in text.char_indices() {
+        let next_byte = byte_index + character.len_utf8();
+        match character {
+            FIELD_BEGIN_CHARACTER => {
+                begin_count += 1;
+                if begin_count > MAX_FIELD_MARKERS {
+                    return Vec::new();
+                }
+                open_fields.push(OpenNonPlcfField {
+                    start_cp: cp,
+                    instruction_start_byte: next_byte,
+                    separator_cp: None,
+                    separator_start_byte: None,
+                    result_start_byte: None,
+                });
+            },
+            FIELD_SEPARATOR_CHARACTER => {
+                if let Some(field) = open_fields.last_mut() {
+                    if field.separator_cp.is_none() {
+                        field.separator_cp = Some(cp);
+                        field.separator_start_byte = Some(byte_index);
+                        field.result_start_byte = Some(next_byte);
+                    }
+                }
+            },
+            FIELD_END_CHARACTER => {
+                if let Some(field) = open_fields.pop() {
+                    let instruction_end = field.separator_start_byte.unwrap_or(byte_index);
+                    let result = field
+                        .result_start_byte
+                        .map(|start| &text[start..byte_index]);
+                    fields.push(NonPlcfFieldText {
+                        story,
+                        start_cp: field.start_cp,
+                        separator_cp: field.separator_cp,
+                        end_cp: cp,
+                        instruction: &text[field.instruction_start_byte..instruction_end],
+                        result,
+                    });
+                }
+            },
+            _ => {},
+        }
+        cp = cp.saturating_add(character.len_utf16() as u32);
+    }
+
+    fields.sort_unstable_by_key(|field| field.start_cp);
+    fields
 }
 
 /// A typed, inert legacy Word `MACROBUTTON` field.
@@ -1158,6 +1252,115 @@ impl TableOfContentsField {
     /// Whether a producer locked this field against refresh.
     pub fn is_locked(&self) -> bool {
         self.field.end_flags.locked
+    }
+}
+
+/// One recognized stored option of a legacy Word `TC` field.
+///
+/// These values identify how the entry participates in a table of contents.
+/// They are inert metadata only: this crate never changes hidden text,
+/// calculates page numbers, or generates a table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableOfContentsEntryOption {
+    /// The `\\f` contents-list identifier.
+    ListIdentifier(String),
+    /// The `\\l` entry level.
+    Level(String),
+    /// The `\\n` switch omits the entry page number.
+    OmitPageNumber,
+}
+
+/// Typed, inert metadata for a legacy Word table-of-contents entry (`TC`)
+/// field.
+///
+/// MS-DOC excludes `TC` field characters from the `Plcfld` `aFld` array, so
+/// this type retains story-relative control-character positions instead of a
+/// `Field` descriptor. It exposes only the stored entry, switches, and cached
+/// result. It never changes hidden text, calculates page numbers, generates a
+/// table of contents, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfContentsEntryField {
+    story: FieldStory,
+    start_cp: u32,
+    separator_cp: Option<u32>,
+    end_cp: u32,
+    instruction: String,
+    entry: String,
+    options: Vec<TableOfContentsEntryOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl TableOfContentsEntryField {
+    pub(crate) fn from_non_plcf_field(field: &NonPlcfFieldText<'_>) -> Option<Self> {
+        let parts = parse_table_of_contents_entry_field_parts(field.instruction)?;
+        Some(Self {
+            story: field.story,
+            start_cp: field.start_cp,
+            separator_cp: field.separator_cp,
+            end_cp: field.end_cp,
+            instruction: field.instruction.to_string(),
+            entry: parts.entry,
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: field.result.map(str::to_string),
+        })
+    }
+
+    /// Return the story that stores this field.
+    pub const fn story(&self) -> FieldStory {
+        self.story
+    }
+
+    /// Return the story-relative position of this field's begin character.
+    pub const fn start_position(&self) -> u32 {
+        self.start_cp
+    }
+
+    /// Return the story-relative position of this field's separator character.
+    ///
+    /// `TC` fields normally have no cached result and therefore no separator.
+    pub const fn separator_position(&self) -> Option<u32> {
+        self.separator_cp
+    }
+
+    /// Return the story-relative position of this field's end character.
+    pub const fn end_position(&self) -> u32 {
+        self.end_cp
+    }
+
+    /// Return the complete stored `TC` field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored text marked for a table of contents.
+    ///
+    /// This is metadata only and is never inserted into generated content.
+    pub fn entry(&self) -> &str {
+        &self.entry
+    }
+
+    /// Return recognized `TC` options in stored source order.
+    ///
+    /// These options are never used to calculate page numbers, change hidden
+    /// text, or update a table of contents.
+    pub fn options(&self) -> &[TableOfContentsEntryOption] {
+        &self.options
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    ///
+    /// They are retained without interpretation or execution.
+    pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This value is never regenerated through pagination or field evaluation.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
     }
 }
 
@@ -4986,6 +5189,8 @@ const MAX_MAIL_MERGE_DATA_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_DATA_FIELD_SWITCHES: usize = 64;
 const MAX_TABLE_OF_CONTENTS_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_CONTENTS_FIELD_SWITCHES: usize = 64;
+const MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_SWITCHES: usize = 64;
 const MAX_TABLE_OF_AUTHORITIES_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_AUTHORITIES_FIELD_SWITCHES: usize = 64;
 const MAX_INDEX_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5089,6 +5294,12 @@ struct ExternalIncludeFieldParts {
 
 struct TableOfContentsFieldParts {
     options: Vec<TableOfContentsOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+}
+
+struct TableOfContentsEntryFieldParts {
+    entry: String,
+    options: Vec<TableOfContentsEntryOption>,
     unknown_switches: Vec<MergeFieldSwitch>,
 }
 
@@ -5377,6 +5588,73 @@ fn parse_table_of_contents_field_parts(instruction: &str) -> Option<TableOfConte
     }
 
     Some(TableOfContentsFieldParts {
+        options,
+        unknown_switches,
+    })
+}
+
+fn parse_table_of_contents_entry_field_parts(
+    instruction: &str,
+) -> Option<TableOfContentsEntryFieldParts> {
+    if instruction.len() > MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("TC") {
+        return None;
+    }
+
+    skip_field_whitespace(instruction, &mut position);
+    if matches!(peek_field_character(instruction, position), None | Some('\\')) {
+        return None;
+    }
+    let entry = next_field_argument(instruction, &mut position).ok()??;
+    if entry.is_empty() {
+        return None;
+    }
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\'
+            || options.len() + unknown_switches.len()
+                >= MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_SWITCHES
+        {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        match name {
+            'f' => options.push(TableOfContentsEntryOption::ListIdentifier(argument?)),
+            'l' => options.push(TableOfContentsEntryOption::Level(argument?)),
+            'n' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfContentsEntryOption::OmitPageNumber);
+            },
+            _ => unknown_switches.push(MergeFieldSwitch { name, argument }),
+        }
+    }
+
+    Some(TableOfContentsEntryFieldParts {
+        entry,
         options,
         unknown_switches,
     })
@@ -8376,6 +8654,80 @@ mod tests {
             ..text
         };
         assert!(wrong_type.table_of_contents().is_none());
+    }
+
+    #[test]
+    fn table_of_contents_entries_reconstruct_omitted_field_markers() {
+        let text = concat!(
+            "\u{0013} TC \"Illustration 1\" \\f i \\l 4 ",
+            "\\n \\* MERGEFORMAT ",
+            "\u{0014}cached entry\u{0015}",
+            "\u{0013} TCC \"not an entry\"\u{0015}",
+            "\u{0013} TC \"missing end\""
+        );
+        let stored = non_plcf_field_texts(FieldStory::Textbox, text);
+        assert_eq!(stored.len(), 2);
+
+        let entries: Vec<_> = stored
+            .iter()
+            .filter_map(TableOfContentsEntryField::from_non_plcf_field)
+            .collect();
+        assert_eq!(entries.len(), 1);
+        let entry = &entries[0];
+        assert_eq!(entry.story(), FieldStory::Textbox);
+        assert_eq!(entry.start_position(), 0);
+        assert_eq!(entry.instruction(), " TC \"Illustration 1\" \\f i \\l 4 \\n \\* MERGEFORMAT ");
+        assert_eq!(entry.entry(), "Illustration 1");
+        assert_eq!(
+            entry.options(),
+            &[
+                TableOfContentsEntryOption::ListIdentifier("i".to_string()),
+                TableOfContentsEntryOption::Level("4".to_string()),
+                TableOfContentsEntryOption::OmitPageNumber,
+            ]
+        );
+        assert_eq!(
+            entry.unknown_switches(),
+            &[MergeFieldSwitch {
+                name: '*',
+                argument: Some("MERGEFORMAT".to_string()),
+            }]
+        );
+        assert_eq!(entry.cached_result(), Some("cached entry"));
+        assert!(entry.separator_position().is_some());
+        assert!(entry.end_position() > entry.start_position());
+
+        let utf16_prefix = "\u{1F980}\u{0013} TC \"Crab\"\u{0015}";
+        let prefixed = non_plcf_field_texts(FieldStory::Main, utf16_prefix);
+        let prefixed = TableOfContentsEntryField::from_non_plcf_field(&prefixed[0]).unwrap();
+        assert_eq!(prefixed.start_position(), 2);
+
+        for instruction in [
+            "TC",
+            "TC \\f i",
+            "TC entry unexpected",
+            "TC entry \\n unexpected",
+            "TC entry \\f",
+            "TC entry \\l",
+        ] {
+            let text = format!("\u{0013}{instruction}\u{0015}");
+            assert!(
+                non_plcf_field_texts(FieldStory::Main, &text)
+                    .iter()
+                    .all(|field| TableOfContentsEntryField::from_non_plcf_field(field).is_none()),
+                "{instruction}"
+            );
+        }
+
+        let too_long = format!(
+            "\u{0013}TC {} \u{0015}",
+            "x".repeat(MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES)
+        );
+        assert!(
+            non_plcf_field_texts(FieldStory::Main, &too_long)
+                .iter()
+                .all(|field| TableOfContentsEntryField::from_non_plcf_field(field).is_none())
+        );
     }
 
     #[test]

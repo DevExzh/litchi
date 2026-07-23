@@ -14,16 +14,17 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
-    BarcodeField, BidiOutlineField, CompareField, DdeField, DocumentContextField,
-    DocumentInformationField, DocumentPropertyField, DocumentVariableField, EmbedField,
-    EquationField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
-    GoToButtonField, HyperlinkField, IfField, IndexField, InfoField, LegacyFormField, LinkField,
-    ListNumberField, MacroButtonField,
+    non_plcf_field_texts, ActiveContentField, AdvanceField, AutoNumberField, AutoTextField,
+    AutoTextListField, BarcodeField, BidiOutlineField, CompareField, DdeField,
+    DocumentContextField, DocumentInformationField, DocumentPropertyField, DocumentVariableField,
+    EmbedField, EquationField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
+    FormulaField, GoToButtonField, HyperlinkField, IfField, IndexField, InfoField,
+    LegacyFormField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
     ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
-    ShapeField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    ShapeField, TableOfAuthoritiesField, TableOfContentsEntryField, TableOfContentsField,
+    UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -739,6 +740,35 @@ impl Document {
         Ok(self.table_of_contents_fields()?.len())
     }
 
+    /// Get typed, inert `TC` table-of-contents entry fields in story and source
+    /// order.
+    ///
+    /// Native Word omits `TC` marker characters from `Plcfld` metadata, so this
+    /// method scans only the stored text of each document story. Returned values
+    /// expose stored entries, switches, cached results, and source positions.
+    /// This method never changes hidden text, calculates page numbers, generates
+    /// a table of contents, or refreshes a field.
+    pub fn table_of_contents_entries(&self) -> Result<Vec<TableOfContentsEntryField>> {
+        let mut entries = Vec::new();
+        for story in FieldStory::ALL {
+            let Some((start, end)) = self.field_story_range_if_present(story) else {
+                continue;
+            };
+            let text = self.text_extractor.text_at_range(start, end);
+            entries.extend(
+                non_plcf_field_texts(story, text)
+                    .iter()
+                    .filter_map(TableOfContentsEntryField::from_non_plcf_field),
+            );
+        }
+        Ok(entries)
+    }
+
+    /// Get the number of typed, inert `TC` table-of-contents entry fields.
+    pub fn table_of_contents_entry_count(&self) -> Result<usize> {
+        Ok(self.table_of_contents_entries()?.len())
+    }
+
     /// Get typed, inert `TOA` fields in story and source order.
     ///
     /// Returned values expose only stored configuration, unrecognized switches,
@@ -1389,8 +1419,8 @@ impl Document {
         Ok(self.text_extractor.text_at_range(start, end).to_string())
     }
 
-    fn field_story_range(&self, story: FieldStory) -> Result<(u32, u32)> {
-        let range = match story {
+    fn field_story_range_if_present(&self, story: FieldStory) -> Option<(u32, u32)> {
+        match story {
             FieldStory::Main => Some(self.fib.get_main_doc_range()),
             FieldStory::Header => self.fib.get_header_range(),
             FieldStory::Footnote => self.fib.get_footnote_range(),
@@ -1398,7 +1428,11 @@ impl Document {
             FieldStory::Endnote => self.fib.get_endnote_range(),
             FieldStory::Textbox => self.fib.get_textbox_range(),
             FieldStory::HeaderTextbox => self.fib.get_header_textbox_range(),
-        };
+        }
+    }
+
+    fn field_story_range(&self, story: FieldStory) -> Result<(u32, u32)> {
+        let range = self.field_story_range_if_present(story);
         range.ok_or_else(|| {
             DocError::Corrupted(format!(
                 "field table refers to absent {} story",

@@ -135,8 +135,9 @@ pub use parts::fields::{
     MailMergeConditionalControlKind, MailMergeCounterField, MailMergeCounterKind,
     MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
     MergeField, MergeFieldSwitch, PromptField, PromptFieldKind, TableOfAuthoritiesField,
-    TableOfAuthoritiesOption, TableOfContentsField, TableOfContentsOption, UserIdentityField,
-    UserIdentityFieldKind, UserIdentityFormatting,
+    TableOfAuthoritiesOption, TableOfContentsEntryField, TableOfContentsEntryOption,
+    TableOfContentsField, TableOfContentsOption, UserIdentityField, UserIdentityFieldKind,
+    UserIdentityFormatting,
 };
 pub use parts::fields::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
 pub use parts::fields::{AutoTextField, AutoTextFieldKind, AutoTextListField, AutoTextListOption};

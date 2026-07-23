@@ -1,4 +1,6 @@
 use litchi_ole::doc::{FieldStory, FieldType, Package};
+use litchi_ole::doc::writer::DocWriter;
+use std::io::Cursor;
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -109,5 +111,30 @@ fn poi_hyperlink_fixture_retains_inert_hyperlink_field() {
             .main_document_fields()
             .iter()
             .any(|field| field.field_type == FieldType::Hyperlink)
+    );
+}
+
+#[test]
+fn generated_tc_document_discovers_table_of_contents_entries() {
+    let mut writer = DocWriter::new();
+    writer
+        .add_paragraph(concat!(
+            "\u{0013} TC \"Illustration 1\" \\f i \\l 4 ",
+            "\\n \u{0014}cached entry\u{0015}",
+        ))
+        .unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+
+    let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+    let document = package.document().unwrap();
+    let entries = document.table_of_contents_entries().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].story(), FieldStory::Main);
+    assert_eq!(entries[0].entry(), "Illustration 1");
+    assert_eq!(entries[0].cached_result(), Some("cached entry"));
+    assert_eq!(
+        document.table_of_contents_entry_count().unwrap(),
+        entries.len()
     );
 }
