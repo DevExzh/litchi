@@ -299,3 +299,88 @@ fn scratch_document_supports_native_chart_caption_crud() {
             .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
     );
 }
+
+#[test]
+fn scratch_document_supports_native_chart_title_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart titles").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart titles".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+
+    assert_eq!(
+        editor.body_chart_title(source.drawable_object_id).unwrap(),
+        None
+    );
+    editor
+        .set_body_chart_title(source.drawable_object_id, "Revenue by region")
+        .unwrap();
+    assert_eq!(
+        editor.body_chart_title(source.drawable_object_id).unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_title(duplicate.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+
+    editor
+        .set_body_chart_title(source.drawable_object_id, "Updated source title")
+        .unwrap();
+    assert_eq!(
+        editor.body_chart_title(source.drawable_object_id).unwrap(),
+        Some("Updated source title".to_owned())
+    );
+    assert_eq!(
+        editor
+            .body_chart_title(duplicate.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+    assert!(
+        editor
+            .remove_body_chart_title(source.drawable_object_id)
+            .unwrap()
+    );
+    assert!(
+        !editor
+            .remove_body_chart_title(source.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        editor.body_chart_title(source.drawable_object_id).unwrap(),
+        None
+    );
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_title(duplicate.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(
+        reopened
+            .body_charts()
+            .unwrap()
+            .iter()
+            .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+    );
+}

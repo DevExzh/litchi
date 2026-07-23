@@ -27,6 +27,7 @@
 
 use crate::Result;
 use crate::bundle::Bundle;
+use crate::charts::title::read_chart_non_style_title;
 use crate::charts::{ChartKind, IWorkChartArchive};
 use crate::object_index::{ObjectIndex, ResolvedObject};
 use crate::protobuf::tsch;
@@ -34,6 +35,7 @@ use prost::Message;
 
 const LEGACY_CHART_MESSAGE_TYPE: u32 = 5_000;
 const CHART_DRAWABLE_MESSAGE_TYPE: u32 = 5_021;
+const CHART_NON_STYLE_MESSAGE_TYPE: u32 = 5_023;
 
 /// Metadata extracted from a chart
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -159,65 +161,34 @@ impl<'a> ChartMetadataExtractor<'a> {
         }
     }
 
-    /// Extract chart title from text storage references
-    ///
-    /// Chart titles are typically stored in TSWP.StorageArchive objects
-    /// that are referenced by the chart or its style properties.
+    /// Extract the title from the chart's native non-style extension.
     fn extract_chart_title(&self, chart: &tsch::ChartArchive) -> Result<Option<String>> {
-        // Check paragraph styles for title text
-        for para_ref in &chart.paragraph_styles {
-            if let Some(text) = self.extract_text_from_style_ref(para_ref.identifier)?
-                && !text.is_empty()
-            {
-                return Ok(Some(text));
-            }
+        let Some(reference) = chart.chart_non_style.as_ref() else {
+            return Ok(None);
+        };
+        let Some(resolved) = self
+            .object_index
+            .resolve_object(self.bundle, reference.identifier)?
+        else {
+            return Ok(None);
+        };
+        let mut messages = resolved
+            .messages
+            .iter()
+            .filter(|message| message.type_ == CHART_NON_STYLE_MESSAGE_TYPE);
+        let Some(message) = messages.next() else {
+            return Err(crate::Error::InvalidFormat(format!(
+                "chart non-style {} must have exactly one payload",
+                reference.identifier
+            )));
+        };
+        if messages.next().is_some() {
+            return Err(crate::Error::InvalidFormat(format!(
+                "chart non-style {} must have exactly one payload",
+                reference.identifier
+            )));
         }
-
-        // Check chart style for title references
-        if let Some(ref chart_style_ref) = chart.chart_style
-            && let Some(text) = self.extract_text_from_style_ref(chart_style_ref.identifier)?
-            && !text.is_empty()
-        {
-            return Ok(Some(text));
-        }
-
-        Ok(None)
-    }
-
-    /// Extract text from a style reference
-    ///
-    /// Styles may reference text storage objects that contain the actual text.
-    fn extract_text_from_style_ref(&self, style_id: u64) -> Result<Option<String>> {
-        if let Some(_resolved) = self.object_index.resolve_object(self.bundle, style_id)? {
-            // Look for associated text storages through dependencies
-            if let Some(deps) = self.object_index.get_dependencies(style_id) {
-                for &dep_id in deps {
-                    if let Some(text) = self.extract_text_from_storage(dep_id)? {
-                        return Ok(Some(text));
-                    }
-                }
-            }
-        }
-
-        Ok(None)
-    }
-
-    /// Extract text from a TSWP.StorageArchive object
-    fn extract_text_from_storage(&self, storage_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_object(self.bundle, storage_id)? {
-            for msg in &resolved.messages {
-                // TSWP storage types
-                if msg.type_ >= 2001
-                    && msg.type_ <= 2022
-                    && let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
-                    && !storage.text.is_empty()
-                {
-                    return Ok(Some(storage.text.join(" ")));
-                }
-            }
-        }
-
-        Ok(None)
+        read_chart_non_style_title(message.data.as_slice())
     }
 
     /// Extract metadata from a specific chart by object ID

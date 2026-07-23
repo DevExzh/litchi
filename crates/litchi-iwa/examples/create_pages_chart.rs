@@ -35,10 +35,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 240.0,
         },
     )?;
+    editor.set_body_chart_title(chart.drawable_object_id, "Quarterly revenue")?;
     editor.set_body_chart_caption(chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Pages {:?} chart {} with a native caption at body UTF-16 index {}",
+        "created Pages {:?} chart {} with native title and caption at body UTF-16 index {}",
         chart.kind, chart.drawable_object_id, chart.anchor_character_index
     );
     Ok(())

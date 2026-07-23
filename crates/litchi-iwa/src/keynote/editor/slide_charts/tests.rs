@@ -299,3 +299,87 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
             .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
     );
 }
+
+#[test]
+fn scratch_presentation_supports_native_chart_title_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    assert_eq!(
+        editor
+            .slide_chart_title(0, source.drawable_object_id)
+            .unwrap(),
+        None
+    );
+    editor
+        .set_slide_chart_title(0, source.drawable_object_id, "Revenue by region")
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_title(0, source.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_title(0, duplicate.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+
+    editor
+        .set_slide_chart_title(0, source.drawable_object_id, "Updated source title")
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_title(0, source.drawable_object_id)
+            .unwrap(),
+        Some("Updated source title".to_owned())
+    );
+    assert_eq!(
+        editor
+            .slide_chart_title(0, duplicate.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+    assert!(
+        editor
+            .remove_slide_chart_title(0, source.drawable_object_id)
+            .unwrap()
+    );
+    assert!(
+        !editor
+            .remove_slide_chart_title(0, source.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        editor
+            .slide_chart_title(0, source.drawable_object_id)
+            .unwrap(),
+        None
+    );
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_title(0, duplicate.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(
+        reopened
+            .slide_charts(0)
+            .unwrap()
+            .iter()
+            .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+    );
+}

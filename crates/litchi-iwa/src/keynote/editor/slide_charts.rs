@@ -3,6 +3,7 @@
 mod caption;
 mod graph;
 mod theme;
+mod title;
 
 use std::collections::HashMap;
 

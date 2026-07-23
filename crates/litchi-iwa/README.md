@@ -107,6 +107,13 @@ private styles, preset registration, UUIDs, ownership, and native placement.
 See `create_*_chart` and `duplicate_*_chart` in `examples/` for runnable
 file-to-file workflows.
 
+Charts expose their native title through `body_chart_title`,
+`sheet_chart_title`, and `slide_chart_title`. `set_*_chart_title` updates the
+same `Chart Options > Title` state and text that Pages, Numbers, and Keynote
+save; `remove_*_chart_title` returns whether a title was visible. Chart titles
+remain independent through duplicate, delete, and package round-trip
+operations.
+
 Charts also expose their native generic Object Caption control through
 `body_chart_caption`, `sheet_chart_caption`, and `slide_chart_caption`.
 `set_*_chart_caption` creates or updates the real caption text graph, while

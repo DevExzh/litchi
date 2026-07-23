@@ -3,6 +3,7 @@
 mod caption;
 mod graph;
 mod theme;
+mod title;
 
 use graph::{
     body_chart_graph, body_chart_infos, chart_attachment_object, set_chart_attachment_position,
