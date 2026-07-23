@@ -3644,6 +3644,68 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_active_and_building_block_fields() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            for (instruction, cached_result) in [
+                ("ADDIN opaque-add-in-data", "cached add-in"),
+                ("CONTROL opaque-control-data", "cached control"),
+                ("HTMLCONTROL opaque-html-data", "cached HTML control"),
+                (r#"GLOSSARY "Legacy Clause" \* MERGEFORMAT"#, "cached glossary"),
+                (r#"AUTOTEXT "Reusable Clause" \q opaque"#, "cached auto text"),
+                (
+                    r#"AUTOTEXTLIST "Choose a name" \s "Name Style" \t "Select one""#,
+                    "cached auto text list",
+                ),
+            ] {
+                document.add_paragraph().add_field(
+                    crate::docx::writer::MutableField::with_result(
+                        instruction.to_string(),
+                        cached_result.to_string(),
+                    ),
+                );
+            }
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+
+        let active_content = document.active_content_fields().unwrap();
+        assert_eq!(document.active_content_field_count().unwrap(), 3);
+        assert_eq!(active_content.len(), 3);
+        assert_eq!(
+            active_content[0].kind(),
+            crate::docx::ActiveContentFieldKind::AddIn
+        );
+        assert_eq!(
+            active_content[1].kind(),
+            crate::docx::ActiveContentFieldKind::OcxControl
+        );
+        assert_eq!(
+            active_content[2].kind(),
+            crate::docx::ActiveContentFieldKind::HtmlControl
+        );
+        assert_eq!(active_content[2].cached_result(), Some("cached HTML control"));
+
+        let auto_text = document.auto_text_fields().unwrap();
+        assert_eq!(document.auto_text_field_count().unwrap(), 2);
+        assert_eq!(auto_text.len(), 2);
+        assert_eq!(auto_text[0].kind(), crate::docx::AutoTextFieldKind::Glossary);
+        assert_eq!(auto_text[0].entry_name(), "Legacy Clause");
+        assert_eq!(auto_text[1].kind(), crate::docx::AutoTextFieldKind::AutoText);
+        assert_eq!(auto_text[1].entry_name(), "Reusable Clause");
+
+        let auto_text_lists = document.auto_text_list_fields().unwrap();
+        assert_eq!(document.auto_text_list_field_count().unwrap(), 1);
+        assert_eq!(auto_text_lists.len(), 1);
+        assert_eq!(auto_text_lists[0].display_text(), Some("Choose a name"));
+        assert_eq!(auto_text_lists[0].cached_result(), Some("cached auto text list"));
+    }
+
+    #[test]
     fn writes_and_discovers_typed_inert_dde_fields() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();

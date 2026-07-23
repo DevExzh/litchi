@@ -9,10 +9,10 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
-    AdvanceField, AutoNumberField, BarcodeField, BibliographyField, BidiOutlineField,
-    CitationField, DatabaseField, DdeField, DocumentContextField, DocumentInformationField,
-    DocumentPropertyField, DocumentVariableField, EmbedField, ExternalIncludeField, Field,
-    GoToButtonField, IfField,
+    ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
+    BarcodeField, BibliographyField, BidiOutlineField, CitationField, DatabaseField, DdeField,
+    DocumentContextField, DocumentInformationField, DocumentPropertyField, DocumentVariableField,
+    EmbedField, ExternalIncludeField, Field, GoToButtonField, IfField,
     IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
@@ -1379,6 +1379,64 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `MACROBUTTON` fields in the main document.
     pub fn macro_button_field_count(&self) -> Result<usize> {
         Ok(self.macro_button_fields()?.len())
+    }
+
+    /// Get typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in document
+    /// order.
+    ///
+    /// Returned values expose stored kinds, instructions, cached content, and
+    /// dirty/lock state only. This method never loads an add-in, instantiates
+    /// an OCX or HTML control, invokes code, executes script, renders content,
+    /// accesses an external resource, or refreshes a field.
+    pub fn active_content_fields(&self) -> Result<Vec<ActiveContentField>> {
+        self.fields()?
+            .iter()
+            .map(Field::active_content_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert active-content fields in the main document.
+    pub fn active_content_field_count(&self) -> Result<usize> {
+        Ok(self.active_content_fields()?.len())
+    }
+
+    /// Get typed, inert `GLOSSARY` and `AUTOTEXT` fields in document order.
+    ///
+    /// Returned values expose stored kinds, entry names, switches, cached
+    /// content, and dirty/lock state only. This method never looks up a
+    /// building block, reads a template, inserts content, changes bookmarks,
+    /// accesses an external resource, or refreshes a field.
+    pub fn auto_text_fields(&self) -> Result<Vec<AutoTextField>> {
+        self.fields()?
+            .iter()
+            .map(Field::auto_text_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert building-block fields in the main document.
+    pub fn auto_text_field_count(&self) -> Result<usize> {
+        Ok(self.auto_text_fields()?.len())
+    }
+
+    /// Get typed, inert `AUTOTEXTLIST` fields in document order.
+    ///
+    /// Returned values expose stored display text, style/tip options, unknown
+    /// switches, cached content, and dirty/lock state only. This method never
+    /// shows a selection UI, looks up a building block, reads a template,
+    /// inserts content, accesses an external resource, or refreshes a field.
+    pub fn auto_text_list_fields(&self) -> Result<Vec<AutoTextListField>> {
+        self.fields()?
+            .iter()
+            .map(Field::auto_text_list_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `AUTOTEXTLIST` fields in the main document.
+    pub fn auto_text_list_field_count(&self) -> Result<usize> {
+        Ok(self.auto_text_list_fields()?.len())
     }
 
     /// Get typed, inert `GOTOBUTTON` fields in document order.
