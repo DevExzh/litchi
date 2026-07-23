@@ -502,6 +502,148 @@ impl PresentationCustomerDataList {
     }
 }
 
+/// Password-verification metadata declared on a presentation root.
+///
+/// The values remain inert metadata; this type neither accepts passwords nor
+/// attempts password verification.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PresentationModificationVerifier {
+    cryptographic_provider_type: Option<String>,
+    cryptographic_algorithm_class: Option<String>,
+    cryptographic_algorithm_type: Option<String>,
+    cryptographic_provider: Option<String>,
+    algorithm_name: Option<String>,
+    crypt_algorithm_sid: Option<u32>,
+    hash_data: Option<String>,
+    hash_value: Option<String>,
+    salt_data: Option<String>,
+    salt_value: Option<String>,
+    spin_count: Option<u32>,
+    spin_value: Option<u32>,
+}
+
+impl PresentationModificationVerifier {
+    /// Return the declared legacy cryptographic provider type, if present.
+    #[inline]
+    pub fn cryptographic_provider_type(&self) -> Option<&str> {
+        self.cryptographic_provider_type.as_deref()
+    }
+
+    /// Return the declared legacy cryptographic algorithm class, if present.
+    #[inline]
+    pub fn cryptographic_algorithm_class(&self) -> Option<&str> {
+        self.cryptographic_algorithm_class.as_deref()
+    }
+
+    /// Return the declared legacy cryptographic algorithm type, if present.
+    #[inline]
+    pub fn cryptographic_algorithm_type(&self) -> Option<&str> {
+        self.cryptographic_algorithm_type.as_deref()
+    }
+
+    /// Return the declared legacy cryptographic provider, if present.
+    #[inline]
+    pub fn cryptographic_provider(&self) -> Option<&str> {
+        self.cryptographic_provider.as_deref()
+    }
+
+    /// Return the declared algorithm name, if present.
+    #[inline]
+    pub fn algorithm_name(&self) -> Option<&str> {
+        self.algorithm_name.as_deref()
+    }
+
+    /// Return the declared legacy cryptographic algorithm SID, if present.
+    #[inline]
+    pub const fn crypt_algorithm_sid(&self) -> Option<u32> {
+        self.crypt_algorithm_sid
+    }
+
+    /// Return the declared legacy password hash data, if present.
+    #[inline]
+    pub fn hash_data(&self) -> Option<&str> {
+        self.hash_data.as_deref()
+    }
+
+    /// Return the declared alternate password hash value, if present.
+    #[inline]
+    pub fn hash_value(&self) -> Option<&str> {
+        self.hash_value.as_deref()
+    }
+
+    /// Return the declared legacy password salt data, if present.
+    #[inline]
+    pub fn salt_data(&self) -> Option<&str> {
+        self.salt_data.as_deref()
+    }
+
+    /// Return the declared alternate password salt value, if present.
+    #[inline]
+    pub fn salt_value(&self) -> Option<&str> {
+        self.salt_value.as_deref()
+    }
+
+    /// Return the declared legacy hash iteration count, if present.
+    #[inline]
+    pub const fn spin_count(&self) -> Option<u32> {
+        self.spin_count
+    }
+
+    /// Return the declared alternate hash iteration count, if present.
+    #[inline]
+    pub const fn spin_value(&self) -> Option<u32> {
+        self.spin_value
+    }
+
+    fn from_element(element: &BytesStart<'_>, decoder: Decoder) -> Result<Self> {
+        Ok(Self {
+            cryptographic_provider_type: unqualified_attribute_value(
+                element,
+                b"cryptProviderType",
+                decoder,
+            )?,
+            cryptographic_algorithm_class: unqualified_attribute_value(
+                element,
+                b"cryptAlgorithmClass",
+                decoder,
+            )?,
+            cryptographic_algorithm_type: unqualified_attribute_value(
+                element,
+                b"cryptAlgorithmType",
+                decoder,
+            )?,
+            cryptographic_provider: unqualified_attribute_value(
+                element,
+                b"cryptProvider",
+                decoder,
+            )?,
+            algorithm_name: unqualified_attribute_value(element, b"algorithmName", decoder)?,
+            crypt_algorithm_sid: optional_u32_attribute(
+                element,
+                b"cryptAlgorithmSid",
+                decoder,
+                "modification verifier cryptographic algorithm SID",
+            )?,
+            hash_data: unqualified_attribute_value(element, b"hashData", decoder)?,
+            hash_value: unqualified_attribute_value(element, b"hashValue", decoder)?,
+            salt_data: unqualified_attribute_value(element, b"saltData", decoder)?,
+            salt_value: unqualified_attribute_value(element, b"saltValue", decoder)?,
+            spin_count: optional_u32_attribute(
+                element,
+                b"spinCount",
+                decoder,
+                "modification verifier spin count",
+            )?,
+            spin_value: optional_u32_attribute(
+                element,
+                b"spinValue",
+                decoder,
+                "modification verifier spin value",
+            )?,
+        })
+    }
+}
+
 /// The main presentation part.
 ///
 /// This part contains the presentation-level properties and references to slides,
@@ -638,6 +780,13 @@ impl<'a> PresentationPart<'a> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.customer_data)
     }
 
+    /// Get the root-level password-verification metadata.
+    ///
+    /// Returns None when the presentation has no modification verifier.
+    pub fn modification_verifier(&self) -> Result<Option<PresentationModificationVerifier>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.modification_verifier)
+    }
+
     /// Get the relationship ID of the declared smart-tags data.
     ///
     /// Returns None when the presentation does not declare smart tags.
@@ -746,6 +895,7 @@ struct PresentationInfo {
     kinsoku_settings: Option<PresentationKinsokuSettings>,
     photo_album: Option<PresentationPhotoAlbum>,
     customer_data: Option<PresentationCustomerDataList>,
+    modification_verifier: Option<PresentationModificationVerifier>,
     smart_tags_relationship_id: Option<String>,
     handout_master_relationship_id: Option<String>,
     seen_slide_list: bool,
@@ -991,6 +1141,16 @@ impl PresentationInfo {
                 ));
             }
             self.photo_album = Some(PresentationPhotoAlbum::from_element(element, decoder)?);
+        } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"modifyVerifier")
+        {
+            if self.modification_verifier.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate PowerPoint modification verifier".to_string(),
+                ));
+            }
+            self.modification_verifier =
+                Some(PresentationModificationVerifier::from_element(element, decoder)?);
         } else if parent == PresentationContext::CustomerDataList
             && is_presentationml_name(namespace, element.name(), b"custData")
         {
@@ -1170,6 +1330,21 @@ fn optional_i32_attribute(
     };
     value
         .parse::<i32>()
+        .map_err(|_| OoxmlError::InvalidFormat(format!("invalid {description} value '{value}'")))
+}
+
+fn optional_u32_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<u32>> {
+    let Some(value) = unqualified_attribute_value(element, name, decoder)? else {
+        return Ok(None);
+    };
+    value
+        .parse::<u32>()
+        .map(Some)
         .map_err(|_| OoxmlError::InvalidFormat(format!("invalid {description} value '{value}'")))
 }
 
@@ -1736,6 +1911,71 @@ mod tests {
     }
 
     #[test]
+    fn parses_modification_verifier_by_namespace() {
+        let xml = format!(
+            r#"<q:presentation xmlns:q="{P}" xmlns:f="urn:foreign">
+                <f:modifyVerifier cryptAlgorithmSid="4" hashData="foreign" saltData="foreign"/>
+                <q:modifyVerifier f:hashData="wrong" cryptProviderType="rsaAES"
+                    cryptAlgorithmClass="hash" cryptAlgorithmType="typeAny" cryptProvider="Microsoft"
+                    cryptAlgorithmSid="14"
+                    hashData="legacy-hash" saltData="legacy-salt" spinCount="100000"/>
+                <q:extLst><q:modifyVerifier cryptAlgorithmSid="4" hashData="nested"/>
+                </q:extLst>
+            </q:presentation>"#
+        );
+        let blob = part(xml);
+        let verifier = PresentationPart::from_part(&blob)
+            .unwrap()
+            .modification_verifier()
+            .unwrap()
+            .unwrap();
+        assert_eq!(verifier.cryptographic_provider_type(), Some("rsaAES"));
+        assert_eq!(verifier.cryptographic_algorithm_class(), Some("hash"));
+        assert_eq!(verifier.cryptographic_algorithm_type(), Some("typeAny"));
+        assert_eq!(verifier.cryptographic_provider(), Some("Microsoft"));
+        assert_eq!(verifier.algorithm_name(), None);
+        assert_eq!(verifier.crypt_algorithm_sid(), Some(14));
+        assert_eq!(verifier.hash_data(), Some("legacy-hash"));
+        assert_eq!(verifier.hash_value(), None);
+        assert_eq!(verifier.salt_data(), Some("legacy-salt"));
+        assert_eq!(verifier.salt_value(), None);
+        assert_eq!(verifier.spin_count(), Some(100_000));
+        assert_eq!(verifier.spin_value(), None);
+
+        let strict = r#"<x:presentation xmlns:x="http://purl.oclc.org/ooxml/presentationml/main">
+            <x:modifyVerifier algorithmName="SHA-512" hashValue="iso-hash"
+                saltValue="iso-salt" spinValue="250000"/></x:presentation>"#;
+        let blob = part(strict);
+        let verifier = PresentationPart::from_part(&blob)
+            .unwrap()
+            .modification_verifier()
+            .unwrap()
+            .unwrap();
+        assert_eq!(verifier.cryptographic_provider_type(), None);
+        assert_eq!(verifier.cryptographic_algorithm_class(), None);
+        assert_eq!(verifier.cryptographic_algorithm_type(), None);
+        assert_eq!(verifier.cryptographic_provider(), None);
+        assert_eq!(verifier.algorithm_name(), Some("SHA-512"));
+        assert_eq!(verifier.crypt_algorithm_sid(), None);
+        assert_eq!(verifier.hash_data(), None);
+        assert_eq!(verifier.hash_value(), Some("iso-hash"));
+        assert_eq!(verifier.salt_data(), None);
+        assert_eq!(verifier.salt_value(), Some("iso-salt"));
+        assert_eq!(verifier.spin_count(), None);
+        assert_eq!(verifier.spin_value(), Some(250_000));
+
+        let absent = format!(r#"<p:presentation xmlns:p="{P}"></p:presentation>"#);
+        let blob = part(absent);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .modification_verifier()
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
     fn rejects_duplicate_default_text_style_declarations() {
         let cases = [
             format!(
@@ -1817,6 +2057,36 @@ mod tests {
                 PresentationPart::from_part(&blob)
                     .unwrap()
                     .customer_data()
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_modification_verifiers() {
+        let cases = [
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:modifyVerifier spinCount="not-a-number"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:modifyVerifier cryptAlgorithmSid="4294967296"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:modifyVerifier spinValue="-1"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:modifyVerifier spinCount="1" spinCount="2"/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:modifyVerifier/><p:modifyVerifier/></p:presentation>"#
+            ),
+        ];
+        for xml in cases {
+            let blob = part(xml);
+            assert!(
+                PresentationPart::from_part(&blob)
+                    .unwrap()
+                    .modification_verifier()
                     .is_err()
             );
         }

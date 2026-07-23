@@ -227,7 +227,7 @@ conversion, fonts, and image conversion are optional.
 | Themes | 🟡 | ✅ | ❌ | Master-, layout-, and slide-scoped validated theme resolution, typed color maps/overrides, and presentation inventory; no general theme authoring workflow |
 | Sections | ✅ | ✅ | ✅ | Graph-safe section and membership CRUD |
 | Custom slide shows | ✅ | ✅ | ✅ | Named subsets and graph-safe ordered CRUD |
-| Presentation/slide protection | ✅ | ✅ | ✅ | Protection and password metadata; policy is not enforced by the library |
+| Presentation/slide protection | ✅ | ✅ | ✅ | Protection and password metadata, including root modification-verifier inspection; policy is not enforced by the library |
 | Embedded fonts | ✅ | ✅ | ✅ | Payloads, obfuscation, licensing checks, and ordered CRUD |
 | Embedded OLE/package objects | 🟡 | ✅ | ❌ | Typed per-slide inert OLE inventory with shape, ProgID, relationship, and payload metadata; no OLE authoring or activation |
 | View and presentation properties, and guides | 🟡 | ✅ | ✅ | Typed root/package presentation settings, slide/notes surface dimensions and size type, including PowerPoint 2010 browse-mode metadata, with bounded serialization and extended guides |

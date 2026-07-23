@@ -8,8 +8,8 @@ use crate::pptx::namespace::is_presentationml_name;
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
 use crate::pptx::parts::{
     NotesSize, PresentationCustomerDataList, PresentationDefaultTextStyle,
-    PresentationKinsokuSettings, PresentationMetadata, PresentationPart, PresentationPhotoAlbum,
-    SlideMasterPart, SlidePart, SlideSize,
+    PresentationKinsokuSettings, PresentationMetadata, PresentationModificationVerifier,
+    PresentationPart, PresentationPhotoAlbum, SlideMasterPart, SlidePart, SlideSize,
 };
 use crate::pptx::show_events::{
     PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events,
@@ -457,6 +457,13 @@ impl<'a> Presentation<'a> {
     /// Returns None when the presentation does not declare customer data.
     pub fn customer_data(&self) -> Result<Option<PresentationCustomerDataList>> {
         self.part.customer_data()
+    }
+
+    /// Get the root-level password-verification metadata.
+    ///
+    /// Returns None when the presentation has no modification verifier.
+    pub fn modification_verifier(&self) -> Result<Option<PresentationModificationVerifier>> {
+        self.part.modification_verifier()
     }
 
     /// Get the relationship ID of the declared smart-tags data.
