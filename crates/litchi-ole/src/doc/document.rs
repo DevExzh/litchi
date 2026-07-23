@@ -14,7 +14,7 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    Field, FieldStory, FieldText, FieldsTable, IfField, MacroButtonField,
+    Field, FieldStory, FieldText, FieldsTable, GoToButtonField, IfField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField,
 };
@@ -591,6 +591,21 @@ impl Document {
     /// Get the number of typed, inert `MACROBUTTON` fields.
     pub fn macro_button_field_count(&self) -> Result<usize> {
         Ok(self.macro_button_fields()?.len())
+    }
+
+    /// Get typed, inert `GOTOBUTTON` fields in story and source order.
+    ///
+    /// Returned values expose only stored destinations, button text, cached
+    /// results, and field state. This method never resolves a destination,
+    /// changes the insertion point, activates a jump, or refreshes a field.
+    pub fn go_to_button_fields(&self) -> Result<Vec<GoToButtonField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::go_to_button).collect())
+    }
+
+    /// Get the number of typed, inert `GOTOBUTTON` fields.
+    pub fn go_to_button_field_count(&self) -> Result<usize> {
+        Ok(self.go_to_button_fields()?.len())
     }
 
     /// Get typed, inert `MERGEFIELD` fields in story and source order.

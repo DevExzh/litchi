@@ -588,6 +588,66 @@ impl MacroButtonField {
     }
 }
 
+/// A typed, inert legacy Word `GOTOBUTTON` field.
+///
+/// [MS-DOC] §2.9.90 identifies its native field-type byte, and ECMA-376 Part
+/// 1 §17.16.5.23 defines two stored field arguments: a destination and the
+/// text or graphic used as its button. This type exposes stored text only; it
+/// never resolves a destination, changes the insertion point, or activates a
+/// jump.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GoToButtonField {
+    field: Field,
+    instruction: String,
+    target: String,
+    button_text: String,
+    cached_result: Option<String>,
+}
+
+impl GoToButtonField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored destination without resolving or navigating to it.
+    ///
+    /// A destination can be a bookmark, page reference, annotation, footnote,
+    /// line, page, or section expression.
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    /// Return the stored text or graphic-label expression for the button.
+    ///
+    /// This is source metadata, not an activated control.
+    pub fn button_text(&self) -> &str {
+        &self.button_text
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from the destination.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// One stored switch in a legacy Word `MERGEFIELD` instruction.
 ///
 /// The name excludes its leading backslash and is normalized to ASCII
@@ -1170,6 +1230,26 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `GOTOBUTTON`
+    /// field.
+    ///
+    /// The destination and button text are parsed only from stored field text.
+    /// Neither is resolved, navigated to, or activated. Malformed instructions
+    /// remain available through this generic type and return `None` here.
+    pub fn go_to_button(&self) -> Option<GoToButtonField> {
+        if self.field.field_type != FieldType::GoToButton {
+            return None;
+        }
+        let (target, button_text) = parse_go_to_button_parts(&self.instruction)?;
+        Some(GoToButtonField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            target,
+            button_text,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed `MERGEFIELD` field.
     ///
     /// The stored data-column name, switches, and cached result are never
@@ -1350,6 +1430,7 @@ impl FieldText {
 }
 
 const MAX_MACRO_BUTTON_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_GO_TO_BUTTON_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MERGE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MERGE_FIELD_SWITCHES: usize = 64;
 const MAX_MAIL_MERGE_COUNTER_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -1387,6 +1468,35 @@ fn parse_macro_button_parts(instruction: &str) -> Option<(String, String)> {
     }
 
     Some((macro_name, display_text))
+}
+
+fn parse_go_to_button_parts(instruction: &str) -> Option<(String, String)> {
+    if instruction.len() > MAX_GO_TO_BUTTON_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("GOTOBUTTON") {
+        return None;
+    }
+
+    let target = next_field_argument(instruction, &mut position).ok()??;
+    if target.is_empty() {
+        return None;
+    }
+    let button_text = next_field_argument(instruction, &mut position).ok()??;
+    if button_text.is_empty() {
+        return None;
+    }
+    if next_field_argument(instruction, &mut position)
+        .ok()?
+        .is_some()
+    {
+        return None;
+    }
+
+    Some((target, button_text))
 }
 
 fn parse_merge_field_parts(instruction: &str) -> Option<(String, Vec<MergeFieldSwitch>)> {
@@ -2257,6 +2367,72 @@ mod tests {
             ..text
         };
         assert!(wrong_keyword.macro_button().is_none());
+    }
+
+    #[test]
+    fn go_to_button_field_exposes_stored_metadata_without_navigation() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::GoToButton,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" GOTOBUTTON "f 2" "Footnote" "#.to_string(),
+            result: Some("cached footnote button".to_string()),
+        };
+
+        let button = text.go_to_button().unwrap();
+        assert_eq!(button.field(), &field);
+        assert_eq!(button.target(), "f 2");
+        assert_eq!(button.button_text(), "Footnote");
+        assert_eq!(button.cached_result(), Some("cached footnote button"));
+        assert!(button.is_dirty());
+        assert!(button.is_locked());
+
+        for instruction in [
+            "GOTOBUTTON",
+            r#"GOTOBUTTON "" Button"#,
+            "GOTOBUTTON Destination",
+            r#"GOTOBUTTON Destination """#,
+            "GOTOBUTTON Destination Button unexpected",
+            r#"GOTOBUTTON Destination Button \* MERGEFORMAT"#,
+            r#"GOTOBUTTON Destination "Button \now""#,
+        ] {
+            let malformed = FieldText {
+                field: field.clone(),
+                instruction: instruction.to_string(),
+                result: None,
+            };
+            assert!(malformed.go_to_button().is_none(), "{instruction}");
+        }
+
+        let wrong_keyword = FieldText {
+            field: field.clone(),
+            instruction: "GOTOBUTTONS Destination Button".to_string(),
+            result: None,
+        };
+        assert!(wrong_keyword.go_to_button().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::MacroButton,
+                ..field
+            },
+            instruction: "GOTOBUTTON Destination Button".to_string(),
+            result: None,
+        };
+        assert!(wrong_type.go_to_button().is_none());
     }
 
     #[test]
