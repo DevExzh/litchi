@@ -453,6 +453,41 @@ impl Document {
         )
     }
 
+    /// Return named legacy and SVG drawing gradients from `styles.xml`.
+    ///
+    /// This exposes stored common-style resources only. It does not resolve
+    /// style use sites, load external data, or render gradients.
+    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::OdfDrawingGradients> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_gradient::parse_drawing_gradients(styles.xml_content()),
+        )
+    }
+
+    /// Return named drawing hatch resources from `styles.xml`.
+    ///
+    /// This exposes stored common-style resources only. It does not resolve
+    /// style use sites or render hatches.
+    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::OdfDrawingHatches> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_hatch::parse_drawing_hatches(styles.xml_content()),
+        )
+    }
+
+    /// Return named drawing stroke-dash resources from `styles.xml`.
+    ///
+    /// This exposes stored common-style resources only. It does not resolve
+    /// style use sites or render strokes.
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<crate::drawing_stroke_dash::OdfDrawingStrokeDashes> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::drawing_stroke_dash::parse_drawing_stroke_dashes(styles.xml_content()),
+        )
+    }
+
     /// Parse master pages and their losslessly retained headers and footers.
     pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
         self.styles.as_ref().map_or_else(

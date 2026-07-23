@@ -421,6 +421,41 @@ impl MutableDocument {
         Ok(old)
     }
 
+    /// Return named legacy and SVG drawing gradients from current styles metadata.
+    ///
+    /// This exposes stored common-style resources only. It does not resolve
+    /// style use sites, load external data, or render gradients.
+    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::OdfDrawingGradients> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_gradient::parse_drawing_gradients,
+        )
+    }
+
+    /// Return named drawing hatch resources from current styles metadata.
+    ///
+    /// This exposes stored common-style resources only. It does not resolve
+    /// style use sites or render hatches.
+    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::OdfDrawingHatches> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_hatch::parse_drawing_hatches,
+        )
+    }
+
+    /// Return named drawing stroke-dash resources from current styles metadata.
+    ///
+    /// This exposes stored common-style resources only. It does not resolve
+    /// style use sites or render strokes.
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<crate::drawing_stroke_dash::OdfDrawingStrokeDashes> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_stroke_dash::parse_drawing_stroke_dashes,
+        )
+    }
+
     /// Return stored footnote and endnote presentation configurations.
     ///
     /// The result describes style metadata only. It never renumbers, lays out,

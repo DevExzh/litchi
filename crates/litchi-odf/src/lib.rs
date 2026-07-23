@@ -257,8 +257,8 @@
 //!
 //! ## References
 //!
-//! - **ODF Toolkit** (Java): `3rdparty/odftoolkit/` - ODFDOM framework, validation tools
-//! - **odfpy** (Python): `3rdparty/odfpy/` - Pure Python ODF manipulation library
+//! - **ODF Toolkit** (Java) - ODFDOM framework and validation tools
+//! - **odfpy** (Python) - Pure Python ODF manipulation library
 //! - **ODF Specification**: ISO/IEC 26300:2015 (ODF 1.2)
 //! - **calamine** (Rust): Spreadsheet parsing patterns
 //!
@@ -299,6 +299,7 @@ pub mod drawing_hatch;
 pub mod drawing_layer;
 pub mod drawing_marker;
 pub mod drawing_opacity;
+mod drawing_style_resources;
 pub mod drawing_stroke_dash;
 /// ODF XML element classes
 pub mod elements;
