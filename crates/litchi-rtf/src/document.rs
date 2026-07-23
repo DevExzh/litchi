@@ -1372,6 +1372,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert legacy automatic-numbering fields in document order.
+    ///
+    /// Stored kinds, switches, cached results, and field state are exposed
+    /// solely as metadata. This method never calculates paragraph numbers,
+    /// reads heading or style state, changes paragraphs or layout, or refreshes
+    /// a field result.
+    pub fn auto_number_fields(&self) -> Vec<crate::AutoNumberField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::auto_number_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert legacy automatic-numbering fields.
+    pub fn auto_number_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.auto_number_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ASK` and `FILLIN` fields in document order.
     ///
     /// Stored prompt, bookmark, default-response, cached results, and field

@@ -167,8 +167,9 @@ pub use external_reference::{
 };
 pub use field::CompareField;
 pub use field::{
-    ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AutoTextField,
-    AutoTextFieldKind, AutoTextListField, AutoTextListOption, BibliographyField,
+    ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AutoNumberField,
+    AutoNumberFieldKind, AutoTextField, AutoTextFieldKind, AutoTextListField, AutoTextListOption,
+    BibliographyField,
     BibliographyOption, BodyStoryEvent, CitationField, CitationOption, DdeField, DdeFieldKind,
     DdeRepresentation, DocumentContextField, DocumentContextFieldKind, DocumentInformationField,
     DocumentInformationFieldKind, DocumentPropertyField, DocumentVariableField, EquationField,
