@@ -710,6 +710,106 @@ impl ActiveContentField {
     }
 }
 
+/// One recognized stored option of a legacy Word `TOC` field.
+///
+/// These values retain how a producer configured a table of contents. They
+/// are metadata only: this crate never scans entries, paginates, generates a
+/// table, follows links, or refreshes the field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableOfContentsOption {
+    /// The `\\a` caption label whose item labels and numbers are omitted.
+    CaptionWithoutLabel(String),
+    /// The `\\b` bookmark that bounds included entries.
+    Bookmark(String),
+    /// The `\\c` sequence identifier for a table of captions.
+    CaptionSequence(String),
+    /// The `\\d` separator between sequence and page numbers.
+    SequencePageSeparator(String),
+    /// The `\\f` contents-entry identifier that selects entries.
+    TableEntryIdentifier(String),
+    /// The `\\h` switch requests hyperlinks for entries.
+    Hyperlinks,
+    /// The `\\l` range of contents-entry levels to include.
+    TableEntryLevels(String),
+    /// The `\\n` switch omits page numbers, optionally for an entry-level range.
+    OmitPageNumbers(Option<String>),
+    /// The `\\o` built-in heading-style range, or all used heading levels.
+    HeadingStyleRange(Option<String>),
+    /// The `\\p` separator between an entry and its page number.
+    EntryPageNumberSeparator(String),
+    /// The `\\s` sequence identifier whose number prefixes page numbers.
+    SequenceIdentifier(String),
+    /// The `\\t` custom style-name/contents-level mappings.
+    StyleMappings(String),
+    /// The `\\u` switch uses applied paragraph outline levels.
+    OutlineLevels,
+    /// The `\\w` switch preserves tab characters within entries.
+    PreserveTabs,
+    /// The `\\x` switch preserves newline characters within entries.
+    PreserveNewlines,
+    /// The `\\z` switch hides page numbers and leaders in Web Layout view.
+    HidePageNumbersInWebLayout,
+}
+
+/// Typed, inert metadata for a legacy Word table-of-contents field.
+///
+/// [MS-DOC] §2.9.90 maps native `TOC` field markers to ECMA-376 Part 1
+/// §17.16.5.68. This type exposes only stored configuration, unrecognized
+/// switches, cached result, and field state. It never scans entries, reads
+/// bookmarks, resolves links, paginates, regenerates a table of contents, or
+/// refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfContentsField {
+    field: Field,
+    instruction: String,
+    options: Vec<TableOfContentsOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl TableOfContentsField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored `TOC` field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return recognized stored configuration options in source order.
+    ///
+    /// This metadata is never used to generate or update a table.
+    pub fn options(&self) -> &[TableOfContentsOption] {
+        &self.options
+    }
+
+    /// Return unrecognized stored switches in source order.
+    ///
+    /// They are retained without interpretation or execution.
+    pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated through pagination or field evaluation.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// One stored switch in a legacy Word `MERGEFIELD` instruction.
 ///
 /// The name excludes its leading backslash and is normalized to ASCII
@@ -2095,6 +2195,26 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `TOC` field.
+    ///
+    /// Stored configuration and cached results are never used to scan entries,
+    /// read bookmarks, resolve links, calculate page numbers, regenerate a
+    /// table of contents, or refresh a field. Malformed instructions remain
+    /// available through this generic type and return `None` here.
+    pub fn table_of_contents(&self) -> Option<TableOfContentsField> {
+        if self.field.field_type != FieldType::TableOfContents {
+            return None;
+        }
+        let parts = parse_table_of_contents_field_parts(&self.instruction)?;
+        Some(TableOfContentsField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed `MERGEFIELD` field.
     ///
     /// The stored data-column name, switches, and cached result are never
@@ -2480,6 +2600,8 @@ const MAX_MERGE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MERGE_FIELD_SWITCHES: usize = 64;
 const MAX_MAIL_MERGE_DATA_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_DATA_FIELD_SWITCHES: usize = 64;
+const MAX_TABLE_OF_CONTENTS_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_TABLE_OF_CONTENTS_FIELD_SWITCHES: usize = 64;
 const MAX_DOCUMENT_VARIABLE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_VARIABLE_FIELD_SWITCHES: usize = 64;
 const MAX_DDE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -2528,6 +2650,11 @@ struct ExternalIncludeFieldParts {
     suppress_nested_field_updates: bool,
     omit_picture_data: bool,
     options: Vec<ExternalIncludeOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+}
+
+struct TableOfContentsFieldParts {
+    options: Vec<TableOfContentsOption>,
     unknown_switches: Vec<MergeFieldSwitch>,
 }
 
@@ -2691,6 +2818,101 @@ fn parse_mail_merge_data_field_parts(
     }
 
     Some((data_source, header_source, switches))
+}
+
+fn parse_table_of_contents_field_parts(instruction: &str) -> Option<TableOfContentsFieldParts> {
+    if instruction.len() > MAX_TABLE_OF_CONTENTS_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("TOC") {
+        return None;
+    }
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\'
+            || options.len() + unknown_switches.len() >= MAX_TABLE_OF_CONTENTS_FIELD_SWITCHES
+        {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        match name {
+            'a' => options.push(TableOfContentsOption::CaptionWithoutLabel(
+                argument.clone()?,
+            )),
+            'b' => options.push(TableOfContentsOption::Bookmark(argument.clone()?)),
+            'c' => options.push(TableOfContentsOption::CaptionSequence(argument.clone()?)),
+            'd' => options.push(TableOfContentsOption::SequencePageSeparator(
+                argument.clone()?,
+            )),
+            'f' => options.push(TableOfContentsOption::TableEntryIdentifier(
+                argument.clone()?,
+            )),
+            'h' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfContentsOption::Hyperlinks);
+            },
+            'l' => options.push(TableOfContentsOption::TableEntryLevels(argument.clone()?)),
+            'n' => options.push(TableOfContentsOption::OmitPageNumbers(argument)),
+            'o' => options.push(TableOfContentsOption::HeadingStyleRange(argument)),
+            'p' => options.push(TableOfContentsOption::EntryPageNumberSeparator(
+                argument.clone()?,
+            )),
+            's' => options.push(TableOfContentsOption::SequenceIdentifier(argument.clone()?)),
+            't' => options.push(TableOfContentsOption::StyleMappings(argument.clone()?)),
+            'u' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfContentsOption::OutlineLevels);
+            },
+            'w' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfContentsOption::PreserveTabs);
+            },
+            'x' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfContentsOption::PreserveNewlines);
+            },
+            'z' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfContentsOption::HidePageNumbersInWebLayout);
+            },
+            _ => unknown_switches.push(MergeFieldSwitch { name, argument }),
+        }
+    }
+
+    Some(TableOfContentsFieldParts {
+        options,
+        unknown_switches,
+    })
 }
 
 fn parse_document_variable_field_parts(
@@ -4047,6 +4269,100 @@ mod tests {
             ..text
         };
         assert!(wrong_type.active_content_field().is_none());
+    }
+
+    #[test]
+    fn table_of_contents_fields_preserve_stored_configuration_without_generation() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::TableOfContents,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" TOC \a Figure \b "Scope Bookmark" \c Table \d "/" \f A \h \l 1-3 \n "2-3" \o "1-4" \p " — " \s Figure \t "Custom,1,Appendix,2" \u \w \x \z \* MERGEFORMAT \q opaque "#.to_string(),
+            result: Some("cached contents".to_string()),
+        };
+
+        let toc = text.table_of_contents().unwrap();
+        assert_eq!(toc.field(), &field);
+        assert_eq!(toc.instruction(), text.instruction);
+        assert_eq!(
+            toc.options(),
+            &[
+                TableOfContentsOption::CaptionWithoutLabel("Figure".to_string()),
+                TableOfContentsOption::Bookmark("Scope Bookmark".to_string()),
+                TableOfContentsOption::CaptionSequence("Table".to_string()),
+                TableOfContentsOption::SequencePageSeparator("/".to_string()),
+                TableOfContentsOption::TableEntryIdentifier("A".to_string()),
+                TableOfContentsOption::Hyperlinks,
+                TableOfContentsOption::TableEntryLevels("1-3".to_string()),
+                TableOfContentsOption::OmitPageNumbers(Some("2-3".to_string())),
+                TableOfContentsOption::HeadingStyleRange(Some("1-4".to_string())),
+                TableOfContentsOption::EntryPageNumberSeparator(" — ".to_string()),
+                TableOfContentsOption::SequenceIdentifier("Figure".to_string()),
+                TableOfContentsOption::StyleMappings("Custom,1,Appendix,2".to_string()),
+                TableOfContentsOption::OutlineLevels,
+                TableOfContentsOption::PreserveTabs,
+                TableOfContentsOption::PreserveNewlines,
+                TableOfContentsOption::HidePageNumbersInWebLayout,
+            ]
+        );
+        assert_eq!(
+            toc.unknown_switches(),
+            &[
+                MergeFieldSwitch {
+                    name: '*',
+                    argument: Some("MERGEFORMAT".to_string()),
+                },
+                MergeFieldSwitch {
+                    name: 'q',
+                    argument: Some("opaque".to_string()),
+                },
+            ]
+        );
+        assert_eq!(toc.cached_result(), Some("cached contents"));
+        assert!(toc.is_dirty());
+        assert!(toc.is_locked());
+
+        let optional_ranges = FieldText {
+            instruction: r"TOC \n \o".to_string(),
+            ..text.clone()
+        };
+        assert_eq!(
+            optional_ranges.table_of_contents().unwrap().options(),
+            &[
+                TableOfContentsOption::OmitPageNumbers(None),
+                TableOfContentsOption::HeadingStyleRange(None),
+            ]
+        );
+
+        for instruction in ["TOC \\a", r"TOC \h unexpected", "TOC unexpected", "TOC \\"] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.table_of_contents().is_none());
+        }
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::MergeField,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.table_of_contents().is_none());
     }
 
     #[test]

@@ -18,7 +18,7 @@ use super::parts::fields::{
     ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, GoToButtonField, IfField,
     LinkField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
     MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
-    UserIdentityField,
+    TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -612,6 +612,25 @@ impl Document {
     /// Get the number of typed, inert add-in and control fields.
     pub fn active_content_field_count(&self) -> Result<usize> {
         Ok(self.active_content_fields()?.len())
+    }
+
+    /// Get typed, inert `TOC` fields in story and source order.
+    ///
+    /// Returned values expose only stored configuration, unrecognized switches,
+    /// cached results, and field state. This method never scans entries, reads
+    /// bookmarks, resolves links, calculates page numbers, paginates,
+    /// regenerates a table of contents, or refreshes a field.
+    pub fn table_of_contents_fields(&self) -> Result<Vec<TableOfContentsField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::table_of_contents)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `TOC` fields.
+    pub fn table_of_contents_field_count(&self) -> Result<usize> {
+        Ok(self.table_of_contents_fields()?.len())
     }
 
     /// Get typed, inert `GOTOBUTTON` fields in story and source order.
