@@ -456,6 +456,24 @@ impl Field {
         UserIdentityField::from_field(self)
     }
 
+    /// Check whether this is an `ADVANCE` placement field.
+    ///
+    /// Recognition is limited to the stored field instruction. It never moves
+    /// text, changes layout, reflows content, or refreshes a cached result.
+    pub fn is_advance_field(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "ADVANCE").is_some()
+    }
+
+    /// Parse this field as inert typed `ADVANCE` placement metadata.
+    ///
+    /// Returns `Ok(None)` for fields other than `ADVANCE`. The returned
+    /// values expose only stored point adjustments, cached content, and
+    /// dirty/lock state. This method never moves text, changes layout, reflows
+    /// content, or refreshes a field.
+    pub fn advance_field(&self) -> Result<Option<AdvanceField>> {
+        AdvanceField::from_field(self)
+    }
+
     /// Check whether this is a legacy `LINK` field.
     ///
     /// Recognition is limited to the stored field instruction. It never
@@ -2724,6 +2742,108 @@ impl UserIdentityField {
     }
 }
 
+/// One stored point-based `ADVANCE` placement operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdvanceFieldOperation {
+    /// The `\\d` switch moves subsequent text down.
+    Down,
+    /// The `\\l` switch moves subsequent text left.
+    Left,
+    /// The `\\r` switch moves subsequent text right.
+    Right,
+    /// The `\\u` switch moves subsequent text up.
+    Up,
+    /// The `\\x` switch specifies a horizontal position from the left edge
+    /// of the column, frame, or text box.
+    HorizontalPosition,
+    /// The `\\y` switch specifies a vertical position relative to the page.
+    VerticalPosition,
+}
+
+/// One stored `ADVANCE` point adjustment.
+///
+/// This is an instruction for a word processor's layout engine only. It is
+/// never applied by this library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvanceFieldAdjustment {
+    operation: AdvanceFieldOperation,
+    points: i64,
+}
+
+impl AdvanceFieldAdjustment {
+    /// Return the requested placement operation.
+    pub fn operation(&self) -> AdvanceFieldOperation {
+        self.operation
+    }
+
+    /// Return the stored signed integral number of points.
+    pub fn points(&self) -> i64 {
+        self.points
+    }
+}
+
+/// A typed, inert Word `ADVANCE` field.
+///
+/// ECMA-376 Part 1 §17.16.5.2 defines this field and its six point-based
+/// placement switches. This type exposes stored adjustments and cached content
+/// only. It never moves text, changes layout, reflows content, or refreshes a
+/// field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdvanceField {
+    instruction: String,
+    adjustments: Vec<AdvanceFieldAdjustment>,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+}
+
+impl AdvanceField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(adjustments) = parse_advance_field_adjustments(field.instruction())? else {
+            return Ok(None);
+        };
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            adjustments,
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored placement adjustments in source order.
+    ///
+    /// Repeated operations are preserved; this library does not resolve or
+    /// apply them.
+    pub fn adjustments(&self) -> &[AdvanceFieldAdjustment] {
+        &self.adjustments
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// `ADVANCE` has no regenerated value here; any returned text is stored
+    /// source content only.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
 /// Backward-compatible name for a lexical switch exposed by a TOC field.
 pub type TableOfContentsSwitch = FieldSwitch;
 
@@ -3530,6 +3650,46 @@ fn parse_user_identity_field_parts(
     }
 
     Ok(Some((kind, override_value, formatting)))
+}
+
+fn parse_advance_field_adjustments(
+    instruction: &str,
+) -> Result<Option<Vec<AdvanceFieldAdjustment>>> {
+    let Some(switches) = parse_field_switches(instruction, "ADVANCE")? else {
+        return Ok(None);
+    };
+
+    let mut adjustments = Vec::with_capacity(switches.len());
+    for switch in switches {
+        let operation = match switch.name {
+            'd' => AdvanceFieldOperation::Down,
+            'l' => AdvanceFieldOperation::Left,
+            'r' => AdvanceFieldOperation::Right,
+            'u' => AdvanceFieldOperation::Up,
+            'x' => AdvanceFieldOperation::HorizontalPosition,
+            'y' => AdvanceFieldOperation::VerticalPosition,
+            name => {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "ADVANCE field has an unsupported \\{name} switch"
+                )));
+            },
+        };
+        let points = switch.argument.ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!(
+                "ADVANCE \\{} switch requires an integral number of points",
+                switch.name
+            ))
+        })?;
+        let points = points.parse::<i64>().map_err(|_| {
+            OoxmlError::InvalidFormat(format!(
+                "ADVANCE \\{} switch must specify an integral number of points",
+                switch.name
+            ))
+        })?;
+        adjustments.push(AdvanceFieldAdjustment { operation, points });
+    }
+
+    Ok(Some(adjustments))
 }
 
 fn parse_link_operands_and_switches(
@@ -5294,6 +5454,63 @@ mod tests {
             blank_override.formatting(),
             Some(UserIdentityFormatting::Caps)
         );
+    }
+
+    #[test]
+    fn parses_inert_advance_fields_without_changing_layout() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" ADVANCE \u 6 \d 12 \l 20 \r -4 \x 150 \y &quot;72&quot; \d -3 " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached placement</w:t></w:r>
+            </w:fldSimple>
+            <w:fldSimple w:instr="ADVANCER \u 6"><w:r><w:t>not an advance field</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 2);
+        assert!(fields[0].is_advance_field());
+        assert!(!fields[1].is_advance_field());
+
+        let advance = fields[0].advance_field().unwrap().unwrap();
+        let adjustments = advance
+            .adjustments()
+            .iter()
+            .map(|adjustment| (adjustment.operation(), adjustment.points()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            adjustments,
+            vec![
+                (AdvanceFieldOperation::Up, 6),
+                (AdvanceFieldOperation::Down, 12),
+                (AdvanceFieldOperation::Left, 20),
+                (AdvanceFieldOperation::Right, -4),
+                (AdvanceFieldOperation::HorizontalPosition, 150),
+                (AdvanceFieldOperation::VerticalPosition, 72),
+                (AdvanceFieldOperation::Down, -3),
+            ]
+        );
+        assert_eq!(advance.cached_result(), Some("cached placement"));
+        assert!(advance.is_dirty());
+        assert!(advance.is_locked());
+        assert!(fields[1].advance_field().unwrap().is_none());
+
+        let no_adjustments = Field::new("aDvAnCe".to_string(), None, false);
+        let no_adjustments = no_adjustments.advance_field().unwrap().unwrap();
+        assert!(no_adjustments.adjustments().is_empty());
+        assert_eq!(no_adjustments.cached_result(), None);
+    }
+
+    #[test]
+    fn rejects_invalid_advance_field_semantics() {
+        for instruction in [
+            r#"ADVANCE \d"#,
+            r#"ADVANCE \z 10"#,
+            r#"ADVANCE \x 1.5"#,
+            r#"ADVANCE \u 9223372036854775808"#,
+            "ADVANCE 12",
+            r#"ADVANCE \d 6 trailing"#,
+        ] {
+            let field = Field::new(instruction.to_string(), None, false);
+            assert!(field.advance_field().is_err(), "{instruction}");
+        }
     }
 
     #[test]

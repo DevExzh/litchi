@@ -8,9 +8,9 @@ use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::{
-    BibliographyField, CitationField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
-    GoToButtonField, IfField, IndexEntryField, IndexField, LinkField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
+    AdvanceField, BibliographyField, CitationField, DdeField, DocumentVariableField,
+    ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField, IndexField, LinkField,
+    MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, ReferencedDocumentField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
@@ -1333,6 +1333,24 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert user-identity fields in the main document.
     pub fn user_identity_field_count(&self) -> Result<usize> {
         Ok(self.user_identity_fields()?.len())
+    }
+
+    /// Get typed, inert `ADVANCE` fields in document order.
+    ///
+    /// Returned values expose stored point adjustments, cached content, and
+    /// dirty/lock state only. This method never moves text, changes layout,
+    /// reflows content, or refreshes a field.
+    pub fn advance_fields(&self) -> Result<Vec<AdvanceField>> {
+        self.fields()?
+            .iter()
+            .map(Field::advance_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `ADVANCE` fields in the main document.
+    pub fn advance_field_count(&self) -> Result<usize> {
+        Ok(self.advance_fields()?.len())
     }
 
     /// Get typed, inert `DDE` and `DDEAUTO` fields in document order.

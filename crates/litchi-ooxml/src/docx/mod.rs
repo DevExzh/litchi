@@ -112,10 +112,11 @@ pub use document::Document;
 pub use drawing::{DrawingObject, ShapeType};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::{
-    AddressBlockCountryInclusion, BibliographyField, CitationField, DdeField, DdeFieldKind,
-    DdeRepresentation, DocumentVariableField, ExternalIncludeField, ExternalIncludeOption, Field,
-    FieldSwitch, GoToButtonField, IfField, IncludeFieldKind, IndexEntryField, IndexField,
-    IndexSortOrder, LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
+    AddressBlockCountryInclusion, AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation,
+    BibliographyField, CitationField, DdeField, DdeFieldKind, DdeRepresentation,
+    DocumentVariableField, ExternalIncludeField, ExternalIncludeOption, Field, FieldSwitch,
+    GoToButtonField, IfField, IncludeFieldKind, IndexEntryField, IndexField, IndexSortOrder,
+    LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
     MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
     MergeField, PromptField, PromptFieldKind, ReferencedDocumentField,
