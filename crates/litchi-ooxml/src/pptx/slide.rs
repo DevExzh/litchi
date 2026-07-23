@@ -186,6 +186,13 @@ impl<'a> Slide<'a> {
         self.part.name()
     }
 
+    /// Whether this slide is hidden during a slide show.
+    ///
+    /// Slides whose PresentationML show attribute is omitted are not hidden.
+    pub fn is_hidden(&self) -> Result<bool> {
+        self.part.is_hidden()
+    }
+
     /// Extract all text content from the slide.
     ///
     /// This extracts text from all text elements in the slide,

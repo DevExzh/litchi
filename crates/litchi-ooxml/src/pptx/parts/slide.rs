@@ -89,13 +89,13 @@ impl MasterVisibility {
         root_label: &str,
     ) -> Result<Self> {
         Ok(Self {
-            show_master_shapes: parse_visibility_attribute(
+            show_master_shapes: parse_boolean_attribute(
                 element,
                 b"showMasterSp",
                 decoder,
                 root_label,
             )?,
-            show_master_placeholder_animations: parse_visibility_attribute(
+            show_master_placeholder_animations: parse_boolean_attribute(
                 element,
                 b"showMasterPhAnim",
                 decoder,
@@ -119,9 +119,23 @@ fn parse_master_visibility(
     root_name: &[u8],
     root_label: &str,
 ) -> Result<MasterVisibility> {
+    let (element, decoder) = read_root_element(xml, root_name, root_label)?;
+    MasterVisibility::from_element(&element, decoder, root_label)
+}
+
+fn parse_slide_show(xml: &[u8]) -> Result<bool> {
+    let (element, decoder) = read_root_element(xml, b"sld", "slide")?;
+    parse_boolean_attribute(&element, b"show", decoder, "slide")
+}
+
+fn read_root_element(
+    xml: &[u8],
+    root_name: &[u8],
+    root_label: &str,
+) -> Result<(BytesStart<'static>, quick_xml::encoding::Decoder)> {
     let mut reader = NsReader::from_reader(xml);
     let mut depth = 0usize;
-    let mut visibility = None;
+    let mut root = None;
 
     loop {
         let decoder = reader.decoder();
@@ -131,36 +145,30 @@ fn parse_master_visibility(
         match event {
             Event::Start(element) => {
                 depth = depth.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat(
-                        "master-visibility XML nesting is too deep".to_string(),
-                    )
+                    OoxmlError::InvalidFormat(format!("{root_label} XML nesting is too deep"))
                 })?;
                 if depth == 1 {
-                    if visibility.is_some() {
+                    if root.is_some() {
                         return Err(OoxmlError::InvalidFormat(format!(
-                            "{root_label} master-visibility XML has multiple roots"
+                            "{root_label} XML has multiple roots"
                         )));
                     }
-                    require_master_visibility_root(&namespace, &element, root_name, root_label)?;
-                    visibility = Some(MasterVisibility::from_element(
-                        &element, decoder, root_label,
-                    )?);
+                    require_presentationml_root(&namespace, &element, root_name, root_label)?;
+                    root = Some((element.into_owned(), decoder));
                 }
             },
             Event::Empty(element) if depth == 0 => {
-                if visibility.is_some() {
+                if root.is_some() {
                     return Err(OoxmlError::InvalidFormat(format!(
-                        "{root_label} master-visibility XML has multiple roots"
+                        "{root_label} XML has multiple roots"
                     )));
                 }
-                require_master_visibility_root(&namespace, &element, root_name, root_label)?;
-                visibility = Some(MasterVisibility::from_element(
-                    &element, decoder, root_label,
-                )?);
+                require_presentationml_root(&namespace, &element, root_name, root_label)?;
+                root = Some((element.into_owned(), decoder));
             },
             Event::End(_) => {
                 depth = depth.checked_sub(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("invalid master-visibility XML nesting".to_string())
+                    OoxmlError::InvalidFormat(format!("invalid {root_label} XML nesting"))
                 })?;
             },
             Event::Eof => break,
@@ -170,17 +178,13 @@ fn parse_master_visibility(
 
     if depth != 0 {
         return Err(OoxmlError::InvalidFormat(format!(
-            "unterminated {root_label} master-visibility XML"
+            "unterminated {root_label} XML"
         )));
     }
-    visibility.ok_or_else(|| {
-        OoxmlError::InvalidFormat(format!(
-            "{root_label} master-visibility XML has no root element"
-        ))
-    })
+    root.ok_or_else(|| OoxmlError::InvalidFormat(format!("{root_label} XML has no root element")))
 }
 
-fn require_master_visibility_root(
+fn require_presentationml_root(
     namespace: &quick_xml::name::ResolveResult<'_>,
     element: &BytesStart<'_>,
     root_name: &[u8],
@@ -190,12 +194,12 @@ fn require_master_visibility_root(
         Ok(())
     } else {
         Err(OoxmlError::InvalidFormat(format!(
-            "{root_label} master-visibility XML must have a PresentationML {root_label} root"
+            "{root_label} XML must have a PresentationML {root_label} root"
         )))
     }
 }
 
-fn parse_visibility_attribute(
+fn parse_boolean_attribute(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
@@ -241,6 +245,14 @@ impl<'a> SlidePart<'a> {
     /// Returns the name attribute from the <p:cSld> element.
     pub fn name(&self) -> Result<String> {
         presentation_name(self.xml_bytes())
+    }
+
+    /// Whether this slide is hidden during a slide show.
+    ///
+    /// The PresentationML show attribute defaults to true, so slides without
+    /// an explicit value are not hidden.
+    pub fn is_hidden(&self) -> Result<bool> {
+        Ok(!parse_slide_show(self.xml_bytes())?)
     }
 
     /// Extract all text content from the slide.
@@ -619,5 +631,24 @@ mod tests {
 
         let wrong_root = format!(r#"<p:sldLayout xmlns:p="{P}"><p:cSld/></p:sldLayout>"#);
         assert!(parse_master_visibility(wrong_root.as_bytes(), b"sld", "slide").is_err());
+    }
+
+    #[test]
+    fn slide_show_flag_defaults_to_true_and_supports_strict_namespaces() {
+        let default_slide = format!(r#"<p:sld xmlns:p="{P}"><p:cSld/></p:sld>"#);
+        assert!(parse_slide_show(default_slide.as_bytes()).unwrap());
+
+        let strict_slide = r#"<q:sld xmlns:q="http://purl.oclc.org/ooxml/presentationml/main"
+            show="0"><q:cSld/></q:sld>"#;
+        assert!(!parse_slide_show(strict_slide.as_bytes()).unwrap());
+    }
+
+    #[test]
+    fn slide_show_flag_rejects_invalid_values_and_roots() {
+        let invalid_value = format!(r#"<p:sld xmlns:p="{P}" show="sometimes"><p:cSld/></p:sld>"#);
+        assert!(parse_slide_show(invalid_value.as_bytes()).is_err());
+
+        let wrong_root = format!(r#"<p:sldLayout xmlns:p="{P}"><p:cSld/></p:sldLayout>"#);
+        assert!(parse_slide_show(wrong_root.as_bytes()).is_err());
     }
 }
