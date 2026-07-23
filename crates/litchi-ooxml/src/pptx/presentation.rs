@@ -461,6 +461,16 @@ impl<'a> Presentation<'a> {
         self.part.photo_album()
     }
 
+    /// Get typed PowerPoint 2013 slide and notes guide extensions.
+    ///
+    /// Guide metadata and unknown extensions remain inert document data. This
+    /// accessor does not resolve or open extension targets.
+    pub fn extended_guides(
+        &self,
+    ) -> Result<crate::pptx::extended_guides::PresentationExtendedGuides> {
+        self.part.extended_guides()
+    }
+
     /// Get the presentation-level customer-data relationship references.
     ///
     /// Returns None when the presentation does not declare customer data.

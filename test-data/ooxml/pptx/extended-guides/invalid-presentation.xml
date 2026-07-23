@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+    xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main">
+  <p:extLst>
+    <p:ext uri="{EFAFB233-063F-42B5-8137-9DF3F51BA10A}">
+      <p15:sldGuideLst>
+        <p15:guide id="1"><p15:clr><a:srgbClr val="AABBCC"/></p15:clr></p15:guide>
+        <p15:guide id="1"><p15:clr><a:srgbClr val="DDEEFF"/></p15:clr></p15:guide>
+      </p15:sldGuideLst>
+    </p:ext>
+  </p:extLst>
+</p:presentation>
