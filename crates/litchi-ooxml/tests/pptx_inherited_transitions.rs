@@ -24,6 +24,9 @@ fn layout_and_master_read_local_powerpoint_2010_transition_choices() {
         })
         .unwrap();
     assert_ripple(&layout.transition().unwrap().unwrap());
+
+    let slides = presentation.slides().unwrap();
+    assert_ripple(&slides[0].layout().unwrap().transition().unwrap().unwrap());
 }
 
 #[test]
@@ -60,6 +63,41 @@ fn master_layout_inventory_rejects_external_layout_relationships() {
     ));
 }
 
+#[test]
+fn slide_layout_accessor_rejects_external_layout_relationships() {
+    let output = NamedTempFile::with_suffix(".pptx").unwrap();
+    let mut package = Package::new().unwrap();
+    package.presentation_mut().unwrap().add_slide().unwrap();
+    package.save(output.path()).unwrap();
+    let mut package = Package::open(output.path()).unwrap();
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let relationship_id = package
+        .opc_package()
+        .get_part(&slide_name)
+        .unwrap()
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == rt::SLIDE_LAYOUT)
+        .unwrap()
+        .r_id()
+        .to_string();
+    let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
+    slide.rels_mut().remove(&relationship_id);
+    slide.rels_mut().add_relationship(
+        rt::SLIDE_LAYOUT.to_string(),
+        "https://example.invalid/slide-layout.xml".to_string(),
+        relationship_id,
+        true,
+    );
+
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    assert!(matches!(
+        slides[0].layout(),
+        Err(OoxmlError::InvalidRelationship(message)) if message.contains("must be internal")
+    ));
+}
+
 fn assert_ripple(transition: &SlideTransition) {
     assert_eq!(transition.duration_ms, Some(1500));
     assert_eq!(
@@ -73,6 +111,7 @@ fn assert_ripple(transition: &SlideTransition) {
 fn package_with_inherited_transition_fragment(fragment: &str) -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
     let mut package = Package::new().unwrap();
+    package.presentation_mut().unwrap().add_slide().unwrap();
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();

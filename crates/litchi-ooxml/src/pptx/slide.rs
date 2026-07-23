@@ -2,8 +2,8 @@
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart};
 use crate::pptx::shapes::base::BaseShape;
-use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::OpcPackage;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
 const STRICT_SLIDE_LAYOUT_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideLayout";
@@ -382,6 +382,64 @@ impl<'a> Slide<'a> {
         self.part.transition()
     }
 
+    /// Resolve the layout used by this slide.
+    ///
+    /// The layout relationship must be an internal PresentationML slide-layout
+    /// part. A slide with no layout relationship or more than one layout
+    /// relationship is invalid.
+    pub fn layout(&self) -> Result<SlideLayout<'a>> {
+        let package = self.package.ok_or_else(|| {
+            OoxmlError::InvalidFormat(
+                "slide-layout discovery requires package-backed slide access".to_string(),
+            )
+        })?;
+        let slide_part = self.part.part();
+        let mut layout_relationships = slide_part.rels().iter().filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::SLIDE_LAYOUT | STRICT_SLIDE_LAYOUT_RELATIONSHIP_TYPE
+            )
+        });
+        let relationship = layout_relationships.next().ok_or_else(|| {
+            OoxmlError::InvalidRelationship(
+                "slide does not have a slide-layout relationship".to_string(),
+            )
+        })?;
+        if layout_relationships.next().is_some() {
+            return Err(OoxmlError::InvalidRelationship(
+                "slide has multiple slide-layout relationships".to_string(),
+            ));
+        }
+        if relationship.is_external() {
+            return Err(OoxmlError::InvalidRelationship(format!(
+                "slide-layout relationship '{}' must be internal",
+                relationship.r_id()
+            )));
+        }
+
+        let part_name = relationship.target_partname().map_err(|error| {
+            OoxmlError::InvalidRelationship(format!(
+                "invalid slide-layout relationship '{}': {error}",
+                relationship.r_id()
+            ))
+        })?;
+        let layout_part = package.get_part(&part_name).map_err(|error| {
+            OoxmlError::PartNotFound(format!(
+                "slide-layout relationship '{}' targets missing part '{}': {error}",
+                relationship.r_id(),
+                part_name.as_str()
+            ))
+        })?;
+        if layout_part.content_type() != ct::PML_SLIDE_LAYOUT {
+            return Err(OoxmlError::InvalidContentType {
+                expected: ct::PML_SLIDE_LAYOUT.to_string(),
+                got: layout_part.content_type().to_string(),
+            });
+        }
+
+        Ok(SlideLayout::new(SlideLayoutPart::from_part(layout_part)?))
+    }
+
     /// Get typed simple animation timing metadata for this slide.
     ///
     /// Targets are validated against shape IDs on the current slide. Unsupported
@@ -571,10 +629,7 @@ impl<'a> SlideMaster<'a> {
     /// Create a new SlideMaster with its owning package.
     #[inline]
     pub(crate) fn with_package(part: SlideMasterPart<'a>, package: &'a OpcPackage) -> Self {
-        Self {
-            part,
-            package,
-        }
+        Self { part, package }
     }
 
     /// Get the master name.
