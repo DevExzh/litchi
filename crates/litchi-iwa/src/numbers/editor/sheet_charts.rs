@@ -3,6 +3,7 @@
 mod axis;
 mod axis_bounds;
 mod axis_gridlines;
+mod axis_labels;
 mod axis_line;
 mod axis_minimum_label;
 mod axis_series_names;
@@ -1394,6 +1395,98 @@ mod tests {
                 .sheet_chart_category_axis_series_names_visible(sheet_id, source.drawable_object_id)
                 .unwrap()
         );
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_axis_label_visibility_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert!(
+                editor
+                    .sheet_chart_axis_labels_visible(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+            );
+        }
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_axis_labels_visible(
+                sheet_id,
+                source.drawable_object_id,
+                ChartAxis::Category,
+                true,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            editor
+                .set_sheet_chart_axis_labels_visible(
+                    sheet_id,
+                    source.drawable_object_id,
+                    axis,
+                    false,
+                )
+                .unwrap();
+            assert!(
+                !editor
+                    .sheet_chart_axis_labels_visible(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+            );
+        }
+
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert!(
+                !editor
+                    .sheet_chart_axis_labels_visible(sheet_id, duplicate.drawable_object_id, axis)
+                    .unwrap()
+            );
+            editor
+                .set_sheet_chart_axis_labels_visible(
+                    sheet_id,
+                    source.drawable_object_id,
+                    axis,
+                    true,
+                )
+                .unwrap();
+        }
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        for axis in [ChartAxis::Category, ChartAxis::Value] {
+            assert!(
+                reopened
+                    .sheet_chart_axis_labels_visible(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+            );
+            assert!(
+                !reopened
+                    .sheet_chart_axis_labels_visible(sheet_id, duplicate.drawable_object_id, axis,)
+                    .unwrap()
+            );
+            reopened
+                .set_sheet_chart_axis_labels_visible(
+                    sheet_id,
+                    source.drawable_object_id,
+                    axis,
+                    false,
+                )
+                .unwrap();
+            assert!(
+                !reopened
+                    .sheet_chart_axis_labels_visible(sheet_id, source.drawable_object_id, axis)
+                    .unwrap()
+            );
+        }
         reopened
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
             .unwrap();

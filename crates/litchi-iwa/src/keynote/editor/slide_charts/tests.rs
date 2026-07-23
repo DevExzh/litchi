@@ -802,6 +802,82 @@ fn scratch_presentation_supports_native_chart_category_axis_series_names_visibil
 }
 
 #[test]
+fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            editor
+                .slide_chart_axis_labels_visible(0, source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_axis_labels_visible(
+            0,
+            source.drawable_object_id,
+            ChartAxis::Category,
+            true,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        editor
+            .set_slide_chart_axis_labels_visible(0, source.drawable_object_id, axis, false)
+            .unwrap();
+        assert!(
+            !editor
+                .slide_chart_axis_labels_visible(0, source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            !editor
+                .slide_chart_axis_labels_visible(0, duplicate.drawable_object_id, axis)
+                .unwrap()
+        );
+        editor
+            .set_slide_chart_axis_labels_visible(0, source.drawable_object_id, axis, true)
+            .unwrap();
+    }
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    for axis in [ChartAxis::Category, ChartAxis::Value] {
+        assert!(
+            reopened
+                .slide_chart_axis_labels_visible(0, source.drawable_object_id, axis)
+                .unwrap()
+        );
+        assert!(
+            !reopened
+                .slide_chart_axis_labels_visible(0, duplicate.drawable_object_id, axis)
+                .unwrap()
+        );
+        reopened
+            .set_slide_chart_axis_labels_visible(0, source.drawable_object_id, axis, false)
+            .unwrap();
+        assert!(
+            !reopened
+                .slide_chart_axis_labels_visible(0, source.drawable_object_id, axis)
+                .unwrap()
+        );
+    }
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
 fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
