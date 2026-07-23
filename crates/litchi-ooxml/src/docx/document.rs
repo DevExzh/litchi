@@ -16,7 +16,7 @@ use crate::docx::field::{
     MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField,
-    MailMergeRecipientField, MergeField, PromptField, PrintField, QuoteField,
+    MailMergeRecipientField, MergeField, PromptField, PrintField, PrivateField, QuoteField,
     ReferencedDocumentField, ShapeField, SymbolField, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
@@ -1453,6 +1453,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert legacy form-code fields.
     pub fn legacy_form_field_count(&self) -> Result<usize> {
         Ok(self.legacy_form_fields()?.len())
+    }
+
+    /// Get typed, inert `PRIVATE` conversion-data fields in document order.
+    ///
+    /// Returned values expose only stored opaque instructions, cached content,
+    /// and dirty/lock state. This method never converts a document, interprets
+    /// field data, changes hidden-text visibility or layout, or refreshes a
+    /// field. `PRIVATE` is not treated as a confidentiality mechanism.
+    pub fn private_fields(&self) -> Result<Vec<PrivateField>> {
+        self.fields()?
+            .iter()
+            .map(Field::private_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `PRIVATE` conversion-data fields.
+    pub fn private_field_count(&self) -> Result<usize> {
+        Ok(self.private_fields()?.len())
     }
 
     /// Get typed, inert user-identity fields in document order.
