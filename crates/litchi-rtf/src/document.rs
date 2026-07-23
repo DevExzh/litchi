@@ -1330,6 +1330,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `QUOTE` fields in document order.
+    ///
+    /// Stored text arguments, switches, cached results, and field state are
+    /// exposed solely as metadata. This method never interprets character codes,
+    /// expands nested fields, inserts text, or refreshes a field result.
+    pub fn quote_fields(&self) -> Vec<crate::QuoteField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::quote_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `QUOTE` fields.
+    pub fn quote_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.quote_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ASK` and `FILLIN` fields in document order.
     ///
     /// Stored prompt, bookmark, default-response, cached results, and field
