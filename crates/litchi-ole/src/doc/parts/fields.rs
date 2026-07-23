@@ -1777,9 +1777,10 @@ impl DocumentPropertyField {
 
 /// The built-in Word document-information field category.
 ///
-/// [MS-DOC] §2.9.90 assigns the native `flt` values 0x0F through 0x14 to
-/// these six Word field types. This enum preserves the stored category only;
-/// it does not resolve document metadata.
+/// [MS-DOC] §2.9.90 assigns the native `flt` values 0x0F through 0x1C to
+/// these fourteen Word field types. This enum preserves the stored category
+/// only; it does not resolve document metadata or calculate dates, revisions,
+/// or statistics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DocumentInformationFieldKind {
     Title,
@@ -1788,6 +1789,14 @@ pub enum DocumentInformationFieldKind {
     Keywords,
     Comments,
     LastSavedBy,
+    CreateDate,
+    SaveDate,
+    PrintDate,
+    RevisionNumber,
+    EditTime,
+    NumberOfPages,
+    NumberOfWords,
+    NumberOfCharacters,
 }
 
 impl DocumentInformationFieldKind {
@@ -1800,6 +1809,14 @@ impl DocumentInformationFieldKind {
             Self::Keywords => "KEYWORDS",
             Self::Comments => "COMMENTS",
             Self::LastSavedBy => "LASTSAVEDBY",
+            Self::CreateDate => "CREATEDATE",
+            Self::SaveDate => "SAVEDATE",
+            Self::PrintDate => "PRINTDATE",
+            Self::RevisionNumber => "REVNUM",
+            Self::EditTime => "EDITTIME",
+            Self::NumberOfPages => "NUMPAGES",
+            Self::NumberOfWords => "NUMWORDS",
+            Self::NumberOfCharacters => "NUMCHARS",
         }
     }
 
@@ -1811,6 +1828,14 @@ impl DocumentInformationFieldKind {
             FieldType::Keywords => Some(Self::Keywords),
             FieldType::Comments => Some(Self::Comments),
             FieldType::LastSavedBy => Some(Self::LastSavedBy),
+            FieldType::CreateDate => Some(Self::CreateDate),
+            FieldType::SaveDate => Some(Self::SaveDate),
+            FieldType::PrintDate => Some(Self::PrintDate),
+            FieldType::RevisionNumber => Some(Self::RevisionNumber),
+            FieldType::EditTime => Some(Self::EditTime),
+            FieldType::NumberOfPages => Some(Self::NumberOfPages),
+            FieldType::NumberOfWords => Some(Self::NumberOfWords),
+            FieldType::NumberOfCharacters => Some(Self::NumberOfCharacters),
             _ => None,
         }
     }
@@ -1823,6 +1848,14 @@ impl DocumentInformationFieldKind {
             Self::Keywords,
             Self::Comments,
             Self::LastSavedBy,
+            Self::CreateDate,
+            Self::SaveDate,
+            Self::PrintDate,
+            Self::RevisionNumber,
+            Self::EditTime,
+            Self::NumberOfPages,
+            Self::NumberOfWords,
+            Self::NumberOfCharacters,
         ]
         .into_iter()
         .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
@@ -1833,7 +1866,8 @@ impl DocumentInformationFieldKind {
 ///
 /// This type exposes the stored native category, instruction, switches, and
 /// cached result only. It never reads document properties, reads or modifies
-/// host identity data, resolves a value, or refreshes a field.
+/// host identity data, calculates dates, revisions, or statistics, resolves a
+/// value, or refreshes a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentInformationField {
     field: Field,
@@ -3369,12 +3403,12 @@ impl FieldText {
     /// Return inert typed metadata when this is a well-formed built-in
     /// document-information field.
     ///
-    /// `TITLE`, `SUBJECT`, `AUTHOR`, `KEYWORDS`, `COMMENTS`, and
-    /// `LASTSAVEDBY` retain only their native category, stored switches,
-    /// cached result, and field state. This method never reads document
-    /// properties or host identity data, resolves a value, or refreshes a
-    /// field. Malformed instructions and mismatched native field types remain
-    /// available through this generic type and return `None` here.
+    /// Built-in document-information fields retain only their native category,
+    /// stored switches, cached result, and field state. This method never reads
+    /// document properties or host identity data, calculates dates, revisions,
+    /// or statistics, resolves a value, or refreshes a field. Malformed
+    /// instructions and mismatched native field types remain available through
+    /// this generic type and return `None` here.
     pub fn document_information(&self) -> Option<DocumentInformationField> {
         let native_kind = DocumentInformationFieldKind::from_field_type(self.field.field_type)?;
         let (kind, switches) = parse_document_information_field_parts(&self.instruction)?;
@@ -7359,7 +7393,7 @@ mod tests {
     }
 
     #[test]
-    fn document_information_fields_expose_cached_metadata_without_resolution() {
+    fn document_information_fields_expose_cached_metadata_without_resolution_or_calculation() {
         let field = Field {
             story: FieldStory::Textbox,
             start_cp: 4,
@@ -7428,6 +7462,46 @@ mod tests {
                 "LASTSAVEDBY",
                 DocumentInformationFieldKind::LastSavedBy,
             ),
+            (
+                FieldType::CreateDate,
+                "CREATEDATE",
+                DocumentInformationFieldKind::CreateDate,
+            ),
+            (
+                FieldType::SaveDate,
+                "SAVEDATE",
+                DocumentInformationFieldKind::SaveDate,
+            ),
+            (
+                FieldType::PrintDate,
+                "PRINTDATE",
+                DocumentInformationFieldKind::PrintDate,
+            ),
+            (
+                FieldType::RevisionNumber,
+                "REVNUM",
+                DocumentInformationFieldKind::RevisionNumber,
+            ),
+            (
+                FieldType::EditTime,
+                "EDITTIME",
+                DocumentInformationFieldKind::EditTime,
+            ),
+            (
+                FieldType::NumberOfPages,
+                "NUMPAGES",
+                DocumentInformationFieldKind::NumberOfPages,
+            ),
+            (
+                FieldType::NumberOfWords,
+                "NUMWORDS",
+                DocumentInformationFieldKind::NumberOfWords,
+            ),
+            (
+                FieldType::NumberOfCharacters,
+                "NUMCHARS",
+                DocumentInformationFieldKind::NumberOfCharacters,
+            ),
         ] {
             let text = FieldText {
                 field: Field {
@@ -7452,6 +7526,7 @@ mod tests {
                 FieldType::LastSavedBy,
                 r"LASTSAVEDBY \* MERGEFORMAT unexpected",
             ),
+            (FieldType::NumberOfWords, "NUMWORDS unexpected"),
             (FieldType::Author, "AUTHORS"),
         ] {
             let malformed = FieldText {

@@ -869,8 +869,8 @@ impl Document {
     ///
     /// Returned values expose only the native category, stored switches,
     /// cached results, and field state. This method never reads document
-    /// properties or host identity data, resolves values, or refreshes a field
-    /// result.
+    /// properties or host identity data, calculates dates, revisions, or
+    /// statistics, resolves values, or refreshes a field result.
     pub fn document_information_fields(&self) -> Result<Vec<DocumentInformationField>> {
         let fields = self.fields()?;
         Ok(fields
