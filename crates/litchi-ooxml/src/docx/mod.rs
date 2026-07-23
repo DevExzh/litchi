@@ -120,7 +120,7 @@ pub use field::{
     LinkField, LinkFormatting, LinkResultOption, MacroButtonField,
     MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
     MailMergeCounterKind, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
-    MergeField, PromptField, PromptFieldKind, ReferencedDocumentField,
+    MergeField, PromptField, PromptFieldKind, ReferencedDocumentField, SetField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsField,
     TableOfContentsLevelRange, TableOfContentsSwitch, UserIdentityField, UserIdentityFieldKind,
     UserIdentityFormatting,
