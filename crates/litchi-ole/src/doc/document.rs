@@ -16,7 +16,7 @@ use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoTextField, AutoTextListField, CompareField, DdeField,
     DocumentVariableField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
-    GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
+    FormulaField, GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, ReferenceField, SetField,
     TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
@@ -703,6 +703,21 @@ impl Document {
     /// Get the number of typed, inert `SET` fields.
     pub fn set_field_count(&self) -> Result<usize> {
         Ok(self.set_fields()?.len())
+    }
+
+    /// Get typed, inert `=` formula fields in story and source order.
+    ///
+    /// Returned values expose only stored optional formulas, cached results,
+    /// and field state. This method never parses or evaluates a formula, reads
+    /// table cells or bookmarks, resolves field values, or refreshes a field.
+    pub fn formula_fields(&self) -> Result<Vec<FormulaField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::formula_field).collect())
+    }
+
+    /// Get the number of typed, inert `=` formula fields.
+    pub fn formula_field_count(&self) -> Result<usize> {
+        Ok(self.formula_fields()?.len())
     }
 
     /// Get typed, inert `GLOSSARY` and `AUTOTEXT` fields in story and source order.
