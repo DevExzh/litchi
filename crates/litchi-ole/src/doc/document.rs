@@ -15,12 +15,12 @@ use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoTextField, AutoTextListField, CompareField, DdeField,
-    DocumentVariableField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
-    FormulaField, GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
-    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, ReferenceField,
-    SequenceField, SetField, StyleReferenceField, TableOfAuthoritiesField, TableOfContentsField,
-    UserIdentityField,
+    DocumentInformationField, DocumentVariableField, ExternalIncludeField, Field, FieldStory,
+    FieldText, FieldsTable, FormulaField, GoToButtonField, IfField, IndexField, LinkField,
+    MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
+    MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
+    ReferenceField, SequenceField, SetField, StyleReferenceField, TableOfAuthoritiesField,
+    TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -862,6 +862,26 @@ impl Document {
     /// Get the number of typed, inert `DOCVARIABLE` fields.
     pub fn document_variable_field_count(&self) -> Result<usize> {
         Ok(self.document_variable_fields()?.len())
+    }
+
+    /// Get typed, inert built-in document-information fields in story and
+    /// source order.
+    ///
+    /// Returned values expose only the native category, stored switches,
+    /// cached results, and field state. This method never reads document
+    /// properties or host identity data, resolves values, or refreshes a field
+    /// result.
+    pub fn document_information_fields(&self) -> Result<Vec<DocumentInformationField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::document_information)
+            .collect())
+    }
+
+    /// Get the number of typed, inert built-in document-information fields.
+    pub fn document_information_field_count(&self) -> Result<usize> {
+        Ok(self.document_information_fields()?.len())
     }
 
     /// Get typed, inert `DDE` and `DDEAUTO` fields in story and source order.

@@ -1775,6 +1775,116 @@ impl DocumentPropertyField {
     }
 }
 
+/// The built-in Word document-information field category.
+///
+/// [MS-DOC] §2.9.90 assigns the native `flt` values 0x0F through 0x14 to
+/// these six Word field types. This enum preserves the stored category only;
+/// it does not resolve document metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DocumentInformationFieldKind {
+    Title,
+    Subject,
+    Author,
+    Keywords,
+    Comments,
+    LastSavedBy,
+}
+
+impl DocumentInformationFieldKind {
+    /// The uppercase field keyword stored in a Word field instruction.
+    pub const fn field_keyword(self) -> &'static str {
+        match self {
+            Self::Title => "TITLE",
+            Self::Subject => "SUBJECT",
+            Self::Author => "AUTHOR",
+            Self::Keywords => "KEYWORDS",
+            Self::Comments => "COMMENTS",
+            Self::LastSavedBy => "LASTSAVEDBY",
+        }
+    }
+
+    fn from_field_type(field_type: FieldType) -> Option<Self> {
+        match field_type {
+            FieldType::Title => Some(Self::Title),
+            FieldType::Subject => Some(Self::Subject),
+            FieldType::Author => Some(Self::Author),
+            FieldType::Keywords => Some(Self::Keywords),
+            FieldType::Comments => Some(Self::Comments),
+            FieldType::LastSavedBy => Some(Self::LastSavedBy),
+            _ => None,
+        }
+    }
+
+    fn from_keyword(keyword: &str) -> Option<Self> {
+        [
+            Self::Title,
+            Self::Subject,
+            Self::Author,
+            Self::Keywords,
+            Self::Comments,
+            Self::LastSavedBy,
+        ]
+        .into_iter()
+        .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
+    }
+}
+
+/// A typed, inert legacy Word built-in document-information field.
+///
+/// This type exposes the stored native category, instruction, switches, and
+/// cached result only. It never reads document properties, reads or modifies
+/// host identity data, resolves a value, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentInformationField {
+    field: Field,
+    instruction: String,
+    kind: DocumentInformationFieldKind,
+    switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl DocumentInformationField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the recognized built-in document-information category.
+    pub const fn kind(&self) -> DocumentInformationFieldKind {
+        self.kind
+    }
+
+    /// Return preserved switches in source order without interpreting them.
+    ///
+    /// These values remain inert source metadata and are never applied.
+    pub fn switches(&self) -> &[MergeFieldSwitch] {
+        &self.switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from document metadata or a host user
+    /// profile.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The stored kind of a legacy Word DDE field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DdeFieldKind {
@@ -3256,6 +3366,30 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed built-in
+    /// document-information field.
+    ///
+    /// `TITLE`, `SUBJECT`, `AUTHOR`, `KEYWORDS`, `COMMENTS`, and
+    /// `LASTSAVEDBY` retain only their native category, stored switches,
+    /// cached result, and field state. This method never reads document
+    /// properties or host identity data, resolves a value, or refreshes a
+    /// field. Malformed instructions and mismatched native field types remain
+    /// available through this generic type and return `None` here.
+    pub fn document_information(&self) -> Option<DocumentInformationField> {
+        let native_kind = DocumentInformationFieldKind::from_field_type(self.field.field_type)?;
+        let (kind, switches) = parse_document_information_field_parts(&self.instruction)?;
+        if kind != native_kind {
+            return None;
+        }
+        Some(DocumentInformationField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            kind,
+            switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed `DDE` or
     /// `DDEAUTO` field.
     ///
@@ -3597,6 +3731,8 @@ const MAX_DOCUMENT_VARIABLE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_VARIABLE_FIELD_SWITCHES: usize = 64;
 const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_PROPERTY_FIELD_SWITCHES: usize = 64;
+const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_DOCUMENT_INFORMATION_FIELD_SWITCHES: usize = 64;
 const MAX_DDE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DDE_FIELD_SWITCHES: usize = 64;
 const MAX_LINK_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -4568,6 +4704,46 @@ fn parse_document_property_field_parts(
     }
 
     Some((property_name, switches))
+}
+
+fn parse_document_information_field_parts(
+    instruction: &str,
+) -> Option<(DocumentInformationFieldKind, Vec<MergeFieldSwitch>)> {
+    if instruction.len() > MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    let kind = DocumentInformationFieldKind::from_keyword(&keyword)?;
+
+    let mut switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' || switches.len() >= MAX_DOCUMENT_INFORMATION_FIELD_SWITCHES {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        switches.push(MergeFieldSwitch {
+            name: name.to_ascii_lowercase(),
+            argument,
+        });
+    }
+
+    Some((kind, switches))
 }
 
 fn parse_dde_field_parts(instruction: &str) -> Option<DdeFieldParts> {
@@ -7180,6 +7356,135 @@ mod tests {
             ..text
         };
         assert!(wrong_type.document_property().is_none());
+    }
+
+    #[test]
+    fn document_information_fields_expose_cached_metadata_without_resolution() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::Title,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" TITLE \* MERGEFORMAT \@ "opaque format" "#.to_string(),
+            result: Some("cached title".to_string()),
+        };
+
+        let information = text.document_information().unwrap();
+        assert_eq!(information.field(), &field);
+        assert_eq!(information.instruction(), text.instruction);
+        assert_eq!(information.kind(), DocumentInformationFieldKind::Title);
+        assert_eq!(information.cached_result(), Some("cached title"));
+        assert!(information.is_dirty());
+        assert!(information.is_locked());
+        assert_eq!(information.switches().len(), 2);
+        assert_eq!(information.switches()[0].name(), '*');
+        assert_eq!(information.switches()[0].argument(), Some("MERGEFORMAT"));
+        assert_eq!(information.switches()[1].name(), '@');
+        assert_eq!(
+            information.switches()[1].argument(),
+            Some("opaque format")
+        );
+
+        for (field_type, instruction, kind) in [
+            (
+                FieldType::Title,
+                "TITLE",
+                DocumentInformationFieldKind::Title,
+            ),
+            (
+                FieldType::Subject,
+                "SUBJECT",
+                DocumentInformationFieldKind::Subject,
+            ),
+            (
+                FieldType::Author,
+                "AUTHOR",
+                DocumentInformationFieldKind::Author,
+            ),
+            (
+                FieldType::Keywords,
+                "KEYWORDS",
+                DocumentInformationFieldKind::Keywords,
+            ),
+            (
+                FieldType::Comments,
+                "COMMENTS",
+                DocumentInformationFieldKind::Comments,
+            ),
+            (
+                FieldType::LastSavedBy,
+                "LASTSAVEDBY",
+                DocumentInformationFieldKind::LastSavedBy,
+            ),
+        ] {
+            let text = FieldText {
+                field: Field {
+                    field_type,
+                    ..field.clone()
+                },
+                instruction: format!("{instruction} \\* MERGEFORMAT"),
+                ..text.clone()
+            };
+            let information = text.document_information().unwrap();
+            assert_eq!(information.kind(), kind);
+            assert_eq!(information.kind().field_keyword(), instruction);
+            assert_eq!(information.switches()[0].name(), '*');
+            assert_eq!(information.switches()[0].argument(), Some("MERGEFORMAT"));
+        }
+
+        for (field_type, instruction) in [
+            (FieldType::Title, "TITLE unexpected"),
+            (FieldType::Author, r#"AUTHOR "unterminated"#),
+            (FieldType::Comments, "COMMENTS \\"),
+            (
+                FieldType::LastSavedBy,
+                r"LASTSAVEDBY \* MERGEFORMAT unexpected",
+            ),
+            (FieldType::Author, "AUTHORS"),
+        ] {
+            let malformed = FieldText {
+                field: Field {
+                    field_type,
+                    ..field.clone()
+                },
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(
+                malformed.document_information().is_none(),
+                "{instruction}"
+            );
+        }
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Author,
+                ..field.clone()
+            },
+            ..text.clone()
+        };
+        assert!(wrong_type.document_information().is_none());
+
+        let too_long = FieldText {
+            instruction: format!(
+                "TITLE \\* {}",
+                "x".repeat(MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text
+        };
+        assert!(too_long.document_information().is_none());
     }
 
     #[test]
