@@ -833,6 +833,48 @@ impl OdfDocumentIdentityFieldKind {
     }
 }
 
+/// One of the fifteen ODF 1.2 subsequent-author `text:sender-*` field categories.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OdfSenderFieldKind {
+    FirstName,
+    LastName,
+    Initials,
+    Title,
+    Position,
+    Email,
+    PrivatePhone,
+    Fax,
+    Company,
+    WorkPhone,
+    Street,
+    City,
+    PostalCode,
+    Country,
+    StateOrProvince,
+}
+
+impl OdfSenderFieldKind {
+    pub const fn element_name(self) -> &'static str {
+        match self {
+            Self::FirstName => "text:sender-firstname",
+            Self::LastName => "text:sender-lastname",
+            Self::Initials => "text:sender-initials",
+            Self::Title => "text:sender-title",
+            Self::Position => "text:sender-position",
+            Self::Email => "text:sender-email",
+            Self::PrivatePhone => "text:sender-phone-private",
+            Self::Fax => "text:sender-fax",
+            Self::Company => "text:sender-company",
+            Self::WorkPhone => "text:sender-phone-work",
+            Self::Street => "text:sender-street",
+            Self::City => "text:sender-city",
+            Self::PostalCode => "text:sender-postal-code",
+            Self::Country => "text:sender-country",
+            Self::StateOrProvince => "text:sender-state-or-province",
+        }
+    }
+}
+
 /// Independently optional cached values permitted by `text:user-defined`.
 ///
 /// Unlike variable fields, ODF 1.2 does not use `office:value-type` here and
@@ -1582,6 +1624,15 @@ pub enum OdfDynamicTextField {
         fixed: Option<bool>,
         display_text: String,
     },
+    /// Cached subsequent-author identity/contact data.
+    ///
+    /// These fields never read or modify host identity or contact data, even when
+    /// `text:fixed` is omitted or false.
+    Sender {
+        kind: OdfSenderFieldKind,
+        fixed: Option<bool>,
+        display_text: String,
+    },
     /// Named custom document metadata with inert cached typed attributes.
     UserDefinedMetadata {
         name: String,
@@ -1638,6 +1689,7 @@ impl OdfDynamicTextField {
             | Self::SheetName { display_text, .. }
             | Self::DocumentMetadata { display_text, .. }
             | Self::DocumentIdentity { display_text, .. }
+            | Self::Sender { display_text, .. }
             | Self::UserDefinedMetadata { display_text, .. } => display_text,
             Self::MetaField { content, .. } => content.display_text(),
         }
@@ -2234,6 +2286,14 @@ impl OdfDynamicTextField {
                     &mut aggregate,
                 )?;
             },
+            Self::Sender { display_text, .. } => {
+                validate_dynamic_value(
+                    "sender display text",
+                    Some(display_text),
+                    false,
+                    &mut aggregate,
+                )?;
+            },
             Self::UserDefinedMetadata {
                 name,
                 values,
@@ -2349,6 +2409,7 @@ impl OdfDynamicTextField {
             Self::SheetName { .. } => Element::new("text:sheet-name"),
             Self::DocumentMetadata { kind, .. } => Element::new(kind.element_name()),
             Self::DocumentIdentity { kind, .. } => Element::new(kind.element_name()),
+            Self::Sender { kind, .. } => Element::new(kind.element_name()),
             Self::UserDefinedMetadata { .. } => Element::new("text:user-defined"),
             Self::MetaField { .. } => unreachable!("meta-field uses ordered mixed serializer"),
         };
@@ -2792,6 +2853,16 @@ impl OdfDynamicTextField {
                 element.set_text(display_text);
             },
             Self::DocumentIdentity {
+                fixed,
+                display_text,
+                ..
+            } => {
+                if let Some(fixed) = fixed {
+                    element.set_attribute("text:fixed", if *fixed { "true" } else { "false" });
+                }
+                element.set_text(display_text);
+            },
+            Self::Sender {
                 fixed,
                 display_text,
                 ..
@@ -3564,6 +3635,48 @@ impl Field {
                     fixed: optional_field_bool(self, "text:fixed")?,
                     display_text: text(),
                 }
+            },
+            "text:sender-firstname"
+            | "text:sender-lastname"
+            | "text:sender-initials"
+            | "text:sender-title"
+            | "text:sender-position"
+            | "text:sender-email"
+            | "text:sender-phone-private"
+            | "text:sender-fax"
+            | "text:sender-company"
+            | "text:sender-phone-work"
+            | "text:sender-street"
+            | "text:sender-city"
+            | "text:sender-postal-code"
+            | "text:sender-country"
+            | "text:sender-state-or-province" => {
+                reject_unknown_field_attributes(self, &["text:fixed"])?;
+                let kind = match self.field_type() {
+                    "text:sender-firstname" => OdfSenderFieldKind::FirstName,
+                    "text:sender-lastname" => OdfSenderFieldKind::LastName,
+                    "text:sender-initials" => OdfSenderFieldKind::Initials,
+                    "text:sender-title" => OdfSenderFieldKind::Title,
+                    "text:sender-position" => OdfSenderFieldKind::Position,
+                    "text:sender-email" => OdfSenderFieldKind::Email,
+                    "text:sender-phone-private" => OdfSenderFieldKind::PrivatePhone,
+                    "text:sender-fax" => OdfSenderFieldKind::Fax,
+                    "text:sender-company" => OdfSenderFieldKind::Company,
+                    "text:sender-phone-work" => OdfSenderFieldKind::WorkPhone,
+                    "text:sender-street" => OdfSenderFieldKind::Street,
+                    "text:sender-city" => OdfSenderFieldKind::City,
+                    "text:sender-postal-code" => OdfSenderFieldKind::PostalCode,
+                    "text:sender-country" => OdfSenderFieldKind::Country,
+                    "text:sender-state-or-province" => OdfSenderFieldKind::StateOrProvince,
+                    _ => unreachable!(),
+                };
+                let result = OdfDynamicTextField::Sender {
+                    kind,
+                    fixed: optional_field_bool(self, "text:fixed")?,
+                    display_text: text(),
+                };
+                result.validate()?;
+                result
             },
             "text:user-defined" => {
                 reject_unknown_field_attributes(
@@ -7182,6 +7295,136 @@ mod document_context_field_tests {
         assert!(oversized.to_xml_fragment().is_err());
         let forbidden = OdfDynamicTextField::TemplateName {
             display: Some(OdfTemplateNameDisplay::Title),
+            display_text: "bad\u{0}".to_string(),
+        };
+        assert!(forbidden.to_xml_fragment().is_err());
+    }
+}
+
+#[cfg(test)]
+mod sender_field_tests {
+    use super::*;
+
+    fn document(body: &str) -> String {
+        format!(
+            r#"<o:document-content
+                xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+                <o:body><o:text><t:p>{body}</t:p></o:text></o:body>
+            </o:document-content>"#
+        )
+    }
+
+    #[test]
+    fn sender_fields_round_trip_all_fifteen_standard_elements() {
+        let kinds = [
+            OdfSenderFieldKind::FirstName,
+            OdfSenderFieldKind::LastName,
+            OdfSenderFieldKind::Initials,
+            OdfSenderFieldKind::Title,
+            OdfSenderFieldKind::Position,
+            OdfSenderFieldKind::Email,
+            OdfSenderFieldKind::PrivatePhone,
+            OdfSenderFieldKind::Fax,
+            OdfSenderFieldKind::Company,
+            OdfSenderFieldKind::WorkPhone,
+            OdfSenderFieldKind::Street,
+            OdfSenderFieldKind::City,
+            OdfSenderFieldKind::PostalCode,
+            OdfSenderFieldKind::Country,
+            OdfSenderFieldKind::StateOrProvince,
+        ];
+        let fields = kinds
+            .into_iter()
+            .enumerate()
+            .map(|(index, kind)| OdfDynamicTextField::Sender {
+                kind,
+                fixed: match index % 3 {
+                    0 => None,
+                    1 => Some(true),
+                    _ => Some(false),
+                },
+                display_text: format!("cached sender {index} & <inert>"),
+            })
+            .collect::<Vec<_>>();
+        let body = fields
+            .iter()
+            .map(OdfDynamicTextField::to_xml_fragment)
+            .collect::<Result<Vec<_>>>()
+            .unwrap()
+            .join("");
+        let parsed = FieldParser::parse_dynamic_text_fields(&document(&body)).unwrap();
+        assert_eq!(parsed, fields);
+        assert_eq!(parsed[5].display_text(), "cached sender 5 & <inert>");
+    }
+
+    #[test]
+    fn sender_fields_preserve_fixed_omission_and_boolean_aliases() {
+        let xml = document(
+            r#"<t:sender-firstname>first</t:sender-firstname>
+               <t:sender-lastname t:fixed="1">last</t:sender-lastname>
+               <t:sender-email t:fixed="0">author@example.invalid</t:sender-email>"#,
+        );
+        let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(matches!(
+            &fields[0],
+            OdfDynamicTextField::Sender {
+                kind: OdfSenderFieldKind::FirstName,
+                fixed: None,
+                ..
+            }
+        ));
+        assert!(matches!(
+            &fields[1],
+            OdfDynamicTextField::Sender {
+                kind: OdfSenderFieldKind::LastName,
+                fixed: Some(true),
+                ..
+            }
+        ));
+        assert!(matches!(
+            &fields[2],
+            OdfDynamicTextField::Sender {
+                kind: OdfSenderFieldKind::Email,
+                fixed: Some(false),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn sender_fields_reject_hostile_attributes_and_bounds() {
+        let invalid = [
+            r#"<t:sender-firstname t:fixed="yes">first</t:sender-firstname>"#,
+            r#"<t:sender-email t:display="value">author@example.invalid</t:sender-email>"#,
+            r#"<t:sender-country t:fixed="TRUE">Country</t:sender-country>"#,
+            r#"<t:sender-state-or-province t:name="region">State</t:sender-state-or-province>"#,
+        ];
+        for body in invalid {
+            assert!(
+                FieldParser::parse_dynamic_text_fields(&document(body)).is_err(),
+                "accepted {body}"
+            );
+        }
+
+        let wrong_namespace = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+            xmlns:x="urn:not-text"><o:body><o:text><t:p>
+            <t:sender-company x:fixed="true">spoof</t:sender-company>
+            </t:p></o:text></o:body></o:document-content>"#;
+        assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
+
+        let oversized = OdfDynamicTextField::Sender {
+            kind: OdfSenderFieldKind::Company,
+            fixed: None,
+            display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
+        };
+        assert!(oversized.to_xml_fragment().is_err());
+        let forbidden = OdfDynamicTextField::Sender {
+            kind: OdfSenderFieldKind::Email,
+            fixed: Some(false),
             display_text: "bad\u{0}".to_string(),
         };
         assert!(forbidden.to_xml_fragment().is_err());

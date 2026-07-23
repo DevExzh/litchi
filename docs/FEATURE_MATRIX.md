@@ -374,7 +374,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Bookmarks and reference marks | ✅ | ✅ | ✅ | Point/range targets and typed insertion/replacement/removal |
 | Comments/annotations | ✅ | ✅ | ✅ | Point/range annotations and package-aware CRUD |
 | Track changes | ✅ | ✅ | ✅ | Change metadata, regions, policy, and mutation APIs |
-| Dynamic/database fields | ✅ | ✅ | ✅ | Date/time/page/user/variable/database families, including cached `text:author-name`/`text:author-initials`, `text:file-name`, `text:template-name`, and `text:sheet-name`; no external query execution, host identity/path reads, template lookups, or live sheet-state resolution |
+| Dynamic/database fields | ✅ | ✅ | ✅ | Date/time/page/user/variable/database families, including cached `text:author-name`/`text:author-initials`, `text:sender-*`, `text:file-name`, `text:template-name`, and `text:sheet-name`; no external query execution, host identity/contact or path reads, template lookups, or live sheet-state resolution |
 | Variables and declarations | ✅ | ✅ | ✅ | Typed declarations and mutation |
 | Ruby annotations | 🟡 | ✅ | 🟡 | Typed `text:ruby` insertion, named ruby styles, and mutable CRUD; append or validate a UTF-8 range wholly inside one text/CDATA/entity node without splitting surrounding markup |
 | TOC, indexes, and source marks | 🟡 | ✅ | ✅ | Typed structures and cached-body authoring; no pagination or automatic regeneration |
