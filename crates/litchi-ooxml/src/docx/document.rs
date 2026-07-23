@@ -10,8 +10,8 @@ use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
     AdvanceField, AutoNumberField, BibliographyField, CitationField, DdeField,
-    DocumentVariableField, ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField,
-    IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
+    DocumentVariableField, EmbedField, ExternalIncludeField, Field, GoToButtonField, IfField,
+    IndexEntryField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, PrintField, QuoteField,
     ReferencedDocumentField, SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
@@ -1356,6 +1356,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `PRINT` fields in the main document.
     pub fn print_field_count(&self) -> Result<usize> {
         Ok(self.print_fields()?.len())
+    }
+
+    /// Get typed, inert `EMBED` fields in document order.
+    ///
+    /// Returned values expose only stored opaque object instructions, cached
+    /// content, and dirty/lock state. This method never loads, inspects,
+    /// deserializes, activates, renders, or executes an embedded object,
+    /// accesses an external resource, or refreshes a field.
+    pub fn embed_fields(&self) -> Result<Vec<EmbedField>> {
+        self.fields()?
+            .iter()
+            .map(Field::embed_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `EMBED` fields in the main document.
+    pub fn embed_field_count(&self) -> Result<usize> {
+        Ok(self.embed_fields()?.len())
     }
 
     /// Get typed, inert user-identity fields in document order.
