@@ -4,6 +4,7 @@ mod axis;
 mod axis_bounds;
 mod axis_gridlines;
 mod axis_line;
+mod axis_steps;
 mod caption;
 mod graph;
 mod legend;
@@ -527,7 +528,10 @@ fn update_chart_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartAxis, ChartAxisBound, ChartValueAxisBounds};
+    use crate::charts::{
+        ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
+        ChartValueAxisBounds, ChartValueAxisSteps,
+    };
     use crate::numbers::NumbersDocumentBuilder;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 120.0 };
@@ -1133,6 +1137,90 @@ mod tests {
                 .sheet_chart_value_axis_bounds(sheet_id, source.drawable_object_id)
                 .unwrap(),
             automatic
+        );
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_value_axis_steps_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let defaults = ChartValueAxisSteps::fixed(
+            ChartAxisMajorStepCount::new(5).unwrap(),
+            ChartAxisMinorStepCount::new(1).unwrap(),
+        );
+        let fixed = ChartValueAxisSteps::fixed(
+            ChartAxisMajorStepCount::new(6).unwrap(),
+            ChartAxisMinorStepCount::new(2).unwrap(),
+        );
+        let major_only =
+            ChartValueAxisSteps::new(Some(ChartAxisMajorStepCount::new(4).unwrap()), None);
+
+        assert_eq!(
+            editor
+                .sheet_chart_value_axis_steps(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            defaults
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_value_axis_steps(sheet_id, source.drawable_object_id, defaults)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_value_axis_steps(sheet_id, source.drawable_object_id, fixed)
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_value_axis_steps(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            fixed
+        );
+
+        editor
+            .set_sheet_chart_value_axis_steps(sheet_id, source.drawable_object_id, major_only)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_value_axis_steps(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            major_only
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_value_axis_steps(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            major_only
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_value_axis_steps(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            fixed
+        );
+        reopened
+            .set_sheet_chart_value_axis_steps(
+                sheet_id,
+                source.drawable_object_id,
+                ChartValueAxisSteps::automatic(),
+            )
+            .unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_value_axis_steps(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            ChartValueAxisSteps::automatic()
         );
         reopened
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)

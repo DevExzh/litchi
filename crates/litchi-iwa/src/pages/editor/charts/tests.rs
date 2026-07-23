@@ -1,7 +1,10 @@
 //! Source-built Pages chart CRUD regression tests.
 
 use super::*;
-use crate::charts::{ChartAxis, ChartAxisBound, ChartValueAxisBounds};
+use crate::charts::{
+    ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
+    ChartValueAxisBounds, ChartValueAxisSteps,
+};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -603,6 +606,96 @@ fn scratch_document_supports_native_chart_value_axis_bounds_crud() {
             .body_chart_value_axis_bounds(source.drawable_object_id)
             .unwrap(),
         automatic
+    );
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
+fn scratch_document_supports_native_chart_value_axis_steps_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart value-axis steps").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart value-axis steps".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let defaults = ChartValueAxisSteps::fixed(
+        ChartAxisMajorStepCount::new(5).unwrap(),
+        ChartAxisMinorStepCount::new(1).unwrap(),
+    );
+    let fixed = ChartValueAxisSteps::fixed(
+        ChartAxisMajorStepCount::new(6).unwrap(),
+        ChartAxisMinorStepCount::new(2).unwrap(),
+    );
+    let major_only = ChartValueAxisSteps::new(Some(ChartAxisMajorStepCount::new(4).unwrap()), None);
+
+    assert_eq!(
+        editor
+            .body_chart_value_axis_steps(source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_value_axis_steps(source.drawable_object_id, defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_value_axis_steps(source.drawable_object_id, fixed)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_value_axis_steps(duplicate.drawable_object_id)
+            .unwrap(),
+        fixed
+    );
+
+    editor
+        .set_body_chart_value_axis_steps(source.drawable_object_id, major_only)
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_value_axis_steps(source.drawable_object_id)
+            .unwrap(),
+        major_only
+    );
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_value_axis_steps(source.drawable_object_id)
+            .unwrap(),
+        major_only
+    );
+    assert_eq!(
+        reopened
+            .body_chart_value_axis_steps(duplicate.drawable_object_id)
+            .unwrap(),
+        fixed
+    );
+    reopened
+        .set_body_chart_value_axis_steps(
+            source.drawable_object_id,
+            ChartValueAxisSteps::automatic(),
+        )
+        .unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_value_axis_steps(source.drawable_object_id)
+            .unwrap(),
+        ChartValueAxisSteps::automatic()
     );
     reopened
         .remove_body_chart(duplicate.drawable_object_id)

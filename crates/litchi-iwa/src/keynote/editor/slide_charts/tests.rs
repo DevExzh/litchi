@@ -1,7 +1,10 @@
 //! Source-built Keynote chart CRUD regression tests.
 
 use super::*;
-use crate::charts::{ChartAxis, ChartAxisBound, ChartValueAxisBounds};
+use crate::charts::{
+    ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
+    ChartValueAxisBounds, ChartValueAxisSteps,
+};
 use crate::keynote::KeynoteDocumentBuilder;
 
 const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
@@ -586,6 +589,88 @@ fn scratch_presentation_supports_native_chart_value_axis_bounds_crud() {
             .slide_chart_value_axis_bounds(0, source.drawable_object_id)
             .unwrap(),
         automatic
+    );
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+}
+
+#[test]
+fn scratch_presentation_supports_native_chart_value_axis_steps_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let defaults = ChartValueAxisSteps::fixed(
+        ChartAxisMajorStepCount::new(5).unwrap(),
+        ChartAxisMinorStepCount::new(1).unwrap(),
+    );
+    let fixed = ChartValueAxisSteps::fixed(
+        ChartAxisMajorStepCount::new(6).unwrap(),
+        ChartAxisMinorStepCount::new(2).unwrap(),
+    );
+    let major_only = ChartValueAxisSteps::new(Some(ChartAxisMajorStepCount::new(4).unwrap()), None);
+
+    assert_eq!(
+        editor
+            .slide_chart_value_axis_steps(0, source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_value_axis_steps(0, source.drawable_object_id, defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_value_axis_steps(0, source.drawable_object_id, fixed)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_value_axis_steps(0, duplicate.drawable_object_id)
+            .unwrap(),
+        fixed
+    );
+
+    editor
+        .set_slide_chart_value_axis_steps(0, source.drawable_object_id, major_only)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_value_axis_steps(0, source.drawable_object_id)
+            .unwrap(),
+        major_only
+    );
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_value_axis_steps(0, source.drawable_object_id)
+            .unwrap(),
+        major_only
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_value_axis_steps(0, duplicate.drawable_object_id)
+            .unwrap(),
+        fixed
+    );
+    reopened
+        .set_slide_chart_value_axis_steps(
+            0,
+            source.drawable_object_id,
+            ChartValueAxisSteps::automatic(),
+        )
+        .unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_value_axis_steps(0, source.drawable_object_id)
+            .unwrap(),
+        ChartValueAxisSteps::automatic()
     );
     reopened
         .remove_slide_chart(0, duplicate.drawable_object_id)
