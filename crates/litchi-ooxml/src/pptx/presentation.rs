@@ -783,6 +783,26 @@ impl<'a> Presentation<'a> {
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
+    /// Load the PowerPoint Revision Information part, if present.
+    ///
+    /// Revision extension XML remains inert metadata and is never executed or
+    /// used to resolve relationships.
+    pub fn revision_information(
+        &self,
+    ) -> Result<Option<crate::pptx::revision_information::RevisionInformationPart>> {
+        crate::pptx::revision_information::load_revision_information(self.package)
+    }
+
+    /// Load the PowerPoint Changes Information part, if present.
+    ///
+    /// Nested change descriptors remain inert XML and are never executed or
+    /// used to resolve relationships.
+    pub fn changes_information(
+        &self,
+    ) -> Result<Option<crate::pptx::changes_information::ChangesInformationPart>> {
+        crate::pptx::changes_information::load_changes_information(self.package)
+    }
+
     /// Get basic chart information from the presentation.
     ///
     /// Returns a vector of tuples: (slide_index, chart_info).

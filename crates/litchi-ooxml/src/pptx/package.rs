@@ -581,6 +581,50 @@ impl Package {
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
+    /// Load the PowerPoint Revision Information part, if present.
+    ///
+    /// Revision extension XML remains inert metadata and is never executed or
+    /// used to resolve relationships.
+    pub fn revision_information(
+        &self,
+    ) -> Result<Option<crate::pptx::revision_information::RevisionInformationPart>> {
+        crate::pptx::revision_information::load_revision_information(&self.opc)
+    }
+
+    /// Add a validated PowerPoint Revision Information part.
+    ///
+    /// This operation deliberately rejects replacing an existing part.
+    pub fn store_revision_information(
+        &mut self,
+        value: &crate::pptx::revision_information::RevisionInformationPart,
+    ) -> Result<()> {
+        crate::pptx::revision_information::store_revision_information(&mut self.opc, value)?;
+        let _ = self.opc.clear_digital_signatures();
+        Ok(())
+    }
+
+    /// Load the PowerPoint Changes Information part, if present.
+    ///
+    /// Nested change descriptors remain inert XML and are never executed or
+    /// used to resolve relationships.
+    pub fn changes_information(
+        &self,
+    ) -> Result<Option<crate::pptx::changes_information::ChangesInformationPart>> {
+        crate::pptx::changes_information::load_changes_information(&self.opc)
+    }
+
+    /// Add a validated PowerPoint Changes Information part.
+    ///
+    /// This operation deliberately rejects replacing an existing part.
+    pub fn store_changes_information(
+        &mut self,
+        value: &crate::pptx::changes_information::ChangesInformationPart,
+    ) -> Result<()> {
+        crate::pptx::changes_information::store_changes_information(&mut self.opc, value)?;
+        let _ = self.opc.clear_digital_signatures();
+        Ok(())
+    }
+
     /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payload.
     ///
     /// This validates only the declared OPC relationship graph and content
