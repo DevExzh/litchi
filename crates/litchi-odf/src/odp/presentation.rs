@@ -408,6 +408,53 @@ impl Presentation {
         }
     }
 
+    /// Inspect named fill-image definitions without resolving style use sites.
+    ///
+    /// Links remain stored metadata: this does not follow them, load linked
+    /// resources, or render images.
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::OdfDrawingFillImages> {
+        match self.styles.as_ref() {
+            Some(styles) => {
+                crate::drawing_fill_image::parse_drawing_fill_images(styles.xml_content())
+            },
+            None => Ok(crate::drawing_fill_image::OdfDrawingFillImages::default()),
+        }
+    }
+
+    /// Inspect named drawing marker definitions without resolving style use sites.
+    ///
+    /// This does not render marker paths.
+    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::OdfDrawingMarkers> {
+        match self.styles.as_ref() {
+            Some(styles) => crate::drawing_marker::parse_drawing_markers(styles.xml_content()),
+            None => Ok(crate::drawing_marker::OdfDrawingMarkers::default()),
+        }
+    }
+
+    /// Inspect named drawing opacity definitions without resolving style use sites.
+    ///
+    /// This does not render opacity gradients.
+    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::OdfDrawingOpacities> {
+        match self.styles.as_ref() {
+            Some(styles) => crate::drawing_opacity::parse_drawing_opacities(styles.xml_content()),
+            None => Ok(crate::drawing_opacity::OdfDrawingOpacities::default()),
+        }
+    }
+
+    /// Inspect named drawing stroke-dash definitions without resolving style use sites.
+    ///
+    /// This does not render strokes.
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<crate::drawing_stroke_dash::OdfDrawingStrokeDashes> {
+        match self.styles.as_ref() {
+            Some(styles) => {
+                crate::drawing_stroke_dash::parse_drawing_stroke_dashes(styles.xml_content())
+            },
+            None => Ok(crate::drawing_stroke_dash::OdfDrawingStrokeDashes::default()),
+        }
+    }
+
     /// Get a slide by index.
     ///
     /// Returns `Some(slide)` if a slide exists at the given index, `None` otherwise.

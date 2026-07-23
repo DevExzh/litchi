@@ -124,6 +124,69 @@ impl MutablePresentation {
         }
     }
 
+    /// Inspect named drawing fill-image definitions from current styles metadata.
+    ///
+    /// Links remain stored metadata: this does not follow them, load linked
+    /// resources, or render images.
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing_fill_image::OdfDrawingFillImages> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_fill_image::parse_drawing_fill_images,
+        )
+    }
+
+    /// Inspect named legacy and SVG drawing gradients from current styles metadata.
+    ///
+    /// This does not resolve style use sites or render gradients.
+    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::OdfDrawingGradients> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_gradient::parse_drawing_gradients,
+        )
+    }
+
+    /// Inspect named drawing hatch definitions from current styles metadata.
+    ///
+    /// This does not resolve style use sites or render hatches.
+    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::OdfDrawingHatches> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_hatch::parse_drawing_hatches,
+        )
+    }
+
+    /// Inspect named drawing marker definitions from current styles metadata.
+    ///
+    /// This does not resolve style use sites or render marker paths.
+    pub fn drawing_markers(&self) -> Result<crate::drawing_marker::OdfDrawingMarkers> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_marker::parse_drawing_markers,
+        )
+    }
+
+    /// Inspect named drawing opacity definitions from current styles metadata.
+    ///
+    /// This does not resolve style use sites or render opacity gradients.
+    pub fn drawing_opacities(&self) -> Result<crate::drawing_opacity::OdfDrawingOpacities> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_opacity::parse_drawing_opacities,
+        )
+    }
+
+    /// Inspect named drawing stroke-dash definitions from current styles metadata.
+    ///
+    /// This does not resolve style use sites or render strokes.
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<crate::drawing_stroke_dash::OdfDrawingStrokeDashes> {
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            crate::drawing_stroke_dash::parse_drawing_stroke_dashes,
+        )
+    }
+
     /// Return the inert slide-show settings.
     pub fn settings(&self) -> Option<&crate::odp::PresentationSettings> {
         self.settings.as_ref()
