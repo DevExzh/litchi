@@ -228,7 +228,7 @@ conversion, fonts, and image conversion are optional.
 | Sections | ✅ | ✅ | ✅ | Typed section readers with stable IDs and resolved slide-index membership, plus graph-safe CRUD |
 | Custom slide shows | ✅ | ✅ | ✅ | High-level typed inventory of named subsets, plus graph-safe ordered CRUD |
 | Presentation/slide protection | ✅ | ✅ | ✅ | Protection and password metadata, including root modification-verifier inspection; policy is not enforced by the library |
-| Embedded fonts | ✅ | ✅ | ✅ | Payloads, obfuscation, licensing checks, and ordered CRUD |
+| Embedded fonts | ✅ | ✅ | ✅ | High-level typed inventory, payloads, obfuscation, licensing checks, and ordered CRUD |
 | Embedded OLE/package objects | 🟡 | ✅ | ❌ | Typed per-slide inert OLE inventory with shape, ProgID, relationship, and payload metadata; no OLE authoring or activation |
 | View and presentation properties, and guides | 🟡 | ✅ | ✅ | Typed root/package presentation settings, slide/notes surface dimensions and size type, including PowerPoint 2010 browse-mode metadata, with bounded serialization and extended guides |
 | Tags, changes, and revision information | 🟡 | ✅ | 🟡 | Inert programmable tags with slide-aware package/presentation inventory, root smart-tag and customer-data relationship references, revision/change readers, and add-only validated package storage |

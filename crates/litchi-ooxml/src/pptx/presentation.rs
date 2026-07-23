@@ -459,6 +459,14 @@ impl<'a> Presentation<'a> {
         self.part.customer_data()
     }
 
+    /// Get validated presentation-level embedded-font metadata and resources.
+    ///
+    /// Font programs are returned only as inert stored bytes. This does not
+    /// parse, load, install, render, or execute a font program.
+    pub fn embedded_fonts(&self) -> Result<Option<crate::pptx::PresentationEmbeddedFonts>> {
+        crate::pptx::load_embedded_fonts(self.package)
+    }
+
     /// Get the validated list of custom slide shows.
     ///
     /// Each show retains its stable ID and the presentation slide IDs it
