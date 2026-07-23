@@ -2086,6 +2086,75 @@ impl DocumentPropertyField {
     }
 }
 
+/// A typed, inert legacy Word `INFO` field.
+///
+/// [MS-DOC] §2.9.90 identifies native `INFO` fields with type `0x0E`.
+/// Word permits the `INFO` keyword to be omitted, and the native type
+/// disambiguates that stored form from standalone document-information fields.
+/// This type retains the stored property selector, optional replacement value,
+/// switches, cached result, and field-marker state only. It never reads,
+/// resolves, modifies, or writes document or template properties, or refreshes
+/// a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InfoField {
+    field: Field,
+    instruction: String,
+    information_type: String,
+    new_value: Option<String>,
+    switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl InfoField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored document or template property selector.
+    ///
+    /// The selector is preserved as metadata and is never looked up.
+    pub fn information_type(&self) -> &str {
+        &self.information_type
+    }
+
+    /// Return the stored optional replacement value.
+    ///
+    /// This value is never applied to a document or template property.
+    pub fn new_value(&self) -> Option<&str> {
+        self.new_value.as_deref()
+    }
+
+    /// Return preserved switches in source order without interpreting them.
+    ///
+    /// These values remain inert source metadata and are never applied.
+    pub fn switches(&self) -> &[MergeFieldSwitch] {
+        &self.switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from a property.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The built-in Word document-information field category.
 ///
 /// [MS-DOC] §2.9.90 assigns the native `flt` values 0x0F through 0x1C to
@@ -3934,6 +4003,29 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a native `INFO` field.
+    ///
+    /// Stored property selectors, optional replacement values, switches, cached
+    /// results, and field-marker state remain metadata only. This method never
+    /// reads, resolves, modifies, or writes document or template properties, or
+    /// refreshes a field. The native field type permits recognition of both
+    /// explicit and keyword-omitted instruction forms. Malformed instructions
+    /// remain available through this generic type and return `None` here.
+    pub fn info_field(&self) -> Option<InfoField> {
+        if self.field.field_type != FieldType::Info {
+            return None;
+        }
+        let (information_type, new_value, switches) = parse_info_field_parts(&self.instruction)?;
+        Some(InfoField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            information_type,
+            new_value,
+            switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed built-in
     /// document-information field.
     ///
@@ -4333,6 +4425,8 @@ const MAX_DOCUMENT_VARIABLE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_VARIABLE_FIELD_SWITCHES: usize = 64;
 const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_PROPERTY_FIELD_SWITCHES: usize = 64;
+const MAX_INFO_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_INFO_FIELD_SWITCHES: usize = 64;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_SWITCHES: usize = 64;
 const MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5477,6 +5571,59 @@ fn parse_document_property_field_parts(
     }
 
     Some((property_name, switches))
+}
+
+fn parse_info_field_parts(
+    instruction: &str,
+) -> Option<(String, Option<String>, Vec<MergeFieldSwitch>)> {
+    if instruction.len() > MAX_INFO_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let first_argument = next_field_argument(instruction, &mut position).ok()??;
+    let information_type = if first_argument.eq_ignore_ascii_case("INFO") {
+        next_field_argument(instruction, &mut position).ok()??
+    } else {
+        first_argument
+    };
+    if information_type.is_empty() {
+        return None;
+    }
+
+    skip_field_whitespace(instruction, &mut position);
+    let new_value = match peek_field_character(instruction, position) {
+        None | Some('\\') => None,
+        Some(_) => Some(next_field_argument(instruction, &mut position).ok()??),
+    };
+
+    let mut switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' || switches.len() >= MAX_INFO_FIELD_SWITCHES {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        switches.push(MergeFieldSwitch {
+            name: name.to_ascii_lowercase(),
+            argument,
+        });
+    }
+
+    Some((information_type, new_value, switches))
 }
 
 fn parse_document_information_field_parts(
@@ -6671,6 +6818,8 @@ mod tests {
 
     #[test]
     fn field_type_mapping_covers_specified_and_unknown_values() {
+        assert_eq!(FieldType::from(0x0E), FieldType::Info);
+        assert_eq!(FieldType::Info.as_u8(), 0x0E);
         assert_eq!(FieldType::from(0x3A), FieldType::EmbeddedObject);
         assert_eq!(FieldType::from(0x58), FieldType::Hyperlink);
         assert_eq!(FieldType::from(0x34), FieldType::AutoNumOutline);
@@ -8622,6 +8771,103 @@ mod tests {
             ..text
         };
         assert!(wrong_type.document_property().is_none());
+    }
+
+    #[test]
+    fn info_fields_expose_stored_metadata_without_property_resolution_or_updates() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::Info,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" INFO TITLE "Stored title override" \* MERGEFORMAT \@ "opaque format" "#
+                .to_string(),
+            result: Some("cached title".to_string()),
+        };
+
+        let information = text.info_field().unwrap();
+        assert_eq!(information.field(), &field);
+        assert_eq!(information.instruction(), text.instruction);
+        assert_eq!(information.information_type(), "TITLE");
+        assert_eq!(information.new_value(), Some("Stored title override"));
+        assert_eq!(information.cached_result(), Some("cached title"));
+        assert!(information.is_dirty());
+        assert!(information.is_locked());
+        assert_eq!(information.switches().len(), 2);
+        assert_eq!(information.switches()[0].name(), '*');
+        assert_eq!(information.switches()[0].argument(), Some("MERGEFORMAT"));
+        assert_eq!(information.switches()[1].name(), '@');
+        assert_eq!(
+            information.switches()[1].argument(),
+            Some("opaque format")
+        );
+
+        let implicit = FieldText {
+            instruction: r#" COMMENTS "Stored comment" \* MERGEFORMAT "#.to_string(),
+            result: Some("cached comment".to_string()),
+            ..text.clone()
+        };
+        let implicit_information = implicit.info_field().unwrap();
+        assert_eq!(implicit_information.information_type(), "COMMENTS");
+        assert_eq!(implicit_information.new_value(), Some("Stored comment"));
+        assert_eq!(
+            implicit_information.cached_result(),
+            Some("cached comment")
+        );
+        assert_eq!(
+            implicit_information.switches()[0].argument(),
+            Some("MERGEFORMAT")
+        );
+
+        let no_replacement = FieldText {
+            instruction: "TEMPLATE".to_string(),
+            ..text.clone()
+        };
+        assert_eq!(no_replacement.info_field().unwrap().new_value(), None);
+
+        for instruction in [
+            "INFO",
+            r#"INFO "" "#,
+            r#"INFO TITLE "Stored title" unexpected"#,
+            r#"INFO TITLE "unterminated"#,
+            r#"INFO TITLE \"#,
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.info_field().is_none(), "{instruction}");
+        }
+
+        let too_long = FieldText {
+            instruction: format!(
+                "INFO {}",
+                "x".repeat(MAX_INFO_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text.clone()
+        };
+        assert!(too_long.info_field().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Title,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.info_field().is_none());
     }
 
     #[test]

@@ -16,11 +16,11 @@ use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
     CompareField, DdeField, DocumentContextField, DocumentInformationField, DocumentVariableField,
-    ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
-    GoToButtonField, IfField, IndexField, LinkField, ListNumberField, MacroButtonField,
+    ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField, GoToButtonField,
+    IfField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
-    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, QuoteField,
-    PrintField, ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
+    ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
     TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
@@ -948,6 +948,22 @@ impl Document {
     /// Get the number of typed, inert `DOCVARIABLE` fields.
     pub fn document_variable_field_count(&self) -> Result<usize> {
         Ok(self.document_variable_fields()?.len())
+    }
+
+    /// Get typed, inert native `INFO` fields in story and source order.
+    ///
+    /// Returned values expose only stored property selectors, optional
+    /// replacement values, switches, cached results, and field state. This
+    /// method never reads, resolves, modifies, or writes document or template
+    /// properties, or refreshes a field.
+    pub fn info_fields(&self) -> Result<Vec<InfoField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::info_field).collect())
+    }
+
+    /// Get the number of typed, inert native `INFO` fields.
+    pub fn info_field_count(&self) -> Result<usize> {
+        Ok(self.info_fields()?.len())
     }
 
     /// Get typed, inert built-in document-information fields in story and
