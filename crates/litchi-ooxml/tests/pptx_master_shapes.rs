@@ -7,8 +7,10 @@ fn master_and_layout_shape_inventories_are_available() {
     let masters = presentation.slide_masters().unwrap();
 
     assert!(!masters[0].shapes().unwrap().is_empty());
+    assert!(!masters[0].placeholders().unwrap().is_empty());
 
     let layouts = masters[0].slide_layouts().unwrap();
     assert!(!layouts.is_empty());
     assert!(!layouts[0].shapes().unwrap().is_empty());
+    assert!(!layouts[0].placeholders().unwrap().is_empty());
 }

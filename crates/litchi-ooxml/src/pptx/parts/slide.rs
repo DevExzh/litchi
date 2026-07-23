@@ -52,6 +52,13 @@ fn parse_shapes(xml: &[u8]) -> Result<Vec<BaseShape>> {
     Ok(shapes)
 }
 
+fn filter_placeholders(shapes: Vec<BaseShape>) -> Vec<BaseShape> {
+    shapes
+        .into_iter()
+        .filter(BaseShape::is_placeholder)
+        .collect()
+}
+
 /// A slide part.
 ///
 /// Corresponds to `/ppt/slides/slideN.xml` in the package.
@@ -100,6 +107,11 @@ impl<'a> SlidePart<'a> {
     /// and converted to specific shape types.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
         parse_shapes(self.xml_bytes())
+    }
+
+    /// Parse and return all placeholder shapes on this slide.
+    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
+        Ok(filter_placeholders(self.shapes()?))
     }
 
     /// Get the transition effect for this slide.
@@ -156,6 +168,11 @@ impl<'a> SlideLayoutPart<'a> {
         parse_shapes(self.xml_bytes())
     }
 
+    /// Get all placeholder shapes defined by this layout.
+    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
+        Ok(filter_placeholders(self.shapes()?))
+    }
+
     /// Get the transition effect inherited from this slide layout.
     ///
     /// Parses the `<p:transition>` element from the layout XML.
@@ -209,6 +226,11 @@ impl<'a> SlideMasterPart<'a> {
     /// Get all shapes defined by this master.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
         parse_shapes(self.xml_bytes())
+    }
+
+    /// Get all placeholder shapes defined by this master.
+    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
+        Ok(filter_placeholders(self.shapes()?))
     }
 
     /// Get the transition effect inherited from this slide master.

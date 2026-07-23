@@ -10,7 +10,14 @@ const LOCAL_SHAPE_XML: &[u8] =
 fn slide_shapes_are_resolved_by_non_visual_id() {
     let package = package_with_slide_xml(LOCAL_SHAPE_XML);
     let presentation = package.presentation().unwrap();
+    assert_eq!(
+        presentation.get_placeholders(0).unwrap(),
+        Some(vec!["title".to_string(), "body".to_string()])
+    );
     let slide = presentation.slides().unwrap().remove(0);
+
+    let placeholders = slide.placeholders().unwrap();
+    assert_eq!(placeholders.len(), 2);
 
     let title = slide.shape_by_id(7).unwrap().unwrap();
     assert_eq!(title.shape_id().unwrap(), Some(7));

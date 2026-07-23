@@ -264,6 +264,11 @@ impl<'a> Slide<'a> {
         self.part.shapes()
     }
 
+    /// Get all placeholder shapes on this slide.
+    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
+        self.part.placeholders()
+    }
+
     /// Get the number of shapes on this slide.
     ///
     /// # Examples
@@ -773,6 +778,11 @@ impl<'a> SlideLayout<'a> {
         self.part.shapes()
     }
 
+    /// Get all placeholder shapes defined by this slide layout.
+    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
+        self.part.placeholders()
+    }
+
     /// Get the transition effect inherited from this layout.
     ///
     /// Returns `None` if the layout has no transition.
@@ -947,6 +957,11 @@ impl<'a> SlideMaster<'a> {
     /// Get all shapes defined by this slide master.
     pub fn shapes(&self) -> Result<Vec<BaseShape>> {
         self.part.shapes()
+    }
+
+    /// Get all placeholder shapes defined by this slide master.
+    pub fn placeholders(&self) -> Result<Vec<BaseShape>> {
+        self.part.placeholders()
     }
 
     /// Get the transition effect inherited from this master.

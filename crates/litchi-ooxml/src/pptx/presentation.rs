@@ -472,11 +472,10 @@ impl<'a> Presentation<'a> {
     /// ```
     pub fn get_placeholders(&self, slide_index: usize) -> Result<Option<Vec<String>>> {
         if let Some(slide) = self.slide(slide_index)? {
-            // Get shapes and filter for placeholders
-            let shapes = slide.shapes()?;
-            let placeholders: Vec<String> = shapes
+            // Get the slide's placeholder inventory.
+            let placeholders: Vec<String> = slide
+                .placeholders()?
                 .iter()
-                .filter(|s| s.is_placeholder())
                 .filter_map(|s| s.placeholder_type().ok())
                 .collect();
 
