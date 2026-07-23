@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2007/10/customui">
+  <outSpace>
+    <place idMso="PlacePrint" visible="false"/>
+  </outSpace>
+</customUI>

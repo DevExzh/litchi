@@ -34,6 +34,10 @@ use crate::docx::variables::DocumentVariables;
 use crate::docx::vba_project::{VbaProject, discover_vba_project};
 use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
+use crate::ribbonx::{
+    RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
+    load_ribbon_customizations, store_ribbon_customization,
+};
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
 use litchi_opc::OpcPackage;
@@ -622,6 +626,27 @@ impl Package {
     pub fn vba_project(&self) -> Result<Option<VbaProject>> {
         let document = self.opc.main_document_part()?;
         discover_vba_project(&self.opc, document)
+    }
+
+    /// Load all package-level RibbonX customizations without invoking callbacks.
+    pub fn ribbon_customizations(&self) -> Result<Vec<RibbonCustomization>> {
+        load_ribbon_customizations(&self.opc)
+    }
+
+    /// Load the effective package-level RibbonX customization without invoking callbacks.
+    pub fn ribbon_customization(&self) -> Result<Option<RibbonCustomization>> {
+        load_ribbon_customization(&self.opc)
+    }
+
+    /// Store opaque RibbonX XML without interpreting or invoking callbacks.
+    pub fn set_ribbon_customization(
+        &mut self,
+        version: RibbonCustomizationVersion,
+        xml: &[u8],
+    ) -> Result<RibbonCustomization> {
+        let customization = store_ribbon_customization(&mut self.opc, version, xml)?;
+        let _ = self.opc.clear_digital_signatures();
+        Ok(customization)
     }
 
     /// Load typed font metadata and inert embedded-font resources.

@@ -5,6 +5,10 @@ use crate::pptx::parts::PresentationPart;
 use crate::pptx::presentation::Presentation;
 use crate::pptx::vba_project::{VbaProject, discover_vba_project};
 use crate::pptx::writer::MutablePresentation;
+use crate::ribbonx::{
+    RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
+    load_ribbon_customizations, store_ribbon_customization,
+};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -526,6 +530,27 @@ impl Package {
     pub fn vba_project(&self) -> Result<Option<VbaProject>> {
         let presentation = self.opc.main_document_part()?;
         discover_vba_project(&self.opc, presentation)
+    }
+
+    /// Load all package-level RibbonX customizations without invoking callbacks.
+    pub fn ribbon_customizations(&self) -> Result<Vec<RibbonCustomization>> {
+        load_ribbon_customizations(&self.opc)
+    }
+
+    /// Load the effective package-level RibbonX customization without invoking callbacks.
+    pub fn ribbon_customization(&self) -> Result<Option<RibbonCustomization>> {
+        load_ribbon_customization(&self.opc)
+    }
+
+    /// Store opaque RibbonX XML without interpreting or invoking callbacks.
+    pub fn set_ribbon_customization(
+        &mut self,
+        version: RibbonCustomizationVersion,
+        xml: &[u8],
+    ) -> Result<RibbonCustomization> {
+        let customization = store_ribbon_customization(&mut self.opc, version, xml)?;
+        let _ = self.opc.clear_digital_signatures();
+        Ok(customization)
     }
 
     /// Get the underlying OPC package.

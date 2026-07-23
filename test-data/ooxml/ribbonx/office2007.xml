@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui">
+  <ribbon>
+    <tabs>
+      <tab id="localTab" label="Local">
+        <group id="localGroup" label="Fixture">
+          <button id="localButton" label="Inspect"/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

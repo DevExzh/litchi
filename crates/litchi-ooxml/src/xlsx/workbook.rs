@@ -27,6 +27,10 @@ use crate::xlsx::volatile_dependencies::{
     store_in_package as store_volatile_dependencies,
 };
 use crate::xlsx::vba_project::{VbaProject, discover_vba_project};
+use crate::ribbonx::{
+    RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
+    load_ribbon_customizations, store_ribbon_customization,
+};
 use crate::xlsx::external_links::{
     ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
     build_external_link_part_with_conformance, load_external_link,
@@ -269,6 +273,27 @@ impl Workbook {
     pub fn vba_project(&self) -> crate::error::Result<Option<VbaProject>> {
         let workbook = self.package.get_part(&self.workbook_uri)?;
         discover_vba_project(&self.package, workbook)
+    }
+
+    /// Load all package-level RibbonX customizations without invoking callbacks.
+    pub fn ribbon_customizations(&self) -> crate::error::Result<Vec<RibbonCustomization>> {
+        load_ribbon_customizations(&self.package)
+    }
+
+    /// Load the effective package-level RibbonX customization without invoking callbacks.
+    pub fn ribbon_customization(&self) -> crate::error::Result<Option<RibbonCustomization>> {
+        load_ribbon_customization(&self.package)
+    }
+
+    /// Store opaque RibbonX XML without interpreting or invoking callbacks.
+    pub fn set_ribbon_customization(
+        &mut self,
+        version: RibbonCustomizationVersion,
+        xml: &[u8],
+    ) -> crate::error::Result<RibbonCustomization> {
+        let customization = store_ribbon_customization(&mut self.package, version, xml)?;
+        let _ = self.package.clear_digital_signatures();
+        Ok(customization)
     }
 
     /// Create a new empty workbook.

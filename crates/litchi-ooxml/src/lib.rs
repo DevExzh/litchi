@@ -52,6 +52,7 @@ pub mod opc {
 }
 pub mod pivot;
 pub mod pptx;
+pub mod ribbonx;
 pub mod web_extensions;
 pub mod xlsb;
 pub mod xlsx;

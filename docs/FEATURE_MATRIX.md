@@ -134,7 +134,7 @@ conversion, fonts, and image conversion are optional.
 | DrawingML text boxes and WordArt | ❌ | ❌ | ❌ | No typed DOCX authoring model |
 | Citations, bibliography, index, and TOA | 🟡 | 🟡 | 🟡 | Typed inert `CITATION` source-tag/multi-source and `BIBLIOGRAPHY` field discovery, Custom XML bibliography source-store/scalar-value metadata, and TOA/TA plus INDEX/XE metadata expose stored switches, cached results, and dirty/lock state; typed `CITATION` authoring writes caller-supplied tags, locale, volume, prefix/suffix, multi-source order, and optional cached text, while typed `BIBLIOGRAPHY` authoring writes caller-supplied display/filter locales, selected source-tag order, and optional cached text; bibliography styles/source-store authoring remain opaque and no citation/table/index generation or refresh occurs |
 | IRM/Rights Management | ❌ | ❌ | ❌ | Not implemented |
-| RibbonX customization | ❌ | ❌ | ❌ | Not implemented |
+| RibbonX customization | 🟡 | ✅ | ✅ | Word, Excel, and PowerPoint package wrappers retain bounded package-level Custom UI XML parts in each documented relationship family, validate their root relationships and namespaces, and can update them without executing callbacks, macros, commands, or linked content |
 | VBA projects/DOCM macros | 🟡 | 🟡 | ❌ | DOCM/DOTM main parts and the MS-OFFMACRO2 VBA Project → Word Supplemental Data relationship graph are validated as inert metadata; payload contents are never inspected, parsed, or executed by this API, and no macro authoring exists |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
