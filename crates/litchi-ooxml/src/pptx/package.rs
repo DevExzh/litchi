@@ -538,6 +538,14 @@ impl Package {
         self.presentation()?.ink_annotations()
     }
 
+    /// Discover persisted laser-pointer traces from presentation slides.
+    ///
+    /// Trace points are returned as inert stored data and are never replayed,
+    /// rendered, interpolated, modified, or executed.
+    pub fn laser_traces(&self) -> Result<Vec<crate::pptx::PptxLaserTrace>> {
+        self.presentation()?.laser_traces()
+    }
+
     /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payload.
     ///
     /// This validates only the declared OPC relationship graph and content

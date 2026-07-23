@@ -68,6 +68,7 @@ pub mod format;
 pub mod handout;
 pub mod hyperlinks;
 pub mod ink;
+pub mod laser;
 pub mod media;
 pub mod media_parts;
 pub mod modern_comment_authors;
@@ -142,6 +143,7 @@ pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
 pub use hyperlinks::Hyperlink;
 pub use ink::{INK_CONTENT_TYPE, PptxInkAnnotation};
+pub use laser::{LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint};
 pub use media::{Media, MediaFormat, MediaType};
 pub use media_parts::{
     MediaBookmark, MediaFade, MediaResource, MediaTrim, OfficeMediaExtension,

@@ -1,0 +1,576 @@
+//! Bounded, inert PowerPoint laser-pointer trace discovery.
+//!
+//! Laser traces are retained as persisted presentation data only. This module
+//! never replays, renders, interpolates, modifies, or executes slide-show
+//! events.
+
+use crate::common::xml::unqualified_attribute_value;
+use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use crate::error::{OoxmlError, Result};
+use crate::pptx::namespace::is_presentationml_name;
+use litchi_opc::Part;
+use litchi_opc::constants::content_type as ct;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
+
+/// The PowerPoint extension URI that contains persisted laser-pointer traces.
+pub const LASER_TRACE_EXTENSION_URI: &str = "{3A86A75C-4F4B-4683-9AE1-C65F6400EC91}";
+
+const P14_NAMESPACE: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
+const P14_NAMESPACE_BYTES: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+const MAX_SLIDE_XML_BYTES: usize = 32 * 1024 * 1024;
+const MAX_TOTAL_SLIDE_XML_BYTES: usize = 256 * 1024 * 1024;
+const MAX_LASER_TRACES: usize = 4_096;
+const MAX_LASER_POINTS: usize = 65_536;
+const MAX_XML_NODES: usize = 250_000;
+const MAX_XML_DEPTH: usize = 128;
+const MAX_TIME_OFFSET_BYTES: usize = 64;
+
+/// A persisted laser-pointer point from a PowerPoint slide show.
+///
+/// The timestamp is kept in its stored universal-time-offset lexical form.
+/// Coordinates are DrawingML EMUs relative to the slide's top-left corner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PptxLaserTracePoint {
+    time: String,
+    x: i64,
+    y: i64,
+}
+
+impl PptxLaserTracePoint {
+    /// Return the stored universal time offset relative to the slide timeline.
+    #[inline]
+    pub fn time(&self) -> &str {
+        &self.time
+    }
+
+    /// Return the horizontal position in DrawingML EMUs.
+    #[inline]
+    pub fn x(&self) -> i64 {
+        self.x
+    }
+
+    /// Return the vertical position in DrawingML EMUs.
+    #[inline]
+    pub fn y(&self) -> i64 {
+        self.y
+    }
+}
+
+/// A bounded, inert laser-pointer trace recorded for a presentation slide.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PptxLaserTrace {
+    slide_index: usize,
+    trace_index: usize,
+    points: Vec<PptxLaserTracePoint>,
+}
+
+impl PptxLaserTrace {
+    /// Return the zero-based index of the slide that owns this trace.
+    #[inline]
+    pub fn slide_index(&self) -> usize {
+        self.slide_index
+    }
+
+    /// Return the zero-based source-order index of this trace on its slide.
+    #[inline]
+    pub fn trace_index(&self) -> usize {
+        self.trace_index
+    }
+
+    /// Return the stored trace points in source order.
+    #[inline]
+    pub fn points(&self) -> &[PptxLaserTracePoint] {
+        &self.points
+    }
+
+    /// Return the number of stored trace points.
+    #[inline]
+    pub fn point_count(&self) -> usize {
+        self.points.len()
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct LaserLoadLimits {
+    total_slide_xml_bytes: usize,
+    trace_count: usize,
+    point_count: usize,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ElementKind {
+    Other,
+    Root,
+    LaserExtension,
+    LaserTraceList,
+    LaserTrace,
+    LaserPoint,
+}
+
+impl ElementKind {
+    fn is_known(self) -> bool {
+        matches!(
+            self,
+            Self::LaserExtension | Self::LaserTraceList | Self::LaserTrace | Self::LaserPoint
+        )
+    }
+}
+
+/// Load bounded, inert laser-pointer traces from one PresentationML slide.
+pub(crate) fn load_slide_laser_traces(
+    slide_index: usize,
+    slide: &dyn Part,
+    limits: &mut LaserLoadLimits,
+) -> Result<Vec<PptxLaserTrace>> {
+    if slide.content_type() != ct::PML_SLIDE {
+        return Err(invalid(
+            "laser-trace discovery requires a PresentationML slide part",
+        ));
+    }
+    limits.add_slide_xml(slide.blob().len())?;
+    scan_slide_laser_traces(slide_index, slide.blob(), limits)
+}
+
+impl LaserLoadLimits {
+    fn add_slide_xml(&mut self, bytes: usize) -> Result<()> {
+        if bytes > MAX_SLIDE_XML_BYTES {
+            return Err(limit("slide XML bytes"));
+        }
+        self.total_slide_xml_bytes = self
+            .total_slide_xml_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| limit("total slide XML bytes"))?;
+        if self.total_slide_xml_bytes > MAX_TOTAL_SLIDE_XML_BYTES {
+            return Err(limit("total slide XML bytes"));
+        }
+        Ok(())
+    }
+
+    fn add_trace(&mut self) -> Result<()> {
+        self.trace_count = self
+            .trace_count
+            .checked_add(1)
+            .ok_or_else(|| limit("laser trace count"))?;
+        if self.trace_count > MAX_LASER_TRACES {
+            return Err(limit("laser trace count"));
+        }
+        Ok(())
+    }
+
+    fn add_point(&mut self) -> Result<()> {
+        self.point_count = self
+            .point_count
+            .checked_add(1)
+            .ok_or_else(|| limit("laser trace-point count"))?;
+        if self.point_count > MAX_LASER_POINTS {
+            return Err(limit("laser trace-point count"));
+        }
+        Ok(())
+    }
+}
+
+fn scan_slide_laser_traces(
+    slide_index: usize,
+    xml_bytes: &[u8],
+    limits: &mut LaserLoadLimits,
+) -> Result<Vec<PptxLaserTrace>> {
+    if xml_bytes.len() > MAX_SLIDE_XML_BYTES {
+        return Err(limit("slide XML bytes"));
+    }
+
+    let mut capabilities = MceCapabilities::ooxml_baseline();
+    capabilities.understand_namespace(P14_NAMESPACE);
+    let mce_limits = MceLimits {
+        max_input_bytes: MAX_SLIDE_XML_BYTES,
+        max_output_bytes: MAX_SLIDE_XML_BYTES,
+        max_depth: MAX_XML_DEPTH,
+        max_namespace_bindings: 4_096,
+        max_directive_tokens: 4_096,
+        max_choices_per_alternate: 1_024,
+    };
+    let xml = process_markup_compatibility(xml_bytes, &capabilities, &mce_limits)?.xml;
+    let mut reader = NsReader::from_reader(xml.as_ref());
+    let mut stack = Vec::new();
+    let mut traces = Vec::new();
+    let mut active_trace = None;
+    let mut nodes = 0usize;
+    let mut saw_root = false;
+    let mut closed_root = false;
+
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+
+        match event {
+            Event::Start(element) => {
+                increment_nodes(&mut nodes)?;
+                let depth = stack
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| limit("slide XML depth"))?;
+                if depth > MAX_XML_DEPTH {
+                    return Err(limit("slide XML depth"));
+                }
+                let parent = stack.last().copied().unwrap_or(ElementKind::Other);
+                let kind = classify_element(
+                    &namespace,
+                    &element,
+                    decoder,
+                    parent,
+                    depth,
+                    saw_root,
+                    false,
+                    &mut active_trace,
+                    limits,
+                )?;
+                if kind == ElementKind::Root {
+                    saw_root = true;
+                }
+                stack.push(kind);
+            },
+            Event::Empty(element) => {
+                increment_nodes(&mut nodes)?;
+                let depth = stack
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| limit("slide XML depth"))?;
+                if depth > MAX_XML_DEPTH {
+                    return Err(limit("slide XML depth"));
+                }
+                let parent = stack.last().copied().unwrap_or(ElementKind::Other);
+                let kind = classify_element(
+                    &namespace,
+                    &element,
+                    decoder,
+                    parent,
+                    depth,
+                    saw_root,
+                    true,
+                    &mut active_trace,
+                    limits,
+                )?;
+                if kind == ElementKind::Root {
+                    saw_root = true;
+                    closed_root = true;
+                } else if kind == ElementKind::LaserTrace {
+                    finish_trace(slide_index, &mut traces, &mut active_trace)?;
+                }
+            },
+            Event::End(element) => {
+                let kind = stack
+                    .pop()
+                    .ok_or_else(|| invalid("invalid slide XML nesting"))?;
+                finish_element(
+                    kind,
+                    &namespace,
+                    element.name(),
+                    slide_index,
+                    &mut traces,
+                    &mut active_trace,
+                )?;
+                if kind == ElementKind::Root {
+                    closed_root = true;
+                }
+            },
+            Event::Text(text) => {
+                if stack.last().copied().is_some_and(ElementKind::is_known)
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(invalid("laser-trace markup cannot contain text"));
+                }
+            },
+            Event::CData(text) => {
+                if stack.last().copied().is_some_and(ElementKind::is_known)
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(invalid("laser-trace markup cannot contain text"));
+                }
+            },
+            Event::GeneralRef(_) if stack.last().copied().is_some_and(ElementKind::is_known) => {
+                return Err(invalid(
+                    "laser-trace markup cannot contain entity references",
+                ));
+            },
+            Event::DocType(_) => return Err(invalid("slide XML must not contain a DTD")),
+            Event::PI(_) => {
+                return Err(invalid(
+                    "slide XML must not contain a processing instruction",
+                ));
+            },
+            Event::Eof => {
+                if !stack.is_empty() || !saw_root || !closed_root {
+                    return Err(invalid("unterminated or missing PresentationML slide root"));
+                }
+                break;
+            },
+            _ => {},
+        }
+    }
+
+    Ok(traces)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn classify_element(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    parent: ElementKind,
+    depth: usize,
+    root_seen: bool,
+    empty: bool,
+    active_trace: &mut Option<Vec<PptxLaserTracePoint>>,
+    limits: &mut LaserLoadLimits,
+) -> Result<ElementKind> {
+    if depth == 1 {
+        if root_seen || !is_presentationml_name(namespace, element.name(), b"sld") {
+            return Err(invalid(
+                "slide XML must have one PresentationML sld root element",
+            ));
+        }
+        return Ok(ElementKind::Root);
+    }
+
+    if is_presentationml_name(namespace, element.name(), b"ext")
+        && is_laser_extension(element, decoder)?
+    {
+        return Ok(ElementKind::LaserExtension);
+    }
+
+    if is_p14_name(namespace, element.name(), b"laserTraceLst") {
+        return match parent {
+            ElementKind::LaserExtension => Ok(ElementKind::LaserTraceList),
+            ElementKind::Other => Ok(ElementKind::Other),
+            ElementKind::Root
+            | ElementKind::LaserTraceList
+            | ElementKind::LaserTrace
+            | ElementKind::LaserPoint => Err(invalid(
+                "laserTraceLst must be the direct child of its PowerPoint extension",
+            )),
+        };
+    }
+
+    if is_p14_name(namespace, element.name(), b"tracePtLst") {
+        let kind = match parent {
+            ElementKind::LaserTraceList => ElementKind::LaserTrace,
+            ElementKind::Other => ElementKind::Other,
+            ElementKind::Root
+            | ElementKind::LaserExtension
+            | ElementKind::LaserTrace
+            | ElementKind::LaserPoint => {
+                return Err(invalid(
+                    "laser trace list contains tracePtLst in an invalid position",
+                ));
+            },
+        };
+        if kind == ElementKind::LaserTrace {
+            limits.add_trace()?;
+            if active_trace.replace(Vec::new()).is_some() {
+                return Err(invalid("nested laser traces are not valid"));
+            }
+        }
+        return Ok(kind);
+    }
+
+    if is_p14_name(namespace, element.name(), b"tracePt") {
+        if parent != ElementKind::LaserTrace {
+            return if parent.is_known() {
+                Err(invalid(
+                    "laser trace point is outside a PowerPoint laser trace",
+                ))
+            } else {
+                Ok(ElementKind::Other)
+            };
+        }
+        let point = parse_trace_point(element, decoder)?;
+        limits.add_point()?;
+        active_trace
+            .as_mut()
+            .ok_or_else(|| invalid("laser trace point has no active trace"))?
+            .push(point);
+        return Ok(empty
+            .then_some(ElementKind::Other)
+            .unwrap_or(ElementKind::LaserPoint));
+    }
+
+    if parent.is_known() {
+        return Err(invalid(
+            "laser-trace extension contains an unsupported child element",
+        ));
+    }
+    Ok(ElementKind::Other)
+}
+
+fn finish_element(
+    kind: ElementKind,
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    slide_index: usize,
+    traces: &mut Vec<PptxLaserTrace>,
+    active_trace: &mut Option<Vec<PptxLaserTracePoint>>,
+) -> Result<()> {
+    match kind {
+        ElementKind::Root if !is_presentationml_name(namespace, name, b"sld") => Err(invalid(
+            "slide XML must close with a PresentationML sld element",
+        )),
+        ElementKind::LaserExtension if !is_presentationml_name(namespace, name, b"ext") => {
+            Err(invalid("invalid laser-trace extension nesting"))
+        },
+        ElementKind::LaserTraceList if !is_p14_name(namespace, name, b"laserTraceLst") => {
+            Err(invalid("invalid laser-trace-list nesting"))
+        },
+        ElementKind::LaserTrace if !is_p14_name(namespace, name, b"tracePtLst") => {
+            Err(invalid("invalid laser-trace nesting"))
+        },
+        ElementKind::LaserTrace => finish_trace(slide_index, traces, active_trace),
+        ElementKind::LaserPoint if !is_p14_name(namespace, name, b"tracePt") => {
+            Err(invalid("invalid laser trace-point nesting"))
+        },
+        _ => Ok(()),
+    }
+}
+
+fn finish_trace(
+    slide_index: usize,
+    traces: &mut Vec<PptxLaserTrace>,
+    active_trace: &mut Option<Vec<PptxLaserTracePoint>>,
+) -> Result<()> {
+    let points = active_trace
+        .take()
+        .ok_or_else(|| invalid("laser trace has no active point list"))?;
+    traces.push(PptxLaserTrace {
+        slide_index,
+        trace_index: traces.len(),
+        points,
+    });
+    Ok(())
+}
+
+fn is_laser_extension(element: &BytesStart<'_>, decoder: Decoder) -> Result<bool> {
+    Ok(
+        unqualified_attribute_value(element, b"uri", decoder)?.as_deref()
+            == Some(LASER_TRACE_EXTENSION_URI),
+    )
+}
+
+fn is_p14_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
+    name.local_name().as_ref() == local_name
+        && matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(value)) if *value == P14_NAMESPACE_BYTES
+        )
+}
+
+fn parse_trace_point(element: &BytesStart<'_>, decoder: Decoder) -> Result<PptxLaserTracePoint> {
+    let time = required_attribute(element, b"t", decoder)?;
+    validate_time_offset(&time)?;
+    let x = parse_coordinate(required_attribute(element, b"x", decoder)?, "x")?;
+    let y = parse_coordinate(required_attribute(element, b"y", decoder)?, "y")?;
+    Ok(PptxLaserTracePoint { time, x, y })
+}
+
+fn required_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<String> {
+    unqualified_attribute_value(element, name, decoder)?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            invalid(format!(
+                "laser trace point is missing required '{}' attribute",
+                String::from_utf8_lossy(name)
+            ))
+        })
+}
+
+fn parse_coordinate(value: String, name: &str) -> Result<i64> {
+    value
+        .parse()
+        .map_err(|_| invalid(format!("invalid laser trace point {name} coordinate")))
+}
+
+fn validate_time_offset(value: &str) -> Result<()> {
+    if value.len() > MAX_TIME_OFFSET_BYTES {
+        return Err(limit("laser trace point time offset bytes"));
+    }
+    let split = value
+        .find(|character: char| !character.is_ascii_digit() && character != '.')
+        .unwrap_or(value.len());
+    let (number, unit) = value.split_at(split);
+    let mut pieces = number.split('.');
+    let whole = pieces.next().unwrap_or_default();
+    let fraction = pieces.next();
+    if whole.is_empty()
+        || !whole.bytes().all(|byte| byte.is_ascii_digit())
+        || fraction
+            .is_some_and(|part| part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()))
+        || pieces.next().is_some()
+        || !matches!(unit, "" | "h" | "min" | "s" | "ms" | "µs" | "ns")
+    {
+        return Err(invalid(format!(
+            "invalid laser trace point universal time offset '{value}'"
+        )));
+    }
+    Ok(())
+}
+
+fn increment_nodes(nodes: &mut usize) -> Result<()> {
+    *nodes = nodes
+        .checked_add(1)
+        .ok_or_else(|| limit("slide XML node count"))?;
+    if *nodes > MAX_XML_NODES {
+        return Err(limit("slide XML node count"));
+    }
+    Ok(())
+}
+
+fn invalid(message: impl Into<String>) -> OoxmlError {
+    OoxmlError::InvalidFormat(message.into())
+}
+
+fn limit(what: &str) -> OoxmlError {
+    invalid(format!("{what} exceeds the supported safety limit"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    #[test]
+    fn scans_laser_traces_through_markup_compatibility() {
+        let xml = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:mc="{MCE}" xmlns:p14="{P14_NAMESPACE}" mc:Ignorable="p14"><p:extLst><p:ext uri="{LASER_TRACE_EXTENSION_URI}"><p14:laserTraceLst><p14:tracePtLst><p14:tracePt t="1.5s" x="-2" y="3"/><p14:tracePt t="2000ms" x="0" y="0"/></p14:tracePtLst><p14:tracePtLst/></p14:laserTraceLst></p:ext></p:extLst></p:sld>"#
+        );
+        let traces =
+            scan_slide_laser_traces(4, xml.as_bytes(), &mut LaserLoadLimits::default()).unwrap();
+
+        assert_eq!(traces.len(), 2);
+        assert_eq!(traces[0].slide_index(), 4);
+        assert_eq!(traces[0].trace_index(), 0);
+        assert_eq!(traces[0].point_count(), 2);
+        assert_eq!(traces[0].points()[0].time(), "1.5s");
+        assert_eq!(traces[0].points()[0].x(), -2);
+        assert_eq!(traces[0].points()[1].y(), 0);
+        assert_eq!(traces[1].trace_index(), 1);
+        assert!(traces[1].points().is_empty());
+    }
+
+    #[test]
+    fn rejects_malformed_laser_trace_points() {
+        let xml = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:p14="{P14_NAMESPACE}"><p:extLst><p:ext uri="{LASER_TRACE_EXTENSION_URI}"><p14:laserTraceLst><p14:tracePtLst><p14:tracePt t="1..2s" x="0" y="0"/></p14:tracePtLst></p14:laserTraceLst></p:ext></p:extLst></p:sld>"#
+        );
+
+        assert!(
+            scan_slide_laser_traces(0, xml.as_bytes(), &mut LaserLoadLimits::default()).is_err()
+        );
+    }
+}

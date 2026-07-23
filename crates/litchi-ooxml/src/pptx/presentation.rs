@@ -1,6 +1,7 @@
 /// Main presentation object - the high-level API for working with presentations.
 use crate::error::{OoxmlError, Result};
 use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
+use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
 use crate::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
 use crate::pptx::slide::{Slide, SlideMaster};
 use litchi_opc::OpcPackage;
@@ -698,6 +699,25 @@ impl<'a> Presentation<'a> {
         }
 
         Ok(annotations)
+    }
+
+    /// Discover persisted laser-pointer traces from presentation slides.
+    ///
+    /// Trace points are retained as bounded inert data. They are never
+    /// replayed, rendered, interpolated, modified, or executed.
+    pub fn laser_traces(&self) -> Result<Vec<PptxLaserTrace>> {
+        let mut traces = Vec::new();
+        let mut limits = LaserLoadLimits::default();
+
+        for (slide_index, slide) in self.slides()?.iter().enumerate() {
+            traces.extend(load_slide_laser_traces(
+                slide_index,
+                slide.part().part(),
+                &mut limits,
+            )?);
+        }
+
+        Ok(traces)
     }
 
     /// Get basic chart information from the presentation.
