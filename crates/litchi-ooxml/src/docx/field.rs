@@ -526,19 +526,19 @@ impl Field {
     /// Check whether this is a built-in document-context field.
     ///
     /// Recognition is limited to the stored field instruction. It never reads
-    /// a document path, attached template, or host filesystem state, resolves
-    /// a value, or refreshes the field.
+    /// a document path, attached template, host filesystem state, current
+    /// clock, or page layout, resolves a value, or refreshes the field.
     pub fn is_document_context(&self) -> bool {
         DocumentContextFieldKind::from_instruction(&self.instruction).is_some()
     }
 
     /// Parse this field as inert typed document-context metadata.
     ///
-    /// Returns `Ok(None)` for fields outside the `FILENAME` and `TEMPLATE`
-    /// family. The result exposes only the stored kind, switches, cached
-    /// content, and dirty/lock state; it never reads a document path, attached
-    /// template, or host filesystem state, resolves a value, or refreshes a
-    /// field.
+    /// Returns `Ok(None)` for fields outside the `FILENAME`, `TEMPLATE`, `DATE`,
+    /// `TIME`, and `PAGE` family. The result exposes only the stored kind,
+    /// switches, cached content, and dirty/lock state; it never reads a
+    /// document path, attached template, host filesystem state, current clock,
+    /// or page layout, resolves a value, or refreshes a field.
     pub fn document_context(&self) -> Result<Option<DocumentContextField>> {
         DocumentContextField::from_field(self)
     }
@@ -2334,13 +2334,17 @@ impl DocumentInformationField {
 
 /// The built-in Word document-context field category.
 ///
-/// `FILENAME` and `TEMPLATE` are defined in ECMA-376 Part 1 §17.16.5.
-/// This enum preserves the stored field kind only; it does not read a document
-/// path, attached template, or host filesystem state.
+/// `FILENAME`, `TEMPLATE`, `DATE`, `TIME`, and `PAGE` are defined in
+/// ECMA-376 Part 1 §17.16.5. This enum preserves the stored field kind only;
+/// it does not read a document path, attached template, host filesystem state,
+/// current clock, or page layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DocumentContextFieldKind {
     FileName,
     Template,
+    Date,
+    Time,
+    Page,
 }
 
 impl DocumentContextFieldKind {
@@ -2349,11 +2353,20 @@ impl DocumentContextFieldKind {
         match self {
             Self::FileName => "FILENAME",
             Self::Template => "TEMPLATE",
+            Self::Date => "DATE",
+            Self::Time => "TIME",
+            Self::Page => "PAGE",
         }
     }
 
     fn from_instruction(instruction: &str) -> Option<Self> {
-        [Self::FileName, Self::Template]
+        [
+            Self::FileName,
+            Self::Template,
+            Self::Date,
+            Self::Time,
+            Self::Page,
+        ]
             .into_iter()
             .find(|kind| field_instruction_remainder(instruction, kind.field_keyword()).is_some())
     }
@@ -2362,8 +2375,9 @@ impl DocumentContextFieldKind {
 /// Typed, inert metadata for a built-in Word document-context field.
 ///
 /// This type retains the stored kind, field switches, cached result, and field
-/// state only. It never reads a document path, attached template, or host
-/// filesystem state, resolves a value, or refreshes a field.
+/// state only. It never reads a document path, attached template, host
+/// filesystem state, current clock, or page layout, resolves a value, or
+/// refreshes a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentContextField {
     instruction: String,
@@ -2411,7 +2425,7 @@ impl DocumentContextField {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from a document path,
-    /// attached template, or host filesystem state.
+    /// attached template, host filesystem state, current clock, or page layout.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -7185,6 +7199,21 @@ mod tests {
                 DocumentContextFieldKind::Template,
                 '*',
             ),
+            (
+                r#"DATE \@ "opaque date format""#,
+                DocumentContextFieldKind::Date,
+                '@',
+            ),
+            (
+                r#"TIME \@ "opaque time format""#,
+                DocumentContextFieldKind::Time,
+                '@',
+            ),
+            (
+                r"PAGE \* MERGEFORMAT",
+                DocumentContextFieldKind::Page,
+                '*',
+            ),
         ] {
             let cached_result = format!("cached {}", kind.field_keyword());
             let field = Field::with_flags(
@@ -7209,6 +7238,7 @@ mod tests {
             "FILENAME unexpected",
             r"TEMPLATE \",
             r"FILENAME \ ",
+            "PAGE unexpected",
         ] {
             let field = Field::new(instruction.to_string(), None, false);
             assert!(field.document_context().is_err(), "{instruction}");
@@ -7225,6 +7255,12 @@ mod tests {
         assert!(too_long.document_context().is_err());
         assert!(
             Field::new("FILENAMES".to_string(), None, false)
+                .document_context()
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            Field::new("PAGES".to_string(), None, false)
                 .document_context()
                 .unwrap()
                 .is_none()
