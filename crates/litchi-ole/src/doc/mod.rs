@@ -118,6 +118,7 @@ pub use parts::fields::{
     UserIdentityFieldKind, UserIdentityFormatting,
 };
 pub use parts::fields::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
+pub use parts::fields::{AutoTextField, AutoTextFieldKind, AutoTextListField, AutoTextListOption};
 pub use parts::fields::{DdeField, DdeFieldKind, DdeRepresentation};
 pub use parts::fields::{ExternalIncludeField, ExternalIncludeOption, IncludeFieldKind};
 pub use parts::fields::{LinkField, LinkFormatting, LinkResultOption};

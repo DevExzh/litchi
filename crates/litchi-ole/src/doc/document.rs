@@ -14,11 +14,11 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    ActiveContentField, AdvanceField, CompareField, DdeField, DocumentVariableField,
-    ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, GoToButtonField, IfField,
-    LinkField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
-    MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
-    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    ActiveContentField, AdvanceField, AutoTextField, AutoTextListField, CompareField, DdeField,
+    DocumentVariableField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
+    GoToButtonField, IfField, LinkField, MacroButtonField, MailMergeConditionalControlField,
+    MailMergeCounterField, MailMergeDataField, MailMergeNextField, MailMergeRecipientField,
+    MergeField, PromptField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -651,6 +651,44 @@ impl Document {
     /// Get the number of typed, inert `TOA` fields.
     pub fn table_of_authorities_field_count(&self) -> Result<usize> {
         Ok(self.table_of_authorities_fields()?.len())
+    }
+
+    /// Get typed, inert `GLOSSARY` and `AUTOTEXT` fields in story and source order.
+    ///
+    /// Returned values expose only stored category, entry name, switches,
+    /// cached results, and field state. This method never looks up a building
+    /// block, reads a template, inserts content, changes bookmarks, opens a
+    /// resource, or refreshes a field.
+    pub fn auto_text_fields(&self) -> Result<Vec<AutoTextField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::auto_text_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `GLOSSARY` and `AUTOTEXT` fields.
+    pub fn auto_text_field_count(&self) -> Result<usize> {
+        Ok(self.auto_text_fields()?.len())
+    }
+
+    /// Get typed, inert `AUTOTEXTLIST` fields in story and source order.
+    ///
+    /// Returned values expose only stored display text, style/tip options,
+    /// switches, cached results, and field state. This method never shows a
+    /// selection UI, looks up a building block, reads a template, inserts
+    /// content, or refreshes a field.
+    pub fn auto_text_list_fields(&self) -> Result<Vec<AutoTextListField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::auto_text_list_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `AUTOTEXTLIST` fields.
+    pub fn auto_text_list_field_count(&self) -> Result<usize> {
+        Ok(self.auto_text_list_fields()?.len())
     }
 
     /// Get typed, inert `GOTOBUTTON` fields in story and source order.
