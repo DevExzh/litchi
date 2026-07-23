@@ -185,7 +185,7 @@ pub use field::{
     MailMergeDataField, MailMergeNextField, MailMergeRecipientField,
     MailMergeRecipientFieldKind, MergeField,
     PageBreak, ParsedFieldCode, PrintField, PrivateField, PromptField, PromptFieldKind,
-    QuoteField, ReferenceCode,
+    QuoteField, ReferenceCode, ReferencedDocumentField,
     SectionBreak, SequenceField, SetField, ShapeField, StoryEvent, StoryField,
     StyleReferenceField, StyleReferenceFieldOption, SymbolField, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesEntryOption,

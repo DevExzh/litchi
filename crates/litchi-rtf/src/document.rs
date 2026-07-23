@@ -1231,6 +1231,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `RD` referenced-document fields in document field order.
+    ///
+    /// Stored paths, relative-path requests, switches, cached results, and
+    /// field state are metadata only. This method never opens, resolves, reads,
+    /// imports, refreshes, evaluates, or executes a referenced document.
+    pub fn referenced_documents(&self) -> Vec<crate::ReferencedDocumentField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::referenced_document)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `RD` referenced-document fields.
+    pub fn referenced_document_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.referenced_document().is_some())
+            .count()
+    }
+
     /// Return typed, inert CITATION fields in document field order.
     ///
     /// Source tags, switches, and cached results are exposed solely as stored
