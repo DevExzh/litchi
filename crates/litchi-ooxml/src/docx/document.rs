@@ -11,7 +11,7 @@ use crate::docx::field::CompareField;
 use crate::docx::field::{
     AdvanceField, AutoNumberField, BibliographyField, CitationField, DdeField,
     DocumentVariableField, ExternalIncludeField, Field, GoToButtonField, IfField, IndexEntryField,
-    IndexField, LinkField, MacroButtonField, MailMergeConditionalControlField,
+    IndexField, LinkField, ListNumberField, MacroButtonField, MailMergeConditionalControlField,
     MailMergeCounterField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
     QuoteField, ReferencedDocumentField, SymbolField, TableOfAuthoritiesEntryField,
     TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
@@ -1686,6 +1686,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert legacy automatic-numbering fields.
     pub fn auto_number_field_count(&self) -> Result<usize> {
         Ok(self.auto_number_fields()?.len())
+    }
+
+    /// Get typed, inert `LISTNUM` fields in document order.
+    ///
+    /// Returned values expose stored optional list names, switches, cached
+    /// content, and dirty/lock state only. This method never looks up a list,
+    /// determines a level or start value, calculates a number, changes layout,
+    /// or refreshes a field result.
+    pub fn list_number_fields(&self) -> Result<Vec<ListNumberField>> {
+        self.fields()?
+            .iter()
+            .map(Field::list_number_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `LISTNUM` fields in the main document.
+    pub fn list_number_field_count(&self) -> Result<usize> {
+        Ok(self.list_number_fields()?.len())
     }
 
     /// Get typed, inert `ASK` and `FILLIN` fields in document order.
