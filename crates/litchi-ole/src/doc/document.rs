@@ -14,8 +14,8 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    Field, FieldStory, FieldText, FieldsTable, GoToButtonField, IfField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
+    AdvanceField, Field, FieldStory, FieldText, FieldsTable, GoToButtonField, IfField,
+    MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
@@ -725,6 +725,21 @@ impl Document {
     /// Get the number of typed, inert user-identity fields.
     pub fn user_identity_field_count(&self) -> Result<usize> {
         Ok(self.user_identity_fields()?.len())
+    }
+
+    /// Get typed, inert `ADVANCE` fields in story and source order.
+    ///
+    /// Returned values expose only stored point adjustments, cached results,
+    /// and field state. This method never moves text, changes layout, reflows
+    /// content, or refreshes a field.
+    pub fn advance_fields(&self) -> Result<Vec<AdvanceField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::advance_field).collect())
+    }
+
+    /// Get the number of typed, inert `ADVANCE` fields.
+    pub fn advance_field_count(&self) -> Result<usize> {
+        Ok(self.advance_fields()?.len())
     }
 
     /// Get typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields in story and source

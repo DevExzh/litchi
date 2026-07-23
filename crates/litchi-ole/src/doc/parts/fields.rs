@@ -1126,6 +1126,98 @@ impl UserIdentityField {
     }
 }
 
+/// One stored point-based `ADVANCE` placement operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdvanceFieldOperation {
+    /// The `\\d` switch moves subsequent text down.
+    Down,
+    /// The `\\l` switch moves subsequent text left.
+    Left,
+    /// The `\\r` switch moves subsequent text right.
+    Right,
+    /// The `\\u` switch moves subsequent text up.
+    Up,
+    /// The `\\x` switch specifies a horizontal position from the left edge
+    /// of the column, frame, or text box.
+    HorizontalPosition,
+    /// The `\\y` switch specifies a vertical position relative to the page.
+    VerticalPosition,
+}
+
+/// One stored `ADVANCE` point adjustment.
+///
+/// This is an instruction for a word processor's layout engine only. It is
+/// never applied by this library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvanceFieldAdjustment {
+    operation: AdvanceFieldOperation,
+    points: i64,
+}
+
+impl AdvanceFieldAdjustment {
+    /// Return the requested placement operation.
+    pub fn operation(&self) -> AdvanceFieldOperation {
+        self.operation
+    }
+
+    /// Return the stored signed integral number of points.
+    pub fn points(&self) -> i64 {
+        self.points
+    }
+}
+
+/// A typed, inert legacy Word `ADVANCE` field.
+///
+/// [MS-DOC] §2.9.90 identifies its native field-type byte, and ECMA-376 Part
+/// 1 §17.16.5.2 defines its six point-based placement switches. This type
+/// exposes stored adjustments and cached content only. It never moves text,
+/// changes layout, reflows content, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdvanceField {
+    field: Field,
+    instruction: String,
+    adjustments: Vec<AdvanceFieldAdjustment>,
+    cached_result: Option<String>,
+}
+
+impl AdvanceField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored placement adjustments in source order.
+    ///
+    /// Repeated operations are preserved; this library does not resolve or
+    /// apply them.
+    pub fn adjustments(&self) -> &[AdvanceFieldAdjustment] {
+        &self.adjustments
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// `ADVANCE` has no regenerated value here; any returned text is stored
+    /// source content only.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The stored kind of a mail-merge recipient layout field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MailMergeRecipientFieldKind {
@@ -1501,6 +1593,25 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `ADVANCE` field.
+    ///
+    /// Stored point adjustments and cached-result data are never used to move
+    /// text, change layout, reflow content, or refresh a field. Malformed
+    /// instructions remain available through this generic type and return
+    /// `None` here.
+    pub fn advance_field(&self) -> Option<AdvanceField> {
+        if self.field.field_type != FieldType::Advance {
+            return None;
+        }
+        let adjustments = parse_advance_field_adjustments(&self.instruction)?;
+        Some(AdvanceField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            adjustments,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert metadata when this is a well-formed `ADDRESSBLOCK` or
     /// `GREETINGLINE` field.
     ///
@@ -1557,6 +1668,8 @@ const MAX_MAIL_MERGE_CONDITIONAL_CONTROL_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_IF_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_PROMPT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_USER_IDENTITY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_ADVANCE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_ADVANCE_FIELD_ADJUSTMENTS: usize = 64;
 const MAX_MAIL_MERGE_RECIPIENT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_RECIPIENT_FIELD_SWITCHES: usize = 64;
 
@@ -1881,6 +1994,49 @@ fn parse_user_identity_field_parts(
     }
 
     Some((kind, override_value, formatting))
+}
+
+fn parse_advance_field_adjustments(instruction: &str) -> Option<Vec<AdvanceFieldAdjustment>> {
+    if instruction.len() > MAX_ADVANCE_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("ADVANCE") {
+        return None;
+    }
+
+    let mut adjustments = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' {
+            return None;
+        }
+        let name = next_field_character(instruction, &mut position)?;
+        let operation = match name.to_ascii_lowercase() {
+            'd' => AdvanceFieldOperation::Down,
+            'l' => AdvanceFieldOperation::Left,
+            'r' => AdvanceFieldOperation::Right,
+            'u' => AdvanceFieldOperation::Up,
+            'x' => AdvanceFieldOperation::HorizontalPosition,
+            'y' => AdvanceFieldOperation::VerticalPosition,
+            _ => return None,
+        };
+        if adjustments.len() >= MAX_ADVANCE_FIELD_ADJUSTMENTS {
+            return None;
+        }
+        let points = next_field_argument(instruction, &mut position)
+            .ok()??
+            .parse::<i64>()
+            .ok()?;
+        adjustments.push(AdvanceFieldAdjustment { operation, points });
+    }
+
+    Some(adjustments)
 }
 
 #[allow(clippy::type_complexity)]
@@ -3156,6 +3312,100 @@ mod tests {
             ..address
         };
         assert!(wrong_type.user_identity_field().is_none());
+    }
+
+    #[test]
+    fn advance_fields_expose_metadata_without_changing_layout() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(9),
+            end_cp: 22,
+            field_type: FieldType::Advance,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let advance = FieldText {
+            field: field.clone(),
+            instruction: r#" ADVANCE \u 6 \d 12 \l 20 \r -4 \x 150 \y "72" \d -3 "#.to_string(),
+            result: Some("cached placement".to_string()),
+        };
+
+        let advance_field = advance.advance_field().unwrap();
+        assert_eq!(advance_field.field(), &field);
+        assert_eq!(advance_field.instruction(), advance.instruction);
+        let adjustments = advance_field
+            .adjustments()
+            .iter()
+            .map(|adjustment| (adjustment.operation(), adjustment.points()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            adjustments,
+            vec![
+                (AdvanceFieldOperation::Up, 6),
+                (AdvanceFieldOperation::Down, 12),
+                (AdvanceFieldOperation::Left, 20),
+                (AdvanceFieldOperation::Right, -4),
+                (AdvanceFieldOperation::HorizontalPosition, 150),
+                (AdvanceFieldOperation::VerticalPosition, 72),
+                (AdvanceFieldOperation::Down, -3),
+            ]
+        );
+        assert_eq!(advance_field.cached_result(), Some("cached placement"));
+        assert!(advance_field.is_dirty());
+        assert!(advance_field.is_locked());
+
+        let no_adjustments = FieldText {
+            instruction: "aDvAnCe".to_string(),
+            result: None,
+            ..advance.clone()
+        };
+        assert!(
+            no_adjustments
+                .advance_field()
+                .unwrap()
+                .adjustments()
+                .is_empty()
+        );
+
+        for instruction in [
+            r#"ADVANCE \d"#,
+            r#"ADVANCE \z 10"#,
+            r#"ADVANCE \x 1.5"#,
+            r#"ADVANCE \u 9223372036854775808"#,
+            "ADVANCE 12",
+            r#"ADVANCE \d 6 trailing"#,
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                result: None,
+                ..advance.clone()
+            };
+            assert!(malformed.advance_field().is_none(), "{instruction}");
+        }
+
+        let wrong_keyword = FieldText {
+            instruction: r#"ADVANCER \u 6"#.to_string(),
+            result: None,
+            ..advance.clone()
+        };
+        assert!(wrong_keyword.advance_field().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::UserAddress,
+                ..field
+            },
+            result: None,
+            ..advance
+        };
+        assert!(wrong_type.advance_field().is_none());
     }
 
     #[test]
