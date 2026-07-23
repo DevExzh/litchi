@@ -113,8 +113,9 @@ pub use parts::fields::{
     GoToButtonField, IfField, MacroButtonField, MailMergeConditionalControlField,
     MailMergeConditionalControlKind, MailMergeCounterField, MailMergeCounterKind,
     MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
-    MergeField, MergeFieldSwitch, PromptField, PromptFieldKind, TableOfContentsField,
-    TableOfContentsOption, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
+    MergeField, MergeFieldSwitch, PromptField, PromptFieldKind, TableOfAuthoritiesField,
+    TableOfAuthoritiesOption, TableOfContentsField, TableOfContentsOption, UserIdentityField,
+    UserIdentityFieldKind, UserIdentityFormatting,
 };
 pub use parts::fields::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
 pub use parts::fields::{DdeField, DdeFieldKind, DdeRepresentation};

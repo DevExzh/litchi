@@ -810,6 +810,95 @@ impl TableOfContentsField {
     }
 }
 
+/// One recognized stored option of a legacy Word `TOA` field.
+///
+/// These values retain how a producer configured a table of authorities. They
+/// are metadata only: this crate never finds citations, follows bookmarks,
+/// calculates page numbers, paginates, generates a table, or refreshes a
+/// field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableOfAuthoritiesOption {
+    /// The `\\b` bookmark that bounds included entries.
+    Bookmark(String),
+    /// The `\\c` authority category to include.
+    Category(String),
+    /// The `\\d` separator between sequence and page numbers.
+    SequencePageSeparator(String),
+    /// The `\\e` separator between an entry and its page number.
+    EntryPageNumberSeparator(String),
+    /// The `\\f` entry-formatting switch.
+    EntryFormatting,
+    /// The `\\g` separator between page numbers in a page range.
+    PageRangeSeparator(String),
+    /// The `\\h` switch includes category headings.
+    CategoryHeadings,
+    /// The `\\l` separator between multiple page references.
+    PageReferenceSeparator(String),
+    /// The `\\p` switch requests passim handling.
+    UsePassim,
+    /// The `\\s` sequence identifier whose number prefixes page numbers.
+    SequenceIdentifier(String),
+}
+
+/// Typed, inert metadata for a legacy Word table-of-authorities field.
+///
+/// [MS-DOC] §2.9.90 maps native `TOA` field markers to ECMA-376 Part 1
+/// §17.16.5.67. This type exposes only stored configuration, unrecognized
+/// switches, cached result, and field state. It never finds citations, scans
+/// hidden text, reads bookmarks, follows links, calculates page numbers,
+/// paginates, regenerates a table of authorities, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableOfAuthoritiesField {
+    field: Field,
+    instruction: String,
+    options: Vec<TableOfAuthoritiesOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl TableOfAuthoritiesField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored `TOA` field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return recognized stored configuration options in source order.
+    ///
+    /// This metadata is never used to generate or update a table.
+    pub fn options(&self) -> &[TableOfAuthoritiesOption] {
+        &self.options
+    }
+
+    /// Return unrecognized stored switches in source order.
+    ///
+    /// They are retained without interpretation or execution.
+    pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated through pagination or field evaluation.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// One stored switch in a legacy Word `MERGEFIELD` instruction.
 ///
 /// The name excludes its leading backslash and is normalized to ASCII
@@ -2215,6 +2304,27 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `TOA` field.
+    ///
+    /// Stored configuration and cached results are never used to find
+    /// citations, scan hidden text, read bookmarks, calculate page numbers,
+    /// paginate, regenerate a table of authorities, or refresh a field.
+    /// Malformed instructions remain available through this generic type and
+    /// return `None` here.
+    pub fn table_of_authorities(&self) -> Option<TableOfAuthoritiesField> {
+        if self.field.field_type != FieldType::TableOfAuthorities {
+            return None;
+        }
+        let parts = parse_table_of_authorities_field_parts(&self.instruction)?;
+        Some(TableOfAuthoritiesField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed `MERGEFIELD` field.
     ///
     /// The stored data-column name, switches, and cached result are never
@@ -2602,6 +2712,8 @@ const MAX_MAIL_MERGE_DATA_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_DATA_FIELD_SWITCHES: usize = 64;
 const MAX_TABLE_OF_CONTENTS_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_TABLE_OF_CONTENTS_FIELD_SWITCHES: usize = 64;
+const MAX_TABLE_OF_AUTHORITIES_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_TABLE_OF_AUTHORITIES_FIELD_SWITCHES: usize = 64;
 const MAX_DOCUMENT_VARIABLE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_VARIABLE_FIELD_SWITCHES: usize = 64;
 const MAX_DDE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -2655,6 +2767,11 @@ struct ExternalIncludeFieldParts {
 
 struct TableOfContentsFieldParts {
     options: Vec<TableOfContentsOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+}
+
+struct TableOfAuthoritiesFieldParts {
+    options: Vec<TableOfAuthoritiesOption>,
     unknown_switches: Vec<MergeFieldSwitch>,
 }
 
@@ -2910,6 +3027,89 @@ fn parse_table_of_contents_field_parts(instruction: &str) -> Option<TableOfConte
     }
 
     Some(TableOfContentsFieldParts {
+        options,
+        unknown_switches,
+    })
+}
+
+fn parse_table_of_authorities_field_parts(
+    instruction: &str,
+) -> Option<TableOfAuthoritiesFieldParts> {
+    if instruction.len() > MAX_TABLE_OF_AUTHORITIES_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("TOA") {
+        return None;
+    }
+
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\'
+            || options.len() + unknown_switches.len() >= MAX_TABLE_OF_AUTHORITIES_FIELD_SWITCHES
+        {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        match name {
+            'b' => options.push(TableOfAuthoritiesOption::Bookmark(argument.clone()?)),
+            'c' => options.push(TableOfAuthoritiesOption::Category(argument.clone()?)),
+            'd' => options.push(TableOfAuthoritiesOption::SequencePageSeparator(
+                argument.clone()?,
+            )),
+            'e' => options.push(TableOfAuthoritiesOption::EntryPageNumberSeparator(
+                argument.clone()?,
+            )),
+            'f' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfAuthoritiesOption::EntryFormatting);
+            },
+            'g' => options.push(TableOfAuthoritiesOption::PageRangeSeparator(
+                argument.clone()?,
+            )),
+            'h' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfAuthoritiesOption::CategoryHeadings);
+            },
+            'l' => options.push(TableOfAuthoritiesOption::PageReferenceSeparator(
+                argument.clone()?,
+            )),
+            'p' => {
+                if argument.is_some() {
+                    return None;
+                }
+                options.push(TableOfAuthoritiesOption::UsePassim);
+            },
+            's' => options.push(TableOfAuthoritiesOption::SequenceIdentifier(
+                argument.clone()?,
+            )),
+            _ => unknown_switches.push(MergeFieldSwitch { name, argument }),
+        }
+    }
+
+    Some(TableOfAuthoritiesFieldParts {
         options,
         unknown_switches,
     })
@@ -4363,6 +4563,82 @@ mod tests {
             ..text
         };
         assert!(wrong_type.table_of_contents().is_none());
+    }
+
+    #[test]
+    fn table_of_authorities_fields_preserve_stored_configuration_without_generation() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::TableOfAuthorities,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" TOA \b Authorities \c 2 \d "-" \e " — " \f \g "–" \h \l ", " \p \s Section \* MERGEFORMAT \q opaque "#.to_string(),
+            result: Some("cached authorities".to_string()),
+        };
+
+        let toa = text.table_of_authorities().unwrap();
+        assert_eq!(toa.field(), &field);
+        assert_eq!(toa.instruction(), text.instruction);
+        assert_eq!(
+            toa.options(),
+            &[
+                TableOfAuthoritiesOption::Bookmark("Authorities".to_string()),
+                TableOfAuthoritiesOption::Category("2".to_string()),
+                TableOfAuthoritiesOption::SequencePageSeparator("-".to_string()),
+                TableOfAuthoritiesOption::EntryPageNumberSeparator(" — ".to_string()),
+                TableOfAuthoritiesOption::EntryFormatting,
+                TableOfAuthoritiesOption::PageRangeSeparator("–".to_string()),
+                TableOfAuthoritiesOption::CategoryHeadings,
+                TableOfAuthoritiesOption::PageReferenceSeparator(", ".to_string()),
+                TableOfAuthoritiesOption::UsePassim,
+                TableOfAuthoritiesOption::SequenceIdentifier("Section".to_string()),
+            ]
+        );
+        assert_eq!(
+            toa.unknown_switches(),
+            &[
+                MergeFieldSwitch {
+                    name: '*',
+                    argument: Some("MERGEFORMAT".to_string()),
+                },
+                MergeFieldSwitch {
+                    name: 'q',
+                    argument: Some("opaque".to_string()),
+                },
+            ]
+        );
+        assert_eq!(toa.cached_result(), Some("cached authorities"));
+        assert!(toa.is_dirty());
+        assert!(toa.is_locked());
+
+        for instruction in ["TOA \\b", r"TOA \f unexpected", "TOA unexpected", "TOA \\"] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.table_of_authorities().is_none());
+        }
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::TableOfContents,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.table_of_authorities().is_none());
     }
 
     #[test]

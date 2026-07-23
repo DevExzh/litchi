@@ -18,7 +18,7 @@ use super::parts::fields::{
     ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, GoToButtonField, IfField,
     LinkField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
     MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
-    TableOfContentsField, UserIdentityField,
+    TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
@@ -631,6 +631,26 @@ impl Document {
     /// Get the number of typed, inert `TOC` fields.
     pub fn table_of_contents_field_count(&self) -> Result<usize> {
         Ok(self.table_of_contents_fields()?.len())
+    }
+
+    /// Get typed, inert `TOA` fields in story and source order.
+    ///
+    /// Returned values expose only stored configuration, unrecognized switches,
+    /// cached results, and field state. This method never finds citations,
+    /// scans hidden text, reads bookmarks, follows links, calculates page
+    /// numbers, paginates, regenerates a table of authorities, or refreshes a
+    /// field.
+    pub fn table_of_authorities_fields(&self) -> Result<Vec<TableOfAuthoritiesField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::table_of_authorities)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `TOA` fields.
+    pub fn table_of_authorities_field_count(&self) -> Result<usize> {
+        Ok(self.table_of_authorities_fields()?.len())
     }
 
     /// Get typed, inert `GOTOBUTTON` fields in story and source order.
