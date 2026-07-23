@@ -113,32 +113,36 @@ fn writer_uses_canonical_order_and_mutation_api() {
 }
 
 #[test]
-fn parses_libreoffice_field_status_fixtures() {
-    let dirty = RtfDocument::parse(include_str!(concat!(
+fn parses_local_field_status_fixtures() {
+    let dirty_private = RtfDocument::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf96326.rtf"
+        "/../../test-data/rtf/field-status-dirty-private.rtf"
     )))
     .unwrap();
-    assert!(dirty.fields().iter().any(|field| field.status.dirty));
+    assert!(
+        dirty_private
+            .fields()
+            .iter()
+            .any(|field| field.status.dirty)
+    );
+    assert!(
+        dirty_private
+            .fields()
+            .iter()
+            .any(|field| field.status.private)
+    );
 
     let edited = RtfDocument::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/pgnlcrm.rtf"
+        "/../../test-data/rtf/field-status-edited.rtf"
     )))
     .unwrap();
     assert!(edited.fields().iter().any(|field| field.status.edited));
 
     let locked = RtfDocument::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf100961_fixedDateTime.rtf"
+        "/../../test-data/rtf/field-status-locked.rtf"
     )))
     .unwrap();
     assert!(locked.fields().iter().any(|field| field.status.locked));
-
-    let private = RtfDocument::parse(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf96326.rtf"
-    )))
-    .unwrap();
-    assert!(private.fields().iter().any(|field| field.status.private));
 }
