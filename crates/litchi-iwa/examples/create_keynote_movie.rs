@@ -64,9 +64,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_loop_mode(Some(MediaLoopMode::Repeat))
             .with_volume(Some(MediaVolume::new(0.75)?)),
     )?;
+    editor.set_slide_movie_title(0, created.drawable_object_id, "Source-built Keynote movie")?;
+    editor.set_slide_movie_caption(
+        0,
+        created.drawable_object_id,
+        &format!("Native title and caption for {movie_filename}"),
+    )?;
+    let labels = editor.slide_movie_title_caption(0, created.drawable_object_id)?;
     editor.save(output)?;
     println!(
-        "created Keynote movie {} backed by video {:?} and poster {:?}",
+        "created Keynote movie {} backed by video {:?} and poster {:?} with labels {labels:?}",
         created.drawable_object_id,
         created.movie_data_identifier,
         created.poster_image_data_identifier,

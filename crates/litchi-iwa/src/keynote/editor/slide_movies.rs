@@ -14,6 +14,7 @@ use crate::shapes::{
 use std::time::Duration;
 
 mod builds;
+mod caption;
 pub(in crate::keynote::editor) mod geometry;
 pub(in crate::keynote::editor) mod graph;
 
@@ -1219,6 +1220,94 @@ mod tests {
         assert!(editor.slide_builds(0).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
         KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn scratch_presentation_supports_native_movie_title_caption_crud() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Movie labels")
+            .build()
+            .unwrap();
+        let movie = editor
+            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
+            .unwrap();
+
+        assert_eq!(
+            editor
+                .slide_movie_title_caption(0, movie.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption::default()
+        );
+        editor
+            .set_slide_movie_title(0, movie.drawable_object_id, "Quarterly highlight")
+            .unwrap();
+        editor
+            .set_slide_movie_caption(0, movie.drawable_object_id, "Revenue overview")
+            .unwrap();
+        let expected = crate::DrawableTitleCaption {
+            title: Some("Quarterly highlight".to_owned()),
+            caption: Some("Revenue overview".to_owned()),
+        };
+        assert_eq!(
+            editor
+                .slide_movie_title_caption(0, movie.drawable_object_id)
+                .unwrap(),
+            expected
+        );
+
+        let duplicate = editor
+            .duplicate_slide_movie(0, movie.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_movie_title_caption(0, duplicate.drawable_object_id)
+                .unwrap(),
+            expected
+        );
+
+        editor
+            .set_slide_movie_title(0, movie.drawable_object_id, "Updated highlight")
+            .unwrap();
+        assert!(
+            editor
+                .remove_slide_movie_caption(0, movie.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            !editor
+                .remove_slide_movie_caption(0, movie.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            editor
+                .remove_slide_movie_title(0, movie.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .slide_movie_title_caption(0, movie.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption::default()
+        );
+
+        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .slide_movie_title_caption(0, duplicate.drawable_object_id)
+                .unwrap(),
+            expected
+        );
+        editor = reopened;
+        editor
+            .remove_slide_movie(0, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(
+            editor
+                .slide_movies(0)
+                .unwrap()
+                .iter()
+                .all(|item| item.drawable_object_id != duplicate.drawable_object_id)
+        );
     }
 
     #[test]

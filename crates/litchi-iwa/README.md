@@ -156,7 +156,13 @@ matching `remove_*` methods. Shape labels remain independent through duplicate,
 delete, and package round-trip operations; the `create_*_shape` examples build
 them from scratch.
 
-File-backed movies likewise expose `flip_body_movie`, `flip_sheet_movie`, and
+File-backed movies expose the same native title/caption controls through
+`*_movie_title_caption`, `set_*_movie_title`, `set_*_movie_caption`, and their
+matching `remove_*` methods. Movie labels remain independent through duplicate,
+delete, and package round-trip operations; the `create_*_movie` examples build
+them from scratch.
+
+They likewise expose `flip_body_movie`, `flip_sheet_movie`, and
 `flip_slide_movie`, preserving their video and poster assets, playback settings,
 and metadata; see `create_*_flipped_movie` for scratch-file examples.
 

@@ -15,8 +15,10 @@ use crate::shapes::{
     flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
 
+mod caption;
 mod graph;
 
+use caption::*;
 use graph::*;
 
 /// One ordinary file-backed movie anchored to the Pages body text flow.
@@ -818,6 +820,99 @@ mod tests {
         assert!(editor.body_movies().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
         PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn scratch_document_supports_native_movie_title_caption_crud() {
+        let mut editor = PagesEditor::create_with_text("Movie labels").unwrap();
+        let movie = editor
+            .add_body_movie(
+                "Movie labels".encode_utf16().count(),
+                "movie.mov",
+                MOVIE,
+                "poster.png",
+                POSTER,
+                options(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            editor
+                .body_movie_title_caption(movie.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption::default()
+        );
+        editor
+            .set_body_movie_title(movie.drawable_object_id, "Quarterly highlight")
+            .unwrap();
+        editor
+            .set_body_movie_caption(movie.drawable_object_id, "Revenue overview")
+            .unwrap();
+        let expected = crate::DrawableTitleCaption {
+            title: Some("Quarterly highlight".to_owned()),
+            caption: Some("Revenue overview".to_owned()),
+        };
+        assert_eq!(
+            editor
+                .body_movie_title_caption(movie.drawable_object_id)
+                .unwrap(),
+            expected
+        );
+
+        let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
+        let duplicate = editor
+            .duplicate_body_movie(movie.drawable_object_id, duplicate_anchor)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_movie_title_caption(duplicate.drawable_object_id)
+                .unwrap(),
+            expected
+        );
+
+        editor
+            .set_body_movie_title(movie.drawable_object_id, "Updated highlight")
+            .unwrap();
+        assert!(
+            editor
+                .remove_body_movie_caption(movie.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            !editor
+                .remove_body_movie_caption(movie.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            editor
+                .remove_body_movie_title(movie.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .body_movie_title_caption(movie.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption::default()
+        );
+
+        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body_movie_title_caption(duplicate.drawable_object_id)
+                .unwrap(),
+            expected
+        );
+        editor = reopened;
+        editor
+            .remove_body_movie(duplicate.drawable_object_id)
+            .unwrap();
+        assert!(
+            editor
+                .body_movies()
+                .unwrap()
+                .iter()
+                .all(|item| item.drawable_object_id != duplicate.drawable_object_id)
+        );
     }
 
     #[test]

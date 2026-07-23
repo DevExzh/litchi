@@ -363,12 +363,24 @@ pub(super) fn body_movie_graph(
         )));
     }
 
-    let title_id = required_reference(drawable_object_id, movie.super_.title, "title stand-in")?;
-    let caption_id =
-        required_reference(drawable_object_id, movie.super_.caption, "caption stand-in")?;
+    let title = movie_caption_slot_from_reference(
+        editor.package(),
+        drawable_object_id,
+        movie.super_.title,
+        crate::image_caption::DrawableCaptionKind::Title,
+    )?;
+    let caption = movie_caption_slot_from_reference(
+        editor.package(),
+        drawable_object_id,
+        movie.super_.caption,
+        crate::image_caption::DrawableCaptionKind::Caption,
+    )?;
     let style_id = required_reference(drawable_object_id, movie.style, "movie style")?;
     find_object_archive(editor.package(), style_id)?;
-    let object_ids = vec![drawable_object_id, title_id, caption_id, *attachment_id];
+    let mut object_ids = vec![drawable_object_id];
+    object_ids.extend(title.object_ids.iter().copied());
+    object_ids.extend(caption.object_ids.iter().copied());
+    object_ids.push(*attachment_id);
     if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
             "Pages movie {drawable_object_id} reuses private graph identifiers"
@@ -382,22 +394,18 @@ pub(super) fn body_movie_graph(
             )));
         }
     }
-    for identifier in [title_id, caption_id] {
-        decode_typed_package_object::<tsd::StandinCaptionArchive>(
-            editor.package(),
-            identifier,
-            STANDIN_CAPTION_MESSAGE_TYPE,
-            "TSD.StandinCaptionArchive",
-        )?;
-    }
-
     let archive = editor.package().archive(&archive_name)?;
     let drawable = archive.object(drawable_object_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Pages movie {drawable_object_id} is missing"))
     })?;
-    let mut allowed_references = [editor.body_storage_id, title_id, caption_id, style_id]
-        .into_iter()
-        .collect::<HashSet<_>>();
+    let mut allowed_references = [
+        editor.body_storage_id,
+        title.reference_id,
+        caption.reference_id,
+        style_id,
+    ]
+    .into_iter()
+    .collect::<HashSet<_>>();
     allowed_references.extend(movie.super_.comment.map(|reference| reference.identifier));
     let unexpected_references = drawable
         .archive_info

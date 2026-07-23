@@ -1,6 +1,8 @@
 //! Typed construction of source-built Keynote movie graphs.
 
 use super::*;
+use crate::IWorkThemeArchive;
+use crate::image_caption::CaptionThemeStyle;
 
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const MEDIA_STYLE_MESSAGE_TYPE: u32 = 3_016;
@@ -68,6 +70,8 @@ pub(in crate::keynote::editor) struct MovieCreationContext {
     pub(in crate::keynote::editor) archive_name: String,
     pub(in crate::keynote::editor) style_id: u64,
     pub(in crate::keynote::editor) stylesheet_component_id: u64,
+    pub(in crate::keynote::editor) caption_theme: CaptionThemeStyle,
+    pub(in crate::keynote::editor) language: Option<String>,
 }
 
 pub(in crate::keynote::editor) fn movie_creation_values(
@@ -175,12 +179,44 @@ pub(in crate::keynote::editor) fn movie_creation_context(
                 "Keynote stylesheet component {stylesheet_archive} is not registered"
             ))
         })?;
+    let caption_theme = movie_caption_theme_style(&graph, show.theme.identifier, stylesheet_id)?;
     Ok(MovieCreationContext {
         slide_id: slide.slide_id,
         component_id,
         archive_name,
         style_id,
         stylesheet_component_id,
+        caption_theme,
+        language: document.super_.document_language,
+    })
+}
+
+fn movie_caption_theme_style(
+    graph: &ObjectGraph,
+    theme_id: u64,
+    stylesheet_id: u64,
+) -> Result<CaptionThemeStyle> {
+    let theme =
+        IWorkThemeArchive::decode(graph.message_data_type(theme_id, 10, "KN.ThemeArchive")?)?;
+    let paragraph_style_id = theme
+        .extensions
+        .application
+        .ok_or_else(|| Error::InvalidFormat("Keynote theme has no application presets".to_owned()))?
+        .caption_style_presets
+        .into_iter()
+        .next()
+        .map(|reference| reference.identifier)
+        .ok_or_else(|| {
+            Error::InvalidFormat("Keynote theme has no caption style preset".to_owned())
+        })?;
+    if !graph.objects.contains_key(&paragraph_style_id) {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote caption paragraph style {paragraph_style_id} is missing"
+        )));
+    }
+    Ok(CaptionThemeStyle {
+        stylesheet_id,
+        paragraph_style_id,
     })
 }
 

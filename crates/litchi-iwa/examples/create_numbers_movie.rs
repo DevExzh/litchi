@@ -71,9 +71,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_loop_mode(Some(MediaLoopMode::Repeat))
             .with_volume(Some(MediaVolume::new(0.75)?)),
     )?;
+    editor.set_sheet_movie_title(
+        sheet_id,
+        created.drawable_object_id,
+        "Source-built Numbers movie",
+    )?;
+    editor.set_sheet_movie_caption(
+        sheet_id,
+        created.drawable_object_id,
+        &format!("Native title and caption for {movie_filename}"),
+    )?;
+    let labels = editor.sheet_movie_title_caption(sheet_id, created.drawable_object_id)?;
     editor.save(output)?;
     println!(
-        "sheet={sheet_id} drawable={} movie_data={} poster_data={} duration={:?}",
+        "sheet={sheet_id} drawable={} movie_data={} poster_data={} duration={:?} labels={labels:?}",
         created.drawable_object_id,
         created.movie_data_identifier,
         created.poster_image_data_identifier,

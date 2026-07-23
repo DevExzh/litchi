@@ -68,9 +68,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_loop_mode(Some(MediaLoopMode::Repeat))
             .with_volume(Some(MediaVolume::new(0.75)?)),
     )?;
+    editor.set_body_movie_title(created.drawable_object_id, "Source-built Pages movie")?;
+    editor.set_body_movie_caption(
+        created.drawable_object_id,
+        &format!("Native title and caption for {movie_filename}"),
+    )?;
+    let labels = editor.body_movie_title_caption(created.drawable_object_id)?;
     editor.save(output)?;
     println!(
-        "anchor={} drawable={} movie_data={} poster_data={} duration={:?}",
+        "anchor={} drawable={} movie_data={} poster_data={} duration={:?} labels={labels:?}",
         created.anchor_character_index,
         created.drawable_object_id,
         created.movie_data_identifier,

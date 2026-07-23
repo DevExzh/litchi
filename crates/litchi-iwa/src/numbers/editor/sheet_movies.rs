@@ -14,8 +14,10 @@ use crate::shapes::{
     flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
 
+mod caption;
 pub(super) mod graph;
 
+use caption::*;
 use graph::*;
 
 /// One ordinary file-backed movie owned directly by a Numbers sheet.
@@ -829,6 +831,102 @@ mod tests {
         assert!(editor.sheet_movies(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
         NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_movie_title_caption_crud() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Movie labels")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let movie = editor
+            .add_sheet_movie(
+                sheet_id,
+                "movie.mov",
+                MOVIE,
+                "poster.png",
+                POSTER,
+                options(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            editor
+                .sheet_movie_title_caption(sheet_id, movie.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption::default()
+        );
+        editor
+            .set_sheet_movie_title(sheet_id, movie.drawable_object_id, "Quarterly highlight")
+            .unwrap();
+        editor
+            .set_sheet_movie_caption(sheet_id, movie.drawable_object_id, "Revenue overview")
+            .unwrap();
+        let expected = crate::DrawableTitleCaption {
+            title: Some("Quarterly highlight".to_owned()),
+            caption: Some("Revenue overview".to_owned()),
+        };
+        assert_eq!(
+            editor
+                .sheet_movie_title_caption(sheet_id, movie.drawable_object_id)
+                .unwrap(),
+            expected
+        );
+
+        let duplicate = editor
+            .duplicate_sheet_movie(sheet_id, movie.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_movie_title_caption(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            expected
+        );
+
+        editor
+            .set_sheet_movie_title(sheet_id, movie.drawable_object_id, "Updated highlight")
+            .unwrap();
+        assert!(
+            editor
+                .remove_sheet_movie_caption(sheet_id, movie.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            !editor
+                .remove_sheet_movie_caption(sheet_id, movie.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            editor
+                .remove_sheet_movie_title(sheet_id, movie.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .sheet_movie_title_caption(sheet_id, movie.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption::default()
+        );
+
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_movie_title_caption(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            expected
+        );
+        editor = reopened;
+        editor
+            .remove_sheet_movie(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(
+            editor
+                .sheet_movies(sheet_id)
+                .unwrap()
+                .iter()
+                .all(|item| item.drawable_object_id != duplicate.drawable_object_id)
+        );
     }
 
     #[test]

@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
+use crate::image_caption::CaptionThemeStyle;
 use crate::media_playback::media_playback_settings;
 use crate::shapes::{
     DrawableProperties, drawable_properties, geometry_from_drawable, patch_drawable_geometry,
@@ -73,6 +74,8 @@ pub(in crate::numbers::editor) struct MovieCreationContext {
     pub(in crate::numbers::editor) component_id: u64,
     pub(in crate::numbers::editor) style_id: u64,
     pub(in crate::numbers::editor) stylesheet_component_id: u64,
+    pub(in crate::numbers::editor) caption_theme: CaptionThemeStyle,
+    pub(in crate::numbers::editor) language: Option<String>,
 }
 
 pub(super) struct SheetMovieGraph {
@@ -120,6 +123,11 @@ pub(in crate::numbers::editor) fn movie_creation_context(
     let (archive_name, _, _) = numbers_sheet(editor.package(), sheet_id)?;
     let document = numbers_document(editor.package())?;
     let style_id = movie_style_id(editor.package(), document.theme.identifier)?;
+    let caption_theme = movie_caption_theme(
+        editor.package(),
+        document.theme.identifier,
+        document.stylesheet.identifier,
+    )?;
     let component_id = component_identifier_for_entry(editor.package(), &archive_name)?
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -143,6 +151,8 @@ pub(in crate::numbers::editor) fn movie_creation_context(
         component_id,
         style_id,
         stylesheet_component_id,
+        caption_theme,
+        language: document.super_.document_language,
     })
 }
 
@@ -171,6 +181,56 @@ fn movie_style_id(package: &IWorkPackage, theme_id: u64) -> Result<u64> {
         .and_then(|presets| presets.movie_style_presets.into_iter().next())
         .map(|reference| reference.identifier)
         .ok_or_else(|| Error::InvalidFormat("Numbers theme has no movie style preset".to_owned()))
+}
+
+pub(super) fn movie_caption_theme(
+    package: &IWorkPackage,
+    theme_id: u64,
+    stylesheet_id: u64,
+) -> Result<CaptionThemeStyle> {
+    let locations = object_locations(package)?;
+    let archive_name = locations.get(&theme_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers theme object {theme_id} is missing"))
+    })?;
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(theme_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers theme object {theme_id} is missing"))
+    })?;
+    let messages = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == NUMBERS_THEME_MESSAGE_TYPE)
+        .collect::<Vec<_>>();
+    let [message] = messages.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers theme object {theme_id} must have exactly one theme payload"
+        )));
+    };
+    let paragraph_style_id = IWorkThemeArchive::decode(&message.data)?
+        .extensions
+        .application
+        .ok_or_else(|| Error::InvalidFormat("Numbers theme has no application presets".to_owned()))?
+        .caption_style_presets
+        .into_iter()
+        .next()
+        .map(|reference| reference.identifier)
+        .ok_or_else(|| {
+            Error::InvalidFormat("Numbers theme has no caption style preset".to_owned())
+        })?;
+    for (identifier, label) in [
+        (stylesheet_id, "stylesheet"),
+        (paragraph_style_id, "caption paragraph style"),
+    ] {
+        if !locations.contains_key(&identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {label} object {identifier} is missing"
+            )));
+        }
+    }
+    Ok(CaptionThemeStyle {
+        stylesheet_id,
+        paragraph_style_id,
+    })
 }
 
 pub(super) fn movie_infos(
@@ -269,43 +329,38 @@ pub(super) fn movie_graph(
             "Numbers movie {drawable_object_id} is not owned by sheet {sheet_id}"
         )));
     }
-    let title_id = required_reference(drawable_object_id, movie.super_.title, "title stand-in")?;
-    let caption_id =
-        required_reference(drawable_object_id, movie.super_.caption, "caption stand-in")?;
+    let title = movie_caption_slot_from_reference(
+        editor.package(),
+        movie.super_.title,
+        crate::image_caption::DrawableCaptionKind::Title,
+    )?;
+    let caption = movie_caption_slot_from_reference(
+        editor.package(),
+        movie.super_.caption,
+        crate::image_caption::DrawableCaptionKind::Caption,
+    )?;
     let style_id = required_reference(drawable_object_id, movie.style, "movie style")?;
     if !locations.contains_key(&style_id) {
         return Err(Error::InvalidFormat(format!(
             "Numbers movie {drawable_object_id} style {style_id} is missing"
         )));
     }
-    let object_ids = vec![drawable_object_id, title_id, caption_id];
+    let mut object_ids = vec![drawable_object_id];
+    object_ids.extend(title.object_ids.iter().copied());
+    object_ids.extend(caption.object_ids.iter().copied());
     if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
             "Numbers movie {drawable_object_id} reuses private graph identifiers"
         )));
     }
-    for identifier in [title_id, caption_id] {
-        if locations.get(&identifier).map(String::as_str) != Some(archive_name.as_str()) {
+    for identifier in &object_ids[1..] {
+        if locations.get(identifier).map(String::as_str) != Some(archive_name.as_str()) {
             return Err(Error::InvalidFormat(format!(
                 "Numbers movie {drawable_object_id} private graph spans multiple archives"
             )));
         }
-        let standin = archive.object(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers movie stand-in {identifier} is missing"))
-        })?;
-        if standin
-            .messages
-            .iter()
-            .filter(|message| message.type_ == STANDIN_CAPTION_MESSAGE_TYPE)
-            .count()
-            != 1
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers movie stand-in {identifier} is malformed"
-            )));
-        }
     }
-    let mut allowed_references = [sheet_id, title_id, caption_id, style_id]
+    let mut allowed_references = [sheet_id, title.reference_id, caption.reference_id, style_id]
         .into_iter()
         .collect::<HashSet<_>>();
     allowed_references.extend(movie.super_.comment.map(|reference| reference.identifier));
