@@ -1084,6 +1084,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `PRIVATE` conversion-data fields in document field order.
+    ///
+    /// Stored opaque instructions, cached results, and state are metadata only.
+    /// This method never converts a document, interprets or reveals hidden
+    /// content, changes layout, or refreshes a field. `PRIVATE` is not treated
+    /// as a confidentiality mechanism.
+    pub fn private_fields(&self) -> Vec<crate::PrivateField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::private_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `PRIVATE` conversion-data fields.
+    pub fn private_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.private_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ADDIN`, `CONTROL`, and `HTMLCONTROL` fields in
     /// document field order.
     ///
