@@ -58,6 +58,7 @@ pub enum FieldType {
     DocumentContext,
     MergeField,
     MailMergeData,
+    Database,
     MergeRecord,
     MergeSequence,
     MailMergeNext,
@@ -1229,6 +1230,22 @@ pub struct MergeField<'a> {
     instruction: &'a str,
     field_name: Cow<'a, str>,
     switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
+/// Inert metadata for a legacy RTF `DATABASE` query field.
+///
+/// Word uses this field to query a database and insert a table. This type
+/// retains opaque instruction text, a cached result, and field state only. It
+/// never opens a data source or database, uses connection information, executes
+/// SQL, generates or inserts a table, changes layout, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatabaseField<'a> {
+    instruction: &'a str,
+    opaque_instructions: &'a str,
     cached_result: Option<&'a str>,
     status: FieldStatus,
     owner: FieldOwner,
@@ -3409,6 +3426,57 @@ impl<'a> MergeField<'a> {
     }
 }
 
+impl<'a> DatabaseField<'a> {
+    /// Return the complete stored `DATABASE` field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to open a data
+    /// source, database, or connection.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return opaque stored instruction text after `DATABASE`.
+    ///
+    /// It is never parsed, interpreted, or used to connect, execute SQL,
+    /// generate a table, or calculate layout.
+    pub fn opaque_instructions(&self) -> &'a str {
+        self.opaque_instructions
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached metadata only and is never regenerated from a database
+    /// query.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> MailMergeDataField<'a> {
     /// Return the complete stored `DATA` field instruction.
     pub fn instruction(&self) -> &'a str {
@@ -4720,6 +4788,11 @@ impl<'a> Field<'a> {
             {
                 FieldType::MergeField
             },
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("DATABASE") =>
+            {
+                FieldType::Database
+            },
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("DATA") => {
                 FieldType::MailMergeData
             },
@@ -5524,6 +5597,27 @@ impl<'a> Field<'a> {
             instruction: self.instruction.as_ref(),
             field_name: parts.field_name,
             switches: parts.switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a `DATABASE` query field.
+    ///
+    /// Stored opaque instructions, cached result, and field state remain
+    /// metadata only. This method never opens a data source or database, uses
+    /// connection information, executes SQL, generates or inserts a table,
+    /// changes layout, or refreshes a field.
+    pub fn database_field(&self) -> Option<DatabaseField<'_>> {
+        if self.field_type != FieldType::Database {
+            return None;
+        }
+        let opaque_instructions = database_field_instructions(self.instruction.as_ref())?;
+        Some(DatabaseField {
+            instruction: self.instruction.as_ref(),
+            opaque_instructions,
             cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
             status: self.status,
             owner: self.owner,
@@ -7631,6 +7725,23 @@ fn merge_field_parts(instruction: &str) -> Option<MergeFieldParts<'_>> {
         field_name,
         switches,
     })
+}
+
+fn database_field_instructions(instruction: &str) -> Option<&str> {
+    if instruction.len() > MAX_INSTRUCTION_LEN {
+        return None;
+    }
+    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let keyword = instruction.get(.."DATABASE".len())?;
+    if !keyword.eq_ignore_ascii_case("DATABASE") {
+        return None;
+    }
+    let remainder = instruction.get("DATABASE".len()..)?;
+    match remainder.chars().next() {
+        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
+        Some(_) => None,
+    }
 }
 
 fn mail_merge_data_field_parts(instruction: &str) -> Option<MailMergeDataFieldParts<'_>> {
@@ -10737,16 +10848,64 @@ mod tests {
                 .mail_merge_data()
                 .is_none()
         );
-        assert_eq!(
-            Field::parse_instruction("DATABASE recipients.csv").field_type,
-            FieldType::Unknown
-        );
+        let database = Field::parse_instruction("DATABASE recipients.csv");
+        assert_eq!(database.field_type, FieldType::Database);
+        assert!(database.mail_merge_data().is_none());
         let too_long = Field::new(
             FieldType::MailMergeData,
             Cow::Owned(format!("DATA {}", "x".repeat(MAX_INSTRUCTION_LEN))),
             Cow::Borrowed(""),
         );
         assert!(too_long.mail_merge_data().is_none());
+    }
+
+    #[test]
+    fn database_fields_preserve_query_metadata_without_connecting_or_executing() {
+        let mut database = Field::parse_instruction(
+            r#"DATABASE \d "unavailable.csv" \c "DSN=NeverConnect" \s "SELECT * FROM Customers" \h"#,
+        );
+        database.result = Cow::Borrowed("cached database table");
+        database.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        database.owner = FieldOwner::Body;
+        database.position = 4;
+
+        assert_eq!(database.field_type, FieldType::Database);
+        let database_field = database.database_field().unwrap();
+        assert_eq!(
+            database_field.instruction(),
+            r#"DATABASE \d "unavailable.csv" \c "DSN=NeverConnect" \s "SELECT * FROM Customers" \h"#
+        );
+        assert_eq!(
+            database_field.opaque_instructions(),
+            r#"\d "unavailable.csv" \c "DSN=NeverConnect" \s "SELECT * FROM Customers" \h"#
+        );
+        assert_eq!(database_field.cached_result(), Some("cached database table"));
+        assert!(database_field.is_dirty());
+        assert!(database_field.is_locked());
+        assert_eq!(database_field.owner(), FieldOwner::Body);
+        assert_eq!(database_field.position(), 4);
+
+        let bare = Field::parse_instruction("database");
+        assert_eq!(bare.field_type, FieldType::Database);
+        assert_eq!(bare.database_field().unwrap().opaque_instructions(), "");
+
+        let nonmatching = Field::parse_instruction("DATABASES");
+        assert_eq!(nonmatching.field_type, FieldType::Unknown);
+        assert!(nonmatching.database_field().is_none());
+
+        let too_long = Field::new(
+            FieldType::Database,
+            Cow::Owned(format!(
+                "DATABASE {}",
+                "x".repeat(MAX_INSTRUCTION_LEN)
+            )),
+            Cow::Borrowed(""),
+        );
+        assert!(too_long.database_field().is_none());
     }
 
     #[test]
@@ -12212,6 +12371,33 @@ mod tests {
         assert_eq!(fields[1].data_source(), "recipients.csv");
         assert_eq!(fields[1].header_source(), None);
         assert_eq!(fields[1].cached_result(), Some("cached bare source"));
+        assert_eq!(document.text(), "Before After");
+    }
+
+    #[test]
+    fn document_discovers_database_fields_without_connecting_or_executing() {
+        let document = crate::RtfDocument::parse(
+            r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DATABASE \\d "unavailable.csv" \\c "DSN=NeverConnect" \\s "SELECT * FROM Customers" \\h}{\fldrslt cached database table}}{\field\flddirty\fldlock{\*\fldinst database}{\fldrslt cached bare database table}}After}"#,
+        )
+        .unwrap();
+
+        let fields = document.database_fields();
+        assert_eq!(document.database_field_count(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(
+            fields[0].opaque_instructions(),
+            r#"\d "unavailable.csv" \c "DSN=NeverConnect" \s "SELECT * FROM Customers" \h"#
+        );
+        assert_eq!(fields[0].cached_result(), Some("cached database table"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[1].opaque_instructions(), "");
+        assert_eq!(
+            fields[1].cached_result(),
+            Some("cached bare database table")
+        );
+        assert!(fields[1].is_dirty());
+        assert!(fields[1].is_locked());
         assert_eq!(document.text(), "Before After");
     }
 

@@ -1395,6 +1395,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `DATABASE` query fields in document field order.
+    ///
+    /// Stored opaque instructions, cached results, and field state are
+    /// metadata only. This method never opens a data source or database, uses
+    /// connection information, executes SQL, generates or inserts a table,
+    /// changes layout, or refreshes a field.
+    pub fn database_fields(&self) -> Vec<crate::DatabaseField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::database_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `DATABASE` query fields.
+    pub fn database_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.database_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `DATA` mail-merge source fields in document order.
     ///
     /// Data-source and header-source identifiers, switches, cached results, and

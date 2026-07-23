@@ -171,7 +171,7 @@ pub use field::{
     AutoNumberFieldKind, AutoTextField, AutoTextFieldKind, AutoTextListField, AutoTextListOption,
     BibliographyField,
     BarcodeField, BibliographyOption, BidiOutlineField, BodyStoryEvent, CitationField,
-    CitationOption, DdeField, DdeFieldKind,
+    CitationOption, DatabaseField, DdeField, DdeFieldKind,
     DdeRepresentation, DocumentContextField, DocumentContextFieldKind, DocumentInformationField,
     DocumentInformationFieldKind, DocumentPropertyField, DocumentVariableField, EquationField,
     EmbedField, ExternalIncludeField, ExternalIncludeOption, Field, FieldCodeError,
