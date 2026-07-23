@@ -819,6 +819,62 @@ impl EmbedField {
     }
 }
 
+/// Typed, inert metadata for a legacy Word `BARCODE` field.
+///
+/// [MS-DOC] §2.9.90 identifies native `BARCODE` fields with type `0x3F`.
+/// This type retains opaque barcode-instruction text, a cached result, and
+/// field-marker state only. It never parses or validates barcode data or
+/// symbology, generates or renders a barcode, accesses an external resource,
+/// or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BarcodeField {
+    field: Field,
+    instruction: String,
+    barcode_instructions: String,
+    cached_result: Option<String>,
+}
+
+impl BarcodeField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored `BARCODE` field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to generate or
+    /// render a barcode.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored opaque barcode-instruction text after `BARCODE`.
+    ///
+    /// It is never parsed, validated, interpreted, or used to generate or
+    /// render barcode content.
+    pub fn barcode_instructions(&self) -> &str {
+        &self.barcode_instructions
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is cached text only and is never regenerated from barcode
+    /// data.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// One recognized stored option of a legacy Word `TOC` field.
 ///
 /// These values retain how a producer configured a table of contents. They
@@ -3697,6 +3753,26 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a native `BARCODE` field.
+    ///
+    /// Stored opaque barcode instructions, cached results, and field-marker
+    /// state remain metadata only. This method never parses or validates
+    /// barcode data or symbology, generates or renders a barcode, accesses an
+    /// external resource, or refreshes a field. Malformed instructions remain
+    /// available through this generic type and return `None` here.
+    pub fn barcode_field(&self) -> Option<BarcodeField> {
+        if self.field.field_type != FieldType::BarCode {
+            return None;
+        }
+        let barcode_instructions = parse_barcode_field_instructions(&self.instruction)?;
+        Some(BarcodeField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            barcode_instructions,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed bookmark-reference field.
     ///
     /// Stored bookmark names, options, and cached results are never used to
@@ -4485,6 +4561,7 @@ const MAX_QUOTE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_QUOTE_FIELD_SWITCHES: usize = 64;
 const MAX_PRINT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_EMBED_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_BARCODE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_SYMBOL_FIELD_SWITCHES: usize = 64;
 const MAX_AUTO_NUMBER_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -5117,6 +5194,19 @@ fn parse_embed_field_instructions(instruction: &str) -> Option<String> {
     let mut position = 0;
     let keyword = next_field_argument(instruction, &mut position).ok()??;
     if !keyword.eq_ignore_ascii_case("EMBED") {
+        return None;
+    }
+    Some(instruction.get(position..)?.trim().to_string())
+}
+
+fn parse_barcode_field_instructions(instruction: &str) -> Option<String> {
+    if instruction.len() > MAX_BARCODE_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("BARCODE") {
         return None;
     }
     Some(instruction.get(position..)?.trim().to_string())
@@ -6912,6 +7002,8 @@ mod tests {
         assert_eq!(FieldType::Info.as_u8(), 0x0E);
         assert_eq!(FieldType::from(0x3A), FieldType::EmbeddedObject);
         assert_eq!(FieldType::EmbeddedObject.as_u8(), 0x3A);
+        assert_eq!(FieldType::from(0x3F), FieldType::BarCode);
+        assert_eq!(FieldType::BarCode.as_u8(), 0x3F);
         assert_eq!(FieldType::from(0x58), FieldType::Hyperlink);
         assert_eq!(FieldType::from(0x34), FieldType::AutoNumOutline);
         assert_eq!(FieldType::from(0x35), FieldType::AutoNumLegal);
@@ -7268,6 +7360,89 @@ mod tests {
             ..text
         };
         assert!(wrong_type.embed_field().is_none());
+    }
+
+    #[test]
+    fn barcode_fields_preserve_opaque_metadata_without_decoding_or_rendering() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::BarCode,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" BARCODE "4901234567894" EAN13 \h 1440 \* MERGEFORMAT "#.to_string(),
+            result: Some("cached EAN13 barcode".to_string()),
+        };
+
+        let barcode = text.barcode_field().unwrap();
+        assert_eq!(barcode.field(), &field);
+        assert_eq!(barcode.instruction(), text.instruction);
+        assert_eq!(
+            barcode.barcode_instructions(),
+            r#""4901234567894" EAN13 \h 1440 \* MERGEFORMAT"#
+        );
+        assert_eq!(barcode.cached_result(), Some("cached EAN13 barcode"));
+        assert!(barcode.is_dirty());
+        assert!(barcode.is_locked());
+
+        let code_39 = FieldText {
+            instruction: r#"barcode "ABC-123" CODE39 \d"#.to_string(),
+            result: Some("cached Code39 barcode".to_string()),
+            ..text.clone()
+        };
+        let code_39 = code_39.barcode_field().unwrap();
+        assert_eq!(
+            code_39.barcode_instructions(),
+            r#""ABC-123" CODE39 \d"#
+        );
+        assert_eq!(code_39.cached_result(), Some("cached Code39 barcode"));
+
+        let bare = FieldText {
+            instruction: "BARCODE".to_string(),
+            result: None,
+            ..text.clone()
+        };
+        assert_eq!(bare.barcode_field().unwrap().barcode_instructions(), "");
+
+        for instruction in [
+            r#"BARCODES 4901234567894"#,
+            r#"BARCODED 4901234567894"#,
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.barcode_field().is_none(), "{instruction}");
+        }
+
+        let too_long = FieldText {
+            instruction: format!(
+                "BARCODE {}",
+                "x".repeat(MAX_BARCODE_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text.clone()
+        };
+        assert!(too_long.barcode_field().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::Equation,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.barcode_field().is_none());
     }
 
     #[test]

@@ -15,8 +15,9 @@ use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
-    CompareField, DdeField, DocumentContextField, DocumentInformationField, DocumentVariableField,
-    EmbedField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
+    BarcodeField, CompareField, DdeField, DocumentContextField, DocumentInformationField,
+    DocumentVariableField, EmbedField, ExternalIncludeField, Field, FieldStory, FieldText,
+    FieldsTable, FormulaField,
     GoToButtonField, IfField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
@@ -647,6 +648,22 @@ impl Document {
     /// Get the number of typed, inert `EMBED` fields.
     pub fn embed_field_count(&self) -> Result<usize> {
         Ok(self.embed_fields()?.len())
+    }
+
+    /// Get typed, inert `BARCODE` fields in story and source order.
+    ///
+    /// Returned values expose only stored opaque barcode instructions, cached
+    /// results, and field state. This method never parses or validates barcode
+    /// data or symbology, generates or renders a barcode, accesses an external
+    /// resource, or refreshes a field.
+    pub fn barcode_fields(&self) -> Result<Vec<BarcodeField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::barcode_field).collect())
+    }
+
+    /// Get the number of typed, inert `BARCODE` fields.
+    pub fn barcode_field_count(&self) -> Result<usize> {
+        Ok(self.barcode_fields()?.len())
     }
 
     /// Get typed, inert `TOC` fields in story and source order.
