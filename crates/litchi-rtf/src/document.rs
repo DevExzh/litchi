@@ -1351,6 +1351,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `SYMBOL` fields in document order.
+    ///
+    /// Stored character arguments, switches, cached results, and field state
+    /// are exposed solely as metadata. This method never maps a character code,
+    /// looks up a font, inserts a glyph, changes formatting or layout, or
+    /// refreshes a field result.
+    pub fn symbol_fields(&self) -> Vec<crate::SymbolField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::symbol_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `SYMBOL` fields.
+    pub fn symbol_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.symbol_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `ASK` and `FILLIN` fields in document order.
     ///
     /// Stored prompt, bookmark, default-response, cached results, and field
