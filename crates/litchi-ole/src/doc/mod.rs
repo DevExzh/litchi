@@ -105,6 +105,7 @@ pub use parts::document_properties_2003::{
     DocumentProtectionMode, DocumentStateToolbars, Dop2003, ReadingModePageLock,
 };
 pub use parts::fields::CompareField;
+pub use parts::fields::DocumentPropertyField;
 pub use parts::fields::DocumentVariableField;
 pub use parts::fields::FormulaField;
 pub use parts::fields::SequenceField;

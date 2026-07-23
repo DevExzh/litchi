@@ -1718,6 +1718,63 @@ impl DocumentVariableField {
     }
 }
 
+/// A typed, inert legacy Word `DOCPROPERTY` field.
+///
+/// [MS-DOC] §2.9.90 identifies its native field-type byte, and ECMA-376 Part
+/// 1 §17.16.5.14 defines `DOCPROPERTY` with one document-property name.
+/// This type exposes the stored name, preserved switches, and cached result
+/// only. It never reads document properties, resolves a value, or refreshes a
+/// field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentPropertyField {
+    field: Field,
+    instruction: String,
+    property_name: String,
+    switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl DocumentPropertyField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored document-property name without resolving it.
+    pub fn property_name(&self) -> &str {
+        &self.property_name
+    }
+
+    /// Return preserved switches in source order without interpreting them.
+    ///
+    /// These values remain inert source metadata and are never applied.
+    pub fn switches(&self) -> &[MergeFieldSwitch] {
+        &self.switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from a document property.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The stored kind of a legacy Word DDE field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DdeFieldKind {
@@ -3179,6 +3236,26 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `DOCPROPERTY`
+    /// field.
+    ///
+    /// The stored property name, switches, and cached result are never resolved
+    /// against document properties or refreshed. Malformed instructions remain
+    /// available through this generic type and return `None` here.
+    pub fn document_property(&self) -> Option<DocumentPropertyField> {
+        if self.field.field_type != FieldType::DocumentProperty {
+            return None;
+        }
+        let (property_name, switches) = parse_document_property_field_parts(&self.instruction)?;
+        Some(DocumentPropertyField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            property_name,
+            switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed `DDE` or
     /// `DDEAUTO` field.
     ///
@@ -3518,6 +3595,8 @@ const MAX_AUTO_TEXT_LIST_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_LIST_FIELD_SWITCHES: usize = 64;
 const MAX_DOCUMENT_VARIABLE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_VARIABLE_FIELD_SWITCHES: usize = 64;
+const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_DOCUMENT_PROPERTY_FIELD_SWITCHES: usize = 64;
 const MAX_DDE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DDE_FIELD_SWITCHES: usize = 64;
 const MAX_LINK_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -4442,6 +4521,53 @@ fn parse_document_variable_field_parts(
     }
 
     Some((variable_name, unknown_switches))
+}
+
+fn parse_document_property_field_parts(
+    instruction: &str,
+) -> Option<(String, Vec<MergeFieldSwitch>)> {
+    if instruction.len() > MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    if !keyword.eq_ignore_ascii_case("DOCPROPERTY") {
+        return None;
+    }
+
+    let property_name = next_field_argument(instruction, &mut position).ok()??;
+    if property_name.is_empty() {
+        return None;
+    }
+
+    let mut switches = Vec::new();
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' || switches.len() >= MAX_DOCUMENT_PROPERTY_FIELD_SWITCHES {
+            return None;
+        }
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+        switches.push(MergeFieldSwitch {
+            name: name.to_ascii_lowercase(),
+            argument,
+        });
+    }
+
+    Some((property_name, switches))
 }
 
 fn parse_dde_field_parts(instruction: &str) -> Option<DdeFieldParts> {
@@ -6973,6 +7099,87 @@ mod tests {
             ..text
         };
         assert!(wrong_type.document_variable().is_none());
+    }
+
+    #[test]
+    fn document_property_fields_expose_cached_metadata_without_resolution() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::DocumentProperty,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" DOCPROPERTY "Project Name" \* MERGEFORMAT \@ "MMMM d, yyyy" "#
+                .to_string(),
+            result: Some("cached project".to_string()),
+        };
+
+        let property = text.document_property().unwrap();
+        assert_eq!(property.field(), &field);
+        assert_eq!(property.instruction(), text.instruction);
+        assert_eq!(property.property_name(), "Project Name");
+        assert_eq!(property.cached_result(), Some("cached project"));
+        assert!(property.is_dirty());
+        assert!(property.is_locked());
+        assert_eq!(property.switches().len(), 2);
+        assert_eq!(property.switches()[0].name(), '*');
+        assert_eq!(property.switches()[0].argument(), Some("MERGEFORMAT"));
+        assert_eq!(property.switches()[1].name(), '@');
+        assert_eq!(property.switches()[1].argument(), Some("MMMM d, yyyy"));
+
+        let compact = FieldText {
+            instruction: r#"DOCPROPERTY"Project Name"\*MERGEFORMAT"#.to_string(),
+            ..text.clone()
+        };
+        let compact_property = compact.document_property().unwrap();
+        assert_eq!(compact_property.property_name(), "Project Name");
+        assert_eq!(
+            compact_property.switches()[0].argument(),
+            Some("MERGEFORMAT")
+        );
+
+        for instruction in [
+            r#"DOCPROPERTY \* MERGEFORMAT"#,
+            r#"DOCPROPERTY """#,
+            "DOCPROPERTY Project unexpected",
+            r#"DOCPROPERTY Project \"#,
+            "DOCPROPERTYS Project",
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.document_property().is_none(), "{instruction}");
+        }
+
+        let too_long = FieldText {
+            instruction: format!(
+                "DOCPROPERTY {}",
+                "x".repeat(MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES)
+            ),
+            ..text.clone()
+        };
+        assert!(too_long.document_property().is_none());
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::DocumentVariable,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.document_property().is_none());
     }
 
     #[test]
