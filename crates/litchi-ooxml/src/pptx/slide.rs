@@ -237,6 +237,17 @@ impl<'a> Slide<'a> {
         crate::pptx::tags::load_slide_tag_lists(self.part.part(), package)
     }
 
+    /// Load typed audio and video pictures with their inert internal resources.
+    ///
+    /// Media payloads remain stored bytes. They are never decoded, rendered,
+    /// played, fetched, or executed.
+    pub fn media(&self) -> Result<crate::pptx::media_parts::SlideMediaList> {
+        let package = self.package.ok_or_else(|| {
+            OoxmlError::InvalidFormat("slide media requires package-backed slide access".into())
+        })?;
+        crate::pptx::media_parts::load_slide_media(package, self.part.part().partname())
+    }
+
     /// Get all shapes on this slide.
     ///
     /// Returns a vector of BaseShape objects that provide access to text,
