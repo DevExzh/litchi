@@ -20,7 +20,7 @@ use super::parts::fields::{
     GoToButtonField, IfField, IndexField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, QuoteField,
-    ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
+    PrintField, ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
     TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
@@ -615,6 +615,22 @@ impl Document {
     /// Get the number of typed, inert add-in and control fields.
     pub fn active_content_field_count(&self) -> Result<usize> {
         Ok(self.active_content_fields()?.len())
+    }
+
+    /// Get typed, inert `PRINT` fields in story and source order.
+    ///
+    /// Returned values expose only stored printer-instruction text, cached
+    /// results, and field state. This method never interprets control codes,
+    /// opens a printer, sends output, changes print settings, or refreshes a
+    /// field.
+    pub fn print_fields(&self) -> Result<Vec<PrintField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::print_field).collect())
+    }
+
+    /// Get the number of typed, inert `PRINT` fields.
+    pub fn print_field_count(&self) -> Result<usize> {
+        Ok(self.print_fields()?.len())
     }
 
     /// Get typed, inert `TOC` fields in story and source order.
