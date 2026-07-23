@@ -45,6 +45,7 @@ pub enum FieldType {
     DocumentVariable,
     DocumentProperty,
     DocumentInformation,
+    DocumentContext,
     MergeField,
     MergeRecord,
     MergeSequence,
@@ -990,6 +991,49 @@ pub struct DocumentInformationField<'a> {
     position: usize,
 }
 
+/// The built-in Word document-context field category.
+///
+/// `FILENAME` and `TEMPLATE` are defined in ECMA-376 Part 1 §17.16.5.
+/// This enum preserves the stored field kind only; it does not read a document
+/// path, attached template, or host filesystem state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DocumentContextFieldKind {
+    FileName,
+    Template,
+}
+
+impl DocumentContextFieldKind {
+    /// The uppercase field keyword stored in a Word field instruction.
+    pub const fn field_keyword(self) -> &'static str {
+        match self {
+            Self::FileName => "FILENAME",
+            Self::Template => "TEMPLATE",
+        }
+    }
+
+    fn from_keyword(keyword: &str) -> Option<Self> {
+        [Self::FileName, Self::Template]
+            .into_iter()
+            .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
+    }
+}
+
+/// Inert metadata for a legacy RTF built-in Word document-context field.
+///
+/// This type retains the stored kind, field switches, cached result, and field
+/// state only. It never reads a document path, attached template, or host
+/// filesystem state, resolves a value, or refreshes a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentContextField<'a> {
+    instruction: &'a str,
+    kind: DocumentContextFieldKind,
+    switches: Vec<FieldSwitch<'a>>,
+    cached_result: Option<&'a str>,
+    status: FieldStatus,
+    owner: FieldOwner,
+    position: usize,
+}
+
 /// Inert metadata for a legacy RTF `MERGEFIELD` field.
 ///
 /// This model retains the stored merge-field name, switches, and cached result
@@ -1440,6 +1484,11 @@ struct DocumentPropertyFieldParts<'a> {
 
 struct DocumentInformationFieldParts<'a> {
     kind: DocumentInformationFieldKind,
+    switches: Vec<FieldSwitch<'a>>,
+}
+
+struct DocumentContextFieldParts<'a> {
+    kind: DocumentContextFieldKind,
     switches: Vec<FieldSwitch<'a>>,
 }
 
@@ -2628,6 +2677,56 @@ impl<'a> DocumentInformationField<'a> {
     }
 }
 
+impl<'a> DocumentContextField<'a> {
+    /// Return the complete stored document-context field instruction.
+    pub fn instruction(&self) -> &'a str {
+        self.instruction
+    }
+
+    /// Return the recognized built-in document-context category.
+    pub const fn kind(&self) -> DocumentContextFieldKind {
+        self.kind
+    }
+
+    /// Return stored field switches in source order without interpreting them.
+    pub fn switches(&self) -> &[FieldSwitch<'a>] {
+        &self.switches
+    }
+
+    /// Return the stored field result when a producer supplied one.
+    ///
+    /// This is cached text only and is never regenerated from a document path,
+    /// attached template, or host filesystem state.
+    pub fn cached_result(&self) -> Option<&'a str> {
+        self.cached_result
+    }
+
+    /// Return the stored field state flags.
+    pub const fn status(&self) -> FieldStatus {
+        self.status
+    }
+
+    /// Return the story that owns this field.
+    pub const fn owner(&self) -> FieldOwner {
+        self.owner
+    }
+
+    /// Return this field's zero-width position in its owning story.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Whether a producer marked the stored field result stale.
+    pub const fn is_dirty(&self) -> bool {
+        self.status.dirty
+    }
+
+    /// Whether a producer locked the field against refresh.
+    pub const fn is_locked(&self) -> bool {
+        self.status.locked
+    }
+}
+
 impl<'a> MergeField<'a> {
     /// Return the complete stored `MERGEFIELD` field instruction.
     pub fn instruction(&self) -> &'a str {
@@ -3574,6 +3673,11 @@ impl<'a> Field<'a> {
                 FieldType::DocumentInformation
             },
             ParsedFieldCode::Other { ref keyword, .. }
+                if DocumentContextFieldKind::from_keyword(keyword.as_ref()).is_some() =>
+            {
+                FieldType::DocumentContext
+            },
+            ParsedFieldCode::Other { ref keyword, .. }
                 if keyword.eq_ignore_ascii_case("MERGEFIELD") =>
             {
                 FieldType::MergeField
@@ -4127,6 +4231,29 @@ impl<'a> Field<'a> {
         }
         let parts = document_information_field_parts(self.instruction.as_ref())?;
         Some(DocumentInformationField {
+            instruction: self.instruction.as_ref(),
+            kind: parts.kind,
+            switches: parts.switches,
+            cached_result: (!self.result.is_empty()).then_some(self.result.as_ref()),
+            status: self.status,
+            owner: self.owner,
+            position: self.position,
+        })
+    }
+
+    /// Return inert metadata when this is a well-formed document-context field.
+    ///
+    /// `FILENAME` and `TEMPLATE` retain only their stored kind, switches,
+    /// cached result, and state. This method never reads a document path,
+    /// attached template, or host filesystem state, resolves a value, or
+    /// refreshes a field. Malformed instructions remain generic fields and
+    /// return `None` here.
+    pub fn document_context(&self) -> Option<DocumentContextField<'_>> {
+        if self.field_type != FieldType::DocumentContext {
+            return None;
+        }
+        let parts = document_context_field_parts(self.instruction.as_ref())?;
+        Some(DocumentContextField {
             instruction: self.instruction.as_ref(),
             kind: parts.kind,
             switches: parts.switches,
@@ -5927,6 +6054,29 @@ fn document_information_field_parts(
     }
 
     Some(DocumentInformationFieldParts { kind, switches })
+}
+
+fn document_context_field_parts(instruction: &str) -> Option<DocumentContextFieldParts<'_>> {
+    let mut tokens = tokenize(instruction).ok()?;
+    let keyword = tokens.first()?;
+    let kind = DocumentContextFieldKind::from_keyword(keyword.value.as_ref())?;
+    tokens.remove(0);
+
+    let mut switches = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let name = switch_name(&tokens[index])?;
+        let value = tokens
+            .get(index + 1)
+            .filter(|token| is_field_operand(token));
+        switches.push(FieldSwitch {
+            name: Cow::Owned(name.to_string()),
+            value: value.map(|token| token.value.clone()),
+        });
+        index += 1 + usize::from(value.is_some());
+    }
+
+    Some(DocumentContextFieldParts { kind, switches })
 }
 
 fn merge_field_parts(instruction: &str) -> Option<MergeFieldParts<'_>> {
@@ -8285,6 +8435,70 @@ mod tests {
     }
 
     #[test]
+    fn document_context_fields_preserve_kinds_without_reading_paths_or_templates() {
+        let mut field = Field::parse_instruction(r"FILENAME \p");
+        field.result = Cow::Borrowed("cached file name");
+        field.status = FieldStatus {
+            dirty: true,
+            locked: true,
+            ..FieldStatus::default()
+        };
+        field.owner = FieldOwner::Body;
+        field.position = 4;
+
+        assert_eq!(field.field_type, FieldType::DocumentContext);
+        let context = field.document_context().unwrap();
+        assert_eq!(context.instruction(), field.instruction);
+        assert_eq!(context.kind(), DocumentContextFieldKind::FileName);
+        assert_eq!(context.cached_result(), Some("cached file name"));
+        assert!(context.is_dirty());
+        assert!(context.is_locked());
+        assert_eq!(context.owner(), FieldOwner::Body);
+        assert_eq!(context.position(), 4);
+        assert_eq!(context.switches().len(), 1);
+        assert_eq!(context.switches()[0].name, "p");
+        assert_eq!(context.switches()[0].value, None);
+
+        for (instruction, kind) in [
+            ("FILENAME", DocumentContextFieldKind::FileName),
+            ("TEMPLATE", DocumentContextFieldKind::Template),
+        ] {
+            let field = Field::parse_instruction(instruction);
+            assert_eq!(field.field_type, FieldType::DocumentContext);
+            let context = field.document_context().unwrap();
+            assert_eq!(context.kind(), kind);
+            assert_eq!(context.kind().field_keyword(), instruction);
+            assert!(context.switches().is_empty());
+        }
+
+        assert!(
+            Field::parse_instruction("FILENAME unexpected")
+                .document_context()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"TEMPLATE "unterminated"#)
+                .document_context()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction("FILENAME \\")
+                .document_context()
+                .is_none()
+        );
+        assert_eq!(
+            Field::parse_instruction("FILENAMES").field_type,
+            FieldType::Unknown
+        );
+        let too_long = Field::new(
+            FieldType::DocumentContext,
+            Cow::Owned(format!("FILENAME {}", "x".repeat(MAX_INSTRUCTION_LEN))),
+            Cow::Borrowed(""),
+        );
+        assert!(too_long.document_context().is_none());
+    }
+
+    #[test]
     fn merge_fields_preserve_names_without_merging() {
         let mut field = Field::parse_instruction(
             r#"MERGEFIELD "Customer Region" \b "Dear " \f "!" \* MERGEFORMAT"#,
@@ -9130,6 +9344,28 @@ mod tests {
             fields[0].switches()[0].value.as_deref(),
             Some("MERGEFORMAT")
         );
+    }
+
+    #[test]
+    fn document_discovers_document_context_fields_without_reading_paths_or_templates() {
+        let document = crate::RtfDocument::parse(
+            r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst FILENAME \\p}{\fldrslt cached file name}}Middle {\field{\*\fldinst TEMPLATE \\* MERGEFORMAT}{\fldrslt cached template}}After}",
+        )
+        .unwrap();
+
+        let fields = document.document_context_fields();
+        assert_eq!(document.document_context_field_count(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].kind(), DocumentContextFieldKind::FileName);
+        assert_eq!(fields[0].cached_result(), Some("cached file name"));
+        assert!(fields[0].is_dirty());
+        assert!(fields[0].is_locked());
+        assert_eq!(fields[0].switches()[0].name, "p");
+        assert_eq!(fields[1].kind(), DocumentContextFieldKind::Template);
+        assert_eq!(fields[1].cached_result(), Some("cached template"));
+        assert_eq!(fields[1].switches()[0].name, "*");
+        assert_eq!(fields[1].switches()[0].value.as_deref(), Some("MERGEFORMAT"));
+        assert_eq!(document.text(), "Before Middle After");
     }
 
     #[test]

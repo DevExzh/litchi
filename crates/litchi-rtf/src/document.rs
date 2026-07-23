@@ -1186,6 +1186,26 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert document-context fields in document field order.
+    ///
+    /// Kinds, switches, cached results, and state are exposed solely as stored
+    /// metadata. This method never reads a document path, attached template, or
+    /// host filesystem state, resolves values, or refreshes a field.
+    pub fn document_context_fields(&self) -> Vec<crate::DocumentContextField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::document_context)
+            .collect()
+    }
+
+    /// Return the number of typed, inert document-context fields.
+    pub fn document_context_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.document_context().is_some())
+            .count()
+    }
+
     /// Return typed, inert `MERGEFIELD` fields in document field order.
     ///
     /// Field names, switches, and cached results are exposed solely as stored
