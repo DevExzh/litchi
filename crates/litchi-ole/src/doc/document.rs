@@ -18,8 +18,8 @@ use super::parts::fields::{
     BarcodeField, BidiOutlineField, CompareField, DdeField, DocumentContextField,
     DocumentInformationField, DocumentPropertyField, DocumentVariableField, EmbedField,
     EquationField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
-    GoToButtonField, IfField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
-    MacroButtonField,
+    GoToButtonField, HyperlinkField, IfField, IndexField, InfoField, LegacyFormField, LinkField,
+    ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
     MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PromptField, QuoteField,
     ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
@@ -843,6 +843,24 @@ impl Document {
         Ok(self.equations()?.len())
     }
 
+    /// Get typed, inert `HYPERLINK` fields in story and source order.
+    ///
+    /// Returned values expose stored targets, options, cached results, and
+    /// field state only. This method never opens, resolves, follows, activates,
+    /// or refreshes a link.
+    pub fn hyperlink_fields(&self) -> Result<Vec<HyperlinkField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::hyperlink_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `HYPERLINK` fields.
+    pub fn hyperlink_field_count(&self) -> Result<usize> {
+        Ok(self.hyperlink_fields()?.len())
+    }
+
     /// Get typed, inert `QUOTE` fields in story and source order.
     ///
     /// Returned values expose only stored text arguments, switches, cached
@@ -1652,7 +1670,9 @@ impl Document {
     /// Get all hyperlinks in the document.
     ///
     /// Hyperlinks are extracted from HYPERLINK fields in the main document.
-    /// Each hyperlink includes the destination URL/path, display text, and type.
+    /// Each hyperlink includes the legacy destination URL/path, display text,
+    /// and type. For stored field metadata from every field story, use
+    /// `hyperlink_fields()`.
     ///
     /// # Example
     ///

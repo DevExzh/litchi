@@ -433,8 +433,8 @@ impl Field {
     /// Parse this field as inert `HYPERLINK` metadata.
     ///
     /// Returns `Ok(None)` for fields other than `HYPERLINK`. The stored target,
-    /// bookmark, tooltip, frame, coordinates, switches, cached content, and
-    /// dirty/lock state are metadata only; this method never opens, resolves,
+    /// bookmark, tooltip, frame, image-map-coordinate request, switches, cached
+    /// content, and dirty/lock state are metadata only; this method never opens, resolves,
     /// follows, activates, or refreshes a link.
     pub fn hyperlink_field(&self) -> Result<Option<HyperlinkField>> {
         HyperlinkField::from_field(self)
@@ -3663,7 +3663,7 @@ pub struct HyperlinkField {
     bookmark: Option<String>,
     screen_tip: Option<String>,
     target_frame: Option<String>,
-    coordinates: Option<String>,
+    appends_image_map_coordinates: bool,
     opens_new_window: bool,
     unknown_switches: Vec<FieldSwitch>,
     cached_result: Option<String>,
@@ -3699,7 +3699,7 @@ impl HyperlinkField {
         let mut bookmark = None;
         let mut screen_tip = None;
         let mut target_frame = None;
-        let mut coordinates = None;
+        let mut appends_image_map_coordinates = false;
         let mut opens_new_window = false;
         let mut unknown_switches = Vec::new();
         for switch in switches {
@@ -3707,7 +3707,20 @@ impl HyperlinkField {
                 'l' => (&mut bookmark, 'l'),
                 'o' => (&mut screen_tip, 'o'),
                 't' => (&mut target_frame, 't'),
-                'm' => (&mut coordinates, 'm'),
+                'm' => {
+                    if appends_image_map_coordinates {
+                        return Err(OoxmlError::InvalidFormat(
+                            "HYPERLINK \\m switch is duplicated".to_string(),
+                        ));
+                    }
+                    if switch.argument.is_some() {
+                        return Err(OoxmlError::InvalidFormat(
+                            "HYPERLINK \\m switch does not take an argument".to_string(),
+                        ));
+                    }
+                    appends_image_map_coordinates = true;
+                    continue;
+                },
                 'n' => {
                     if opens_new_window {
                         return Err(OoxmlError::InvalidFormat(
@@ -3755,7 +3768,7 @@ impl HyperlinkField {
             bookmark,
             screen_tip,
             target_frame,
-            coordinates,
+            appends_image_map_coordinates,
             opens_new_window,
             unknown_switches,
             cached_result: field.result.clone(),
@@ -3793,11 +3806,11 @@ impl HyperlinkField {
         self.target_frame.as_deref()
     }
 
-    /// Return the stored image-map coordinates, if present.
+    /// Whether the target receives click coordinates for a server-side image map.
     ///
-    /// This is metadata only and is never used for hit testing or navigation.
-    pub fn coordinates(&self) -> Option<&str> {
-        self.coordinates.as_deref()
+    /// This records producer intent only; no navigation or hit testing occurs.
+    pub fn appends_image_map_coordinates(&self) -> bool {
+        self.appends_image_map_coordinates
     }
 
     /// Whether the field requests opening the target in a new window.
@@ -8610,7 +8623,7 @@ mod tests {
     #[test]
     fn parses_inert_hyperlink_fields_without_opening_or_following_them() {
         let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
-            <w:fldSimple w:instr=" HYPERLINK &quot;https://example.test/a b&quot; \l &quot;_Toc1&quot; \o &quot;Stored tip&quot; \t &quot;_blank&quot; \m &quot;0,0,100,20&quot; \n \* MERGEFORMAT \q opaque " w:dirty="true" w:fldLock="on">
+            <w:fldSimple w:instr=" HYPERLINK &quot;https://example.test/a b&quot; \l &quot;_Toc1&quot; \o &quot;Stored tip&quot; \t &quot;_blank&quot; \m \n \* MERGEFORMAT \q opaque " w:dirty="true" w:fldLock="on">
                 <w:r><w:t>cached external link</w:t></w:r>
             </w:fldSimple>
             <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
@@ -8631,7 +8644,7 @@ mod tests {
         assert_eq!(external.bookmark(), Some("_Toc1"));
         assert_eq!(external.screen_tip(), Some("Stored tip"));
         assert_eq!(external.target_frame(), Some("_blank"));
-        assert_eq!(external.coordinates(), Some("0,0,100,20"));
+        assert!(external.appends_image_map_coordinates());
         assert!(external.opens_new_window());
         assert_eq!(external.unknown_switches().len(), 2);
         assert_eq!(external.unknown_switches()[0].name(), '*');
@@ -8662,6 +8675,8 @@ mod tests {
             r#"HYPERLINK \l ""#,
             r#"HYPERLINK "https://example.test" \l First \l Second"#,
             r#"HYPERLINK "https://example.test" \o"#,
+            r#"HYPERLINK "https://example.test" \m unexpected"#,
+            r#"HYPERLINK "https://example.test" \m \m"#,
             r#"HYPERLINK "https://example.test" \n unexpected"#,
             r#"HYPERLINK "https://example.test" \n \n"#,
         ] {

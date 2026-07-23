@@ -117,6 +117,7 @@ pub use parts::fields::BidiOutlineField;
 pub use parts::fields::EmbedField;
 pub use parts::fields::EquationField;
 pub use parts::fields::FormulaField;
+pub use parts::fields::HyperlinkField;
 pub use parts::fields::InfoField;
 pub use parts::fields::{LegacyFormField, LegacyFormFieldKind};
 pub use parts::fields::ListNumberField;
