@@ -1,10 +1,16 @@
 //! Numbers sheet chart graph discovery and validation.
 
 use super::*;
+use crate::image_caption::{DrawableCaptionKind, drawable_caption_slot};
 
 pub(super) struct SheetChartGraph {
     pub(super) archive_name: String,
+    /// Archive that contains the sheet's ownership list.
+    pub(super) sheet_archive_name: String,
+    /// Component that owns the chart's private object graph.
     pub(super) component_id: u64,
+    /// Component that owns the sheet's cross-component drawable reference.
+    pub(super) sheet_component_id: u64,
     pub(super) info: NumbersSheetChartInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
@@ -16,7 +22,8 @@ pub(super) fn chart_graph(
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<SheetChartGraph> {
-    let (archive_name, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
+    let (sheet_archive_name, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
+    let sheet_archive_name = sheet_archive_name.to_owned();
     if sheet
         .drawable_infos
         .iter()
@@ -29,11 +36,12 @@ pub(super) fn chart_graph(
         )));
     }
     let locations = object_locations(editor.package())?;
-    if locations.get(&drawable_object_id).map(String::as_str) != Some(archive_name.as_str()) {
-        return Err(Error::InvalidFormat(format!(
-            "Numbers chart {drawable_object_id} is outside sheet component {archive_name}"
-        )));
-    }
+    let archive_name = locations
+        .get(&drawable_object_id)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers chart {drawable_object_id} is missing"))
+        })?
+        .to_owned();
     let archive = editor.package().archive(&archive_name)?;
     let object = archive.object(drawable_object_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Numbers chart {drawable_object_id} is missing"))
@@ -69,10 +77,12 @@ pub(super) fn chart_graph(
             "Numbers chart {drawable_object_id} has no chart payload"
         ))
     })?;
-    let caption_id = required_chart_reference(
+    let caption = drawable_caption_slot(
+        editor.package(),
         drawable_object_id,
         drawable.caption.as_ref(),
-        "caption stand-in",
+        DrawableCaptionKind::Caption,
+        "Numbers chart",
     )?;
     let title_id = required_chart_reference(
         drawable_object_id,
@@ -85,7 +95,9 @@ pub(super) fn chart_graph(
         .preset
         .as_ref()
         .map(|reference| reference.identifier);
-    let mut object_ids = vec![drawable_object_id, caption_id, title_id, mediator_id];
+    let mut object_ids = vec![drawable_object_id];
+    object_ids.extend(&caption.object_ids);
+    object_ids.extend([title_id, mediator_id]);
     let mut local_styles = Vec::new();
     local_styles.extend(
         payload
@@ -181,7 +193,6 @@ pub(super) fn chart_graph(
         )));
     }
     for (identifier, message_type, label) in [
-        (caption_id, STANDIN_MESSAGE_TYPE, "caption stand-in"),
         (title_id, STANDIN_MESSAGE_TYPE, "title stand-in"),
         (mediator_id, CHART_MEDIATOR_MESSAGE_TYPE, "mediator"),
     ] {
@@ -208,7 +219,13 @@ pub(super) fn chart_graph(
     let component_id = component_identifier_for_entry(editor.package(), &archive_name)?
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "Numbers sheet component {archive_name} is not registered"
+                "Numbers chart component {archive_name} is not registered"
+            ))
+        })?;
+    let sheet_component_id = component_identifier_for_entry(editor.package(), &sheet_archive_name)?
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers sheet component {sheet_archive_name} is not registered"
             ))
         })?;
     let registered =
@@ -218,7 +235,14 @@ pub(super) fn chart_graph(
         .copied()
         .filter(|identifier| registered.contains(identifier))
         .collect::<Vec<_>>();
-    if !registered.is_empty() && uuid_object_ids.len() != object_ids.len() {
+    // App-created native captions can leave part of their chart graph out of
+    // the component UUID map. Placeholder-only graphs retain the strict
+    // source-built invariant, while native caption graphs keep their actual
+    // registered subset for safe duplication and removal.
+    if !registered.is_empty()
+        && caption.storage_id.is_none()
+        && uuid_object_ids.len() != object_ids.len()
+    {
         return Err(Error::InvalidFormat(format!(
             "Numbers component {component_id} UUID map does not cover chart {drawable_object_id}"
         )));
@@ -228,7 +252,9 @@ pub(super) fn chart_graph(
     });
     Ok(SheetChartGraph {
         archive_name,
+        sheet_archive_name,
         component_id,
+        sheet_component_id,
         info: NumbersSheetChartInfo {
             sheet_id,
             drawable_object_id,

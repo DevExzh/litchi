@@ -1,5 +1,6 @@
 //! Standalone, inline-data chart CRUD for Pages body attachments.
 
+mod caption;
 mod graph;
 mod theme;
 
@@ -314,7 +315,7 @@ impl PagesEditor {
 
     /// Duplicate one body chart at a UTF-16 body position.
     ///
-    /// The clone receives fresh drawable, stand-in, style, preset, attachment,
+    /// The clone receives fresh drawable, title/caption graph, style, preset, attachment,
     /// and UUID identities while retaining the source chart's editable inline
     /// data and opaque protobuf fields. Its geometry and attachment are offset
     /// using Pages' native duplicate placement, so both body charts remain

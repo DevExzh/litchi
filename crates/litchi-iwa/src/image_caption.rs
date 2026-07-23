@@ -1,11 +1,13 @@
 //! Typed native archive construction shared by drawable title and caption editors.
 
+use std::collections::HashSet;
+
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tsa, tsd, tsp, tss, tswp};
 use crate::wire::{patch_length_delimited_field, transform_length_delimited_field};
-use crate::{Error, Result};
+use crate::{Error, IWorkPackage, Result};
 
 pub(crate) const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 pub(crate) const CAPTION_PLACEMENT_MESSAGE_TYPE: u32 = 634;
@@ -90,6 +92,161 @@ pub(crate) struct CaptionObjectIds {
     pub(crate) info: u64,
     pub(crate) storage: u64,
     pub(crate) placement: u64,
+}
+
+/// The private object graph behind a drawable's native title or caption.
+///
+/// Applications use a stand-in object until a label is created. Once present,
+/// the reference instead targets a `TSA.CaptionInfoArchive` with private text,
+/// placement, and sometimes style objects. A shared style can live outside the
+/// drawable component, so it is deliberately omitted from [`Self::object_ids`]
+/// in that case.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DrawableCaptionSlot {
+    pub(crate) reference_id: u64,
+    pub(crate) storage_id: Option<u64>,
+    pub(crate) object_ids: Vec<u64>,
+}
+
+/// Resolve and validate a drawable title or caption graph without assuming a
+/// particular iWork application or drawable type.
+#[allow(deprecated)]
+pub(crate) fn drawable_caption_slot(
+    package: &IWorkPackage,
+    drawable_object_id: u64,
+    reference: Option<&tsp::Reference>,
+    kind: DrawableCaptionKind,
+    drawable_label: &str,
+) -> Result<DrawableCaptionSlot> {
+    let reference_id = reference
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{drawable_label} {drawable_object_id} has no native title/caption reference"
+            ))
+        })?;
+    let drawable_archive_name = unique_object_archive_name(package, drawable_object_id)?;
+    let archive_name = unique_object_archive_name(package, reference_id)?;
+    if archive_name != drawable_archive_name {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} title/caption object {reference_id} is outside drawable {drawable_object_id}'s component"
+        )));
+    }
+    let archive = package.archive(&archive_name)?;
+    let object = archive.object(reference_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "{drawable_label} title/caption object {reference_id} is missing"
+        ))
+    })?;
+    let caption_messages = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)
+        .collect::<Vec<_>>();
+    if caption_messages.is_empty() {
+        require_exact_caption_message_count(
+            package,
+            reference_id,
+            STANDIN_CAPTION_MESSAGE_TYPE,
+            "stand-in caption",
+            drawable_label,
+        )?;
+        return Ok(DrawableCaptionSlot {
+            reference_id,
+            storage_id: None,
+            object_ids: vec![reference_id],
+        });
+    }
+    let [message] = caption_messages.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} title/caption object {reference_id} has multiple CaptionInfo payloads"
+        )));
+    };
+    let info = tsa::CaptionInfoArchive::decode(message.data.as_slice())?;
+    if info.child_info_kind != Some(kind.native_kind()) {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} title/caption object {reference_id} has the wrong native kind"
+        )));
+    }
+    if info
+        .super_
+        .super_
+        .super_
+        .parent
+        .as_ref()
+        .map(|parent| parent.identifier)
+        != Some(drawable_object_id)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} title/caption object {reference_id} has the wrong parent drawable"
+        )));
+    }
+    let storage_id = required_caption_reference(
+        reference_id,
+        info.super_.owned_storage.as_ref(),
+        "text storage",
+        drawable_label,
+    )?;
+    if info
+        .super_
+        .deprecated_storage
+        .as_ref()
+        .map(|storage| storage.identifier)
+        != Some(storage_id)
+        || info.super_.is_text_box != Some(true)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} title/caption object {reference_id} has inconsistent text storage"
+        )));
+    }
+    let style_id = required_caption_reference(
+        reference_id,
+        info.super_.super_.style.as_ref(),
+        "shape style",
+        drawable_label,
+    )?;
+    let placement_id = required_caption_reference(
+        reference_id,
+        info.placement.as_ref(),
+        "placement",
+        drawable_label,
+    )?;
+    for (identifier, message_type, label) in [
+        (style_id, SHAPE_STYLE_MESSAGE_TYPE, "shape style"),
+        (storage_id, STORAGE_MESSAGE_TYPE, "text storage"),
+        (placement_id, CAPTION_PLACEMENT_MESSAGE_TYPE, "placement"),
+    ] {
+        require_exact_caption_message_count(
+            package,
+            identifier,
+            message_type,
+            label,
+            drawable_label,
+        )?;
+    }
+    for (identifier, label) in [(storage_id, "text storage"), (placement_id, "placement")] {
+        if unique_object_archive_name(package, identifier)? != drawable_archive_name {
+            return Err(Error::InvalidFormat(format!(
+                "{drawable_label} title/caption {label} {identifier} is outside drawable {drawable_object_id}'s component"
+            )));
+        }
+    }
+    let mut object_ids = vec![reference_id];
+    if unique_object_archive_name(package, style_id)? == drawable_archive_name {
+        object_ids.push(style_id);
+    }
+    object_ids.extend([storage_id, placement_id]);
+    if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} title/caption object {reference_id} aliases its private graph"
+        )));
+    }
+    Ok(DrawableCaptionSlot {
+        reference_id,
+        storage_id: Some(storage_id),
+        object_ids,
+    })
 }
 
 impl CaptionObjectIds {
@@ -286,6 +443,65 @@ pub(crate) fn replace_object_reference(references: &mut Vec<u64>, old: u64, new:
     } else if !references.contains(&new) {
         references.push(new);
     }
+}
+
+fn required_caption_reference(
+    reference_id: u64,
+    reference: Option<&tsp::Reference>,
+    label: &str,
+    drawable_label: &str,
+) -> Result<u64> {
+    reference
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{drawable_label} title/caption object {reference_id} has no {label} reference"
+            ))
+        })
+}
+
+fn require_exact_caption_message_count(
+    package: &IWorkPackage,
+    object_id: u64,
+    message_type: u32,
+    label: &str,
+    drawable_label: &str,
+) -> Result<()> {
+    let archive_name = unique_object_archive_name(package, object_id)?;
+    let archive = package.archive(&archive_name)?;
+    let object = archive.object(object_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "{drawable_label} title/caption {label} {object_id} is missing"
+        ))
+    })?;
+    if object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == message_type)
+        .count()
+        != 1
+    {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} title/caption {label} {object_id} must have exactly one expected payload"
+        )));
+    }
+    Ok(())
+}
+
+fn unique_object_archive_name(package: &IWorkPackage, identifier: u64) -> Result<String> {
+    let mut archive_name = None;
+    for name in package.iwa_entry_names() {
+        if package.archive(name)?.object(identifier).is_none() {
+            continue;
+        }
+        if archive_name.replace(name.to_owned()).is_some() {
+            return Err(Error::Archive(format!(
+                "object {identifier} occurs in multiple IWA components"
+            )));
+        }
+    }
+    archive_name.ok_or_else(|| Error::InvalidFormat(format!("object {identifier} is missing")))
 }
 
 fn caption_shape_style(

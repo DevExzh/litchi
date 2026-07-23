@@ -1,6 +1,7 @@
 //! Keynote slide chart graph discovery and validation.
 
 use super::*;
+use crate::image_caption::{DrawableCaptionKind, drawable_caption_slot};
 
 pub(super) struct SlideChartGraph {
     pub(super) archive_name: String,
@@ -85,10 +86,12 @@ pub(super) fn chart_graph(
             "Keynote inline chart {drawable_object_id} unexpectedly has a Numbers mediator"
         )));
     }
-    let caption_id = required_chart_reference(
+    let caption = drawable_caption_slot(
+        editor.package(),
         drawable_object_id,
         drawable.caption.as_ref(),
-        "caption stand-in",
+        DrawableCaptionKind::Caption,
+        "Keynote chart",
     )?;
     let title_id = required_chart_reference(
         drawable_object_id,
@@ -99,7 +102,9 @@ pub(super) fn chart_graph(
         .preset
         .as_ref()
         .map(|reference| reference.identifier);
-    let mut object_ids = vec![drawable_object_id, caption_id, title_id];
+    let mut object_ids = vec![drawable_object_id];
+    object_ids.extend(&caption.object_ids);
+    object_ids.push(title_id);
     let mut local_styles = Vec::new();
     local_styles.extend(
         payload
@@ -194,29 +199,26 @@ pub(super) fn chart_graph(
             "Keynote chart {drawable_object_id} aliases private objects"
         )));
     }
-    for (identifier, label) in [
-        (caption_id, "caption stand-in"),
-        (title_id, "title stand-in"),
-    ] {
-        if graph.archive_name(identifier)? != archive_name {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote chart {label} {identifier} is outside {archive_name}"
-            )));
-        }
-        let private = archive.object(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!("Keynote chart {label} {identifier} is missing"))
-        })?;
-        if private
-            .messages
-            .iter()
-            .filter(|message| message.type_ == STANDIN_MESSAGE_TYPE)
-            .count()
-            != 1
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote chart {label} {identifier} must have exactly one expected payload"
-            )));
-        }
+    if graph.archive_name(title_id)? != archive_name {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote chart title stand-in {title_id} is outside {archive_name}"
+        )));
+    }
+    let title = archive.object(title_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Keynote chart title stand-in {title_id} is missing"
+        ))
+    })?;
+    if title
+        .messages
+        .iter()
+        .filter(|message| message.type_ == STANDIN_MESSAGE_TYPE)
+        .count()
+        != 1
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote chart title stand-in {title_id} must have exactly one expected payload"
+        )));
     }
     let component_id = component_identifier_for_entry(editor.package(), &archive_name)?
         .ok_or_else(|| {
@@ -231,7 +233,14 @@ pub(super) fn chart_graph(
         .copied()
         .filter(|identifier| registered.contains(identifier))
         .collect::<Vec<_>>();
-    if !registered.is_empty() && uuid_object_ids.len() != object_ids.len() {
+    // App-created native captions can leave part of their chart graph out of
+    // the component UUID map. Placeholder-only graphs retain the strict
+    // source-built invariant, while native caption graphs keep their actual
+    // registered subset for safe duplication and removal.
+    if !registered.is_empty()
+        && caption.storage_id.is_none()
+        && uuid_object_ids.len() != object_ids.len()
+    {
         return Err(Error::InvalidFormat(format!(
             "Keynote slide UUID map does not cover chart {drawable_object_id}"
         )));

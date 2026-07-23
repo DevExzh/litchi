@@ -1,5 +1,6 @@
 //! Standalone, inline-data chart CRUD for Numbers sheets.
 
+mod caption;
 mod graph;
 mod theme;
 
@@ -275,7 +276,7 @@ impl NumbersEditor {
 
     /// Duplicate one sheet chart using Numbers' native placement.
     ///
-    /// The clone receives fresh drawable, stand-in, mediator, style, preset,
+    /// The clone receives fresh drawable, title/caption graph, mediator, style, preset,
     /// and UUID identities while retaining editable inline data and opaque
     /// protobuf fields. The source and clone have independent chart grids and
     /// are both owned directly by the same sheet.
@@ -330,11 +331,19 @@ impl NumbersEditor {
         )?;
         patch_numbers_sheet_drawable_reference(
             &mut staged,
-            &source.archive_name,
+            &source.sheet_archive_name,
             sheet_id,
             None,
             Some(new_drawable_id),
         )?;
+        if source.sheet_component_id != source.component_id {
+            add_component_external_reference(
+                &mut staged,
+                source.sheet_component_id,
+                source.component_id,
+                new_drawable_id,
+            )?;
+        }
         if let Some(source_preset_id) = source.private_preset_id {
             let theme = chart_theme_context(&staged)?;
             let new_preset_id = remap.get(&source_preset_id).copied().ok_or_else(|| {
@@ -406,7 +415,7 @@ impl NumbersEditor {
         let mut staged = comments.into_package();
         patch_numbers_sheet_drawable_reference(
             &mut staged,
-            &source.archive_name,
+            &source.sheet_archive_name,
             sheet_id,
             Some(drawable_object_id),
             None,
@@ -740,5 +749,126 @@ mod tests {
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
             .unwrap();
         assert!(editor.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_caption_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+
+        assert_eq!(
+            editor
+                .sheet_chart_caption(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            None
+        );
+        editor
+            .set_sheet_chart_caption(sheet_id, source.drawable_object_id, "Revenue by region")
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_caption(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            Some("Revenue by region".to_owned())
+        );
+
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_caption(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            Some("Revenue by region".to_owned())
+        );
+
+        editor
+            .set_sheet_chart_caption(
+                sheet_id,
+                source.drawable_object_id,
+                "Updated source caption",
+            )
+            .unwrap();
+        assert!(
+            editor
+                .remove_sheet_chart_caption(sheet_id, source.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            !editor
+                .remove_sheet_chart_caption(sheet_id, source.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .sheet_chart_caption(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            None
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_caption(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            Some("Revenue by region".to_owned())
+        );
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(
+            reopened
+                .sheet_charts(sheet_id)
+                .unwrap()
+                .iter()
+                .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+        );
+    }
+
+    #[test]
+    fn native_chart_caption_graphs_tolerate_partial_uuid_registration() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        editor
+            .set_sheet_chart_caption(sheet_id, source.drawable_object_id, "Revenue by region")
+            .unwrap();
+
+        let graph = chart_graph(&editor, sheet_id, source.drawable_object_id).unwrap();
+        let caption =
+            caption::sheet_chart_caption_slot(&editor, sheet_id, source.drawable_object_id)
+                .unwrap();
+        remove_component_object_uuids(&mut editor.package, graph.component_id, &caption.object_ids)
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_caption(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            Some("Revenue by region".to_owned())
+        );
+        let duplicate = reopened
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_caption(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            Some("Revenue by region".to_owned())
+        );
+
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
     }
 }

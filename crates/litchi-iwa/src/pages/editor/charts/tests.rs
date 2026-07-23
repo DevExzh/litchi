@@ -218,3 +218,84 @@ fn duplicate_body_chart_clones_the_private_graph_and_inline_data() {
     assert!(editor.body_charts().unwrap().is_empty());
     assert_eq!(editor.body_text().unwrap(), "Body");
 }
+
+#[test]
+fn scratch_document_supports_native_chart_caption_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart captions").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart captions".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+
+    assert_eq!(
+        editor
+            .body_chart_caption(source.drawable_object_id)
+            .unwrap(),
+        None
+    );
+    editor
+        .set_body_chart_caption(source.drawable_object_id, "Revenue by region")
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_caption(source.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_caption(duplicate.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+
+    editor
+        .set_body_chart_caption(source.drawable_object_id, "Updated source caption")
+        .unwrap();
+    assert!(
+        editor
+            .remove_body_chart_caption(source.drawable_object_id)
+            .unwrap()
+    );
+    assert!(
+        !editor
+            .remove_body_chart_caption(source.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        editor
+            .body_chart_caption(source.drawable_object_id)
+            .unwrap(),
+        None
+    );
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_caption(duplicate.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(
+        reopened
+            .body_charts()
+            .unwrap()
+            .iter()
+            .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+    );
+}

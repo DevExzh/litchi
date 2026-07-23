@@ -49,8 +49,9 @@ println!("{}", structured.summary());
   with independent rich-text storage, fresh UUID mappings, preserved opaque
   fields, and app-specific selection offsets
 - Native Pages, Numbers, and Keynote chart CRUD, including source-built inline
-  data charts and duplicate operations with fresh private graphs, preserved
-  editable data, theme-preset registration, UUIDs, and native placement offsets
+  data charts, typed native caption CRUD, and duplicate operations with fresh
+  private graphs, preserved editable data, theme-preset registration, UUIDs,
+  and native placement offsets
 - Typed copy-on-write text-box paragraph alignment, native line-spacing modes,
   atomic before/after spacing, first-line/left/right indentation, and ordered
   left/center/right/decimal tab stops with leaders across Pages, Numbers, and Keynote
@@ -105,6 +106,12 @@ data and opaque chart fields while giving the new chart independent inline data,
 private styles, preset registration, UUIDs, ownership, and native placement.
 See `create_*_chart` and `duplicate_*_chart` in `examples/` for runnable
 file-to-file workflows.
+
+Charts also expose their native generic Object Caption control through
+`body_chart_caption`, `sheet_chart_caption`, and `slide_chart_caption`.
+`set_*_chart_caption` creates or updates the real caption text graph, while
+`remove_*_chart_caption` returns whether a caption was present. Captions remain
+independent through duplicate, delete, and package round-trip operations.
 
 Source-built and existing file-backed images also expose typed shared drawable
 properties through `body_image_properties` / `set_body_image_properties`,

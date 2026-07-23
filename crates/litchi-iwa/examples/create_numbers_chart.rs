@@ -38,9 +38,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 280.0,
         },
     )?;
+    editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} chart {} on sheet {}",
+        "created Numbers {:?} chart {} with a native caption on sheet {}",
         chart.kind, chart.drawable_object_id, sheet_id
     );
     Ok(())

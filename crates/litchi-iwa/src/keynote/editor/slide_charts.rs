@@ -1,5 +1,6 @@
 //! Standalone, inline-data chart CRUD for Keynote slides.
 
+mod caption;
 mod graph;
 mod theme;
 
@@ -291,7 +292,7 @@ impl KeynoteEditor {
 
     /// Duplicate one slide chart using Keynote's native placement.
     ///
-    /// The clone receives fresh drawable, stand-in, style, preset, and UUID
+    /// The clone receives fresh drawable, title/caption graph, style, preset, and UUID
     /// identities while retaining editable inline data and opaque protobuf
     /// fields. It is owned by the same slide but has an independent chart grid
     /// and geometry.

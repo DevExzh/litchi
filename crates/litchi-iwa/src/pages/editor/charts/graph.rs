@@ -1,6 +1,7 @@
 //! Strict discovery and construction of body-anchored Pages chart graphs.
 
 use super::*;
+use crate::image_caption::{DrawableCaptionKind, drawable_caption_slot};
 
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
 const ATTACHMENT_HORIZONTAL_OFFSET_FIELD: u32 = 3;
@@ -203,10 +204,12 @@ pub(super) fn body_chart_graph(
             "Pages inline chart {drawable_object_id} unexpectedly has a Numbers mediator"
         )));
     }
-    let caption_id = required_chart_reference(
+    let caption = drawable_caption_slot(
+        editor.package(),
         drawable_object_id,
         drawable.caption.as_ref(),
-        "caption stand-in",
+        DrawableCaptionKind::Caption,
+        "Pages chart",
     )?;
     let title_id = required_chart_reference(
         drawable_object_id,
@@ -228,7 +231,9 @@ pub(super) fn body_chart_graph(
         )));
     }
 
-    let mut object_ids = vec![drawable_object_id, caption_id, title_id];
+    let mut object_ids = vec![drawable_object_id];
+    object_ids.extend(&caption.object_ids);
+    object_ids.push(title_id);
     if private_preset_id.is_some() {
         let mut private_styles = Vec::new();
         private_styles.extend(
@@ -322,29 +327,24 @@ pub(super) fn body_chart_graph(
             object_ids.push(identifier);
         }
     }
-    for (identifier, label) in [
-        (caption_id, "caption stand-in"),
-        (title_id, "title stand-in"),
-    ] {
-        if find_object_archive(editor.package(), identifier)? != archive_name {
-            return Err(Error::InvalidFormat(format!(
-                "Pages chart {label} {identifier} is outside {archive_name}"
-            )));
-        }
-        let private = archive.object(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!("Pages chart {label} {identifier} is missing"))
-        })?;
-        if private
-            .messages
-            .iter()
-            .filter(|message| message.type_ == STANDIN_MESSAGE_TYPE)
-            .count()
-            != 1
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Pages chart {label} {identifier} must have exactly one stand-in payload"
-            )));
-        }
+    if find_object_archive(editor.package(), title_id)? != archive_name {
+        return Err(Error::InvalidFormat(format!(
+            "Pages chart title stand-in {title_id} is outside {archive_name}"
+        )));
+    }
+    let title = archive.object(title_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Pages chart title stand-in {title_id} is missing"))
+    })?;
+    if title
+        .messages
+        .iter()
+        .filter(|message| message.type_ == STANDIN_MESSAGE_TYPE)
+        .count()
+        != 1
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Pages chart title stand-in {title_id} must have exactly one stand-in payload"
+        )));
     }
     if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
@@ -366,7 +366,14 @@ pub(super) fn body_chart_graph(
         .copied()
         .filter(|identifier| *identifier != *attachment_id && registered.contains(identifier))
         .collect::<Vec<_>>();
-    if private_preset_id.is_some() && uuid_object_ids.len() + 1 != object_ids.len() {
+    // App-created native captions can leave part of their chart graph out of
+    // the component UUID map. Placeholder-only graphs retain the strict
+    // source-built invariant, while native caption graphs keep their actual
+    // registered subset for safe duplication and removal.
+    if private_preset_id.is_some()
+        && caption.storage_id.is_none()
+        && uuid_object_ids.len() + 1 != object_ids.len()
+    {
         return Err(Error::InvalidFormat(format!(
             "Pages component UUID map does not cover private chart {drawable_object_id}"
         )));
