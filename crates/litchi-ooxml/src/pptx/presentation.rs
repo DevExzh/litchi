@@ -5,6 +5,9 @@ use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotati
 use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
 use crate::pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
+use crate::pptx::show_events::{
+    PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events,
+};
 use crate::pptx::slide::{Slide, SlideMaster};
 use crate::pptx::tags::{SlideTagList, TagList};
 use litchi_opc::OpcPackage;
@@ -770,6 +773,25 @@ impl<'a> Presentation<'a> {
         }
 
         Ok(traces)
+    }
+
+    /// Discover persisted slide-show event records from presentation slides.
+    ///
+    /// Event records remain inert historical metadata. This never replays
+    /// triggers, seeks media, opens targets, or changes slide-show state.
+    pub fn show_events(&self) -> Result<Vec<PptxSlideShowEvent>> {
+        let mut events = Vec::new();
+        let mut limits = ShowEventLoadLimits::default();
+
+        for (slide_index, slide) in self.slides()?.iter().enumerate() {
+            events.extend(load_slide_show_events(
+                slide_index,
+                slide.part().part(),
+                &mut limits,
+            )?);
+        }
+
+        Ok(events)
     }
 
     /// Discover bounded, inert click and hover action settings on slides.

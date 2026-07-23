@@ -1,0 +1,18 @@
+<p:extLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" xmlns:fut="urn:litchi:future" mc:Ignorable="p14 fut">
+  <mc:AlternateContent>
+    <mc:Choice Requires="fut"><fut:ignored/></mc:Choice>
+    <mc:Fallback>
+      <p:ext uri="{E180D4A7-C9FB-4DFB-919C-405C955672EB}">
+        <p14:showEvtLst>
+          <p14:triggerEvt type="onClick" time="6950" objId="6"/>
+          <p14:playEvt time="12722" objId="4"/>
+          <p14:pauseEvt time="38839" objId="4"/>
+          <p14:seekEvt time="38839" objId="4" seek="10379"/>
+          <p14:resumeEvt time="38859" objId="4"/>
+          <p14:stopEvt time="49628" objId="4"/>
+          <p14:nullEvt time="50000ms" objId="4"/>
+        </p14:showEvtLst>
+      </p:ext>
+    </mc:Fallback>
+  </mc:AlternateContent>
+</p:extLst>

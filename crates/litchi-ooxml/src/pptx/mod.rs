@@ -85,6 +85,7 @@ pub mod presentation_properties;
 pub mod protection;
 pub mod revision_information;
 pub mod sections;
+pub mod show_events;
 pub mod shapes;
 pub mod slide;
 pub mod smartart;
@@ -225,6 +226,9 @@ pub use revision_information::{
     load_revision_information, store_revision_information,
 };
 pub use sections::{Section, SectionList};
+pub use show_events::{
+    PptxSlideShowEvent, PptxSlideShowEventKind, PptxSlideShowTrigger, SHOW_EVENT_EXTENSION_URI,
+};
 pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use tags::{

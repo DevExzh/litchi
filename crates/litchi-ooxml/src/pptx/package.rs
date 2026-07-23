@@ -3,6 +3,7 @@ use crate::common::DocumentProperties;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
 use crate::pptx::presentation::{PptxChart, PptxTagList, Presentation};
+use crate::pptx::show_events::PptxSlideShowEvent;
 use crate::pptx::vba_project::{VbaProject, discover_vba_project};
 use crate::pptx::writer::MutablePresentation;
 use crate::ribbonx::{
@@ -544,6 +545,14 @@ impl Package {
     /// rendered, interpolated, modified, or executed.
     pub fn laser_traces(&self) -> Result<Vec<crate::pptx::PptxLaserTrace>> {
         self.presentation()?.laser_traces()
+    }
+
+    /// Discover persisted slide-show event records from presentation slides.
+    ///
+    /// Event records are returned as inert historical metadata only. This
+    /// never replays triggers, seeks media, opens targets, or changes slide-show state.
+    pub fn show_events(&self) -> Result<Vec<PptxSlideShowEvent>> {
+        self.presentation()?.show_events()
     }
 
     /// Discover bounded, inert click and hover action settings on slides.

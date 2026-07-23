@@ -234,6 +234,7 @@ conversion, fonts, and image conversion are optional.
 | Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | PowerPoint package task-pane discovery plus bounded web-extension parsing/serialization; add-ins are never executed |
 | Ink annotations | 🟡 | ✅ | ❌ | Bounded inert InkML content-part inventory with slide/relationship/part identity and stored trace counts; no handwriting recognition, rendering, mutation, or execution |
 | Laser pointer traces | 🟡 | ✅ | ❌ | Bounded inert PowerPoint 2010 slide-show trace inventory with stored time offsets and coordinates; never replayed, rendered, interpolated, or mutated |
+| Slide-show event records | 🟡 | ✅ | ❌ | Bounded inert PowerPoint 2010 trigger/media event inventory with slide, event, target object, and stored timeline metadata; events are never replayed or executed |
 | VBA projects/PPTM macros | 🟡 | 🟡 | ❌ | PPTM/PPSM/POTM main parts and the MS-OFFMACRO2 Presentation → VBA Project relationship graph are validated as inert metadata; payload contents are never inspected, parsed, or executed by this API, and no macro authoring exists |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
