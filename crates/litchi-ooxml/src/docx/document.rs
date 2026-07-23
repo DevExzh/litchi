@@ -10,8 +10,8 @@ use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
     AdvanceField, AutoNumberField, BarcodeField, BibliographyField, BidiOutlineField,
-    CitationField, DatabaseField, DdeField, DocumentInformationField, DocumentPropertyField,
-    DocumentVariableField, EmbedField, ExternalIncludeField, Field,
+    CitationField, DatabaseField, DdeField, DocumentContextField, DocumentInformationField,
+    DocumentPropertyField, DocumentVariableField, EmbedField, ExternalIncludeField, Field,
     GoToButtonField, IfField,
     IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
     MacroButtonField,
@@ -1342,6 +1342,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert built-in document-information fields.
     pub fn document_information_field_count(&self) -> Result<usize> {
         Ok(self.document_information_fields()?.len())
+    }
+
+    /// Get typed, inert built-in document-context and runtime fields in document order.
+    ///
+    /// Returned values expose only stored kinds, switches, cached content, and
+    /// dirty/lock state. This method never reads a document path, attached
+    /// template, host filesystem state or file size, current clock, or page and
+    /// section layout; resolves a value; or refreshes fields.
+    pub fn document_context_fields(&self) -> Result<Vec<DocumentContextField>> {
+        self.fields()?
+            .iter()
+            .map(Field::document_context)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert built-in document-context and runtime fields.
+    pub fn document_context_field_count(&self) -> Result<usize> {
+        Ok(self.document_context_fields()?.len())
     }
 
     /// Get typed, inert `MACROBUTTON` fields in document order.

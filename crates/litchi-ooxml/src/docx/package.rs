@@ -3381,6 +3381,45 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_discovers_inert_document_context_fields_without_resolution() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            let file_name = document.add_paragraph();
+            file_name.add_field(crate::docx::writer::MutableField::with_result(
+                r#"FILENAME \p"#.to_string(),
+                "cached file name".to_string(),
+            ));
+            let page = document.add_paragraph();
+            page.add_field(crate::docx::writer::MutableField::with_result(
+                r#"PAGE \* MERGEFORMAT"#.to_string(),
+                "cached page".to_string(),
+            ));
+        }
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let document = reopened.document().unwrap();
+        let fields = document.document_context_fields().unwrap();
+        assert_eq!(document.document_context_field_count().unwrap(), 2);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(
+            fields[0].kind(),
+            crate::docx::DocumentContextFieldKind::FileName
+        );
+        assert_eq!(fields[0].cached_result(), Some("cached file name"));
+        assert!(fields[0].has_switch('p'));
+        assert_eq!(
+            fields[1].kind(),
+            crate::docx::DocumentContextFieldKind::Page
+        );
+        assert_eq!(fields[1].cached_result(), Some("cached page"));
+        assert!(fields[1].has_switch('*'));
+        assert_eq!(fields[1].switches()[0].argument(), Some("MERGEFORMAT"));
+    }
+
+    #[test]
     fn writes_and_discovers_typed_inert_merge_fields_without_merging() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
