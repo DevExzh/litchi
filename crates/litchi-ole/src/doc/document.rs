@@ -18,7 +18,7 @@ use super::parts::fields::{
     DocumentVariableField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
     GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
-    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, ReferenceField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, ReferenceField, SetField,
     TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
@@ -687,6 +687,22 @@ impl Document {
     /// Get the number of typed, inert bookmark-reference fields.
     pub fn reference_field_count(&self) -> Result<usize> {
         Ok(self.reference_fields()?.len())
+    }
+
+    /// Get typed, inert `SET` fields in story and source order.
+    ///
+    /// Returned values expose only stored target names, opaque expressions,
+    /// cached results, and field state. This method never evaluates an
+    /// expression, looks up or changes a bookmark, changes document state, or
+    /// refreshes a field.
+    pub fn set_fields(&self) -> Result<Vec<SetField>> {
+        let fields = self.fields()?;
+        Ok(fields.iter().filter_map(FieldText::set_field).collect())
+    }
+
+    /// Get the number of typed, inert `SET` fields.
+    pub fn set_field_count(&self) -> Result<usize> {
+        Ok(self.set_fields()?.len())
     }
 
     /// Get typed, inert `GLOSSARY` and `AUTOTEXT` fields in story and source order.
