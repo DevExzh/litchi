@@ -4,7 +4,10 @@ use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_actio
 use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
 use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
-use crate::pptx::parts::{NotesSize, PresentationPart, SlideMasterPart, SlidePart, SlideSize};
+use crate::pptx::parts::{
+    NotesSize, PresentationDefaultTextStyle, PresentationPart, SlideMasterPart, SlidePart,
+    SlideSize,
+};
 use crate::pptx::show_events::{
     PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events,
 };
@@ -391,6 +394,11 @@ impl<'a> Presentation<'a> {
     /// Get the notes and handout surface dimensions.
     pub fn notes_size(&self) -> Result<Option<NotesSize>> {
         self.part.notes_size()
+    }
+
+    /// Get the presentation-wide default text-style inventory.
+    pub fn default_text_style(&self) -> Result<Option<PresentationDefaultTextStyle>> {
+        self.part.default_text_style()
     }
 
     // ========================================================================

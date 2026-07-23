@@ -8,8 +8,12 @@ use litchi_opc::part::Part;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::sync::Arc;
+
+const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
 /// The presentation slide surface dimensions and declared size type.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -60,6 +64,33 @@ impl NotesSize {
     #[inline]
     pub const fn height(&self) -> i64 {
         self.height
+    }
+}
+
+/// The declared paragraph-level inventory for a presentation default text style.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct PresentationDefaultTextStyle {
+    has_default_paragraph_properties: bool,
+    levels: Vec<u8>,
+}
+
+impl PresentationDefaultTextStyle {
+    /// Whether the style declares default paragraph properties.
+    #[inline]
+    pub const fn has_default_paragraph_properties(&self) -> bool {
+        self.has_default_paragraph_properties
+    }
+
+    /// Return the declared paragraph levels in document order.
+    #[inline]
+    pub fn levels(&self) -> &[u8] {
+        &self.levels
+    }
+
+    /// Whether the style declares the requested paragraph level.
+    #[inline]
+    pub fn has_level(&self, level: u8) -> bool {
+        self.levels.contains(&level)
     }
 }
 
@@ -168,6 +199,11 @@ impl<'a> PresentationPart<'a> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.notes_size)
     }
 
+    /// Get the presentation-wide default text-style inventory.
+    pub fn default_text_style(&self) -> Result<Option<PresentationDefaultTextStyle>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.default_text_style)
+    }
+
     /// Get the relationship IDs of all slides in presentation order.
     ///
     /// Returns a vector of relationship IDs that can be used to access
@@ -245,6 +281,7 @@ enum PresentationContext {
     Presentation,
     SlideList,
     MasterList,
+    DefaultTextStyle,
     Other,
 }
 
@@ -254,6 +291,7 @@ struct PresentationInfo {
     masters: Vec<(u32, String)>,
     slide_size: Option<SlideSize>,
     notes_size: Option<NotesSize>,
+    default_text_style: Option<PresentationDefaultTextStyle>,
     seen_slide_list: bool,
     seen_master_list: bool,
 }
@@ -372,6 +410,10 @@ impl PresentationInfo {
             }
             self.seen_master_list = true;
             Ok(PresentationContext::MasterList)
+        } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"defaultTextStyle")
+        {
+            Ok(PresentationContext::DefaultTextStyle)
         } else {
             Ok(PresentationContext::Other)
         }
@@ -440,6 +482,12 @@ impl PresentationInfo {
             let width = required_positive_i64(element, b"cx", decoder, "notes width")?;
             let height = required_positive_i64(element, b"cy", decoder, "notes height")?;
             self.notes_size = Some(NotesSize { width, height });
+        } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"defaultTextStyle")
+        {
+            self.begin_default_text_style()?;
+        } else if parent == PresentationContext::DefaultTextStyle {
+            self.observe_default_text_style_child(namespace, element)?;
         } else if parent == PresentationContext::SlideList
             && is_presentationml_name(namespace, element.name(), b"sldId")
         {
@@ -466,6 +514,76 @@ impl PresentationInfo {
         }
         Ok(())
     }
+
+    fn begin_default_text_style(&mut self) -> Result<()> {
+        if self.default_text_style.is_some() {
+            return Err(OoxmlError::InvalidFormat(
+                "duplicate PowerPoint default text style".to_string(),
+            ));
+        }
+        self.default_text_style = Some(PresentationDefaultTextStyle::default());
+        Ok(())
+    }
+
+    fn observe_default_text_style_child(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+    ) -> Result<()> {
+        let style = self.default_text_style.as_mut().ok_or_else(|| {
+            OoxmlError::InvalidFormat("missing PowerPoint default text style".to_string())
+        })?;
+        if is_drawingml_name(namespace, element, b"defPPr") {
+            if style.has_default_paragraph_properties {
+                return Err(OoxmlError::InvalidFormat(
+                    "PowerPoint default text style has duplicate default paragraph properties"
+                        .to_string(),
+                ));
+            }
+            style.has_default_paragraph_properties = true;
+        } else if let Some(level) = drawingml_text_style_level(namespace, element) {
+            if style.levels.contains(&level) {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "PowerPoint default text style has duplicate level {level}"
+                )));
+            }
+            style.levels.push(level);
+        }
+        Ok(())
+    }
+}
+
+fn is_drawingml_name(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+) -> bool {
+    if element.name().local_name().as_ref() != local_name {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE
+        },
+        ResolveResult::Unknown(prefix) => prefix.as_slice() == b"a",
+        ResolveResult::Unbound => false,
+    }
+}
+
+fn drawingml_text_style_level(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> Option<u8> {
+    let local_name = element.name().local_name();
+    let local_name = local_name.as_ref();
+    if local_name.len() != 7 || !local_name.starts_with(b"lvl") || !local_name.ends_with(b"pPr") {
+        return None;
+    }
+    let level = local_name[3];
+    if !(b'1'..=b'9').contains(&level) || !is_drawingml_name(namespace, element, local_name) {
+        return None;
+    }
+    Some(level - b'0')
 }
 
 fn required_relationship_id(
@@ -543,6 +661,7 @@ mod tests {
     use litchi_opc::part::BlobPart;
 
     const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
     const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
     fn part(xml: impl Into<Vec<u8>>) -> BlobPart {
@@ -617,6 +736,72 @@ mod tests {
         let blob = part(xml);
         let presentation = PresentationPart::from_part(&blob).unwrap();
         assert_eq!(presentation.slide_rids().unwrap(), ["real"]);
+    }
+
+    #[test]
+    fn parses_default_text_style_inventory() {
+        let xml = format!(
+            r#"<p:presentation xmlns:p="{P}" xmlns:a="{A}" xmlns:f="urn:foreign">
+                <p:defaultTextStyle><a:defPPr/><a:lvl2pPr/><a:lvl8pPr/>
+                    <f:lvl3pPr/><a:extLst><a:lvl4pPr/></a:extLst>
+                </p:defaultTextStyle></p:presentation>"#
+        );
+        let blob = part(xml);
+        let style = PresentationPart::from_part(&blob)
+            .unwrap()
+            .default_text_style()
+            .unwrap()
+            .unwrap();
+        assert!(style.has_default_paragraph_properties());
+        assert_eq!(style.levels(), [2, 8]);
+        assert!(style.has_level(8));
+        assert!(!style.has_level(4));
+
+        let strict = r#"<q:presentation xmlns:q="http://purl.oclc.org/ooxml/presentationml/main"
+            xmlns:d="http://purl.oclc.org/ooxml/drawingml/main"><q:defaultTextStyle>
+            <d:lvl1pPr/></q:defaultTextStyle></q:presentation>"#;
+        let blob = part(strict);
+        let style = PresentationPart::from_part(&blob)
+            .unwrap()
+            .default_text_style()
+            .unwrap()
+            .unwrap();
+        assert!(!style.has_default_paragraph_properties());
+        assert_eq!(style.levels(), [1]);
+
+        let absent = format!(r#"<p:presentation xmlns:p="{P}"></p:presentation>"#);
+        let blob = part(absent);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .default_text_style()
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_default_text_style_declarations() {
+        let cases = [
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:defaultTextStyle/><p:defaultTextStyle/></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:a="{A}"><p:defaultTextStyle><a:defPPr/><a:defPPr/></p:defaultTextStyle></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:a="{A}"><p:defaultTextStyle><a:lvl3pPr/><a:lvl3pPr/></p:defaultTextStyle></p:presentation>"#
+            ),
+        ];
+        for xml in cases {
+            let blob = part(xml);
+            assert!(
+                PresentationPart::from_part(&blob)
+                    .unwrap()
+                    .default_text_style()
+                    .is_err()
+            );
+        }
     }
 
     #[test]

@@ -208,7 +208,7 @@ conversion, fonts, and image conversion are optional.
 |---------|--------|------|-------|-------|
 | Open/create/save | ✅ | ✅ | ✅ | Path and in-memory package workflows |
 | Slides and ordering | ✅ | ✅ | ✅ | Add, delete, duplicate, move, resize, enumerate slides and their hidden state, and validate root slide/master relationships |
-| Text, text boxes, and bullets | ✅ | ✅ | ✅ | Text extraction and formatted text-box authoring |
+| Text, text boxes, and bullets | ✅ | ✅ | ✅ | Text extraction and formatted text-box authoring, plus presentation-default text-style level inventory |
 | Basic shapes and groups | ✅ | ✅ | ✅ | Rectangles, ellipses, text boxes, nested groups, formatting, non-visual IDs, and placeholder inventories |
 | Images and backgrounds | ✅ | ✅ | ✅ | Picture resources plus solid, gradient, pattern, and relationship-resolved picture backgrounds with slide/layout/master inheritance |
 | Tables | ✅ | ✅ | ✅ | Table extraction and authoring |
