@@ -1,8 +1,10 @@
 /// Main presentation object - the high-level API for working with presentations.
 use crate::error::{OoxmlError, Result};
 use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_action_settings};
+use crate::pptx::handout::HandoutMaster;
 use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
 use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
+use crate::pptx::namespace::is_presentationml_name;
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
 use crate::pptx::parts::{
     NotesSize, PresentationDefaultTextStyle, PresentationMetadata, PresentationPart,
@@ -17,11 +19,15 @@ use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::Part;
+use quick_xml::events::Event;
+use quick_xml::reader::NsReader;
 
 const STRICT_SLIDE_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slide";
 const STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideMaster";
+const STRICT_HANDOUT_MASTER_RELATIONSHIP_TYPE: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/handoutMaster";
 
 fn resolve_presentation_relationship<'a>(
     presentation_part: &dyn Part,
@@ -72,6 +78,31 @@ fn resolve_presentation_relationship<'a>(
     }
 
     Ok(target)
+}
+
+fn validate_handout_master_root(xml: &[u8]) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if is_presentationml_name(&namespace, element.name(), b"handoutMaster") {
+                    return Ok(());
+                }
+                return Err(OoxmlError::InvalidFormat(
+                    "handout-master part must have a PresentationML handoutMaster root".to_string(),
+                ));
+            },
+            Event::Eof => {
+                return Err(OoxmlError::InvalidFormat(
+                    "handout-master part is missing its PresentationML root".to_string(),
+                ));
+            },
+            _ => {},
+        }
+    }
 }
 
 /// A chart part discovered on a presentation slide.
@@ -404,6 +435,39 @@ impl<'a> Presentation<'a> {
     /// Get the presentation-wide default text-style inventory.
     pub fn default_text_style(&self) -> Result<Option<PresentationDefaultTextStyle>> {
         self.part.default_text_style()
+    }
+
+    /// Get the relationship ID of the declared handout master.
+    ///
+    /// Returns None when the presentation does not declare a handout master.
+    pub fn handout_master_relationship_id(&self) -> Result<Option<String>> {
+        self.part.handout_master_relationship_id()
+    }
+
+    /// Resolve and parse the declared handout master.
+    ///
+    /// Returns None when the presentation does not declare a handout master.
+    /// The relationship must be internal, use a handout-master relationship
+    /// type, and target a PresentationML handout-master part.
+    pub fn handout_master(&self) -> Result<Option<HandoutMaster>> {
+        let Some(relationship_id) = self.handout_master_relationship_id()? else {
+            return Ok(None);
+        };
+        let handout_master = resolve_presentation_relationship(
+            self.part.part(),
+            self.package,
+            &relationship_id,
+            &[rt::HANDOUT_MASTER, STRICT_HANDOUT_MASTER_RELATIONSHIP_TYPE],
+            "handout-master",
+            ct::PML_HANDOUT_MASTER,
+        )?;
+        validate_handout_master_root(handout_master.blob())?;
+        let xml = std::str::from_utf8(handout_master.blob()).map_err(|error| {
+            OoxmlError::InvalidFormat(format!(
+                "handout-master relationship '{relationship_id}' targets non-UTF-8 XML: {error}"
+            ))
+        })?;
+        Ok(Some(HandoutMaster::parse_xml(xml)?))
     }
 
     // ========================================================================

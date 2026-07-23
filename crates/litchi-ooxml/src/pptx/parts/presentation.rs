@@ -407,6 +407,13 @@ impl<'a> PresentationPart<'a> {
         Ok(PresentationInfo::parse(self.xml_bytes())?.default_text_style)
     }
 
+    /// Get the relationship ID of the declared handout master.
+    ///
+    /// Returns None when the presentation does not declare a handout master.
+    pub fn handout_master_relationship_id(&self) -> Result<Option<String>> {
+        Ok(PresentationInfo::parse(self.xml_bytes())?.handout_master_relationship_id)
+    }
+
     /// Get the relationship IDs of all slides in presentation order.
     ///
     /// Returns a vector of relationship IDs that can be used to access
@@ -484,6 +491,7 @@ enum PresentationContext {
     Presentation,
     SlideList,
     MasterList,
+    HandoutMasterList,
     DefaultTextStyle,
     Other,
 }
@@ -496,8 +504,10 @@ struct PresentationInfo {
     notes_size: Option<NotesSize>,
     metadata: PresentationMetadata,
     default_text_style: Option<PresentationDefaultTextStyle>,
+    handout_master_relationship_id: Option<String>,
     seen_slide_list: bool,
     seen_master_list: bool,
+    seen_handout_master_list: bool,
 }
 
 impl PresentationInfo {
@@ -616,6 +626,16 @@ impl PresentationInfo {
             self.seen_master_list = true;
             Ok(PresentationContext::MasterList)
         } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"handoutMasterIdLst")
+        {
+            if self.seen_handout_master_list {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate PowerPoint handout-master ID list".to_string(),
+                ));
+            }
+            self.seen_handout_master_list = true;
+            Ok(PresentationContext::HandoutMasterList)
+        } else if parent == PresentationContext::Presentation
             && is_presentationml_name(namespace, element.name(), b"defaultTextStyle")
         {
             Ok(PresentationContext::DefaultTextStyle)
@@ -648,6 +668,15 @@ impl PresentationInfo {
                 ));
             }
             self.seen_master_list = true;
+        } else if parent == PresentationContext::Presentation
+            && is_presentationml_name(namespace, element.name(), b"handoutMasterIdLst")
+        {
+            if self.seen_handout_master_list {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate PowerPoint handout-master ID list".to_string(),
+                ));
+            }
+            self.seen_handout_master_list = true;
         }
         Ok(())
     }
@@ -716,6 +745,20 @@ impl PresentationInfo {
             let relationship_id =
                 required_relationship_id(element, decoder, resolver, "slide master")?;
             push_unique_reference(&mut self.masters, id, relationship_id, "slide master")?;
+        } else if parent == PresentationContext::HandoutMasterList
+            && is_presentationml_name(namespace, element.name(), b"handoutMasterId")
+        {
+            let relationship_id =
+                required_relationship_id(element, decoder, resolver, "handout master")?;
+            if self
+                .handout_master_relationship_id
+                .replace(relationship_id)
+                .is_some()
+            {
+                return Err(OoxmlError::InvalidFormat(
+                    "PowerPoint presentation has multiple handout-master references".to_string(),
+                ));
+            }
         }
         Ok(())
     }
@@ -1000,6 +1043,52 @@ mod tests {
     }
 
     #[test]
+    fn parses_handout_master_reference_by_namespace() {
+        let xml = format!(
+            r#"<q:presentation xmlns:q="{P}" xmlns:rel="{R}" xmlns:f="urn:foreign">
+                <f:handoutMasterIdLst><f:handoutMasterId rel:id="spoof"/></f:handoutMasterIdLst>
+                <q:handoutMasterIdLst><f:handoutMasterId rel:id="spoof"/>
+                    <q:handoutMasterId f:id="wrong" rel:id="handout-alpha">
+                        <q:extLst><q:handoutMasterId rel:id="nested"/></q:extLst>
+                    </q:handoutMasterId>
+                </q:handoutMasterIdLst>
+                <q:extLst><q:handoutMasterIdLst>
+                    <q:handoutMasterId rel:id="extension"/>
+                </q:handoutMasterIdLst></q:extLst>
+            </q:presentation>"#
+        );
+        let blob = part(xml);
+        let presentation = PresentationPart::from_part(&blob).unwrap();
+        assert_eq!(
+            presentation.handout_master_relationship_id().unwrap(),
+            Some("handout-alpha".to_string())
+        );
+
+        let strict = r#"<x:presentation xmlns:x="http://purl.oclc.org/ooxml/presentationml/main"
+            xmlns:z="http://purl.oclc.org/ooxml/officeDocument/relationships">
+            <x:handoutMasterIdLst><x:handoutMasterId z:id="strict-handout"/>
+            </x:handoutMasterIdLst></x:presentation>"#;
+        let blob = part(strict);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .handout_master_relationship_id()
+                .unwrap(),
+            Some("strict-handout".to_string())
+        );
+
+        let absent = format!(r#"<p:presentation xmlns:p="{P}"></p:presentation>"#);
+        let blob = part(absent);
+        assert_eq!(
+            PresentationPart::from_part(&blob)
+                .unwrap()
+                .handout_master_relationship_id()
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
     fn ignores_nested_and_foreign_reference_lookalikes() {
         let xml = format!(
             r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}" xmlns:f="urn:foreign">
@@ -1129,6 +1218,33 @@ mod tests {
                 PresentationPart::from_part(&blob)
                     .unwrap()
                     .default_text_style()
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_handout_master_references() {
+        let cases = [
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:handoutMasterIdLst><p:handoutMasterId/></p:handoutMasterIdLst></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:handoutMasterIdLst><p:handoutMasterId r:id=""/></p:handoutMasterIdLst></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:handoutMasterIdLst><p:handoutMasterId r:id="one"/><p:handoutMasterId r:id="two"/></p:handoutMasterIdLst></p:presentation>"#
+            ),
+            format!(
+                r#"<p:presentation xmlns:p="{P}"><p:handoutMasterIdLst/><p:handoutMasterIdLst/></p:presentation>"#
+            ),
+        ];
+        for xml in cases {
+            let blob = part(xml);
+            assert!(
+                PresentationPart::from_part(&blob)
+                    .unwrap()
+                    .handout_master_relationship_id()
                     .is_err()
             );
         }
