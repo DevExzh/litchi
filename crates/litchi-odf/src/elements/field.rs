@@ -513,6 +513,76 @@ impl OdfFormulaFieldDisplay {
     }
 }
 
+/// Display format permitted by ODF 1.2's `text:file-name` field (§19.796.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OdfFileNameDisplay {
+    Full,
+    Path,
+    Name,
+    NameAndExtension,
+}
+
+impl OdfFileNameDisplay {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Full => "full",
+            Self::Path => "path",
+            Self::Name => "name",
+            Self::NameAndExtension => "name-and-extension",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "full" => Ok(Self::Full),
+            "path" => Ok(Self::Path),
+            "name" => Ok(Self::Name),
+            "name-and-extension" => Ok(Self::NameAndExtension),
+            _ => Err(Error::InvalidFormat(format!(
+                "invalid file-name text:display '{value}'"
+            ))),
+        }
+    }
+}
+
+/// Display format permitted by ODF 1.2's `text:template-name` field (§19.796.8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OdfTemplateNameDisplay {
+    Area,
+    Full,
+    Name,
+    NameAndExtension,
+    Path,
+    Title,
+}
+
+impl OdfTemplateNameDisplay {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Area => "area",
+            Self::Full => "full",
+            Self::Name => "name",
+            Self::NameAndExtension => "name-and-extension",
+            Self::Path => "path",
+            Self::Title => "title",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "area" => Ok(Self::Area),
+            "full" => Ok(Self::Full),
+            "name" => Ok(Self::Name),
+            "name-and-extension" => Ok(Self::NameAndExtension),
+            "path" => Ok(Self::Path),
+            "title" => Ok(Self::Title),
+            _ => Err(Error::InvalidFormat(format!(
+                "invalid template-name text:display '{value}'"
+            ))),
+        }
+    }
+}
+
 /// Strict ODF `common-value-and-type-attlist` cached value group.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OdfCalculatedFieldValue {
@@ -1482,6 +1552,19 @@ pub enum OdfDynamicTextField {
         number_format: Option<OdfPageVariableNumberFormat>,
         display_text: String,
     },
+    /// Cached filename presentation; never reads a host path or document location.
+    FileName {
+        display: Option<OdfFileNameDisplay>,
+        fixed: Option<bool>,
+        display_text: String,
+    },
+    /// Cached template presentation; never opens or locates a template resource.
+    TemplateName {
+        display: Option<OdfTemplateNameDisplay>,
+        display_text: String,
+    },
+    /// Cached active spreadsheet sheet label; never resolves live sheet state.
+    SheetName { display_text: String },
     /// Cached presentation and optional fixed value of a metadata field.
     DocumentMetadata {
         kind: OdfDocumentMetadataFieldKind,
@@ -1550,6 +1633,9 @@ impl OdfDynamicTextField {
             | Self::PageContinuation { display_text, .. }
             | Self::PageVariableSet { display_text, .. }
             | Self::PageVariableGet { display_text, .. }
+            | Self::FileName { display_text, .. }
+            | Self::TemplateName { display_text, .. }
+            | Self::SheetName { display_text, .. }
             | Self::DocumentMetadata { display_text, .. }
             | Self::DocumentIdentity { display_text, .. }
             | Self::UserDefinedMetadata { display_text, .. } => display_text,
@@ -2089,6 +2175,30 @@ impl OdfDynamicTextField {
                     &mut aggregate,
                 )?;
             },
+            Self::FileName { display_text, .. } => {
+                validate_dynamic_value(
+                    "file-name display text",
+                    Some(display_text),
+                    false,
+                    &mut aggregate,
+                )?;
+            },
+            Self::TemplateName { display_text, .. } => {
+                validate_dynamic_value(
+                    "template-name display text",
+                    Some(display_text),
+                    false,
+                    &mut aggregate,
+                )?;
+            },
+            Self::SheetName { display_text } => {
+                validate_dynamic_value(
+                    "sheet-name display text",
+                    Some(display_text),
+                    false,
+                    &mut aggregate,
+                )?;
+            },
             Self::DocumentMetadata {
                 kind,
                 value,
@@ -2234,6 +2344,9 @@ impl OdfDynamicTextField {
             Self::PageContinuation { .. } => Element::new("text:page-continuation"),
             Self::PageVariableSet { .. } => Element::new("text:page-variable-set"),
             Self::PageVariableGet { .. } => Element::new("text:page-variable-get"),
+            Self::FileName { .. } => Element::new("text:file-name"),
+            Self::TemplateName { .. } => Element::new("text:template-name"),
+            Self::SheetName { .. } => Element::new("text:sheet-name"),
             Self::DocumentMetadata { kind, .. } => Element::new(kind.element_name()),
             Self::DocumentIdentity { kind, .. } => Element::new(kind.element_name()),
             Self::UserDefinedMetadata { .. } => Element::new("text:user-defined"),
@@ -2623,6 +2736,31 @@ impl OdfDynamicTextField {
                         );
                     }
                 }
+                element.set_text(display_text);
+            },
+            Self::FileName {
+                display,
+                fixed,
+                display_text,
+            } => {
+                if let Some(display) = display {
+                    element.set_attribute("text:display", display.as_str());
+                }
+                if let Some(fixed) = fixed {
+                    element.set_attribute("text:fixed", if *fixed { "true" } else { "false" });
+                }
+                element.set_text(display_text);
+            },
+            Self::TemplateName {
+                display,
+                display_text,
+            } => {
+                if let Some(display) = display {
+                    element.set_attribute("text:display", display.as_str());
+                }
+                element.set_text(display_text);
+            },
+            Self::SheetName { display_text } => {
                 element.set_text(display_text);
             },
             Self::DocumentMetadata {
@@ -3289,6 +3427,41 @@ impl Field {
                     number_format: parse_common_number_format(self)?,
                     display_text: text(),
                 }
+            },
+            "text:file-name" => {
+                reject_unknown_field_attributes(self, &["text:display", "text:fixed"])?;
+                let result = OdfDynamicTextField::FileName {
+                    display: self
+                        .element
+                        .get_attribute("text:display")
+                        .map(OdfFileNameDisplay::parse)
+                        .transpose()?,
+                    fixed: optional_field_bool(self, "text:fixed")?,
+                    display_text: text(),
+                };
+                result.validate()?;
+                result
+            },
+            "text:template-name" => {
+                reject_unknown_field_attributes(self, &["text:display"])?;
+                let result = OdfDynamicTextField::TemplateName {
+                    display: self
+                        .element
+                        .get_attribute("text:display")
+                        .map(OdfTemplateNameDisplay::parse)
+                        .transpose()?,
+                    display_text: text(),
+                };
+                result.validate()?;
+                result
+            },
+            "text:sheet-name" => {
+                reject_unknown_field_attributes(self, &[])?;
+                let result = OdfDynamicTextField::SheetName {
+                    display_text: text(),
+                };
+                result.validate()?;
+                result
             },
             "text:creation-date"
             | "text:creation-time"
@@ -6870,6 +7043,145 @@ mod document_identity_fixed_field_tests {
         let forbidden = OdfDynamicTextField::DocumentIdentity {
             kind: OdfDocumentIdentityFieldKind::Title,
             fixed: Some(true),
+            display_text: "bad\u{0}".to_string(),
+        };
+        assert!(forbidden.to_xml_fragment().is_err());
+    }
+}
+
+#[cfg(test)]
+mod document_context_field_tests {
+    use super::*;
+
+    fn document(body: &str) -> String {
+        format!(
+            r#"<o:document-content
+                xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+                <o:body><o:text><t:p>{body}</t:p></o:text></o:body>
+            </o:document-content>"#
+        )
+    }
+
+    #[test]
+    fn document_context_fields_round_trip_every_standard_display() {
+        let fields = vec![
+            OdfDynamicTextField::FileName {
+                display: Some(OdfFileNameDisplay::Full),
+                fixed: Some(true),
+                display_text: "file:///cached/report.odt".to_string(),
+            },
+            OdfDynamicTextField::FileName {
+                display: Some(OdfFileNameDisplay::Path),
+                fixed: Some(false),
+                display_text: "file:///cached/".to_string(),
+            },
+            OdfDynamicTextField::FileName {
+                display: Some(OdfFileNameDisplay::Name),
+                fixed: None,
+                display_text: "report".to_string(),
+            },
+            OdfDynamicTextField::FileName {
+                display: Some(OdfFileNameDisplay::NameAndExtension),
+                fixed: None,
+                display_text: "report.odt".to_string(),
+            },
+            OdfDynamicTextField::TemplateName {
+                display: Some(OdfTemplateNameDisplay::Area),
+                display_text: "Business".to_string(),
+            },
+            OdfDynamicTextField::TemplateName {
+                display: Some(OdfTemplateNameDisplay::Full),
+                display_text: "file:///templates/Letter.ott".to_string(),
+            },
+            OdfDynamicTextField::TemplateName {
+                display: Some(OdfTemplateNameDisplay::Name),
+                display_text: "Letter".to_string(),
+            },
+            OdfDynamicTextField::TemplateName {
+                display: Some(OdfTemplateNameDisplay::NameAndExtension),
+                display_text: "Letter.ott".to_string(),
+            },
+            OdfDynamicTextField::TemplateName {
+                display: Some(OdfTemplateNameDisplay::Path),
+                display_text: "file:///templates/".to_string(),
+            },
+            OdfDynamicTextField::TemplateName {
+                display: Some(OdfTemplateNameDisplay::Title),
+                display_text: "Cached template & <title>".to_string(),
+            },
+            OdfDynamicTextField::SheetName {
+                display_text: "Sheet 1".to_string(),
+            },
+        ];
+        let body = fields
+            .iter()
+            .map(OdfDynamicTextField::to_xml_fragment)
+            .collect::<Result<Vec<_>>>()
+            .unwrap()
+            .join("");
+        let parsed = FieldParser::parse_dynamic_text_fields(&document(&body)).unwrap();
+        assert_eq!(parsed, fields);
+        assert_eq!(parsed[10].display_text(), "Sheet 1");
+    }
+
+    #[test]
+    fn document_context_fields_preserve_attribute_omission() {
+        let xml = document(
+            r#"<t:file-name>cached.odt</t:file-name>
+               <t:template-name>Letter</t:template-name>
+               <t:sheet-name>Budget</t:sheet-name>"#,
+        );
+        let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
+        assert_eq!(fields.len(), 3);
+        assert!(matches!(
+            &fields[0],
+            OdfDynamicTextField::FileName {
+                display: None,
+                fixed: None,
+                ..
+            }
+        ));
+        assert!(matches!(
+            &fields[1],
+            OdfDynamicTextField::TemplateName { display: None, .. }
+        ));
+        assert!(matches!(&fields[2], OdfDynamicTextField::SheetName { .. }));
+    }
+
+    #[test]
+    fn document_context_fields_reject_hostile_attributes_and_bounds() {
+        let invalid = [
+            r#"<t:file-name t:display="directory">report</t:file-name>"#,
+            r#"<t:file-name t:fixed="yes">report</t:file-name>"#,
+            r#"<t:file-name t:template-name="Letter">report</t:file-name>"#,
+            r#"<t:template-name t:display="extension">Letter</t:template-name>"#,
+            r#"<t:template-name t:fixed="true">Letter</t:template-name>"#,
+            r#"<t:sheet-name t:display="name">Budget</t:sheet-name>"#,
+        ];
+        for body in invalid {
+            assert!(
+                FieldParser::parse_dynamic_text_fields(&document(body)).is_err(),
+                "accepted {body}"
+            );
+        }
+
+        let wrong_namespace = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+            xmlns:x="urn:not-text"><o:body><o:text><t:p>
+            <t:file-name x:display="full">spoof</t:file-name>
+            </t:p></o:text></o:body></o:document-content>"#;
+        assert!(FieldParser::parse_dynamic_text_fields(wrong_namespace).is_err());
+
+        let oversized = OdfDynamicTextField::FileName {
+            display: None,
+            fixed: None,
+            display_text: "x".repeat(MAX_DYNAMIC_FIELD_VALUE + 1),
+        };
+        assert!(oversized.to_xml_fragment().is_err());
+        let forbidden = OdfDynamicTextField::TemplateName {
+            display: Some(OdfTemplateNameDisplay::Title),
             display_text: "bad\u{0}".to_string(),
         };
         assert!(forbidden.to_xml_fragment().is_err());
