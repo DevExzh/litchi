@@ -14,12 +14,13 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    ActiveContentField, AdvanceField, AutoTextField, AutoTextListField, CompareField, DdeField,
-    DocumentContextField, DocumentInformationField, DocumentVariableField, ExternalIncludeField,
-    Field, FieldStory, FieldText, FieldsTable, FormulaField, GoToButtonField, IfField, IndexField,
-    LinkField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
-    MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PromptField,
-    QuoteField, ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
+    ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
+    CompareField, DdeField, DocumentContextField, DocumentInformationField, DocumentVariableField,
+    ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
+    GoToButtonField, IfField, IndexField, LinkField, MacroButtonField,
+    MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PromptField, QuoteField,
+    ReferenceField, SequenceField, SetField, StyleReferenceField, SymbolField,
     TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
@@ -750,6 +751,25 @@ impl Document {
     /// Get the number of typed, inert `SYMBOL` fields.
     pub fn symbol_field_count(&self) -> Result<usize> {
         Ok(self.symbol_fields()?.len())
+    }
+
+    /// Get typed, inert legacy automatic-numbering fields in story and source order.
+    ///
+    /// Returned values expose only stored kinds, switches, cached results, and
+    /// field state. This method never calculates paragraph numbers, reads
+    /// heading or style state, changes paragraphs or layout, or refreshes a
+    /// field.
+    pub fn auto_number_fields(&self) -> Result<Vec<AutoNumberField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::auto_number_field)
+            .collect())
+    }
+
+    /// Get the number of typed, inert legacy automatic-numbering fields.
+    pub fn auto_number_field_count(&self) -> Result<usize> {
+        Ok(self.auto_number_fields()?.len())
     }
 
     /// Get typed, inert `SEQ` fields in story and source order.
