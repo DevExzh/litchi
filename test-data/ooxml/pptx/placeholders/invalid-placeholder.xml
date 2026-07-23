@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp>
+        <p:nvSpPr>
+          <p:nvPr><p:ph type="&unknown;"/></p:nvPr>
+        </p:nvSpPr>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>

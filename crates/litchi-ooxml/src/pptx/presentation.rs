@@ -627,8 +627,8 @@ impl<'a> Presentation<'a> {
             let placeholders: Vec<String> = slide
                 .placeholders()?
                 .iter()
-                .filter_map(|s| s.placeholder_type().ok())
-                .collect();
+                .map(|shape| shape.placeholder_type())
+                .collect::<Result<Vec<_>>>()?;
 
             Ok(Some(placeholders))
         } else {
