@@ -14,8 +14,8 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    AdvanceField, CompareField, DdeField, DocumentVariableField, Field, FieldStory, FieldText,
-    FieldsTable, GoToButtonField, IfField, LinkField, MacroButtonField,
+    AdvanceField, CompareField, DdeField, DocumentVariableField, ExternalIncludeField, Field,
+    FieldStory, FieldText, FieldsTable, GoToButtonField, IfField, LinkField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
     MailMergeRecipientField, MergeField, PromptField, UserIdentityField,
 };
@@ -672,6 +672,25 @@ impl Document {
     /// Get the number of typed, inert `LINK` fields.
     pub fn link_field_count(&self) -> Result<usize> {
         Ok(self.link_fields()?.len())
+    }
+
+    /// Get typed, inert `INCLUDETEXT` and `INCLUDEPICTURE` fields in story and source order.
+    ///
+    /// Returned values expose only stored source, bookmark, converter,
+    /// XML-option, cached-result, and field-state metadata. This method never
+    /// opens, resolves, imports, fetches, refreshes, transforms, converts,
+    /// evaluates, or executes an external source.
+    pub fn external_includes(&self) -> Result<Vec<ExternalIncludeField>> {
+        let fields = self.fields()?;
+        Ok(fields
+            .iter()
+            .filter_map(FieldText::external_include)
+            .collect())
+    }
+
+    /// Get the number of typed, inert `INCLUDETEXT` and `INCLUDEPICTURE` fields.
+    pub fn external_include_count(&self) -> Result<usize> {
+        Ok(self.external_includes()?.len())
     }
 
     /// Get typed, inert `MERGEREC` and `MERGESEQ` fields in story and source order.

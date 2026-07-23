@@ -1062,6 +1062,143 @@ impl LinkField {
     }
 }
 
+/// The kind of externally sourced legacy Word include field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IncludeFieldKind {
+    /// An `INCLUDETEXT` field that stores a document or XML source.
+    Text,
+    /// An `INCLUDEPICTURE` field that stores an image source.
+    Picture,
+}
+
+/// One recognized stored option of a legacy Word external-include field.
+///
+/// These values are configuration metadata only. This API never opens,
+/// resolves, imports, transforms, or evaluates the referenced source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExternalIncludeOption {
+    /// A document or graphics converter name from the `\\c` switch.
+    Converter(String),
+    /// A source encoding from the `INCLUDETEXT \\e` switch.
+    Encoding(String),
+    /// A source MIME type from the `INCLUDETEXT \\m` switch.
+    MimeType(String),
+    /// An XML namespace mapping from the `INCLUDETEXT \\n` switch.
+    NamespaceMapping(String),
+    /// An XSLT location from the `INCLUDETEXT \\t` switch.
+    Xslt(String),
+    /// An XPath expression from the `INCLUDETEXT \\x` switch.
+    XPath(String),
+}
+
+/// Typed, inert metadata for a legacy Word `INCLUDETEXT` or `INCLUDEPICTURE` field.
+///
+/// ECMA-376 Part 1 §§17.16.5.27–28 defines these stored source operands and
+/// switches, while [MS-DOC] §2.9.90 identifies their native field-type bytes.
+/// Source identifiers, bookmarks, options, and cached results are retained as
+/// stored field data. This type never opens, resolves, imports, fetches,
+/// refreshes, transforms, converts, evaluates, or executes source content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalIncludeField {
+    field: Field,
+    instruction: String,
+    kind: IncludeFieldKind,
+    source: String,
+    bookmark: Option<String>,
+    suppress_nested_field_updates: bool,
+    omit_picture_data: bool,
+    options: Vec<ExternalIncludeOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
+    cached_result: Option<String>,
+}
+
+impl ExternalIncludeField {
+    /// Return the paired field markers and their story-relative positions.
+    pub fn field(&self) -> &Field {
+        &self.field
+    }
+
+    /// Return the complete stored field instruction.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return whether this stores an `INCLUDETEXT` or `INCLUDEPICTURE` field.
+    pub fn kind(&self) -> IncludeFieldKind {
+        self.kind
+    }
+
+    /// Return the stored source identifier without opening or resolving it.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Return the optional stored `INCLUDETEXT` bookmark selector.
+    ///
+    /// `INCLUDEPICTURE` fields do not define a bookmark operand, so they
+    /// always return `None` here.
+    pub fn bookmark(&self) -> Option<&str> {
+        self.bookmark.as_deref()
+    }
+
+    /// Return the optional stored `\\c` converter name.
+    ///
+    /// The converter is never looked up or invoked.
+    pub fn converter(&self) -> Option<&str> {
+        self.options.iter().find_map(|option| match option {
+            ExternalIncludeOption::Converter(value) => Some(value.as_str()),
+            _ => None,
+        })
+    }
+
+    /// Return recognized converter and XML options in stored source order.
+    ///
+    /// All options are inert metadata. This method never resolves a converter,
+    /// opens a source, runs XSLT, or evaluates XPath.
+    pub fn options(&self) -> &[ExternalIncludeOption] {
+        &self.options
+    }
+
+    /// Whether the stored `INCLUDETEXT \\!` switch suppresses nested field updates.
+    ///
+    /// This is stored metadata only. The API never performs an update.
+    pub fn suppresses_nested_field_updates(&self) -> bool {
+        self.suppress_nested_field_updates
+    }
+
+    /// Whether the stored `INCLUDEPICTURE \\d` switch omits picture data.
+    ///
+    /// This is stored metadata only. The API never reads the source to obtain
+    /// omitted picture data.
+    pub fn omits_picture_data(&self) -> bool {
+        self.omit_picture_data
+    }
+
+    /// Return unrecognized stored field switches in source order.
+    ///
+    /// These values are preserved as inert metadata and never interpreted.
+    pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
+        &self.unknown_switches
+    }
+
+    /// Return the stored cached field result, if present.
+    ///
+    /// This value is never regenerated from an external source.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a producer marked the stored result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.field.end_flags.results_dirty
+    }
+
+    /// Whether a producer locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.field.end_flags.locked
+    }
+}
+
 /// The stored kind of a legacy Word mail-merge counter field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MailMergeCounterKind {
@@ -1909,6 +2046,36 @@ impl FieldText {
         })
     }
 
+    /// Return inert typed metadata when this is a well-formed `INCLUDETEXT` or
+    /// `INCLUDEPICTURE` field.
+    ///
+    /// Stored source, bookmark, converter, and XML-option data are never used
+    /// to open, resolve, import, fetch, refresh, transform, convert, evaluate,
+    /// or execute source content. Malformed instructions remain available
+    /// through this generic type and return `None` here.
+    pub fn external_include(&self) -> Option<ExternalIncludeField> {
+        let parts = parse_external_include_field_parts(&self.instruction)?;
+        if !matches!(
+            (self.field.field_type, parts.kind),
+            (FieldType::IncludeText, IncludeFieldKind::Text)
+                | (FieldType::IncludePicture, IncludeFieldKind::Picture)
+        ) {
+            return None;
+        }
+        Some(ExternalIncludeField {
+            field: self.field.clone(),
+            instruction: self.instruction.clone(),
+            kind: parts.kind,
+            source: parts.source,
+            bookmark: parts.bookmark,
+            suppress_nested_field_updates: parts.suppress_nested_field_updates,
+            omit_picture_data: parts.omit_picture_data,
+            options: parts.options,
+            unknown_switches: parts.unknown_switches,
+            cached_result: self.result.clone(),
+        })
+    }
+
     /// Return inert typed metadata when this is a well-formed mail-merge counter.
     ///
     /// The stored kind and cached result are never used to select or count
@@ -2144,6 +2311,8 @@ const MAX_DDE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DDE_FIELD_SWITCHES: usize = 64;
 const MAX_LINK_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_LINK_FIELD_SWITCHES: usize = 64;
+const MAX_EXTERNAL_INCLUDE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_EXTERNAL_INCLUDE_FIELD_SWITCHES: usize = 64;
 const MAX_MAIL_MERGE_COUNTER_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_NEXT_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_MAIL_MERGE_CONDITIONAL_CONTROL_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -2175,6 +2344,16 @@ struct LinkFieldParts {
     result_options: Vec<LinkResultOption>,
     formatting_modes: Vec<LinkFormatting>,
     switches: Vec<MergeFieldSwitch>,
+}
+
+struct ExternalIncludeFieldParts {
+    kind: IncludeFieldKind,
+    source: String,
+    bookmark: Option<String>,
+    suppress_nested_field_updates: bool,
+    omit_picture_data: bool,
+    options: Vec<ExternalIncludeOption>,
+    unknown_switches: Vec<MergeFieldSwitch>,
 }
 
 fn parse_macro_button_parts(instruction: &str) -> Option<(String, String)> {
@@ -2525,6 +2704,106 @@ fn parse_link_field_parts(instruction: &str) -> Option<LinkFieldParts> {
         result_options,
         formatting_modes,
         switches,
+    })
+}
+
+fn parse_external_include_field_parts(instruction: &str) -> Option<ExternalIncludeFieldParts> {
+    if instruction.len() > MAX_EXTERNAL_INCLUDE_FIELD_INSTRUCTION_BYTES {
+        return None;
+    }
+
+    let mut position = 0;
+    let keyword = next_field_argument(instruction, &mut position).ok()??;
+    let kind = if keyword.eq_ignore_ascii_case("INCLUDETEXT") {
+        IncludeFieldKind::Text
+    } else if keyword.eq_ignore_ascii_case("INCLUDEPICTURE") {
+        IncludeFieldKind::Picture
+    } else {
+        return None;
+    };
+
+    let source = next_field_argument(instruction, &mut position).ok()??;
+    if source.is_empty() {
+        return None;
+    }
+
+    skip_field_whitespace(instruction, &mut position);
+    let bookmark = match (kind, peek_field_character(instruction, position)) {
+        (IncludeFieldKind::Text, None | Some('\\')) => None,
+        (IncludeFieldKind::Text, Some(_)) => {
+            Some(next_field_argument(instruction, &mut position).ok()??)
+        },
+        (IncludeFieldKind::Picture, _) => None,
+    };
+
+    let mut suppress_nested_field_updates = false;
+    let mut omit_picture_data = false;
+    let mut options = Vec::new();
+    let mut unknown_switches = Vec::new();
+    let mut switch_count = 0;
+    loop {
+        skip_field_whitespace(instruction, &mut position);
+        let Some(introducer) = next_field_character(instruction, &mut position) else {
+            break;
+        };
+        if introducer != '\\' || switch_count >= MAX_EXTERNAL_INCLUDE_FIELD_SWITCHES {
+            return None;
+        }
+        switch_count += 1;
+
+        let name = next_field_character(instruction, &mut position)?;
+        if name == '\\' || name.is_whitespace() {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        skip_field_whitespace(instruction, &mut position);
+        let argument = match peek_field_character(instruction, position) {
+            None | Some('\\') => None,
+            Some(_) => next_field_argument(instruction, &mut position).ok()?,
+        };
+
+        match (kind, name) {
+            (_, 'c') => options.push(ExternalIncludeOption::Converter(argument?)),
+            (IncludeFieldKind::Text, 'e') => {
+                options.push(ExternalIncludeOption::Encoding(argument?));
+            },
+            (IncludeFieldKind::Text, 'm') => {
+                options.push(ExternalIncludeOption::MimeType(argument?));
+            },
+            (IncludeFieldKind::Text, 'n') => {
+                options.push(ExternalIncludeOption::NamespaceMapping(argument?));
+            },
+            (IncludeFieldKind::Text, 't') => {
+                options.push(ExternalIncludeOption::Xslt(argument?));
+            },
+            (IncludeFieldKind::Text, 'x') => {
+                options.push(ExternalIncludeOption::XPath(argument?));
+            },
+            (IncludeFieldKind::Text, '!') => {
+                if suppress_nested_field_updates || argument.is_some() {
+                    return None;
+                }
+                suppress_nested_field_updates = true;
+            },
+            (IncludeFieldKind::Picture, 'd') => {
+                if omit_picture_data || argument.is_some() {
+                    return None;
+                }
+                omit_picture_data = true;
+            },
+            _ => unknown_switches.push(MergeFieldSwitch { name, argument }),
+        }
+    }
+
+    Some(ExternalIncludeFieldParts {
+        kind,
+        source,
+        bookmark,
+        suppress_nested_field_updates,
+        omit_picture_data,
+        options,
+        unknown_switches,
     })
 }
 
@@ -3861,6 +4140,118 @@ mod tests {
             ..text
         };
         assert!(wrong_type.link_field().is_none());
+    }
+
+    #[test]
+    fn external_include_fields_expose_cached_metadata_without_opening_sources() {
+        let field = Field {
+            story: FieldStory::Textbox,
+            start_cp: 4,
+            separator_cp: Some(37),
+            end_cp: 52,
+            field_type: FieldType::IncludeText,
+            end_flags: FieldEndFlags {
+                results_dirty: true,
+                locked: true,
+                has_separator: true,
+                ..FieldEndFlags::default()
+            },
+            nesting_depth: 1,
+            has_separator: true,
+        };
+        let text = FieldText {
+            field: field.clone(),
+            instruction: r#" INCLUDETEXT "unavailable.xml" Summary \! \c Word8 \e utf-8 \m application/xml \n "xmlns:a=\"resume-schema\"" \t "file:///unavailable.xsl" \x a:Resume/a:Name \* MERGEFORMAT "#
+                .to_string(),
+            result: Some("cached include".to_string()),
+        };
+
+        let include = text.external_include().unwrap();
+        assert_eq!(include.field(), &field);
+        assert_eq!(include.instruction(), text.instruction);
+        assert_eq!(include.kind(), IncludeFieldKind::Text);
+        assert_eq!(include.source(), "unavailable.xml");
+        assert_eq!(include.bookmark(), Some("Summary"));
+        assert_eq!(include.converter(), Some("Word8"));
+        assert!(include.suppresses_nested_field_updates());
+        assert!(!include.omits_picture_data());
+        assert_eq!(
+            include.options(),
+            &[
+                ExternalIncludeOption::Converter("Word8".to_string()),
+                ExternalIncludeOption::Encoding("utf-8".to_string()),
+                ExternalIncludeOption::MimeType("application/xml".to_string()),
+                ExternalIncludeOption::NamespaceMapping("xmlns:a=\"resume-schema\"".to_string()),
+                ExternalIncludeOption::Xslt("file:///unavailable.xsl".to_string()),
+                ExternalIncludeOption::XPath("a:Resume/a:Name".to_string()),
+            ]
+        );
+        assert_eq!(include.unknown_switches().len(), 1);
+        assert_eq!(include.unknown_switches()[0].name(), '*');
+        assert_eq!(
+            include.unknown_switches()[0].argument(),
+            Some("MERGEFORMAT")
+        );
+        assert_eq!(include.cached_result(), Some("cached include"));
+        assert!(include.is_dirty());
+        assert!(include.is_locked());
+
+        let picture = FieldText {
+            field: Field {
+                field_type: FieldType::IncludePicture,
+                ..field.clone()
+            },
+            instruction: r#"INCLUDEPICTURE "unavailable.gif" \c Pictim32 \d \* MERGEFORMAT"#
+                .to_string(),
+            result: Some("cached picture".to_string()),
+        };
+        let picture_include = picture.external_include().unwrap();
+        assert_eq!(picture_include.kind(), IncludeFieldKind::Picture);
+        assert_eq!(picture_include.source(), "unavailable.gif");
+        assert_eq!(picture_include.bookmark(), None);
+        assert_eq!(picture_include.converter(), Some("Pictim32"));
+        assert_eq!(
+            picture_include.options(),
+            &[ExternalIncludeOption::Converter("Pictim32".to_string())]
+        );
+        assert!(!picture_include.suppresses_nested_field_updates());
+        assert!(picture_include.omits_picture_data());
+        assert_eq!(picture_include.cached_result(), Some("cached picture"));
+
+        for instruction in [
+            "INCLUDETEXT",
+            r#"INCLUDETEXT \c Word8"#,
+            r#"INCLUDETEXT source \! unexpected"#,
+            r#"INCLUDETEXT source \e"#,
+            r#"INCLUDETEXT source \! \!"#,
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..text.clone()
+            };
+            assert!(malformed.external_include().is_none(), "{instruction}");
+        }
+        for instruction in [
+            r#"INCLUDEPICTURE "picture.gif" Selector"#,
+            r#"INCLUDEPICTURE "picture.gif" \d extra"#,
+            r#"INCLUDEPICTURE "picture.gif" \d \d"#,
+            r#"INCLUDEPICTURE "picture.gif" \c"#,
+        ] {
+            let malformed = FieldText {
+                instruction: instruction.to_string(),
+                ..picture.clone()
+            };
+            assert!(malformed.external_include().is_none(), "{instruction}");
+        }
+
+        let wrong_type = FieldText {
+            field: Field {
+                field_type: FieldType::IncludePicture,
+                ..field
+            },
+            ..text
+        };
+        assert!(wrong_type.external_include().is_none());
     }
 
     #[test]
