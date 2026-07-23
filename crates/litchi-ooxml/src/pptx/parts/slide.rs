@@ -94,12 +94,14 @@ impl MasterVisibility {
                 b"showMasterSp",
                 decoder,
                 root_label,
+                true,
             )?,
             show_master_placeholder_animations: parse_boolean_attribute(
                 element,
                 b"showMasterPhAnim",
                 decoder,
                 root_label,
+                true,
             )?,
         })
     }
@@ -110,6 +112,82 @@ impl Default for MasterVisibility {
         Self {
             show_master_shapes: true,
             show_master_placeholder_animations: true,
+        }
+    }
+}
+
+/// Root-level metadata declared by a slide layout.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlideLayoutMetadata {
+    matching_name: String,
+    layout_type: String,
+    preserve: bool,
+    user_drawn: bool,
+}
+
+impl SlideLayoutMetadata {
+    /// Return the name used to match this layout during template changes.
+    ///
+    /// This is empty when the matchingName attribute is omitted.
+    #[inline]
+    pub fn matching_name(&self) -> &str {
+        &self.matching_name
+    }
+
+    /// Return the layout type token.
+    ///
+    /// This is cust when the type attribute is omitted.
+    #[inline]
+    pub fn layout_type(&self) -> &str {
+        &self.layout_type
+    }
+
+    /// Whether the layout is retained after its dependent slides are removed.
+    #[inline]
+    pub const fn is_preserved(&self) -> bool {
+        self.preserve
+    }
+
+    /// Whether the layout is marked as user-drawn.
+    #[inline]
+    pub const fn is_user_drawn(&self) -> bool {
+        self.user_drawn
+    }
+
+    fn from_element(
+        element: &BytesStart<'_>,
+        decoder: quick_xml::encoding::Decoder,
+    ) -> Result<Self> {
+        Ok(Self {
+            matching_name: unqualified_attribute_value(element, b"matchingName", decoder)?
+                .unwrap_or_default(),
+            layout_type: unqualified_attribute_value(element, b"type", decoder)?
+                .unwrap_or_else(|| "cust".to_string()),
+            preserve: parse_boolean_attribute(
+                element,
+                b"preserve",
+                decoder,
+                "slide layout",
+                false,
+            )?,
+            user_drawn: parse_boolean_attribute(
+                element,
+                b"userDrawn",
+                decoder,
+                "slide layout",
+                false,
+            )?,
+        })
+    }
+}
+
+impl Default for SlideLayoutMetadata {
+    fn default() -> Self {
+        Self {
+            matching_name: String::new(),
+            layout_type: "cust".to_string(),
+            preserve: false,
+            user_drawn: false,
         }
     }
 }
@@ -125,7 +203,12 @@ fn parse_master_visibility(
 
 fn parse_slide_show(xml: &[u8]) -> Result<bool> {
     let (element, decoder) = read_root_element(xml, b"sld", "slide")?;
-    parse_boolean_attribute(&element, b"show", decoder, "slide")
+    parse_boolean_attribute(&element, b"show", decoder, "slide", true)
+}
+
+fn parse_slide_layout_metadata(xml: &[u8]) -> Result<SlideLayoutMetadata> {
+    let (element, decoder) = read_root_element(xml, b"sldLayout", "slide layout")?;
+    SlideLayoutMetadata::from_element(&element, decoder)
 }
 
 fn read_root_element(
@@ -204,9 +287,10 @@ fn parse_boolean_attribute(
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
     root_label: &str,
+    default: bool,
 ) -> Result<bool> {
     let Some(value) = unqualified_attribute_value(element, name, decoder)? else {
-        return Ok(true);
+        return Ok(default);
     };
     match value.as_str() {
         "true" | "1" => Ok(true),
@@ -338,6 +422,11 @@ impl<'a> SlideLayoutPart<'a> {
     /// Get the layout name.
     pub fn name(&self) -> Result<String> {
         presentation_name(self.xml_bytes())
+    }
+
+    /// Get the root-level metadata declared by this slide layout.
+    pub fn metadata(&self) -> Result<SlideLayoutMetadata> {
+        parse_slide_layout_metadata(self.xml_bytes())
     }
 
     /// Get all shapes defined by this layout.
@@ -650,5 +739,37 @@ mod tests {
 
         let wrong_root = format!(r#"<p:sldLayout xmlns:p="{P}"><p:cSld/></p:sldLayout>"#);
         assert!(parse_slide_show(wrong_root.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn slide_layout_metadata_reports_values_and_defaults() {
+        let defined = format!(
+            r#"<p:sldLayout xmlns:p="{P}" matchingName="Picture Caption" type="picTx"
+                preserve="1" userDrawn="false"><p:cSld/></p:sldLayout>"#
+        );
+        let metadata = parse_slide_layout_metadata(defined.as_bytes()).unwrap();
+        assert_eq!(metadata.matching_name(), "Picture Caption");
+        assert_eq!(metadata.layout_type(), "picTx");
+        assert!(metadata.is_preserved());
+        assert!(!metadata.is_user_drawn());
+
+        let strict_default = r#"<q:sldLayout
+            xmlns:q="http://purl.oclc.org/ooxml/presentationml/main"><q:cSld/></q:sldLayout>"#;
+        let metadata = parse_slide_layout_metadata(strict_default.as_bytes()).unwrap();
+        assert_eq!(metadata, SlideLayoutMetadata::default());
+        assert_eq!(metadata.matching_name(), "");
+        assert_eq!(metadata.layout_type(), "cust");
+        assert!(!metadata.is_preserved());
+        assert!(!metadata.is_user_drawn());
+    }
+
+    #[test]
+    fn slide_layout_metadata_rejects_invalid_boolean_values_and_roots() {
+        let invalid_value =
+            format!(r#"<p:sldLayout xmlns:p="{P}" preserve="sometimes"><p:cSld/></p:sldLayout>"#);
+        assert!(parse_slide_layout_metadata(invalid_value.as_bytes()).is_err());
+
+        let wrong_root = format!(r#"<p:sld xmlns:p="{P}"><p:cSld/></p:sld>"#);
+        assert!(parse_slide_layout_metadata(wrong_root.as_bytes()).is_err());
     }
 }

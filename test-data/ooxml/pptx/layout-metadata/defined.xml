@@ -1,0 +1,6 @@
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    matchingName="Picture Caption" type="picTx" preserve="1" userDrawn="0">
+  <p:cSld name="Picture with Caption">
+    <p:spTree/>
+  </p:cSld>
+</p:sldLayout>

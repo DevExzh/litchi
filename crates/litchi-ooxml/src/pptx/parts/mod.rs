@@ -53,5 +53,7 @@ pub use comment::{
     generate_comments_xml,
 };
 pub use presentation::PresentationPart;
-pub use slide::{MasterVisibility, SlideLayoutPart, SlideMasterPart, SlidePart};
+pub use slide::{
+    MasterVisibility, SlideLayoutMetadata, SlideLayoutPart, SlideMasterPart, SlidePart,
+};
 pub use theme::{Theme, ThemeColor, ThemeFont, ThemePart};

@@ -2,7 +2,7 @@
 use crate::error::{OoxmlError, Result};
 use crate::pptx::color_map::{ColorMap, ColorMapOverride, ColorMapSlot};
 use crate::pptx::parts::{
-    MasterVisibility, SlideLayoutPart, SlideMasterPart, SlidePart, ThemePart,
+    MasterVisibility, SlideLayoutMetadata, SlideLayoutPart, SlideMasterPart, SlidePart, ThemePart,
 };
 use crate::pptx::shapes::base::BaseShape;
 use litchi_opc::OpcPackage;
@@ -814,6 +814,11 @@ impl<'a> SlideLayout<'a> {
     /// ```
     pub fn name(&self) -> Result<String> {
         self.part.name()
+    }
+
+    /// Get the root-level metadata declared by this slide layout.
+    pub fn metadata(&self) -> Result<SlideLayoutMetadata> {
+        self.part.metadata()
     }
 
     /// Get all shapes defined by this slide layout.
