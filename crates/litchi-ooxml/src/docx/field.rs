@@ -21,6 +21,7 @@ const MAX_AUTO_TEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_AUTO_TEXT_LIST_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_PROPERTY_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_EMBED_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
+const MAX_BARCODE_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_INFO_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_INFORMATION_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
 const MAX_DOCUMENT_CONTEXT_FIELD_INSTRUCTION_BYTES: usize = 64 * 1024;
@@ -721,6 +722,25 @@ impl Field {
     /// embedded object, or refreshes a field.
     pub fn embed_field(&self) -> Result<Option<EmbedField>> {
         EmbedField::from_field(self)
+    }
+
+    /// Check whether this is a `BARCODE` field.
+    ///
+    /// Recognition is limited to stored field metadata. It never parses or
+    /// validates barcode data or symbology, generates or renders a barcode, or
+    /// refreshes the field.
+    pub fn is_barcode_field(&self) -> bool {
+        field_instruction_remainder(&self.instruction, "BARCODE").is_some()
+    }
+
+    /// Parse this field as inert typed `BARCODE` metadata.
+    ///
+    /// Returns `Ok(None)` for fields other than `BARCODE`. The stored opaque barcode
+    /// instruction, cached content, and dirty/lock state are metadata only;
+    /// this method never parses or validates barcode data or symbology,
+    /// generates or renders a barcode, or refreshes a field.
+    pub fn barcode_field(&self) -> Result<Option<BarcodeField>> {
+        BarcodeField::from_field(self)
     }
 
     /// Check whether this is an `ADDIN` field.
@@ -4393,6 +4413,77 @@ impl EmbedField {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from an object.
+    pub fn cached_result(&self) -> Option<&str> {
+        self.cached_result.as_deref()
+    }
+
+    /// Whether a word processor has marked the cached result stale.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Whether a word processor has locked this field against refresh.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+}
+
+/// A typed, inert Word `BARCODE` field.
+///
+/// This type retains opaque barcode-instruction text, a cached result, and
+/// field state only. It never parses or validates barcode data or symbology,
+/// generates or renders a barcode, accesses an external resource, or refreshes
+/// a field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BarcodeField {
+    instruction: String,
+    barcode_instructions: String,
+    cached_result: Option<String>,
+    dirty: bool,
+    locked: bool,
+}
+
+impl BarcodeField {
+    fn from_field(field: &Field) -> Result<Option<Self>> {
+        let Some(barcode_instructions) =
+            field_instruction_remainder(field.instruction(), "BARCODE")
+        else {
+            return Ok(None);
+        };
+        if field.instruction().len() > MAX_BARCODE_FIELD_INSTRUCTION_BYTES {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "BARCODE field instruction exceeds {MAX_BARCODE_FIELD_INSTRUCTION_BYTES} bytes"
+            )));
+        }
+
+        Ok(Some(Self {
+            instruction: field.instruction.clone(),
+            barcode_instructions: barcode_instructions.trim().to_string(),
+            cached_result: field.result.clone(),
+            dirty: field.dirty,
+            locked: field.locked,
+        }))
+    }
+
+    /// Return the complete stored field instruction.
+    ///
+    /// This string remains opaque metadata and is never used to generate or
+    /// render a barcode.
+    pub fn instruction(&self) -> &str {
+        &self.instruction
+    }
+
+    /// Return the stored opaque barcode-instruction text after `BARCODE`.
+    ///
+    /// It is never parsed, validated, interpreted, or used to generate or
+    /// render barcode content.
+    pub fn barcode_instructions(&self) -> &str {
+        &self.barcode_instructions
+    }
+
+    /// Return the cached visible field result, if present.
+    ///
+    /// This is stored text only and is never regenerated from barcode data.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -8670,6 +8761,63 @@ mod tests {
             false,
         );
         assert!(too_long.embed_field().is_err());
+    }
+
+    #[test]
+    fn parses_inert_barcode_fields_without_decoding_or_rendering() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>
+            <w:fldSimple w:instr=" BARCODE &quot;4901234567894&quot; EAN13 \h 1440 " w:dirty="true" w:fldLock="on">
+                <w:r><w:t>cached EAN13 barcode</w:t></w:r>
+            </w:fldSimple>
+            <w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>
+            <w:r><w:instrText>barcode "ABC-123" CODE39 \d</w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate" w:dirty="true"/></w:r>
+            <w:r><w:t>cached Code39 barcode</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+            <w:fldSimple w:instr="BARCODE"><w:r><w:t>cached bare barcode</w:t></w:r></w:fldSimple>
+            <w:fldSimple w:instr="BARCODES 4901234567894"><w:r><w:t>not barcode metadata</w:t></w:r></w:fldSimple>
+        </w:p></w:body></w:document>"#;
+        let fields = Field::extract_from_document(xml).unwrap();
+        assert_eq!(fields.len(), 4);
+        assert!(fields[0].is_barcode_field());
+        assert!(fields[1].is_barcode_field());
+        assert!(fields[2].is_barcode_field());
+        assert!(!fields[3].is_barcode_field());
+
+        let ean13 = fields[0].barcode_field().unwrap().unwrap();
+        assert_eq!(
+            ean13.barcode_instructions(),
+            r#""4901234567894" EAN13 \h 1440"#
+        );
+        assert_eq!(ean13.cached_result(), Some("cached EAN13 barcode"));
+        assert!(ean13.is_dirty());
+        assert!(ean13.is_locked());
+
+        let code_39 = fields[1].barcode_field().unwrap().unwrap();
+        assert_eq!(
+            code_39.barcode_instructions(),
+            r#""ABC-123" CODE39 \d"#
+        );
+        assert_eq!(code_39.cached_result(), Some("cached Code39 barcode"));
+        assert!(code_39.is_dirty());
+        assert!(code_39.is_locked());
+
+        let bare = fields[2].barcode_field().unwrap().unwrap();
+        assert_eq!(bare.barcode_instructions(), "");
+        assert_eq!(bare.cached_result(), Some("cached bare barcode"));
+        assert!(!bare.is_dirty());
+        assert!(!bare.is_locked());
+        assert!(fields[3].barcode_field().unwrap().is_none());
+
+        let too_long = Field::new(
+            format!(
+                "BARCODE {}",
+                "x".repeat(MAX_BARCODE_FIELD_INSTRUCTION_BYTES)
+            ),
+            None,
+            false,
+        );
+        assert!(too_long.barcode_field().is_err());
     }
 
     #[test]

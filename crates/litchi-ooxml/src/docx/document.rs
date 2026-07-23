@@ -9,7 +9,7 @@ use crate::docx::custom_xml::CustomXmlPart;
 use crate::docx::enums::WdHeaderFooter;
 use crate::docx::field::CompareField;
 use crate::docx::field::{
-    AdvanceField, AutoNumberField, BibliographyField, CitationField, DdeField,
+    AdvanceField, AutoNumberField, BarcodeField, BibliographyField, CitationField, DdeField,
     DocumentVariableField, EmbedField, ExternalIncludeField, Field, GoToButtonField, IfField,
     IndexEntryField, IndexField, InfoField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeNextField,
@@ -1375,6 +1375,25 @@ impl<'a> Document<'a> {
     /// Get the number of typed, inert `EMBED` fields in the main document.
     pub fn embed_field_count(&self) -> Result<usize> {
         Ok(self.embed_fields()?.len())
+    }
+
+    /// Get typed, inert `BARCODE` fields in document order.
+    ///
+    /// Returned values expose only stored opaque barcode instructions, cached
+    /// content, and dirty/lock state. This method never parses or validates
+    /// barcode data or symbology, generates or renders a barcode, accesses an
+    /// external resource, or refreshes a field.
+    pub fn barcode_fields(&self) -> Result<Vec<BarcodeField>> {
+        self.fields()?
+            .iter()
+            .map(Field::barcode_field)
+            .filter_map(|result| result.transpose())
+            .collect()
+    }
+
+    /// Get the number of typed, inert `BARCODE` fields in the main document.
+    pub fn barcode_field_count(&self) -> Result<usize> {
+        Ok(self.barcode_fields()?.len())
     }
 
     /// Get typed, inert user-identity fields in document order.
