@@ -210,7 +210,7 @@ conversion, fonts, and image conversion are optional.
 | Slides and ordering | ✅ | ✅ | ✅ | Add, delete, duplicate, move, resize, and enumerate |
 | Text, text boxes, and bullets | ✅ | ✅ | ✅ | Text extraction and formatted text-box authoring |
 | Basic shapes and groups | ✅ | ✅ | ✅ | Rectangles, ellipses, text boxes, nested groups, and formatting |
-| Images and backgrounds | ✅ | ✅ | ✅ | Picture resources plus solid, gradient, pattern, and picture backgrounds with slide/layout/master inheritance |
+| Images and backgrounds | ✅ | ✅ | ✅ | Picture resources plus solid, gradient, pattern, and relationship-resolved picture backgrounds with slide/layout/master inheritance |
 | Tables | ✅ | ✅ | ✅ | Table extraction and authoring |
 | Classic and extended charts | ✅ | ✅ | ✅ | Per-slide classic-chart inventory with relationship/part identity and basic type/title/legend metadata, plus multiple chart types, chart/style/color parts, ChartEx, and embedded workbook resources |
 | SmartArt | ✅ | ✅ | ✅ | Diagram data/layout/style/color part graphs and builder support |

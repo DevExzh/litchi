@@ -4,6 +4,9 @@ use crate::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart, ThemePart}
 use crate::pptx::shapes::base::BaseShape;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::part::Part;
+use quick_xml::Reader;
+use quick_xml::events::Event;
 
 const STRICT_SLIDE_LAYOUT_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideLayout";
@@ -11,6 +14,102 @@ const STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideMaster";
 const STRICT_THEME_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/theme";
+
+fn resolve_picture_background(
+    source_part: &dyn Part,
+    package: &OpcPackage,
+) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+    let Some((relationship_id, style)) = picture_background_reference(source_part.blob())? else {
+        return Ok(None);
+    };
+    let relationship = source_part.rels().get(&relationship_id).ok_or_else(|| {
+        OoxmlError::InvalidRelationship(format!(
+            "background image relationship '{relationship_id}' does not exist"
+        ))
+    })?;
+    if !matches!(relationship.reltype(), rt::IMAGE | rt::STRICT_IMAGE) {
+        return Err(OoxmlError::InvalidRelationship(format!(
+            "background image relationship '{relationship_id}' has unsupported type '{}'",
+            relationship.reltype()
+        )));
+    }
+    if relationship.is_external() {
+        return Err(OoxmlError::InvalidRelationship(format!(
+            "background image relationship '{relationship_id}' must be internal"
+        )));
+    }
+
+    let part_name = relationship.target_partname().map_err(|error| {
+        OoxmlError::InvalidRelationship(format!(
+            "invalid background image relationship '{relationship_id}': {error}"
+        ))
+    })?;
+    let image_part = package.get_part(&part_name).map_err(|error| {
+        OoxmlError::PartNotFound(format!(
+            "background image relationship '{relationship_id}' targets missing part '{}': {error}",
+            part_name.as_str()
+        ))
+    })?;
+    let image_data = image_part.blob();
+    let format = crate::pptx::format::ImageFormat::detect_from_bytes(image_data).ok_or_else(|| {
+        OoxmlError::InvalidFormat(format!(
+            "background image relationship '{relationship_id}' targets an unsupported image format"
+        ))
+    })?;
+
+    Ok(Some(crate::pptx::backgrounds::SlideBackground::Picture {
+        image_data: image_data.to_vec(),
+        format,
+        style,
+    }))
+}
+
+fn picture_background_reference(
+    xml: &[u8],
+) -> Result<Option<(String, crate::pptx::backgrounds::PictureStyle)>> {
+    let xml = crate::common::mce::process_ooxml(xml)?;
+    let mut reader = Reader::from_reader(xml.as_ref());
+    let mut in_background = false;
+    let mut in_blip_fill = false;
+    let mut relationship_id = None;
+    let mut style = crate::pptx::backgrounds::PictureStyle::Stretch;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(element)) => match element.local_name().as_ref() {
+                b"bg" => in_background = true,
+                b"blipFill" if in_background => in_blip_fill = true,
+                b"blip" if in_blip_fill => {
+                    relationship_id = crate::drawings::blip::read_blip_embed_attr(&element)?;
+                },
+                b"tile" if in_blip_fill => {
+                    style = crate::pptx::backgrounds::PictureStyle::Tile;
+                },
+                _ => {},
+            },
+            Ok(Event::Empty(element)) => {
+                if in_blip_fill && element.local_name().as_ref() == b"blip" {
+                    relationship_id = crate::drawings::blip::read_blip_embed_attr(&element)?;
+                } else if in_blip_fill && element.local_name().as_ref() == b"tile" {
+                    style = crate::pptx::backgrounds::PictureStyle::Tile;
+                }
+            },
+            Ok(Event::End(element)) => {
+                if in_blip_fill && element.local_name().as_ref() == b"blipFill" {
+                    return Ok(relationship_id.map(|id| (id, style)));
+                }
+                if element.local_name().as_ref() == b"bg" {
+                    in_background = false;
+                }
+            },
+            Ok(Event::Eof) => break,
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+            _ => {},
+        }
+    }
+
+    Ok(None)
+}
 
 /// A slide in a presentation.
 ///
@@ -511,6 +610,12 @@ impl<'a> Slide<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+        if let Some(package) = self.package
+            && let Some(background) = resolve_picture_background(self.part.part(), package)?
+        {
+            return Ok(Some(background));
+        }
+
         self.part.background()
     }
 
@@ -733,6 +838,10 @@ impl<'a> SlideLayout<'a> {
     ///
     /// Returns `None` when the layout has no local background.
     pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+        if let Some(background) = resolve_picture_background(self.part.part(), self.package)? {
+            return Ok(Some(background));
+        }
+
         self.part.background()
     }
 
@@ -821,6 +930,10 @@ impl<'a> SlideMaster<'a> {
     ///
     /// Returns `None` when the master has no local background.
     pub fn background(&self) -> Result<Option<crate::pptx::backgrounds::SlideBackground>> {
+        if let Some(background) = resolve_picture_background(self.part.part(), self.package)? {
+            return Ok(Some(background));
+        }
+
         self.part.background()
     }
 
