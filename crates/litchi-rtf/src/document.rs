@@ -1002,6 +1002,27 @@ impl<'a> RtfDocument<'a> {
             .count()
     }
 
+    /// Return typed, inert `AUTOTEXTLIST` fields in document field order.
+    ///
+    /// Stored display text, style/tip options, switches, cached results, and
+    /// state are metadata only. This method never shows a selection UI, looks
+    /// up eligible building blocks, reads a template, inserts content, changes
+    /// bookmarks, accesses an external resource, or refreshes a field.
+    pub fn auto_text_list_fields(&self) -> Vec<crate::AutoTextListField<'_>> {
+        self.fields
+            .iter()
+            .filter_map(crate::Field::auto_text_list_field)
+            .collect()
+    }
+
+    /// Return the number of typed, inert `AUTOTEXTLIST` fields in the document.
+    pub fn auto_text_list_field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| field.auto_text_list_field().is_some())
+            .count()
+    }
+
     /// Return typed, inert `DDE` and `DDEAUTO` fields in document field order.
     ///
     /// Application, source, item, representation, and storage metadata are
