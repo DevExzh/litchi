@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/document")
+        .join("../../test-data/ole/doc")
         .join(name)
 }
 

@@ -8,15 +8,9 @@ use litchi_ole::doc::parts::headers::HeaderFooterType;
 use litchi_ole::doc::{Document, Package};
 use std::path::PathBuf;
 
-fn poi_fixture(name: &str) -> PathBuf {
+fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/document")
-        .join(name)
-}
-
-fn libreoffice_fixture(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sw/qa")
+        .join("../../test-data/ole/doc")
         .join(name)
 }
 
@@ -37,7 +31,7 @@ fn story_text(stories: &[HeaderFooter], story_type: HeaderFooterType) -> Option<
 
 #[test]
 fn reads_odd_page_header_from_poi_three_col_head() {
-    let mut package = open(poi_fixture("ThreeColHead.doc"));
+    let mut package = open(fixture("ThreeColHead.doc"));
     let document = package.document().unwrap();
 
     let headers = document.headers().unwrap();
@@ -55,7 +49,7 @@ fn reads_odd_page_header_from_poi_three_col_head() {
 
 #[test]
 fn reads_odd_page_footer_from_poi_three_col_foot() {
-    let mut package = open(poi_fixture("ThreeColFoot.doc"));
+    let mut package = open(fixture("ThreeColFoot.doc"));
     let document = package.document().unwrap();
 
     let footers = document.footers().unwrap();
@@ -72,7 +66,7 @@ fn reads_odd_page_footer_from_poi_three_col_foot() {
 
 #[test]
 fn reads_first_page_stories_from_poi_diff_first_page() {
-    let mut package = open(poi_fixture("DiffFirstPageHeadFoot.doc"));
+    let mut package = open(fixture("DiffFirstPageHeadFoot.doc"));
     let document = package.document().unwrap();
 
     let stories = document.headers_footers().unwrap();
@@ -97,7 +91,7 @@ fn reads_first_page_stories_from_poi_diff_first_page() {
 
 #[test]
 fn returns_no_stories_when_document_has_no_headers() {
-    let mut package = open(poi_fixture("NoHeadFoot.doc"));
+    let mut package = open(fixture("NoHeadFoot.doc"));
     let document = package.document().unwrap();
 
     assert!(document.headers_footers().unwrap().is_empty());
@@ -107,9 +101,7 @@ fn returns_no_stories_when_document_has_no_headers() {
 
 #[test]
 fn reads_all_six_story_kinds_per_section_from_libreoffice_fixture() {
-    let mut package = open(libreoffice_fixture(
-        "core/header_footer/data/first-header-footer.doc",
-    ));
+    let mut package = open(fixture("first-header-footer.doc"));
     let document = package.document().unwrap();
 
     // Two sections, each with all six header/footer stories populated.
@@ -134,9 +126,7 @@ fn reads_all_six_story_kinds_per_section_from_libreoffice_fixture() {
 
 #[test]
 fn reads_footnotes_from_libreoffice_fixture() {
-    let mut package = open(libreoffice_fixture(
-        "filter/ww8/data/tdf71749_with_footnote.doc",
-    ));
+    let mut package = open(fixture("tdf71749_with_footnote.doc"));
     let document = package.document().unwrap();
 
     let footnotes = document.footnotes().unwrap();
@@ -155,7 +145,7 @@ fn reads_footnotes_from_libreoffice_fixture() {
 
 #[test]
 fn reads_endnote_from_poi_endingnote() {
-    let mut package = open(poi_fixture("endingnote.doc"));
+    let mut package = open(fixture("endingnote.doc"));
     let document = package.document().unwrap();
 
     let endnotes = document.endnotes().unwrap();
@@ -168,7 +158,7 @@ fn reads_endnote_from_poi_endingnote() {
 
 #[test]
 fn reads_multiple_endnotes_in_reference_order() {
-    let mut package = open(libreoffice_fixture("filter/ww8/data/3endnotes.doc"));
+    let mut package = open(fixture("3endnotes.doc"));
     let document = package.document().unwrap();
 
     let endnotes = document.endnotes().unwrap();
@@ -184,9 +174,7 @@ fn reads_multiple_endnotes_in_reference_order() {
 
 #[test]
 fn reads_footnote_and_endnote_from_the_same_document() {
-    let mut package = open(libreoffice_fixture(
-        "core/layout/data/inline-endnote-and-footnote.doc",
-    ));
+    let mut package = open(fixture("inline-endnote-and-footnote.doc"));
     let document = package.document().unwrap();
 
     let footnotes = document.footnotes().unwrap();
@@ -203,9 +191,7 @@ fn reads_footnote_and_endnote_from_the_same_document() {
 
 #[test]
 fn reads_range_comment_with_author_and_metadata() {
-    let mut package = open(libreoffice_fixture(
-        "extras/ww8export/data/commented-table.doc",
-    ));
+    let mut package = open(fixture("commented-table.doc"));
     let document = package.document().unwrap();
 
     let comments = document.comments().unwrap();
@@ -236,9 +222,7 @@ fn rejects_comment_references_that_are_not_annotation_characters() {
     // LibreOffice anchors this comment on an inline image character instead
     // of the U+0005 annotation reference that [MS-DOC] 2.8.7 requires, so a
     // strict reader must report corruption instead of panicking.
-    let mut package = open(libreoffice_fixture(
-        "extras/ww8export/data/image-comment-at-char.doc",
-    ));
+    let mut package = open(fixture("image-comment-at-char.doc"));
     let document = package.document().unwrap();
     assert!(document.comments().is_err());
 }
@@ -249,7 +233,7 @@ fn rejects_comment_references_that_are_not_annotation_characters() {
 
 #[test]
 fn reads_url_hyperlink_with_display_text() {
-    let mut package = open(poi_fixture("hyperlink.doc"));
+    let mut package = open(fixture("hyperlink.doc"));
     let document = package.document().unwrap();
 
     let hyperlinks = document.hyperlinks().unwrap();
@@ -273,7 +257,7 @@ fn document_with_truncated_table_stream() -> Option<Document> {
     // Rewrite the fixture with its table stream cut short so every
     // table-anchored structure (PlcfHdd, note and comment PLCs) runs past
     // the stream bounds.
-    let path = poi_fixture("DiffFirstPageHeadFoot.doc");
+    let path = fixture("DiffFirstPageHeadFoot.doc");
     let mut package = Package::open(path).unwrap();
     let document = package.document().unwrap();
     let word_document = document.word_document().to_vec();
@@ -308,7 +292,7 @@ fn garbage_bytes_are_rejected_without_panicking() {
     let garbage = vec![0xA5u8; 4096];
     assert!(Package::from_reader(std::io::Cursor::new(garbage)).is_err());
 
-    let path = poi_fixture("ThreeColHead.doc");
+    let path = fixture("ThreeColHead.doc");
     let mut truncated = std::fs::read(path).unwrap();
     truncated.truncate(truncated.len() / 2);
     if let Ok(mut package) = Package::from_reader(std::io::Cursor::new(truncated)) {
