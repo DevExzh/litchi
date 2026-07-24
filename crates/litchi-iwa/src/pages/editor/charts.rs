@@ -12,6 +12,7 @@ mod axis_steps;
 mod axis_tick_marks;
 mod border;
 mod caption;
+mod gaps;
 mod graph;
 mod legend;
 mod rounded_corners;

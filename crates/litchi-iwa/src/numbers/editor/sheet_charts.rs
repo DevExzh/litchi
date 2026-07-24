@@ -12,6 +12,7 @@ mod axis_steps;
 mod axis_tick_marks;
 mod border;
 mod caption;
+mod gaps;
 mod graph;
 mod legend;
 mod rounded_corners;
@@ -537,8 +538,8 @@ mod tests {
     use super::*;
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-        ChartAxisTickMarkLocation, ChartCornerRadius, ChartRoundedCorners, ChartValueAxisBounds,
-        ChartValueAxisScale, ChartValueAxisSteps,
+        ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
+        ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
 
@@ -555,6 +556,13 @@ mod tests {
             vec![vec![Some(12.0), Some(18.0)], vec![Some(9.0), Some(21.0)]],
         )
         .unwrap()
+    }
+
+    fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
+        ChartGapSpacing::new(
+            ChartGapPercentage::new(between_items).unwrap(),
+            ChartGapPercentage::new(between_sets).unwrap(),
+        )
     }
 
     #[test]
@@ -2335,6 +2343,70 @@ mod tests {
                 .sheet_chart_rounded_corners(sheet_id, duplicate.drawable_object_id)
                 .unwrap(),
             rounded
+        );
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_gap_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let customized = gap_spacing(25.0, 70.0);
+        let changed = gap_spacing(30.0, 60.0);
+
+        assert_eq!(
+            editor
+                .sheet_chart_gap_spacing(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            ChartGapSpacing::NATIVE_DEFAULT
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_gap_spacing(
+                sheet_id,
+                source.drawable_object_id,
+                ChartGapSpacing::NATIVE_DEFAULT,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_gap_spacing(sheet_id, source.drawable_object_id, customized)
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_gap_spacing(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+        editor
+            .set_sheet_chart_gap_spacing(sheet_id, source.drawable_object_id, changed)
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_gap_spacing(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            changed
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_gap_spacing(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
         );
         reopened
             .remove_sheet_chart(sheet_id, source.drawable_object_id)

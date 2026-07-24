@@ -3,8 +3,8 @@
 use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartRoundedCorners, ChartValueAxisBounds,
-    ChartValueAxisScale, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
+    ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 
@@ -29,6 +29,13 @@ fn sample_data() -> ChartData {
         ],
     )
     .unwrap()
+}
+
+fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
+    ChartGapSpacing::new(
+        ChartGapPercentage::new(between_items).unwrap(),
+        ChartGapPercentage::new(between_sets).unwrap(),
+    )
 }
 
 #[test]
@@ -711,6 +718,69 @@ fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
             .slide_chart_rounded_corners(0, duplicate.drawable_object_id)
             .unwrap(),
         rounded
+    );
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_chart_gap_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let customized = gap_spacing(25.0, 70.0);
+    let changed = gap_spacing(30.0, 60.0);
+
+    assert_eq!(
+        editor
+            .slide_chart_gap_spacing(0, source.drawable_object_id)
+            .unwrap(),
+        ChartGapSpacing::NATIVE_DEFAULT
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_gap_spacing(
+            0,
+            source.drawable_object_id,
+            ChartGapSpacing::NATIVE_DEFAULT,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_gap_spacing(0, source.drawable_object_id, customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_gap_spacing(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    editor
+        .set_slide_chart_gap_spacing(0, source.drawable_object_id, changed)
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_gap_spacing(0, source.drawable_object_id)
+            .unwrap(),
+        changed
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_gap_spacing(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
     );
     reopened
         .remove_slide_chart(0, source.drawable_object_id)

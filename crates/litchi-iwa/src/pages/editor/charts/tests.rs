@@ -3,8 +3,8 @@
 use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartRoundedCorners, ChartValueAxisBounds,
-    ChartValueAxisScale, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
+    ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 
 const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
@@ -23,6 +23,13 @@ fn sample_data() -> ChartData {
         ],
     )
     .unwrap()
+}
+
+fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
+    ChartGapSpacing::new(
+        ChartGapPercentage::new(between_items).unwrap(),
+        ChartGapPercentage::new(between_sets).unwrap(),
+    )
 }
 
 #[test]
@@ -746,6 +753,74 @@ fn scratch_document_supports_native_chart_rounded_corner_crud() {
             .body_chart_rounded_corners(duplicate.drawable_object_id)
             .unwrap(),
         rounded
+    );
+    reopened
+        .remove_body_chart(source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
+}
+
+#[test]
+fn scratch_document_supports_native_chart_gap_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart gaps").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart gaps".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let customized = gap_spacing(25.0, 70.0);
+    let changed = gap_spacing(30.0, 60.0);
+
+    assert_eq!(
+        editor
+            .body_chart_gap_spacing(source.drawable_object_id)
+            .unwrap(),
+        ChartGapSpacing::NATIVE_DEFAULT
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_gap_spacing(source.drawable_object_id, ChartGapSpacing::NATIVE_DEFAULT)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_gap_spacing(source.drawable_object_id, customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_gap_spacing(duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    editor
+        .set_body_chart_gap_spacing(source.drawable_object_id, changed)
+        .unwrap();
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_gap_spacing(source.drawable_object_id)
+            .unwrap(),
+        changed
+    );
+    assert_eq!(
+        reopened
+            .body_chart_gap_spacing(duplicate.drawable_object_id)
+            .unwrap(),
+        customized
     );
     reopened
         .remove_body_chart(source.drawable_object_id)

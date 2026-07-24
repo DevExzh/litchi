@@ -20,6 +20,7 @@ pub(crate) mod axis_style;
 pub(crate) mod border;
 mod data;
 mod direction;
+pub(crate) mod gaps;
 mod kind;
 pub mod metadata_extractor;
 pub(crate) mod options;
@@ -35,6 +36,7 @@ pub use axis_steps::{ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartValu
 pub use axis_style::ChartAxisTickMarkLocation;
 pub use data::ChartData;
 pub use direction::ChartSeriesDirection;
+pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};

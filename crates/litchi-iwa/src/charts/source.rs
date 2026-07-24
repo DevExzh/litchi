@@ -15,7 +15,7 @@ pub(crate) use ids::SourceChartObjectIds;
 
 use prost::Message;
 
-use super::{ChartData, ChartKind, IWorkChartArchive};
+use super::{ChartData, ChartGapSpacing, ChartKind, IWorkChartArchive};
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tn, tsch, tsd, tsk, tsp, tss};
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
