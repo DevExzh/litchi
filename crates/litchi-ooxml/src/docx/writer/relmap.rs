@@ -26,6 +26,10 @@ pub struct RelationshipMapper {
     endnotes_id: Option<String>,
     /// Explicitly keyed per-section header/footer relationships.
     section_header_footer_ids: HashMap<String, String>,
+    /// Maps OLE object shape IDs to their payload relationship IDs.
+    ole_object_ids: HashMap<String, String>,
+    /// Maps OLE object shape IDs to their preview image relationship IDs.
+    ole_preview_ids: HashMap<String, String>,
 }
 
 impl RelationshipMapper {
@@ -100,6 +104,26 @@ impl RelationshipMapper {
 
     pub fn get_section_header_footer_id(&self, key: &str) -> Option<&str> {
         self.section_header_footer_ids.get(key).map(String::as_str)
+    }
+
+    /// Add an OLE object payload relationship mapping, keyed by shape ID.
+    pub fn add_ole_object(&mut self, shape_id: &str, rel_id: String) {
+        self.ole_object_ids.insert(shape_id.to_string(), rel_id);
+    }
+
+    /// Get the payload relationship ID for an OLE object shape ID.
+    pub fn get_ole_object_id(&self, shape_id: &str) -> Option<&str> {
+        self.ole_object_ids.get(shape_id).map(String::as_str)
+    }
+
+    /// Add an OLE object preview image relationship mapping, keyed by shape ID.
+    pub fn add_ole_preview(&mut self, shape_id: &str, rel_id: String) {
+        self.ole_preview_ids.insert(shape_id.to_string(), rel_id);
+    }
+
+    /// Get the preview image relationship ID for an OLE object shape ID.
+    pub fn get_ole_preview_id(&self, shape_id: &str) -> Option<&str> {
+        self.ole_preview_ids.get(shape_id).map(String::as_str)
     }
 }
 

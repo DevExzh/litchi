@@ -10,6 +10,7 @@ pub mod field;
 pub mod hyperlink;
 pub mod image;
 pub mod note;
+pub mod ole_object;
 pub mod paragraph;
 pub mod revision;
 pub(crate) mod relmap;
@@ -60,6 +61,9 @@ pub use table::{CellProperties, MutableCell, MutableRow, MutableTable, TableBord
 
 // Re-export text-box authoring types
 pub use textbox::MutableTextBox;
+
+// Re-export embedded-object authoring types
+pub use ole_object::{MAX_OLE_PAYLOAD_BYTES, MutableOleObject};
 
 // Re-export comment types
 pub use comment::MutableComment;

@@ -205,7 +205,7 @@ pub use writer::{
     MutableContentControl, MutableDocument, MutableField, MutableHyperlink,
     MutableInlineImage, MutableParagraph, MutableRevision, MutableRun, MutableSmartTag,
     MutableSmartTagAttribute, MutableStyle, MutableTable, MutableTextBox, MutableTheme,
-    PageNumberFormat,
+    MutableOleObject, MAX_OLE_PAYLOAD_BYTES, PageNumberFormat,
     PageOrientation, RevisionContentControl, RevisionKind, RevisionMetadata, RowRevisionKind,
     CellRevisionKind, TableCellMergeRevisionState, TableRevisionKind, RunContent,
     DocumentGridType, NoteNumberRestart, SectionColumn, SectionColumns, SectionDocumentGrid,

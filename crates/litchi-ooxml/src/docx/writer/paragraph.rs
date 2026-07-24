@@ -12,6 +12,7 @@ use super::bookmark::MutableBookmark;
 use super::field::MutableField;
 use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
+use super::ole_object::MutableOleObject;
 use super::run::MutableRun;
 use super::textbox::MutableTextBox;
 use super::revision::{MutableRevision, ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode};
@@ -28,6 +29,8 @@ pub(crate) enum ParagraphElement {
     InlineImage(MutableInlineImage),
     /// Inline DrawingML text box (wordprocessing shape).
     TextBox(MutableTextBox),
+    /// Embedded OLE/package object (`w:object` with `o:OLEObject`).
+    OleObject(MutableOleObject),
     /// Bookmark start marker
     BookmarkStart(MutableBookmark),
     /// Bookmark end marker (ID only)
@@ -81,6 +84,14 @@ impl ParagraphElement {
             Self::TextBox(text_box) => {
                 xml.push_str("<w:r>");
                 text_box.to_xml(xml)?;
+                xml.push_str("</w:r>");
+                Ok(())
+            },
+            // Without a relationship mapper the serializer emits
+            // deterministic `{{OLE_*}}` placeholders.
+            Self::OleObject(object) => {
+                xml.push_str("<w:r>");
+                object.to_xml(xml, None, None)?;
                 xml.push_str("</w:r>");
                 Ok(())
             },
@@ -155,6 +166,17 @@ impl ParagraphElement {
             Self::TextBox(text_box) => {
                 xml.push_str("<w:r>");
                 text_box.to_xml(xml)?;
+                xml.push_str("</w:r>");
+                Ok(())
+            },
+            // OLE object payload/preview relationships resolve by shape ID.
+            Self::OleObject(object) => {
+                xml.push_str("<w:r>");
+                object.to_xml(
+                    xml,
+                    rel_mapper.get_ole_object_id(object.shape_id()),
+                    rel_mapper.get_ole_preview_id(object.shape_id()),
+                )?;
                 xml.push_str("</w:r>");
                 Ok(())
             },
@@ -354,6 +376,19 @@ impl MutableParagraph {
         self.elements.push(ParagraphElement::TextBox(text_box));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::TextBox(text_box) => text_box,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Add an embedded OLE/package object to the paragraph.
+    ///
+    /// Crate-internal: public embedding goes through
+    /// [`crate::docx::writer::MutableDocument::add_ole_object`], which assigns
+    /// and validates the shape identity first.
+    pub(crate) fn add_ole_object(&mut self, object: MutableOleObject) -> &mut MutableOleObject {
+        self.elements.push(ParagraphElement::OleObject(object));
+        match self.elements.last_mut().unwrap() {
+            ParagraphElement::OleObject(object) => object,
             _ => unreachable!(),
         }
     }

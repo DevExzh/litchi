@@ -2113,6 +2113,7 @@ impl Package {
                 // Step 1: Collect all content that needs relationships
                 let hyperlink_urls = mutable_doc.collect_hyperlink_urls();
                 let images = mutable_doc.collect_images();
+                let ole_objects = mutable_doc.collect_ole_objects();
                 let has_header = mutable_doc.has_header();
                 let has_footer = mutable_doc.has_footer();
                 let section_header_footer_parts =
@@ -2257,6 +2258,40 @@ impl Package {
                     // Create relationship from document to image
                     let rid = temp_part.relate_to(&image_partname, rt::IMAGE);
                     rel_mapper.add_image(i, rid);
+                }
+
+                // Add embedded OLE object parts and relationships. Payloads
+                // are stored verbatim as inert binary parts; optional
+                // previews are stored as ordinary media parts.
+                for (i, object) in ole_objects.iter().enumerate() {
+                    let object_num = i + 1;
+                    let object_partname = format!("/word/embeddings/oleObject{object_num}.bin");
+                    let object_uri = PackURI::new(&object_partname)
+                        .map_err(|e| OoxmlError::InvalidUri(format!("OLE object URI: {}", e)))?;
+                    self.opc.add_part(Box::new(BlobPart::new(
+                        object_uri,
+                        ct::OFC_OLE_OBJECT.to_string(),
+                        object.payload().to_vec(),
+                    )));
+                    let rid = temp_part.relate_to(&object_partname, rt::OLE_OBJECT);
+                    rel_mapper.add_ole_object(object.shape_id(), rid);
+
+                    if let Some((preview_data, preview_format)) = object.preview() {
+                        let preview_partname = format!(
+                            "/word/media/oleObjectPreview{object_num}.{}",
+                            preview_format.extension()
+                        );
+                        let preview_uri = PackURI::new(&preview_partname).map_err(|e| {
+                            OoxmlError::InvalidUri(format!("OLE preview URI: {}", e))
+                        })?;
+                        self.opc.add_part(Box::new(BlobPart::new(
+                            preview_uri,
+                            preview_format.mime_type().to_string(),
+                            preview_data.to_vec(),
+                        )));
+                        let rid = temp_part.relate_to(&preview_partname, rt::IMAGE);
+                        rel_mapper.add_ole_preview(object.shape_id(), rid);
+                    }
                 }
 
                 // Add header/footer parts and relationships

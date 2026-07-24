@@ -9,12 +9,14 @@ pub use super::super::format::ImageFormat;
 // Import from other writer modules
 use super::comment::MutableComment;
 use super::note::Note;
+use super::ole_object::MutableOleObject;
 use super::paragraph::MutableParagraph;
 use super::section::SectionProperties;
 use super::table::MutableTable;
 use super::theme::MutableTheme;
 use super::toc::TableOfContents;
 use super::watermark::Watermark;
+use std::collections::HashSet;
 // Import settings types
 use super::super::settings::ProtectionType;
 
@@ -55,7 +57,15 @@ pub struct MutableDocument {
     preserved_suffix: Option<String>,
     /// Whether section properties must be regenerated instead of preserved verbatim.
     section_dirty: bool,
+    /// VML shape IDs already assigned to embedded OLE objects in this document.
+    ole_shape_ids: HashSet<String>,
+    /// Next VML shape number tried when allocating OLE object identities.
+    next_ole_shape_number: u32,
 }
+
+/// First VML shape number used when allocating OLE object identities
+/// (`_x0000_i1025`, matching Word's numbering convention).
+const FIRST_OLE_SHAPE_NUMBER: u32 = 1025;
 
 /// Document protection settings.
 #[derive(Debug, Clone)]
@@ -206,6 +216,8 @@ impl MutableDocument {
             preserved_prefix: None,
             preserved_suffix: None,
             section_dirty: false,
+            ole_shape_ids: HashSet::new(),
+            next_ole_shape_number: FIRST_OLE_SHAPE_NUMBER,
         }
     }
 
@@ -234,6 +246,8 @@ impl MutableDocument {
             preserved_prefix: Some(parsed.prefix),
             preserved_suffix: Some(parsed.suffix),
             section_dirty: false,
+            ole_shape_ids: HashSet::new(),
+            next_ole_shape_number: FIRST_OLE_SHAPE_NUMBER,
         })
     }
 
@@ -398,6 +412,71 @@ impl MutableDocument {
         text_box: super::textbox::MutableTextBox,
     ) -> &mut super::textbox::MutableTextBox {
         self.add_paragraph().add_text_box(text_box)
+    }
+
+    /// Embed an OLE/package object in a new paragraph at the end of the
+    /// document.
+    ///
+    /// Assigns the object's VML shape identity when unset, rejecting explicit
+    /// IDs that collide with shapes already present in the document. The
+    /// payload is stored verbatim as an inert `/word/embeddings/oleObjectN.bin`
+    /// part and is discoverable through
+    /// [`crate::docx::Package::embedded_parts`] after save and reopen.
+    pub fn add_ole_object(&mut self, mut object: MutableOleObject) -> Result<&mut MutableOleObject> {
+        if object.shape_id.is_empty() {
+            let mut number = self.next_ole_shape_number;
+            let shape_id = loop {
+                let candidate = format!("_x0000_i{number}");
+                if !self.ole_shape_id_in_use(&candidate) {
+                    break candidate;
+                }
+                number = number.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("OLE shape ID space exhausted".to_string())
+                })?;
+            };
+            self.next_ole_shape_number = number.saturating_add(1);
+            object.shape_id = shape_id;
+            object.object_id = number;
+        } else {
+            if self.ole_shape_id_in_use(&object.shape_id) {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "OLE shape ID '{}' collides with an existing shape",
+                    object.shape_id
+                )));
+            }
+            if object.object_id == 0 {
+                object.object_id = self.next_ole_shape_number;
+                self.next_ole_shape_number = self.next_ole_shape_number.saturating_add(1);
+            }
+        }
+        self.ole_shape_ids.insert(object.shape_id.clone());
+        self.modified = true;
+        Ok(self.add_paragraph().add_ole_object(object))
+    }
+
+    /// Check whether a VML shape ID is already used by an embedded OLE object
+    /// or appears in preserved document XML.
+    fn ole_shape_id_in_use(&self, shape_id: &str) -> bool {
+        if self.ole_shape_ids.contains(shape_id) {
+            return true;
+        }
+        let preserved_hit = |raw: &str| raw.contains(shape_id);
+        if self
+            .preserved_prefix
+            .as_deref()
+            .is_some_and(preserved_hit)
+            || self.preserved_suffix.as_deref().is_some_and(preserved_hit)
+        {
+            return true;
+        }
+        self.body.elements.iter().any(|element| match element {
+            BodyElement::PreservedParagraph(raw)
+            | BodyElement::PreservedTable(raw)
+            | BodyElement::PreservedSectionProperties(raw)
+            | BodyElement::PreservedOther(raw) => raw.contains(shape_id),
+            BodyElement::PreservedAltChunk(raw, _) => raw.contains(shape_id),
+            _ => false,
+        })
     }
 
     /// Add a page break.
@@ -928,6 +1007,23 @@ impl MutableDocument {
         }
 
         images
+    }
+
+    /// Collect all embedded OLE objects from the document in document order.
+    pub(crate) fn collect_ole_objects(&self) -> Vec<&MutableOleObject> {
+        let mut objects = Vec::new();
+
+        for element in &self.body.elements {
+            if let BodyElement::Paragraph(para) = element {
+                for para_element in &para.elements {
+                    if let super::paragraph::ParagraphElement::OleObject(object) = para_element {
+                        objects.push(object);
+                    }
+                }
+            }
+        }
+
+        objects
     }
 
     /// Generate header XML content.
