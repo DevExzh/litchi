@@ -740,6 +740,18 @@ impl Package {
         crate::docx::smartart::load_smart_arts(&self.opc, &document)
     }
 
+    /// Load the typed, inert text-box and WordArt inventory anchored in the
+    /// main document.
+    ///
+    /// Each returned [`crate::docx::textbox::DocxTextBox`] carries the shape
+    /// identity, the `wps:bodyPr` text-body properties, the story as
+    /// paragraphs with runs, and WordArt warp/styling presence flags. Both
+    /// DrawingML shapes and legacy VML `w:pict` fallbacks are recognized, in
+    /// both the transitional and Strict namespace dialects.
+    pub fn text_boxes(&self) -> Result<Vec<crate::docx::textbox::DocxTextBox>> {
+        crate::docx::textbox::load_text_boxes(self.opc.main_document_part()?.blob())
+    }
+
     /// Deterministically store an already coherent classic-chart graph.
     pub fn store_chart_graph(&mut self, graph: &crate::docx::chart::DocxChartGraph) -> Result<()> {
         let document = self.opc.main_document_part()?.partname().clone();

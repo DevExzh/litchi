@@ -123,6 +123,18 @@ impl<'a> Document<'a> {
         crate::docx::smartart::load_smart_arts(self.opc, self.part.part().partname())
     }
 
+    /// Load the typed, inert text-box and WordArt inventory anchored in this
+    /// document.
+    ///
+    /// Each returned [`crate::docx::textbox::DocxTextBox`] carries the shape
+    /// identity, the `wps:bodyPr` text-body properties, the story as
+    /// paragraphs with runs, and WordArt warp/styling presence flags. Both
+    /// DrawingML shapes and legacy VML `w:pict` fallbacks are recognized, in
+    /// both the transitional and Strict namespace dialects.
+    pub fn text_boxes(&self) -> Result<Vec<crate::docx::textbox::DocxTextBox>> {
+        crate::docx::textbox::load_text_boxes(self.part.xml_bytes())
+    }
+
     /// Return numbered paragraphs with resolved, typed list markers.
     ///
     /// This is separate from [`Self::text`], whose behavior remains unchanged.

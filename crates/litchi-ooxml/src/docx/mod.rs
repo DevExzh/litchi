@@ -85,6 +85,7 @@ pub mod statistics;
 pub mod styles;
 pub mod table;
 pub mod template;
+pub mod textbox;
 pub mod theme;
 pub mod variables;
 pub mod vba_project;
@@ -182,6 +183,11 @@ pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
 pub use statistics::DocumentStatistics;
 pub use styles::{Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
+pub use textbox::{
+    DocxTextBox, TextBoxAnchor, TextBoxAutofit, TextBoxBodyProperties, TextBoxInsets,
+    TextBoxParagraph, TextBoxRun, TextDirection, TextVerticalAnchor, TextWarpPreset, TextWrap,
+    WordArt, load_text_boxes,
+};
 pub use theme::Theme;
 pub use variables::DocumentVariables;
 pub use vba_project::VbaProject;
