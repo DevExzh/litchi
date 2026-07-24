@@ -495,7 +495,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 |--------|------------|--------|------|-------|-------|
 | Drawing | `.odg`, `.otg` | ✅ | ✅ | ✅ | Pages, layers, standard 2D shapes, groups, text, geometry, metadata, typed named fill-image/gradient/hatch/marker/opacity/stroke-dash inspection from immutable and mutable drawings, resources, builder, and mutable CRUD; no link following, style-use resolution, or rendering |
 | Standalone chart | `.odc`, `.otc` | ✅ | ✅ | ✅ | Titles, legends, plot areas, axes, series, data points, analytics nodes, cached tables, and semantic mutation |
-| Formula document | `.odf`, `.otf` | 🟡 | ✅ | 🟡 | MathML mixed-content model, annotations, lossless source save, and validated formula/template package construction from direct MathML roots; no typed MathML-tree editor or evaluation |
+| Formula document | `.odf`, `.otf` | ✅ | ✅ | ✅ | MathML mixed-content model, annotations, lossless source save, validated formula/template package construction from direct MathML roots, and a typed inert MathML tree editor (validated mutation, well-formed serialization with regenerated namespace prefixes, typed schemata builders, atomic `set_math` repackaging); no evaluation |
 | Image document | `.odi`, `.oti` | 🟡 | ✅ | 🟡 | Frames, linked/package/base64 images, text boxes, objects, tables, maps, and exact lossless save |
 | Master document | `.odm`, `.otm` | ✅ | ✅ | ✅ | Paragraphs, linked sections/subdocuments, indexes, styles, encryption, signing, builder, and mutable CRUD |
 | Web template | `.oth` | 🟡 | ✅ | 🟡 | Text semantic reader and exact lossless save; no dedicated authoring model |
