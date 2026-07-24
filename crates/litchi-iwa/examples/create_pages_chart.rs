@@ -8,7 +8,9 @@ use litchi_iwa::charts::{
     ChartKind, ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use litchi_iwa::pages::PagesDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern, StrokeWidth,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -41,6 +43,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_body_chart_title(chart.drawable_object_id, "Quarterly revenue")?;
     editor.set_body_chart_border_visible(chart.drawable_object_id, true)?;
+    editor.set_body_chart_border_stroke(
+        chart.drawable_object_id,
+        Some(ShapeStroke::new(
+            RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
+            StrokeWidth::new(3.0)?,
+            StrokePattern::MediumDash,
+        )),
+    )?;
     editor.set_body_chart_rounded_corners(
         chart.drawable_object_id,
         ChartRoundedCorners::new(ChartCornerRadius::new(20.0)?, true),
@@ -101,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_caption(chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Pages {:?} chart {} with native chart and axis titles, a visible chart border, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption at body UTF-16 index {}",
+        "created Pages {:?} chart {} with native chart and axis titles, a visible blue 3 pt medium-dash chart border, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption at body UTF-16 index {}",
         chart.kind, chart.drawable_object_id, chart.anchor_character_index
     );
     Ok(())

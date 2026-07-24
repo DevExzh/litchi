@@ -13,7 +13,7 @@ mod style;
 
 #[cfg(test)]
 use native::pattern_to_native;
-pub(crate) use native::{stroke_from_native, stroke_to_native};
+pub(crate) use native::{empty_stroke_archive, stroke_from_native, stroke_to_native};
 pub(crate) use style::{reset_shape_stroke, set_shape_stroke, shape_stroke};
 
 /// A finite, positive stroke width measured in points.

@@ -68,7 +68,8 @@ pub use stroke::{
     LineStyle, ShapeStroke, StrokeCap, StrokeJoin, StrokeMiterLimit, StrokePattern, StrokeWidth,
 };
 pub(crate) use stroke::{
-    reset_shape_stroke, set_shape_stroke, shape_stroke, stroke_from_native, stroke_to_native,
+    empty_stroke_archive, reset_shape_stroke, set_shape_stroke, shape_stroke, stroke_from_native,
+    stroke_to_native,
 };
 pub(crate) use text_columns::{
     reset_shape_text_columns, set_shape_text_columns, shape_text_columns,

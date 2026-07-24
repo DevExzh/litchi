@@ -6,6 +6,7 @@ use crate::charts::{
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
     ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
+use crate::shapes::{RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern, StrokeWidth};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -29,6 +30,14 @@ fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
     ChartGapSpacing::new(
         ChartGapPercentage::new(between_items).unwrap(),
         ChartGapPercentage::new(between_sets).unwrap(),
+    )
+}
+
+fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
+    ShapeStroke::new(
+        RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
+        StrokeWidth::new(width).unwrap(),
+        pattern,
     )
 }
 
@@ -1732,4 +1741,76 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
     reopened
         .remove_body_chart(duplicate.drawable_object_id)
         .unwrap();
+}
+
+#[test]
+fn scratch_document_supports_native_chart_border_stroke_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart border stroke").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Chart border stroke".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let default = ShapeStroke::new(RgbaColor::black(), StrokeWidth::ONE, StrokePattern::Solid);
+    let customized = chart_stroke(StrokePattern::MediumDash, 3.0);
+    let changed = chart_stroke(StrokePattern::RoundedDash, 2.0);
+
+    assert_eq!(
+        editor
+            .body_chart_border_stroke(source.drawable_object_id)
+            .unwrap(),
+        Some(default)
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_border_stroke(source.drawable_object_id, Some(default))
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_border_stroke(source.drawable_object_id, Some(customized))
+        .unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_border_stroke(duplicate.drawable_object_id)
+            .unwrap(),
+        Some(customized)
+    );
+    editor
+        .set_body_chart_border_stroke(source.drawable_object_id, Some(changed))
+        .unwrap();
+    editor
+        .set_body_chart_border_stroke(duplicate.drawable_object_id, None)
+        .unwrap();
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_border_stroke(source.drawable_object_id)
+            .unwrap(),
+        Some(changed)
+    );
+    assert_eq!(
+        reopened
+            .body_chart_border_stroke(duplicate.drawable_object_id)
+            .unwrap(),
+        None
+    );
+    reopened
+        .remove_body_chart(source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
 }

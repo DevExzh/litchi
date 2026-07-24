@@ -11,6 +11,7 @@ mod axis_series_names;
 mod axis_steps;
 mod axis_tick_marks;
 mod border;
+mod border_stroke;
 mod caption;
 mod gaps;
 mod graph;

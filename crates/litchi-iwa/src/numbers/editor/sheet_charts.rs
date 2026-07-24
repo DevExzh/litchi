@@ -11,6 +11,7 @@ mod axis_series_names;
 mod axis_steps;
 mod axis_tick_marks;
 mod border;
+mod border_stroke;
 mod caption;
 mod gaps;
 mod graph;
@@ -542,6 +543,7 @@ mod tests {
         ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
+    use crate::shapes::{RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern, StrokeWidth};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 120.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -562,6 +564,14 @@ mod tests {
         ChartGapSpacing::new(
             ChartGapPercentage::new(between_items).unwrap(),
             ChartGapPercentage::new(between_sets).unwrap(),
+        )
+    }
+
+    fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
+        ShapeStroke::new(
+            RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
+            StrokeWidth::new(width).unwrap(),
+            pattern,
         )
     }
 
@@ -2407,6 +2417,70 @@ mod tests {
                 .sheet_chart_gap_spacing(sheet_id, duplicate.drawable_object_id)
                 .unwrap(),
             customized
+        );
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_border_stroke_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let default = ShapeStroke::new(RgbaColor::black(), StrokeWidth::ONE, StrokePattern::Solid);
+        let customized = chart_stroke(StrokePattern::MediumDash, 3.0);
+        let changed = chart_stroke(StrokePattern::RoundedDash, 2.0);
+
+        assert_eq!(
+            editor
+                .sheet_chart_border_stroke(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            Some(default)
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_border_stroke(sheet_id, source.drawable_object_id, Some(default))
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_border_stroke(sheet_id, source.drawable_object_id, Some(customized))
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_border_stroke(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            Some(customized)
+        );
+        editor
+            .set_sheet_chart_border_stroke(sheet_id, source.drawable_object_id, Some(changed))
+            .unwrap();
+        editor
+            .set_sheet_chart_border_stroke(sheet_id, duplicate.drawable_object_id, None)
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_border_stroke(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            Some(changed)
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_border_stroke(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            None
         );
         reopened
             .remove_sheet_chart(sheet_id, source.drawable_object_id)

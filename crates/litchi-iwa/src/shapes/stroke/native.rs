@@ -121,7 +121,7 @@ pub(crate) fn stroke_to_native(stroke: ShapeStroke) -> tsd::StrokeArchive {
     }
 }
 
-pub(super) fn empty_stroke_archive() -> tsd::StrokeArchive {
+pub(crate) fn empty_stroke_archive() -> tsd::StrokeArchive {
     let mut stroke = stroke_to_native(ShapeStroke::new(
         RgbaColor::black(),
         StrokeWidth(1.0),
