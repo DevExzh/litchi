@@ -155,6 +155,32 @@ if let Some(style) = styles.get_by_name("Heading 1")? {
 }
 ```
 
+### Document Inventories (Read-Only)
+
+SmartArt diagrams and DrawingML text boxes are exposed as typed, inert
+inventories in both transitional and Strict namespace dialects:
+
+```rust
+use litchi::ooxml::docx::Package;
+
+let pkg = Package::open("document.docx")?;
+
+// SmartArt (DrawingML diagram) inventory: data-model node trees plus
+// layout/quick-style/colors part metadata.
+for art in pkg.smart_arts()? {
+    println!("Diagram: {:?} ({} parts)", art.diagram_type(), art.text().lines().count());
+    println!("{}", art.text());
+}
+
+// Text boxes and WordArt anchored in the main document, including VML
+// fallbacks collapsed from mc:AlternateContent.
+for text_box in pkg.text_boxes()? {
+    let name = text_box.name.as_deref().unwrap_or("<unnamed>");
+    println!("Shape '{name}' (word art: {})", text_box.is_word_art());
+    println!("{}", text_box.text());
+}
+```
+
 ## Excel Spreadsheets (XLSX)
 
 ### Creating Workbooks
@@ -289,6 +315,29 @@ if ws.is_cell_empty(1, 1) {
 
 // Count non-empty cells
 println!("Non-empty cells: {}", ws.non_empty_cell_count());
+```
+
+### Pivot Inventories (Read-Only)
+
+Pivot charts bound to a worksheet's pivot tables are exposed as a typed,
+validated graph; XLSB workbooks additionally expose their PivotCache
+definition streams:
+
+```rust
+use litchi::ooxml::xlsx::Workbook;
+
+let wb = Workbook::open("report.xlsx")?;
+
+// Pivot charts: chart part, c:pivotSource metadata, per-series drop-zone
+// visibility, and the resolved typed pivot table.
+for chart in wb.pivot_charts_on_sheet("Sheet1")? {
+    println!("Pivot chart '{}' -> table '{}'",
+        chart.part_name, chart.pivot_table.name);
+}
+
+// XLSB PivotCache definitions (via litchi::ooxml::xlsb::Workbook):
+// refresh metadata, sources, cache fields, shared items, grouping,
+// OLAP hierarchies, and calculated members.
 ```
 
 ## PowerPoint Presentations (PPTX)
