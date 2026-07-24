@@ -23,6 +23,7 @@ mod pie_labels;
 mod pie_start_angle;
 mod pie_wedge_explosion;
 mod rounded_corners;
+mod series_value_labels;
 mod shadow;
 mod theme;
 mod title;

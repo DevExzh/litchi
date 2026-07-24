@@ -8,8 +8,9 @@ use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
     ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
-    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
+    ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+    ChartValueAxisSteps,
 };
 use crate::shapes::{
     RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
@@ -2522,6 +2523,112 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
             .body_chart_pie_label_distance(
                 source.drawable_object_id,
                 ChartPieWedgeIndex::from_zero_based(3),
+            )
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+    reopened
+        .remove_body_chart(source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
+}
+
+#[test]
+fn scratch_document_supports_native_series_value_label_crud() {
+    const BODY_TEXT: &str = "Chart value labels";
+
+    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let source = editor
+        .add_body_chart(
+            BODY_TEXT.encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let defaults = [ChartSeriesValueLabelVisibility::Hidden; 2];
+    let customized = [
+        ChartSeriesValueLabelVisibility::Visible,
+        ChartSeriesValueLabelVisibility::Hidden,
+    ];
+
+    assert_eq!(
+        editor
+            .body_chart_series_value_label_visibilities(source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_series_value_label_visibilities(source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_series_value_label_visibilities(source.drawable_object_id, &customized)
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_series_value_label_visibility(
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(0),
+            )
+            .unwrap(),
+        ChartSeriesValueLabelVisibility::Visible
+    );
+    editor
+        .set_body_chart_series_value_label_visibilities(source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_series_value_label_visibilities(source.drawable_object_id, &customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    editor
+        .set_body_chart_series_value_label_visibility(
+            source.drawable_object_id,
+            ChartSeriesIndex::from_zero_based(0),
+            ChartSeriesValueLabelVisibility::Hidden,
+        )
+        .unwrap();
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_series_value_label_visibilities(source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    assert_eq!(
+        reopened
+            .body_chart_series_value_label_visibilities(duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+
+    let before_rejected = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_body_chart_series_value_label_visibilities(
+                source.drawable_object_id,
+                &customized[..1],
+            )
+            .is_err()
+    );
+    assert!(
+        reopened
+            .body_chart_series_value_label_visibility(
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(2),
             )
             .is_err()
     );

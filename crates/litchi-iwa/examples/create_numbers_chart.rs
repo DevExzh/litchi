@@ -5,8 +5,8 @@ use std::env;
 use litchi_iwa::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartData, ChartGapPercentage, ChartGapSpacing,
-    ChartKind, ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-    ChartValueAxisSteps,
+    ChartKind, ChartRoundedCorners, ChartSeriesValueLabelVisibility, ChartShadow,
+    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
@@ -167,10 +167,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_sheet_chart_includes_hidden_data(sheet_id, chart.drawable_object_id, false)?;
     editor.set_sheet_chart_legend_visible(sheet_id, chart.drawable_object_id, false)?;
+    editor.set_sheet_chart_series_value_label_visibilities(
+        sheet_id,
+        chart.drawable_object_id,
+        &[ChartSeriesValueLabelVisibility::Visible; 2],
+    )?;
     editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, excluded hidden source rows and columns, and a caption on sheet {}",
+        "created Numbers {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names and data value labels, hidden value-axis major gridlines, visible value-axis minor gridlines, excluded hidden source rows and columns, and a caption on sheet {}",
         chart.kind, chart.drawable_object_id, sheet_id
     );
     Ok(())
