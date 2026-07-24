@@ -95,6 +95,14 @@ pub(crate) fn chart_style_slot(
 }
 
 impl ChartStyleSlot {
+    pub(crate) fn archive_name(&self) -> &str {
+        &self.archive_name
+    }
+
+    pub(crate) const fn object_id(&self) -> u64 {
+        self.object_id
+    }
+
     /// Read the resolved chart-style bytes without allocating a rewritten archive.
     pub(crate) fn read<T>(
         &self,

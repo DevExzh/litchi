@@ -1,5 +1,8 @@
 //! Source-built Keynote chart CRUD regression tests.
 
+use std::fs;
+use std::path::PathBuf;
+
 use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
@@ -7,7 +10,10 @@ use crate::charts::{
     ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
-use crate::shapes::{RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern, StrokeWidth};
+use crate::shapes::{
+    RgbColorSpace, RgbaColor, ShapeFill, ShapeImageFillTechnique, ShapeStroke, StrokePattern,
+    StrokeWidth,
+};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -45,6 +51,15 @@ fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
         StrokeWidth::new(width).unwrap(),
         pattern,
     )
+}
+
+fn chart_background_fill() -> ShapeFill {
+    ShapeFill::Solid(RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap())
+}
+
+fn fixture(relative: &str) -> Vec<u8> {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    fs::read(root.join(relative)).unwrap()
 }
 
 #[test]
@@ -1708,6 +1723,76 @@ fn scratch_presentation_supports_native_chart_border_stroke_crud() {
         .unwrap();
     reopened
         .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_chart_background_fill_crud() {
+    let image_bytes = fixture("test-data/images/png/lena.png");
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let native_default = editor
+        .slide_chart_background_fill(0, source.drawable_object_id)
+        .unwrap();
+    assert!(matches!(native_default, ShapeFill::Gradient(_)));
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_background_fill(0, source.drawable_object_id, &native_default)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let customized = chart_background_fill();
+    let image = editor
+        .set_slide_chart_background_image_fill(
+            0,
+            source.drawable_object_id,
+            "lena.png",
+            &image_bytes,
+            ShapeImageFillTechnique::Tile,
+            None,
+        )
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_background_fill(0, duplicate.drawable_object_id)
+            .unwrap(),
+        ShapeFill::Image(image.clone())
+    );
+    editor
+        .set_slide_chart_background_fill(0, source.drawable_object_id, &customized)
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_background_fill(0, source.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_background_fill(0, duplicate.drawable_object_id)
+            .unwrap(),
+        ShapeFill::Image(image.clone())
+    );
+    assert_eq!(
+        reopened
+            .extract_media(image.data_identifier().unwrap().get())
+            .unwrap(),
+        image_bytes
+    );
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.media_assets().unwrap().is_empty());
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }

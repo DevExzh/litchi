@@ -17,6 +17,7 @@ pub(crate) mod axis_bounds;
 pub(crate) mod axis_scale;
 pub(crate) mod axis_steps;
 pub(crate) mod axis_style;
+pub(crate) mod background_fill;
 pub(crate) mod border;
 pub(crate) mod border_stroke;
 mod data;

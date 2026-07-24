@@ -32,6 +32,10 @@ pub use fill::{
     ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
     ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique,
 };
+pub(crate) use fill::{
+    fill_from_native, fill_to_native, image_data_identifier, remove_orphaned_image_asset,
+    validate_image_asset,
+};
 pub(crate) use fill::{reset_shape_fill, set_shape_fill, set_shape_image_fill_data, shape_fill};
 pub use geometry::{DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableSize};
 pub(crate) use geometry::{

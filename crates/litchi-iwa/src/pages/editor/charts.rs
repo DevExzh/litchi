@@ -10,6 +10,7 @@ mod axis_scale;
 mod axis_series_names;
 mod axis_steps;
 mod axis_tick_marks;
+mod background_fill;
 mod border;
 mod border_stroke;
 mod caption;
@@ -36,8 +37,14 @@ use crate::charts::source::{
     require_creatable_kind, source_chart_objects,
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
+use crate::data_reference_registry::{
+    clone_component_data_references, remove_component_data_references_for_objects,
+};
 use crate::protobuf::tsch;
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
+    remove_orphaned_image_asset,
+};
 
 const PAGES_THEME_MESSAGE_TYPE: u32 = 10_001;
 
@@ -450,6 +457,7 @@ impl PagesEditor {
             })
             .collect::<Result<Vec<_>>>()?;
         add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
+        clone_component_data_references(&mut staged, source.component_id, &remap)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         let created = body_chart_graph(&verified, new_drawable_id)?;
@@ -507,6 +515,11 @@ impl PagesEditor {
                 *identifier,
             )?;
         }
+        let affected_data_identifiers = remove_component_data_references_for_objects(
+            &mut staged,
+            source.component_id,
+            &source.object_ids,
+        )?;
         staged.update_archive(&source.archive_name, |archive| {
             for identifier in &source.object_ids {
                 archive.remove_object(*identifier).ok_or_else(|| {
@@ -526,6 +539,9 @@ impl PagesEditor {
             }
         }
         remove_component_object_uuids(&mut staged, source.component_id, &source.uuid_object_ids)?;
+        for data_identifier in affected_data_identifiers {
+            remove_orphaned_image_asset(&mut staged, Some(data_identifier))?;
+        }
         release_package_identifier_suffix(&mut staged, &source.object_ids)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;

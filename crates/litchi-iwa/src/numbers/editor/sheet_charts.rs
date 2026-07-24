@@ -10,6 +10,7 @@ mod axis_scale;
 mod axis_series_names;
 mod axis_steps;
 mod axis_tick_marks;
+mod background_fill;
 mod border;
 mod border_stroke;
 mod caption;
@@ -36,8 +37,14 @@ use crate::charts::source::{
     geometry_archive, reference, require_creatable_kind, source_chart_objects,
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
+use crate::data_reference_registry::{
+    clone_component_data_references, remove_component_data_references_for_objects,
+};
 use crate::protobuf::tsch;
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
+    remove_orphaned_image_asset,
+};
 
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 
@@ -391,6 +398,7 @@ impl NumbersEditor {
             })
             .collect::<Result<Vec<_>>>()?;
         add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
+        clone_component_data_references(&mut staged, source.component_id, &remap)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         let created = chart_graph(&verified, sheet_id, new_drawable_id)?;
@@ -447,6 +455,11 @@ impl NumbersEditor {
                 *identifier,
             )?;
         }
+        let affected_data_identifiers = remove_component_data_references_for_objects(
+            &mut staged,
+            source.component_id,
+            &source.object_ids,
+        )?;
         staged.update_archive(&source.archive_name, |archive| {
             for identifier in &source.object_ids {
                 archive.remove_object(*identifier).ok_or_else(|| {
@@ -464,6 +477,9 @@ impl NumbersEditor {
             }
         }
         remove_component_object_uuids(&mut staged, source.component_id, &source.uuid_object_ids)?;
+        for data_identifier in affected_data_identifiers {
+            remove_orphaned_image_asset(&mut staged, Some(data_identifier))?;
+        }
         release_package_identifier_suffix(&mut staged, &source.object_ids)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -536,6 +552,9 @@ fn update_chart_payload(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+
     use super::*;
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
@@ -543,7 +562,10 @@ mod tests {
         ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
-    use crate::shapes::{RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern, StrokeWidth};
+    use crate::shapes::{
+        RgbColorSpace, RgbaColor, ShapeFill, ShapeImageFillTechnique, ShapeStroke, StrokePattern,
+        StrokeWidth,
+    };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 120.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -573,6 +595,15 @@ mod tests {
             StrokeWidth::new(width).unwrap(),
             pattern,
         )
+    }
+
+    fn chart_background_fill() -> ShapeFill {
+        ShapeFill::Solid(RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap())
+    }
+
+    fn fixture(relative: &str) -> Vec<u8> {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        fs::read(root.join(relative)).unwrap()
     }
 
     #[test]
@@ -2487,6 +2518,77 @@ mod tests {
             .unwrap();
         reopened
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_background_fill_crud() {
+        let image_bytes = fixture("test-data/images/png/lena.png");
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let native_default = editor
+            .sheet_chart_background_fill(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert!(matches!(native_default, ShapeFill::Gradient(_)));
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_background_fill(sheet_id, source.drawable_object_id, &native_default)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let customized = chart_background_fill();
+        let image = editor
+            .set_sheet_chart_background_image_fill(
+                sheet_id,
+                source.drawable_object_id,
+                "lena.png",
+                &image_bytes,
+                ShapeImageFillTechnique::ScaleToFit,
+                None,
+            )
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_background_fill(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            ShapeFill::Image(image.clone())
+        );
+        editor
+            .set_sheet_chart_background_fill(sheet_id, source.drawable_object_id, &customized)
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_background_fill(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_background_fill(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            ShapeFill::Image(image.clone())
+        );
+        assert_eq!(
+            reopened
+                .extract_media(image.data_identifier().unwrap().get())
+                .unwrap(),
+            image_bytes
+        );
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.media_assets().unwrap().is_empty());
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
         assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
     }

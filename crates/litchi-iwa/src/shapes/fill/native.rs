@@ -11,7 +11,7 @@ use super::{
     ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique,
 };
 
-pub(super) fn fill_from_native(fill: &tsd::FillArchive) -> Result<ShapeFill> {
+pub(crate) fn fill_from_native(fill: &tsd::FillArchive) -> Result<ShapeFill> {
     match (
         fill.color.as_ref(),
         fill.gradient.as_ref(),
@@ -27,7 +27,7 @@ pub(super) fn fill_from_native(fill: &tsd::FillArchive) -> Result<ShapeFill> {
     }
 }
 
-pub(super) fn fill_to_native(fill: &ShapeFill) -> tsd::FillArchive {
+pub(crate) fn fill_to_native(fill: &ShapeFill) -> tsd::FillArchive {
     match fill {
         ShapeFill::None => tsd::FillArchive::default(),
         ShapeFill::Solid(color) => tsd::FillArchive {
@@ -45,7 +45,7 @@ pub(super) fn fill_to_native(fill: &ShapeFill) -> tsd::FillArchive {
     }
 }
 
-pub(super) fn image_data_identifier(fill: &ShapeFill) -> Option<u64> {
+pub(crate) fn image_data_identifier(fill: &ShapeFill) -> Option<u64> {
     match fill {
         ShapeFill::Image(image) => image.data_identifier().map(ShapeImageDataIdentifier::get),
         ShapeFill::None | ShapeFill::Solid(_) | ShapeFill::Gradient(_) => None,

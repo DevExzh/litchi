@@ -12,6 +12,8 @@ pub use gradient::{
     ShapeGradientStopMidpoint, ShapeGradientStopPosition,
 };
 pub use image::{ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique};
+pub(crate) use native::{fill_from_native, fill_to_native, image_data_identifier};
+pub(crate) use style::{remove_orphaned_image_asset, validate_image_asset};
 pub(crate) use style::{reset_shape_fill, set_shape_fill, set_shape_image_fill_data, shape_fill};
 
 /// Standard shape fills shared by Pages, Numbers, and Keynote.

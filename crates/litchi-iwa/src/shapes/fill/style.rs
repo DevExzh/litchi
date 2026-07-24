@@ -308,7 +308,7 @@ fn insert_fill_variation(
     Ok(())
 }
 
-fn validate_image_asset(package: &IWorkPackage, fill: &ShapeFill) -> Result<()> {
+pub(crate) fn validate_image_asset(package: &IWorkPackage, fill: &ShapeFill) -> Result<()> {
     let Some(data_identifier) = image_data_identifier(fill) else {
         return Ok(());
     };
@@ -364,7 +364,7 @@ fn remove_style_data_reference(
     remove_component_data_reference(package, style_component, data_identifier, style_id)
 }
 
-fn remove_orphaned_image_asset(
+pub(crate) fn remove_orphaned_image_asset(
     package: &mut IWorkPackage,
     data_identifier: Option<u64>,
 ) -> Result<()> {

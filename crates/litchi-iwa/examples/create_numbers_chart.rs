@@ -9,7 +9,8 @@ use litchi_iwa::charts::{
 };
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern, StrokeWidth,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeStroke, StrokePattern,
+    StrokeWidth,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -45,6 +46,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     editor.set_sheet_chart_title(sheet_id, chart.drawable_object_id, "Quarterly revenue")?;
+    editor.set_sheet_chart_background_fill(
+        sheet_id,
+        chart.drawable_object_id,
+        &ShapeFill::Solid(RgbaColor::new(0.85, 0.92, 1.0, 1.0, RgbColorSpace::Srgb)?),
+    )?;
     editor.set_sheet_chart_border_visible(sheet_id, chart.drawable_object_id, true)?;
     editor.set_sheet_chart_border_stroke(
         sheet_id,
@@ -148,7 +154,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} chart {} with native chart and axis titles, a visible blue 3 pt medium-dash chart border, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on sheet {}",
+        "created Numbers {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on sheet {}",
         chart.kind, chart.drawable_object_id, sheet_id
     );
     Ok(())
