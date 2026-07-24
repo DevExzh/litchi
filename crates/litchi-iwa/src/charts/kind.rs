@@ -50,6 +50,11 @@ impl ChartKind {
         )
     }
 
+    /// Whether the chart exposes the native Segments inner-radius control.
+    pub const fn supports_donut_inner_radius(self) -> bool {
+        matches!(self, Self::Donut2d | Self::Donut3d)
+    }
+
     /// Decode the integer stored by the iWork protobuf schema.
     pub const fn from_raw(value: i32) -> Self {
         match value {

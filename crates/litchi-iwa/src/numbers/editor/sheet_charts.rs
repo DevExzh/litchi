@@ -14,6 +14,7 @@ mod background_fill;
 mod border;
 mod border_stroke;
 mod caption;
+mod donut_inner_radius;
 mod gaps;
 mod graph;
 mod legend;
@@ -561,9 +562,10 @@ mod tests {
     use super::*;
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-        ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
-        ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-        ChartShadow, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+        ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
+        ChartGapSpacing, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+        ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+        ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -2777,6 +2779,101 @@ mod tests {
             .unwrap();
         reopened
             .remove_sheet_chart(sheet_id, column.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_donut_inner_radius_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Donut2d, pie_data(), POSITION, SIZE)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_donut_inner_radius(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            ChartDonutInnerRadius::DEFAULT
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_donut_inner_radius(
+                sheet_id,
+                source.drawable_object_id,
+                ChartDonutInnerRadius::DEFAULT,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let customized = ChartDonutInnerRadius::from_percent(42.0).unwrap();
+        editor
+            .set_sheet_chart_donut_inner_radius(sheet_id, source.drawable_object_id, customized)
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_donut_inner_radius(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+        editor
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Pie2d)
+            .unwrap();
+        let before_rejected_update = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .sheet_chart_donut_inner_radius(sheet_id, duplicate.drawable_object_id)
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_sheet_chart_donut_inner_radius(
+                    sheet_id,
+                    duplicate.drawable_object_id,
+                    ChartDonutInnerRadius::MAXIMUM,
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_rejected_update);
+        editor
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Donut3d)
+            .unwrap();
+
+        editor
+            .set_sheet_chart_donut_inner_radius(
+                sheet_id,
+                source.drawable_object_id,
+                ChartDonutInnerRadius::MINIMUM,
+            )
+            .unwrap();
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_donut_inner_radius(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            ChartDonutInnerRadius::MINIMUM
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_donut_inner_radius(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+        reopened
+            .set_sheet_chart_donut_inner_radius(
+                sheet_id,
+                duplicate.drawable_object_id,
+                ChartDonutInnerRadius::DEFAULT,
+            )
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
             .unwrap();
         assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
     }

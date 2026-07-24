@@ -6,9 +6,10 @@ use std::path::PathBuf;
 use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
-    ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-    ChartShadow, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
+    ChartGapSpacing, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+    ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+    ChartValueAxisSteps,
 };
 use crate::shapes::{
     RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
@@ -2096,6 +2097,105 @@ fn scratch_document_supports_native_pie_start_angle_crud() {
         .unwrap();
     reopened
         .remove_body_chart(column.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
+}
+
+#[test]
+fn scratch_document_supports_native_donut_inner_radius_crud() {
+    let mut editor = PagesEditor::create_with_text("Donut radius").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Donut radius".encode_utf16().count(),
+            ChartKind::Donut2d,
+            pie_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_donut_inner_radius(source.drawable_object_id)
+            .unwrap(),
+        ChartDonutInnerRadius::DEFAULT
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_donut_inner_radius(
+            source.drawable_object_id,
+            ChartDonutInnerRadius::DEFAULT,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let customized = ChartDonutInnerRadius::from_percent(42.0).unwrap();
+    editor
+        .set_body_chart_donut_inner_radius(source.drawable_object_id, customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_donut_inner_radius(duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    editor
+        .set_body_chart_kind(duplicate.drawable_object_id, ChartKind::Pie2d)
+        .unwrap();
+    let before_rejected_update = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .body_chart_donut_inner_radius(duplicate.drawable_object_id)
+            .is_err()
+    );
+    assert!(
+        editor
+            .set_body_chart_donut_inner_radius(
+                duplicate.drawable_object_id,
+                ChartDonutInnerRadius::MAXIMUM,
+            )
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_rejected_update);
+    editor
+        .set_body_chart_kind(duplicate.drawable_object_id, ChartKind::Donut3d)
+        .unwrap();
+
+    editor
+        .set_body_chart_donut_inner_radius(
+            source.drawable_object_id,
+            ChartDonutInnerRadius::MINIMUM,
+        )
+        .unwrap();
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_donut_inner_radius(source.drawable_object_id)
+            .unwrap(),
+        ChartDonutInnerRadius::MINIMUM
+    );
+    assert_eq!(
+        reopened
+            .body_chart_donut_inner_radius(duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    reopened
+        .set_body_chart_donut_inner_radius(
+            duplicate.drawable_object_id,
+            ChartDonutInnerRadius::DEFAULT,
+        )
+        .unwrap();
+    reopened
+        .remove_body_chart(source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
         .unwrap();
     assert!(reopened.body_charts().unwrap().is_empty());
 }

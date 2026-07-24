@@ -22,6 +22,7 @@ pub(crate) mod border;
 pub(crate) mod border_stroke;
 mod data;
 mod direction;
+pub(crate) mod donut_inner_radius;
 pub(crate) mod gaps;
 mod kind;
 pub mod metadata_extractor;
@@ -43,6 +44,7 @@ pub use axis_steps::{ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartValu
 pub use axis_style::ChartAxisTickMarkLocation;
 pub use data::ChartData;
 pub use direction::ChartSeriesDirection;
+pub use donut_inner_radius::ChartDonutInnerRadius;
 pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};

@@ -14,6 +14,7 @@ mod background_fill;
 mod border;
 mod border_stroke;
 mod caption;
+mod donut_inner_radius;
 mod gaps;
 mod graph;
 mod legend;

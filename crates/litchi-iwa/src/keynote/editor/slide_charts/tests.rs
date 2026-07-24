@@ -6,9 +6,10 @@ use std::path::PathBuf;
 use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
-    ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-    ChartShadow, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
+    ChartGapSpacing, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+    ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+    ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -1968,6 +1969,100 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
         .unwrap();
     reopened
         .remove_slide_chart(0, column.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_donut_inner_radius_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Donut2d, pie_data(), POSITION, SIZE)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_donut_inner_radius(0, source.drawable_object_id)
+            .unwrap(),
+        ChartDonutInnerRadius::DEFAULT
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_donut_inner_radius(
+            0,
+            source.drawable_object_id,
+            ChartDonutInnerRadius::DEFAULT,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let customized = ChartDonutInnerRadius::from_percent(42.0).unwrap();
+    editor
+        .set_slide_chart_donut_inner_radius(0, source.drawable_object_id, customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_donut_inner_radius(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    editor
+        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Pie2d)
+        .unwrap();
+    let before_rejected_update = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .slide_chart_donut_inner_radius(0, duplicate.drawable_object_id)
+            .is_err()
+    );
+    assert!(
+        editor
+            .set_slide_chart_donut_inner_radius(
+                0,
+                duplicate.drawable_object_id,
+                ChartDonutInnerRadius::MAXIMUM,
+            )
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_rejected_update);
+    editor
+        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Donut3d)
+        .unwrap();
+
+    editor
+        .set_slide_chart_donut_inner_radius(
+            0,
+            source.drawable_object_id,
+            ChartDonutInnerRadius::MINIMUM,
+        )
+        .unwrap();
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_donut_inner_radius(0, source.drawable_object_id)
+            .unwrap(),
+        ChartDonutInnerRadius::MINIMUM
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_donut_inner_radius(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    reopened
+        .set_slide_chart_donut_inner_radius(
+            0,
+            duplicate.drawable_object_id,
+            ChartDonutInnerRadius::DEFAULT,
+        )
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
