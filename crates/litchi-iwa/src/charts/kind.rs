@@ -42,6 +42,14 @@ pub enum ChartKind {
 }
 
 impl ChartKind {
+    /// Whether the chart exposes the native Wedges rotation control.
+    pub const fn supports_pie_start_angle(self) -> bool {
+        matches!(
+            self,
+            Self::Pie2d | Self::Pie3d | Self::Donut2d | Self::Donut3d
+        )
+    }
+
     /// Decode the integer stored by the iWork protobuf schema.
     pub const fn from_raw(value: i32) -> Self {
         match value {

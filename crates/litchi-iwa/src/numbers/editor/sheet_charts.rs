@@ -17,6 +17,7 @@ mod caption;
 mod gaps;
 mod graph;
 mod legend;
+mod pie_start_angle;
 mod rounded_corners;
 mod shadow;
 mod theme;
@@ -560,8 +561,8 @@ mod tests {
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
-        ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-        ChartValueAxisSteps,
+        ChartPieStartAngle, ChartRoundedCorners, ChartShadow, ChartValueAxisBounds,
+        ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -581,6 +582,15 @@ mod tests {
             vec!["North".to_owned(), "South".to_owned()],
             vec!["Q1".to_owned(), "Q2".to_owned()],
             vec![vec![Some(12.0), Some(18.0)], vec![Some(9.0), Some(21.0)]],
+        )
+        .unwrap()
+    }
+
+    fn pie_data() -> ChartData {
+        ChartData::new(
+            vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+            vec!["Revenue".to_owned()],
+            vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
         )
         .unwrap()
     }
@@ -2666,6 +2676,106 @@ mod tests {
             .unwrap();
         reopened
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_pie_start_angle_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_pie_start_angle(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            ChartPieStartAngle::ZERO
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_pie_start_angle(
+                sheet_id,
+                source.drawable_object_id,
+                ChartPieStartAngle::ZERO,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let customized = ChartPieStartAngle::from_degrees(123.0).unwrap();
+        editor
+            .set_sheet_chart_pie_start_angle(sheet_id, source.drawable_object_id, customized)
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        editor
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Donut2d)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_pie_start_angle(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+        editor
+            .set_sheet_chart_pie_start_angle(
+                sheet_id,
+                source.drawable_object_id,
+                ChartPieStartAngle::HALF_TURN,
+            )
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_pie_start_angle(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            ChartPieStartAngle::HALF_TURN
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_pie_start_angle(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+        reopened
+            .set_sheet_chart_pie_start_angle(
+                sheet_id,
+                duplicate.drawable_object_id,
+                ChartPieStartAngle::ZERO,
+            )
+            .unwrap();
+
+        let column = reopened
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let before_rejected_update = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .sheet_chart_pie_start_angle(sheet_id, column.drawable_object_id)
+                .is_err()
+        );
+        assert!(
+            reopened
+                .set_sheet_chart_pie_start_angle(
+                    sheet_id,
+                    column.drawable_object_id,
+                    ChartPieStartAngle::QUARTER_TURN,
+                )
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before_rejected_update);
+
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, column.drawable_object_id)
             .unwrap();
         assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
     }

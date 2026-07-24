@@ -7,8 +7,8 @@ use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
-    ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-    ChartValueAxisSteps,
+    ChartPieStartAngle, ChartRoundedCorners, ChartShadow, ChartValueAxisBounds,
+    ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::shapes::{
     RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
@@ -30,6 +30,15 @@ fn sample_data() -> ChartData {
             vec![Some(12.0), Some(18.0), Some(24.0)],
             vec![Some(9.0), Some(21.0), Some(27.0)],
         ],
+    )
+    .unwrap()
+}
+
+fn pie_data() -> ChartData {
+    ChartData::new(
+        vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+        vec!["Revenue".to_owned()],
+        vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
     )
     .unwrap()
 }
@@ -1986,6 +1995,107 @@ fn scratch_document_supports_native_chart_shadow_crud() {
         .unwrap();
     reopened
         .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
+}
+
+#[test]
+fn scratch_document_supports_native_pie_start_angle_crud() {
+    let mut editor = PagesEditor::create_with_text("Pie rotation").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Pie rotation".encode_utf16().count(),
+            ChartKind::Pie2d,
+            pie_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_pie_start_angle(source.drawable_object_id)
+            .unwrap(),
+        ChartPieStartAngle::ZERO
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_pie_start_angle(source.drawable_object_id, ChartPieStartAngle::ZERO)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let customized = ChartPieStartAngle::from_degrees(123.0).unwrap();
+    editor
+        .set_body_chart_pie_start_angle(source.drawable_object_id, customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    editor
+        .set_body_chart_kind(duplicate.drawable_object_id, ChartKind::Donut2d)
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_pie_start_angle(duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    editor
+        .set_body_chart_pie_start_angle(source.drawable_object_id, ChartPieStartAngle::HALF_TURN)
+        .unwrap();
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_pie_start_angle(source.drawable_object_id)
+            .unwrap(),
+        ChartPieStartAngle::HALF_TURN
+    );
+    assert_eq!(
+        reopened
+            .body_chart_pie_start_angle(duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    reopened
+        .set_body_chart_pie_start_angle(duplicate.drawable_object_id, ChartPieStartAngle::ZERO)
+        .unwrap();
+
+    let column = reopened
+        .add_body_chart(
+            reopened.body_text().unwrap().encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let before_rejected_update = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .body_chart_pie_start_angle(column.drawable_object_id)
+            .is_err()
+    );
+    assert!(
+        reopened
+            .set_body_chart_pie_start_angle(
+                column.drawable_object_id,
+                ChartPieStartAngle::QUARTER_TURN,
+            )
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected_update);
+
+    reopened
+        .remove_body_chart(source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(column.drawable_object_id)
         .unwrap();
     assert!(reopened.body_charts().unwrap().is_empty());
 }

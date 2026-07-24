@@ -17,6 +17,7 @@ mod caption;
 mod gaps;
 mod graph;
 mod legend;
+mod pie_start_angle;
 mod rounded_corners;
 mod shadow;
 mod theme;

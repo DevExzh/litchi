@@ -7,8 +7,8 @@ use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
-    ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-    ChartValueAxisSteps,
+    ChartPieStartAngle, ChartRoundedCorners, ChartShadow, ChartValueAxisBounds,
+    ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -36,6 +36,15 @@ fn sample_data() -> ChartData {
             vec![Some(17.0), Some(26.0), Some(53.0), Some(96.0)],
             vec![Some(55.0), Some(43.0), Some(70.0), Some(58.0)],
         ],
+    )
+    .unwrap()
+}
+
+fn pie_data() -> ChartData {
+    ChartData::new(
+        vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+        vec!["Revenue".to_owned()],
+        vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
     )
     .unwrap()
 }
@@ -1868,6 +1877,97 @@ fn scratch_presentation_supports_native_chart_shadow_crud() {
         .unwrap();
     reopened
         .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_pie_start_angle_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_pie_start_angle(0, source.drawable_object_id)
+            .unwrap(),
+        ChartPieStartAngle::ZERO
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_pie_start_angle(0, source.drawable_object_id, ChartPieStartAngle::ZERO)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let customized = ChartPieStartAngle::from_degrees(123.0).unwrap();
+    editor
+        .set_slide_chart_pie_start_angle(0, source.drawable_object_id, customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    editor
+        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Donut2d)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_pie_start_angle(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    editor
+        .set_slide_chart_pie_start_angle(
+            0,
+            source.drawable_object_id,
+            ChartPieStartAngle::HALF_TURN,
+        )
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_pie_start_angle(0, source.drawable_object_id)
+            .unwrap(),
+        ChartPieStartAngle::HALF_TURN
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_pie_start_angle(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    reopened
+        .set_slide_chart_pie_start_angle(0, duplicate.drawable_object_id, ChartPieStartAngle::ZERO)
+        .unwrap();
+
+    let column = reopened
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let before_rejected_update = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .slide_chart_pie_start_angle(0, column.drawable_object_id)
+            .is_err()
+    );
+    assert!(
+        reopened
+            .set_slide_chart_pie_start_angle(
+                0,
+                column.drawable_object_id,
+                ChartPieStartAngle::QUARTER_TURN,
+            )
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected_update);
+
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, column.drawable_object_id)
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
