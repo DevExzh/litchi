@@ -342,6 +342,8 @@ mod form_package;
 mod formula;
 /// Format-neutral package access for every OpenDocument family.
 mod generic;
+/// Semantic family readers for flat OpenDocument XML documents.
+mod flat;
 mod graphic_properties;
 mod line_numbering;
 mod master_page;
@@ -476,6 +478,10 @@ pub use formula::builder as mathml;
 pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
 pub use formula::builder::{MathDisplay, MathVariant};
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
+pub use flat::{
+    FlatChartDocument, FlatDrawingDocument, FlatImageDocument, FlatPresentation, FlatSpreadsheet,
+    FlatTextDocument,
+};
 pub use graphic_properties::{
     GraphicProperty, GraphicPropertyChild, GraphicPropertyChildKind, GraphicPropertyKind,
     GraphicPropertyNamespace, GraphicPropertyValue, GraphicStyleProperties,
