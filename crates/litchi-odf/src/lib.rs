@@ -479,7 +479,8 @@ pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, Math
 pub use formula::builder::{MathDisplay, MathVariant};
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use flat::{
-    FlatChartDocument, FlatDrawingDocument, FlatImageDocument, FlatPresentation, FlatSpreadsheet,
+    FlatChartDocument, FlatDrawingDocument, FlatImageDocument, FlatMutablePresentation,
+    FlatMutableSpreadsheet, FlatMutableTextDocument, FlatPresentation, FlatSpreadsheet,
     FlatTextDocument,
 };
 pub use graphic_properties::{

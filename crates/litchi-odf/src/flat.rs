@@ -14,12 +14,13 @@
 //! bounded parsing limits of the packaged readers.
 
 use crate::constants;
-use crate::core::PackageWriter;
+use crate::core::{OwnedPackage, PackageWriter};
 use crate::generic::{FlatOpenDocument, OpenDocumentFamily};
 use litchi_core::{Error, Metadata, Result};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::collections::HashSet;
 use std::io::Read;
 use std::path::Path;
 
@@ -84,23 +85,39 @@ impl FlatSections<'_> {
     }
 }
 
-/// Split the top-level sections of a flat document into package parts.
-///
-/// Sections are borrowed slices of the flat XML; allocation only happens when
-/// the synthesized part documents are rendered.
-fn split_flat_sections(xml: &str) -> Result<FlatSections<'_>> {
+/// One top-level office child element of a scanned XML document.
+struct ScannedSection {
+    /// Local name of the section element.
+    local: String,
+    /// Byte offset of the section's start tag.
+    start: usize,
+    /// Byte offset just past the section's end tag.
+    end: usize,
+}
+
+/// Result of scanning the top level of a flat document or package part.
+struct TopLevelScan {
+    /// Byte offset just past the root start tag's closing `>`.
+    root_tag_end: usize,
+    /// `xmlns` declarations of the root element, verbatim.
+    decls: Vec<(String, String)>,
+    /// Top-level office-namespace children in document order.
+    sections: Vec<ScannedSection>,
+}
+
+/// Scan one XML document for its root declarations and top-level office
+/// children. Sections are recorded as byte ranges; no content is copied.
+fn scan_top_level(xml: &str) -> Result<TopLevelScan> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
-    let mut namespace_decls: Vec<(String, String)> = Vec::new();
+    let mut decls: Vec<(String, String)> = Vec::new();
     let mut root_seen = false;
-    let mut content = Vec::new();
-    let mut styles = Vec::new();
-    let mut meta = Vec::new();
-    let mut settings = Vec::new();
+    let mut root_tag_end = 0usize;
+    let mut sections = Vec::new();
     // Top-level section whose start tag was seen but whose end tag is still
-    // pending: (route, byte offset of the start tag).
-    let mut pending_section: Option<(SectionRoute, usize)> = None;
+    // pending: (local name, byte offset of the start tag).
+    let mut pending_section: Option<(String, usize)> = None;
 
     loop {
         let event_start = reader.buffer_position() as usize;
@@ -118,14 +135,13 @@ fn split_flat_sections(xml: &str) -> Result<FlatSections<'_>> {
                         ));
                     }
                     root_seen = true;
-                    namespace_decls = root_namespace_decls(element)?;
+                    root_tag_end = reader.buffer_position() as usize;
+                    decls = root_namespace_decls(element)?;
                 } else if depth == 1
                     && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                 {
-                    pending_section = Some((
-                        SectionRoute::of(element.local_name().as_ref()),
-                        event_start,
-                    ));
+                    let local = decode_local_name(element.local_name().as_ref())?;
+                    pending_section = Some((local, event_start));
                 }
                 depth = depth.checked_add(1).ok_or_else(|| {
                     Error::InvalidFormat("flat OpenDocument nesting overflow".to_string())
@@ -136,26 +152,22 @@ fn split_flat_sections(xml: &str) -> Result<FlatSections<'_>> {
                     && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE) =>
             {
                 let event_end = reader.buffer_position() as usize;
-                SectionRoute::of(element.local_name().as_ref()).push(
-                    &xml[event_start..event_end],
-                    &mut content,
-                    &mut styles,
-                    &mut meta,
-                    &mut settings,
-                );
+                sections.push(ScannedSection {
+                    local: decode_local_name(element.local_name().as_ref())?,
+                    start: event_start,
+                    end: event_end,
+                });
             },
             Event::End(_) => {
                 if depth == 2
-                    && let Some((route, section_start)) = pending_section.take()
+                    && let Some((local, section_start)) = pending_section.take()
                 {
                     let event_end = reader.buffer_position() as usize;
-                    route.push(
-                        &xml[section_start..event_end],
-                        &mut content,
-                        &mut styles,
-                        &mut meta,
-                        &mut settings,
-                    );
+                    sections.push(ScannedSection {
+                        local,
+                        start: section_start,
+                        end: event_end,
+                    });
                 }
                 depth = depth.checked_sub(1).ok_or_else(|| {
                     Error::InvalidFormat("unexpected flat OpenDocument closing tag".to_string())
@@ -171,10 +183,42 @@ fn split_flat_sections(xml: &str) -> Result<FlatSections<'_>> {
             "flat OpenDocument has no root element".to_string(),
         ));
     }
+    Ok(TopLevelScan {
+        root_tag_end,
+        decls,
+        sections,
+    })
+}
 
-    let (wrapper_prefix, wrapper_decl) = wrapper_prefix(&namespace_decls)?;
+fn decode_local_name(local_name: &[u8]) -> Result<String> {
+    std::str::from_utf8(local_name)
+        .map(str::to_string)
+        .map_err(|_| Error::InvalidFormat("invalid flat OpenDocument element name".to_string()))
+}
+
+/// Split the top-level sections of a flat document into package parts.
+///
+/// Sections are borrowed slices of the flat XML; allocation only happens when
+/// the synthesized part documents are rendered.
+fn split_flat_sections(xml: &str) -> Result<FlatSections<'_>> {
+    let scan = scan_top_level(xml)?;
+    let mut content = Vec::new();
+    let mut styles = Vec::new();
+    let mut meta = Vec::new();
+    let mut settings = Vec::new();
+    for section in &scan.sections {
+        SectionRoute::of(section.local.as_bytes()).push(
+            &xml[section.start..section.end],
+            &mut content,
+            &mut styles,
+            &mut meta,
+            &mut settings,
+        );
+    }
+
+    let (wrapper_prefix, wrapper_decl) = wrapper_prefix(&scan.decls)?;
     let mut serialized = String::new();
-    for (key, value) in &namespace_decls {
+    for (key, value) in &scan.decls {
         serialized.push(' ');
         serialized.push_str(key);
         serialized.push_str("=\"");
@@ -318,6 +362,210 @@ fn synthesize_package(flat: &FlatOpenDocument) -> Result<Vec<u8>> {
         )?;
     }
     writer.finish_to_bytes()
+}
+
+/// Schema-order ranks for flat top-level sections, used to place sections
+/// that a mutation added and the original flat document did not have.
+mod rank {
+    pub const META: u8 = 0;
+    pub const SETTINGS: u8 = 1;
+    pub const SCRIPTS: u8 = 2;
+    pub const FONT_FACE_DECLS: u8 = 3;
+    pub const STYLES: u8 = 4;
+    pub const AUTOMATIC_STYLES: u8 = 5;
+    pub const MASTER_STYLES: u8 = 6;
+    pub const BODY: u8 = 7;
+    /// Unknown sections sort just ahead of the body.
+    pub const UNKNOWN: u8 = MASTER_STYLES;
+}
+
+fn section_rank(local: &str) -> u8 {
+    match local {
+        "meta" => rank::META,
+        "settings" => rank::SETTINGS,
+        "scripts" => rank::SCRIPTS,
+        "font-face-decls" => rank::FONT_FACE_DECLS,
+        "styles" => rank::STYLES,
+        "automatic-styles" => rank::AUTOMATIC_STYLES,
+        "master-styles" => rank::MASTER_STYLES,
+        "body" => rank::BODY,
+        _ => rank::UNKNOWN,
+    }
+}
+
+/// Read one optional UTF-8 XML part from a mutated package.
+fn package_xml_part(package: &OwnedPackage, path: &str) -> Result<Option<String>> {
+    if !package.has_file(path)? {
+        return Ok(None);
+    }
+    let bytes = package.get_file(path)?;
+    String::from_utf8(bytes)
+        .map(Some)
+        .map_err(|_| Error::InvalidFormat(format!("invalid UTF-8 in mutated {path}")))
+}
+
+/// Whether a section slice is an empty element such as `<office:scripts/>`.
+fn is_empty_element(slice: &str) -> bool {
+    slice.trim_end().ends_with("/>")
+}
+
+/// Look up one section slice by local name in a mutated part's child list.
+fn find_section<'a>(map: &[(&str, &'a str)], local: &str) -> Option<&'a str> {
+    map.iter()
+        .find(|(name, _)| *name == local)
+        .map(|(_, slice)| *slice)
+}
+
+/// Keep a replacement section only when it is not an empty placeholder.
+fn non_empty_section(candidate: Option<&str>) -> Option<&str> {
+    candidate.filter(|slice| !is_empty_element(slice))
+}
+
+/// Splice the parts of a mutated in-memory package back into the original
+/// flat XML document.
+///
+/// Sections the mutation did not touch keep their original bytes — most
+/// notably `office:settings`, which the packaged mutation flows do not
+/// carry. Sections present in the mutated `content.xml`/`styles.xml`/
+/// `meta.xml` replace their original counterparts; an empty replacement
+/// (such as the `<office:automatic-styles/>` placeholder some flows emit)
+/// never discards a non-empty original section. Sections that only exist in
+/// the mutated parts are inserted in schema order, and namespace
+/// declarations the mutated part roots added are merged into the flat root.
+fn splice_package_into_flat(flat: &FlatOpenDocument, package_bytes: Vec<u8>) -> Result<Vec<u8>> {
+    let package = OwnedPackage::from_bytes(package_bytes)?;
+    let content_xml = package_xml_part(&package, constants::ODF_CONTENT)?.ok_or_else(|| {
+        Error::InvalidFormat("mutated package has no content.xml".to_string())
+    })?;
+    let styles_xml = package_xml_part(&package, constants::ODF_STYLES)?;
+    let meta_xml = package_xml_part(&package, constants::ODF_META)?;
+
+    let original = scan_top_level(flat.xml())?;
+    let content = scan_top_level(&content_xml)?;
+    let styles = styles_xml.as_deref().map(scan_top_level).transpose()?;
+    let meta = meta_xml.as_deref().map(scan_top_level).transpose()?;
+    let Some(first_section) = original.sections.first() else {
+        return Err(Error::InvalidFormat(
+            "flat OpenDocument has no sections to splice into".to_string(),
+        ));
+    };
+    let head_end = first_section.start;
+
+    let content_map: Vec<(&str, &str)> = content
+        .sections
+        .iter()
+        .map(|section| (section.local.as_str(), &content_xml[section.start..section.end]))
+        .collect();
+    let styles_map: Vec<(&str, &str)> = styles
+        .as_ref()
+        .map(|scan| {
+            let xml = styles_xml.as_deref().expect("styles scan implies styles XML");
+            scan.sections
+                .iter()
+                .map(|section| (section.local.as_str(), &xml[section.start..section.end]))
+                .collect()
+        })
+        .unwrap_or_default();
+    let meta_section = meta.as_ref().and_then(|scan| {
+        let xml = meta_xml.as_deref().expect("meta scan implies meta XML");
+        scan.sections
+            .first()
+            .map(|section| &xml[section.start..section.end])
+    });
+
+    // Replace original sections in place, preserving order and whitespace.
+    let flat_xml = flat.xml();
+    let mut emitted: Vec<(u8, &str, &str)> = Vec::with_capacity(original.sections.len());
+    let mut prev_end = head_end;
+    for section in &original.sections {
+        let gap = &flat_xml[prev_end..section.start];
+        let local = section.local.as_str();
+        let replacement = match local {
+            // The packaged mutation flows do not carry settings; keep them.
+            "settings" => None,
+            // The body is always authoritative in the mutated content.
+            "body" => find_section(&content_map, "body"),
+            "meta" => meta_section,
+            "styles" | "master-styles" => non_empty_section(find_section(&styles_map, local)),
+            _ => non_empty_section(
+                find_section(&content_map, local).or(find_section(&styles_map, local)),
+            ),
+        };
+        let xml = replacement.unwrap_or(&flat_xml[section.start..section.end]);
+        emitted.push((section_rank(local), gap, xml));
+        prev_end = section.end;
+    }
+
+    // Insert sections that only exist in the mutated parts, in schema order.
+    let original_locals: HashSet<&str> = original
+        .sections
+        .iter()
+        .map(|section| section.local.as_str())
+        .collect();
+    let mut additions: Vec<(u8, &str)> = Vec::new();
+    if let Some(meta_slice) = meta_section
+        && !original_locals.contains("meta")
+        && !is_empty_element(meta_slice)
+    {
+        additions.push((rank::META, meta_slice));
+    }
+    let mut added_locals: HashSet<&str> = HashSet::new();
+    for (local, slice) in content_map.iter().chain(styles_map.iter()) {
+        if original_locals.contains(local)
+            || !added_locals.insert(local)
+            || is_empty_element(slice)
+        {
+            continue;
+        }
+        additions.push((section_rank(local), slice));
+    }
+    for (rank, slice) in additions {
+        let position = emitted
+            .iter()
+            .position(|(section_rank, _, _)| *section_rank > rank)
+            .unwrap_or(emitted.len());
+        emitted.insert(position, (rank, "\n", slice));
+    }
+
+    // Merge namespace declarations the mutated part roots introduced.
+    let mut decl_keys: HashSet<&str> = original
+        .decls
+        .iter()
+        .map(|(key, _)| key.as_str())
+        .collect();
+    let mut extra_decls = String::new();
+    for scan in [Some(&content), styles.as_ref(), meta.as_ref()]
+        .into_iter()
+        .flatten()
+    {
+        for (key, value) in &scan.decls {
+            if !decl_keys.insert(key.as_str()) {
+                continue;
+            }
+            extra_decls.push(' ');
+            extra_decls.push_str(key);
+            extra_decls.push_str("=\"");
+            extra_decls.push_str(value);
+            extra_decls.push('"');
+        }
+    }
+
+    let mut head = flat_xml[..head_end].to_string();
+    if !extra_decls.is_empty() {
+        // `root_tag_end` points just past the root start tag's `>`.
+        head.insert_str(original.root_tag_end - 1, &extra_decls);
+    }
+    let mut output = head;
+    for (_, gap, xml) in &emitted {
+        output.push_str(gap);
+        output.push_str(xml);
+    }
+    output.push_str(&flat_xml[prev_end..]);
+
+    // The spliced document must remain a valid flat document of the same
+    // family before it is handed out.
+    FlatOpenDocument::from_bytes(output.clone().into_bytes())?;
+    Ok(output.into_bytes())
 }
 
 /// Open a validated flat document of `expected_family` through its packaged
@@ -548,6 +796,164 @@ flat_family_wrapper! {
         mut_accessor: image_mut,
         family: OpenDocumentFamily::Image,
         extension: "fodi",
+    }
+}
+
+macro_rules! flat_mutable_wrapper {
+    (
+        $(#[$meta:meta])*
+        pub struct $name:ident {
+            inner: $inner:ty,
+            accessor: $accessor:ident,
+            mut_accessor: $mut_accessor:ident,
+            extension: $extension:literal,
+        }
+    ) => {
+        $(#[$meta])*
+        pub struct $name {
+            flat: FlatOpenDocument,
+            document: $inner,
+        }
+
+        impl $name {
+            fn from_flat(flat: FlatOpenDocument, document: $inner) -> Self {
+                Self { flat, document }
+            }
+
+            #[doc = concat!("Borrow the mutable packaged authoring model.")]
+            pub fn $accessor(&self) -> &$inner {
+                &self.document
+            }
+
+            #[doc = concat!("Borrow the mutable packaged authoring model mutably.\n\nAll edits are applied through the packaged authoring APIs and are written back into flat XML form by `to_bytes`/`save`.")]
+            pub fn $mut_accessor(&mut self) -> &mut $inner {
+                &mut self.document
+            }
+
+            /// Borrow the format-neutral flat wrapper of the original
+            /// document for settings, forms, and variable declarations.
+            pub fn flat_document(&self) -> &FlatOpenDocument {
+                &self.flat
+            }
+
+            #[doc = concat!("Serialize the mutated document back into flat `.", $extension, "` XML.\n\nSections the mutation did not touch keep their original bytes; the result is validated again as a flat document of the same family. Binary package parts created by the authoring model (for example added `Pictures/` media) cannot be represented as flat sections and are not carried over.")]
+            pub fn to_bytes(&self) -> Result<Vec<u8>> {
+                splice_package_into_flat(&self.flat, self.document.to_bytes()?)
+            }
+
+            #[doc = concat!("Save the mutated document as flat `.", $extension, "` XML.")]
+            pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+                std::fs::write(path, self.to_bytes()?)?;
+                Ok(())
+            }
+        }
+    };
+}
+
+flat_mutable_wrapper! {
+    /// Mutable semantic editor for flat OpenDocument text (`.fodt`).
+    ///
+    /// Obtained from [`FlatTextDocument::into_mutable`] or
+    /// [`FlatTextDocument::to_mutable`]. Edits go through the packaged
+    /// [`MutableDocument`](crate::MutableDocument) authoring APIs and
+    /// `to_bytes`/`save` write them back into flat XML form.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odf::FlatTextDocument;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let document = FlatTextDocument::open("notes.fodt")?;
+    /// let mut mutable = document.into_mutable()?;
+    /// mutable.document_mut().update_paragraph(0, "Rewritten")?;
+    /// mutable.save("notes-updated.fodt")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub struct FlatMutableTextDocument {
+        inner: crate::MutableDocument,
+        accessor: document,
+        mut_accessor: document_mut,
+        extension: "fodt",
+    }
+}
+
+flat_mutable_wrapper! {
+    /// Mutable semantic editor for flat OpenDocument spreadsheets (`.fods`).
+    ///
+    /// Obtained from [`FlatSpreadsheet::into_mutable`] or
+    /// [`FlatSpreadsheet::to_mutable`]. Edits go through the packaged
+    /// [`MutableSpreadsheet`](crate::MutableSpreadsheet) authoring APIs and
+    /// `to_bytes`/`save` write them back into flat XML form.
+    pub struct FlatMutableSpreadsheet {
+        inner: crate::MutableSpreadsheet,
+        accessor: spreadsheet,
+        mut_accessor: spreadsheet_mut,
+        extension: "fods",
+    }
+}
+
+flat_mutable_wrapper! {
+    /// Mutable semantic editor for flat OpenDocument presentations (`.fodp`).
+    ///
+    /// Obtained from [`FlatPresentation::into_mutable`] or
+    /// [`FlatPresentation::to_mutable`]. Edits go through the packaged
+    /// [`MutablePresentation`](crate::MutablePresentation) authoring APIs and
+    /// `to_bytes`/`save` write them back into flat XML form.
+    pub struct FlatMutablePresentation {
+        inner: crate::MutablePresentation,
+        accessor: presentation,
+        mut_accessor: presentation_mut,
+        extension: "fodp",
+    }
+}
+
+impl FlatTextDocument {
+    /// Convert this flat document into an atomic mutable flat text document.
+    pub fn into_mutable(self) -> Result<FlatMutableTextDocument> {
+        let document = crate::MutableDocument::from_document(self.document)?;
+        Ok(FlatMutableTextDocument::from_flat(self.flat, document))
+    }
+
+    /// Clone this flat document into an atomic mutable flat text document.
+    pub fn to_mutable(&self) -> Result<FlatMutableTextDocument> {
+        let flat = FlatOpenDocument::from_bytes(self.flat.to_bytes())?;
+        let document = crate::odt::Document::from_bytes(synthesize_package(&flat)?)?;
+        let document = crate::MutableDocument::from_document(document)?;
+        Ok(FlatMutableTextDocument::from_flat(flat, document))
+    }
+}
+
+impl FlatSpreadsheet {
+    /// Convert this flat spreadsheet into an atomic mutable flat spreadsheet.
+    pub fn into_mutable(self) -> Result<FlatMutableSpreadsheet> {
+        let document = crate::MutableSpreadsheet::from_spreadsheet(self.document)?;
+        Ok(FlatMutableSpreadsheet::from_flat(self.flat, document))
+    }
+
+    /// Clone this flat spreadsheet into an atomic mutable flat spreadsheet.
+    pub fn to_mutable(&self) -> Result<FlatMutableSpreadsheet> {
+        let flat = FlatOpenDocument::from_bytes(self.flat.to_bytes())?;
+        let document = crate::ods::Spreadsheet::from_bytes(synthesize_package(&flat)?)?;
+        let document = crate::MutableSpreadsheet::from_spreadsheet(document)?;
+        Ok(FlatMutableSpreadsheet::from_flat(flat, document))
+    }
+}
+
+impl FlatPresentation {
+    /// Convert this flat presentation into an atomic mutable flat presentation.
+    pub fn into_mutable(self) -> Result<FlatMutablePresentation> {
+        let document = crate::MutablePresentation::from_presentation(self.document)?;
+        Ok(FlatMutablePresentation::from_flat(self.flat, document))
+    }
+
+    /// Clone this flat presentation into an atomic mutable flat presentation.
+    pub fn to_mutable(&self) -> Result<FlatMutablePresentation> {
+        let flat = FlatOpenDocument::from_bytes(self.flat.to_bytes())?;
+        let document = crate::odp::Presentation::from_bytes(synthesize_package(&flat)?)?;
+        let document = crate::MutablePresentation::from_presentation(document)?;
+        Ok(FlatMutablePresentation::from_flat(flat, document))
     }
 }
 
