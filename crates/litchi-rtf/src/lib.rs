@@ -59,6 +59,7 @@ mod document_variable;
 mod document_view;
 mod document_word_2003_compatibility;
 mod document_xml_policies;
+mod equation;
 mod error;
 mod external_reference;
 mod field;
@@ -160,6 +161,11 @@ pub use document_view::{
 };
 pub use document_word_2003_compatibility::DocumentWord2003Compatibility;
 pub use document_xml_policies::DocumentXmlPolicies;
+pub use equation::{
+    EquationAlignment, EquationArray, EquationBox, EquationBracket, EquationDisplace,
+    EquationGroup, EquationIntegral, EquationIntegralSymbol, EquationModel, EquationOverstrike,
+    EquationScript, EquationSegment, EquationSpacing, EquationSwitch,
+};
 pub use error::{RtfError, RtfResult};
 pub use external_reference::{
     DocumentExternalReferences, MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES,

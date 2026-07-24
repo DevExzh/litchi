@@ -551,7 +551,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Mail-merge metadata | ✅ | ✅ | ✅ | Data sources, field mappings, and recipients as inert metadata; no merge execution |
 | Document variables and user properties | ✅ | ✅ | ✅ | Typed values, lexical forms, links, Unicode, and mutation |
 | Embedded OLE objects | ✅ | ✅ | ✅ | OLE1 header decoding, object data/results, positions, and mutation; payloads remain inert |
-| Equations/math | 🟡 | ✅ | 🟡 | Typed inert `EQ` field discovery and caller-authored `EQ` field serialization, plus embedded equation objects and math-property metadata; equation syntax is never parsed, calculated, formatted, or rendered |
+| Equations/math | 🟡 | ✅ | 🟡 | Typed inert `EQ` field discovery and caller-authored `EQ` field serialization, a typed syntactic model of the ECMA-376 `EQ` instruction switches (fractions, radicals, scripts, integrals/sums/products, arrays, brackets, boxes, overstrikes, lists, and displacements), plus embedded equation objects and math-property metadata; equations are never calculated, formatted, or rendered |
 | Embedded fonts | ✅ | ✅ | ✅ | `fontemb`/`fontfile` destinations and inline data |
 | Themes and data stores | ✅ | ✅ | ✅ | Inert theme/data-store bytes and typed mutation |
 | File table and external references | ✅ | ✅ | ✅ | Bounded inert external-file metadata; targets are never resolved |

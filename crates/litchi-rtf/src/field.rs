@@ -317,8 +317,9 @@ pub struct ReferenceField<'a> {
 /// Inert metadata for a legacy RTF `EQ` field.
 ///
 /// The expression is retained exactly as field-instruction text after the
-/// `EQ` keyword. It is never parsed as an equation, evaluated, rendered, or
-/// sent to an external application.
+/// `EQ` keyword. On request, [`EquationField::model`] parses it into the
+/// typed, inert [`crate::EquationModel`] syntax tree; it is never evaluated,
+/// typeset, rendered, or sent to an external application.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EquationField<'a> {
     instruction: &'a str,
@@ -2122,6 +2123,15 @@ impl<'a> EquationField<'a> {
     /// Return the opaque equation expression after the `EQ` keyword.
     pub fn expression(&self) -> &'a str {
         self.expression
+    }
+
+    /// Parse the expression into a typed, inert [`crate::EquationModel`].
+    ///
+    /// The model is purely syntactic: switch kinds, spacing values, bracket
+    /// characters, and element text exactly as stored. Malformed expressions
+    /// are reported as errors; nothing is evaluated or rendered.
+    pub fn model(&self) -> crate::RtfResult<crate::EquationModel<'a>> {
+        crate::EquationModel::parse(self.expression)
     }
 
     /// Return the stored field result when a producer supplied one.
@@ -5297,7 +5307,8 @@ impl<'a> Field<'a> {
     /// Construct an inert `EQ` field from caller-provided equation syntax.
     ///
     /// The expression is serialized as field text with RTF escaping. The
-    /// library never parses, calculates, formats, or renders that syntax.
+    /// library parses it only on request (see [`EquationField::model`]) and
+    /// never calculates, formats, or renders that syntax.
     pub fn new_equation(expression: impl Into<String>) -> crate::RtfResult<Field<'static>> {
         let expression = expression.into();
         let instruction = if expression.is_empty() {
