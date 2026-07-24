@@ -1,5 +1,6 @@
 //! Mutable worksheet and workbook writer components for XLSX.
 
+pub mod shape;
 pub mod sheet;
 pub mod strings;
 pub mod styles;
@@ -7,6 +8,7 @@ pub mod table;
 pub mod workbook;
 
 // Re-export main types
+pub use shape::XlsxShapeSpec;
 pub use sheet::{
     AutoFilter, CellComment, ConditionalFormat, ConditionalFormatType, DefinedNameBuiltIn,
     FreezePanes, HeaderFooter, Hyperlink, Image, MutableWorksheet, NamedRange, PageBreak,

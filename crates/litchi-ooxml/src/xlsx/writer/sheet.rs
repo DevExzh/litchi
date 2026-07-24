@@ -16,6 +16,7 @@ use crate::xlsx::sheet_protection::{
 };
 use crate::xlsx::table::Table;
 use crate::xlsx::views::{SheetPane, SheetSelection, SheetView};
+use crate::xlsx::writer::shape::XlsxShapeSpec;
 /// Writer module for creating and modifying Excel worksheets.
 use litchi_core::sheet::{CellValue, Result as SheetResult};
 use litchi_core::{id::generate_guid_braced, xml::escape::escape_xml};
@@ -414,6 +415,8 @@ pub struct MutableWorksheet {
     conditional_formats: Vec<ConditionalFormat>,
     /// Images embedded in the worksheet
     images: Vec<Image>,
+    /// DrawingML shapes and text boxes authored for the worksheet
+    shapes: Vec<XlsxShapeSpec>,
     /// Row outline levels (row -> level)
     row_outline_levels: HashMap<u32, u8>,
     /// Column outline levels (col -> level)
@@ -465,6 +468,7 @@ impl MutableWorksheet {
             comments: Vec::new(),
             conditional_formats: Vec::new(),
             images: Vec::new(),
+            shapes: Vec::new(),
             row_outline_levels: HashMap::new(),
             column_outline_levels: HashMap::new(),
             rich_text_cells: HashMap::new(),
@@ -1443,11 +1447,55 @@ impl MutableWorksheet {
         &self.images
     }
 
+    /// Add a DrawingML shape or text box to the worksheet's drawing part.
+    ///
+    /// The spec is validated against worksheet bounds and module limits;
+    /// shapes coexist with images and charts in the same drawing part and are
+    /// readable back through `Workbook::shapes_on_sheet`.
+    pub fn add_shape(&mut self, shape: XlsxShapeSpec) -> SheetResult<()> {
+        shape.validate(self.shapes.len())?;
+        self.shapes.push(shape);
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Add a plain-text text box with the given preset geometry and anchor.
+    ///
+    /// Convenience wrapper around [`Self::add_shape`]; `text` is split into
+    /// paragraphs on `\n`.
+    pub fn add_text_box(
+        &mut self,
+        name: &str,
+        anchor: crate::xlsx::XlsxShapeAnchor,
+        preset: crate::xlsx::XlsxShapePreset,
+        text: &str,
+    ) -> SheetResult<()> {
+        self.add_shape(XlsxShapeSpec::text_box(name, anchor, preset, text))
+    }
+
+    /// Get all authored shapes in the worksheet.
+    pub fn shapes(&self) -> &[XlsxShapeSpec] {
+        &self.shapes
+    }
+
+    /// Remove the authored shape at `index`, returning it.
+    pub fn remove_shape(&mut self, index: usize) -> SheetResult<XlsxShapeSpec> {
+        if index >= self.shapes.len() {
+            return Err(format!(
+                "shape index {index} out of bounds ({} shapes)",
+                self.shapes.len()
+            )
+            .into());
+        }
+        self.modified = true;
+        Ok(self.shapes.remove(index))
+    }
+
     /// Generate drawing XML for images and charts.
     ///
     /// This generates the xl/drawings/drawing{N}.xml file content.
     pub fn generate_drawing_xml(&self) -> SheetResult<Option<String>> {
-        if self.images.is_empty() && self.charts.is_empty() {
+        if self.images.is_empty() && self.charts.is_empty() && self.shapes.is_empty() {
             return Ok(None);
         }
         for chart in &self.charts {
@@ -1591,6 +1639,19 @@ impl MutableWorksheet {
 
             xml.push_str("</a:graphicData></a:graphic></xdr:graphicFrame>");
             xml.push_str("<xdr:clientData/></xdr:twoCellAnchor>");
+        }
+
+        // Add authored shapes after pictures and charts; they consume no
+        // drawing-part relationships, so the positional rId scheme for images
+        // and charts is unaffected. Object IDs continue the same sequence.
+        let shape_id_offset = (self.images.len() + self.charts.len()) as u32;
+        for (idx, shape) in self.shapes.iter().enumerate() {
+            crate::xlsx::writer::shape::write_shape_anchor_xml(
+                &mut xml,
+                shape,
+                shape_id_offset + idx as u32 + 1,
+            )
+            .map_err(|e| format!("XML write error: {e}"))?;
         }
 
         xml.push_str("</xdr:wsDr>");

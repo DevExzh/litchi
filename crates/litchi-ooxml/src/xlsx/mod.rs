@@ -315,7 +315,7 @@ pub use writer::{
     Hyperlink as WriterHyperlink, Image, MutableSharedStrings, MutableWorkbookData,
     MutableWorksheet, NamedRange, PageBreak as WriterPageBreak, PageSetup as WriterPageSetup,
     PageSetupProperties as WriterPageSetupProperties, RichTextRun, SheetProtection, StylesBuilder,
-    WorkbookProtection,
+    WorkbookProtection, XlsxShapeSpec,
 };
 // Re-export threaded comments types
 pub use threaded_comments::{
