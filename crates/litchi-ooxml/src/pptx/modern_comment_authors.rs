@@ -177,15 +177,11 @@ pub fn validate_modern_comment_author_references(
     authors: Option<&ModernCommentAuthorPart>,
     comments: &[ModernCommentPart],
 ) -> Result<()> {
-    let has_references = comments.iter().any(|part| {
-        part.comments.comments.iter().any(|comment| {
-            true || !comment.replies.is_empty()
-                || comment
-                    .assigned_to
-                    .as_ref()
-                    .is_some_and(|ids| !ids.is_empty())
-        })
-    });
+    // Every modeled comment carries an `authorId`, so any comment at all
+    // references the Author part.
+    let has_references = comments
+        .iter()
+        .any(|part| !part.comments.comments.is_empty());
     if !has_references {
         return Ok(());
     }
