@@ -640,7 +640,7 @@ mod tests {
             .unwrap()
             .parent()
             .unwrap()
-            .join("3rdparty")
+            .join("test-data")
             .join("poi")
             .join("test-data")
             .join("slideshow")
