@@ -152,6 +152,9 @@ pub mod data_validation;
 /// Conditional formatting support
 pub mod conditional_formatting;
 
+/// PivotCache definition stream parsing (MS-XLSB 2.1.7.38)
+pub mod pivot;
+
 /// Formula parsing and generation
 pub mod formula;
 
@@ -160,6 +163,18 @@ pub use cell::XlsbCell;
 pub use data_validation::{DataValidation, DataValidationRecordKind, DataValidationSettings};
 pub use error::{XlsbError, XlsbResult};
 pub use formula::{XlsbExternalLink, XlsbExternalLinkKind};
+pub use pivot::{
+    CalculatedItem, CalculatedMember, CalculatedMemberExt14, PivotCacheConsolidationPage,
+    PivotCacheConsolidationSet, PivotCacheConsolidationSource, PivotCacheDateTime,
+    PivotCacheDefinition, PivotCacheDefinitionExt14, PivotCacheDiscreteGrouping,
+    PivotCacheErrorCode, PivotCacheField, PivotCacheFieldGrouping, PivotCacheGroupBy,
+    PivotCacheGroupingGroup, PivotCacheGroupingGroupMember, PivotCacheGroupingLevel,
+    PivotCacheHierarchy, PivotCacheHierarchyExt14, PivotCacheItem, PivotCacheItemInfo,
+    PivotCacheItemValue, PivotCacheRange, PivotCacheRangeGrouping, PivotCacheSharedItems,
+    PivotCacheSharedItemsStats, PivotCacheSource, PivotCacheSourceType, PivotCacheTupleCache,
+    PivotCacheTupleCacheSet, PivotCacheWorksheetSource, PivotName, PivotNameFunction,
+    PivotNamePair, PivotParsedFormulaData, PivotRuleFilter, parse_pivot_cache_definition,
+};
 pub use shared_strings::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedString, SharedStringRun,
 };

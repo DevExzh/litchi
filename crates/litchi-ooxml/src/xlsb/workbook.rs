@@ -56,6 +56,7 @@ pub struct XlsbWorkbook {
     styles: StylesTable,
     calculation_properties: CalculationProperties,
     is_1904: bool,
+    pivot_cache_definitions: Vec<(u32, crate::xlsb::pivot::PivotCacheDefinition)>,
 }
 
 #[derive(Default)]
@@ -167,6 +168,27 @@ impl XlsbWorkbook {
     /// PivotTable views available as hosts for calculated field/item formulas.
     pub fn pivot_views(&self) -> &[FormulaPivotViewDefinition] {
         &self.formula_context.pivot_views
+    }
+
+    /// Typed PivotCache definitions paired with their workbook cache
+    /// identifiers, in workbook declaration order (MS-XLSB 2.1.7.38).
+    ///
+    /// These are inert data snapshots: external connection identifiers,
+    /// relationship identifiers, MDX expressions, and formula tokens are
+    /// stored verbatim and are never dereferenced, refreshed, or evaluated.
+    pub fn pivot_cache_definitions(&self) -> &[(u32, crate::xlsb::pivot::PivotCacheDefinition)] {
+        &self.pivot_cache_definitions
+    }
+
+    /// Look up a typed PivotCache definition by its workbook cache identifier.
+    pub fn pivot_cache_definition(
+        &self,
+        cache_id: u32,
+    ) -> Option<&crate::xlsb::pivot::PivotCacheDefinition> {
+        self.pivot_cache_definitions
+            .iter()
+            .find(|(id, _)| *id == cache_id)
+            .map(|(_, definition)| definition)
     }
 
     /// Workbook style table loaded from `xl/styles.bin`.
@@ -320,6 +342,7 @@ impl XlsbWorkbook {
             styles: StylesTable::default(),
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
+            pivot_cache_definitions: Vec::new(),
         };
 
         workbook.load_workbook_info()?;
@@ -347,6 +370,7 @@ impl XlsbWorkbook {
             styles: StylesTable::default(),
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
+            pivot_cache_definitions: Vec::new(),
         };
 
         workbook.load_workbook_info()?;
@@ -675,6 +699,7 @@ impl XlsbWorkbook {
             .map(|uri| self.load_external_book(uri))
             .collect::<XlsbResult<Vec<_>>>()?;
         let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob())?;
+        let mut pivot_cache_definitions = Vec::with_capacity(pivot_cache_ids.len());
         for (cache_id, rel_id) in &pivot_cache_ids {
             let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
                 crate::xlsb::error::XlsbError::InvalidFormula(format!(
@@ -691,7 +716,9 @@ impl XlsbWorkbook {
                     "PivotCache {cache_id} relationship is external or has the wrong type"
                 )));
             }
-            self.package.get_part(&relationship.target_partname()?)?;
+            let part = self.package.get_part(&relationship.target_partname()?)?;
+            let definition = crate::xlsb::pivot::parse_pivot_cache_definition(part.blob())?;
+            pivot_cache_definitions.push((*cache_id, definition));
         }
 
         let mut tables = Vec::new();
@@ -794,6 +821,7 @@ impl XlsbWorkbook {
         self.worksheet_rel_ids = info.worksheet_rel_ids;
         self.is_1904 = info.is_1904;
         self.calculation_properties = info.calculation_properties.unwrap_or_default();
+        self.pivot_cache_definitions = pivot_cache_definitions;
 
         Ok(())
     }
@@ -1935,6 +1963,7 @@ mod tests {
             styles: StylesTable::default(),
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
+            pivot_cache_definitions: Vec::new(),
         };
         workbook.load_external_book(&uri)
     }
@@ -2243,6 +2272,7 @@ mod tests {
             styles: StylesTable::default(),
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
+            pivot_cache_definitions: Vec::new(),
         };
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
         let book = workbook.load_external_book(&uri).unwrap();
@@ -2427,5 +2457,94 @@ mod tests {
             parse_external_link(&trailing_record),
             Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
         ));
+    }
+
+    #[test]
+    fn loads_typed_pivot_cache_definitions_from_package_relationships() {
+        // workbook.bin declares one PivotCache (idSx 12) related to a
+        // pivotCacheDefinition part.
+        let mut cache_id = 12u32.to_le_bytes().to_vec();
+        cache_id.extend_from_slice(&wide_string("rIdCache"));
+        let workbook_data = external_link_records(&[
+            (record_types::BEGIN_PIVOT_CACHE_IDS, Vec::new()),
+            (record_types::BEGIN_PIVOT_CACHE_ID, cache_id),
+            (record_types::END_PIVOT_CACHE_ID, Vec::new()),
+            (record_types::END_PIVOT_CACHE_IDS, Vec::new()),
+        ]);
+        let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+        let mut workbook_part = BlobPart::new(
+            workbook_uri,
+            "application/vnd.ms-excel.sheet.binary.macroEnabled.main".to_string(),
+            workbook_data,
+        );
+        workbook_part.rels_mut().add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition"
+                .to_string(),
+            "pivotCache/pivotCacheDefinition1.bin".to_string(),
+            "rIdCache".to_string(),
+            false,
+        );
+
+        // Minimal worksheet-range PivotCache definition stream.
+        let mut definition = vec![
+            3,           // bVerCacheLastRefresh
+            0,           // bVerCacheRefreshableMin
+            2,           // bVerCacheCreated
+            0b0001_0001, // fSaveData | fEnableRefresh
+        ];
+        definition.extend_from_slice(&(-1i32).to_le_bytes()); // citmGhostMax
+        definition.extend_from_slice(&44_000.0f64.to_le_bytes()); // xnumRefreshedDate
+        definition.push(0x00); // no optional strings
+        definition.extend_from_slice(&5u32.to_le_bytes()); // cRecords
+        definition.extend_from_slice(&[0; 4]); // unused (fLoadRefreshedWho = 0)
+        let mut source = Vec::new();
+        source.extend_from_slice(&0u32.to_le_bytes()); // iSrcType = sheet
+        source.extend_from_slice(&0u32.to_le_bytes()); // dwConnID
+        let mut range = vec![0x00, 0x00, 0b0000_0010]; // fLoadSheet
+        range.extend_from_slice(&wide_string("Data"));
+        for value in [0i32, 9, 0, 3] {
+            range.extend_from_slice(&value.to_le_bytes());
+        }
+        let definition_part = BlobPart::new(
+            PackURI::new("/xl/pivotCache/pivotCacheDefinition1.bin").unwrap(),
+            "application/vnd.ms-excel.pivotCacheDefinition".to_string(),
+            external_link_records(&[
+                (record_types::BEGIN_PIVOT_CACHE_DEF, definition),
+                (record_types::BEGIN_PCD_SOURCE, source),
+                (record_types::BEGIN_PCDS_RANGE, range),
+                (record_types::END_PCDS_RANGE, Vec::new()),
+                (record_types::END_PCD_SOURCE, Vec::new()),
+                (record_types::END_PIVOT_CACHE_DEF, Vec::new()),
+            ]),
+        );
+
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(workbook_part));
+        package.add_part(Box::new(definition_part));
+        let workbook = XlsbWorkbook::from_opc_package(package).unwrap();
+
+        let definitions = workbook.pivot_cache_definitions();
+        assert_eq!(definitions.len(), 1);
+        assert_eq!(definitions[0].0, 12);
+        let definition = workbook.pivot_cache_definition(12).unwrap();
+        assert!(definition.save_data);
+        assert_eq!(definition.record_count, 5);
+        let source = definition.source.as_ref().unwrap();
+        assert_eq!(
+            source.source_type,
+            crate::xlsb::pivot::PivotCacheSourceType::Worksheet
+        );
+        let worksheet = source.worksheet.as_ref().unwrap();
+        assert_eq!(worksheet.sheet_name.as_deref(), Some("Data"));
+        assert_eq!(
+            worksheet.range,
+            Some(crate::xlsb::pivot::PivotCacheRange {
+                first_row: 0,
+                last_row: 9,
+                first_column: 0,
+                last_column: 3,
+            })
+        );
+        assert!(workbook.pivot_cache_definition(99).is_none());
     }
 }
