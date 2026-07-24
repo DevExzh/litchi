@@ -71,6 +71,7 @@ pub mod handout;
 pub mod hyperlinks;
 pub mod ink;
 pub mod laser;
+pub mod master_layout;
 pub mod media;
 pub mod media_parts;
 pub mod modern_comment_authors;
@@ -152,6 +153,11 @@ pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
 pub use hyperlinks::Hyperlink;
 pub use ink::{INK_CONTENT_TYPE, PptxInkAnnotation};
 pub use laser::{LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint};
+pub use master_layout::{
+    AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
+    PlaceholderSpec, SlideLayoutKind, add_slide_layout, add_slide_master,
+    remove_slide_layout, store_placeholder_shape, validate_master_layout_graph,
+};
 pub use media::{Media, MediaFormat, MediaType};
 pub use media_parts::{
     MediaBookmark, MediaFade, MediaResource, MediaTrim, OfficeMediaExtension,

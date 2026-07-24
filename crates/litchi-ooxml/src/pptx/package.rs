@@ -761,6 +761,66 @@ impl Package {
         crate::pptx::notes::store_notes_graph(&mut self.opc, &presentation, graph)
     }
 
+    /// Create a new slide master with default text styles and reference it
+    /// from the presentation (`sldMasterIdLst` + relationship + part).
+    ///
+    /// The master is assigned a spec-compliant unique ID (≥ 2^31) and is
+    /// related to an existing theme part when one is available.
+    pub fn add_slide_master(&mut self) -> Result<crate::pptx::master_layout::AuthoredSlideMaster> {
+        crate::pptx::master_layout::add_slide_master(&mut self.opc)
+    }
+
+    /// Create a new slide layout of the given kind, attached to an existing
+    /// slide master identified by its part name (for example
+    /// `/ppt/slideMasters/slideMaster1.xml`).
+    ///
+    /// The master's `sldLayoutIdLst`, relationships, and content types stay
+    /// consistent, and the layout carries the required relationship back to
+    /// its owning master. Optional placeholder shapes are inventoried back by
+    /// the read side.
+    pub fn add_slide_layout(
+        &mut self,
+        master_part_name: &str,
+        kind: crate::pptx::master_layout::SlideLayoutKind,
+        name: &str,
+        placeholders: &[crate::pptx::master_layout::PlaceholderSpec],
+    ) -> Result<crate::pptx::master_layout::AuthoredSlideLayout> {
+        crate::pptx::master_layout::add_slide_layout(
+            &mut self.opc,
+            master_part_name,
+            kind,
+            name,
+            placeholders,
+        )
+    }
+
+    /// Add or replace a placeholder shape (and its prompt text) on a slide
+    /// master or slide layout part.
+    ///
+    /// The placeholder is matched by its `p:ph` type and index; an existing
+    /// match is replaced in place, otherwise a new shape is appended.
+    pub fn store_placeholder_shape(
+        &mut self,
+        part_name: &str,
+        spec: &crate::pptx::master_layout::PlaceholderSpec,
+    ) -> Result<()> {
+        crate::pptx::master_layout::store_placeholder_shape(&mut self.opc, part_name, spec)
+    }
+
+    /// Delete a slide layout that is not referenced by any slide.
+    ///
+    /// The owning master's `sldLayoutIdLst` entry and relationship are
+    /// removed together with the layout part.
+    pub fn remove_slide_layout(&mut self, layout_part_name: &str) -> Result<()> {
+        crate::pptx::master_layout::remove_slide_layout(&mut self.opc, layout_part_name)
+    }
+
+    /// Validate the slide master and slide layout relationship graph with the
+    /// same rules the read side applies.
+    pub fn validate_master_layout_graph(&self) -> Result<()> {
+        crate::pptx::master_layout::validate_master_layout_graph(&self.opc)
+    }
+
     /// Get mutable access to the underlying OPC package.
     ///
     /// This provides access to lower-level package operations for modification.
