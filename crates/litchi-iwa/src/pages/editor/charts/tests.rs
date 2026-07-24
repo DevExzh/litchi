@@ -9,8 +9,8 @@ use crate::charts::{
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
     ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
     ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-    ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
+    ChartShadow, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::shapes::{
     RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
@@ -2733,6 +2733,105 @@ fn scratch_document_supports_native_series_value_label_location_crud() {
     assert!(
         reopened
             .body_chart_series_value_label_location(
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(2),
+            )
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+    reopened
+        .remove_body_chart(source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
+}
+
+#[test]
+fn scratch_document_supports_native_series_value_label_affix_crud() {
+    const BODY_TEXT: &str = "Chart value-label affixes";
+
+    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let source = editor
+        .add_body_chart(
+            BODY_TEXT.encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let defaults = vec![ChartSeriesValueLabelAffixes::default(); 2];
+    let customized = vec![
+        ChartSeriesValueLabelAffixes::new("$", " USD"),
+        ChartSeriesValueLabelAffixes::new("€", " net"),
+    ];
+
+    assert_eq!(
+        editor
+            .body_chart_series_value_label_affixes(source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_series_value_label_affixes(source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_body_chart_series_value_label_affixes(source.drawable_object_id, &customized)
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_series_value_label_affix(
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(0),
+            )
+            .unwrap()
+            .suffix(),
+        " USD"
+    );
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    for series in 0..2 {
+        editor
+            .set_body_chart_series_value_label_affix(
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(series),
+                ChartSeriesValueLabelAffixes::default(),
+            )
+            .unwrap();
+    }
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_series_value_label_affixes(source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    assert_eq!(
+        reopened
+            .body_chart_series_value_label_affixes(duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+
+    let before_rejected = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_body_chart_series_value_label_affixes(source.drawable_object_id, &customized[..1],)
+            .is_err()
+    );
+    assert!(
+        reopened
+            .body_chart_series_value_label_affix(
                 source.drawable_object_id,
                 ChartSeriesIndex::from_zero_based(2),
             )

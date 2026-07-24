@@ -295,7 +295,7 @@ fn set_slide_chart_series_value_label_locations(
     Ok(())
 }
 
-fn value_label_series_count(
+pub(super) fn value_label_series_count(
     direction: ChartSeriesDirection,
     data: &ChartData,
     drawable_label: &str,

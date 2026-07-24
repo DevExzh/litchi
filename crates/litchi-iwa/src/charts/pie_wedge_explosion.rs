@@ -133,7 +133,7 @@ pub(crate) fn set_chart_pie_wedge_explosions(
         expected,
         ChartPieWedgeExplosion::ZERO,
         read_series_non_style_explosion,
-        patch_series_non_style_explosion,
+        |data, explosion| patch_series_non_style_explosion(data, *explosion),
     )
 }
 

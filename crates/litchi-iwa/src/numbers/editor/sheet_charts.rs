@@ -24,6 +24,7 @@ mod pie_labels;
 mod pie_start_angle;
 mod pie_wedge_explosion;
 mod rounded_corners;
+mod series_value_label_affixes;
 mod series_value_labels;
 mod shadow;
 mod theme;
@@ -569,8 +570,9 @@ mod tests {
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
         ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
         ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-        ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility, ChartShadow,
-        ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+        ChartSeriesValueLabelAffixes, ChartSeriesValueLabelLocation,
+        ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+        ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -3559,6 +3561,110 @@ mod tests {
         assert!(
             reopened
                 .sheet_chart_series_value_label_location(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartSeriesIndex::from_zero_based(2),
+                )
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_series_value_label_affix_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let defaults = vec![ChartSeriesValueLabelAffixes::default(); 2];
+        let customized = vec![
+            ChartSeriesValueLabelAffixes::new("$", " USD"),
+            ChartSeriesValueLabelAffixes::new("€", " net"),
+        ];
+
+        assert_eq!(
+            editor
+                .sheet_chart_series_value_label_affixes(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            defaults
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_series_value_label_affixes(
+                sheet_id,
+                source.drawable_object_id,
+                &defaults,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_series_value_label_affixes(
+                sheet_id,
+                source.drawable_object_id,
+                &customized,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_series_value_label_affix(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartSeriesIndex::from_zero_based(1),
+                )
+                .unwrap()
+                .prefix(),
+            "€"
+        );
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        for series in 0..2 {
+            editor
+                .set_sheet_chart_series_value_label_affix(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartSeriesIndex::from_zero_based(series),
+                    ChartSeriesValueLabelAffixes::default(),
+                )
+                .unwrap();
+        }
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_series_value_label_affixes(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            defaults
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_series_value_label_affixes(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+
+        let before_rejected = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_sheet_chart_series_value_label_affixes(
+                    sheet_id,
+                    source.drawable_object_id,
+                    &customized[..1],
+                )
+                .is_err()
+        );
+        assert!(
+            reopened
+                .sheet_chart_series_value_label_affix(
                     sheet_id,
                     source.drawable_object_id,
                     ChartSeriesIndex::from_zero_based(2),

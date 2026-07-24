@@ -105,7 +105,7 @@ pub(crate) fn set_chart_pie_label_distances(
         expected,
         ChartPieLabelDistance::DEFAULT,
         read_series_non_style_label_distance,
-        patch_series_non_style_label_distance,
+        |data, distance| patch_series_non_style_label_distance(data, *distance),
     )
 }
 

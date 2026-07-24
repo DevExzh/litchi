@@ -106,7 +106,7 @@ pub(crate) fn set_chart_series_value_label_visibilities(
         expected,
         storage.default_visibility(),
         |data| read_series_value_label_visibility(data, storage),
-        |data, visibility| patch_series_value_label_visibility(data, storage, visibility),
+        |data, visibility| patch_series_value_label_visibility(data, storage, *visibility),
     )
 }
 

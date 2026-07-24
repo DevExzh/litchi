@@ -97,7 +97,7 @@ pub(crate) fn set_chart_pie_label_visibilities(
         expected,
         ChartPieLabelVisibility::DEFAULT,
         read_series_non_style_labels,
-        patch_series_non_style_labels,
+        |data, visibility| patch_series_non_style_labels(data, *visibility),
     )
 }
 

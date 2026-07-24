@@ -55,7 +55,7 @@ pub(crate) fn chart_series_non_style_values<T>(
     read: impl Fn(&[u8]) -> Result<T>,
 ) -> Result<Vec<T>>
 where
-    T: Copy,
+    T: Clone,
 {
     let graph = chart_series_non_style_graph(
         package,
@@ -64,7 +64,7 @@ where
         drawable_label,
         series_count,
     )?;
-    read_values_from_graph(package, &graph, default, &read)
+    read_values_from_graph(package, &graph, &default, &read)
 }
 
 /// Set one typed value for each series in chart series order.
@@ -77,10 +77,10 @@ pub(crate) fn set_chart_series_non_style_values<T>(
     expected: &[T],
     default: T,
     read: impl Fn(&[u8]) -> Result<T> + Copy,
-    patch: impl Fn(&[u8], T) -> Result<Vec<u8>>,
+    patch: impl Fn(&[u8], &T) -> Result<Vec<u8>>,
 ) -> Result<()>
 where
-    T: Copy + PartialEq,
+    T: Clone + PartialEq,
 {
     if expected.is_empty() {
         return Err(Error::InvalidFormat(format!(
@@ -94,7 +94,7 @@ where
         drawable_label,
         expected.len(),
     )?;
-    let current = read_values_from_graph(package, &graph, default, &read)?;
+    let current = read_values_from_graph(package, &graph, &default, &read)?;
     if current == expected {
         return Ok(());
     }
@@ -117,15 +117,15 @@ where
         }
         if let Some(slot) = slot {
             slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
-            let patched = slot.read(package, |data| patch(data, *replacement))?;
+            let patched = slot.read(package, |data| patch(data, replacement))?;
             if patched == canonical_empty {
                 final_ids[index] = None;
                 removals.push(slot.clone());
             } else {
                 updates.push((slot.clone(), patched));
             }
-        } else if *replacement != default {
-            let data = patch(canonical_empty.as_slice(), *replacement)?;
+        } else if replacement != &default {
+            let data = patch(canonical_empty.as_slice(), replacement)?;
             if data == canonical_empty {
                 return Err(Error::InvalidFormat(format!(
                     "{drawable_label} chart {drawable_object_id} {property_label} patch produced no native override"
@@ -189,7 +189,7 @@ where
         drawable_object_id,
         drawable_label,
         expected.len(),
-        default,
+        default.clone(),
         read,
     )? != expected
     {
@@ -203,18 +203,18 @@ where
 fn read_values_from_graph<T>(
     package: &IWorkPackage,
     graph: &ChartSeriesNonStyleGraph,
-    default: T,
+    default: &T,
     read: &impl Fn(&[u8]) -> Result<T>,
 ) -> Result<Vec<T>>
 where
-    T: Copy,
+    T: Clone,
 {
     graph
         .slots
         .iter()
         .map(|slot| {
             slot.as_ref()
-                .map_or(Ok(default), |slot| slot.read(package, read))
+                .map_or_else(|| Ok(default.clone()), |slot| slot.read(package, read))
         })
         .collect()
 }
