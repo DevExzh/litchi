@@ -821,6 +821,61 @@ impl Package {
         crate::pptx::master_layout::validate_master_layout_graph(&self.opc)
     }
 
+    /// Create a new theme part with a caller-supplied color scheme and font
+    /// scheme, registered with the Office theme content type.
+    ///
+    /// The theme is written to the next free `/ppt/theme/themeN.xml` part
+    /// name with the twelve-slot color scheme, the major/minor font scheme,
+    /// and the default format scheme; serialization is deterministic.
+    pub fn add_theme(
+        &mut self,
+        name: &str,
+        color_scheme: &crate::pptx::theme::ThemeColorScheme,
+        font_scheme: &crate::pptx::theme::ThemeFontScheme,
+    ) -> Result<crate::pptx::theme::AuthoredTheme> {
+        crate::pptx::theme::add_theme(&mut self.opc, name, color_scheme, font_scheme)
+    }
+
+    /// Attach a theme part to a slide master through a theme relationship.
+    ///
+    /// The master part must exist with the slide-master content type and no
+    /// existing theme relationship; the theme part must exist with the
+    /// Office theme content type. The master/layout/theme graph is
+    /// re-validated afterwards.
+    pub fn attach_theme_to_master(
+        &mut self,
+        master_part_name: &str,
+        theme_part_name: &str,
+    ) -> Result<String> {
+        crate::pptx::theme::attach_theme_to_master(&mut self.opc, master_part_name, theme_part_name)
+    }
+
+    /// Replace the color scheme (`a:clrScheme`) of an existing theme part,
+    /// leaving the rest of the part untouched.
+    pub fn store_theme_color_scheme(
+        &mut self,
+        theme_part_name: &str,
+        color_scheme: &crate::pptx::theme::ThemeColorScheme,
+    ) -> Result<()> {
+        crate::pptx::theme::store_theme_color_scheme(&mut self.opc, theme_part_name, color_scheme)
+    }
+
+    /// Replace the font scheme (`a:fontScheme`) of an existing theme part,
+    /// leaving the rest of the part untouched.
+    pub fn store_theme_font_scheme(
+        &mut self,
+        theme_part_name: &str,
+        font_scheme: &crate::pptx::theme::ThemeFontScheme,
+    ) -> Result<()> {
+        crate::pptx::theme::store_theme_font_scheme(&mut self.opc, theme_part_name, font_scheme)
+    }
+
+    /// Validate the master/layout/theme relationship graph with the same
+    /// rules the read side applies.
+    pub fn validate_theme_graph(&self) -> Result<()> {
+        crate::pptx::theme::validate_theme_graph(&self.opc)
+    }
+
     /// Get mutable access to the underlying OPC package.
     ///
     /// This provides access to lower-level package operations for modification.

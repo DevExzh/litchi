@@ -93,6 +93,7 @@ pub mod slide;
 pub mod smartart;
 pub mod tags;
 pub mod template;
+pub mod theme;
 pub mod tracks;
 pub mod transitions;
 pub mod vba_project;
@@ -249,6 +250,11 @@ pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use tags::{
     ProgrammableTag, SlideTagList, TagExtensionAttribute, TagList, TagListConformance,
     parse_tag_list, write_tag_list,
+};
+pub use theme::{
+    AuthoredTheme, SystemColorKind, ThemeColorScheme, ThemeColorSlot, ThemeColorValue,
+    ThemeFontFace, ThemeFontScheme, ThemeScriptFont, add_theme, attach_theme_to_master,
+    store_theme_color_scheme, store_theme_font_scheme, validate_theme_graph,
 };
 pub use transitions::{
     RippleDirection, SlideTransition, SplitDirection, TransitionDirection, TransitionSpeed,
