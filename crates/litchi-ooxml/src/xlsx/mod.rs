@@ -64,6 +64,7 @@ pub mod sheet_format;
 pub mod sheet_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
+pub mod shapes;
 pub mod slicer_cache;
 pub mod slicers;
 pub mod slicer_timeline_crud;
@@ -244,6 +245,15 @@ pub use sheet_view::{
     WorksheetPaneState, WorksheetPivotArea, WorksheetPivotSelection, WorksheetRangeReference,
     WorksheetViewCollection, WorksheetViewDefinition, WorksheetViewExtension, WorksheetViewPane,
     WorksheetViewSelection, WorksheetViewSqref, WorksheetViewType, parse_worksheet_views,
+};
+pub use shapes::{
+    XlsxAnchoredObject, XlsxCellMarker, XlsxClientData, XlsxConnectionShape, XlsxDrawingObject,
+    XlsxDrawingOleObject, XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform,
+    XlsxShape, XlsxShapeAnchor, XlsxShapeBodyProperties, XlsxShapeConnectionEnd,
+    XlsxShapeGroup, XlsxShapeNonVisual, XlsxShapeParagraph, XlsxShapePreset, XlsxShapeRun,
+    XlsxShapeTextBody, XlsxTextAutofit, XlsxTextDirection, XlsxTextInsets,
+    XlsxTextVerticalAnchor, XlsxTextWrap, XlsxWorksheetShapes, load_shapes,
+    load_worksheet_shapes, parse_drawing_shapes,
 };
 pub use slicer_cache::{
     SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, SlicerCacheData,
