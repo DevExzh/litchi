@@ -366,7 +366,7 @@ conversion, fonts, and image conversion are optional.
 | Shapes, groups, and OfficeArt | ✅ | ✅ | ✅ | AutoShapes, groups, anchors, fills, gradients, lines, and Escher records |
 | Pictures | ✅ | ✅ | ✅ | JPEG/PNG/BLIP resources and writer support |
 | Tables | 🟡 | ✅ | ❌ | Table group/grid/cell extraction; no general table authoring API |
-| Native charts | ❌ | ❌ | ❌ | Charts can exist as embedded OLE payloads, not as a typed PPT chart model |
+| Native charts | 🟡 | ✅ | ❌ | Typed inert inventory of embedded MSGraph/Excel.Chart OLE payloads: persist-mapping resolution (incremental-save safe), optional zlib payload decompression, and full BIFF8 chart models (type, series, data links, cached values, titles) via the XLS chart parser, with best-effort slide-frame attribution and per-object failure isolation; no chart authoring or activation |
 | Hyperlinks | ✅ | ✅ | ✅ | URLs and slide navigation |
 | Action/interaction settings | 🟡 | ✅ | 🟡 | Typed action, jump, trigger, and macro metadata with bounded writer integration |
 | Notes | ✅ | ✅ | ✅ | Speaker-note records |

@@ -19,6 +19,7 @@ bumpalo         = { workspace = true }
 bytes           = { workspace = true }
 chrono          = { workspace = true }
 encoding_rs     = { workspace = true }
+flate2          = { workspace = true }
 litchi-cfb      = { workspace = true }
 litchi-core     = { workspace = true, features = ["ole"] }
 litchi-formula  = { workspace = true, optional = true }

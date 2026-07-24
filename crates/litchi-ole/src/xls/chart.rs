@@ -340,6 +340,9 @@ impl XlsChartEditor {
 
     pub fn charts(&self) -> Vec<XlsChartEntry> { self.charts.iter().map(|value| value.entry.clone()).collect() }
 
+    /// Consume the editor and return the parsed chart inventory without persisting.
+    pub fn into_charts(self) -> Vec<XlsChartEntry> { self.charts.into_iter().map(|value| value.entry).collect() }
+
     pub fn find(&self, location: &XlsChartLocation) -> Option<&XlsChart> {
         self.charts.iter().find(|value| &value.entry.location == location).map(|value| &value.entry.chart)
     }

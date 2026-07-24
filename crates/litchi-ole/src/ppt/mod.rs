@@ -79,6 +79,7 @@ pub mod escher;
 // Legacy compatibility modules
 pub mod bookmark_summary;
 pub mod broadcast;
+pub mod chart;
 pub mod client_anchor;
 pub mod client_data;
 pub mod comments;
@@ -166,6 +167,10 @@ pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape
 // Re-export legacy types
 pub use bookmark_summary::{PowerPointBookmark, PowerPointBookmarkSummary};
 pub use broadcast::{PowerPointBroadcast, PowerPointBroadcastProperties, PowerPointBroadcasts};
+pub use chart::{
+    PowerPointChart, PowerPointChartFailure, PowerPointChartFrame, PowerPointChartInventory,
+    PowerPointChartKind,
+};
 pub use client_anchor::{
     OFFICE_ART_CLIENT_ANCHOR_RECORD_TYPE, PowerPointClientAnchor, PowerPointClientAnchorData,
     PowerPointClientAnchorEncoding, PowerPointClientAnchorLimits, PowerPointRect,

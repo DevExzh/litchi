@@ -353,6 +353,46 @@ impl Presentation {
         PowerPointOleStorage::parse(&record).map(Some)
     }
 
+    /// Enumerate typed, inert native charts embedded as OLE objects.
+    ///
+    /// Embedded objects whose subtype or ProgID identifies `MSGraph.Chart` or
+    /// `Excel.Chart` ([MS-PPT] 2.13.11) have their `ExOleObjStg` payload opened
+    /// as a compound storage and their BIFF8 chart substreams parsed. Linked
+    /// charts are never opened. Everything is inert: no formula evaluation, no
+    /// rendering, and no OLE activation. A corrupt payload degrades to a
+    /// per-object failure entry and never aborts the remaining charts.
+    pub fn charts(&self) -> Result<crate::ppt::PowerPointChartInventory> {
+        self.charts_with_limits(crate::xls::XlsChartLimits::default())
+    }
+
+    /// Enumerate native charts with caller-supplied BIFF8 chart resource limits.
+    pub fn charts_with_limits(
+        &self,
+        limits: crate::xls::XlsChartLimits,
+    ) -> Result<crate::ppt::PowerPointChartInventory> {
+        crate::ppt::chart::enumerate(self, limits)
+    }
+
+    /// Resolve the live `DocumentContainer` record via the persist directory.
+    ///
+    /// Incrementally saved presentations can hold several `DocumentContainer`
+    /// records; only the one referenced by the current `UserEditAtom` is live.
+    pub(crate) fn live_document_record(&self) -> Result<PptRecord> {
+        let persist_id = self.slide_directory.document_persist_id();
+        let offset = self.persist_mapping.get_offset(persist_id).ok_or_else(|| {
+            PptError::Corrupted(format!("document persist ID {persist_id} has no mapping"))
+        })?;
+        let offset = usize::try_from(offset)
+            .map_err(|_| PptError::Corrupted("document offset exceeds usize".to_string()))?;
+        let (record, _) = PptRecord::parse(&self.powerpoint_document, offset)?;
+        if record.record_type != PptRecordType::Document {
+            return Err(PptError::Corrupted(
+                "document persist ID does not resolve to a DocumentContainer".to_string(),
+            ));
+        }
+        Ok(record)
+    }
+
     /// Return a payload-free descriptor for the document's VBA project storage.
     ///
     /// Macro bytes are not returned, decompressed, interpreted, or executed.
@@ -1111,6 +1151,10 @@ mod tests {
             parser,
             persist_mapping,
             slide_directory: SlideDirectory::new_for_test(0),
+            #[cfg(feature = "imgconv")]
+            pictures_data: None,
+            #[cfg(feature = "imgconv")]
+            blip_store: None,
         }
     }
 
