@@ -112,6 +112,17 @@ impl<'a> Document<'a> {
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
+    /// Load the typed, inert SmartArt (DrawingML diagram) inventory anchored
+    /// in this document.
+    ///
+    /// Each returned [`crate::docx::smartart::DocxSmartArt`] carries the
+    /// parsed data-model node tree, the layout/quick-style/colors part
+    /// metadata, and the diagram part names. Both transitional and Strict
+    /// namespace dialects are supported.
+    pub fn smart_arts(&self) -> Result<Vec<crate::docx::smartart::DocxSmartArt>> {
+        crate::docx::smartart::load_smart_arts(self.opc, self.part.part().partname())
+    }
+
     /// Return numbered paragraphs with resolved, typed list markers.
     ///
     /// This is separate from [`Self::text`], whose behavior remains unchanged.

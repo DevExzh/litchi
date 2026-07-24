@@ -728,6 +728,18 @@ impl Package {
         crate::docx::chart::load_chart_graph(&self.opc, &document)
     }
 
+    /// Load the typed, inert SmartArt (DrawingML diagram) inventory anchored
+    /// in the main document.
+    ///
+    /// Each returned [`crate::docx::smartart::DocxSmartArt`] carries the
+    /// parsed data-model node tree, the layout/quick-style/colors part
+    /// metadata, and the diagram part names. Both transitional and Strict
+    /// namespace dialects are supported.
+    pub fn smart_arts(&self) -> Result<Vec<crate::docx::smartart::DocxSmartArt>> {
+        let document = self.opc.main_document_part()?.partname().clone();
+        crate::docx::smartart::load_smart_arts(&self.opc, &document)
+    }
+
     /// Deterministically store an already coherent classic-chart graph.
     pub fn store_chart_graph(&mut self, graph: &crate::docx::chart::DocxChartGraph) -> Result<()> {
         let document = self.opc.main_document_part()?.partname().clone();
