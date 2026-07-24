@@ -800,7 +800,7 @@ mod tests {
 
     fn poi_fixture(name: &str) -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/spreadsheet")
+            .join("../../test-data/poi/test-data/spreadsheet")
             .join(name)
     }
 
@@ -1075,7 +1075,7 @@ mod tests {
     #[test]
     fn opens_apache_poi_xor_encrypted_workbook() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/spreadsheet/xor-encryption-abc.xls");
+            .join("../../test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls");
         let file = std::fs::File::open(path).unwrap();
         let workbook = XlsWorkbook::new_with_options(
             file,

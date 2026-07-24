@@ -44,5 +44,5 @@ fn invalid_indexes_and_limits_are_atomic() {
 #[test]
 fn poi_and_libreoffice_animation_fixtures_are_strictly_gated() {
     let root=std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for path in [root.join("3rdparty/poi/test-data/slideshow/sound.ppt"),root.join("3rdparty/poi/test-data/slideshow/datetime.ppt")]{let original=std::fs::read(&path).unwrap();match PowerPointAnimationEditor::open(original.clone(),PowerPointAnimationEditorLimits::default()){Ok(editor)=>{let _=editor.timelines();assert_eq!(std::fs::read(&path).unwrap(),original)},Err(_)=>assert_eq!(std::fs::read(&path).unwrap(),original)}}
+    for path in [root.join("test-data/poi/test-data/slideshow/sound.ppt"),root.join("test-data/poi/test-data/slideshow/datetime.ppt")]{let original=std::fs::read(&path).unwrap();match PowerPointAnimationEditor::open(original.clone(),PowerPointAnimationEditorLimits::default()){Ok(editor)=>{let _=editor.timelines();assert_eq!(std::fs::read(&path).unwrap(),original)},Err(_)=>assert_eq!(std::fs::read(&path).unwrap(),original)}}
 }

@@ -133,7 +133,7 @@ fn rejects_missing_parameters_parameters_on_flags_duplicates_and_out_of_range_va
 #[test]
 fn parses_real_libreoffice_row_banding_fixture() {
     let bytes = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf"
     );
     let document = RtfDocument::parse_bytes(bytes).unwrap();
     let rows = document

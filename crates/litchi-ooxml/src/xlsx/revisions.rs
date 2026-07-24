@@ -1426,10 +1426,10 @@ fn xml_error(v: impl std::fmt::Display) -> OoxmlError {
 mod tests {
     use super::*;
     const LO: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx"
+        "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx"
     );
     const POI: &[u8] = include_bytes!(
-        "../../../../3rdparty/poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx"
+        "../../../../test-data/poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx"
     );
     fn guid(n: u8) -> String {
         format!("{{00000000-0000-0000-0000-{n:012X}}}")

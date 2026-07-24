@@ -62,7 +62,7 @@ fn parses_all_typed_values_in_normative_order() {
 #[test]
 fn parses_libreoffice_user_property_fixtures_when_available() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sw/qa/extras");
+        .join("../../test-data/libreoffice-core/sw/qa/extras");
     let fixtures = [
         "rtfexport/data/custom-doc-props.rtf",
         "rtfexport/data/classification-confidential.rtf",

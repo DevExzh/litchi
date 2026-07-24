@@ -13,7 +13,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_real_libreoffice_body_wrapper_and_rewrites_positionally() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/fdo76633.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo76633.rtf"
     );
     let document = RtfDocument::parse_bytes(source).unwrap();
     let records = document.picture_compatibility_records();

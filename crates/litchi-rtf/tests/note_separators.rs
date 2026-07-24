@@ -74,7 +74,7 @@ fn rejects_malformed_note_separators() {
 #[test]
 fn parses_real_libreoffice_note_separator_fixture() {
     let fixture = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-3.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-3.rtf"
     );
     let marker = br"{\*\ftnsep";
     let start = fixture

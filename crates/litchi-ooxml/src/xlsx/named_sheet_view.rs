@@ -2079,7 +2079,7 @@ mod tests {
 
     fn libreoffice_fixture() -> OpcPackage {
         OpcPackage::from_bytes(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx"
         ))
         .unwrap()
     }
@@ -2306,7 +2306,7 @@ mod tests {
     #[test]
     fn poi_fixture_has_no_named_sheet_views_relationship() {
         let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/right-to-left.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx"
         ))
         .unwrap();
         let sheet = package

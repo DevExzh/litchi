@@ -1389,7 +1389,7 @@ mod tests {
 
     #[test]
     fn parses_libreoffice_content_validation_when_available() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty/libreoffice-core/sc/qa/unit/data/functions/mathematical/fods/aggregate.fods");
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/libreoffice-core/sc/qa/unit/data/functions/mathematical/fods/aggregate.fods");
         let Ok(xml) = std::fs::read_to_string(path) else {
             return;
         };

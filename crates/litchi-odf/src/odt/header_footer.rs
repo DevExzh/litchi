@@ -926,7 +926,7 @@ mod tests {
     fn rejects_libreoffice_legacy_first_before_left_region_order() {
         let document = crate::Document::open(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt"
+            "/../../test-data/libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt"
         ))
         .unwrap();
         assert!(document.master_pages().is_err());

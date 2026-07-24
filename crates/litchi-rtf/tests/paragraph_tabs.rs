@@ -12,7 +12,7 @@ fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a litchi_rtf::Sty
 fn parses_libreoffice_paragraph_and_style_tab_fixture() {
     let source =
         std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf96308-tabpos.rtf",
+            "../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf96308-tabpos.rtf",
         ))
         .unwrap();
     let document = RtfDocument::parse_bytes(&source).unwrap();
@@ -36,7 +36,7 @@ fn parses_libreoffice_paragraph_and_style_tab_fixture() {
     }));
 
     let leader_source = std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-        "../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tab-stop-fill-chars.rtf",
+        "../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tab-stop-fill-chars.rtf",
     ))
     .unwrap();
     let leader_document = RtfDocument::parse_bytes(&leader_source).unwrap();

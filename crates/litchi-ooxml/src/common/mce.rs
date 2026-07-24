@@ -970,7 +970,7 @@ mod fixture_tests {
     #[test]
     fn poi_styles_select_unsupported_vendor_fallbacks() {
         let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/style-alternate-content.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx"
         ))
         .unwrap();
         let part = package
@@ -991,7 +991,7 @@ mod fixture_tests {
     #[test]
     fn libreoffice_pptx_emits_only_fallback_shape() {
         let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/oox/qa/unit/data/import-mce.pptx"
+            "../../../../test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx"
         ))
         .unwrap();
         let part = package

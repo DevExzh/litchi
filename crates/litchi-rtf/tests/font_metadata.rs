@@ -58,7 +58,7 @@ fn rejects_malformed_extended_font_metadata() {
 #[test]
 fn parses_real_libreoffice_font_metadata_fixture() {
     let fixture = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf"
     );
     let marker = br"{\fonttbl";
     let start = fixture

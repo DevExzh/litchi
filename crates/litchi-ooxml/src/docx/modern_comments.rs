@@ -1575,9 +1575,9 @@ mod tests {
     use litchi_opc::part::BlobPart;
 
     const POI_DOCX: &[u8] =
-        include_bytes!("../../../../3rdparty/poi/test-data/document/testComment.docx");
+        include_bytes!("../../../../test-data/poi/test-data/document/testComment.docx");
     const LO_DOCX: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx"
+        "../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx"
     );
 
     #[test]

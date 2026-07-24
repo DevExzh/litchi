@@ -420,21 +420,21 @@ mod tests {
     fn reads_poi_and_libreoffice_outline_fixtures() {
         let poi = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/66365.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/66365.xlsx"
         )));
         assert!(!poi.summary_below());
         assert!(!poi.summary_right());
 
         let subtotal = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx"
         )));
         assert!(!subtotal.summary_below());
         assert!(subtotal.summary_right());
 
         let defaults = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx"
         )));
         assert!(!defaults.apply_styles());
         assert!(defaults.summary_below());

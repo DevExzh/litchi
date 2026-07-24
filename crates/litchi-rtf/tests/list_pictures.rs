@@ -11,7 +11,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_real_libreoffice_picture_bullet_without_cloning_payload() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf"
     );
     let document = RtfDocument::parse_bytes(source).unwrap();
     let indices = document.list_table().picture_bullet_picture_indices();

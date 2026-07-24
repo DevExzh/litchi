@@ -1340,11 +1340,11 @@ mod tests {
     #[test]
     fn reads_poi_and_libreoffice_view_fixtures() {
         let poi = fixture(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/right-to-left.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx"
         ));
         assert_eq!(poi.views()[0].selections()[0].active_cell().as_str(), "A4");
         let lo = fixture(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx"
         ));
         let view = &lo.views()[0];
         assert_eq!(view.selections().len(), 4);

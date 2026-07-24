@@ -170,19 +170,19 @@ fn bundled_libreoffice_fixtures_round_trip_layout_settings() {
         (
             "margmirror.rtf",
             include_bytes!(
-                "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf"
+                "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf"
             ),
         ),
         (
             "gutter-left.rtf",
             include_bytes!(
-                "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/gutter-left.rtf"
+                "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/gutter-left.rtf"
             ),
         ),
         (
             "rhbz1065629.rtf",
             include_bytes!(
-                "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/rhbz1065629.rtf"
+                "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/rhbz1065629.rtf"
             ),
         ),
     ];

@@ -13,7 +13,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_real_libreoffice_text_frames_and_round_trips_canonically() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf"
     );
     let producer = RtfDocument::parse_bytes(source).unwrap();
     assert_eq!(producer.shapes().len(), 1);

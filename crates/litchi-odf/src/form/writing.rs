@@ -755,7 +755,7 @@ mod tests {
     #[test]
     fn libreoffice_odfpy_and_odfdo_properties_round_trip() {
         let libreoffice = include_str!(
-            "../../../../3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/PDF_export_with_formcontrol.fodt"
+            "../../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/PDF_export_with_formcontrol.fodt"
         );
         let parsed = form_properties(libreoffice).unwrap();
         assert!(parsed.len() >= 6);

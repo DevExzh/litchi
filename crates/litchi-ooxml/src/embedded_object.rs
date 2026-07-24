@@ -226,21 +226,21 @@ mod tests {
     use litchi_opc::part::{BlobPart, Part};
 
     const POI_DOCX_OLE: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/document/EmbeddedDocument.docx");
+        include_bytes!("../../../test-data/poi/test-data/document/EmbeddedDocument.docx");
     const LO_DOCX_PACKAGE: &[u8] = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx"
+        "../../../test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx"
     );
     const LO_DOCX_BAD_COMPOUND: &[u8] = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx"
+        "../../../test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx"
     );
     const POI_DOCX_RECURSIVE: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/integration/test_recursive_embedded.docx");
+        include_bytes!("../../../test-data/poi/test-data/integration/test_recursive_embedded.docx");
     const POI_XLSX_TWO: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/spreadsheet/WithEmbeded.xlsx");
+        include_bytes!("../../../test-data/poi/test-data/spreadsheet/WithEmbeded.xlsx");
     const LO_PPTX_PACKAGE: &[u8] =
-        include_bytes!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/pptx/ole.pptx");
+        include_bytes!("../../../test-data/libreoffice-core/sd/qa/unit/data/pptx/ole.pptx");
     const POI_PPTX_MIXED: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/slideshow/bug62513.pptx");
+        include_bytes!("../../../test-data/poi/test-data/slideshow/bug62513.pptx");
 
     #[test]
     fn inventories_all_seven_real_world_fixtures_without_opening_payloads() {

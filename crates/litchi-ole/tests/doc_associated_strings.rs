@@ -7,7 +7,7 @@ use std::path::Path;
 #[test]
 fn apache_poi_associated_strings_integrate_and_round_trip_exactly() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/document/47950_normal.doc");
+        .join("../../test-data/poi/test-data/document/47950_normal.doc");
 
     let mut package = Package::from_reader(File::open(&path).unwrap()).unwrap();
     let document = package.document().unwrap();

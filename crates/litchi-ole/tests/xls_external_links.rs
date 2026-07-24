@@ -50,7 +50,7 @@ fn external_workbook_cache_round_trip_is_inert() {
 #[test]
 fn reads_poi_and_libreoffice_external_caches() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let poi = root.join("3rdparty/poi/test-data/spreadsheet/XRefCalc.xls");
+    let poi = root.join("test-data/poi/test-data/spreadsheet/XRefCalc.xls");
     let workbook = XlsWorkbook::new(File::open(poi).unwrap()).unwrap();
     let external = workbook
         .external_links()
@@ -61,7 +61,7 @@ fn reads_poi_and_libreoffice_external_caches() {
     assert_eq!(external.sheets()[0].name(), "MarkupSheet");
     assert!(!external.sheets()[0].cache_rows().is_empty());
 
-    let libreoffice = root.join("3rdparty/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls");
+    let libreoffice = root.join("test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls");
     let workbook = XlsWorkbook::new(File::open(libreoffice).unwrap()).unwrap();
     let external = workbook
         .external_links()

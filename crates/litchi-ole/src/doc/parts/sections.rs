@@ -1186,7 +1186,7 @@ mod tests {
 
     fn poi_fixture(name: &str) -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/document")
+            .join("../../test-data/poi/test-data/document")
             .join(name)
     }
 

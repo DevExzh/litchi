@@ -1558,7 +1558,7 @@ mod tests {
     #[test]
     fn poi_web_paths_are_inert() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/56169.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/56169.xlsx"
         ));
         assert_eq!(v.connections.len(), 3);
         assert!(
@@ -1575,7 +1575,7 @@ mod tests {
     #[test]
     fn poi_database_mce_and_strict_roundtrip() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx"
         ));
         let db = v.connections[0].database.as_ref().unwrap();
         assert!(db.connection.contains("Microsoft.ACE.OLEDB"));
@@ -1593,7 +1593,7 @@ mod tests {
     #[test]
     fn libreoffice_text_import_fields() {
         let v = f_without_broken_thumbnail(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx"
         ));
         assert_eq!(v.connections.len(), 2);
         assert_eq!(
@@ -1612,7 +1612,7 @@ mod tests {
     #[test]
     fn libreoffice_olap_and_extensions() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx"
         ));
         assert_eq!(
             v.connections[0].olap.as_ref().unwrap().row_drill_count,
@@ -1627,7 +1627,7 @@ mod tests {
     #[test]
     fn libreoffice_prefixed_core_namespace() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx"
         ));
         assert_eq!(
             v.connections[0].web.as_ref().unwrap().xml_source,

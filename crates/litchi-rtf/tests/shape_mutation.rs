@@ -85,7 +85,7 @@ fn typed_units_anchors_and_nested_group_mutation_round_trip() {
 
 #[test]
 fn libreoffice_fixture_mutates_without_interpreting_picture_or_ole_payloads() {
-    let source = include_bytes!("../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/shpz-dhgt.rtf");
+    let source = include_bytes!("../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/shpz-dhgt.rtf");
     let mut document = RtfDocument::parse_bytes(source).unwrap();
     let index = document.shapes().iter().position(|shape| shape.shape_id().is_some()).unwrap();
     let mut replacement = document.shapes()[index].clone().into_owned();

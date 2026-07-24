@@ -63,7 +63,7 @@ fn rejects_malformed_paragraph_group_tables() {
 #[test]
 fn parses_real_libreoffice_paragraph_group_fixture() {
     let fixture = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569-2.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569-2.rtf"
     );
     let marker = br"{\*\pgptbl";
     let start = fixture

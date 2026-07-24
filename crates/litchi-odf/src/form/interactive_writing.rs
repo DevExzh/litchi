@@ -1306,7 +1306,7 @@ mod tests {
     #[test]
     fn libreoffice_odfpy_and_odfdo_shapes_parse_inertly() {
         let lo = include_str!(
-            "../../../../3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt"
+            "../../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt"
         );
         let parsed = interactive_controls(lo).unwrap();
         assert!(

@@ -1284,9 +1284,9 @@ mod tests {
     use super::*;
 
     const POI: &[u8] =
-        include_bytes!("../../../../3rdparty/poi/test-data/slideshow/45545_Comment.pptx");
+        include_bytes!("../../../../test-data/poi/test-data/slideshow/45545_Comment.pptx");
     const LIBREOFFICE: &[u8] =
-        include_bytes!("../../../../3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx");
+        include_bytes!("../../../../test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx");
 
     fn author() -> PresentationCommentAuthor {
         PresentationCommentAuthor {

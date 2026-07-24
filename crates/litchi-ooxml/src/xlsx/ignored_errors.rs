@@ -758,7 +758,7 @@ mod tests {
     fn reads_poi_ignored_error_fixtures() {
         let format = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/FormatKM.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/FormatKM.xlsx"
         )));
         assert_eq!(
             format.entries()[0]
@@ -772,7 +772,7 @@ mod tests {
 
         let large = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx"
         )));
         assert_eq!(large.entries()[0].ranges()[0].as_str(), "A1:J7577");
         assert!(large.entries()[0].ignores(WorksheetIgnoredErrorType::NumberStoredAsText));

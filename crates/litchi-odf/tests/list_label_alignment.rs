@@ -26,7 +26,7 @@ fn parses_aliases_values_and_round_trip() {
 }
 #[test]
 fn parses_odfdo_and_libreoffice_fixtures() {
-    let odfdo = include_str!("../../../3rdparty/odfdo/tests/samples/example.xml");
+    let odfdo = include_str!("../../../test-data/odfdo/tests/samples/example.xml");
     let odfdo_parsed = parse_list_level_label_alignments(odfdo).unwrap();
     assert!(odfdo_parsed.levels.len() >= 10);
     assert!(
@@ -36,7 +36,7 @@ fn parses_odfdo_and_libreoffice_fixtures() {
             .any(|x| x.list_style_kind == ListStyleKind::Outline)
     );
     let lo = include_bytes!(
-        "../../../3rdparty/libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt"
+        "../../../test-data/libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt"
     );
     let flat = FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
     assert!(

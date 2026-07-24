@@ -84,7 +84,7 @@ fn rejects_missing_attributes_wrong_order_duplicates_foreign_children_and_depth(
 
 #[test]
 fn reads_real_conforming_libreoffice_package_through_generic_accessor() {
-    let package = OpenDocumentPackage::open(concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/simple-ruby.odt")).unwrap();
+    let package = OpenDocumentPackage::open(concat!(env!("CARGO_MANIFEST_DIR"), "/../../test-data/libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/simple-ruby.odt")).unwrap();
     let pages = package.master_pages().unwrap();
     assert!(!pages.is_empty());
     assert!(pages.iter().all(|page| page.page_layout_name.is_some()));

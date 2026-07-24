@@ -251,9 +251,9 @@ fn rejects_starred_story_drawings_and_recursive_text_story_abuse() {
 fn real_libreoffice_story_fixtures_round_trip_with_stable_ownership() {
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     for relative in [
-        "../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/copypaste-footnote.rtf",
-        "../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/text-with-comment.rtf",
-        "../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/shptxt-pard.rtf",
+        "../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/copypaste-footnote.rtf",
+        "../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/text-with-comment.rtf",
+        "../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/shptxt-pard.rtf",
     ] {
         let source = std::fs::read(manifest.join(relative)).unwrap();
         let document = RtfDocument::parse_bytes(&source).unwrap();

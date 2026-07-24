@@ -1503,7 +1503,7 @@ mod tests {
         use std::path::Path;
 
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/spreadsheet/WithConditionalFormatting.xls");
+            .join("../../test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls");
         let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
         let groups = workbook.xls_worksheet(0).unwrap().conditional_formattings();
         assert_eq!(groups.len(), 3);
@@ -1534,7 +1534,7 @@ mod tests {
         use std::fs::File;
         use std::path::Path;
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls");
+            .join("../../test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls");
         let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
         let mut count = 0usize;
         let mut priorities = HashSet::new();

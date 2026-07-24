@@ -1284,7 +1284,7 @@ mod tests {
 
     #[test]
     fn reads_apache_poi_named_custom_properties() {
-        let bytes = fixture("3rdparty/poi/test-data/hpsf/TestMickey.doc");
+        let bytes = fixture("test-data/poi/test-data/hpsf/TestMickey.doc");
         let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
         let metadata = ole.get_metadata().unwrap();
         assert_eq!(metadata.title.as_deref(), Some("sample title"));
@@ -1304,7 +1304,7 @@ mod tests {
 
     #[test]
     fn reads_apache_poi_two_section_unicode_properties() {
-        let bytes = fixture("3rdparty/poi/test-data/hpsf/TestUnicode.xls");
+        let bytes = fixture("test-data/poi/test-data/hpsf/TestUnicode.xls");
         let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
         let stream = ole
             .property_set_stream(&["\u{0005}DocumentSummaryInformation"])
@@ -1351,7 +1351,7 @@ mod tests {
 
     #[test]
     fn reads_non_dword_and_zero_length_property_fixtures() {
-        let bytes = fixture("3rdparty/poi/test-data/hpsf/TestNon4ByteBoundary.doc");
+        let bytes = fixture("test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc");
         let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
         let metadata = ole.get_metadata().unwrap();
         assert_eq!(
@@ -1362,7 +1362,7 @@ mod tests {
         assert_eq!(metadata.author.as_deref(), Some(""));
         assert_eq!(metadata.company.as_deref(), Some("Cour de Justice"));
 
-        let bytes = fixture("3rdparty/poi/test-data/hpsf/TestZeroLengthCodePage.mpp");
+        let bytes = fixture("test-data/poi/test-data/hpsf/TestZeroLengthCodePage.mpp");
         let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
         let metadata = ole.get_metadata().unwrap();
         assert_eq!(metadata.creating_application.as_deref(), Some("MSProject"));
@@ -1377,7 +1377,7 @@ mod tests {
 
     #[test]
     fn reads_undefined_filetime_and_word90_fixtures() {
-        let bytes = fixture("3rdparty/poi/test-data/hpsf/TestBug52117.doc");
+        let bytes = fixture("test-data/poi/test-data/hpsf/TestBug52117.doc");
         let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
         let metadata = ole.get_metadata().unwrap();
         assert_eq!(metadata.last_printed_time, None);
@@ -1386,7 +1386,7 @@ mod tests {
             Some(180_000)
         );
 
-        let bytes = fixture("3rdparty/poi/test-data/hpsf/TestGermanWord90.doc");
+        let bytes = fixture("test-data/poi/test-data/hpsf/TestGermanWord90.doc");
         let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
         let stream = ole
             .property_set_stream(&["\u{0005}SummaryInformation"])

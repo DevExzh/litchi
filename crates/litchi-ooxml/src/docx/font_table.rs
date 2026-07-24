@@ -2178,7 +2178,7 @@ mod tests {
         assert_eq!(parse_font_table(xml).unwrap().fonts()[0].name(), "Fallback");
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let p = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
-            root.join("3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx"),
+            root.join("test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx"),
         )
         .unwrap();
         let u = litchi_opc::PackURI::new("/word/fontTable.xml").unwrap();
@@ -2206,7 +2206,7 @@ mod tests {
     fn real_poi_embedded_resources_are_inert() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let p =
-            crate::docx::Package::open(root.join("3rdparty/poi/test-data/document/saut_page.docx"))
+            crate::docx::Package::open(root.join("test-data/poi/test-data/document/saut_page.docx"))
                 .unwrap();
         let t = p.font_table().unwrap().unwrap();
         assert_eq!(t.fonts().len(), 7);

@@ -115,7 +115,7 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
 fn parses_bundled_word_2003_producer_matrix_in_arbitrary_source_order() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/hidden-linebreaks.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/hidden-linebreaks.rtf"
     );
     let doc = RtfDocument::parse_bytes(&std::fs::read(path).unwrap()).unwrap();
     assert_eq!(*doc.word_2003_compatibility(), all_enabled());

@@ -20,7 +20,7 @@ fn wrap(body: &str) -> String {
 fn parses_libreoffice_section_separator_and_other_property_contexts() {
     let section = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/uitest/data/section-columns-separator.fodt"
+        "/../../test-data/libreoffice-core/sw/qa/uitest/data/section-columns-separator.fodt"
     ));
     let parsed = parse_style_columns(section).unwrap();
     let columns = &parsed[0];
@@ -40,11 +40,11 @@ fn parses_libreoffice_section_separator_and_other_property_contexts() {
     for fixture in [
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt"
+            "/../../test-data/libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sw/qa/extras/pagelinespacing/data/frameWithColumns.fodt"
+            "/../../test-data/libreoffice-core/sw/qa/extras/pagelinespacing/data/frameWithColumns.fodt"
         )),
     ] {
         let flat = FlatOpenDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();

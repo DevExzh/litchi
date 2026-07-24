@@ -108,7 +108,7 @@ fn writer_is_deterministic_and_preserves_units() {
 fn parses_libreoffice_superscript_fixture() {
     let source = std::fs::read_to_string(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf"),
+            .join("../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf"),
     )
     .unwrap();
     let document = RtfDocument::parse(&source).unwrap();

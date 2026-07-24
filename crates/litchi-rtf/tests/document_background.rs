@@ -13,7 +13,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_and_rewrites_real_producer_background_with_provenance() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/page-background.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/page-background.rtf"
     );
     let document = RtfDocument::parse_bytes(source).unwrap();
     let background = document.background_shape().unwrap();

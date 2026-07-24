@@ -81,7 +81,7 @@ fn workbook_window_and_sheet_ids_round_trip() {
 #[test]
 fn reads_poi_simple_workbook_window_and_sheet_ids() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/spreadsheet/Simple.xls");
+        .join("../../test-data/poi/test-data/spreadsheet/Simple.xls");
     let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
     let view = workbook.workbook_view();
     assert_eq!(view.sheet_ids(), &[1, 2, 3]);
@@ -145,7 +145,7 @@ fn writer_rejects_window1_window2_selection_disagreement() {
 #[test]
 fn reads_poi_zero_based_sheet_identifiers() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/spreadsheet/duprich1.xls");
+        .join("../../test-data/poi/test-data/spreadsheet/duprich1.xls");
     let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
     assert_eq!(workbook.workbook_view().sheet_ids(), &[0, 1, 2]);
 }

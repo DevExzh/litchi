@@ -56,7 +56,7 @@ fn stylesheet_writer_round_trip() {
 #[test]
 fn real_libreoffice() {
     let b =
-        include_bytes!("../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf");
+        include_bytes!("../../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf");
     let d = RtfDocument::parse_bytes(b).unwrap();
     assert!(
         d.blocks()

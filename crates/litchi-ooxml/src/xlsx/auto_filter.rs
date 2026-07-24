@@ -1571,17 +1571,17 @@ mod tests {
         assert!(
             matches!(&values.columns[0].payload,Some(FilterColumnPayload::Values(v))if v.items.len()==2)
         );
-        let date = fixture("3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx");
+        let date = fixture("test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx");
         assert!(
             matches!(&date.columns[0].payload,Some(FilterColumnPayload::Values(v))if v.items.len()==2)
         );
         let top =
-            fixture("3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx");
+            fixture("test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx");
         assert!(
             matches!(&top.columns[0].payload,Some(FilterColumnPayload::Top10(v))if v.value==4.0&&v.filter_value==Some(7.0))
         );
         let buttons =
-            fixture("3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx");
+            fixture("test-data/libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx");
         assert_eq!(buttons.columns.len(), 4);
         assert!(buttons.columns.iter().all(|v| !v.show_button));
         for f in [

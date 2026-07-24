@@ -1568,7 +1568,7 @@ mod tests {
     #[test]
     fn parses_real_libreoffice_standard_style() {
         let fixture = include_str!(
-            "../../../3rdparty/libreoffice-core/chart2/qa/extras/data/fods/stacked-column-chart.fods"
+            "../../../test-data/libreoffice-core/chart2/qa/extras/data/fods/stacked-column-chart.fods"
         );
         let begin = fixture
             .find(r#"<style:style style:name="ch3" style:family="chart">"#)

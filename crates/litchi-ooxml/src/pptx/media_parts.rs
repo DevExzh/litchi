@@ -1321,9 +1321,9 @@ mod tests {
     use super::*;
 
     const POI_AUDIO: &[u8] =
-        include_bytes!("../../../../3rdparty/poi/test-data/slideshow/EmbeddedAudio.pptx");
+        include_bytes!("../../../../test-data/poi/test-data/slideshow/EmbeddedAudio.pptx");
     const POI_VIDEO: &[u8] =
-        include_bytes!("../../../../3rdparty/poi/test-data/slideshow/EmbeddedVideo.pptx");
+        include_bytes!("../../../../test-data/poi/test-data/slideshow/EmbeddedVideo.pptx");
 
     fn extension() -> OfficeMediaExtension {
         OfficeMediaExtension {

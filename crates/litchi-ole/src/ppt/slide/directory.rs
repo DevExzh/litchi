@@ -455,7 +455,7 @@ mod tests {
     #[test]
     fn poi_reordered_and_basic_fixtures_match_normative_ids() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/slideshow");
+            .join("../../test-data/poi/test-data/slideshow");
         let mut package = Package::open(root.join("incorrect_slide_order.ppt")).unwrap();
         let presentation = package.presentation().unwrap();
         let slides = presentation.slides().unwrap();

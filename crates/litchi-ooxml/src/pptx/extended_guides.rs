@@ -763,7 +763,7 @@ mod tests {
     use litchi_opc::OpcPackage;
 
     const LO_GUIDES: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx"
+        "../../../../test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx"
     );
 
     fn wrap(fragment: &str) -> String {

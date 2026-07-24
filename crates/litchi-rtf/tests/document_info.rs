@@ -123,7 +123,7 @@ fn parses_real_libreoffice_info_fixtures() {
     ];
     let root = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/"
+        "/../../test-data/libreoffice-core"
     );
     for (index, fixture) in FIXTURES.iter().enumerate() {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();
@@ -141,7 +141,7 @@ fn parses_real_libreoffice_info_fixtures() {
 fn preserves_libreoffice_zero_timestamp_sentinels() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/text-change-tracking.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/text-change-tracking.rtf"
     );
     let bytes = fs::read(path).unwrap();
     let document = RtfDocument::parse_bytes(&bytes).unwrap();

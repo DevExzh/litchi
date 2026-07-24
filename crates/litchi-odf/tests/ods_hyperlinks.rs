@@ -3,7 +3,7 @@ use litchi_odf::Spreadsheet;
 #[test]
 fn reads_libreoffice_external_hyperlink_when_fixture_is_available() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sc/qa/unit/data/ods/external_hyperlink.ods");
+        .join("../../test-data/libreoffice-core/sc/qa/unit/data/ods/external_hyperlink.ods");
     if !path.exists() {
         return;
     }

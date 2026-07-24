@@ -123,7 +123,7 @@ fn isolated_drawing(fixture: &[u8]) -> Vec<u8> {
 #[test]
 fn parses_named_libreoffice_legacy_text_box_fixtures() {
     let hollow = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/dplinehollow.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dplinehollow.rtf"
     );
     let document = RtfDocument::parse_bytes(&isolated_drawing(hollow)).unwrap();
     assert_eq!(document.text(), "AB");
@@ -143,7 +143,7 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
     assert_eq!((text_box.width, text_box.height), (Some(10556), Some(561)));
 
     let relation = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/dptxbx-relation.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dptxbx-relation.rtf"
     );
     let document = RtfDocument::parse_bytes(&isolated_drawing(relation)).unwrap();
     let text_box = &document.legacy_text_boxes()[0];
@@ -152,7 +152,7 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
     assert_eq!((text_box.width, text_box.height), (Some(1349), Some(221)));
 
     let nested_geometry =
-        include_bytes!("../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf");
+        include_bytes!("../../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf");
     let document = RtfDocument::parse_bytes(&isolated_drawing(nested_geometry)).unwrap();
     let text_box = &document.legacy_text_boxes()[0];
     assert!(text_box.text.contains("hello"));

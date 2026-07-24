@@ -82,7 +82,7 @@ fn rejects_wrong_order_kind_bounds_duplicates_and_active_content() {
 #[test]
 fn parses_bundled_libreoffice_extended_formfield() {
     let fixture = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf"
     );
     let marker = br"{\*\formfield";
     let format_marker = br"\ffformat";

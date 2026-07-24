@@ -86,7 +86,7 @@ fn rejects_bad_placement_cardinality_active_content_and_resource_exhaustion() {
 fn parses_bundled_libreoffice_template_fixture() {
     let bytes = std::fs::read(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf163003.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf163003.rtf"
     ))
     .unwrap();
     let document = RtfDocument::parse_bytes(&bytes).unwrap();

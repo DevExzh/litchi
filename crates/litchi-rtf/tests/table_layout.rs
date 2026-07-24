@@ -101,7 +101,7 @@ fn applies_end_defined_nested_layout_without_leaking_outer_state() {
 #[test]
 fn parses_real_libreoffice_row_and_text_flow_fixtures() {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sw/qa");
+        .join("../../test-data/libreoffice-core/sw/qa");
     let header = RtfDocument::parse(
         &std::fs::read_to_string(base.join("extras/rtfimport/data/tblrepeat.rtf")).unwrap(),
     )

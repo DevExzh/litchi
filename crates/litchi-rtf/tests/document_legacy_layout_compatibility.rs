@@ -104,7 +104,7 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
 fn parses_bundled_libreoffice_legacy_layout_flags() {
     let common_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf161878.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf161878.rtf"
     );
     let common = RtfDocument::parse_bytes(&std::fs::read(common_path).unwrap()).unwrap();
     let compatibility = common.legacy_layout_compatibility();
@@ -114,7 +114,7 @@ fn parses_bundled_libreoffice_legacy_layout_flags() {
 
     let html_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/fdo82006.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo82006.rtf"
     );
     let html = RtfDocument::parse_bytes(&std::fs::read(html_path).unwrap()).unwrap();
     assert!(

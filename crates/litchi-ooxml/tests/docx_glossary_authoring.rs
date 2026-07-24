@@ -90,7 +90,7 @@ fn ordinary_mutation_preserves_libreoffice_test_glossary() {
     let output = directory.path().join("libreoffice-preserved.docx");
     let mut package = Package::open(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx"
+        "/../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx"
     ))
     .unwrap();
     assert!(package.glossary_document().unwrap().unwrap().entries().is_empty());

@@ -1266,7 +1266,7 @@ mod tests {
     #[test]
     fn reads_poi_real_fixture_and_round_trips_strict() {
         let maps = package(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"
         ));
         assert_eq!(maps.schemas.len(), 1);
         assert_eq!(maps.maps[0].name, "CORSO_mapping");
@@ -1276,7 +1276,7 @@ mod tests {
     #[test]
     fn keeps_poi_xxe_schema_inert() {
         let maps = package(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/xxe_in_schema.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/xxe_in_schema.xlsx"
         ));
         let payload = maps.schemas[0].payload_xml.as_deref().unwrap();
         let text = std::str::from_utf8(payload).unwrap();
@@ -1286,7 +1286,7 @@ mod tests {
     #[test]
     fn reads_libreoffice_unqualified_children_and_binding() {
         let maps = package(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx"
         ));
         let binding = maps.maps[0].data_binding.as_ref().unwrap();
         assert_eq!(binding.file_binding, Some(true));
@@ -1323,7 +1323,7 @@ mod tests {
             assert!(XmlMapInfo::parse(xml.as_bytes()).is_err(), "accepted {xml}");
         }
         let mut valid = package(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"
         ));
         valid.schemas[0].payload_xml = Some(b"<?unsafe?><x/>".to_vec());
         assert!(valid.to_xml(false).is_err());
@@ -1419,7 +1419,7 @@ mod tests {
     #[test]
     fn writes_real_poi_xml_maps_package_without_resolving_schema_payloads() {
         let mut package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"
         ))
         .unwrap();
         let (value, conformance) = load_from_package_with_conformance(&package)

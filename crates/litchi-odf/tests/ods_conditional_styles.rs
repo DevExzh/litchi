@@ -3,7 +3,7 @@ use litchi_odf::Spreadsheet;
 #[test]
 fn reads_libreoffice_standard_conditional_style_maps_when_fixture_is_available() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sc/qa/unit/data/ods/formats.ods");
+        .join("../../test-data/libreoffice-core/sc/qa/unit/data/ods/formats.ods");
     if !path.exists() {
         return;
     }

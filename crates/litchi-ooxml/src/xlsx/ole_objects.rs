@@ -1283,7 +1283,7 @@ mod tests {
     use super::*;
 
     const POI: &[u8] =
-        include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/bug64512_embed.xlsx");
+        include_bytes!("../../../../test-data/poi/test-data/spreadsheet/bug64512_embed.xlsx");
 
     fn marker(row: u32) -> OleObjectMarker {
         OleObjectMarker {

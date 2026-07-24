@@ -15,14 +15,14 @@ fn write_document(document: &RtfDocument<'_>) -> String {
 #[test]
 fn parses_libreoffice_group_producers_and_round_trips_order() {
     let fdo = RtfDocument::parse(include_str!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/fdo89496.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo89496.rtf"
     ))
     .unwrap();
     assert_eq!(fdo.shape_groups().len(), 1);
     assert!(!fdo.shape_groups()[0].shapes().is_empty());
 
     let source = include_str!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf127806.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf127806.rtf"
     );
     let document = RtfDocument::parse(source).unwrap();
     let group = &document.shape_groups()[0];

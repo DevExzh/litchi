@@ -16,7 +16,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_real_libreoffice_theme_metadata_and_round_trips_canonically() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/watermark.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/watermark.rtf"
     );
     let producer = RtfDocument::parse_bytes(source).unwrap();
     let property = producer

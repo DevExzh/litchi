@@ -427,7 +427,7 @@ mod tests {
     fn reads_poi_and_libreoffice_fixtures() {
         let preserve_attributes = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/48962.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/48962.xlsx"
         )));
         assert_eq!(preserve_attributes.font_id(), 3);
         assert_eq!(
@@ -437,7 +437,7 @@ mod tests {
 
         let poi = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/54071.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/54071.xlsx"
         )));
         assert_eq!(poi.font_id(), 1);
         assert_eq!(poi.phonetic_type(), WorksheetPhoneticType::NoConversion);
@@ -445,7 +445,7 @@ mod tests {
 
         let libreoffice = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx"
         )));
         assert_eq!(libreoffice.font_id(), 1);
         assert_eq!(

@@ -168,10 +168,10 @@ fn rejects_malformed_spoofed_unresolved_and_limited_inputs() {
 #[test]
 fn parses_all_bundled_fixtures_without_rewriting_packages() {
     for relative in [
-        "3rdparty/odfdo/tests/samples/forms.odt",
-        "3rdparty/libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt",
-        "3rdparty/libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt",
-        "3rdparty/libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt",
+        "test-data/odfdo/tests/samples/forms.odt",
+        "test-data/libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt",
+        "test-data/libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt",
+        "test-data/libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt",
     ] {
         let bytes = std::fs::read(fixture(relative)).unwrap();
         let package = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
@@ -181,7 +181,7 @@ fn parses_all_bundled_fixtures_without_rewriting_packages() {
         assert_eq!(package.to_bytes(), bytes, "{relative}");
     }
     let bytes = std::fs::read(fixture(
-        "3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt",
+        "test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt",
     ))
     .unwrap();
     let forms = FlatOpenDocument::from_bytes(bytes)

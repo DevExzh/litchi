@@ -154,7 +154,7 @@ fn stable_round_trip_covers_body_style_and_default_owners() {
 #[test]
 fn parses_libreoffice_paragraph_style_producer() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/fdo82071.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/fdo82071.rtf"
     );
     let document = RtfDocument::parse_bytes(source).unwrap();
     assert!(

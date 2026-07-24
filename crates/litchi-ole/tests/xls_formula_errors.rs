@@ -6,7 +6,7 @@ use litchi_ole::xls::XlsWorkbook;
 fn parses_poi_formula_error_shared_feature_fixture() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/poi/test-data/spreadsheet/46136-NoWarnings.xls"
+        "/../../test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls"
     );
     let workbook = XlsWorkbook::new(File::open(path).unwrap()).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();

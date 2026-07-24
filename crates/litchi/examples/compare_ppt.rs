@@ -5,7 +5,7 @@ use litchi::ole::OleFile;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Verify minimal.ppt matches POI
     let poi_path =
-        "3rdparty/poi/poi-scratchpad/src/main/resources/org/apache/poi/hslf/data/empty.ppt";
+        "test-data/poi/poi-scratchpad/src/main/resources/org/apache/poi/hslf/data/empty.ppt";
     let poi_file = std::fs::File::open(poi_path)?;
     let mut poi_ole = OleFile::open(poi_file)?;
     let poi = poi_ole.open_stream(&["PowerPoint Document"])?;

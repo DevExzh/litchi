@@ -107,7 +107,7 @@ fn rejects_a_private_key_that_does_not_match_the_leaf_certificate() {
 #[test]
 fn verifies_the_bundled_libreoffice_xades_signature() {
     let bytes = include_bytes!(
-        "../../../3rdparty/libreoffice-core/xmlsecurity/qa/unit/signing/data/signed_with_x509certificate_chain.odt"
+        "../../../test-data/libreoffice-core/xmlsecurity/qa/unit/signing/data/signed_with_x509certificate_chain.odt"
     );
     let results = OwnedPackage::from_bytes(bytes.to_vec())
         .unwrap()

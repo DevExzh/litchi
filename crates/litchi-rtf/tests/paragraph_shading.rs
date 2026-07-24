@@ -104,7 +104,7 @@ fn rejects_missing_negative_and_out_of_range_values_but_keeps_destinations_inert
 fn parses_clean_libreoffice_explicit_zero_body_and_style_producers() {
     let explicit_zero = RtfDocument::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/fdo47764.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo47764.rtf"
     )))
     .unwrap();
     assert!(
@@ -116,7 +116,7 @@ fn parses_clean_libreoffice_explicit_zero_body_and_style_producers() {
 
     let style_and_body = RtfDocument::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf108955.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf108955.rtf"
     )))
     .unwrap();
     assert_eq!(

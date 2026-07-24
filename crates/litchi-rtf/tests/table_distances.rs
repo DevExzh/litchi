@@ -44,7 +44,7 @@ fn writer_round_trips_deterministically() {
 fn parses_real_libreoffice_row_and_cell_distances() {
     let row_source = std::fs::read_to_string(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf165923.rtf"),
+            .join("../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf165923.rtf"),
     )
     .unwrap();
     let row_doc = RtfDocument::parse(&row_source).unwrap();
@@ -56,7 +56,7 @@ fn parses_real_libreoffice_row_and_cell_distances() {
             .any(|row| row.padding().left.value == Some(57)
                 && row.padding().left.unit == Some(TableDistanceUnit::Twips))
     );
-    let cell_source=std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty/libreoffice-core/sw/qa/writerfilter/dmapper/data/floattable-vertical-frame-offset.rtf")).unwrap();
+    let cell_source=std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/floattable-vertical-frame-offset.rtf")).unwrap();
     let cell_doc = RtfDocument::parse(&cell_source).unwrap();
     assert!(
         cell_doc

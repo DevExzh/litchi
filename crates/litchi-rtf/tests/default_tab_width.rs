@@ -125,7 +125,7 @@ fn malformed_domain_duplicates_and_placement_are_rejected() {
 fn libreoffice_fixture_exposes_its_explicit_default_tab_width() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf"
     );
     let bytes = std::fs::read(path).unwrap();
     let doc = RtfDocument::parse_bytes(&bytes).unwrap();

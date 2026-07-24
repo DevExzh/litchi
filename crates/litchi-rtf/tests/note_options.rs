@@ -163,7 +163,7 @@ fn omission_stays_empty_and_note_bodies_do_not_infer_options() {
 #[test]
 fn parses_named_libreoffice_note_option_fixtures() {
     let section_end = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf"
     );
     let document = RtfDocument::parse_bytes(section_end).unwrap();
     assert_eq!(
@@ -176,7 +176,7 @@ fn parses_named_libreoffice_note_option_fixtures() {
     );
 
     let restart = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158982.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158982.rtf"
     );
     let document = RtfDocument::parse_bytes(restart).unwrap();
     let options = document.note_options();
@@ -197,7 +197,7 @@ fn parses_named_libreoffice_note_option_fixtures() {
     assert_eq!(options.endnote_start, Some(1));
 
     let arabic = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf108947.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf108947.rtf"
     );
     let document = RtfDocument::parse_bytes(arabic).unwrap();
     let options = document.note_options();

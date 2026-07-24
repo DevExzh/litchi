@@ -103,7 +103,7 @@ fn applies_end_defined_nested_decorations_without_outer_leakage() {
 #[test]
 fn parses_real_libreoffice_row_borders() {
     let source =
-        include_str!("../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/fdo44715.rtf");
+        include_str!("../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo44715.rtf");
     let document = RtfDocument::parse(source).unwrap();
     let row = document
         .tables()

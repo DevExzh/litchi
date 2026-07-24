@@ -846,9 +846,9 @@ mod tests {
     use litchi_opc::part::BlobPart;
 
     const POI_XLSX: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/spreadsheet/customIndexedColors.xlsx");
+        include_bytes!("../../../test-data/poi/test-data/spreadsheet/customIndexedColors.xlsx");
     const LO_DOCX: &[u8] = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx"
+        "../../../test-data/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx"
     );
 
     #[test]

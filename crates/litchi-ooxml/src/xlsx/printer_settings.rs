@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn loads_poi_and_libreoffice_reference_packages() {
-        let poi = OpcPackage::open(root().join("3rdparty/poi/test-data/spreadsheet/sample.xlsx"))
+        let poi = OpcPackage::open(root().join("test-data/poi/test-data/spreadsheet/sample.xlsx"))
             .unwrap();
         let settings = load_worksheet_printer_settings(
             &poi,
@@ -557,7 +557,7 @@ mod tests {
         assert_eq!(settings.reference.relationship_id, "rId1");
         assert_eq!(settings.resource.data.len(), 2452);
         let libreoffice = OpcPackage::open(root().join(
-            "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx",
+            "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx",
         ))
         .unwrap();
         let settings = load_worksheet_printer_settings(

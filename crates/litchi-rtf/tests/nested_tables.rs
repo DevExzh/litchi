@@ -70,7 +70,7 @@ fn parses_ordered_nested_content_empty_cells_and_round_trips() {
 #[test]
 fn parses_real_libreoffice_end_defined_nested_table() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf117268.rtf");
+        .join("../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf117268.rtf");
     let document = RtfDocument::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
     assert!(
         document

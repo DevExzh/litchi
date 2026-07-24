@@ -512,7 +512,7 @@ mod tests {
     fn reads_poi_calculation_fixtures() {
         let iterative = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/47889.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/47889.xlsx"
         )));
         assert_eq!(
             iterative.calculation_mode(),
@@ -524,13 +524,13 @@ mod tests {
 
         let no_save = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/58106.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/58106.xlsx"
         )));
         assert!(!no_save.calculate_on_save());
 
         let recalculate = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/60289.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/60289.xlsx"
         )));
         assert!(recalculate.full_calculation_on_load());
     }
@@ -539,13 +539,13 @@ mod tests {
     fn reads_libreoffice_calculation_fixtures() {
         let displayed_precision = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx"
         )));
         assert!(!displayed_precision.full_precision());
 
         let r1c1 = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx"
         )));
         assert_eq!(r1c1.reference_mode(), WorkbookReferenceMode::R1C1);
         assert_eq!(r1c1.iteration_count(), 100);

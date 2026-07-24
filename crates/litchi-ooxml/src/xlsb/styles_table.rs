@@ -572,7 +572,7 @@ mod tests {
     fn reads_custom_number_formats_from_poi_fixture_when_available() {
         let path = std::path::Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/62815.xlsb"
+            "/../../test-data/poi/test-data/spreadsheet/62815.xlsb"
         ));
         if !path.exists() {
             return;

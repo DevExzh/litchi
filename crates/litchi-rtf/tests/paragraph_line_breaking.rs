@@ -108,7 +108,7 @@ fn deterministic_writer_and_stylesheet_round_trip() {
 #[test]
 fn parses_real_libreoffice_fixture() {
     let bytes = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-1.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-1.rtf"
     );
     let marker = br"{\stylesheet";
     let start = bytes

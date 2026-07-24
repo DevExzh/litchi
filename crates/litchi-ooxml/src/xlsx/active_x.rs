@@ -1258,7 +1258,7 @@ mod tests {
     #[test]
     fn libreoffice_stream_init_is_opaque_and_anchored() {
         let set = fixture(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx"
         ));
         assert_eq!(set.controls.len(), 1);
         let item = &set.controls[0];
@@ -1276,7 +1276,7 @@ mod tests {
     #[test]
     fn libreoffice_radio_buttons_resolve_five_inert_payloads() {
         let set = fixture(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx"
         ));
         assert_eq!(set.controls.len(), 5);
         assert!(
@@ -1290,9 +1290,9 @@ mod tests {
     #[test]
     fn poi_property_bag_header_and_footer() {
         for bytes in [
-            include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/45540_form_Header.xlsx")
+            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/45540_form_Header.xlsx")
                 .as_slice(),
-            include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/45540_form_Footer.xlsx")
+            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/45540_form_Footer.xlsx")
                 .as_slice(),
         ] {
             let set = fixture(bytes);

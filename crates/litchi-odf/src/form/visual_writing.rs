@@ -1362,7 +1362,7 @@ mod tests {
     #[test]
     fn libreoffice_odfpy_and_odfdo_shapes_parse() {
         let lo = include_str!(
-            "../../../../3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt"
+            "../../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt"
         );
         let parsed = visual_controls(lo).unwrap();
         assert_eq!(

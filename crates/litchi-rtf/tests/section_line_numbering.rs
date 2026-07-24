@@ -36,7 +36,7 @@ fn parses_grouped_line_numbering_and_round_trips_in_canonical_order() {
 fn parses_bundled_libreoffice_line_numbering_fixtures() {
     let continuous = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/linenumbering.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/linenumbering.rtf"
     ));
     let continuous = RtfDocument::parse_bytes(continuous).unwrap();
     assert!(continuous.sections().iter().any(|section| {
@@ -51,7 +51,7 @@ fn parses_bundled_libreoffice_line_numbering_fixtures() {
 
     let start = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf66543.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf66543.rtf"
     ));
     let start = RtfDocument::parse_bytes(start).unwrap();
     assert!(start.sections().iter().any(|section| {

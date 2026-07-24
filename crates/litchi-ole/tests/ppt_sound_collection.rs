@@ -5,7 +5,7 @@ use std::collections::HashSet;
 #[test]
 fn parses_poi_sound_fixture_byte_for_byte_when_available() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/slideshow");
+        .join("../../test-data/poi/test-data/slideshow");
     let ppt = root.join("sound.ppt");
     let wav = root.join("ringin.wav");
     if !ppt.exists() || !wav.exists() {

@@ -128,14 +128,14 @@ fn parses_recursive_groups_and_callouts() {
 #[test]
 fn parses_named_libreoffice_primitive_fixtures() {
     let polyline = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/dppolyline.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dppolyline.rtf"
     );
     let document = RtfDocument::parse_bytes(polyline).unwrap();
     assert_eq!(document.legacy_drawings().len(), 4);
     assert!(document.legacy_drawings().iter().all(|drawing| matches!(&drawing.primitive, LegacyDrawingPrimitive::Polyline { points, .. } if points.len() == 2)));
 
     let rectangle = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/dprect-anchor.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dprect-anchor.rtf"
     );
     let document = RtfDocument::parse_bytes(rectangle).unwrap();
     let LegacyDrawingPrimitive::Rectangle {
@@ -157,7 +157,7 @@ fn parses_named_libreoffice_primitive_fixtures() {
     );
 
     let group = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf91684.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf91684.rtf"
     );
     let document = RtfDocument::parse_bytes(&isolated_drawing(group)).unwrap();
     let LegacyDrawingPrimitive::Group { children, .. } = &document.legacy_drawings()[0].primitive

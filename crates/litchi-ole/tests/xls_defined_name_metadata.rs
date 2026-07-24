@@ -11,7 +11,7 @@ use litchi_ole::xls::{
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/spreadsheet")
+        .join("../../test-data/poi/test-data/spreadsheet")
         .join(name)
 }
 

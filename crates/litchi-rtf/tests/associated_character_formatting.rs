@@ -193,7 +193,7 @@ fn parses_specification_association_examples() {
 #[test]
 fn parses_libreoffice_associated_character_fixture() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/sbkeven.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/sbkeven.rtf"
     );
     let document = RtfDocument::parse_bytes(source).unwrap();
     assert!(document.blocks().iter().any(|block| {

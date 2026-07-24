@@ -11,7 +11,7 @@ use std::path::PathBuf;
 fn reads_poi_and_libreoffice_consolidation_directories() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let poi = XlsWorkbook::new(
-        File::open(root.join("3rdparty/poi/test-data/spreadsheet/54016.xls")).unwrap(),
+        File::open(root.join("test-data/poi/test-data/spreadsheet/54016.xls")).unwrap(),
     )
     .unwrap();
     let value = poi.xls_worksheet(0).unwrap().consolidation().unwrap();
@@ -25,7 +25,7 @@ fn reads_poi_and_libreoffice_consolidation_directories() {
 
     let lo = XlsWorkbook::new(
         File::open(
-            root.join("3rdparty/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls"),
+            root.join("test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls"),
         )
         .unwrap(),
     )

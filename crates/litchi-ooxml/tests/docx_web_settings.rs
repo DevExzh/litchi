@@ -23,7 +23,7 @@ fn writes_both_namespace_families_deterministically() {
 #[test]
 fn opens_real_poi_div_metadata_and_round_trips_a_package() {
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..//3rdparty/poi/test-data/document/heading123.docx");
+        .join("../..//test-data/poi/test-data/document/heading123.docx");
     let package = Package::open(fixture).unwrap();
     let web_settings = package.document().unwrap().web_settings().unwrap().unwrap();
     let xml = web_settings.to_xml().unwrap();

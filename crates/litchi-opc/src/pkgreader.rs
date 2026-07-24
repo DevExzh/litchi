@@ -782,7 +782,7 @@ mod tests {
     #[test]
     fn rejects_apache_poi_derived_part_name_fixture() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx");
+            .join("../../test-data/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx");
         let bytes = std::fs::read(path).unwrap();
         let physical = PhysPkgReader::new(&bytes).unwrap();
         let error = match PackageReader::from_phys_reader(&physical) {
@@ -893,7 +893,7 @@ mod tests {
     #[test]
     fn rejects_poi_relationships_entity_fixture() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml");
+            .join("../../test-data/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml");
         let bytes = std::fs::read(path).unwrap();
         let physical = PhysPkgReader::new(&bytes).unwrap();
         let error = match PackageReader::from_phys_reader(&physical) {
@@ -917,7 +917,7 @@ mod tests {
         }
 
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/openxml4j/50154.xlsx");
+            .join("../../test-data/poi/test-data/openxml4j/50154.xlsx");
         let bytes = std::fs::read(path).unwrap();
         let package = crate::OpcPackage::from_bytes(&bytes).unwrap();
         let original_targets = targets(&package);

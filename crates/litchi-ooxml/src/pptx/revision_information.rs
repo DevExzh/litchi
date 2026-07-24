@@ -822,7 +822,7 @@ mod tests {
     fn loads_real_powerpoint_and_libreoffice_revision_parts() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let powerpoint =
-            OpcPackage::open(root.join("3rdparty/poi/test-data/slideshow/bug65551.pptx")).unwrap();
+            OpcPackage::open(root.join("test-data/poi/test-data/slideshow/bug65551.pptx")).unwrap();
         let loaded = load_revision_information(&powerpoint).unwrap().unwrap();
         assert_eq!(loaded.part_name, "/ppt/revisionInfo.xml");
         assert_eq!(loaded.revision_information.clients.len(), 2);
@@ -830,7 +830,7 @@ mod tests {
         assert_eq!(loaded.revision_information.clients[1].revision, Some(18));
 
         let libreoffice = OpcPackage::open(
-            root.join("3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx"),
+            root.join("test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx"),
         )
         .unwrap();
         let loaded = load_revision_information(&libreoffice).unwrap().unwrap();

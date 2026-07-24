@@ -1426,7 +1426,7 @@ mod tests {
     #[test]
     fn libreoffice_odfpy_odfdo_and_inline_shapes_parse() {
         let lo = include_str!(
-            "../../../../3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt"
+            "../../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt"
         );
         let parsed = selection_controls(lo).unwrap();
         assert!(parsed.iter().any(|v|matches!(v,OdfSelectionControl::Listbox(l)if l.list_source_type==Some(OdfListSourceType::Sql))));

@@ -99,7 +99,7 @@ fn shared_graph_references_block_dangling_removal() {
 fn libreoffice_rdf_and_malformed_xml_discovery() {
     let fixture = std::fs::read(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/extras/source/autotext/lang/szl/standard/FN/manifest.rdf"
+        "/../../test-data/libreoffice-core/extras/source/autotext/lang/szl/standard/FN/manifest.rdf"
     )).unwrap();
     let document = Document::from_bytes(package(
         constants::ODF_TEXT, "text", &[("manifest.rdf", fixture.as_slice())], false,

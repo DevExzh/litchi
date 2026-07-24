@@ -4289,14 +4289,14 @@ fn limit(name: &str) -> OoxmlError {
 mod tests {
     use super::*;
     const POI_ONE: &[u8] =
-        include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/WithChartSheet.xlsx");
+        include_bytes!("../../../../test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx");
     const POI_TWO: &[u8] =
-        include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/chart_sheet.xlsx");
+        include_bytes!("../../../../test-data/poi/test-data/spreadsheet/chart_sheet.xlsx");
     const LO_CHART_EX: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx"
+        "../../../../test-data/libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx"
     );
     pub(super) const LO_USER_SHAPES_IMAGES: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx"
+        "../../../../test-data/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx"
     );
     fn sheet() -> ChartSheet {
         ChartSheet {

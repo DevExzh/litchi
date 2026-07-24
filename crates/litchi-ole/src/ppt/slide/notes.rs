@@ -377,7 +377,7 @@ mod tests {
     fn poi_basic_fixture_exposes_exact_speaker_notes() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/slideshow/basic_test_ppt_file.ppt"
+            "/../../test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt"
         );
         let mut package = Package::open(path).expect("open POI fixture");
         let presentation = package.presentation().expect("parse POI fixture");

@@ -3950,7 +3950,7 @@ mod tests {
     #[test]
     fn preserves_mixed_text_anchor_range_from_libreoffice_fods() {
         let source = include_str!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/functions/text/fods/encodeurl.fods"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/functions/text/fods/encodeurl.fods"
         );
         let anchor = r#"<text:a xlink:href="http://www.test/libreOffice" xlink:type="simple">"#;
         let anchor_start = source.find(anchor).unwrap();

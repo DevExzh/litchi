@@ -1347,7 +1347,7 @@ mod defined_name_tests {
 
     fn poi_fixture(name: &str) -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/spreadsheet")
+            .join("../../test-data/poi/test-data/spreadsheet")
             .join(name)
     }
 
@@ -1719,7 +1719,7 @@ mod tests {
     fn reads_data_validation_fixtures() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let empty = XlsWorkbook::new(
-            std::fs::File::open(root.join("3rdparty/poi/test-data/spreadsheet/dvEmpty.xls"))
+            std::fs::File::open(root.join("test-data/poi/test-data/spreadsheet/dvEmpty.xls"))
                 .unwrap(),
         )
         .unwrap();
@@ -1735,7 +1735,7 @@ mod tests {
 
         let validation = XlsWorkbook::new(
             std::fs::File::open(
-                root.join("3rdparty/libreoffice-core/sc/qa/unit/data/xls/validation.xls"),
+                root.join("test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls"),
             )
             .unwrap(),
         )

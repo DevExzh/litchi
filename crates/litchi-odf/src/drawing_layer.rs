@@ -853,7 +853,7 @@ mod tests {
     #[test]
     fn parses_libreoffice_default_layer_set_when_fixture_is_available() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/xmloff/qa/unit/data/theme.fodp");
+            .join("../../test-data/libreoffice-core/xmloff/qa/unit/data/theme.fodp");
         let Ok(xml) = std::fs::read_to_string(path) else {
             return;
         };

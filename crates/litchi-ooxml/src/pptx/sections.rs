@@ -784,10 +784,10 @@ mod tests {
     use litchi_opc::part::BlobPart;
 
     const LO_SECTIONS: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx"
+        "../../../../test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx"
     );
     const LO_SECTION_TEST: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+        "../../../../test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
     );
 
     fn wrap(fragment: &str) -> String {

@@ -420,7 +420,7 @@ mod tests {
     fn workbook_accessor_reads_a_real_excel_strong_verifier() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let workbook = Workbook::open(root.join(
-            "3rdparty/poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx",
+            "test-data/poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx",
         ))
         .unwrap();
         let metadata = workbook.workbook_protection_metadata().unwrap().unwrap();

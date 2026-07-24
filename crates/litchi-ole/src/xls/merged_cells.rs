@@ -181,7 +181,7 @@ mod tests {
 
         let fixture = |name: &str| {
             Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../3rdparty/poi/test-data/spreadsheet")
+                .join("../../test-data/poi/test-data/spreadsheet")
                 .join(name)
         };
 

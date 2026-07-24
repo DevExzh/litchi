@@ -117,7 +117,7 @@ fn rejects_malformed_duplicates_starred_grouped_and_late_controls() {
 fn parses_bundled_libreoffice_alias_sequence() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/hidden-linebreaks.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/hidden-linebreaks.rtf"
     );
     let doc = RtfDocument::parse_bytes(&std::fs::read(path).unwrap()).unwrap();
     assert_eq!(

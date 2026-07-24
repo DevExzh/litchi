@@ -576,7 +576,7 @@ mod tests {
     fn loads_poi_dpi_sentinel_and_relationship_fixture() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/45540_classic_Header.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/45540_classic_Header.xlsx"
         );
         let setup = parse_fixture(path);
         assert_eq!(setup.orientation(), PageSetupOrientation::Portrait);
@@ -589,7 +589,7 @@ mod tests {
     fn loads_libreoffice_paper_and_orientation_fixture() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx"
         );
         let setup = parse_fixture(path);
         assert_eq!(setup.paper_size(), 70);

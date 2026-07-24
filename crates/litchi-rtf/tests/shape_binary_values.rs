@@ -13,7 +13,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_real_libreoffice_metro_blob_and_reuses_its_payload() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569-2.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569-2.rtf"
     );
     let source = std::str::from_utf8(source).unwrap();
     let property_start = source.find(r#"{\sp{\sn metroBlob}"#).unwrap();

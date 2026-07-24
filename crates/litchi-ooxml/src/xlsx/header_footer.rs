@@ -536,7 +536,7 @@ mod tests {
     fn loads_poi_ampersand_fixture() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/AmpersandHeader.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/AmpersandHeader.xlsx"
         );
         let settings = parse_fixture(path);
         assert_eq!(
@@ -549,7 +549,7 @@ mod tests {
     fn loads_libreoffice_color_sections_fixture() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx"
         );
         let settings = parse_fixture(path);
         let header = settings.odd_header().unwrap();

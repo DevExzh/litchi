@@ -1069,15 +1069,15 @@ mod tests {
     fn parses_poi_and_libreoffice_numbering_fixtures() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         for relative in [
-            "3rdparty/poi/test-data/document/Numbering.docx",
-            "3rdparty/poi/test-data/document/NumberingWOverrides.docx",
-            "3rdparty/poi/test-data/document/ComplexNumberedLists.docx",
-            "3rdparty/poi/test-data/document/NumberingWithOutOfOrderId.docx",
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx",
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx",
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx",
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx",
+            "test-data/poi/test-data/document/Numbering.docx",
+            "test-data/poi/test-data/document/NumberingWOverrides.docx",
+            "test-data/poi/test-data/document/ComplexNumberedLists.docx",
+            "test-data/poi/test-data/document/NumberingWithOutOfOrderId.docx",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx",
         ] {
             let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(relative))
                 .unwrap_or_else(|error| panic!("failed to open {relative}: {error}"));

@@ -1406,7 +1406,7 @@ mod tests {
     #[test]
     fn parses_real_libreoffice_remote_background_without_loading_it() {
         let xml = include_str!(
-            "../../../3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp"
+            "../../../test-data/libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp"
         );
         let set = parse_drawing_page_style_properties(xml).unwrap();
         let p = set.get("dp1").unwrap().properties.as_ref().unwrap();

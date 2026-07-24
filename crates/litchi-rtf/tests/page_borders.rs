@@ -7,7 +7,7 @@ use litchi_rtf::{
 fn parses_libreoffice_page_border_export_and_round_trips_deterministically() {
     let fixture = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/page-border.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/page-border.rtf"
     ));
     let document = RtfDocument::parse(fixture).unwrap();
     let borders = document.sections()[0].properties.page_borders;
@@ -84,7 +84,7 @@ fn rejects_malformed_page_borders_and_negative_libreoffice_fixture() {
     }
     let negative = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/writerfilter/rtftok/data/negative-page-border.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data/negative-page-border.rtf"
     ));
     assert!(RtfDocument::parse(negative).is_err());
 }

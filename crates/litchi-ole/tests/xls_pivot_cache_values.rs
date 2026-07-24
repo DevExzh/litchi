@@ -148,7 +148,7 @@ fn reads_libreoffice_boolean_and_empty_pivot_caches() {
         ("pivottable_bool_field_filter.xls", PivotCacheItem::Boolean(true)),
         ("pivottable_empty_item.xls", PivotCacheItem::Empty),
     ] {
-        let path = root.join("../../3rdparty/libreoffice-core/sc/qa/unit/data/xls").join(name);
+        let path = root.join("../../test-data/libreoffice-core/sc/qa/unit/data/xls").join(name);
         let workbook = XlsWorkbook::new(std::fs::File::open(path).unwrap()).unwrap();
         assert!(workbook.pivot_caches().iter().flat_map(|cache| cache.fields()).flat_map(|field| field.items()).any(|item| item == &expected));
     }

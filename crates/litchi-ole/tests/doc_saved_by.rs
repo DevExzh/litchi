@@ -7,7 +7,7 @@ use std::path::Path;
 #[test]
 fn apache_poi_saved_by_table_is_exact_and_round_trips() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/document/saved-by-table.doc");
+        .join("../../test-data/poi/test-data/document/saved-by-table.doc");
     let mut ole = OleFile::open(File::open(path).unwrap()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();

@@ -91,7 +91,7 @@ fn calculation_settings_round_trip() {
 #[test]
 fn reads_poi_calculation_fixture() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/spreadsheet/UncalcedRecord.xls");
+        .join("../../test-data/poi/test-data/spreadsheet/UncalcedRecord.xls");
     let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
     let calculation = workbook.xls_worksheet(0).unwrap().calculation();
     assert_eq!(calculation.mode(), XlsCalculationMode::Automatic);

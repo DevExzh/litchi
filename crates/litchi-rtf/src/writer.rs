@@ -8263,7 +8263,7 @@ mod tests {
     #[test]
     fn document_writer_round_trips_libreoffice_multi_section_fixture() {
         let document = RtfDocument::parse(include_str!(
-            "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf94043.rtf"
+            "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf94043.rtf"
         ))
         .unwrap();
         assert!(document.sections().len() >= 3);

@@ -333,7 +333,7 @@ mod tests {
     fn loads_poi_custom_margin_fixture() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/headerFooterTest.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/headerFooterTest.xlsx"
         );
         let margins = parse_fixture(path);
         assert!((margins.left().inches() - 0.75).abs() < 1e-12);
@@ -345,7 +345,7 @@ mod tests {
     fn loads_libreoffice_metric_margin_fixture() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx"
         );
         let margins = parse_fixture(path);
         assert!((margins.left().millimeters() - 20.0).abs() < 1e-10);

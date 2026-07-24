@@ -120,7 +120,7 @@ fn resets_groups_and_inert_destinations() {
 #[test]
 fn parses_real_libreoffice_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sw/qa/writerfilter/rtftok/data");
+        .join("../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data");
     let floating =
         RtfDocument::parse(&std::fs::read_to_string(root.join("floating-table.rtf")).unwrap())
             .unwrap();

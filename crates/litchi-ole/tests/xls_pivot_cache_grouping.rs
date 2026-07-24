@@ -130,7 +130,7 @@ fn emits_and_reopens_exact_numeric_date_and_discrete_grouping_records() {
 
 #[test]
 fn reads_libreoffice_number_and_date_grouping_fixtures() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty/libreoffice-core/sc/qa/unit/data/xls");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/libreoffice-core/sc/qa/unit/data/xls");
     for file in ["pivottable_number_grouping.xls", "pivottable_dates_grouping.xls"] {
         let workbook = XlsWorkbook::new(std::fs::File::open(root.join(file)).unwrap()).unwrap();
         assert!(workbook.pivot_caches().iter().flat_map(|cache| cache.fields()).any(|field| field.grouping().is_some()));

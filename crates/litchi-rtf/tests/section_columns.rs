@@ -56,7 +56,7 @@ fn parses_bundled_libreoffice_equal_and_variable_column_fixtures() {
 
     let variable = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf100507.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf100507.rtf"
     ));
     let variable = RtfDocument::parse_bytes(variable).unwrap();
     assert!(variable.sections().iter().any(|section| {

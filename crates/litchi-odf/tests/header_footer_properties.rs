@@ -50,8 +50,8 @@ fn parses_all_standard_attributes_and_round_trips() {
 #[test]
 fn parses_odfdo_and_libreoffice_real_fixtures() {
     for path in [
-        "../../3rdparty/odfdo/tests/samples/test_flat_lo.fods",
-        "../../3rdparty/libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt",
+        "../../test-data/odfdo/tests/samples/test_flat_lo.fods",
+        "../../test-data/libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt",
     ] {
         let source =
             std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path))

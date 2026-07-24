@@ -81,9 +81,9 @@ fn malformed_ranges_controls_and_failed_updates_roll_back() {
 fn bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let fixtures = [
-        root.join("3rdparty/libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc"),
-        root.join("3rdparty/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc"),
-        root.join("3rdparty/libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc"),
+        root.join("test-data/libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc"),
+        root.join("test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc"),
+        root.join("test-data/libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc"),
     ];
     for path in fixtures {
         let original = std::fs::read(&path).unwrap();

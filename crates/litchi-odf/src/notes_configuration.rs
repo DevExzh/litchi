@@ -1144,7 +1144,7 @@ mod tests {
         );
 
         let fixture =
-            include_str!("../../../3rdparty/libreoffice-core/sw/qa/uitest/data/tdf145178.fodt");
+            include_str!("../../../test-data/libreoffice-core/sw/qa/uitest/data/tdf145178.fodt");
         let real = parse_notes_configurations(fixture).unwrap();
         assert_eq!(
             real.footnote.as_ref().unwrap().number_format,

@@ -489,7 +489,7 @@ mod tests {
 
     fn poi_package(name: &str) -> OpcPackage {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/poi/test-data/openxml4j")
+            .join("../../test-data/poi/test-data/openxml4j")
             .join(name);
         OpcPackage::from_bytes(&std::fs::read(path).unwrap()).unwrap()
     }
@@ -617,7 +617,7 @@ mod tests {
         let empty = extract_metadata(&poi_package("OPCCompliance_NoCoreProperties.xlsx")).unwrap();
         assert!(!empty.has_data());
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx",
+            "../../test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx",
         );
         assert!(OpcPackage::from_bytes(&std::fs::read(path).unwrap()).is_err());
     }

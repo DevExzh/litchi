@@ -64,7 +64,7 @@ fn worksheet_layout_round_trip() {
 #[test]
 fn reads_poi_column_width_fixture_defaults() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/spreadsheet/colwidth.xls");
+        .join("../../test-data/poi/test-data/spreadsheet/colwidth.xls");
     let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
     let layout = workbook.xls_worksheet(0).unwrap().sheet_layout();
     assert_eq!(layout.default_row_height_twips(), 255);

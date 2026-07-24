@@ -1219,7 +1219,7 @@ mod tests {
     #[test]
     fn loads_real_poi_and_synthetic_packages_and_validates_relationships() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..//3rdparty/poi/test-data/spreadsheet/62834.xlsx");
+            .join("../..//test-data/poi/test-data/spreadsheet/62834.xlsx");
         let workbook = crate::xlsx::Workbook::open(path).unwrap();
         let chain = workbook.calculation_chain().unwrap();
         assert_eq!(chain.cells().len(), 3);

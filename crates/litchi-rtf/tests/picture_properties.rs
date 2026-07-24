@@ -13,7 +13,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_and_round_trips_real_libreoffice_picture_properties() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/fdo85179.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/fdo85179.rtf"
     );
     let document = RtfDocument::parse_bytes(source).unwrap();
     assert_eq!(document.pictures().len(), 1);

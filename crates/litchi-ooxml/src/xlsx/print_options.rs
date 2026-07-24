@@ -293,7 +293,7 @@ mod tests {
     fn loads_poi_centering_fixture() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/45540_classic_Header.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/45540_classic_Header.xlsx"
         );
         let options = parse_fixture(path);
         assert!(options.horizontal_centered());
@@ -304,7 +304,7 @@ mod tests {
     fn loads_libreoffice_gridline_fixture() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx"
         );
         let options = parse_fixture(path);
         assert!(options.grid_lines());

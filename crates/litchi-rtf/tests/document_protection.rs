@@ -61,7 +61,7 @@ fn rejects_malformed_duplicate_or_misplaced_protection() {
 fn parses_real_libreoffice_protection_fixtures() {
     let root = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/"
+        "/../../test-data/libreoffice-core/sw/qa/extras"
     );
 
     let read_only = fs::read(format!("{root}rtfimport/data/read-only-protect.rtf")).unwrap();

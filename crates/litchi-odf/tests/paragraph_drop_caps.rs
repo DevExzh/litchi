@@ -34,7 +34,7 @@ fn parses_aliases_all_values_inheritance_and_round_trip() {
 fn parses_real_libreoffice_fixture() {
     let bytes = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt"
+        "/../../test-data/libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt"
     ));
     let flat = FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
     let parsed = flat.paragraph_style_drop_caps().unwrap();

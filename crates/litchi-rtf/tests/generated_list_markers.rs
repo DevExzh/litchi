@@ -97,7 +97,7 @@ fn isolated_marker(fixture: &[u8], marker: &[u8], header: &[u8]) -> Vec<u8> {
 #[test]
 fn parses_modern_and_legacy_bundled_libreoffice_markers() {
     let modern_fixture = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf"
     );
     let source = isolated_marker(modern_fixture, br"{\listtext", br"\ansi\ansicpg1252\uc1");
     let document = RtfDocument::parse_bytes(&source).unwrap();
@@ -108,7 +108,7 @@ fn parses_modern_and_legacy_bundled_libreoffice_markers() {
     assert_eq!(marker.position, 1);
 
     let legacy_fixture = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-4.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-4.rtf"
     );
     let source = isolated_marker(legacy_fixture, br"{\pntext", br"\ansi\ansicpg1252\uc1");
     let document = RtfDocument::parse_bytes(&source).unwrap();

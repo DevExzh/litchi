@@ -1984,31 +1984,31 @@ mod tests {
     fn parses_poi_and_libreoffice_fixtures() {
         let cases = [
             (
-                "3rdparty/poi/test-data/spreadsheet/DataValidationListTooLong.xlsx",
+                "test-data/poi/test-data/spreadsheet/DataValidationListTooLong.xlsx",
                 1usize,
             ),
             (
-                "3rdparty/poi/test-data/spreadsheet/DataValidations-49244.xlsx",
+                "test-data/poi/test-data/spreadsheet/DataValidations-49244.xlsx",
                 52,
             ),
             (
-                "3rdparty/poi/test-data/spreadsheet/dataValidationTableRange.xlsx",
+                "test-data/poi/test-data/spreadsheet/dataValidationTableRange.xlsx",
                 5,
             ),
             (
-                "3rdparty/poi/test-data/spreadsheet/DataValidationEvaluations.xlsx",
+                "test-data/poi/test-data/spreadsheet/DataValidationEvaluations.xlsx",
                 17,
             ),
             (
-                "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx",
+                "test-data/libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx",
                 1,
             ),
             (
-                "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx",
+                "test-data/libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx",
                 1,
             ),
             (
-                "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx",
+                "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx",
                 1,
             ),
         ];

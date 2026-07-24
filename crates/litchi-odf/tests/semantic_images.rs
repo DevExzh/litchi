@@ -7,20 +7,20 @@ use zip::CompressionMethod;
 use zip::write::SimpleFileOptions;
 
 const ODT_LINK: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sw/qa/extras/odfimport/data/draw-image-link.fodt"
+    "../../../test-data/libreoffice-core/sw/qa/extras/odfimport/data/draw-image-link.fodt"
 );
 const ODT_INLINE: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sw/qa/extras/odfimport/data/draw-image-embedded.fodt"
+    "../../../test-data/libreoffice-core/sw/qa/extras/odfimport/data/draw-image-embedded.fodt"
 );
 const ODS_LINK: &str =
-    include_str!("../../../3rdparty/libreoffice-core/sc/qa/unit/data/draw-image-link.fods");
+    include_str!("../../../test-data/libreoffice-core/sc/qa/unit/data/draw-image-link.fods");
 const ODP_LINK: &str =
-    include_str!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/draw-image-link.fodp");
+    include_str!("../../../test-data/libreoffice-core/sd/qa/unit/data/draw-image-link.fodp");
 const ODT_HYPERLINK_ALT: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/image-hyperlink-alttext.fodt"
+    "../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/image-hyperlink-alttext.fodt"
 );
 const ODP_ALTERNATIVE_TEXT: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/alternativeText.fodp"
+    "../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/alternativeText.fodp"
 );
 
 #[test]

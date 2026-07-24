@@ -155,11 +155,11 @@ fn mutations_drop_stale_signatures() {
 #[test]
 fn libreoffice_ole_fixtures_remain_mutable_without_resolution() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
-    let mut document = Document::open(format!("{root}3rdparty/libreoffice-core/sw/qa/uibase/shells/data/ole-save-preview-update.odt")).unwrap();
+    let mut document = Document::open(format!("{root}test-data/libreoffice-core/sw/qa/uibase/shells/data/ole-save-preview-update.odt")).unwrap();
     assert!(!document.embedded_objects().unwrap().is_empty());
     document.replace_embedded_object(0, &linked(OdfEmbeddedResourceKind::ObjectOle, "https://example.invalid/not-fetched")).unwrap();
     assert!(matches!(&document.embedded_objects().unwrap()[0].source, OdfEmbeddedObjectSource::Linked { .. }));
-    let mut slides = Presentation::open(format!("{root}3rdparty/libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp")).unwrap();
+    let mut slides = Presentation::open(format!("{root}test-data/libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp")).unwrap();
     if !slides.embedded_objects().unwrap().is_empty() {
         slides.remove_embedded_object(0).unwrap();
         let _ = Presentation::from_bytes(slides.to_bytes().unwrap()).unwrap();

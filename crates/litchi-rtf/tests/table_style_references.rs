@@ -112,7 +112,7 @@ fn canonical_writer_round_trips_outer_and_nested_row_references_stably() {
 #[test]
 fn parses_libreoffice_table_style_declaration_and_body_references() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf"
     );
     let document = RtfDocument::parse_bytes(source).unwrap();
     assert!(

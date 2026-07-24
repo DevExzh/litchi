@@ -23,7 +23,7 @@ fn parses_full_comment_metadata_range_unicode_and_hidden_body() {
 #[test]
 fn parses_bundled_libreoffice_comment_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data");
+        .join("../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data");
     if !root.exists() {
         return;
     }

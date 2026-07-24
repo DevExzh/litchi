@@ -1753,7 +1753,7 @@ mod tests {
     #[test]
     fn parses_libreoffice_flat_conditional_style_fixture_when_available() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/libreoffice-core/sc/qa/unit/data/functions/financial/fods/couppcd.fods",
+            "../../test-data/libreoffice-core/sc/qa/unit/data/functions/financial/fods/couppcd.fods",
         );
         if !path.exists() {
             return;

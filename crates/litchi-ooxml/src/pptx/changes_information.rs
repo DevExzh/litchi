@@ -1185,7 +1185,7 @@ mod tests {
     fn loads_powerpoint_and_libreoffice_changes_packages() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let powerpoint = OpcPackage::open(
-            root.join("3rdparty/poi/test-data/slideshow/ArtisticEffectSample.pptx"),
+            root.join("test-data/poi/test-data/slideshow/ArtisticEffectSample.pptx"),
         )
         .unwrap();
         let loaded = load_changes_information(&powerpoint).unwrap().unwrap();
@@ -1201,7 +1201,7 @@ mod tests {
         );
 
         let libreoffice = OpcPackage::open(
-            root.join("3rdparty/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx"),
+            root.join("test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx"),
         )
         .unwrap();
         let loaded = load_changes_information(&libreoffice).unwrap().unwrap();

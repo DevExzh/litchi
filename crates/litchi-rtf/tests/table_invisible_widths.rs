@@ -164,7 +164,7 @@ fn rejects_malformed_duplicate_unpaired_and_out_of_range_controls() {
 
 #[test]
 fn parses_real_libreoffice_unit_only_invisible_widths() {
-    let path=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf108505_fieldCharFormat2.rtf");
+    let path=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf108505_fieldCharFormat2.rtf");
     let fixture = std::fs::read_to_string(path).unwrap();
     let pair = "\\trftsWidthB3\\trftsWidthA3";
     let marker = fixture.find(pair).unwrap();

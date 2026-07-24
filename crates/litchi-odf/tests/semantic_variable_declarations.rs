@@ -239,11 +239,11 @@ fn packaged_content_styles_and_every_specialized_facade_expose_declarations() {
 fn parses_bundled_flat_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let fixtures = [
-        "3rdparty/libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt",
-        "3rdparty/libreoffice-core/sw/qa/extras/layout/data/user-field-type-language.fodt",
-        "3rdparty/libreoffice-core/sw/qa/extras/uiwriter/data/tdf91801.fodt",
-        "3rdparty/libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt",
-        "3rdparty/odfdo/tests/samples/images.fodt",
+        "test-data/libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt",
+        "test-data/libreoffice-core/sw/qa/extras/layout/data/user-field-type-language.fodt",
+        "test-data/libreoffice-core/sw/qa/extras/uiwriter/data/tdf91801.fodt",
+        "test-data/libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt",
+        "test-data/odfdo/tests/samples/images.fodt",
     ];
     for fixture in fixtures {
         let path = root.join(fixture);
@@ -262,8 +262,8 @@ fn parses_bundled_flat_fixtures() {
 fn parses_bundled_odfpy_and_odfdo_package_oracles() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for fixture in [
-        "3rdparty/odfpy/tests/examples/simpletable.odt",
-        "3rdparty/odfdo/tests/samples/variable.odt",
+        "test-data/odfpy/tests/examples/simpletable.odt",
+        "test-data/odfdo/tests/samples/variable.odt",
     ] {
         let path = root.join(fixture);
         if !path.exists() {
@@ -276,7 +276,7 @@ fn parses_bundled_odfpy_and_odfdo_package_oracles() {
         assert!(!declarations.groups.is_empty(), "{fixture}");
     }
 
-    let example = root.join("3rdparty/odfdo/tests/samples/example.xml");
+    let example = root.join("test-data/odfdo/tests/samples/example.xml");
     if example.exists() {
         let xml = std::fs::read_to_string(example).unwrap();
         let bytes = package("application/vnd.oasis.opendocument.text", &xml, None);

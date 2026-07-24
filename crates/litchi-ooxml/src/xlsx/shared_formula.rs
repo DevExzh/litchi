@@ -680,7 +680,7 @@ mod tests {
     #[test]
     fn poi_and_libreoffice_fixture_oracles_expand() {
         let poi = parse_fixture(
-            include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/shared_formulas.xlsx"),
+            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/shared_formulas.xlsx"),
             "/xl/worksheets/sheet1.xml",
         )
         .unwrap();
@@ -689,7 +689,7 @@ mod tests {
 
         let shifted = parse_fixture(
             include_bytes!(
-                "../../../../3rdparty/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx"
+                "../../../../test-data/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx"
             ),
             "/xl/worksheets/sheet1.xml",
         )
@@ -697,7 +697,7 @@ mod tests {
         assert_eq!(formula(&shifted.cells[&5][&5]).0, "SUM(E2:E4)");
 
         let basic = parse_fixture(
-            include_bytes!("../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx"),
+            include_bytes!("../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx"),
             "/xl/worksheets/sheet1.xml",
         )
         .unwrap();
@@ -705,7 +705,7 @@ mod tests {
         assert_eq!(formula(&basic.cells[&19][&2]).0, "A19*10");
 
         let updated = parse_fixture(
-            include_bytes!("../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx"),
+            include_bytes!("../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx"),
             "/xl/worksheets/sheet1.xml",
         )
         .unwrap();
@@ -713,7 +713,7 @@ mod tests {
         assert_eq!(formula(&updated.cells[&1][&5]).0, "E30+1");
 
         let text = parse_fixture(
-            include_bytes!("../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx"),
+            include_bytes!("../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx"),
             "/xl/worksheets/sheet1.xml",
         )
         .unwrap();
@@ -723,7 +723,7 @@ mod tests {
         );
 
         parse_fixture(
-            include_bytes!("../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx"),
+            include_bytes!("../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx"),
             "/xl/worksheets/sheet1.xml",
         )
         .unwrap();
@@ -732,8 +732,8 @@ mod tests {
     #[test]
     fn poi_intersecting_range_regression_fixtures_resolve_by_si() {
         for bytes in [
-            include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx").as_slice(),
-            include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx").as_slice(),
+            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx").as_slice(),
+            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx").as_slice(),
         ] {
             parse_fixture(bytes, "/xl/worksheets/sheet1.xml").unwrap();
         }

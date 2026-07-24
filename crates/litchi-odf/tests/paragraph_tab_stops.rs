@@ -59,7 +59,7 @@ fn parses_aliases_all_values_and_deterministic_round_trip() {
 fn parses_odfpy_and_libreoffice_reference_documents() {
     let odfpy = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/odfpy/xml2odf/definitionlists.xml"
+        "/../../test-data/odfpy/xml2odf/definitionlists.xml"
     ));
     let parsed = parse_paragraph_style_tab_stops(odfpy).unwrap();
     assert!(parsed.styles.iter().any(|style| {
@@ -71,7 +71,7 @@ fn parses_odfpy_and_libreoffice_reference_documents() {
 
     let libreoffice = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/extras/source/autotext/lang/cs/template/HLC/styles.xml"
+        "/../../test-data/libreoffice-core/extras/source/autotext/lang/cs/template/HLC/styles.xml"
     ));
     let parsed = parse_paragraph_style_tab_stops(libreoffice).unwrap();
     assert!(parsed.styles.iter().any(|style| {

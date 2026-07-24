@@ -867,7 +867,7 @@ mod tests {
     fn reads_libreoffice_and_poi_fixtures() {
         let color = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx"
         )));
         assert_eq!(
             color.tab_color().unwrap().argb(),
@@ -876,14 +876,14 @@ mod tests {
 
         let page = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx"
         )));
         assert!(!page.filter_mode());
         assert!(!page.page_setup_properties().unwrap().fit_to_page());
 
         let outline = fixture(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/poi/test-data/spreadsheet/66365.xlsx"
+            "/../../test-data/poi/test-data/spreadsheet/66365.xlsx"
         )));
         assert!(!outline.outline_properties().unwrap().summary_below());
         assert!(!outline.outline_properties().unwrap().summary_right());

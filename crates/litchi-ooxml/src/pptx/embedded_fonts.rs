@@ -1610,7 +1610,7 @@ mod tests {
     #[test]
     fn loads_libreoffice_and_poi_reference_packages() {
         let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
-            root().join("3rdparty/libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx"),
+            root().join("test-data/libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx"),
         )
         .unwrap();
         let mut libreoffice = package(EmbeddedFontConformance::Transitional);
@@ -1647,7 +1647,7 @@ mod tests {
             36_187
         );
         let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
-            root().join("3rdparty/poi/test-data/slideshow/placeholder-layout-color.pptx"),
+            root().join("test-data/poi/test-data/slideshow/placeholder-layout-color.pptx"),
         )
         .unwrap();
         let mut poi = package(EmbeddedFontConformance::Transitional);

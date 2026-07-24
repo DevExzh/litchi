@@ -1007,7 +1007,7 @@ mod tests {
     fn opens_poi_date_and_epoch_fixtures() {
         let dates = XlsWorkbook::new(
             File::open(fixture(
-                "3rdparty/poi/test-data/spreadsheet/DateFormats.xls",
+                "test-data/poi/test-data/spreadsheet/DateFormats.xls",
             ))
             .unwrap(),
         )
@@ -1031,11 +1031,11 @@ mod tests {
 
         for (path, expected) in [
             (
-                "3rdparty/poi/test-data/spreadsheet/1900DateWindowing.xls",
+                "test-data/poi/test-data/spreadsheet/1900DateWindowing.xls",
                 XlsDateSystem::Excel1900,
             ),
             (
-                "3rdparty/poi/test-data/spreadsheet/1904DateWindowing.xls",
+                "test-data/poi/test-data/spreadsheet/1904DateWindowing.xls",
                 XlsDateSystem::Excel1904,
             ),
         ] {
@@ -1077,8 +1077,8 @@ mod tests {
     #[test]
     fn opens_libreoffice_format_fixtures_with_ordered_xfs() {
         for path in [
-            "3rdparty/libreoffice-core/sc/qa/unit/data/xls/formats.xls",
-            "3rdparty/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls",
+            "test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls",
+            "test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls",
         ] {
             let workbook = XlsWorkbook::new(File::open(fixture(path)).unwrap()).unwrap();
             assert!(workbook.extended_formats().len() >= 16, "{path}");

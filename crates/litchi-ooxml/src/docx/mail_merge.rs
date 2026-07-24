@@ -1579,7 +1579,7 @@ mod tests {
     #[test]
     fn opens_libreoffice_and_synthetic_packages_without_accessing_sources() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..//3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx");
+            .join("../..//test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx");
         let package = Package::open(fixture).unwrap();
         let settings = package.document().unwrap().settings().unwrap().unwrap();
         let merge = settings.mail_merge().unwrap();

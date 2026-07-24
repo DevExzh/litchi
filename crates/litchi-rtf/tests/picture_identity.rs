@@ -138,7 +138,7 @@ fn isolated_picture(fixture: &[u8], required: &[u8]) -> Vec<u8> {
 #[test]
 fn parses_multiple_bundled_libreoffice_identity_fixtures() {
     let uid_only = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf127806.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf127806.rtf"
     );
     let source = isolated_picture(uid_only, br"\blipuid");
     let document = RtfDocument::parse_bytes(&source).unwrap();
@@ -158,7 +158,7 @@ fn parses_multiple_bundled_libreoffice_identity_fixtures() {
     );
 
     let with_upi = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf153613_inlineAfterPgBreak.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf153613_inlineAfterPgBreak.rtf"
     );
     let source = isolated_picture(with_upi, br"\blipupi2");
     let document = RtfDocument::parse_bytes(&source).unwrap();

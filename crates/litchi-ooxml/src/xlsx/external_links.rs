@@ -1916,7 +1916,7 @@ mod tests {
     #[test]
     fn loads_poi_ordered_external_workbook_reference() {
         let package = litchi_opc::OpcPackage::from_bytes(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/link-external-workbook-b.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/link-external-workbook-b.xlsx"
         ))
         .unwrap();
         let workbook = crate::xlsx::Workbook::new(package).unwrap();
@@ -1933,7 +1933,7 @@ mod tests {
     #[test]
     fn loads_libreoffice_sparse_external_cache() {
         let package = litchi_opc::OpcPackage::from_bytes(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx"
         ))
         .unwrap();
         let workbook = crate::xlsx::Workbook::new(package).unwrap();
@@ -1960,7 +1960,7 @@ mod tests {
     #[test]
     fn unrelated_modified_save_preserves_external_part_and_relationship() {
         const FIXTURE: &[u8] = include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx"
         );
         let original = litchi_opc::OpcPackage::from_bytes(FIXTURE).unwrap();
         let original_workbook =

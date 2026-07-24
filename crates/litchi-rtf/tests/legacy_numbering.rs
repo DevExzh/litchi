@@ -60,7 +60,7 @@ fn rejects_malformed_legacy_section_numbering() {
 #[test]
 fn parses_real_libreoffice_pnseclvl_fixture() {
     let doc = RtfDocument::parse_bytes(include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf"
     ))
     .unwrap();
     let numbering = doc.legacy_section_numbering();

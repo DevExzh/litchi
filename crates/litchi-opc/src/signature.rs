@@ -2209,19 +2209,19 @@ mod tests {
     use super::*;
     use crate::part::BlobPart;
     const DOCX: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/xmldsign/hello-world-signed.docx");
+        include_bytes!("../../../test-data/poi/test-data/xmldsign/hello-world-signed.docx");
     const XLSX: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/xmldsign/hello-world-signed.xlsx");
+        include_bytes!("../../../test-data/poi/test-data/xmldsign/hello-world-signed.xlsx");
     const PPTX: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/xmldsign/hello-world-signed.pptx");
+        include_bytes!("../../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx");
     const TWICE: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/xmldsign/hello-world-signed-twice.docx");
+        include_bytes!("../../../test-data/poi/test-data/xmldsign/hello-world-signed-twice.docx");
     const MICROSOFT_DOCX: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/xmldsign/ms-office-2010-signed.docx");
+        include_bytes!("../../../test-data/poi/test-data/xmldsign/ms-office-2010-signed.docx");
     const MICROSOFT_XLSX: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/xmldsign/ms-office-2010-signed.xlsx");
+        include_bytes!("../../../test-data/poi/test-data/xmldsign/ms-office-2010-signed.xlsx");
     const MICROSOFT_PPTX: &[u8] =
-        include_bytes!("../../../3rdparty/poi/test-data/xmldsign/ms-office-2010-signed.pptx");
+        include_bytes!("../../../test-data/poi/test-data/xmldsign/ms-office-2010-signed.pptx");
     fn valid(bytes: &[u8], count: usize) {
         let p = OpcPackage::from_bytes(bytes).unwrap();
         let reports = p

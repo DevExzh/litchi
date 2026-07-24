@@ -2812,7 +2812,7 @@ mod tests {
 
     #[test]
     fn libreoffice_toc_fixture_round_trips_as_inert_markup() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty/libreoffice-core/sw/qa/extras/layout/data/toc-inline-heading-order.fodt");
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/libreoffice-core/sw/qa/extras/layout/data/toc-inline-heading-order.fodt");
         let xml = std::fs::read_to_string(path).unwrap();
         let indexes = validated_indexes(&xml).unwrap();
         assert!(!indexes.is_empty());
@@ -2921,7 +2921,7 @@ mod tests {
 
     #[test]
     fn libreoffice_table_index_source_round_trips_after_required_body_is_supplied() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty/libreoffice-core/sw/qa/extras/uiwriter/data/IndexElementsInHiddenSections.fodt");
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/libreoffice-core/sw/qa/extras/uiwriter/data/IndexElementsInHiddenSections.fodt");
         let producer_xml = std::fs::read_to_string(path).unwrap();
         assert!(producer_xml.contains("<text:table-index-source text:use-caption=\"false\""));
         let start = producer_xml.find("<text:table-index>").unwrap();
@@ -3041,7 +3041,7 @@ mod tests {
     #[test]
     fn libreoffice_bibliography_and_configuration_round_trip_inertly() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt",
+            "../../test-data/libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt",
         );
         let xml = std::fs::read_to_string(path).unwrap();
         assert!(

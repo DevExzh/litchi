@@ -89,7 +89,7 @@ fn rejects_malformed_list_roots_ids_and_overrides() {
 #[test]
 fn parses_rare_libreoffice_list_fixtures() {
     let picture = RtfDocument::parse_bytes(include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf"
     ))
     .unwrap();
     assert!(picture.list_table().picture_bullet_count > 0);
@@ -103,7 +103,7 @@ fn parses_rare_libreoffice_list_fixtures() {
     );
 
     let style = RtfDocument::parse_bytes(include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf125719_case_2.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf125719_case_2.rtf"
     ))
     .unwrap();
     assert!(
@@ -115,7 +115,7 @@ fn parses_rare_libreoffice_list_fixtures() {
     );
 
     let starts = RtfDocument::parse_bytes(include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/num-override-start.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/num-override-start.rtf"
     ))
     .unwrap();
     assert!(starts.list_override_table().overrides().iter().any(

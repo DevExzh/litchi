@@ -606,7 +606,7 @@ mod tests {
     #[test]
     fn reads_libreoffice_document_signature_metadata_without_verification() {
         let bytes = include_bytes!(
-            "../../../3rdparty/libreoffice-core/xmlsecurity/qa/unit/signing/data/signed_with_x509certificate_chain.odt"
+            "../../../test-data/libreoffice-core/xmlsecurity/qa/unit/signing/data/signed_with_x509certificate_chain.odt"
         );
         let package = OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
         let signatures = package.digital_signatures().unwrap();

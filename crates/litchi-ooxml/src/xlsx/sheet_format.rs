@@ -573,7 +573,7 @@ mod tests {
     fn reads_libreoffice_hidden_default_rows_fixture() {
         let value = fixture_sheet(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx"
         )));
         assert_eq!(value.default_row_height(), 15.0);
         assert!(value.zero_height());
@@ -583,7 +583,7 @@ mod tests {
     fn reads_libreoffice_custom_dimensions_fixture() {
         let value = fixture_sheet(include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx"
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx"
         )));
         assert_eq!(value.default_column_width(), Some(21.85546875));
         assert_eq!(value.default_row_height(), 39.0);

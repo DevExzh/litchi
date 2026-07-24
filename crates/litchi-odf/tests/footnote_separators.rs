@@ -32,7 +32,7 @@ fn parses_aliases_and_writes_a_deterministic_self_contained_fragment() {
 fn parses_bundled_libreoffice_flat_fixture() {
     let fixture = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt"
+        "/../../test-data/libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt"
     ));
     let document = FlatOpenDocument::from_reader(Cursor::new(fixture)).unwrap();
     let separators = document.style_footnote_separators().unwrap();

@@ -1372,7 +1372,7 @@ mod tests {
     #[test]
     fn poi_placeholders_and_strict_roundtrip() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/poi/test-data/document/Bug54849.docx"
+            "../../../../test-data/poi/test-data/document/Bug54849.docx"
         ));
         assert_eq!(v.entries.len(), 3);
         let p = v.entries[0].properties.as_ref().unwrap();
@@ -1384,7 +1384,7 @@ mod tests {
     #[test]
     fn libreoffice_multiple_autotext_and_tables_stay_inert() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx"
+            "../../../../test-data/libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx"
         ));
         assert_eq!(v.entries.len(), 3);
         assert_eq!(
@@ -1405,7 +1405,7 @@ mod tests {
     #[test]
     fn libreoffice_empty_glossary_is_valid() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx"
+            "../../../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx"
         ));
         assert!(v.entries.is_empty());
         assert!(v.to_xml(false).is_ok());

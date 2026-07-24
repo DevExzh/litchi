@@ -1050,12 +1050,12 @@ fn limit(label: &str) -> OoxmlError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const POI: &[u8] = include_bytes!("../../../../3rdparty/poi/test-data/document/61745.docx");
+    const POI: &[u8] = include_bytes!("../../../../test-data/poi/test-data/document/61745.docx");
     const LO_INTERNAL: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx"
+        "../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx"
     );
     const LO_EXTERNAL: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx"
+        "../../../../test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx"
     );
     fn document() -> PackURI {
         PackURI::new("/word/document.xml").unwrap()

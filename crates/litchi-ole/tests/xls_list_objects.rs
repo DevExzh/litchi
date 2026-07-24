@@ -72,7 +72,7 @@ fn writer_custom_list_object_round_trips_through_reader() {
 #[test]
 fn reads_excel_producer_feature11_and_list12_tables() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls");
+        .join("../../test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls");
     let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
     let mut found = None;
     let mut observed = Vec::new();
@@ -232,7 +232,7 @@ fn headerless_internal_feature12_and_table_sort_continuations_round_trip_in_orde
 #[test]
 fn producer_table_sort_continue_frt12_chain_remains_attached() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls");
+        .join("../../test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls");
     let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
     let mut found = false;
     for index in 0..workbook.worksheet_count() {

@@ -392,9 +392,9 @@ mod tests {
 
     #[test]
     fn bundled_named_and_database_fixtures_parse_when_available() {
-        let named = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/odfdo/tests/samples/simple_table_named_range.ods"));
+        let named = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../test-data/odfdo/tests/samples/simple_table_named_range.ods"));
         if named.exists() { assert!(!Spreadsheet::open(named).unwrap().named_definitions().is_empty()); }
-        let database = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/sc/qa/extras/testdocuments/ScDatabaseRangeObj.ods"));
+        let database = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../test-data/libreoffice-core/sc/qa/extras/testdocuments/ScDatabaseRangeObj.ods"));
         if database.exists() { assert!(!Spreadsheet::open(database).unwrap().database_ranges().is_empty()); }
     }
 }

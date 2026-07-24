@@ -328,7 +328,7 @@ fn ignores_section_note_controls_after_the_parsed_document_group() {
 #[test]
 fn parses_named_libreoffice_section_note_option_fixtures() {
     let uiwriter = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/uiwriter/data/tdf147006.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/uiwriter/data/tdf147006.rtf"
     );
     let document = RtfDocument::parse_bytes(uiwriter).unwrap();
     let options = document.sections()[0].properties.note_options;
@@ -339,7 +339,7 @@ fn parses_named_libreoffice_section_note_option_fixtures() {
     );
 
     let tracking = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/text-change-tracking.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/text-change-tracking.rtf"
     );
     let document = RtfDocument::parse_bytes(tracking).unwrap();
     let options = document.sections()[0].properties.note_options;
@@ -350,7 +350,7 @@ fn parses_named_libreoffice_section_note_option_fixtures() {
     );
 
     let header = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/writerfilter/dmapper/data/NoFirstPageHeadFooter.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/NoFirstPageHeadFooter.rtf"
     );
     let document = RtfDocument::parse_bytes(header).unwrap();
     assert!(document.sections().iter().any(|section| {

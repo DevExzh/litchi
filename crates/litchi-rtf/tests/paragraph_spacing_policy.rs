@@ -64,7 +64,7 @@ fn stylesheet_and_deterministic_writer_round_trip() {
 #[test]
 fn parses_real_libreoffice_stylesheet_fixture() {
     let bytes = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf107480.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf107480.rtf"
     );
     let marker = br"{\stylesheet";
     let start = bytes
@@ -99,7 +99,7 @@ fn parses_real_libreoffice_stylesheet_fixture() {
         .spacing_policy;
     assert!(p.automatic_before && p.automatic_after);
     let list_fixture = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/fdo77996.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo77996.rtf"
     );
     let sequence = br"\lisb0 \sa100 \lisa0";
     assert!(

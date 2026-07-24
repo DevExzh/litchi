@@ -445,7 +445,7 @@ mod tests {
         assert_eq!(semantic, vec![note.clone()]);
 
         let fixture = include_str!(
-            "../../../../../3rdparty/libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/footnote.fodt"
+            "../../../../../test-data/libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/footnote.fodt"
         );
         let inserted = insert_note_xml(fixture, 0, &note).unwrap();
         let inserted_notes = parse_notes(&inserted).unwrap();

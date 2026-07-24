@@ -985,9 +985,9 @@ mod tests {
     fn libreoffice_point_range_and_bibliography_marks_round_trip() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         for relative in [
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt",
-            "3rdparty/libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt",
-            "3rdparty/libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt",
+            "test-data/libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt",
+            "test-data/libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt",
         ] {
             let xml = std::fs::read_to_string(root.join(relative)).unwrap();
             let marks = validated_marks(&xml).unwrap();

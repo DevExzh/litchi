@@ -7,19 +7,19 @@ use zip::CompressionMethod;
 use zip::write::SimpleFileOptions;
 
 const ODT_REMOTE: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sw/qa/extras/odfimport/data/draw-object-link.fodt"
+    "../../../test-data/libreoffice-core/sw/qa/extras/odfimport/data/draw-object-link.fodt"
 );
 const ODS_REMOTE: &str =
-    include_str!("../../../3rdparty/libreoffice-core/sc/qa/unit/data/draw-object-link.fods");
+    include_str!("../../../test-data/libreoffice-core/sc/qa/unit/data/draw-object-link.fods");
 const ODP_REMOTE: &str =
-    include_str!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/draw-object-link.fodp");
+    include_str!("../../../test-data/libreoffice-core/sd/qa/unit/data/draw-object-link.fodp");
 const ODT_MATH: &str = include_str!(
-    "../../../3rdparty/libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt"
+    "../../../test-data/libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt"
 );
 const ODP_MATH: &str =
-    include_str!("../../../3rdparty/libreoffice-core/sd/qa/unit/data/odp/Math.fodp");
+    include_str!("../../../test-data/libreoffice-core/sd/qa/unit/data/odp/Math.fodp");
 const ODT_CHART: &str =
-    include_str!("../../../3rdparty/libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt");
+    include_str!("../../../test-data/libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt");
 
 #[test]
 fn libreoffice_remote_objects_remain_typed_and_inert_across_families() {

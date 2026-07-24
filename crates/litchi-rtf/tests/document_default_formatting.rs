@@ -58,13 +58,13 @@ fn parses_preserves_order_and_round_trips_defaults_inertly() {
 #[test]
 fn parses_real_producer_default_destinations() {
     let first = RtfDocument::parse_bytes(include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/core/text/data/A011-charheight.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/core/text/data/A011-charheight.rtf"
     ))
     .unwrap();
     assert!(first.default_formatting().character().is_some());
     assert!(first.default_formatting().paragraph().is_some());
     let cjk = RtfDocument::parse_bytes(include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/cjklist24.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/cjklist24.rtf"
     ))
     .unwrap();
     assert_eq!(

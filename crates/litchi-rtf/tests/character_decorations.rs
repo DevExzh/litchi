@@ -4,7 +4,7 @@ use litchi_rtf::{CharacterBorderStyle, RtfDocument, RtfWriter};
 fn parses_libreoffice_character_border_and_shading_fixtures() {
     let border_source =
         std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/hidden-para-separator.rtf",
+            "../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/hidden-para-separator.rtf",
         ))
         .unwrap();
     let border_document = RtfDocument::parse(&border_source).unwrap();
@@ -17,7 +17,7 @@ fn parses_libreoffice_character_border_and_shading_fixtures() {
 
     let shading_source = std::fs::read_to_string(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/165717.rtf"),
+            .join("../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/165717.rtf"),
     )
     .unwrap();
     let shading_document = RtfDocument::parse(&shading_source).unwrap();

@@ -70,7 +70,7 @@ fn typed_api_round_trips_in_specification_order_and_clears_passively() {
 #[test]
 fn parses_bundled_producer_flags_without_applying_compatibility_layout() {
     let fixture =
-        include_bytes!("../../../3rdparty/libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf");
+        include_bytes!("../../../test-data/libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf");
     let document = RtfDocument::parse_bytes(fixture).unwrap();
     assert!(
         document

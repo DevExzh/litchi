@@ -71,7 +71,7 @@ fn builder_and_mutable_round_trip_inert_sheet_images() {
 fn parses_libreoffice_table_shapes_references_alternatives_and_invalid_forms() {
     let source = std::fs::read_to_string(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/sc/qa/unit/data/draw-image-link.fods"),
+            .join("../../test-data/libreoffice-core/sc/qa/unit/data/draw-image-link.fods"),
     )
     .unwrap();
     let package = package_with_content(&source);

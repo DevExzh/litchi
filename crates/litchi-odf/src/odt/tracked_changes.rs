@@ -972,7 +972,7 @@ mod tests {
     #[test]
     fn parses_a_libreoffice_flat_document_before_serializing() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/sw/qa/uitest/data/redline-autocorrect.fodt");
+            .join("../../test-data/libreoffice-core/sw/qa/uitest/data/redline-autocorrect.fodt");
         let Ok(xml) = std::fs::read_to_string(path) else {
             return;
         };

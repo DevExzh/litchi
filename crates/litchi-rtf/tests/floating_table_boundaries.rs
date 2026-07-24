@@ -3,7 +3,7 @@ use litchi_rtf::{RtfDocument, RtfWriter};
 #[test]
 fn splits_real_libreoffice_floating_tables_at_non_table_paragraphs() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-        "../../3rdparty/libreoffice-core/sw/qa/writerfilter/rtftok/data/floattable-tbl-overlap.rtf",
+        "../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data/floattable-tbl-overlap.rtf",
     );
     let document = RtfDocument::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
     assert_eq!(document.tables().len(), 2);

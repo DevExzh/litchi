@@ -890,9 +890,9 @@ fn limit(label: &str) -> OoxmlError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const POI: &[u8] = include_bytes!("../../../../3rdparty/poi/test-data/slideshow/prProps.pptx");
+    const POI: &[u8] = include_bytes!("../../../../test-data/poi/test-data/slideshow/prProps.pptx");
     const LO: &[u8] =
-        include_bytes!("../../../../3rdparty/libreoffice-core/oox/qa/unit/data/tdf131082.pptx");
+        include_bytes!("../../../../test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx");
     fn presentation() -> PackURI {
         PackURI::new("/ppt/presentation.xml").unwrap()
     }

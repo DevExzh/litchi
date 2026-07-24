@@ -876,7 +876,7 @@ mod tests {
     #[test]
     fn parses_libreoffice_range_and_expression_fixtures_when_available() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/sc/qa/unit/data/functions");
+            .join("../../test-data/libreoffice-core/sc/qa/unit/data/functions");
         for (relative, expected) in [
             ("financial/fods/yielddisc.fods", "days"),
             ("mathematical/fods/aggregate.fods", "columnOne"),

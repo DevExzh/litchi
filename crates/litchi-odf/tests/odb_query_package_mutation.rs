@@ -141,7 +141,7 @@ fn packaged_query_insert_replace_remove_preserves_every_unrelated_part() {
 #[test]
 fn mutates_real_libreoffice_query_package_without_touching_embedded_resources() {
     let bytes = include_bytes!(
-        "../../../3rdparty/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb"
+        "../../../test-data/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb"
     )
     .to_vec();
     let bytes = remove_empty_scripts_from_fixture(bytes);

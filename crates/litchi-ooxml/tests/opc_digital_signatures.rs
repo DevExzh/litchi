@@ -2,11 +2,11 @@ use litchi_ooxml::{OpcPackage, SignatureVerificationPolicy, VerificationStatus};
 use std::io::Cursor;
 
 const DOCX: &[u8] =
-    include_bytes!("../../../3rdparty/poi/test-data/xmldsign/ms-office-2010-signed.docx");
+    include_bytes!("../../../test-data/poi/test-data/xmldsign/ms-office-2010-signed.docx");
 const XLSX: &[u8] =
-    include_bytes!("../../../3rdparty/poi/test-data/xmldsign/ms-office-2010-signed.xlsx");
+    include_bytes!("../../../test-data/poi/test-data/xmldsign/ms-office-2010-signed.xlsx");
 const PPTX: &[u8] =
-    include_bytes!("../../../3rdparty/poi/test-data/xmldsign/ms-office-2010-signed.pptx");
+    include_bytes!("../../../test-data/poi/test-data/xmldsign/ms-office-2010-signed.pptx");
 
 fn assert_valid(reports: &[litchi_ooxml::DigitalSignatureVerification]) {
     assert_eq!(reports.len(), 1);

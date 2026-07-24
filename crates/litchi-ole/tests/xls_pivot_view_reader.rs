@@ -81,7 +81,7 @@ fn writer_view_records_reopen_with_identical_layout_and_cache_link() {
 #[test]
 fn libreoffice_pivot_views_parse_with_cache_links() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sc/qa/unit/data/xls");
+        .join("../../test-data/libreoffice-core/sc/qa/unit/data/xls");
     for name in ["pivottable_number_grouping.xls", "pivottable_dates_grouping.xls"] {
         let workbook = XlsWorkbook::new(std::fs::File::open(root.join(name)).unwrap()).unwrap();
         let tables = (0..workbook.sheets().len())
@@ -139,7 +139,7 @@ fn pivot_view_editor_regenerates_grouping_cache_and_preserves_fixture_noops() {
     assert!(matches!(workbook.pivot_caches()[0].fields()[1].grouping(), Some(PivotCacheGrouping::Numeric(_))));
 
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls");
+        .join("../../test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls");
     let bytes = std::fs::read(fixture).unwrap();
     assert_eq!(XlsPivotViewEditor::new(bytes.clone()).unwrap().finish().unwrap(), bytes);
 }

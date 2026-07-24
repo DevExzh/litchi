@@ -116,7 +116,7 @@ fn applies_end_defined_nested_merge_metadata() {
 #[test]
 fn parses_real_libreoffice_merge_fixtures() {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sw/qa/extras");
+        .join("../../test-data/libreoffice-core/sw/qa/extras");
     let horizontal = RtfDocument::parse(
         &std::fs::read_to_string(base.join("rtfimport/data/tdf117403.rtf")).unwrap(),
     )

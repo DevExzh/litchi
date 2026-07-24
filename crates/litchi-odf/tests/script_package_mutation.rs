@@ -125,7 +125,7 @@ fn ods_and_odp_facades_expose_the_same_inert_api() {
 #[test]
 fn bundled_libreoffice_macro_fixture_is_only_read_as_bytes() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/xmlsecurity/qa/unit/signing/data/macro.odt");
+        .join("../../test-data/libreoffice-core/xmlsecurity/qa/unit/signing/data/macro.odt");
     if !fixture.exists() { return; }
     let document = Document::open(fixture).unwrap();
     let resources = document.script_resources().unwrap();

@@ -1517,11 +1517,11 @@ mod tests {
             ("test-data/ooxml/xlsx/conditional_fmt_origin.xlsx", 1),
             ("test-data/ooxml/xlsx/conditional_fmt_checkpriority.xlsx", 1),
             (
-                "3rdparty/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx",
+                "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx",
                 2,
             ),
             (
-                "3rdparty/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx",
+                "test-data/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx",
                 1,
             ),
         ];

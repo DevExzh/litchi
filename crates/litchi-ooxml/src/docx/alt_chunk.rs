@@ -498,13 +498,13 @@ mod tests {
     use std::io::Cursor;
 
     const HTML_FIXTURE: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx"
+        "../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx"
     );
     const DOCX_FIXTURE: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx"
+        "../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx"
     );
     const HEADER_FIXTURE: &[u8] = include_bytes!(
-        "../../../../3rdparty/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx"
+        "../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx"
     );
 
     #[test]

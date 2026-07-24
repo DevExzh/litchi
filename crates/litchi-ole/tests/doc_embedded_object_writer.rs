@@ -72,8 +72,8 @@ fn malformed_add_and_reorder_leave_editor_state_unchanged() {
 fn producer_fixtures_append_only_when_their_layout_is_supported() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let fixtures = [
-        root.join("3rdparty/poi/test-data/document/word_with_embeded.doc"),
-        root.join("3rdparty/libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc"),
+        root.join("test-data/poi/test-data/document/word_with_embeded.doc"),
+        root.join("test-data/libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc"),
     ];
     let mut supported = 0usize;
     let mut rejected = 0usize;

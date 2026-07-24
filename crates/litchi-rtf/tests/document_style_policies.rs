@@ -95,7 +95,7 @@ fn coexists_with_theme_data_filter_sort_and_language_metadata() {
 #[test]
 fn parses_bundled_producer_after_stylesheet_without_loading_a_template() {
     let fixture = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf"
     );
     let document = RtfDocument::parse_bytes(fixture).unwrap();
     assert!(document.style_policies().update_styles_from_template);

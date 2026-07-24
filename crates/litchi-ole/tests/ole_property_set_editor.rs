@@ -93,8 +93,8 @@ fn signed_and_encrypted_containers_are_rejected_without_execution() {
 fn poi_and_libreoffice_fixtures_preserve_exact_noop_bytes() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     for relative in [
-        "3rdparty/poi/test-data/hpsf/TestMickey.doc",
-        "3rdparty/poi/test-data/hpsf/TestUnicode.xls",
+        "test-data/poi/test-data/hpsf/TestMickey.doc",
+        "test-data/poi/test-data/hpsf/TestUnicode.xls",
         "test-data/ole/doc/documentProperties.doc",
     ] {
         let bytes = std::fs::read(root.join(relative)).unwrap();
@@ -109,6 +109,6 @@ fn doc_xls_and_ppt_facades_expose_standard_property_sets() {
     assert!(doc.summary_information().unwrap().is_some());
     let mut xls = litchi_ole::xls::XlsWorkbook::new(std::fs::File::open(root.join("test-data/ole/xls/Simple.xls")).unwrap()).unwrap();
     let _ = xls.summary_information().unwrap();
-    let mut ppt = litchi_ole::ppt::Package::open(root.join("3rdparty/poi/test-data/slideshow/text-margins.ppt")).unwrap();
+    let mut ppt = litchi_ole::ppt::Package::open(root.join("test-data/poi/test-data/slideshow/text-margins.ppt")).unwrap();
     let _ = ppt.document_summary_information().unwrap();
 }

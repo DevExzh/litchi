@@ -100,7 +100,7 @@ fn writer_is_canonical_and_round_trip_is_stable_without_resolving_styles() {
 fn parses_libreoffice_section_fixture_without_materializing_a_reference() {
     let source = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf100507.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf100507.rtf"
     ));
     let document = RtfDocument::parse_bytes(source).unwrap();
     assert!(

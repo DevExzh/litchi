@@ -972,7 +972,7 @@ mod tests {
     #[test]
     fn libreoffice_odfpy_and_odfdo_shapes_parse_without_resource_resolution() {
         let lo = include_str!(
-            "../../../../3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/PDF_export_with_formcontrol.fodt"
+            "../../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/PDF_export_with_formcontrol.fodt"
         );
         let controls = text_controls(lo).unwrap();
         assert!(

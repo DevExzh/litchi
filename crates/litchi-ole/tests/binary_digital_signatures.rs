@@ -180,8 +180,8 @@ fn producer_fixtures_are_noop_exact_and_facades_discover_unsigned_state() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (relative, format) in [
         ("test-data/ole/doc/documentProperties.doc", BinaryOfficeFormat::Doc),
-        ("3rdparty/poi/test-data/spreadsheet/Simple.xls", BinaryOfficeFormat::Xls),
-        ("3rdparty/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls", BinaryOfficeFormat::Xls),
+        ("test-data/poi/test-data/spreadsheet/Simple.xls", BinaryOfficeFormat::Xls),
+        ("test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls", BinaryOfficeFormat::Xls),
         ("test-data/ole/ppt/text-margins.ppt", BinaryOfficeFormat::Ppt),
     ] {
         let bytes = std::fs::read(root.join(relative)).unwrap();
@@ -191,7 +191,7 @@ fn producer_fixtures_are_noop_exact_and_facades_discover_unsigned_state() {
 
     let mut doc = litchi_ole::doc::Package::open(root.join("test-data/ole/doc/documentProperties.doc")).unwrap();
     assert!(doc.verify_digital_signatures(&SignatureVerificationPolicy::strict()).unwrap().is_empty());
-    let mut xls = litchi_ole::xls::XlsWorkbook::new(File::open(root.join("3rdparty/poi/test-data/spreadsheet/Simple.xls")).unwrap()).unwrap();
+    let mut xls = litchi_ole::xls::XlsWorkbook::new(File::open(root.join("test-data/poi/test-data/spreadsheet/Simple.xls")).unwrap()).unwrap();
     assert!(xls.verify_digital_signatures(&SignatureVerificationPolicy::strict()).unwrap().is_empty());
     let mut ppt = litchi_ole::ppt::Package::open(root.join("test-data/ole/ppt/text-margins.ppt")).unwrap();
     assert!(ppt.verify_digital_signatures(&SignatureVerificationPolicy::strict()).unwrap().is_empty());

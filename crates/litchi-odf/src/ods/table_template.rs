@@ -918,7 +918,7 @@ mod tests {
     #[test]
     fn parses_libreoffice_table_style_catalog() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../3rdparty/libreoffice-core/sc/res/xml/tablestyles.xml");
+            .join("../../test-data/libreoffice-core/sc/res/xml/tablestyles.xml");
         let xml = std::fs::read_to_string(path).unwrap();
         let templates = parse_table_templates(&[&xml]).unwrap();
         assert!(templates.len() > 10);

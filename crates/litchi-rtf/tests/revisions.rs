@@ -141,7 +141,7 @@ fn parses_bundled_libreoffice_revision_fixtures() {
     ];
     let root = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/"
+        "/../../test-data/libreoffice-core"
     );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}{fixture}")).unwrap();

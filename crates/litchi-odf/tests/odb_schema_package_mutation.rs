@@ -182,7 +182,7 @@ fn relation_column_crud_and_clear_are_validated() {
 #[test]
 fn libreoffice_table_representation_variation_is_preserved() {
     let bytes = include_bytes!(
-        "../../../3rdparty/libreoffice-core/extras/source/database/biblio.odb"
+        "../../../test-data/libreoffice-core/extras/source/database/biblio.odb"
     )
     .to_vec();
     let mut document = DatabaseDocument::from_bytes(bytes).unwrap();

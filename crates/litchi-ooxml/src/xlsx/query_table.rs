@@ -2078,7 +2078,7 @@ mod tests {
     fn loads_real_libreoffice_query_table_parts_through_workbook() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let workbook = crate::xlsx::Workbook::open(
-            root.join("3rdparty/poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx"),
+            root.join("test-data/poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx"),
         )
         .unwrap();
         let tables = workbook.query_tables_on_sheet("Query").unwrap();

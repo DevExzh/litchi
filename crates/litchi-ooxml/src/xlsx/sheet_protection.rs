@@ -1972,19 +1972,19 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         inspect(
             &root.join(
-                "3rdparty/poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx",
+                "test-data/poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx",
             ),
             "rId1",
             0,
             true,
         );
         inspect(
-            &root.join("3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx"),
+            &root.join("test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx"),
             "rId1",
             5,
             false,
         );
-        inspect(&root.join("3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx"), "rId2", 1, false);
+        inspect(&root.join("test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx"), "rId2", 1, false);
 
         let metadata = parse(r#"<sheetData/><sheetProtection password="CC3D" sheet="1"/><protectedRanges><protectedRange name="Editable" sqref="A1:B2"/></protectedRanges>"#).unwrap();
         let fragment =

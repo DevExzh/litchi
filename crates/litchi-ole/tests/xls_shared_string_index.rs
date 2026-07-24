@@ -6,7 +6,7 @@ use litchi_ole::xls::XlsWorkbook;
 fn parses_poi_simple_shared_string_index() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/poi/test-data/spreadsheet/Simple.xls"
+        "/../../test-data/poi/test-data/spreadsheet/Simple.xls"
     );
     let workbook = XlsWorkbook::new(File::open(path).unwrap()).unwrap();
     let index = workbook.shared_string_index().unwrap().unwrap();

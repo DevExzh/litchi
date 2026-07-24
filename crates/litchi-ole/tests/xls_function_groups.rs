@@ -39,7 +39,7 @@ fn custom_function_groups_round_trip_across_record_generations() {
 #[test]
 fn reads_poi_and_libreoffice_builtin_function_groups() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let poi = root.join("3rdparty/poi/test-data/spreadsheet/externalFunctionExample.xls");
+    let poi = root.join("test-data/poi/test-data/spreadsheet/externalFunctionExample.xls");
     let workbook = XlsWorkbook::new(File::open(poi).unwrap()).unwrap();
     assert_eq!(
         workbook.function_groups().unwrap().built_in(),
@@ -47,7 +47,7 @@ fn reads_poi_and_libreoffice_builtin_function_groups() {
     );
 
     let libreoffice =
-        root.join("3rdparty/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls");
+        root.join("test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls");
     let workbook = XlsWorkbook::new(File::open(libreoffice).unwrap()).unwrap();
     assert_eq!(
         workbook.function_groups().unwrap().built_in(),

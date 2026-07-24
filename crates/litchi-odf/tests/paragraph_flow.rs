@@ -32,7 +32,7 @@ fn parses_aliases_values_and_round_trip() {
 }
 #[test]
 fn parses_real_odfdo_and_libreoffice() {
-    let odfdo = include_str!("../../../3rdparty/odfdo/tests/samples/example.xml");
+    let odfdo = include_str!("../../../test-data/odfdo/tests/samples/example.xml");
     assert!(
         !parse_paragraph_style_flows(odfdo)
             .unwrap()
@@ -40,7 +40,7 @@ fn parses_real_odfdo_and_libreoffice() {
             .is_empty()
     );
     let lo = include_bytes!(
-        "../../../3rdparty/libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt"
+        "../../../test-data/libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt"
     );
     let flat = FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
     assert!(!flat.paragraph_style_flows().unwrap().styles.is_empty());

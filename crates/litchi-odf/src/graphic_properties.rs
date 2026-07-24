@@ -1255,7 +1255,7 @@ mod tests {
     }
     #[test]
     fn parses_real_odfdo_fixture_values() {
-        let fixture = include_str!("../../../3rdparty/odfdo/tests/samples/images.fodt");
+        let fixture = include_str!("../../../test-data/odfdo/tests/samples/images.fodt");
         let begin = fixture
             .find(r#"<style:style style:name="fr1" style:family="graphic""#)
             .unwrap();

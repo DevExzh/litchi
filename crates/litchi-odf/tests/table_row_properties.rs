@@ -79,11 +79,11 @@ fn embedded_binary_and_empty_image_round_trip() {
 
 #[test]
 fn parses_real_odfdo_and_libreoffice_fixtures() {
-    let odfdo = include_str!("../../../3rdparty/odfdo/tests/samples/test_flat_lo.fods");
+    let odfdo = include_str!("../../../test-data/odfdo/tests/samples/test_flat_lo.fods");
     let rows = parse_table_row_style_properties(odfdo).unwrap();
     assert!(rows.get("ro1").is_some());
     let lo = include_bytes!(
-        "../../../3rdparty/libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods"
+        "../../../test-data/libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods"
     );
     let flat = FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
     assert!(!flat.table_row_style_properties().unwrap().styles.is_empty());

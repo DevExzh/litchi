@@ -1009,7 +1009,7 @@ mod tests {
     #[test]
     fn poi_xlookup_dynamic_array() {
         let m = fixture(include_bytes!(
-            "../../../../3rdparty/poi/test-data/spreadsheet/xlookup.xlsx"
+            "../../../../test-data/poi/test-data/spreadsheet/xlookup.xlsx"
         ));
         assert_eq!(m.types[0].name, "XLDAPR");
         assert_eq!(
@@ -1028,17 +1028,17 @@ mod tests {
     #[test]
     fn libreoffice_dynamic_and_rich_value_fixtures() {
         let m = fixture(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx"
         ));
         assert_eq!(m.future.len(), 1);
         let spill = fixture(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx"
         ));
         assert_eq!(spill.types.len(), 2);
         assert_eq!(spill.value_blocks.len(), 1);
         assert_eq!(spill.value_blocks[0].records[0].type_index, 2);
         let lambda = fixture(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx"
+            "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx"
         ));
         assert_eq!(lambda.future[1].blocks.len(), 2);
         assert_eq!(lambda.value_blocks.len(), 2);

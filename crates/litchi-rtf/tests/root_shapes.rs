@@ -13,12 +13,12 @@ fn write_document(document: &RtfDocument<'_>) -> String {
 #[test]
 fn parses_root_shape_producers_at_start_and_after_visible_body() {
     let producers = [
-        include_str!("../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf"),
+        include_str!("../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf"),
         include_str!(
-            "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/fdo55504-1-min.rtf"
+            "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo55504-1-min.rtf"
         ),
         include_str!(
-            "../../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf141173_missingFrames.rtf"
+            "../../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf141173_missingFrames.rtf"
         ),
     ];
     let documents: Vec<_> = producers

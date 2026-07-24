@@ -13,7 +13,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn round_trips_real_libreoffice_inline_ole_object() {
     let source = include_bytes!(
-        "../../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/ole-inline.rtf"
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/ole-inline.rtf"
     );
     let document = RtfDocument::parse_bytes(source).unwrap();
     assert_eq!(document.objects().len(), 1);

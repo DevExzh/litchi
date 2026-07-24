@@ -16,7 +16,7 @@ fn parses_ordered_document_variables_without_body_leakage() {
 #[test]
 fn parses_libreoffice_document_variable_fixtures_when_available() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sw/qa/extras");
+        .join("../../test-data/libreoffice-core/sw/qa/extras");
     let fixtures = [
         "rtfexport/data/tdf150267.rtf",
         "rtfexport/data/tdf151370.rtf",

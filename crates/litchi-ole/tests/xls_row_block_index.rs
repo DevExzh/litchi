@@ -6,7 +6,7 @@ use litchi_ole::xls::XlsWorkbook;
 fn parses_poi_simple_and_multirow_indexes() {
     let simple_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/poi/test-data/spreadsheet/Simple.xls"
+        "/../../test-data/poi/test-data/spreadsheet/Simple.xls"
     );
     let workbook = XlsWorkbook::new(File::open(simple_path).unwrap()).unwrap();
     let index = workbook
@@ -29,7 +29,7 @@ fn parses_poi_simple_and_multirow_indexes() {
 
     let multi_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/poi/test-data/spreadsheet/48968.xls"
+        "/../../test-data/poi/test-data/spreadsheet/48968.xls"
     );
     let workbook = XlsWorkbook::new(File::open(multi_path).unwrap()).unwrap();
     let index = workbook

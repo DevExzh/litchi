@@ -161,7 +161,7 @@ fn rejects_missing_invalid_unpaired_and_out_of_range_controls() {
 #[test]
 fn parses_real_libreoffice_geometry_fixture() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf");
+        .join("../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf");
     let document = RtfDocument::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
     let rows = document
         .tables()

@@ -87,7 +87,7 @@ fn rejects_invalid_values_duplicates_and_bad_placement_or_group_shape() {
 fn parses_bundled_libreoffice_starred_view_fixture() {
     let bytes = std::fs::read(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf114303.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf114303.rtf"
     ))
     .unwrap();
     let document = RtfDocument::parse_bytes(&bytes).unwrap();
@@ -104,7 +104,7 @@ fn parses_bundled_libreoffice_starred_view_fixture() {
 fn parses_bundled_libreoffice_background_shapes_fixture() {
     let bytes = std::fs::read(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/page-background.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/page-background.rtf"
     ))
     .unwrap();
     let document = RtfDocument::parse_bytes(&bytes).unwrap();

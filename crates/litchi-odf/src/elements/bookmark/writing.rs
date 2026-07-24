@@ -642,7 +642,7 @@ mod tests {
     #[test]
     fn libreoffice_odfpy_odfdo_and_crossed_ranges_round_trip() {
         let libreoffice = include_str!(
-            "../../../../../3rdparty/libreoffice-core/sw/qa/extras/odfexport/data/CrossRefHeadingBookmark.fodt"
+            "../../../../../test-data/libreoffice-core/sw/qa/extras/odfexport/data/CrossRefHeadingBookmark.fodt"
         );
         let targets = parse_bookmark_targets(libreoffice).unwrap();
         assert_eq!(targets.len(), 2);

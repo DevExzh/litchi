@@ -475,7 +475,7 @@ mod tests {
     fn real_libreoffice_package_tags() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let package = crate::pptx::Package::open(
-            root.join("3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx"),
+            root.join("test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx"),
         )
         .unwrap();
         let presentation = package.presentation().unwrap();

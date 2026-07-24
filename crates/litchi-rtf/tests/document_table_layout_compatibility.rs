@@ -108,7 +108,7 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
 fn parses_bundled_libreoffice_table_compatibility_preamble() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfexport/data/tdf161878.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf161878.rtf"
     );
     let bytes = std::fs::read(path).unwrap();
     let doc = RtfDocument::parse_bytes(&bytes).unwrap();

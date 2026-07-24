@@ -92,7 +92,7 @@ fn rejects_missing_negative_overflow_and_unrepresentable_shape_runs() {
 fn parses_libreoffice_producer_fragment_and_round_trips_uniform_shape_text() {
     let fixture = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../3rdparty/libreoffice-core/sw/qa/extras/rtfimport/data/fdo53556.rtf"
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/fdo53556.rtf"
     ));
     let start = fixture.find(r"{\pard\cb1 ").unwrap();
     let producer = &fixture[start..];

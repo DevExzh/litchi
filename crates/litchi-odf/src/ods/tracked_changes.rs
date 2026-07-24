@@ -2067,7 +2067,7 @@ mod tests {
     fn parses_libreoffice_change_tracking_fixtures() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let tracked_path =
-            root.join("3rdparty/libreoffice-core/sc/qa/unit/data/ods/change-tracking.ods");
+            root.join("test-data/libreoffice-core/sc/qa/unit/data/ods/change-tracking.ods");
         let tracked = crate::Spreadsheet::open(tracked_path).unwrap();
         let changes = tracked.tracked_changes().unwrap();
         assert_eq!(changes.changes.len(), 2);
@@ -2079,7 +2079,7 @@ mod tests {
         );
 
         let protected_path = root.join(
-            "3rdparty/libreoffice-core/sc/qa/extras/testdocuments/RecordChangesProtected.ods",
+            "test-data/libreoffice-core/sc/qa/extras/testdocuments/RecordChangesProtected.ods",
         );
         let protected = crate::Spreadsheet::open(protected_path).unwrap();
         assert!(protected.tracked_changes().unwrap().changes.is_empty());

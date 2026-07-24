@@ -1114,7 +1114,7 @@ mod tests {
     #[test]
     fn poi_prprops_guides_grid_and_strict_roundtrip() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/poi/test-data/slideshow/prProps.pptx"
+            "../../../../test-data/poi/test-data/slideshow/prProps.pptx"
         ));
         assert_eq!(v.slide.as_ref().unwrap().common.guides.len(), 2);
         assert_eq!(
@@ -1137,7 +1137,7 @@ mod tests {
     #[test]
     fn poi_outline_and_splitters() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/poi/test-data/slideshow/45545_Comment.pptx"
+            "../../../../test-data/poi/test-data/slideshow/45545_Comment.pptx"
         ));
         let n = v.normal.unwrap();
         assert_eq!(n.vertical_bar_state, Some(SplitterState::Minimized));
@@ -1148,7 +1148,7 @@ mod tests {
     #[test]
     fn libreoffice_ratio_and_sparse_views() {
         let v = f(include_bytes!(
-            "../../../../3rdparty/libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx"
+            "../../../../test-data/libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx"
         ));
         assert_eq!(
             v.notes_text.unwrap().view.scale_x,

@@ -4,7 +4,7 @@ use std::path::Path;
 #[test]
 fn apache_poi_slide_view_zoom_and_guides_are_exposed() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/poi/test-data/slideshow/54880_chinese.ppt");
+        .join("../../test-data/poi/test-data/slideshow/54880_chinese.ppt");
     let mut package = Package::open(path).unwrap();
     let presentation = package.presentation().unwrap();
     let information = presentation.slide_view_information().unwrap();
