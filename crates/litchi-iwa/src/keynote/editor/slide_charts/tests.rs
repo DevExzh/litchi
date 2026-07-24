@@ -7,9 +7,9 @@ use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
-    ChartGapSpacing, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
-    ChartPieWedgeIndex, ChartRoundedCorners, ChartShadow, ChartValueAxisBounds,
-    ChartValueAxisScale, ChartValueAxisSteps,
+    ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
+    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartShadow,
+    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -2289,6 +2289,118 @@ fn scratch_presentation_supports_native_pie_label_visibility_crud() {
     assert!(
         reopened
             .set_slide_chart_pie_label_visibilities(0, source.drawable_object_id, &customized[..2],)
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_pie_label_distance_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .unwrap();
+    let defaults = vec![ChartPieLabelDistance::DEFAULT; 3];
+    let customized = [
+        ChartPieLabelDistance::MINIMUM,
+        ChartPieLabelDistance::from_percent(100.0).unwrap(),
+        ChartPieLabelDistance::MAXIMUM,
+    ];
+    assert_eq!(
+        editor
+            .slide_chart_pie_label_distances(0, source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &customized)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_pie_label_distance(
+                0,
+                source.drawable_object_id,
+                ChartPieWedgeIndex::from_zero_based(1),
+            )
+            .unwrap(),
+        customized[1]
+    );
+    let visibilities = [
+        ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
+        ChartPieLabelVisibility::ALL,
+        ChartPieLabelVisibility::VALUES_ONLY,
+    ];
+    editor
+        .set_slide_chart_pie_label_visibilities(0, source.drawable_object_id, &visibilities)
+        .unwrap();
+    editor
+        .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_pie_label_visibilities(0, source.drawable_object_id)
+            .unwrap(),
+        visibilities
+    );
+    editor
+        .set_slide_chart_pie_label_visibilities(
+            0,
+            source.drawable_object_id,
+            &[ChartPieLabelVisibility::DEFAULT; 3],
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    editor
+        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Donut2d)
+        .unwrap();
+    editor
+        .set_slide_chart_pie_label_distance(
+            0,
+            source.drawable_object_id,
+            ChartPieWedgeIndex::from_zero_based(0),
+            ChartPieLabelDistance::DEFAULT,
+        )
+        .unwrap();
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_pie_label_distances(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    let before_rejected = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &customized[..2],)
+            .is_err()
+    );
+    assert!(
+        reopened
+            .slide_chart_pie_label_distance(
+                0,
+                source.drawable_object_id,
+                ChartPieWedgeIndex::from_zero_based(3),
+            )
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
