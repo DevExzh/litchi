@@ -155,6 +155,9 @@ pub mod conditional_formatting;
 /// PivotCache definition stream parsing (MS-XLSB 2.1.7.38)
 pub mod pivot;
 
+/// Table (ListObject) stream parsing (MS-XLSB 2.1.7.51)
+pub mod table;
+
 /// Formula parsing and generation
 pub mod formula;
 
@@ -182,8 +185,12 @@ pub use styles::{
     Alignment, Border, BorderSide, BorderStyle, HorizontalAlignment, VerticalAlignment,
 };
 pub use styles_table::{CellFormat, Fill, Font, StylesTable};
-pub use workbook::XlsbWorkbook;
+pub use table::{
+    XlsbTable, XlsbTableColumn, XlsbTableFormula, XlsbTableRange, XlsbTableStyleInfo,
+    XlsbTableTotalsRowFunction, XlsbTableType, parse_table_part,
+};
 pub use vba_project::{VbaProject, VbaProjectSignature, VbaProjectSignatureKind};
+pub use workbook::XlsbWorkbook;
 pub use worksheet::{
     XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection, XlsbStrongProtection,
     XlsbWorksheet,

@@ -57,6 +57,7 @@ pub struct XlsbWorkbook {
     calculation_properties: CalculationProperties,
     is_1904: bool,
     pivot_cache_definitions: Vec<(u32, crate::xlsb::pivot::PivotCacheDefinition)>,
+    structured_tables: Vec<(usize, crate::xlsb::table::XlsbTable)>,
 }
 
 #[derive(Default)]
@@ -189,6 +190,29 @@ impl XlsbWorkbook {
             .iter()
             .find(|(id, _)| *id == cache_id)
             .map(|(_, definition)| definition)
+    }
+
+    /// Typed structured-table (ListObject) definitions paired with their
+    /// worksheet indexes, in worksheet discovery order (MS-XLSB 2.1.7.51).
+    ///
+    /// These are inert data snapshots: relationship identifiers, external
+    /// connection identifiers, differential-formatting identifiers, and
+    /// formula token streams are stored verbatim and are never dereferenced,
+    /// contacted, or evaluated. Named `structured_tables` because
+    /// [`XlsbWorkbook::tables`] already exposes the formula-context table
+    /// definitions.
+    pub fn structured_tables(&self) -> &[(usize, crate::xlsb::table::XlsbTable)] {
+        &self.structured_tables
+    }
+
+    /// Typed structured-table (ListObject) definitions anchored to one
+    /// worksheet, selected by zero-based worksheet index.
+    pub fn tables_on_sheet(&self, sheet_index: usize) -> Vec<&crate::xlsb::table::XlsbTable> {
+        self.structured_tables
+            .iter()
+            .filter(|(index, _)| *index == sheet_index)
+            .map(|(_, table)| table)
+            .collect()
     }
 
     /// Workbook style table loaded from `xl/styles.bin`.
@@ -343,6 +367,7 @@ impl XlsbWorkbook {
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
+            structured_tables: Vec::new(),
         };
 
         workbook.load_workbook_info()?;
@@ -371,6 +396,7 @@ impl XlsbWorkbook {
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
+            structured_tables: Vec::new(),
         };
 
         workbook.load_workbook_info()?;
@@ -723,6 +749,7 @@ impl XlsbWorkbook {
 
         let mut tables = Vec::new();
         let mut pivot_views = Vec::new();
+        let mut structured_tables = Vec::new();
         for (sheet_index, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
             let Some(rel_id) = rel_id else { continue };
             let Some(sheet_relationship) = workbook_part.rels().get(rel_id) else {
@@ -734,6 +761,21 @@ impl XlsbWorkbook {
             let sheet_part = self
                 .package
                 .get_part(&sheet_relationship.target_partname()?)?;
+            for table_rel_id in crate::xlsb::table::parse_table_part_rel_ids(sheet_part.blob())? {
+                let relationship = sheet_part.rels().get(&table_rel_id).ok_or_else(|| {
+                    crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "BrtListPart relationship {table_rel_id:?} on sheet {sheet_index} is missing"
+                    ))
+                })?;
+                if relationship.is_external() {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "BrtListPart relationship {table_rel_id:?} on sheet {sheet_index} is external"
+                    )));
+                }
+                let part = self.package.get_part(&relationship.target_partname()?)?;
+                let table = crate::xlsb::table::parse_table_part(part.blob())?;
+                structured_tables.push((sheet_index, table));
+            }
             for relationship in sheet_part.rels().iter().filter(|relationship| {
                 matches!(
                     relationship.reltype(),
@@ -822,6 +864,7 @@ impl XlsbWorkbook {
         self.is_1904 = info.is_1904;
         self.calculation_properties = info.calculation_properties.unwrap_or_default();
         self.pivot_cache_definitions = pivot_cache_definitions;
+        self.structured_tables = structured_tables;
 
         Ok(())
     }
@@ -1964,6 +2007,7 @@ mod tests {
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
+            structured_tables: Vec::new(),
         };
         workbook.load_external_book(&uri)
     }
@@ -2273,6 +2317,7 @@ mod tests {
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
+            structured_tables: Vec::new(),
         };
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
         let book = workbook.load_external_book(&uri).unwrap();

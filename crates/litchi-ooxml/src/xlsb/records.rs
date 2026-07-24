@@ -208,6 +208,22 @@ pub mod record_types {
     pub const SHR_FMLA: u16 = 0x01AB;
     pub const TABLE: u16 = 0x01AC;
 
+    // Structured tables (ListObject stream, MS-XLSB 2.1.7.51)
+    pub const BEGIN_LIST: u16 = 343;
+    pub const END_LIST: u16 = 344;
+    pub const BEGIN_LIST_COLS: u16 = 345;
+    pub const END_LIST_COLS: u16 = 346;
+    pub const BEGIN_LIST_COL: u16 = 347;
+    pub const END_LIST_COL: u16 = 348;
+    pub const BEGIN_LIST_XML_CPR: u16 = 349;
+    pub const END_LIST_XML_CPR: u16 = 350;
+    pub const LIST_CC_FMLA: u16 = 351;
+    pub const LIST_TR_FMLA: u16 = 352;
+    pub const BEGIN_LIST_PARTS: u16 = 660;
+    pub const LIST_PART: u16 = 661;
+    pub const END_LIST_PARTS: u16 = 662;
+    pub const LIST14: u16 = 1111;
+
     // External connections and links
     pub const BEGIN_EXTERNALS: u16 = 0x0161;
     pub const END_EXTERNALS: u16 = 0x0162;
