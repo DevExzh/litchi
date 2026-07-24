@@ -3244,6 +3244,21 @@ impl Workbook {
             .collect())
     }
 
+    /// Load the typed pivot-chart bindings anchored on one worksheet.
+    ///
+    /// Each returned pivot chart has its `c:pivotSource` name resolved to the
+    /// typed pivot-table model; broken or dangling bindings are errors.
+    /// Ordinary charts without a pivot source are excluded.
+    pub fn pivot_charts_on_sheet(
+        &self,
+        sheet_name: &str,
+    ) -> SheetResult<Vec<super::pivot_chart::PivotChart>> {
+        Ok(super::pivot_chart::load_worksheet_pivot_charts(
+            self.package(),
+            sheet_name,
+        )?)
+    }
+
     // ===== Worksheet-level Writing Features =====
     // (These are mostly implemented via MutableWorksheet, exposed through worksheet_mut)
 

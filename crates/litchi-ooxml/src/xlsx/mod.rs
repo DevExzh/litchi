@@ -53,6 +53,7 @@ pub mod page_setup;
 pub mod parsers;
 pub mod phonetic_properties;
 pub mod pivot;
+pub mod pivot_chart;
 pub mod print_options;
 pub mod printer_settings;
 pub mod query_table;
@@ -289,6 +290,13 @@ pub use pivot::{
     PivotTableStyle, Reference, RowColField, RowColItem, SharedItem, SortType, Subtotal,
     read_pivot_cache_definition, read_pivot_cache_records, read_pivot_table_definition,
     read_pivot_tables, write_pivot_cache_definition, write_pivot_cache_records, write_pivot_table,
+};
+// Re-export pivot-chart binding types
+pub use pivot_chart::{
+    PIVOT_OPTIONS_EXTENSION_URI, PivotChart, PivotChartBinding, PivotChartDropZoneVisibility,
+    PivotChartFieldType, PivotChartPivotOptions, PivotChartSeries, PivotChartSource,
+    WorksheetPivotCharts, load_pivot_charts, load_worksheet_pivot_charts,
+    parse_pivot_chart_binding,
 };
 // Re-export writer types
 pub use writer::{
