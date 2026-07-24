@@ -131,7 +131,7 @@ conversion, fonts, and image conversion are optional.
 | Watermarks | 🟡 | ✅ | ✅ | Typed VML text-watermark discovery in headers plus generated watermark authoring/removal; arbitrary and image watermark variants remain bounded |
 | Office Math equations in-document | ✅ | ✅ | ✅ | Exact OMML extraction plus validated inline/display equation and math-paragraph authoring; layout and equation evaluation remain renderer responsibilities |
 | SmartArt | 🟡 | ✅ | ❌ | Typed inert diagram inventory: parsed `dgm:dataModel` node/connection trees, layout/quick-style/colors part metadata, and pre-rendered drawing references in both transitional and Strict dialects; no DOCX SmartArt authoring |
-| DrawingML text boxes and WordArt | ❌ | ❌ | ❌ | No typed DOCX authoring model |
+| DrawingML text boxes and WordArt | 🟡 | ✅ | ❌ | Typed inert text-box/WordArt inventory: DrawingML `wps:txbx` and VML `v:textbox` fallbacks (via MCE), body properties (insets, vertical anchor, direction, wrap, autofit), rich story text with basic run formatting, and WordArt warp presets with inert styling flags; no authoring model |
 | Citations, bibliography, index, and TOA | 🟡 | 🟡 | 🟡 | Typed inert `CITATION` source-tag/multi-source and `BIBLIOGRAPHY` field discovery, Custom XML bibliography source-store/scalar-value metadata, and TOA/TA plus INDEX/XE metadata expose stored switches, cached results, and dirty/lock state; typed `CITATION` authoring writes caller-supplied tags, locale, volume, prefix/suffix, multi-source order, and optional cached text, while typed `BIBLIOGRAPHY` authoring writes caller-supplied display/filter locales, selected source-tag order, and optional cached text; bibliography styles/source-store authoring remain opaque and no citation/table/index generation or refresh occurs |
 | IRM/Rights Management | ❌ | ❌ | ❌ | Not implemented |
 | RibbonX customization | 🟡 | ✅ | ✅ | Word, Excel, and PowerPoint package wrappers retain bounded package-level Custom UI XML parts in each documented relationship family; PowerPoint additionally exposes read-only presentation accessors. All paths validate root relationships and namespaces without executing callbacks, macros, commands, or linked content |
@@ -166,7 +166,7 @@ conversion, fonts, and image conversion are optional.
 | ChartEx | 🟡 | ✅ | ✅ | Extended chart part model and serialization; integration is more limited than classic charts |
 | Chart sheets | ✅ | ✅ | ✅ | Views, protection, print settings, chart resources, and package graph |
 | Pivot tables and caches | ✅ | ✅ | ✅ | Definitions, cache fields/records, filters, grouping, layouts, and writer support |
-| Pivot charts | ❌ | ❌ | ❌ | No typed chart-to-pivot binding workflow |
+| Pivot charts | 🟡 | ✅ | ❌ | Typed inert chart-to-pivot binding: per-worksheet pivot-chart enumeration through the drawing/chart relationship graph, `c:pivotSource` name/format-id/extension parsing, validated resolution of pivot names (qualified, unqualified, case-insensitive) to typed pivot tables, and per-series drop-zone visibility metadata; chartsheet-hosted pivot charts and authoring are not covered |
 | Structured tables/ListObjects | ✅ | ✅ | ✅ | Columns, formulas, totals, table types, and styles |
 | Structured-reference evaluation | 🟡 | ✅ | N/A | Evaluator supports bounded table references, not complete Excel semantics |
 | Data validation | ✅ | ✅ | ✅ | Standard and extension collections, formulas, prompts, and ranges |
@@ -348,7 +348,7 @@ conversion, fonts, and image conversion are optional.
 | Auto-filter and sort | ✅ | ✅ | ✅ | Typed binary filter/sort models |
 | Sheet protection | ✅ | ✅ | ✅ | Protection flags and password metadata |
 | Calculation properties | ✅ | ✅ | ✅ | Workbook calculation settings |
-| Pivot tables/caches | ❌ | ❌ | ❌ | No public compiled XLSB pivot module |
+| Pivot tables/caches | 🟡 | ✅ | ❌ | Typed inert PivotCache definition stream model (MS-XLSB 2.1.7.38): refresh metadata, worksheet/consolidation sources, cache fields with shared items of every value type, range/discrete grouping, OLAP hierarchies and tuple caches, calculated items/members with inert formula tokens, and Excel 2010/2014 extensions, exposed per cache id alongside the existing pivot views; unknown records are skipped and external references are never dereferenced |
 | Charts and drawings | ❌ | ❌ | ❌ | No typed XLSB chart/drawing model |
 | Structured tables | ❌ | ❌ | ❌ | No ListObject model |
 | External links and connections | 🟡 | ✅ | ❌ | Typed inert external-workbook, DDE, and OLE link targets, sheet names, and declared name/item metadata; connections remain unmodeled and no target is opened, contacted, refreshed, or executed |
