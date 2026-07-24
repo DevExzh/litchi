@@ -608,12 +608,14 @@ pub struct ParagraphFormatting {
 
 /// Represents a text run with formatting
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Reserved for future implementation
 struct TextRun {
     /// Text content
     text: String,
     /// Character formatting
     formatting: CharacterFormatting,
+    /// Index into `DocWriter::pictures` when this run is an inline picture
+    /// (a single 0x0001 picture character).
+    picture_index: Option<u32>,
 }
 
 /// Represents a paragraph
@@ -634,10 +636,15 @@ fn writable_paragraph_from_runs(
         vec![TextRun {
             text: String::new(),
             formatting: CharacterFormatting::default(),
+            picture_index: None,
         }]
     } else {
         runs.into_iter()
-            .map(|(text, formatting)| TextRun { text, formatting })
+            .map(|(text, formatting)| TextRun {
+                text,
+                formatting,
+                picture_index: None,
+            })
             .collect()
     };
     WritableParagraph { runs, formatting }
@@ -792,6 +799,8 @@ pub struct DocWriter {
     numbering: NumberingWriter,
     /// User-defined styles appended after the fifteen fixed style slots
     styles: Vec<super::stylesheet::DocStyleDefinition>,
+    /// Inline pictures embedded via [`DocWriter::insert_picture`]
+    pictures: Vec<super::images::DocPicture>,
     /// Password-to-open settings. The password is wiped when replaced, cleared, or dropped.
     encryption: Option<DocWriterEncryption>,
 }
@@ -861,6 +870,7 @@ impl DocWriter {
             section_page_borders: None,
             numbering: NumberingWriter::new(),
             styles: Vec::new(),
+            pictures: Vec::new(),
             encryption: None,
         }
     }
@@ -952,6 +962,7 @@ impl DocWriter {
             runs: vec![TextRun {
                 text: text.to_string(),
                 formatting: CharacterFormatting::default(),
+                picture_index: None,
             }],
             formatting: ParagraphFormatting::default(),
         });
@@ -984,6 +995,7 @@ impl DocWriter {
             runs: vec![TextRun {
                 text: text.to_string(),
                 formatting: char_fmt,
+                picture_index: None,
             }],
             formatting: para_fmt,
         });
@@ -1004,11 +1016,44 @@ impl DocWriter {
         }
         let mut wruns = Vec::with_capacity(runs.len());
         for (text, formatting) in runs {
-            wruns.push(TextRun { text, formatting });
+            wruns.push(TextRun {
+                text,
+                formatting,
+                picture_index: None,
+            });
         }
         self.paragraphs.push(WritableParagraph {
             runs: wruns,
             formatting: para_fmt,
+        });
+        Ok(())
+    }
+
+    /// Insert an inline picture as its own paragraph.
+    ///
+    /// The picture is written as a single 0x0001 picture character with
+    /// sprmCFSpec and sprmCPicLocation applied ([MS-DOC] 1.3); the character
+    /// points to an OfficeArtWordDrawing block (PICF + OfficeArtSpContainer +
+    /// OfficeArtFBSE with an embedded BLIP) in the Data stream. The image
+    /// bytes are stored verbatim — no re-encoding is performed.
+    pub fn insert_picture(
+        &mut self,
+        picture: super::images::DocPicture,
+    ) -> Result<(), DocWriteError> {
+        let picture_index = u32::try_from(self.pictures.len()).map_err(|_| {
+            DocWriteError::InvalidData("DOC picture count exceeds the 32-bit range".to_string())
+        })?;
+        self.pictures.push(picture);
+        self.paragraphs.push(WritableParagraph {
+            runs: vec![TextRun {
+                text: "\u{0001}".to_string(),
+                formatting: CharacterFormatting {
+                    special: Some(true),
+                    ..CharacterFormatting::default()
+                },
+                picture_index: Some(picture_index),
+            }],
+            formatting: ParagraphFormatting::default(),
         });
         Ok(())
     }
@@ -2501,6 +2546,7 @@ impl DocWriter {
                         runs: vec![TextRun {
                             text: String::new(),
                             formatting: CharacterFormatting::default(),
+                            picture_index: None,
                         }],
                         formatting: ParagraphFormatting::default(),
                     }],
@@ -2748,6 +2794,7 @@ impl DocWriter {
         // Text starts immediately after FIB, with padding to 512-byte boundary
         // Per POI's TextPieceTable.writeTo() lines 427-433
         let mut text_stream = Vec::new();
+        let mut data_stream: Vec<u8> = Vec::new();
         let mut current_cp = 0u32; // Character position in document
         let mut pieces = Vec::new();
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
@@ -2799,6 +2846,28 @@ impl DocWriter {
                     &mut font_builder,
                     revision_data.as_ref(),
                 )?;
+                // Inline pictures: append the OfficeArtWordDrawing block to the
+                // Data stream and point sprmCPicLocation at it.
+                let grpprl = if let Some(picture_index) = run.picture_index {
+                    let picture = self.pictures.get(picture_index as usize).ok_or_else(|| {
+                        DocWriteError::InvalidData(format!(
+                            "DOC picture index {picture_index} is out of range"
+                        ))
+                    })?;
+                    let pic_offset = u32::try_from(data_stream.len()).map_err(|_| {
+                        DocWriteError::InvalidData(
+                            "DOC Data stream exceeds 32-bit FC space".to_string(),
+                        )
+                    })?;
+                    let shape_id = super::images::FIRST_PICTURE_SHAPE_ID + picture_index;
+                    super::images::write_picture_block(picture, shape_id, &mut data_stream);
+                    let mut grpprl = grpprl;
+                    grpprl.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
+                    grpprl.extend_from_slice(&pic_offset.to_le_bytes());
+                    grpprl
+                } else {
+                    grpprl
+                };
 
                 // Track field characters in this run
                 let mut utf16_offset = 0u32;
@@ -3288,7 +3357,13 @@ impl DocWriter {
 
         // Data is staged with the clear document and encrypted with the other
         // document streams only after every clear structure has been validated.
-        let mut data_stream = vec![0u8; 4096];
+        // POI writes a zero-filled Data stream when the document has no pictures.
+        let mut data_stream = if data_stream.is_empty() {
+            vec![0u8; 4096]
+        } else {
+            pad_to_4096(&mut data_stream);
+            data_stream
+        };
         self.encrypt_output_streams(
             &mut word_document_stream,
             &mut table_stream,
@@ -3347,6 +3422,7 @@ impl DocWriter {
 
         // Build text stream and piece table
         let mut text_stream = Vec::new();
+        let mut data_stream: Vec<u8> = Vec::new();
         let mut current_cp = 0u32;
         let mut pieces = Vec::new();
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
@@ -3394,6 +3470,28 @@ impl DocWriter {
                     &mut font_builder,
                     revision_data.as_ref(),
                 )?;
+                // Inline pictures: append the OfficeArtWordDrawing block to the
+                // Data stream and point sprmCPicLocation at it.
+                let grpprl = if let Some(picture_index) = run.picture_index {
+                    let picture = self.pictures.get(picture_index as usize).ok_or_else(|| {
+                        DocWriteError::InvalidData(format!(
+                            "DOC picture index {picture_index} is out of range"
+                        ))
+                    })?;
+                    let pic_offset = u32::try_from(data_stream.len()).map_err(|_| {
+                        DocWriteError::InvalidData(
+                            "DOC Data stream exceeds 32-bit FC space".to_string(),
+                        )
+                    })?;
+                    let shape_id = super::images::FIRST_PICTURE_SHAPE_ID + picture_index;
+                    super::images::write_picture_block(picture, shape_id, &mut data_stream);
+                    let mut grpprl = grpprl;
+                    grpprl.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
+                    grpprl.extend_from_slice(&pic_offset.to_le_bytes());
+                    grpprl
+                } else {
+                    grpprl
+                };
 
                 let mut utf16_offset = 0u32;
                 for ch in run_text.chars() {
@@ -3843,7 +3941,13 @@ impl DocWriter {
         pad_to_4096(&mut word_document_stream);
         pad_to_4096(&mut table_stream);
 
-        let mut data_stream = vec![0u8; 4096];
+        // POI writes a zero-filled Data stream when the document has no pictures.
+        let mut data_stream = if data_stream.is_empty() {
+            vec![0u8; 4096]
+        } else {
+            pad_to_4096(&mut data_stream);
+            data_stream
+        };
         self.encrypt_output_streams(
             &mut word_document_stream,
             &mut table_stream,

@@ -58,6 +58,9 @@ pub mod hyperlinks;
 /// List numbering writer
 pub mod numbering;
 
+/// Inline picture writer (OfficeArtWordDrawing blocks for the Data stream)
+pub mod images;
+
 // Re-export public types
 pub use crate::doc::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
 pub use crate::doc::parts::pap::{
@@ -87,6 +90,7 @@ pub use fkp::{ChpxFkpBuilder, PapxFkpBuilder};
 pub use footnotes::{EndnotesWriter, FootnoteEntry, FootnotesWriter};
 pub use headers::{HeaderFooterEntry, HeaderFooterType, HeadersWriter};
 pub use hyperlinks::{HyperlinkEntry, HyperlinkType, HyperlinksWriter};
+pub use images::{DocPicture, PictureFormat};
 pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, NumberingWriter};
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};

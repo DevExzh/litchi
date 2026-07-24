@@ -174,7 +174,7 @@ conversion, fonts, and image conversion are optional.
 | Classic comments/notes | ✅ | ✅ | ✅ | Comment text, authors, and VML-backed notes |
 | Threaded comments | ✅ | ✅ | ✅ | People, mentions, replies, resolution state, and graph-safe CRUD |
 | Images and drawing anchors | ✅ | ✅ | ✅ | Pictures, drawing resources, and worksheet anchors |
-| Arbitrary DrawingML shapes/text boxes | ❌ | ❌ | ❌ | Picture/chart drawing support does not expose a general shape model |
+| Arbitrary DrawingML shapes/text boxes | 🟡 | ✅ | ❌ | Typed inert worksheet drawing inventory: two-cell/one-cell/absolute anchors with typed EMU coordinates, ~100 typed preset geometries, hidden/locked flags, text bodies with bodyPr properties and basic run formatting, connection shapes, nested groups, and inert legacy OLE object metadata; no shape authoring |
 | Hyperlinks | ✅ | ✅ | ✅ | Internal/external links and tooltips |
 | Auto-filter and sort state | ✅ | ✅ | ✅ | Values, custom/dynamic/color/icon filters, Top10, and multi-key sorts |
 | Sparklines | ✅ | ✅ | ✅ | Groups, axes, colors, and extension markup |
@@ -287,7 +287,7 @@ conversion, fonts, and image conversion are optional.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Images | 🟡 | ✅ | ❌ | Inline/floating picture and blip extraction; image writer is not integrated into `DocWriter` |
+| Images | 🟡 | ✅ | 🟡 | Inline/floating picture and blip extraction; `DocWriter::insert_picture` writes inline PNG/JPEG pictures (OfficeArtWordDrawing in the Data stream); floating picture authoring is not supported |
 | Drawings and shapes | 🟡 | ✅ | ❌ | OfficeArt/Escher shape extraction only |
 | Embedded OLE/package objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve embedded object storages; payloads remain inert |
 | MathType/MTEF equations | 🟡 | ✅ | ❌ | Equation Native extraction and conversion; no DOC equation authoring |
@@ -350,7 +350,7 @@ conversion, fonts, and image conversion are optional.
 | Calculation properties | ✅ | ✅ | ✅ | Workbook calculation settings |
 | Pivot tables/caches | 🟡 | ✅ | ❌ | Typed inert PivotCache definition stream model (MS-XLSB 2.1.7.38): refresh metadata, worksheet/consolidation sources, cache fields with shared items of every value type, range/discrete grouping, OLAP hierarchies and tuple caches, calculated items/members with inert formula tokens, and Excel 2010/2014 extensions, exposed per cache id alongside the existing pivot views; unknown records are skipped and external references are never dereferenced |
 | Charts and drawings | ❌ | ❌ | ❌ | No typed XLSB chart/drawing model |
-| Structured tables | ❌ | ❌ | ❌ | No ListObject model |
+| Structured tables | 🟡 | ✅ | ❌ | Typed inert ListObject model (MS-XLSB 2.1.7.51): identity, ranges, table types, header/totals metadata, DXF style ids, typed totals-row functions, inert calculated-column/totals formulas, and style-info flags; worksheet list parts are resolved eagerly at load |
 | External links and connections | 🟡 | ✅ | ❌ | Typed inert external-workbook, DDE, and OLE link targets, sheet names, and declared name/item metadata; connections remain unmodeled and no target is opened, contacted, refreshed, or executed |
 | VBA project/code modules | 🟡 | 🟡 | ❌ | Inert MS-XLSB Workbook → VBA Project topology plus declared legacy/Agile signature-part metadata; project/signature payload contents are never inspected, parsed, verified, or executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
@@ -500,7 +500,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Master document | `.odm`, `.otm` | ✅ | ✅ | ✅ | Paragraphs, linked sections/subdocuments, indexes, styles, encryption, signing, builder, and mutable CRUD |
 | Web template | `.oth` | 🟡 | ✅ | 🟡 | Text semantic reader and exact lossless save; no dedicated authoring model |
 | Database front end | `.odb` | 🟡 | ✅ | 🟡 | Connections, settings, forms, reports, queries, tables, schemas, keys, indices, and package mutation; nothing is executed |
-| Flat OpenDocument | `.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`, `.fodi`, `.fodf` | 🟡 | ✅ | 🟡 | Family validation and exact lossless save through `FlatOpenDocument`; no generic semantic editor |
+| Flat OpenDocument | `.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`, `.fodi`, `.fodf` | ✅ | ✅ | 🟡 | Family validation and exact lossless save through `FlatOpenDocument`, plus family-typed read-only wrappers that open flat files through the full packaged semantic readers (text/tables, sheets/cells, slides/notes, drawings, charts, image frames); no semantic authoring on flat files |
 
 ## Rich Text Format (RTF)
 
@@ -689,7 +689,7 @@ typed VBA code-module model or macro-authoring support.
 | Master document/template | `.odm`, `.otm` | ✅ | ✅ | Semantic reader, builder, and mutable master document |
 | Web template | `.oth` | ✅ | 🟡 | Text-compatible reader and lossless save |
 | Database front end | `.odb` | ✅ | 🟡 | Semantic configuration plus bounded package mutation; no database execution |
-| Flat OpenDocument | `.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`, `.fodi`, `.fodf` | ✅ | 🟡 | Validation and exact lossless save |
+| Flat OpenDocument | `.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`, `.fodi`, `.fodf` | ✅ | 🟡 | Validation, semantic reading through the packaged family models, and exact lossless save |
 
 ODF models target ISO/IEC 26300 structures and retain producer extensions where their typed or opaque
 models allow it. The matrix does not claim complete ODF-version conformance validation.

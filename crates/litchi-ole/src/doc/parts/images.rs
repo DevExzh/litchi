@@ -33,7 +33,7 @@ pub enum PictureType {
 impl PictureType {
     /// Detect picture type from binary data
     pub fn from_data(data: &[u8]) -> Self {
-        if data.len() < 8 {
+        if data.len() < 4 {
             return PictureType::Unknown;
         }
 

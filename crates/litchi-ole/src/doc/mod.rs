@@ -193,7 +193,8 @@ pub use tracked_revision::{
 pub use vba::VbaProjectStorage;
 pub use writer::{
     AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,
-    DocStyleDefinition, DocStyleRevision, DocWriteError, DocWriter, DropCap, DropCapType,
+    DocPicture, DocStyleDefinition, DocStyleRevision, DocWriteError, DocWriter, DropCap,
+    DropCapType,
     FontAlignment, FormattingRevision, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
     FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
     FrameVerticalPosition, HeaderFooterParagraph, LegacyAutoNumbering, LegacyBorderPosition,

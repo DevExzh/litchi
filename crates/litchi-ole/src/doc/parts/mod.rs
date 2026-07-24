@@ -25,6 +25,7 @@ pub mod footnotes;
 pub mod glossary;
 pub mod headers;
 pub mod hyperlinks;
+pub mod images;
 pub mod list_names;
 pub mod list_templates;
 pub mod numbering;
