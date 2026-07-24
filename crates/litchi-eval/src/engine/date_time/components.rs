@@ -4,7 +4,9 @@ use litchi_core::sheet::{CellValue, Result};
 
 use chrono::Datelike;
 
-use super::helpers::{SECONDS_PER_DAY, coerce_date_value, coerce_time_fraction};
+use super::helpers::{
+    SECONDS_PER_DAY, coerce_date_value, coerce_time_fraction, serial_to_excel_date_1900,
+};
 
 pub(crate) async fn eval_year(
     ctx: EvalCtx<'_>,
@@ -54,6 +56,35 @@ pub(crate) async fn eval_day(
         None => Ok(CellValue::Error(
             "DAY expects a valid date serial or text".to_string(),
         )),
+    }
+}
+
+/// DATESTRING(serial_number) — East Asian date string in the form
+/// `YYYY年MM月DD日` (ECMA-376 §18.17.7.62). Only a numeric date serial in the
+/// 1900 date system is accepted, matching the other component functions.
+pub(crate) async fn eval_datestring(
+    ctx: EvalCtx<'_>,
+    current_sheet: &str,
+    args: &[Expr],
+) -> Result<CellValue> {
+    if args.len() != 1 {
+        return Ok(CellValue::Error(
+            "DATESTRING expects 1 argument".to_string(),
+        ));
+    }
+    let value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let serial = match crate::engine::to_number(&value) {
+        Some(n) => n,
+        None => return Ok(CellValue::Error("#VALUE!".to_string())),
+    };
+    match serial_to_excel_date_1900(serial) {
+        Some(date) => Ok(CellValue::String(format!(
+            "{:04}年{:02}月{:02}日",
+            date.year(),
+            date.month(),
+            date.day()
+        ))),
+        None => Ok(CellValue::Error("#VALUE!".to_string())),
     }
 }
 
@@ -242,6 +273,59 @@ mod tests {
         let result = eval_hour(ctx, "Sheet1", &args).await.unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects a valid time")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_datestring_ecma_example() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // ECMA-376 §18.17.7.62: DATESTRING(39448) -> 2008年01月01日
+        let args = vec![num_expr(39448.0)];
+        let result = eval_datestring(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("2008年01月01日".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_datestring_zero_padded() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Excel serial for 2024-03-15
+        let args = vec![num_expr(45366.0)];
+        let result = eval_datestring(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("2024年03月15日".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_datestring_ignores_time_fraction() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(45366.75)];
+        let result = eval_datestring(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("2024年03月15日".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_datestring_non_numeric() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![Expr::Literal(CellValue::String("abc".to_string()))];
+        let result = eval_datestring(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#VALUE!"),
+            _ => panic!("Expected #VALUE!, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_datestring_wrong_args() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_datestring(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 argument")),
             _ => panic!("Expected Error"),
         }
     }

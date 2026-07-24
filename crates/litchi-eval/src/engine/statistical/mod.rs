@@ -21,9 +21,9 @@ pub(crate) use ranking::{
 };
 
 pub(crate) use simple::{
-    eval_correl, eval_covar_p, eval_covar_s, eval_fisher, eval_fisherinv, eval_geomean,
-    eval_harmean, eval_intercept, eval_kurt, eval_median, eval_mode_sngl, eval_pearson, eval_rsq,
-    eval_skew, eval_skew_p, eval_slope, eval_standardize, eval_stdev_a, eval_stdev_p,
-    eval_stdev_pa, eval_stdev_s, eval_steyx, eval_trimmean, eval_var_a, eval_var_p, eval_var_pa,
-    eval_var_s,
+    eval_correl, eval_covar_p, eval_covar_s, eval_fisher, eval_fisherinv, eval_forecast,
+    eval_geomean, eval_harmean, eval_intercept, eval_kurt, eval_median, eval_mode_sngl,
+    eval_pearson, eval_rsq, eval_skew, eval_skew_p, eval_slope, eval_standardize, eval_stdev_a,
+    eval_stdev_p, eval_stdev_pa, eval_stdev_s, eval_steyx, eval_trimmean, eval_var_a, eval_var_p,
+    eval_var_pa, eval_var_s,
 };

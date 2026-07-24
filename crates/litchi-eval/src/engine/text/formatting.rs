@@ -91,6 +91,76 @@ pub(crate) async fn eval_dollar(
     Ok(CellValue::String(text))
 }
 
+pub(crate) async fn eval_usdollar(
+    ctx: EvalCtx<'_>,
+    current_sheet: &str,
+    args: &[Expr],
+) -> Result<CellValue> {
+    eval_legacy_currency(ctx, current_sheet, args, "$", 2, "USDOLLAR").await
+}
+
+pub(crate) async fn eval_yen(
+    ctx: EvalCtx<'_>,
+    current_sheet: &str,
+    args: &[Expr],
+) -> Result<CellValue> {
+    eval_legacy_currency(ctx, current_sheet, args, "¥", 0, "YEN").await
+}
+
+/// Shared implementation for the legacy East Asian currency functions
+/// USDOLLAR and YEN (ECMA-376 §18.17.7.352 / §18.17.7.372). Unlike DOLLAR,
+/// negative values use the parenthesized accounting convention, e.g.
+/// `($1,234.57)`; the symbol and the default decimals differ per function.
+async fn eval_legacy_currency(
+    ctx: EvalCtx<'_>,
+    current_sheet: &str,
+    args: &[Expr],
+    symbol: &str,
+    default_decimals: i32,
+    func_name: &str,
+) -> Result<CellValue> {
+    if args.is_empty() || args.len() > 2 {
+        return Ok(CellValue::Error(format!(
+            "{func_name} expects 1 or 2 arguments (number, [decimals])"
+        )));
+    }
+
+    let number_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number = match to_number(&number_val) {
+        Some(n) => n,
+        None => {
+            return Ok(CellValue::Error(format!(
+                "{func_name} number is not numeric"
+            )));
+        },
+    };
+
+    let decimals = if args.len() == 2 {
+        let dec_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        match to_number(&dec_val) {
+            Some(n) => n.trunc() as i32,
+            None => {
+                return Ok(CellValue::Error(format!(
+                    "{func_name} decimals is not numeric"
+                )));
+            },
+        }
+    } else {
+        default_decimals
+    };
+    let decimals = decimals.clamp(-MAX_FIXED_DECIMALS, MAX_FIXED_DECIMALS);
+
+    let rounded = round_to_decimal_places(number, decimals);
+    let display_decimals = decimals.max(0) as usize;
+    let core = format_abs_value(rounded.abs(), display_decimals, true);
+    let text = if rounded.is_sign_negative() {
+        format!("({symbol}{core})")
+    } else {
+        format!("{symbol}{core}")
+    };
+    Ok(CellValue::String(text))
+}
+
 pub(crate) async fn eval_text(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
@@ -618,6 +688,85 @@ mod tests {
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
         let result = eval_dollar(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 or 2")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_usdollar_default() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.567)];
+        let result = eval_usdollar(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("$1,234.57".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_usdollar_negative_parenthesized() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-1234.567), Expr::Literal(CellValue::Int(2))];
+        let result = eval_usdollar(ctx, "Sheet1", &args).await.unwrap();
+        // ECMA-376 USDOLLAR uses the accounting-style parenthesized negative.
+        assert_eq!(result, CellValue::String("($1,234.57)".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_usdollar_negative_decimals_round_left() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.567), Expr::Literal(CellValue::Int(-2))];
+        let result = eval_usdollar(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("$1,200".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_usdollar_non_numeric() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![str_expr("abc")];
+        let result = eval_usdollar(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("not numeric")),
+            _ => panic!("Expected Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_yen_default_zero_decimals() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.567)];
+        let result = eval_yen(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("¥1,235".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_yen_custom_decimals() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1234.567), Expr::Literal(CellValue::Int(2))];
+        let result = eval_yen(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("¥1,234.57".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_yen_negative_parenthesized() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(-1234.567)];
+        let result = eval_yen(ctx, "Sheet1", &args).await.unwrap();
+        assert_eq!(result, CellValue::String("(¥1,235)".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_eval_yen_wrong_args() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_yen(ctx, "Sheet1", &args).await.unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 1 or 2")),
             _ => panic!("Expected Error"),

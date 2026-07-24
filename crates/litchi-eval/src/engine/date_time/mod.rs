@@ -7,7 +7,9 @@ mod offsets;
 mod week;
 mod workdays;
 
-pub(crate) use components::{eval_day, eval_hour, eval_minute, eval_month, eval_second, eval_year};
+pub(crate) use components::{
+    eval_datestring, eval_day, eval_hour, eval_minute, eval_month, eval_second, eval_year,
+};
 pub(crate) use constructors::{eval_date, eval_datevalue, eval_time, eval_timevalue};
 pub(crate) use current::{eval_now, eval_today};
 pub(crate) use differences::{eval_datedif, eval_days, eval_days360, eval_yearfrac};

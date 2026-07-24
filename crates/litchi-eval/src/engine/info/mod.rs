@@ -101,6 +101,46 @@ pub(crate) fn classify_reference(
     }
 }
 
+/// ERROR.TYPE(error_value) — maps the seven standard Excel error values to
+/// their numeric codes; returns #N/A for anything else.
+fn error_type_code(code: &str) -> Option<i64> {
+    if code.eq_ignore_ascii_case("#NULL!") {
+        Some(1)
+    } else if code.eq_ignore_ascii_case("#DIV/0!") {
+        Some(2)
+    } else if code.eq_ignore_ascii_case("#VALUE!") {
+        Some(3)
+    } else if code.eq_ignore_ascii_case("#REF!") {
+        Some(4)
+    } else if code.eq_ignore_ascii_case("#NAME?") {
+        Some(5)
+    } else if code.eq_ignore_ascii_case("#NUM!") {
+        Some(6)
+    } else if code.eq_ignore_ascii_case("#N/A") {
+        Some(7)
+    } else {
+        None
+    }
+}
+
+pub(crate) async fn eval_error_type(
+    ctx: EvalCtx<'_>,
+    current_sheet: &str,
+    args: &[Expr],
+) -> Result<CellValue> {
+    if args.len() != 1 {
+        return Ok(CellValue::Error(
+            "ERROR.TYPE expects 1 argument".to_string(),
+        ));
+    }
+    let v = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    match error_code(&v).and_then(error_type_code) {
+        Some(n) => Ok(CellValue::Int(n)),
+        // Not an error (or not one of the seven standard codes).
+        None => Ok(CellValue::Error("#N/A".to_string())),
+    }
+}
+
 pub(crate) async fn eval_isblank(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
@@ -1182,6 +1222,70 @@ mod tests {
         match result {
             CellValue::Int(n) => assert!(n >= 0),
             _ => panic!("Expected Int"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_error_type_all_codes() {
+        let cases = [
+            ("#NULL!", 1),
+            ("#DIV/0!", 2),
+            ("#VALUE!", 3),
+            ("#REF!", 4),
+            ("#NAME?", 5),
+            ("#NUM!", 6),
+            ("#N/A", 7),
+        ];
+        for (code, expected) in cases {
+            let engine = crate::engine::test_helpers::TestEngine::new();
+            let ctx = engine.ctx();
+            let args = vec![Expr::Literal(CellValue::Error(code.to_string()))];
+            let result = eval_error_type(ctx, "Sheet1", &args).await.unwrap();
+            assert_eq!(result, CellValue::Int(expected), "for {}", code);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_error_type_non_error_returns_na() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        for value in [
+            CellValue::Int(1),
+            CellValue::String("#VALUE!".to_string()),
+            CellValue::Bool(true),
+            CellValue::Empty,
+        ] {
+            let args = vec![Expr::Literal(value)];
+            let result = eval_error_type(ctx, "Sheet1", &args).await.unwrap();
+            match result {
+                CellValue::Error(e) => assert_eq!(e, "#N/A"),
+                _ => panic!("Expected #N/A, got {:?}", result),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_error_type_unknown_error_returns_na() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Engine-internal free-form error text is not one of the seven codes.
+        let args = vec![Expr::Literal(CellValue::Error("some failure".to_string()))];
+        let result = eval_error_type(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#N/A"),
+            _ => panic!("Expected #N/A, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_error_type_wrong_arg_count() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args: Vec<Expr> = vec![];
+        let result = eval_error_type(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 1 argument")),
+            _ => panic!("Expected Error"),
         }
     }
 }

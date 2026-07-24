@@ -2525,6 +2525,34 @@ mod tests {
         assert!(matches!(result, CellValue::Error(_)));
     }
 
+    // Legacy compat: FDIST(x, df1, df2) == F.DIST(x, df1, df2, TRUE) and
+    // FINV(p, df1, df2) == F.INV(p, df1, df2). Both are registered as
+    // aliases of the modern implementations in the function registry.
+    #[tokio::test]
+    async fn test_legacy_fdist_defaults_to_cumulative() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        // 3-argument call (the FDIST form) must produce the cumulative value.
+        let args = vec![num_expr(2.0), num_expr(5.0), num_expr(10.0)];
+        let result = eval_f_dist(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 0.8358).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_legacy_finv_left_tailed() {
+        let engine = TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(0.95), num_expr(5.0), num_expr(10.0)];
+        let result = eval_f_inv(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 3.3258).abs() < 0.01),
+            _ => panic!("Expected Float"),
+        }
+    }
+
     // F.INV.RT tests
     #[tokio::test]
     async fn test_eval_f_inv_rt() {

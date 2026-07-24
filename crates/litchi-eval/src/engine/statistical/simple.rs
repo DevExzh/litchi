@@ -1,4 +1,6 @@
-use crate::engine::{EvalCtx, evaluate_expression, for_each_value_in_expr, to_number};
+use crate::engine::{
+    EvalCtx, evaluate_expression, flatten_range_expr, for_each_value_in_expr, to_number,
+};
 use crate::parser::Expr;
 use litchi_core::sheet::{CellValue, Result};
 use std::cmp::Ordering;
@@ -730,6 +732,65 @@ pub(crate) async fn eval_intercept(
     }
 }
 
+pub(crate) async fn eval_forecast(
+    ctx: EvalCtx<'_>,
+    current_sheet: &str,
+    args: &[Expr],
+) -> Result<CellValue> {
+    if args.len() != 3 {
+        return Ok(CellValue::Error(
+            "FORECAST expects 3 arguments (x, known_y, known_x)".to_string(),
+        ));
+    }
+
+    let x_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let x = match to_number(&x_val) {
+        Some(n) => n,
+        None => return Ok(CellValue::Error("#VALUE!".to_string())),
+    };
+
+    // Same least-squares math as SLOPE/INTERCEPT, but FORECAST reports
+    // mismatched or empty ranges as #N/A instead of a hard failure.
+    let known_y = flatten_range_expr(ctx, current_sheet, &args[1]).await?;
+    let known_x = flatten_range_expr(ctx, current_sheet, &args[2]).await?;
+    if known_y.values.len() != known_x.values.len() {
+        return Ok(CellValue::Error("#N/A".to_string()));
+    }
+
+    let mut ys = Vec::new();
+    let mut xs = Vec::new();
+    for (vy, vx) in known_y.values.iter().zip(known_x.values.iter()) {
+        if let (Some(ny), Some(nx)) = (to_number(vy), to_number(vx)) {
+            ys.push(ny);
+            xs.push(nx);
+        }
+    }
+
+    let n = ys.len() as f64;
+    if n < 1.0 {
+        return Ok(CellValue::Error("#N/A".to_string()));
+    }
+
+    let mean_x = xs.iter().sum::<f64>() / n;
+    let mean_y = ys.iter().sum::<f64>() / n;
+
+    let mut sum_sq_diff_x = 0.0;
+    let mut sum_prod_diff = 0.0;
+    for i in 0..ys.len() {
+        let dx = xs[i] - mean_x;
+        sum_sq_diff_x += dx * dx;
+        sum_prod_diff += dx * (ys[i] - mean_y);
+    }
+
+    if sum_sq_diff_x == 0.0 {
+        return Ok(CellValue::Error("#DIV/0!".to_string()));
+    }
+
+    let slope = sum_prod_diff / sum_sq_diff_x;
+    let intercept = mean_y - slope * mean_x;
+    Ok(CellValue::Float(intercept + slope * x))
+}
+
 async fn eval_covariance(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
@@ -1306,6 +1367,209 @@ mod tests {
                 assert!((v - 1.666667).abs() < 1e-5, "Expected ~1.667, got {}", v)
             },
             _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_mode_sngl_tie_picks_lowest() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // 1 and 2 both appear twice; the lowest-valued mode wins.
+        let args = vec![
+            num_expr(2.0),
+            num_expr(1.0),
+            num_expr(2.0),
+            num_expr(1.0),
+            num_expr(3.0),
+        ];
+        let result = eval_mode_sngl(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
+            _ => panic!("Expected Float"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_forecast_perfect_line() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // y = 2x + 1 over x in 1..=4; FORECAST(5) should be 11.
+        engine.add_range(
+            "",
+            1,
+            1,
+            4,
+            1,
+            vec![
+                CellValue::Int(3),
+                CellValue::Int(5),
+                CellValue::Int(7),
+                CellValue::Int(9),
+            ],
+        );
+        engine.add_range(
+            "",
+            1,
+            2,
+            4,
+            1,
+            vec![
+                CellValue::Int(1),
+                CellValue::Int(2),
+                CellValue::Int(3),
+                CellValue::Int(4),
+            ],
+        );
+        let args = vec![
+            num_expr(5.0),
+            range_expr(1, 1, 4, 1),
+            range_expr(1, 2, 4, 2),
+        ];
+        let result = eval_forecast(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 11.0).abs() < 1e-9, "Expected 11, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_forecast_ignores_non_numeric_pairs() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Text/empty cells drop the aligned pair, same as SLOPE.
+        engine.add_range(
+            "",
+            1,
+            1,
+            3,
+            1,
+            vec![
+                CellValue::Int(2),
+                CellValue::String("skip".to_string()),
+                CellValue::Int(6),
+            ],
+        );
+        engine.add_range(
+            "",
+            1,
+            2,
+            3,
+            1,
+            vec![CellValue::Int(1), CellValue::Int(2), CellValue::Int(3)],
+        );
+        // Remaining pairs (2,1) and (6,3): y = 2x; FORECAST(4) = 8.
+        let args = vec![
+            num_expr(4.0),
+            range_expr(1, 1, 3, 1),
+            range_expr(1, 2, 3, 2),
+        ];
+        let result = eval_forecast(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Float(v) => assert!((v - 8.0).abs() < 1e-9, "Expected 8, got {}", v),
+            _ => panic!("Expected Float, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_forecast_zero_variance_x() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // All known_x identical -> #DIV/0!
+        engine.add_range(
+            "",
+            1,
+            1,
+            3,
+            1,
+            vec![CellValue::Int(1), CellValue::Int(2), CellValue::Int(3)],
+        );
+        engine.add_range(
+            "",
+            1,
+            2,
+            3,
+            1,
+            vec![CellValue::Int(7), CellValue::Int(7), CellValue::Int(7)],
+        );
+        let args = vec![
+            num_expr(5.0),
+            range_expr(1, 1, 3, 1),
+            range_expr(1, 2, 3, 2),
+        ];
+        let result = eval_forecast(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#DIV/0!"),
+            _ => panic!("Expected #DIV/0!, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_forecast_mismatched_ranges() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        engine.add_range(
+            "",
+            1,
+            1,
+            3,
+            1,
+            vec![CellValue::Int(1), CellValue::Int(2), CellValue::Int(3)],
+        );
+        engine.add_range("", 1, 2, 2, 1, vec![CellValue::Int(1), CellValue::Int(2)]);
+        let args = vec![
+            num_expr(5.0),
+            range_expr(1, 1, 3, 1),
+            range_expr(1, 2, 2, 2),
+        ];
+        let result = eval_forecast(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#N/A"),
+            _ => panic!("Expected #N/A, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_forecast_empty_ranges() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        // Both ranges contain only empty cells -> #N/A
+        let args = vec![
+            num_expr(5.0),
+            range_expr(1, 1, 3, 1),
+            range_expr(1, 2, 3, 2),
+        ];
+        let result = eval_forecast(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#N/A"),
+            _ => panic!("Expected #N/A, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_forecast_non_numeric_x() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![
+            Expr::Literal(CellValue::String("abc".to_string())),
+            num_expr(1.0),
+            num_expr(2.0),
+        ];
+        let result = eval_forecast(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert_eq!(e, "#VALUE!"),
+            _ => panic!("Expected #VALUE!, got {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_forecast_wrong_arg_count() {
+        let engine = crate::engine::test_helpers::TestEngine::new();
+        let ctx = engine.ctx();
+        let args = vec![num_expr(1.0), num_expr(2.0)];
+        let result = eval_forecast(ctx, "Sheet1", &args).await.unwrap();
+        match result {
+            CellValue::Error(e) => assert!(e.contains("expects 3 arguments")),
+            _ => panic!("Expected Error"),
         }
     }
 }

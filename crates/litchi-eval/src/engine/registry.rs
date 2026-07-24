@@ -55,6 +55,7 @@ register_functions!(
     wrap_countblank => super::aggregate::eval_countblank => ["COUNTBLANK"],
     wrap_mina => super::aggregate::eval_mina => ["MINA"],
     wrap_maxa => super::aggregate::eval_maxa => ["MAXA"],
+    wrap_subtotal => super::aggregate::eval_subtotal => ["SUBTOTAL"],
 
     // Criteria Aggregates
     wrap_sumif => super::criteria_aggs::eval_sumif => ["SUMIF"],
@@ -202,6 +203,7 @@ register_functions!(
     wrap_value => super::info::eval_value => ["VALUE"],
     wrap_sheet => super::info::eval_sheet => ["SHEET"],
     wrap_sheets => super::info::eval_sheets => ["SHEETS"],
+    wrap_error_type => super::info::eval_error_type => ["ERROR.TYPE"],
 
     // Text
     wrap_len => super::text::eval_len => ["LEN"],
@@ -219,6 +221,9 @@ register_functions!(
     wrap_clean => super::text::eval_clean => ["CLEAN"],
     wrap_fixed => super::text::eval_fixed => ["FIXED"],
     wrap_dollar => super::text::eval_dollar => ["DOLLAR"],
+    wrap_usdollar => super::text::eval_usdollar => ["USDOLLAR"],
+    wrap_yen => super::text::eval_yen => ["YEN"],
+    wrap_numberstring => super::text::eval_numberstring => ["NUMBERSTRING"],
     wrap_text => super::text::eval_text => ["TEXT"],
     wrap_left => super::text::eval_left => ["LEFT"],
     wrap_leftb => super::text::eval_leftb => ["LEFTB"],
@@ -273,6 +278,7 @@ register_functions!(
     wrap_workday_intl => super::date_time::eval_workday_intl => ["WORKDAY.INTL"],
     wrap_networkdays => super::date_time::eval_networkdays => ["NETWORKDAYS"],
     wrap_networkdays_intl => super::date_time::eval_networkdays_intl => ["NETWORKDAYS.INTL"],
+    wrap_datestring => super::date_time::eval_datestring => ["DATESTRING"],
 
     // Lookup & Reference
     wrap_index => super::lookup::eval_index => ["INDEX"],
@@ -286,6 +292,9 @@ register_functions!(
     wrap_row => super::lookup::eval_row => ["ROW"],
     wrap_rows => super::lookup::eval_rows => ["ROWS"],
     wrap_columns => super::lookup::eval_columns => ["COLUMNS"],
+    wrap_lookup => super::lookup::eval_lookup => ["LOOKUP"],
+    wrap_address => super::lookup::eval_address => ["ADDRESS"],
+    wrap_areas => super::lookup::eval_areas => ["AREAS"],
 
     // Statistical - Distributions
     wrap_norm_dist => super::statistical::eval_norm_dist => ["NORM.DIST", "NORMDIST"],
@@ -316,9 +325,9 @@ register_functions!(
     wrap_t_dist_rt => super::statistical::eval_t_dist_rt => ["T.DIST.RT", "TDIST"],
     wrap_t_inv => super::statistical::eval_t_inv => ["T.INV"],
     wrap_t_inv_2t => super::statistical::eval_t_inv_2t => ["T.INV.2T", "TINV"],
-    wrap_f_dist => super::statistical::eval_f_dist => ["F.DIST"],
+    wrap_f_dist => super::statistical::eval_f_dist => ["F.DIST", "FDIST"],
     wrap_f_dist_rt => super::statistical::eval_f_dist_rt => ["F.DIST.RT"],
-    wrap_f_inv => super::statistical::eval_f_inv => ["F.INV"],
+    wrap_f_inv => super::statistical::eval_f_inv => ["F.INV", "FINV"],
     wrap_f_inv_rt => super::statistical::eval_f_inv_rt => ["F.INV.RT"],
 
     // Statistical - Tests
@@ -353,7 +362,8 @@ register_functions!(
     wrap_gauss => super::statistical::eval_gauss => ["GAUSS"],
     wrap_phi => super::statistical::eval_phi => ["PHI"],
     wrap_median => super::statistical::eval_median => ["MEDIAN"],
-    wrap_mode_sngl => super::statistical::eval_mode_sngl => ["MODE.SNGL"],
+    wrap_mode_sngl => super::statistical::eval_mode_sngl => ["MODE.SNGL", "MODE"],
+    wrap_forecast => super::statistical::eval_forecast => ["FORECAST", "FORECAST.LINEAR"],
     wrap_stdev_s => super::statistical::eval_stdev_s => ["STDEV", "STDEV.S"],
     wrap_stdev_p => super::statistical::eval_stdev_p => ["STDEVP", "STDEV.P"],
     wrap_var_s => super::statistical::eval_var_s => ["VAR", "VAR.S"],
@@ -605,6 +615,30 @@ mod tests {
         assert!(FUNCTION_MAP.get("STDEV.S").is_some());
         assert!(FUNCTION_MAP.get("NORMDIST").is_some());
         assert!(FUNCTION_MAP.get("NORM.DIST").is_some());
+    }
+
+    #[test]
+    fn test_function_map_classic_compat_functions() {
+        // Newly added classic/legacy functions dispatch through the registry,
+        // including the legacy aliases of modern implementations.
+        for name in [
+            "FORECAST",
+            "FORECAST.LINEAR",
+            "LOOKUP",
+            "ADDRESS",
+            "AREAS",
+            "ERROR.TYPE",
+            "SUBTOTAL",
+            "MODE",
+            "FDIST",
+            "FINV",
+            "USDOLLAR",
+            "YEN",
+            "NUMBERSTRING",
+            "DATESTRING",
+        ] {
+            assert!(FUNCTION_MAP.get(name).is_some(), "{} not registered", name);
+        }
     }
 
     #[test]
