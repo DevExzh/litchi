@@ -3,8 +3,9 @@
 //! reopen.
 
 use litchi_odf::{
-    CellValue, FlatOpenDocument, FlatPresentation, FlatSpreadsheet, FlatTextDocument,
-    OpenDocumentFamily,
+    CellValue, DrawingLayer, DrawingPageProperties, DrawingShapeKind, FlatChartDocument,
+    FlatDrawingDocument, FlatOpenDocument, FlatPresentation, FlatSpreadsheet, FlatTextDocument,
+    OpenDocumentFamily, Shape,
 };
 
 const FLAT_TEXT: &str =
@@ -14,6 +15,38 @@ const FLAT_SPREADSHEET: &str =
 const FLAT_SPREADSHEET_DDE: &str = include_str!("fixtures/odfpy-sheet-dde-source.fods");
 const FLAT_PRESENTATION: &str =
     include_str!("../../../test-data/libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp");
+const FLAT_DRAWING: &str =
+    include_str!("../../../test-data/odf/drawing/fill-image-inline.fodg");
+
+const FLAT_DRAWING_WITH_SHAPE: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+    r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+    r#"xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+    r#"office:mimetype="application/vnd.oasis.opendocument.graphics" office:version="1.3">"#,
+    r#"<office:body><office:drawing><draw:page draw:name="p1" draw:master-page-name="Default">"#,
+    r#"<draw:layer-set><draw:layer draw:name="layout"/></draw:layer-set>"#,
+    r#"<draw:rect draw:name="box" draw:layer="layout" svg:width="2cm" svg:height="1cm">"#,
+    r#"<text:p>Old label</text:p></draw:rect>"#,
+    r#"</draw:page></office:drawing></office:body></office:document>"#,
+);
+
+const FLAT_CHART: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+    r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+    r#"office:mimetype="application/vnd.oasis.opendocument.chart" office:version="1.3">"#,
+    r#"<office:styles><style:style xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="keep-me"/></office:styles>"#,
+    r#"<office:body><office:chart>"#,
+    r#"<chart:chart chart:class="chart:bar">"#,
+    r#"<chart:title><text:p>Revenue</text:p></chart:title>"#,
+    r#"<chart:plot-area>"#,
+    r#"<chart:axis chart:dimension="x" chart:name="primary-x"/>"#,
+    r#"<chart:series chart:values-cell-range-address="Sheet1.A1:A3" chart:class="chart:bar"/>"#,
+    r#"</chart:plot-area></chart:chart></office:chart></office:body></office:document>"#,
+);
 
 #[test]
 fn flat_text_paragraph_edit_round_trips() {
@@ -187,4 +220,83 @@ fn flat_mutable_wrappers_reject_wrong_families() {
     assert!(FlatTextDocument::from_bytes(FLAT_SPREADSHEET.as_bytes().to_vec()).is_err());
     assert!(FlatSpreadsheet::from_bytes(FLAT_PRESENTATION.as_bytes().to_vec()).is_err());
     assert!(FlatPresentation::from_bytes(FLAT_TEXT.as_bytes().to_vec()).is_err());
+    assert!(FlatDrawingDocument::from_bytes(FLAT_CHART.as_bytes().to_vec()).is_err());
+    assert!(FlatChartDocument::from_bytes(FLAT_DRAWING.as_bytes().to_vec()).is_err());
+}
+
+#[test]
+fn flat_drawing_page_and_shape_authoring_round_trips() {
+    // The fixture has an empty `<office:drawing/>` body and a fill-image
+    // style section; authoring adds a page while the styles stay untouched.
+    let document = FlatDrawingDocument::from_bytes(FLAT_DRAWING.as_bytes().to_vec()).unwrap();
+    let mut mutable = document.into_mutable().unwrap();
+    let mut properties = DrawingPageProperties::new();
+    properties.set_name(Some("Page 1"));
+    mutable.drawing_mut().add_page(properties).unwrap();
+    mutable
+        .drawing_mut()
+        .add_layer(0, DrawingLayer::new("layout"))
+        .unwrap();
+    let shape = Shape {
+        drawing_kind: Some(DrawingShapeKind::Rectangle),
+        name: Some("added-rect".to_string()),
+        text: "Added flat shape".to_string(),
+        layer: Some("layout".to_string()),
+        ..Shape::new()
+    };
+    mutable.drawing_mut().add_shape(0, shape).unwrap();
+
+    let bytes = mutable.to_bytes().unwrap();
+    let output = String::from_utf8(bytes.clone()).unwrap();
+    let flat = FlatOpenDocument::from_bytes(bytes.clone()).unwrap();
+    assert_eq!(flat.family(), OpenDocumentFamily::Drawing);
+    assert!(output.contains("libreoffice_5f_0"));
+
+    let reopened = FlatDrawingDocument::from_bytes(bytes).unwrap();
+    assert_eq!(reopened.drawing().page_count(), 1);
+    let page = reopened.drawing().page(0).unwrap();
+    assert_eq!(page.shapes().len(), 1);
+    assert_eq!(page.shapes()[0].name.as_deref(), Some("added-rect"));
+    assert_eq!(page.shapes()[0].text, "Added flat shape");
+}
+
+#[test]
+fn flat_drawing_existing_shape_text_edit_round_trips() {
+    let document =
+        FlatDrawingDocument::from_bytes(FLAT_DRAWING_WITH_SHAPE.as_bytes().to_vec()).unwrap();
+    let mut mutable = document.into_mutable().unwrap();
+    let mut shape = mutable.drawing().page(0).unwrap().shapes()[0].clone();
+    shape.text = "New label".to_string();
+    mutable.drawing_mut().set_shape(0, 0, shape).unwrap();
+
+    let bytes = mutable.to_bytes().unwrap();
+    let reopened = FlatDrawingDocument::from_bytes(bytes).unwrap();
+    let page = reopened.drawing().page(0).unwrap();
+    assert_eq!(page.shapes()[0].text, "New label");
+    assert_eq!(page.layers().len(), 1);
+}
+
+#[test]
+fn flat_chart_axis_update_round_trips() {
+    let document = FlatChartDocument::from_bytes(FLAT_CHART.as_bytes().to_vec()).unwrap();
+    let mut mutable = document.to_mutable().unwrap();
+    let update = litchi_odf::ChartAxisUpdate {
+        name: Some(Some("renamed-x".to_string())),
+        ..Default::default()
+    };
+    mutable.chart_mut().update_axis(0, &update).unwrap();
+
+    let bytes = mutable.to_bytes().unwrap();
+    let output = String::from_utf8(bytes.clone()).unwrap();
+    let flat = FlatOpenDocument::from_bytes(bytes.clone()).unwrap();
+    assert_eq!(flat.family(), OpenDocumentFamily::Chart);
+    assert!(output.contains("keep-me"));
+
+    let reopened = FlatChartDocument::from_bytes(bytes).unwrap();
+    assert!(reopened.chart().find_axis("renamed-x").is_some());
+    assert!(reopened.chart().find_axis("primary-x").is_none());
+    assert!(reopened.chart().text().contains("Revenue"));
+
+    // `to_mutable` left the original wrapper unchanged.
+    assert!(document.chart().find_axis("primary-x").is_some());
 }

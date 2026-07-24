@@ -35,6 +35,34 @@ const PART_WRAPPER_OVERHEAD: usize = 64;
 /// Maximum wrapper-prefix candidates tried before rejecting the document.
 const MAX_WRAPPER_PREFIX_ATTEMPTS: usize = 64;
 
+/// Standard ODF namespace declarations added to synthesized `content.xml`
+/// and `styles.xml` roots when the flat root did not declare them.
+///
+/// Packaged mutation flows that preserve the source part root (notably
+/// `MutableDrawing`) assume these prefixes are in scope when they serialize
+/// new elements; real packaged parts declare them on every part root.
+const STANDARD_PART_NAMESPACES: [(&str, &str); 16] = [
+    ("style", "urn:oasis:names:tc:opendocument:xmlns:style:1.0"),
+    ("text", "urn:oasis:names:tc:opendocument:xmlns:text:1.0"),
+    ("table", "urn:oasis:names:tc:opendocument:xmlns:table:1.0"),
+    ("draw", "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"),
+    ("fo", "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"),
+    ("xlink", "http://www.w3.org/1999/xlink"),
+    ("dc", "http://purl.org/dc/elements/1.1/"),
+    ("meta", "urn:oasis:names:tc:opendocument:xmlns:meta:1.0"),
+    ("number", "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"),
+    ("svg", "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"),
+    ("chart", "urn:oasis:names:tc:opendocument:xmlns:chart:1.0"),
+    ("dr3d", "urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0"),
+    ("form", "urn:oasis:names:tc:opendocument:xmlns:form:1.0"),
+    ("script", "urn:oasis:names:tc:opendocument:xmlns:script:1.0"),
+    (
+        "presentation",
+        "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0",
+    ),
+    ("math", "http://www.w3.org/1998/Math/MathML"),
+];
+
 /// Byte-range slices of one flat document, grouped by package part.
 struct FlatSections<'a> {
     /// Serialized `xmlns` declarations copied from the root element.
@@ -71,6 +99,17 @@ impl FlatSections<'_> {
         if let Some(decl) = &self.wrapper_decl {
             part.push(' ');
             part.push_str(decl);
+        }
+        if matches!(root_local_name, "document-content" | "document-styles") {
+            for (prefix, uri) in STANDARD_PART_NAMESPACES {
+                let key = format!("xmlns:{prefix}=\"");
+                if !self.namespace_decls.contains(&key) {
+                    part.push(' ');
+                    part.push_str(&key);
+                    part.push_str(uri);
+                    part.push('"');
+                }
+            }
         }
         part.push('>');
         for section in sections {
@@ -799,6 +838,45 @@ flat_family_wrapper! {
     }
 }
 
+/// Package serialization shared by the packaged mutable authoring models.
+///
+/// `ChartDocument` mutates in place and returns infallible package bytes;
+/// the other models return `Result`. This adapter gives the flat mutable
+/// wrappers one uniform serialization entry point.
+trait MutatedPackageBytes {
+    fn mutated_package_bytes(&self) -> Result<Vec<u8>>;
+}
+
+impl MutatedPackageBytes for crate::MutableDocument {
+    fn mutated_package_bytes(&self) -> Result<Vec<u8>> {
+        self.to_bytes()
+    }
+}
+
+impl MutatedPackageBytes for crate::MutableSpreadsheet {
+    fn mutated_package_bytes(&self) -> Result<Vec<u8>> {
+        self.to_bytes()
+    }
+}
+
+impl MutatedPackageBytes for crate::MutablePresentation {
+    fn mutated_package_bytes(&self) -> Result<Vec<u8>> {
+        self.to_bytes()
+    }
+}
+
+impl MutatedPackageBytes for crate::MutableDrawing {
+    fn mutated_package_bytes(&self) -> Result<Vec<u8>> {
+        self.to_bytes()
+    }
+}
+
+impl MutatedPackageBytes for crate::ChartDocument {
+    fn mutated_package_bytes(&self) -> Result<Vec<u8>> {
+        Ok(self.to_bytes())
+    }
+}
+
 macro_rules! flat_mutable_wrapper {
     (
         $(#[$meta:meta])*
@@ -838,7 +916,7 @@ macro_rules! flat_mutable_wrapper {
 
             #[doc = concat!("Serialize the mutated document back into flat `.", $extension, "` XML.\n\nSections the mutation did not touch keep their original bytes; the result is validated again as a flat document of the same family. Binary package parts created by the authoring model (for example added `Pictures/` media) cannot be represented as flat sections and are not carried over.")]
             pub fn to_bytes(&self) -> Result<Vec<u8>> {
-                splice_package_into_flat(&self.flat, self.document.to_bytes()?)
+                splice_package_into_flat(&self.flat, self.document.mutated_package_bytes()?)
             }
 
             #[doc = concat!("Save the mutated document as flat `.", $extension, "` XML.")]
@@ -909,6 +987,37 @@ flat_mutable_wrapper! {
     }
 }
 
+flat_mutable_wrapper! {
+    /// Mutable semantic editor for flat OpenDocument drawings (`.fodg`).
+    ///
+    /// Obtained from [`FlatDrawingDocument::into_mutable`] or
+    /// [`FlatDrawingDocument::to_mutable`]. Edits go through the packaged
+    /// [`MutableDrawing`](crate::MutableDrawing) authoring APIs and
+    /// `to_bytes`/`save` write them back into flat XML form.
+    pub struct FlatMutableDrawingDocument {
+        inner: crate::MutableDrawing,
+        accessor: drawing,
+        mut_accessor: drawing_mut,
+        extension: "fodg",
+    }
+}
+
+flat_mutable_wrapper! {
+    /// Mutable semantic editor for flat OpenDocument charts (`.fodc`).
+    ///
+    /// Obtained from [`FlatChartDocument::into_mutable`] or
+    /// [`FlatChartDocument::to_mutable`]. The packaged
+    /// [`ChartDocument`](crate::ChartDocument) mutates in place through its
+    /// axis and series APIs; `to_bytes`/`save` write the edits back into
+    /// flat XML form.
+    pub struct FlatMutableChartDocument {
+        inner: crate::ChartDocument,
+        accessor: chart,
+        mut_accessor: chart_mut,
+        extension: "fodc",
+    }
+}
+
 impl FlatTextDocument {
     /// Convert this flat document into an atomic mutable flat text document.
     pub fn into_mutable(self) -> Result<FlatMutableTextDocument> {
@@ -954,6 +1063,39 @@ impl FlatPresentation {
         let document = crate::odp::Presentation::from_bytes(synthesize_package(&flat)?)?;
         let document = crate::MutablePresentation::from_presentation(document)?;
         Ok(FlatMutablePresentation::from_flat(flat, document))
+    }
+}
+
+impl FlatDrawingDocument {
+    /// Convert this flat drawing into an atomic mutable flat drawing.
+    pub fn into_mutable(self) -> Result<FlatMutableDrawingDocument> {
+        let document = self.document.into_mutable()?;
+        Ok(FlatMutableDrawingDocument::from_flat(self.flat, document))
+    }
+
+    /// Clone this flat drawing into an atomic mutable flat drawing.
+    pub fn to_mutable(&self) -> Result<FlatMutableDrawingDocument> {
+        let flat = FlatOpenDocument::from_bytes(self.flat.to_bytes())?;
+        let document = crate::odg::DrawingDocument::from_bytes(synthesize_package(&flat)?)?;
+        let document = document.into_mutable()?;
+        Ok(FlatMutableDrawingDocument::from_flat(flat, document))
+    }
+}
+
+impl FlatChartDocument {
+    /// Convert this flat chart into an atomic mutable flat chart.
+    ///
+    /// The packaged [`ChartDocument`](crate::ChartDocument) is itself the
+    /// mutable model, so the conversion only carries the flat source over.
+    pub fn into_mutable(self) -> Result<FlatMutableChartDocument> {
+        Ok(FlatMutableChartDocument::from_flat(self.flat, self.document))
+    }
+
+    /// Clone this flat chart into an atomic mutable flat chart.
+    pub fn to_mutable(&self) -> Result<FlatMutableChartDocument> {
+        let flat = FlatOpenDocument::from_bytes(self.flat.to_bytes())?;
+        let document = crate::odc::ChartDocument::from_bytes(synthesize_package(&flat)?)?;
+        Ok(FlatMutableChartDocument::from_flat(flat, document))
     }
 }
 

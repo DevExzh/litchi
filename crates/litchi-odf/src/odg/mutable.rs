@@ -23,6 +23,10 @@ const MAX_LAYERS_PER_PAGE: usize = 65_536;
 const MAX_SHAPES_PER_PAGE: usize = 65_536;
 const MAX_SHAPE_DEPTH: usize = 64;
 const MAX_STRING_BYTES: usize = 1_048_576;
+/// Length of the `/>` marker ending an empty element.
+const SELF_CLOSING_MARKER_LEN: usize = 2;
+/// Closing tag used when normalizing an empty `office:drawing` body.
+const DRAWING_CLOSE_TAG: &str = "</office:drawing>";
 
 #[derive(Clone)]
 struct MutablePage {
@@ -85,12 +89,25 @@ impl MutableDrawing {
         metadata: Metadata,
         pages: Vec<DrawingPage>,
     ) -> Result<Self> {
-        let (inner, ranges) = drawing_page_ranges(&content)?;
+        let (inner, ranges, empty_drawing) = drawing_page_ranges(&content)?;
         if ranges.len() != pages.len() {
             return Err(Error::InvalidFormat(
                 "drawing page inventory does not match content.xml".to_string(),
             ));
         }
+        // An empty `<office:drawing/>` body cannot accept inserted pages, so
+        // it is normalized to an explicit open/close pair before staging.
+        let (content, inner) = if let Some(span) = empty_drawing {
+            let open_end = span.end - SELF_CLOSING_MARKER_LEN;
+            let mut normalized = String::with_capacity(content.len() + DRAWING_CLOSE_TAG.len() + 1);
+            normalized.push_str(&content[..open_end]);
+            normalized.push('>');
+            normalized.push_str(DRAWING_CLOSE_TAG);
+            normalized.push_str(&content[span.end..]);
+            (normalized, (open_end + 1)..(open_end + 1))
+        } else {
+            (content, inner)
+        };
         let mutable_pages = pages
             .into_iter()
             .zip(ranges)
@@ -899,7 +916,9 @@ fn generate_meta_xml(metadata: &Metadata) -> String {
     )
 }
 
-fn drawing_page_ranges(content: &str) -> Result<(Range<usize>, Vec<Range<usize>>)> {
+fn drawing_page_ranges(
+    content: &str,
+) -> Result<(Range<usize>, Vec<Range<usize>>, Option<Range<usize>>)> {
     let mut reader = NsReader::from_str(content);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -909,6 +928,7 @@ fn drawing_page_ranges(content: &str) -> Result<(Range<usize>, Vec<Range<usize>>
     let mut page_start = None;
     let mut page_depth = None;
     let mut pages = Vec::new();
+    let mut empty_drawing = None;
     loop {
         let event_start = reader.buffer_position() as usize;
         let (namespace, event) = reader.read_resolved_event_into(&mut buffer).map_err(|error| {
@@ -936,7 +956,12 @@ fn drawing_page_ranges(content: &str) -> Result<(Range<usize>, Vec<Range<usize>>
                 })?;
             },
             Event::Empty(element) => {
-                if draw_namespace
+                if office_namespace
+                    && element.local_name().as_ref() == b"drawing"
+                    && drawing_depth.is_none()
+                {
+                    empty_drawing = Some(event_start..event_end);
+                } else if draw_namespace
                     && element.local_name().as_ref() == b"page"
                     && drawing_depth.is_some_and(|drawing| depth == drawing + 1)
                 {
@@ -966,13 +991,18 @@ fn drawing_page_ranges(content: &str) -> Result<(Range<usize>, Vec<Range<usize>>
         }
         buffer.clear();
     }
+    if let Some(span) = empty_drawing {
+        // Placeholder inner range; the caller normalizes the empty body into
+        // an explicit open/close pair and recomputes the range.
+        return Ok((0..0, pages, Some(span)));
+    }
     let start = inner_start.ok_or_else(|| {
         Error::InvalidFormat("ODG content.xml has no office:drawing body".to_string())
     })?;
     let end = inner_end.ok_or_else(|| {
         Error::InvalidFormat("ODG content.xml has no complete office:drawing body".to_string())
     })?;
-    Ok((start..end, pages))
+    Ok((start..end, pages, None))
 }
 
 fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
@@ -1131,5 +1161,26 @@ mod tests {
         metadata.title = Some("x".repeat(MAX_STRING_BYTES + 1));
         assert!(drawing.set_metadata(metadata).is_err());
         assert_eq!(drawing.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn empty_drawing_body_accepts_inserted_pages() {
+        let content = concat!(
+            r#"<?xml version="1.0"?><office:document-content "#,
+            r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+            r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+            r#"office:version="1.3"><office:body><office:drawing/></office:body></office:document-content>"#,
+        );
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(constants::ODF_DRAWING).unwrap();
+        writer.add_file(constants::ODF_CONTENT, content.as_bytes()).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let mut drawing = MutableDrawing::from_bytes(bytes).unwrap();
+        drawing.add_page(page("Page 1")).unwrap();
+        let output = drawing.to_bytes().unwrap();
+        let reopened = DrawingDocument::from_bytes(output).unwrap();
+        assert_eq!(reopened.page_count(), 1);
+        assert_eq!(reopened.pages()[0].properties().name(), Some("Page 1"));
     }
 }
