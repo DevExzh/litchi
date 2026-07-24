@@ -18,6 +18,7 @@ mod gaps;
 mod graph;
 mod legend;
 mod pie_start_angle;
+mod pie_wedge_explosion;
 mod rounded_corners;
 mod shadow;
 mod theme;
@@ -34,9 +35,9 @@ use crate::charts::source::{
     AXIS_NON_STYLE_MESSAGE_TYPE, AXIS_STYLE_MESSAGE_TYPE, CHART_MEDIATOR_MESSAGE_TYPE,
     CHART_MESSAGE_TYPE, CHART_NON_STYLE_MESSAGE_TYPE, CHART_PRESET_MESSAGE_TYPE,
     CHART_STYLE_MESSAGE_TYPE, ChartApplicationProfile, LEGEND_NON_STYLE_MESSAGE_TYPE,
-    LEGEND_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
-    SourceChartObjectIds, chart_data, chart_geometry, chart_grid, drawable_geometry,
-    geometry_archive, reference, require_creatable_kind, source_chart_objects,
+    LEGEND_STYLE_MESSAGE_TYPE, SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE,
+    STANDIN_MESSAGE_TYPE, SourceChartObjectIds, chart_data, chart_geometry, chart_grid,
+    drawable_geometry, geometry_archive, reference, require_creatable_kind, source_chart_objects,
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
 use crate::data_reference_registry::{
@@ -561,8 +562,8 @@ mod tests {
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
-        ChartPieStartAngle, ChartRoundedCorners, ChartShadow, ChartValueAxisBounds,
-        ChartValueAxisScale, ChartValueAxisSteps,
+        ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
+        ChartShadow, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -2767,6 +2768,146 @@ mod tests {
                 .is_err()
         );
         assert_eq!(reopened.to_bytes().unwrap(), before_rejected_update);
+
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, column.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_pie_wedge_explosion_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+            .unwrap();
+        let zeros = vec![ChartPieWedgeExplosion::ZERO; 3];
+        assert_eq!(
+            editor
+                .sheet_chart_pie_wedge_explosions(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            zeros
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_pie_wedge_explosions(sheet_id, source.drawable_object_id, &zeros)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let customized = [
+            ChartPieWedgeExplosion::from_percent(10.0).unwrap(),
+            ChartPieWedgeExplosion::from_percent(25.0).unwrap(),
+            ChartPieWedgeExplosion::from_percent(40.0).unwrap(),
+        ];
+        editor
+            .set_sheet_chart_pie_wedge_explosions(sheet_id, source.drawable_object_id, &customized)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_pie_wedge_explosion(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartPieWedgeIndex::from_zero_based(1),
+                )
+                .unwrap(),
+            customized[1]
+        );
+        editor
+            .set_sheet_chart_pie_wedge_explosions(sheet_id, source.drawable_object_id, &zeros)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_pie_wedge_explosions(sheet_id, source.drawable_object_id, &customized)
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        editor
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Donut2d)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_pie_wedge_explosions(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+        let isolated = ChartPieWedgeExplosion::from_percent(55.0).unwrap();
+        editor
+            .set_sheet_chart_pie_wedge_explosion(
+                sheet_id,
+                source.drawable_object_id,
+                ChartPieWedgeIndex::from_zero_based(0),
+                isolated,
+            )
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_pie_wedge_explosion(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartPieWedgeIndex::from_zero_based(0),
+                )
+                .unwrap(),
+            isolated
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_pie_wedge_explosions(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+
+        let before_rejected_updates = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_sheet_chart_pie_wedge_explosions(
+                    sheet_id,
+                    source.drawable_object_id,
+                    &customized[..2],
+                )
+                .is_err()
+        );
+        assert!(
+            reopened
+                .set_sheet_chart_pie_wedge_explosion(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartPieWedgeIndex::from_zero_based(3),
+                    isolated,
+                )
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before_rejected_updates);
+
+        let column = reopened
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let before_wrong_kind = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .sheet_chart_pie_wedge_explosions(sheet_id, column.drawable_object_id)
+                .is_err()
+        );
+        assert!(
+            reopened
+                .set_sheet_chart_pie_wedge_explosions(
+                    sheet_id,
+                    column.drawable_object_id,
+                    &customized,
+                )
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before_wrong_kind);
 
         reopened
             .remove_sheet_chart(sheet_id, source.drawable_object_id)

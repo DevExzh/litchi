@@ -7,8 +7,8 @@ use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
-    ChartPieStartAngle, ChartRoundedCorners, ChartShadow, ChartValueAxisBounds,
-    ChartValueAxisScale, ChartValueAxisSteps,
+    ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
+    ChartShadow, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -1959,6 +1959,137 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected_update);
+
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, column.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .unwrap();
+    let zeros = vec![ChartPieWedgeExplosion::ZERO; 3];
+    assert_eq!(
+        editor
+            .slide_chart_pie_wedge_explosions(0, source.drawable_object_id)
+            .unwrap(),
+        zeros
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_pie_wedge_explosions(0, source.drawable_object_id, &zeros)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let customized = [
+        ChartPieWedgeExplosion::from_percent(10.0).unwrap(),
+        ChartPieWedgeExplosion::from_percent(25.0).unwrap(),
+        ChartPieWedgeExplosion::from_percent(40.0).unwrap(),
+    ];
+    editor
+        .set_slide_chart_pie_wedge_explosions(0, source.drawable_object_id, &customized)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_pie_wedge_explosion(
+                0,
+                source.drawable_object_id,
+                ChartPieWedgeIndex::from_zero_based(1),
+            )
+            .unwrap(),
+        customized[1]
+    );
+    editor
+        .set_slide_chart_pie_wedge_explosions(0, source.drawable_object_id, &zeros)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_chart_pie_wedge_explosions(0, source.drawable_object_id, &customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    editor
+        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Donut2d)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_pie_wedge_explosions(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    let isolated = ChartPieWedgeExplosion::from_percent(55.0).unwrap();
+    editor
+        .set_slide_chart_pie_wedge_explosion(
+            0,
+            source.drawable_object_id,
+            ChartPieWedgeIndex::from_zero_based(0),
+            isolated,
+        )
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_pie_wedge_explosion(
+                0,
+                source.drawable_object_id,
+                ChartPieWedgeIndex::from_zero_based(0),
+            )
+            .unwrap(),
+        isolated
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_pie_wedge_explosions(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+
+    let before_rejected_updates = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_slide_chart_pie_wedge_explosions(0, source.drawable_object_id, &customized[..2],)
+            .is_err()
+    );
+    assert!(
+        reopened
+            .set_slide_chart_pie_wedge_explosion(
+                0,
+                source.drawable_object_id,
+                ChartPieWedgeIndex::from_zero_based(3),
+                isolated,
+            )
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected_updates);
+
+    let column = reopened
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let before_wrong_kind = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .slide_chart_pie_wedge_explosions(0, column.drawable_object_id)
+            .is_err()
+    );
+    assert!(
+        reopened
+            .set_slide_chart_pie_wedge_explosions(0, column.drawable_object_id, &customized,)
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_wrong_kind);
 
     reopened
         .remove_slide_chart(0, source.drawable_object_id)

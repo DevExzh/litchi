@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::charts::{ChartData, ChartKind, ChartPieStartAngle};
+use litchi_iwa::charts::{ChartData, ChartKind, ChartPieStartAngle, ChartPieWedgeExplosion};
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -27,9 +27,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         chart.drawable_object_id,
         ChartPieStartAngle::from_degrees(123.0)?,
     )?;
+    editor.set_sheet_chart_pie_wedge_explosions(
+        sheet_id,
+        chart.drawable_object_id,
+        &[
+            ChartPieWedgeExplosion::from_percent(10.0)?,
+            ChartPieWedgeExplosion::from_percent(25.0)?,
+            ChartPieWedgeExplosion::from_percent(40.0)?,
+        ],
+    )?;
     editor.save(output)?;
     println!(
-        "created Numbers pie chart {} with a 123° Wedges rotation",
+        "created Numbers pie chart {} with a 123° rotation and separated wedges",
         chart.drawable_object_id
     );
     Ok(())

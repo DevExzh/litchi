@@ -28,6 +28,7 @@ pub mod metadata_extractor;
 pub(crate) mod non_style;
 pub(crate) mod options;
 pub(crate) mod pie_start_angle;
+pub(crate) mod pie_wedge_explosion;
 pub(crate) mod rounded_corners;
 pub(crate) mod series_style;
 pub(crate) mod shadow;
@@ -46,6 +47,7 @@ pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use pie_start_angle::ChartPieStartAngle;
+pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
 pub use shadow::ChartShadow;
 

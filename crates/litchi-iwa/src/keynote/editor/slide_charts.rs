@@ -18,6 +18,7 @@ mod gaps;
 mod graph;
 mod legend;
 mod pie_start_angle;
+mod pie_wedge_explosion;
 mod rounded_corners;
 mod shadow;
 mod theme;
@@ -34,9 +35,9 @@ use crate::charts::source::{
     AXIS_NON_STYLE_MESSAGE_TYPE, AXIS_STYLE_MESSAGE_TYPE, CHART_MESSAGE_TYPE,
     CHART_NON_STYLE_MESSAGE_TYPE, CHART_PRESET_MESSAGE_TYPE, CHART_STYLE_MESSAGE_TYPE,
     ChartApplicationProfile, LEGEND_NON_STYLE_MESSAGE_TYPE, LEGEND_STYLE_MESSAGE_TYPE,
-    SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE, SourceChartObjectIds, chart_data,
-    chart_geometry, chart_grid, drawable_geometry, geometry_archive, reference,
-    require_creatable_kind, source_chart_objects,
+    SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
+    SourceChartObjectIds, chart_data, chart_geometry, chart_grid, drawable_geometry,
+    geometry_archive, reference, require_creatable_kind, source_chart_objects,
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
 use crate::data_reference_registry::{

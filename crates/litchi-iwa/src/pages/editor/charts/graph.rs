@@ -304,6 +304,32 @@ pub(super) fn body_chart_graph(
                 "series style",
             )
         }));
+        private_styles.extend(payload.series_private_styles.as_ref().into_iter().flat_map(
+            |sparse| {
+                sparse.entries.iter().map(|entry| {
+                    (
+                        entry.reference.identifier,
+                        SERIES_STYLE_MESSAGE_TYPE,
+                        "private series style",
+                    )
+                })
+            },
+        ));
+        private_styles.extend(
+            payload
+                .series_non_styles
+                .as_ref()
+                .into_iter()
+                .flat_map(|sparse| {
+                    sparse.entries.iter().map(|entry| {
+                        (
+                            entry.reference.identifier,
+                            SERIES_NON_STYLE_MESSAGE_TYPE,
+                            "series non-style",
+                        )
+                    })
+                }),
+        );
         for (identifier, message_type, label) in private_styles {
             if find_object_archive(editor.package(), identifier)? != archive_name {
                 return Err(Error::InvalidFormat(format!(

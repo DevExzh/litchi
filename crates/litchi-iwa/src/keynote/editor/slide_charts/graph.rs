@@ -174,6 +174,36 @@ pub(super) fn chart_graph(
             "series style",
         )
     }));
+    local_styles.extend(
+        payload
+            .series_private_styles
+            .as_ref()
+            .into_iter()
+            .flat_map(|sparse| {
+                sparse.entries.iter().map(|entry| {
+                    (
+                        entry.reference.identifier,
+                        SERIES_STYLE_MESSAGE_TYPE,
+                        "private series style",
+                    )
+                })
+            }),
+    );
+    local_styles.extend(
+        payload
+            .series_non_styles
+            .as_ref()
+            .into_iter()
+            .flat_map(|sparse| {
+                sparse.entries.iter().map(|entry| {
+                    (
+                        entry.reference.identifier,
+                        SERIES_NON_STYLE_MESSAGE_TYPE,
+                        "series non-style",
+                    )
+                })
+            }),
+    );
     for (identifier, message_type, label) in local_styles {
         if graph.archive_name(identifier)? != archive_name {
             continue;
