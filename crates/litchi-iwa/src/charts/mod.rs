@@ -27,6 +27,8 @@ mod kind;
 pub mod metadata_extractor;
 pub(crate) mod options;
 pub(crate) mod rounded_corners;
+pub(crate) mod series_style;
+pub(crate) mod shadow;
 pub(crate) mod source;
 pub(crate) mod style;
 
@@ -42,6 +44,7 @@ pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
+pub use shadow::ChartShadow;
 
 /// Locate one chart-private object and reject ambiguous cross-component IDs.
 pub(crate) fn unique_chart_object_archive_name(

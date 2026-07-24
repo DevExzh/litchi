@@ -5,12 +5,14 @@ use std::env;
 use litchi_iwa::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartData, ChartGapPercentage, ChartGapSpacing,
-    ChartKind, ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartKind, ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+    ChartValueAxisSteps,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeStroke, StrokePattern,
-    StrokeWidth,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill,
+    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
+    ShapeShadowOpacity, ShapeStroke, StrokePattern, StrokeWidth,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -72,6 +74,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ChartGapPercentage::new(25.0)?,
             ChartGapPercentage::new(70.0)?,
         ),
+    )?;
+    editor.set_slide_chart_shadow(
+        0,
+        chart.drawable_object_id,
+        ChartShadow::Grouped(ShapeDropShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
+                ShapeShadowBlurRadius::from_points(15)?,
+                ShapeShadowOffset::from_points(8.0)?,
+                ShapeShadowOpacity::new(0.6)?,
+            ),
+            ShapeShadowAngle::from_degrees(60.0)?,
+        )),
     )?;
     editor.set_slide_chart_axis_title(
         0,
@@ -140,7 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_chart_caption(0, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Keynote {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
+        "created Keynote {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
         chart.kind, chart.drawable_object_id, chart.slide_index
     );
     Ok(())

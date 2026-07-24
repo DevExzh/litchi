@@ -45,6 +45,8 @@ impl ShapeShadowOffset {
     pub const ZERO: Self = Self(0.0);
     /// Five-point offset used by standard iWork text shadows.
     pub const FIVE_POINTS: Self = Self(5.0);
+    /// Six-point offset used by newly inserted native chart shadows.
+    pub const SIX_POINTS: Self = Self(6.0);
 
     pub fn from_points(points: f32) -> Result<Self> {
         if !points.is_finite() || points < 0.0 {
@@ -68,6 +70,8 @@ impl ShapeShadowBlurRadius {
     pub const ZERO: Self = Self(0);
     /// One-point blur radius used by standard iWork text shadows.
     pub const ONE_POINT: Self = Self(1);
+    /// Ten-point blur used by newly inserted native chart shadows.
+    pub const TEN_POINTS: Self = Self(10);
 
     pub fn from_points(points: u32) -> Result<Self> {
         if points > MAX_NATIVE_BLUR_RADIUS {
@@ -89,6 +93,8 @@ pub struct ShapeShadowOpacity(f32);
 
 impl ShapeShadowOpacity {
     pub const TRANSPARENT: Self = Self(0.0);
+    /// Seventy-five percent opacity used by newly inserted native chart shadows.
+    pub const THREE_QUARTERS: Self = Self(0.75);
     pub const OPAQUE: Self = Self(1.0);
 
     pub fn new(value: f32) -> Result<Self> {

@@ -7,12 +7,14 @@ use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartGapPercentage, ChartGapSpacing,
-    ChartRoundedCorners, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+    ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
-    RgbColorSpace, RgbaColor, ShapeFill, ShapeImageFillTechnique, ShapeStroke, StrokePattern,
-    StrokeWidth,
+    RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
+    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
+    ShapeShadowOpacity, ShapeStroke, StrokePattern, StrokeWidth,
 };
 
 const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
@@ -55,6 +57,18 @@ fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
 
 fn chart_background_fill() -> ShapeFill {
     ShapeFill::Solid(RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap())
+}
+
+fn chart_shadow() -> ChartShadow {
+    ChartShadow::Grouped(ShapeDropShadow::new(
+        ShapeShadowAppearance::new(
+            RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
+            ShapeShadowBlurRadius::from_points(15).unwrap(),
+            ShapeShadowOffset::from_points(8.0).unwrap(),
+            ShapeShadowOpacity::new(0.6).unwrap(),
+        ),
+        ShapeShadowAngle::from_degrees(60.0).unwrap(),
+    ))
 }
 
 fn fixture(relative: &str) -> Vec<u8> {
@@ -1793,6 +1807,67 @@ fn scratch_presentation_supports_native_chart_background_fill_crud() {
     assert!(reopened.media_assets().unwrap().is_empty());
     reopened
         .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_chart_shadow_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let native_default = ChartShadow::native_default();
+    assert_eq!(
+        editor
+            .slide_chart_shadow(0, source.drawable_object_id)
+            .unwrap(),
+        native_default
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_shadow(0, source.drawable_object_id, native_default)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let customized = chart_shadow();
+    editor
+        .set_slide_chart_shadow(0, source.drawable_object_id, customized)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_shadow(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    editor
+        .set_slide_chart_shadow(0, source.drawable_object_id, ChartShadow::None)
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_shadow(0, source.drawable_object_id)
+            .unwrap(),
+        ChartShadow::None
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_shadow(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    reopened
+        .set_slide_chart_shadow(0, duplicate.drawable_object_id, native_default)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }

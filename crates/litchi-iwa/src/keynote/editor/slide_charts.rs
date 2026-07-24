@@ -18,6 +18,7 @@ mod gaps;
 mod graph;
 mod legend;
 mod rounded_corners;
+mod shadow;
 mod theme;
 mod title;
 
