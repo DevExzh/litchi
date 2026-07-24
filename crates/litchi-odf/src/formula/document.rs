@@ -9,7 +9,7 @@ use quick_xml::reader::NsReader;
 use std::io::Read;
 use std::path::Path;
 
-const MATHML_NAMESPACE: &str = "http://www.w3.org/1998/Math/MathML";
+pub(crate) const MATHML_NAMESPACE: &str = "http://www.w3.org/1998/Math/MathML";
 const MAX_MATH_DEPTH: usize = 128;
 const MAX_MATH_NODES: usize = 65_536;
 const MAX_ATTRIBUTES: usize = 256;
@@ -66,6 +66,18 @@ pub struct MathAttribute {
 }
 
 impl MathAttribute {
+    pub(crate) fn from_parts(
+        namespace_uri: Option<String>,
+        local_name: String,
+        value: String,
+    ) -> Self {
+        Self {
+            namespace_uri,
+            local_name,
+            value,
+        }
+    }
+
     /// Return the expanded namespace URI, or `None` for an unqualified attribute.
     pub fn namespace_uri(&self) -> Option<&str> {
         self.namespace_uri.as_deref()
@@ -105,6 +117,28 @@ pub struct MathElement {
 }
 
 impl MathElement {
+    pub(crate) fn from_parts(
+        namespace_uri: Option<String>,
+        local_name: String,
+        attributes: Vec<MathAttribute>,
+        content: Vec<MathContent>,
+    ) -> Self {
+        Self {
+            namespace_uri,
+            local_name,
+            attributes,
+            content,
+        }
+    }
+
+    pub(crate) fn attributes_mut(&mut self) -> &mut Vec<MathAttribute> {
+        &mut self.attributes
+    }
+
+    pub(crate) fn content_mut(&mut self) -> &mut Vec<MathContent> {
+        &mut self.content
+    }
+
     /// Return the element's expanded namespace URI.
     pub fn namespace_uri(&self) -> Option<&str> {
         self.namespace_uri.as_deref()
@@ -290,6 +324,37 @@ impl FormulaDocument {
         &self.math
     }
 
+    /// Replace the document's MathML tree and repackage the formula.
+    ///
+    /// `math` must be a MathML `math` element. The tree is serialized,
+    /// re-validated through the same bounded parser used for reading, and
+    /// stored as the new `content.xml`; remaining package files are copied
+    /// unchanged. The document is left untouched when validation fails.
+    pub fn set_math(&mut self, math: MathElement) -> Result<()> {
+        if math.namespace_uri() != Some(MATHML_NAMESPACE) || math.local_name() != "math" {
+            return Err(Error::InvalidFormat(
+                "replacement formula tree must have a MathML math root".to_string(),
+            ));
+        }
+        let xml = math.to_xml();
+        // Re-validate the serialized form so a package can never contain
+        // MathML the reader itself would reject.
+        let validated = parse_mathml(&xml)?;
+
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(self.package.mimetype())?;
+        writer.add_file(constants::ODF_CONTENT, xml.as_bytes())?;
+        if self.package.has_file(constants::ODF_META)? {
+            let bytes = self.package.get_file(constants::ODF_META)?;
+            writer.add_file(constants::ODF_META, &bytes)?;
+        }
+        writer.copy_auxiliary_files_from(self.package.owned_package())?;
+        let package = OpenDocumentPackage::from_bytes(writer.finish_to_bytes()?)?;
+        self.package = package;
+        self.math = validated;
+        Ok(())
+    }
+
     /// Return every MathML annotation in document order.
     pub fn annotations(&self) -> Vec<&MathElement> {
         let mut annotations = Vec::new();
@@ -338,7 +403,7 @@ impl FormulaDocument {
     }
 }
 
-fn parse_mathml(xml: &str) -> Result<MathElement> {
+pub(crate) fn parse_mathml(xml: &str) -> Result<MathElement> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut stack = Vec::new();
@@ -704,8 +769,62 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_expanded_attributes_and_excessive_nesting() {
-        let duplicate = r#"<math xmlns="http://www.w3.org/1998/Math/MathML" xmlns:a="urn:test" xmlns:b="urn:test" a:x="one" b:x="two"/>"#;
+    fn set_math_replaces_the_tree_and_repackages_atomically() {
+        let bytes = package(constants::ODF_FORMULA, formula_xml());
+        let mut document = FormulaDocument::from_bytes(bytes.clone()).unwrap();
+        let original_math = document.math().clone();
+
+        // Non-math roots are rejected without touching the package.
+        let foreign = MathElement::new("mrow").unwrap();
+        assert!(document.set_math(foreign).is_err());
+        assert_eq!(document.as_bytes(), bytes.as_slice());
+
+        let replacement = crate::formula::builder::document_root(
+            crate::formula::builder::fraction(
+                crate::formula::builder::number("1"),
+                crate::formula::builder::identifier("x"),
+            ),
+            crate::formula::builder::MathDisplay::Inline,
+        );
+        document.set_math(replacement.clone()).unwrap();
+        assert_eq!(document.math(), &replacement);
+        assert!(document.to_bytes() != bytes);
+
+        // The repackaged bytes reopen cleanly and preserve the family.
+        let reopened = FormulaDocument::from_bytes(document.to_bytes()).unwrap();
+        assert_eq!(reopened.math(), &replacement);
+        assert_eq!(reopened.mimetype(), constants::ODF_FORMULA);
+        assert!(!reopened.is_template());
+        assert_ne!(original_math, replacement);
+    }
+
+    #[test]
+    fn set_math_preserves_package_metadata() {
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(constants::ODF_FORMULA).unwrap();
+        writer
+            .add_file(constants::ODF_CONTENT, formula_xml().as_bytes())
+            .unwrap();
+        writer
+            .add_file(constants::ODF_META, b"<office:document-meta/>")
+            .unwrap();
+        let mut document = FormulaDocument::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+
+        let replacement = crate::formula::builder::document_root(
+            crate::formula::builder::identifier("y"),
+            crate::formula::builder::MathDisplay::Block,
+        );
+        document.set_math(replacement).unwrap();
+        let package = crate::OpenDocumentPackage::from_bytes(document.to_bytes()).unwrap();
+        assert!(package.has_file(constants::ODF_META).unwrap());
+        assert_eq!(
+            package.get_file(constants::ODF_META).unwrap(),
+            b"<office:document-meta/>"
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_expanded_attributes_and_excessive_nesting() {        let duplicate = r#"<math xmlns="http://www.w3.org/1998/Math/MathML" xmlns:a="urn:test" xmlns:b="urn:test" a:x="one" b:x="two"/>"#;
         assert!(FormulaDocument::from_bytes(package(constants::ODF_FORMULA, duplicate)).is_err());
 
         let nested = "<mrow>".repeat(MAX_MATH_DEPTH) + &"</mrow>".repeat(MAX_MATH_DEPTH);

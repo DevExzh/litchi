@@ -354,6 +354,10 @@ fn validate_flat_document(xml: &str, family: OpenDocumentFamily) -> Result<()> {
 }
 
 impl OpenDocumentPackage {
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        &self.package
+    }
+
     /// Stage a `content.xml` replacement without mutating this package.
     ///
     /// Optional core parts and reproducible auxiliary entries are preserved;

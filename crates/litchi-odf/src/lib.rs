@@ -187,6 +187,8 @@
 //! - ✅ Namespace-aware direct MathML root and complete mixed-content subtree
 //! - ✅ Expanded attributes, common presentation element kinds, and vendor elements
 //! - ✅ MathML annotations and inert StarMath source extraction
+//! - ✅ Typed MathML tree editing: validated mutation, well-formed serialization,
+//!   typed schemata builders, and atomic `set_math` package replacement
 //! - ✅ Metadata and lossless exact original-byte saving
 //! - ✅ Formula markup remains inert and is never evaluated
 //!
@@ -470,7 +472,9 @@ pub use form::{
     replace_visual_control_xml, selection_controls, text_controls, visual_controls,
 };
 pub use form_package::{OdfAuthoredForm, OdfAuthoredFormControl, OdfAuthoredFormNode};
+pub use formula::builder as mathml;
 pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
+pub use formula::builder::{MathDisplay, MathVariant};
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use graphic_properties::{
     GraphicProperty, GraphicPropertyChild, GraphicPropertyChildKind, GraphicPropertyKind,
