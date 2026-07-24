@@ -24,6 +24,7 @@ mod data;
 mod direction;
 pub(crate) mod donut_inner_radius;
 pub(crate) mod gaps;
+pub(crate) mod hidden_data;
 mod kind;
 pub mod metadata_extractor;
 pub(crate) mod non_style;

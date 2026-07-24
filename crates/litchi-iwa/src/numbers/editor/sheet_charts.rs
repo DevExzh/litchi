@@ -17,6 +17,7 @@ mod caption;
 mod donut_inner_radius;
 mod gaps;
 mod graph;
+mod hidden_data;
 mod legend;
 mod pie_label_distance;
 mod pie_labels;
@@ -2164,6 +2165,86 @@ mod tests {
                 .sheet_chart_legend_visible(sheet_id, duplicate.drawable_object_id)
                 .unwrap()
         );
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_chart_hidden_data_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+
+        assert!(
+            editor
+                .sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id)
+                .unwrap()
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id, true)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id, false)
+            .unwrap();
+        assert!(
+            !editor
+                .sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id)
+                .unwrap()
+        );
+        editor
+            .set_sheet_chart_legend_visible(sheet_id, source.drawable_object_id, false)
+            .unwrap();
+        editor
+            .set_sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id, true)
+            .unwrap();
+        assert!(
+            !editor
+                .sheet_chart_legend_visible(sheet_id, source.drawable_object_id)
+                .unwrap()
+        );
+        editor
+            .set_sheet_chart_legend_visible(sheet_id, source.drawable_object_id, true)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id, false)
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        editor
+            .set_sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id, true)
+            .unwrap();
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(
+            reopened
+                .sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            !reopened
+                .sheet_chart_includes_hidden_data(sheet_id, duplicate.drawable_object_id)
+                .unwrap()
+        );
+
+        let before_rejected = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_sheet_chart_includes_hidden_data(sheet_id, u64::MAX, false)
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
         reopened
             .remove_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
