@@ -303,6 +303,16 @@ pub mod record_types {
     pub const LEGACY_DRAWING: u16 = 0x0227;
     pub const LEGACY_DRAWING_HF: u16 = 0x0228;
 
+    // Chart sheet stream (MS-XLSB 2.1.7.7). The chart sheet view records
+    // (BEGIN_CS_VIEWS/END_CS_VIEWS/BEGIN_CS_VIEW/END_CS_VIEW) and the drawing
+    // records above are shared with the worksheet stream; these are specific
+    // to chart sheets. Note that `UID` (used for comment ACUid records) and
+    // `CS_PROP` share record type 651 in their respective streams.
+    pub const CS_PROP: u16 = 651;
+    pub const CS_PAGE_SETUP: u16 = 652;
+    pub const CS_PROTECTION: u16 = 669;
+    pub const CS_PROTECTION_ISO: u16 = 679;
+
     // Data validation
     pub const BEGIN_D_VALS: u16 = 0x023D;
     pub const END_D_VALS: u16 = 0x023E;

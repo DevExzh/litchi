@@ -58,12 +58,21 @@ pub struct XlsbWorkbook {
     is_1904: bool,
     pivot_cache_definitions: Vec<(u32, crate::xlsb::pivot::PivotCacheDefinition)>,
     structured_tables: Vec<(usize, crate::xlsb::table::XlsbTable)>,
+    chart_sheets: Vec<(usize, crate::xlsb::chartsheet::XlsbChartSheet)>,
+    sheet_drawings: Vec<crate::xlsb::drawing::XlsbSheetDrawing>,
 }
+
+/// Chart sheet relationship types documented by MS-XLSB 2.1.7.7.
+const CHART_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet",
+];
 
 #[derive(Default)]
 struct ParsedWorkbookInfo {
     worksheet_names: Vec<String>,
     worksheet_rel_ids: Vec<Option<String>>,
+    worksheet_states: Vec<u32>,
     supporting_links: Vec<FormulaSupportingLink>,
     external_sheets: Vec<FormulaExternalSheet>,
     external_link_rel_ids: Vec<String>,
@@ -213,6 +222,103 @@ impl XlsbWorkbook {
             .filter(|(index, _)| *index == sheet_index)
             .map(|(_, table)| table)
             .collect()
+    }
+
+    /// Typed chart sheet definitions paired with their sheet indexes, in
+    /// workbook sheet order (MS-XLSB 2.1.7.7).
+    ///
+    /// These are inert data snapshots: relationship identifiers, password
+    /// verifiers, and hash data are stored verbatim and are never
+    /// dereferenced, verified, or executed. The chart hosted by a chart
+    /// sheet is surfaced through [`XlsbWorkbook::sheet_drawing`].
+    pub fn chart_sheets(&self) -> &[(usize, crate::xlsb::chartsheet::XlsbChartSheet)] {
+        &self.chart_sheets
+    }
+
+    /// Look up the typed chart sheet anchored to one sheet, selected by
+    /// zero-based sheet index; `None` for worksheets and macro sheets.
+    pub fn chart_sheet(
+        &self,
+        sheet_index: usize,
+    ) -> Option<&crate::xlsb::chartsheet::XlsbChartSheet> {
+        self.chart_sheets
+            .iter()
+            .find(|(index, _)| *index == sheet_index)
+            .map(|(_, chart_sheet)| chart_sheet)
+    }
+
+    /// Drawings part inventories anchored to sheets, in sheet discovery
+    /// order (MS-XLSB 2.1.7.23), with the charts their graphic frames
+    /// reference parsed into the shared typed chart model.
+    ///
+    /// These are inert data snapshots: relationship identifiers and content
+    /// URIs are stored verbatim and are never dereferenced.
+    pub fn sheet_drawings(&self) -> &[crate::xlsb::drawing::XlsbSheetDrawing] {
+        &self.sheet_drawings
+    }
+
+    /// Look up the drawing inventory of one sheet, selected by zero-based
+    /// sheet index; `None` when the sheet has no Drawings part.
+    pub fn sheet_drawing(
+        &self,
+        sheet_index: usize,
+    ) -> Option<&crate::xlsb::drawing::XlsbSheetDrawing> {
+        self.sheet_drawings
+            .iter()
+            .find(|drawing| drawing.sheet_index == sheet_index)
+    }
+
+    /// Parse one Drawings part and resolve the chart parts its chart
+    /// graphic frames reference (MS-XLSB 2.1.7.5, 2.1.7.23).
+    fn load_sheet_drawing(
+        &self,
+        sheet_index: usize,
+        drawing_part: &dyn litchi_opc::part::Part,
+    ) -> XlsbResult<crate::xlsb::drawing::XlsbSheetDrawing> {
+        use crate::xlsb::drawing::{XlsbDrawingObject, XlsbEmbeddedChart, XlsbSheetDrawing};
+        let drawing = crate::xlsb::drawing::parse_drawing_part(drawing_part.blob())?;
+        let mut charts = Vec::new();
+        for anchor in &drawing.anchors {
+            let XlsbDrawingObject::GraphicFrame(frame) = &anchor.object else {
+                continue;
+            };
+            let Some(rel_id) = &frame.rel_id else {
+                continue;
+            };
+            let relationship = drawing_part.rels().get(rel_id).ok_or_else(|| {
+                crate::xlsb::error::XlsbError::Unrecognized {
+                    typ: "Drawings part".to_string(),
+                    val: format!(
+                        "graphic frame {:?} relationship {rel_id:?} is missing",
+                        frame.non_visual.name
+                    ),
+                }
+            })?;
+            if !matches!(
+                relationship.reltype(),
+                relationship_type::CHART | relationship_type::STRICT_CHART
+            ) {
+                continue;
+            }
+            if relationship.is_external() {
+                return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                    typ: "Drawings part".to_string(),
+                    val: format!("chart relationship {rel_id:?} is external"),
+                });
+            }
+            let chart_part = self.package.get_part(&relationship.target_partname()?)?;
+            let chart = crate::charts::reader::parse_chart(chart_part.blob())?;
+            charts.push(XlsbEmbeddedChart {
+                frame_name: frame.non_visual.name.clone(),
+                rel_id: rel_id.clone(),
+                chart,
+            });
+        }
+        Ok(XlsbSheetDrawing {
+            sheet_index,
+            drawing,
+            charts,
+        })
     }
 
     /// Workbook style table loaded from `xl/styles.bin`.
@@ -368,6 +474,8 @@ impl XlsbWorkbook {
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
             structured_tables: Vec::new(),
+            chart_sheets: Vec::new(),
+            sheet_drawings: Vec::new(),
         };
 
         workbook.load_workbook_info()?;
@@ -397,6 +505,8 @@ impl XlsbWorkbook {
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
             structured_tables: Vec::new(),
+            chart_sheets: Vec::new(),
+            sheet_drawings: Vec::new(),
         };
 
         workbook.load_workbook_info()?;
@@ -750,6 +860,8 @@ impl XlsbWorkbook {
         let mut tables = Vec::new();
         let mut pivot_views = Vec::new();
         let mut structured_tables = Vec::new();
+        let mut chart_sheets = Vec::new();
+        let mut sheet_drawings = Vec::new();
         for (sheet_index, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
             let Some(rel_id) = rel_id else { continue };
             let Some(sheet_relationship) = workbook_part.rels().get(rel_id) else {
@@ -761,6 +873,68 @@ impl XlsbWorkbook {
             let sheet_part = self
                 .package
                 .get_part(&sheet_relationship.target_partname()?)?;
+            if CHART_SHEET_RELATIONSHIP_TYPES.contains(&sheet_relationship.reltype()) {
+                // Chart Sheet part (MS-XLSB 2.1.7.7): a BIFF12 stream. The
+                // chart itself lives in the linked XML Drawings/Chart parts.
+                let name = info
+                    .worksheet_names
+                    .get(sheet_index)
+                    .cloned()
+                    .ok_or_else(|| crate::xlsb::error::XlsbError::Unrecognized {
+                        typ: "BrtBundleSh".to_string(),
+                        val: format!("chart sheet index {sheet_index} out of bounds"),
+                    })?;
+                let state = info.worksheet_states.get(sheet_index).copied().unwrap_or(0);
+                let chart_sheet = crate::xlsb::chartsheet::parse_chart_sheet_part(
+                    sheet_part.blob(),
+                    name,
+                    state,
+                )?;
+                if let Some(drawing_rel_id) = chart_sheet.drawing_rel_id.clone() {
+                    let relationship = sheet_part.rels().get(&drawing_rel_id).ok_or_else(|| {
+                        crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtDrawing".to_string(),
+                            val: format!(
+                                "relationship {drawing_rel_id:?} on chart sheet {sheet_index} is missing"
+                            ),
+                        }
+                    })?;
+                    if !matches!(
+                        relationship.reltype(),
+                        relationship_type::DRAWING | relationship_type::STRICT_DRAWING
+                    ) || relationship.is_external()
+                    {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "BrtDrawing".to_string(),
+                            val: format!(
+                                "relationship {drawing_rel_id:?} on chart sheet {sheet_index} is external or has the wrong type"
+                            ),
+                        });
+                    }
+                    let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
+                    sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                }
+                chart_sheets.push((sheet_index, chart_sheet));
+            } else {
+                // Worksheet Drawings parts (MS-XLSB 2.1.7.23) are standard
+                // SpreadsheetDrawing XML parts discovered through the sheet's
+                // drawing relationships.
+                for relationship in sheet_part.rels().iter().filter(|relationship| {
+                    matches!(
+                        relationship.reltype(),
+                        relationship_type::DRAWING | relationship_type::STRICT_DRAWING
+                    )
+                }) {
+                    if relationship.is_external() {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "worksheet drawing relationship".to_string(),
+                            val: "external Drawings part".to_string(),
+                        });
+                    }
+                    let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
+                    sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                }
+            }
             for table_rel_id in crate::xlsb::table::parse_table_part_rel_ids(sheet_part.blob())? {
                 let relationship = sheet_part.rels().get(&table_rel_id).ok_or_else(|| {
                     crate::xlsb::error::XlsbError::InvalidFormula(format!(
@@ -865,6 +1039,8 @@ impl XlsbWorkbook {
         self.calculation_properties = info.calculation_properties.unwrap_or_default();
         self.pivot_cache_definitions = pivot_cache_definitions;
         self.structured_tables = structured_tables;
+        self.chart_sheets = chart_sheets;
+        self.sheet_drawings = sheet_drawings;
 
         Ok(())
     }
@@ -1071,6 +1247,7 @@ impl XlsbWorkbook {
         let mut info = ParsedWorkbookInfo::default();
         let worksheet_names = &mut info.worksheet_names;
         let worksheet_rel_ids = &mut info.worksheet_rel_ids;
+        let worksheet_states = &mut info.worksheet_states;
         let supporting_links = &mut info.supporting_links;
         let external_sheets = &mut info.external_sheets;
         let external_link_rel_ids = &mut info.external_link_rel_ids;
@@ -1107,6 +1284,7 @@ impl XlsbWorkbook {
                     }
                     worksheet_names.push(bundle_sh.name);
                     worksheet_rel_ids.push(bundle_sh.rel_id);
+                    worksheet_states.push(bundle_sh.state);
                 },
                 record_types::SUP_SELF => {
                     supporting_links.push(FormulaSupportingLink::SelfWorkbook);
@@ -2008,6 +2186,8 @@ mod tests {
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
             structured_tables: Vec::new(),
+            chart_sheets: Vec::new(),
+            sheet_drawings: Vec::new(),
         };
         workbook.load_external_book(&uri)
     }
@@ -2318,6 +2498,8 @@ mod tests {
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
             structured_tables: Vec::new(),
+            chart_sheets: Vec::new(),
+            sheet_drawings: Vec::new(),
         };
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
         let book = workbook.load_external_book(&uri).unwrap();

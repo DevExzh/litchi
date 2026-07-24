@@ -16,6 +16,10 @@
 //! - **Merged Cells**: Parse and handle merged cell ranges
 //! - **Hyperlinks**: Parse hyperlink data with locations and tooltips
 //! - **Named Ranges**: Parse defined names and ranges
+//! - **Chart Sheets**: Typed chart sheet stream parsing (code name, tab color, views,
+//!   protection, page setup, drawing links)
+//! - **Drawings and Charts**: SpreadsheetDrawing inventory (anchors, shapes, pictures,
+//!   graphic frames) with embedded charts parsed through the shared typed chart model
 //! - **Error Handling**: Comprehensive error types with detailed context
 //!
 //! ## Writing
@@ -158,12 +162,28 @@ pub mod pivot;
 /// Table (ListObject) stream parsing (MS-XLSB 2.1.7.51)
 pub mod table;
 
+/// Chart sheet stream parsing (MS-XLSB 2.1.7.7)
+pub mod chartsheet;
+
+/// SpreadsheetDrawing XML inventory for XLSB Drawings parts (MS-XLSB 2.1.7.23)
+pub mod drawing;
+
 /// Formula parsing and generation
 pub mod formula;
 
 pub use calculation::{CalculationMode, CalculationProperties};
 pub use cell::XlsbCell;
+pub use chartsheet::{
+    XlsbChartSheet, XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
+    XlsbChartSheetProtection, XlsbChartSheetState, XlsbChartSheetView, parse_chart_sheet_part,
+};
 pub use data_validation::{DataValidation, DataValidationRecordKind, DataValidationSettings};
+pub use drawing::{
+    CHART_GRAPHIC_DATA_URI, XlsbDrawing, XlsbDrawingAnchor, XlsbDrawingAnchorKind,
+    XlsbDrawingCellMarker, XlsbDrawingEmuPoint, XlsbDrawingEmuSize, XlsbDrawingGraphicFrame,
+    XlsbDrawingNonVisual, XlsbDrawingObject, XlsbEmbeddedChart, XlsbSheetDrawing,
+    parse_drawing_part,
+};
 pub use error::{XlsbError, XlsbResult};
 pub use formula::{XlsbExternalLink, XlsbExternalLinkKind};
 pub use pivot::{
