@@ -18,6 +18,7 @@ mod donut_inner_radius;
 mod gaps;
 mod graph;
 mod legend;
+mod pie_labels;
 mod pie_start_angle;
 mod pie_wedge_explosion;
 mod rounded_corners;

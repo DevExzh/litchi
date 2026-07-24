@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::charts::{ChartData, ChartDonutInnerRadius, ChartKind};
+use litchi_iwa::charts::{ChartData, ChartDonutInnerRadius, ChartKind, ChartPieLabelVisibility};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -27,9 +27,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         chart.drawable_object_id,
         ChartDonutInnerRadius::from_percent(42.0)?,
     )?;
+    editor.set_slide_chart_pie_label_visibilities(
+        0,
+        chart.drawable_object_id,
+        &[
+            ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
+            ChartPieLabelVisibility::ALL,
+            ChartPieLabelVisibility::HIDDEN,
+        ],
+    )?;
     editor.save(output)?;
     println!(
-        "created Keynote donut chart {} with a 42% inner radius",
+        "created Keynote donut chart {} with a 42% inner radius and per-wedge labels",
         chart.drawable_object_id
     );
     Ok(())

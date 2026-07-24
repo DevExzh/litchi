@@ -18,6 +18,7 @@ mod donut_inner_radius;
 mod gaps;
 mod graph;
 mod legend;
+mod pie_labels;
 mod pie_start_angle;
 mod pie_wedge_explosion;
 mod rounded_corners;
@@ -563,9 +564,9 @@ mod tests {
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
-        ChartGapSpacing, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
-        ChartRoundedCorners, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-        ChartValueAxisSteps,
+        ChartGapSpacing, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
+        ChartPieWedgeIndex, ChartRoundedCorners, ChartShadow, ChartValueAxisBounds,
+        ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -3014,6 +3015,122 @@ mod tests {
             .unwrap();
         reopened
             .remove_sheet_chart(sheet_id, column.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_pie_label_visibility_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+            .unwrap();
+        let defaults = vec![ChartPieLabelVisibility::DEFAULT; 3];
+        let customized = [
+            ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
+            ChartPieLabelVisibility::ALL,
+            ChartPieLabelVisibility::HIDDEN,
+        ];
+        assert_eq!(
+            editor
+                .sheet_chart_pie_label_visibilities(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            defaults
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_pie_label_visibilities(sheet_id, source.drawable_object_id, &defaults)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_pie_label_visibilities(
+                sheet_id,
+                source.drawable_object_id,
+                &customized,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_pie_label_visibility(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartPieWedgeIndex::from_zero_based(1),
+                )
+                .unwrap(),
+            ChartPieLabelVisibility::ALL
+        );
+        let explosions = [
+            ChartPieWedgeExplosion::from_percent(10.0).unwrap(),
+            ChartPieWedgeExplosion::from_percent(25.0).unwrap(),
+            ChartPieWedgeExplosion::from_percent(40.0).unwrap(),
+        ];
+        editor
+            .set_sheet_chart_pie_wedge_explosions(sheet_id, source.drawable_object_id, &explosions)
+            .unwrap();
+        editor
+            .set_sheet_chart_pie_label_visibilities(sheet_id, source.drawable_object_id, &defaults)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_pie_wedge_explosions(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            explosions
+        );
+        editor
+            .set_sheet_chart_pie_wedge_explosions(
+                sheet_id,
+                source.drawable_object_id,
+                &[ChartPieWedgeExplosion::ZERO; 3],
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_pie_label_visibilities(
+                sheet_id,
+                source.drawable_object_id,
+                &customized,
+            )
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        editor
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Donut2d)
+            .unwrap();
+        editor
+            .set_sheet_chart_pie_label_visibility(
+                sheet_id,
+                source.drawable_object_id,
+                ChartPieWedgeIndex::from_zero_based(0),
+                ChartPieLabelVisibility::VALUES_ONLY,
+            )
+            .unwrap();
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_pie_label_visibilities(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+        let before_rejected = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_sheet_chart_pie_label_visibilities(
+                    sheet_id,
+                    source.drawable_object_id,
+                    &customized[..2],
+                )
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
             .unwrap();
         assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
     }
