@@ -1,11 +1,17 @@
-//! Native per-series value-label visibility CRUD for Keynote charts.
+//! Native per-series value-label CRUD for Keynote charts.
 
 use super::*;
+use crate::charts::series_value_label_location::{
+    chart_series_value_label_locations as read_native_locations,
+    set_chart_series_value_label_locations as set_native_locations,
+};
 use crate::charts::series_value_labels::{
     chart_series_value_label_visibilities as read_native_value_labels,
     set_chart_series_value_label_visibilities as set_native_value_labels,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesValueLabelVisibility};
+use crate::charts::{
+    ChartSeriesIndex, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
+};
 
 impl KeynoteEditor {
     /// Read every series' value-label visibility in native series order.
@@ -72,6 +78,70 @@ impl KeynoteEditor {
             slide_index,
             drawable_object_id,
             &visibilities,
+        )
+    }
+
+    /// Read every series' value-label Location setting in native series order.
+    pub fn slide_chart_series_value_label_locations(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<ChartSeriesValueLabelLocation>> {
+        slide_chart_series_value_label_locations(self, slide_index, drawable_object_id)
+    }
+
+    /// Read one series' value-label Location setting.
+    pub fn slide_chart_series_value_label_location(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        series: ChartSeriesIndex,
+    ) -> Result<ChartSeriesValueLabelLocation> {
+        let locations =
+            slide_chart_series_value_label_locations(self, slide_index, drawable_object_id)?;
+        locations.get(series.zero_based()).copied().ok_or_else(|| {
+            value_label_index_error("Keynote", drawable_object_id, series, locations.len())
+        })
+    }
+
+    /// Set every series' value-label Location setting in native series order.
+    pub fn set_slide_chart_series_value_label_locations(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        locations: &[ChartSeriesValueLabelLocation],
+    ) -> Result<()> {
+        set_slide_chart_series_value_label_locations(
+            self,
+            slide_index,
+            drawable_object_id,
+            locations,
+        )
+    }
+
+    /// Set one series' value-label Location setting.
+    pub fn set_slide_chart_series_value_label_location(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        series: ChartSeriesIndex,
+        location: ChartSeriesValueLabelLocation,
+    ) -> Result<()> {
+        let mut locations =
+            slide_chart_series_value_label_locations(self, slide_index, drawable_object_id)?;
+        let count = locations.len();
+        let target = locations
+            .get_mut(series.zero_based())
+            .ok_or_else(|| value_label_index_error("Keynote", drawable_object_id, series, count))?;
+        if *target == location {
+            return Ok(());
+        }
+        *target = location;
+        set_slide_chart_series_value_label_locations(
+            self,
+            slide_index,
+            drawable_object_id,
+            &locations,
         )
     }
 }
@@ -144,6 +214,81 @@ fn set_slide_chart_series_value_label_visibilities(
     {
         return Err(Error::InvalidFormat(
             "Keynote chart series value-label update failed validation".to_owned(),
+        ));
+    }
+    *editor = verified;
+    Ok(())
+}
+
+fn slide_chart_series_value_label_locations(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    drawable_object_id: u64,
+) -> Result<Vec<ChartSeriesValueLabelLocation>> {
+    let graph = chart_graph(editor, slide_index, drawable_object_id)?;
+    let series_count = value_label_series_count(
+        graph.info.direction,
+        &graph.info.data,
+        "Keynote",
+        drawable_object_id,
+    )?;
+    read_native_locations(
+        editor.package(),
+        &graph.archive_name,
+        drawable_object_id,
+        "Keynote",
+        graph.info.kind,
+        series_count,
+    )
+}
+
+fn set_slide_chart_series_value_label_locations(
+    editor: &mut KeynoteEditor,
+    slide_index: usize,
+    drawable_object_id: u64,
+    locations: &[ChartSeriesValueLabelLocation],
+) -> Result<()> {
+    let graph = chart_graph(editor, slide_index, drawable_object_id)?;
+    let series_count = value_label_series_count(
+        graph.info.direction,
+        &graph.info.data,
+        "Keynote",
+        drawable_object_id,
+    )?;
+    if locations.len() != series_count {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote chart {drawable_object_id} requires {series_count} series value-label Location settings, got {}",
+            locations.len()
+        )));
+    }
+    if read_native_locations(
+        editor.package(),
+        &graph.archive_name,
+        drawable_object_id,
+        "Keynote",
+        graph.info.kind,
+        series_count,
+    )? == locations
+    {
+        return Ok(());
+    }
+    let expected = locations.to_vec();
+    let mut staged = editor.package().clone();
+    set_native_locations(
+        &mut staged,
+        &graph.archive_name,
+        drawable_object_id,
+        "Keynote",
+        graph.info.kind,
+        series_count,
+        &expected,
+    )?;
+    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    if verified.slide_chart_series_value_label_locations(slide_index, drawable_object_id)?
+        != expected
+    {
+        return Err(Error::InvalidFormat(
+            "Keynote chart series value-label Location update failed validation".to_owned(),
         ));
     }
     *editor = verified;

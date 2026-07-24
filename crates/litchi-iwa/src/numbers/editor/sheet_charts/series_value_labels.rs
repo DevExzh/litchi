@@ -1,11 +1,17 @@
-//! Native per-series value-label visibility CRUD for Numbers charts.
+//! Native per-series value-label CRUD for Numbers charts.
 
 use super::*;
+use crate::charts::series_value_label_location::{
+    chart_series_value_label_locations as read_native_locations,
+    set_chart_series_value_label_locations as set_native_locations,
+};
 use crate::charts::series_value_labels::{
     chart_series_value_label_visibilities as read_native_value_labels,
     set_chart_series_value_label_visibilities as set_native_value_labels,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesValueLabelVisibility};
+use crate::charts::{
+    ChartSeriesIndex, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
+};
 
 impl NumbersEditor {
     /// Read every series' value-label visibility in native series order.
@@ -73,6 +79,60 @@ impl NumbersEditor {
             drawable_object_id,
             &visibilities,
         )
+    }
+
+    /// Read every series' value-label Location setting in native series order.
+    pub fn sheet_chart_series_value_label_locations(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Vec<ChartSeriesValueLabelLocation>> {
+        sheet_chart_series_value_label_locations(self, sheet_id, drawable_object_id)
+    }
+
+    /// Read one series' value-label Location setting.
+    pub fn sheet_chart_series_value_label_location(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        series: ChartSeriesIndex,
+    ) -> Result<ChartSeriesValueLabelLocation> {
+        let locations =
+            sheet_chart_series_value_label_locations(self, sheet_id, drawable_object_id)?;
+        locations.get(series.zero_based()).copied().ok_or_else(|| {
+            value_label_index_error("Numbers", drawable_object_id, series, locations.len())
+        })
+    }
+
+    /// Set every series' value-label Location setting in native series order.
+    pub fn set_sheet_chart_series_value_label_locations(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        locations: &[ChartSeriesValueLabelLocation],
+    ) -> Result<()> {
+        set_sheet_chart_series_value_label_locations(self, sheet_id, drawable_object_id, locations)
+    }
+
+    /// Set one series' value-label Location setting.
+    pub fn set_sheet_chart_series_value_label_location(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        series: ChartSeriesIndex,
+        location: ChartSeriesValueLabelLocation,
+    ) -> Result<()> {
+        let mut locations =
+            sheet_chart_series_value_label_locations(self, sheet_id, drawable_object_id)?;
+        let count = locations.len();
+        let target = locations
+            .get_mut(series.zero_based())
+            .ok_or_else(|| value_label_index_error("Numbers", drawable_object_id, series, count))?;
+        if *target == location {
+            return Ok(());
+        }
+        *target = location;
+        set_sheet_chart_series_value_label_locations(self, sheet_id, drawable_object_id, &locations)
     }
 }
 
@@ -144,6 +204,80 @@ fn set_sheet_chart_series_value_label_visibilities(
     {
         return Err(Error::InvalidFormat(
             "Numbers chart series value-label update failed validation".to_owned(),
+        ));
+    }
+    *editor = verified;
+    Ok(())
+}
+
+fn sheet_chart_series_value_label_locations(
+    editor: &NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+) -> Result<Vec<ChartSeriesValueLabelLocation>> {
+    let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
+    let series_count = value_label_series_count(
+        graph.info.direction,
+        &graph.info.data,
+        "Numbers",
+        drawable_object_id,
+    )?;
+    read_native_locations(
+        editor.package(),
+        &graph.archive_name,
+        drawable_object_id,
+        "Numbers",
+        graph.info.kind,
+        series_count,
+    )
+}
+
+fn set_sheet_chart_series_value_label_locations(
+    editor: &mut NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+    locations: &[ChartSeriesValueLabelLocation],
+) -> Result<()> {
+    let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
+    let series_count = value_label_series_count(
+        graph.info.direction,
+        &graph.info.data,
+        "Numbers",
+        drawable_object_id,
+    )?;
+    if locations.len() != series_count {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers chart {drawable_object_id} requires {series_count} series value-label Location settings, got {}",
+            locations.len()
+        )));
+    }
+    if read_native_locations(
+        editor.package(),
+        &graph.archive_name,
+        drawable_object_id,
+        "Numbers",
+        graph.info.kind,
+        series_count,
+    )? == locations
+    {
+        return Ok(());
+    }
+    let expected = locations.to_vec();
+    let mut staged = editor.package().clone();
+    set_native_locations(
+        &mut staged,
+        &graph.archive_name,
+        drawable_object_id,
+        "Numbers",
+        graph.info.kind,
+        series_count,
+        &expected,
+    )?;
+    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    if verified.sheet_chart_series_value_label_locations(sheet_id, drawable_object_id)? != expected
+    {
+        return Err(Error::InvalidFormat(
+            "Numbers chart series value-label Location update failed validation".to_owned(),
         ));
     }
     *editor = verified;

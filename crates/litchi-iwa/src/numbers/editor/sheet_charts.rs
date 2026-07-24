@@ -569,8 +569,8 @@ mod tests {
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
         ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
         ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-        ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-        ChartValueAxisSteps,
+        ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility, ChartShadow,
+        ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -3443,6 +3443,122 @@ mod tests {
         assert!(
             reopened
                 .sheet_chart_series_value_label_visibility(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartSeriesIndex::from_zero_based(2),
+                )
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_series_value_label_location_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let defaults = [ChartSeriesValueLabelLocation::Top; 2];
+        let customized = [
+            ChartSeriesValueLabelLocation::Outside,
+            ChartSeriesValueLabelLocation::Top,
+        ];
+
+        assert_eq!(
+            editor
+                .sheet_chart_series_value_label_locations(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            defaults
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_series_value_label_locations(
+                sheet_id,
+                source.drawable_object_id,
+                &defaults,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_series_value_label_locations(
+                sheet_id,
+                source.drawable_object_id,
+                &customized,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_series_value_label_location(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartSeriesIndex::from_zero_based(0),
+                )
+                .unwrap(),
+            ChartSeriesValueLabelLocation::Outside
+        );
+        editor
+            .set_sheet_chart_series_value_label_locations(
+                sheet_id,
+                source.drawable_object_id,
+                &defaults,
+            )
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_sheet_chart_series_value_label_locations(
+                sheet_id,
+                source.drawable_object_id,
+                &customized,
+            )
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        editor
+            .set_sheet_chart_series_value_label_location(
+                sheet_id,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(0),
+                ChartSeriesValueLabelLocation::Top,
+            )
+            .unwrap();
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_series_value_label_locations(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            defaults
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_series_value_label_locations(sheet_id, duplicate.drawable_object_id,)
+                .unwrap(),
+            customized
+        );
+
+        let before_rejected = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_sheet_chart_series_value_label_locations(
+                    sheet_id,
+                    source.drawable_object_id,
+                    &customized[..1],
+                )
+                .is_err()
+        );
+        assert!(
+            reopened
+                .sheet_chart_series_value_label_location(
                     sheet_id,
                     source.drawable_object_id,
                     ChartSeriesIndex::from_zero_based(2),
