@@ -64,20 +64,20 @@ fn parses_real_libreoffice_protection_fixtures() {
         "/../../test-data/libreoffice-core/sw/qa/extras"
     );
 
-    let read_only = fs::read(format!("{root}rtfimport/data/read-only-protect.rtf")).unwrap();
+    let read_only = fs::read(format!("{root}/rtfimport/data/read-only-protect.rtf")).unwrap();
     let document = RtfDocument::parse_bytes(&read_only).unwrap();
     assert_eq!(document.protection().annotations, Some(true));
     assert_eq!(document.protection().read_only, Some(true));
     assert_eq!(document.protection().enforced, Some(true));
     assert_eq!(document.protection().level, Some(ProtectionLevel::Level3));
 
-    let forms = fs::read(format!("{root}rtfexport/data/4010_min.rtf")).unwrap();
+    let forms = fs::read(format!("{root}/rtfexport/data/4010_min.rtf")).unwrap();
     let document = RtfDocument::parse_bytes(&forms).unwrap();
     assert_eq!(document.protection().forms, Some(true));
     assert_eq!(document.protection().all, Some(true));
     assert_eq!(document.protection().level, Some(ProtectionLevel::Level2));
 
-    let password = fs::read(format!("{root}rtfexport/data/fdo55504-1-min.rtf")).unwrap();
+    let password = fs::read(format!("{root}/rtfexport/data/fdo55504-1-min.rtf")).unwrap();
     let document = RtfDocument::parse_bytes(&password).unwrap();
     assert_eq!(
         document.protection().password_hash.as_deref(),

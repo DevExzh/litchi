@@ -102,7 +102,7 @@ fn parses_bundled_libreoffice_latent_style_fixtures() {
         "/../../test-data/libreoffice-core"
     );
     for (fixture, has_exceptions) in FIXTURES {
-        let bytes = fs::read(format!("{root}{fixture}")).unwrap();
+        let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let styles = document

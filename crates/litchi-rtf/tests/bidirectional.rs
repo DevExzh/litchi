@@ -94,7 +94,7 @@ fn parses_bundled_libreoffice_bidirectional_fixtures() {
         "/../../test-data/libreoffice-core"
     );
     for fixture in FIXTURES {
-        let bytes = fs::read(format!("{root}{fixture}")).unwrap();
+        let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         assert!(
@@ -201,14 +201,14 @@ fn parses_bundled_libreoffice_scope_direction_fixtures() {
     );
 
     let gutter = RtfDocument::parse_bytes(
-        &fs::read(format!("{root}sw/qa/extras/rtfexport/data/rtl-gutter.rtf")).unwrap(),
+        &fs::read(format!("{root}/sw/qa/extras/rtfexport/data/rtl-gutter.rtf")).unwrap(),
     )
     .unwrap();
     assert!(gutter.gutter_on_right());
 
     let document_ltr = RtfDocument::parse_bytes(
         &fs::read(format!(
-            "{root}sw/qa/extras/rtfexport/data/dplinehollow.rtf"
+            "{root}/sw/qa/extras/rtfexport/data/dplinehollow.rtf"
         ))
         .unwrap(),
     )
@@ -219,7 +219,7 @@ fn parses_bundled_libreoffice_scope_direction_fixtures() {
     );
 
     let row_rtl = RtfDocument::parse_bytes(
-        &fs::read(format!("{root}sw/qa/extras/rtfexport/data/table-rtl.rtf")).unwrap(),
+        &fs::read(format!("{root}/sw/qa/extras/rtfexport/data/table-rtl.rtf")).unwrap(),
     )
     .unwrap();
     assert_eq!(
@@ -228,7 +228,7 @@ fn parses_bundled_libreoffice_scope_direction_fixtures() {
     );
 
     let section_ltr = RtfDocument::parse_bytes(
-        &fs::read(format!("{root}sw/qa/core/data/rtf/pass/tdf116851.rtf")).unwrap(),
+        &fs::read(format!("{root}/sw/qa/core/data/rtf/pass/tdf116851.rtf")).unwrap(),
     )
     .unwrap();
     assert!(

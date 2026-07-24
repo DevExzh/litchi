@@ -105,7 +105,7 @@ fn parses_real_libreoffice_stylesheet_types_and_implicit_normal() {
         "/../../test-data/libreoffice-core"
     );
     for fixture in FIXTURES {
-        let bytes = fs::read(format!("{root}{fixture}")).unwrap();
+        let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
         let document = RtfDocument::parse_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let sheet = document.stylesheet();
