@@ -31,12 +31,15 @@ const WRAPPER_PREFIXES: [&str; 3] = ["office", "officeflat", "flatwrapper"];
 /// Capacity slack for the XML declaration and synthesized part root tags.
 const PART_WRAPPER_OVERHEAD: usize = 64;
 
+/// Maximum wrapper-prefix candidates tried before rejecting the document.
+const MAX_WRAPPER_PREFIX_ATTEMPTS: usize = 64;
+
 /// Byte-range slices of one flat document, grouped by package part.
 struct FlatSections<'a> {
     /// Serialized `xmlns` declarations copied from the root element.
     namespace_decls: String,
     /// Prefix bound to the office namespace for the synthesized part roots.
-    wrapper_prefix: &'static str,
+    wrapper_prefix: String,
     /// Extra `xmlns` declaration needed when the root did not bind the prefix.
     wrapper_decl: Option<String>,
     /// Sections forming `content.xml`, in document order.
@@ -60,7 +63,7 @@ impl FlatSections<'_> {
                 + PART_WRAPPER_OVERHEAD,
         );
         part.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<");
-        part.push_str(self.wrapper_prefix);
+        part.push_str(&self.wrapper_prefix);
         part.push(':');
         part.push_str(root_local_name);
         part.push_str(&self.namespace_decls);
@@ -73,7 +76,7 @@ impl FlatSections<'_> {
             part.push_str(section);
         }
         part.push_str("</");
-        part.push_str(self.wrapper_prefix);
+        part.push_str(&self.wrapper_prefix);
         part.push(':');
         part.push_str(root_local_name);
         part.push_str(">\n");
@@ -128,19 +131,18 @@ fn split_flat_sections(xml: &str) -> Result<FlatSections<'_>> {
                     Error::InvalidFormat("flat OpenDocument nesting overflow".to_string())
                 })?;
             },
-            Event::Empty(ref element) => {
+            Event::Empty(ref element)
                 if depth == 1
-                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
-                {
-                    let event_end = reader.buffer_position() as usize;
-                    SectionRoute::of(element.local_name().as_ref()).push(
-                        &xml[event_start..event_end],
-                        &mut content,
-                        &mut styles,
-                        &mut meta,
-                        &mut settings,
-                    );
-                }
+                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE) =>
+            {
+                let event_end = reader.buffer_position() as usize;
+                SectionRoute::of(element.local_name().as_ref()).push(
+                    &xml[event_start..event_end],
+                    &mut content,
+                    &mut styles,
+                    &mut meta,
+                    &mut settings,
+                );
             },
             Event::End(_) => {
                 if depth == 2
@@ -170,7 +172,7 @@ fn split_flat_sections(xml: &str) -> Result<FlatSections<'_>> {
         ));
     }
 
-    let (wrapper_prefix, wrapper_decl) = wrapper_prefix(&namespace_decls);
+    let (wrapper_prefix, wrapper_decl) = wrapper_prefix(&namespace_decls)?;
     let mut serialized = String::new();
     for (key, value) in &namespace_decls {
         serialized.push(' ');
@@ -260,23 +262,28 @@ fn root_namespace_decls(root: &quick_xml::events::BytesStart<'_>) -> Result<Vec<
 
 /// Choose a prefix for the synthesized part roots, adding a declaration when
 /// the flat root did not already bind that prefix to the office namespace.
-fn wrapper_prefix(decls: &[(String, String)]) -> (&'static str, Option<String>) {
-    for prefix in WRAPPER_PREFIXES {
+///
+/// When every preferred prefix is bound to a foreign namespace, numbered
+/// `flatwrapperN` candidates are tried before giving up with an error; a
+/// crafted document must never reach a panic here.
+fn wrapper_prefix(decls: &[(String, String)]) -> Result<(String, Option<String>)> {
+    let office_uri = std::str::from_utf8(OFFICE_NAMESPACE)
+        .expect("office namespace URI is valid UTF-8");
+    let candidates = WRAPPER_PREFIXES
+        .iter()
+        .map(|prefix| (*prefix).to_string())
+        .chain((WRAPPER_PREFIXES.len()..).map(|index| format!("flatwrapper{index}")));
+    for prefix in candidates.take(MAX_WRAPPER_PREFIX_ATTEMPTS) {
         let key = format!("xmlns:{prefix}");
         match decls.iter().find(|(name, _)| *name == key) {
-            Some((_, uri)) if uri.as_bytes() == OFFICE_NAMESPACE => return (prefix, None),
+            Some((_, uri)) if uri.as_bytes() == OFFICE_NAMESPACE => return Ok((prefix, None)),
             Some(_) => continue,
-            None => {
-                let uri = std::str::from_utf8(OFFICE_NAMESPACE)
-                    .expect("office namespace URI is valid UTF-8");
-                return (prefix, Some(format!("{key}=\"{uri}\"")));
-            },
+            None => return Ok((prefix, Some(format!("{key}=\"{office_uri}\"")))),
         }
     }
-    // All candidate prefixes are bound to foreign namespaces; this cannot
-    // happen for a conforming flat document because `FlatOpenDocument`
-    // validation requires the office namespace on the root element.
-    unreachable!("flat OpenDocument root binds every wrapper prefix candidate")
+    Err(Error::InvalidFormat(
+        "flat OpenDocument root binds every synthesized wrapper prefix candidate".to_string(),
+    ))
 }
 
 /// Synthesize an in-memory package from a validated flat document.
@@ -587,6 +594,27 @@ mod tests {
         let content = sections.render("document-content", &sections.content);
         assert!(content.contains("<officeflat:document-content"));
         assert!(content.contains("xmlns:officeflat=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\""));
+    }
+
+    #[test]
+    fn wrapper_prefix_generates_numbered_fallbacks_and_never_panics() {
+        // All preferred prefixes bound to foreign namespaces.
+        let decls: Vec<(String, String)> = WRAPPER_PREFIXES
+            .iter()
+            .map(|prefix| (format!("xmlns:{prefix}"), "urn:example:foreign".to_string()))
+            .collect();
+        let (prefix, decl) = wrapper_prefix(&decls).unwrap();
+        assert_eq!(prefix, format!("flatwrapper{}", WRAPPER_PREFIXES.len()));
+        assert!(decl.unwrap().starts_with(&format!("xmlns:{prefix}=")));
+
+        // Every candidate bound: an error, not a panic.
+        let decls: Vec<(String, String)> = (0..MAX_WRAPPER_PREFIX_ATTEMPTS + 4)
+            .map(|index| (format!("xmlns:flatwrapper{index}"), "urn:example:foreign".to_string()))
+            .chain(WRAPPER_PREFIXES.iter().map(|prefix| {
+                (format!("xmlns:{prefix}"), "urn:example:foreign".to_string())
+            }))
+            .collect();
+        assert!(wrapper_prefix(&decls).is_err());
     }
 
     #[test]
