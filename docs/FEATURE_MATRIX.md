@@ -123,7 +123,7 @@ conversion, fonts, and image conversion are optional.
 | Images | ✅ | ✅ | ✅ | Inline/floating image resources and relationships |
 | Drawing/VML shapes | 🟡 | ✅ | ❌ | Shape extraction is available; general-purpose shape authoring is not |
 | Embedded fonts | ✅ | ✅ | ✅ | Font table, payloads, obfuscation, licensing checks, and ordered CRUD |
-| Embedded OLE/package objects | 🟡 | ✅ | ❌ | Package-level embedded-part discovery; no DOCX object graph authoring |
+| Embedded OLE/package objects | ✅ | ✅ | ✅ | Package-level embedded-part discovery plus inert OLE object authoring: validated ProgIDs, Word-convention shape id allocation, `/word/embeddings` parts with content types and relationships, optional preview images, and byte-identical payload round-trips |
 | Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | Word package task-pane discovery plus bounded web-extension parsing/serialization; add-ins are never executed |
 | Themes | ✅ | ✅ | ✅ | Theme colors, fonts, and related package parts |
 | Document protection | 🟡 | ✅ | ✅ | Protection settings and hashes; the library does not enforce editing policy |
@@ -224,7 +224,7 @@ conversion, fonts, and image conversion are optional.
 | Speaker notes and notes masters | ✅ | ✅ | ✅ | High-level complete notes graph load/store with resources and themes |
 | Slide masters and layouts | ✅ | ✅ | ✅ | Semantic reading, including master/layout shape and placeholder inventory, header/footer and master-content visibility flags, matching/type and master/layout retention metadata, typed layout-reference identifiers, master text-style level inventory, and slide/layout/master relationship resolution; authoring of new masters (default text styles), typed layouts with placeholders, placeholder add/replace, and unreferenced-layout removal, all re-validated against the read-side graph; layout repointing and master deletion are not covered |
 | Handout master | ✅ | ✅ | ✅ | Presentation-root relationship resolution plus layout and header/footer settings |
-| Themes | 🟡 | ✅ | ❌ | Master-, layout-, and slide-scoped validated theme resolution, typed color maps/overrides, and presentation inventory; no general theme authoring workflow |
+| Themes | ✅ | ✅ | ✅ | Master-, layout-, and slide-scoped validated theme resolution, typed color maps/overrides, and presentation inventory; theme authoring with typed 12-slot color schemes and major/minor font schemes, master attachment with graph validation, and scheme replacement on existing theme parts; fmtScheme and themeOverride authoring are not covered |
 | Sections | ✅ | ✅ | ✅ | Typed section readers with stable IDs and resolved slide-index membership, plus graph-safe CRUD |
 | Custom slide shows | ✅ | ✅ | ✅ | High-level typed inventory of named subsets, plus graph-safe ordered CRUD |
 | Presentation/slide protection | ✅ | ✅ | ✅ | Protection and password metadata, including root modification-verifier inspection; policy is not enforced by the library |
@@ -349,7 +349,7 @@ conversion, fonts, and image conversion are optional.
 | Sheet protection | ✅ | ✅ | ✅ | Protection flags and password metadata |
 | Calculation properties | ✅ | ✅ | ✅ | Workbook calculation settings |
 | Pivot tables/caches | 🟡 | ✅ | ❌ | Typed inert PivotCache definition stream model (MS-XLSB 2.1.7.38): refresh metadata, worksheet/consolidation sources, cache fields with shared items of every value type, range/discrete grouping, OLAP hierarchies and tuple caches, calculated items/members with inert formula tokens, and Excel 2010/2014 extensions, exposed per cache id alongside the existing pivot views; unknown records are skipped and external references are never dereferenced |
-| Charts and drawings | ❌ | ❌ | ❌ | No typed XLSB chart/drawing model |
+| Charts and drawings | 🟡 | ✅ | ❌ | Typed inert chart-sheet metadata (tab color, views, protection, page setup, drawing links), bounded SpreadsheetDrawing inventory (anchors, shapes, pictures, graphic frames), and embedded-chart resolution into the shared DrawingML chart model; no authoring |
 | Structured tables | 🟡 | ✅ | ❌ | Typed inert ListObject model (MS-XLSB 2.1.7.51): identity, ranges, table types, header/totals metadata, DXF style ids, typed totals-row functions, inert calculated-column/totals formulas, and style-info flags; worksheet list parts are resolved eagerly at load |
 | External links and connections | 🟡 | ✅ | ❌ | Typed inert external-workbook, DDE, and OLE link targets, sheet names, and declared name/item metadata; connections remain unmodeled and no target is opened, contacted, refreshed, or executed |
 | VBA project/code modules | 🟡 | 🟡 | ❌ | Inert MS-XLSB Workbook → VBA Project topology plus declared legacy/Agile signature-part metadata; project/signature payload contents are never inspected, parsed, verified, or executed |
