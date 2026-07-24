@@ -13,6 +13,7 @@ use super::field::MutableField;
 use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
 use super::run::MutableRun;
+use super::textbox::MutableTextBox;
 use super::revision::{MutableRevision, ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode};
 use super::section::SectionProperties;
 use super::smart_tag::MutableSmartTag;
@@ -25,6 +26,8 @@ pub(crate) enum ParagraphElement {
     DisplayOfficeMath(OfficeMathParagraph),
     Hyperlink(MutableHyperlink),
     InlineImage(MutableInlineImage),
+    /// Inline DrawingML text box (wordprocessing shape).
+    TextBox(MutableTextBox),
     /// Bookmark start marker
     BookmarkStart(MutableBookmark),
     /// Bookmark end marker (ID only)
@@ -72,6 +75,13 @@ impl ParagraphElement {
                 image.to_xml(xml, &placeholder)?;
                 xml.push_str("</w:r>");
                 *image_index += 1;
+                Ok(())
+            },
+            // Text boxes carry no relationships; both modes serialize alike.
+            Self::TextBox(text_box) => {
+                xml.push_str("<w:r>");
+                text_box.to_xml(xml)?;
+                xml.push_str("</w:r>");
                 Ok(())
             },
             Self::BookmarkStart(bookmark) => {
@@ -139,6 +149,13 @@ impl ParagraphElement {
                 }
                 xml.push_str("</w:r>");
                 *image_index += 1;
+                Ok(())
+            },
+            // Text boxes carry no relationships; both modes serialize alike.
+            Self::TextBox(text_box) => {
+                xml.push_str("<w:r>");
+                text_box.to_xml(xml)?;
+                xml.push_str("</w:r>");
                 Ok(())
             },
             Self::BookmarkStart(bookmark) => {
@@ -324,6 +341,19 @@ impl MutableParagraph {
         self.elements.push(ParagraphElement::InlineImage(image));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::InlineImage(img) => Ok(img),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Add an inline text box to the paragraph.
+    ///
+    /// The text box is serialized as a DrawingML wordprocessing shape
+    /// (`wps:wsp`) and reappears in the
+    /// [`crate::docx::Document::text_boxes`] inventory after save and reopen.
+    pub fn add_text_box(&mut self, text_box: MutableTextBox) -> &mut MutableTextBox {
+        self.elements.push(ParagraphElement::TextBox(text_box));
+        match self.elements.last_mut().unwrap() {
+            ParagraphElement::TextBox(text_box) => text_box,
             _ => unreachable!(),
         }
     }

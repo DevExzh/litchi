@@ -388,6 +388,18 @@ impl MutableDocument {
         self.body.add_table(rows, cols)
     }
 
+    /// Add an inline text box in a new paragraph at the end of the document.
+    ///
+    /// The text box is serialized as a DrawingML wordprocessing shape
+    /// (`wps:wsp`) and reappears in the
+    /// [`crate::docx::Document::text_boxes`] inventory after save and reopen.
+    pub fn add_text_box(
+        &mut self,
+        text_box: super::textbox::MutableTextBox,
+    ) -> &mut super::textbox::MutableTextBox {
+        self.add_paragraph().add_text_box(text_box)
+    }
+
     /// Add a page break.
     pub fn add_page_break(&mut self) -> &mut MutableParagraph {
         let para = self.add_paragraph();

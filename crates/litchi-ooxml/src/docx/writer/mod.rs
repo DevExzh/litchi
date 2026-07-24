@@ -18,6 +18,7 @@ pub mod section;
 pub mod smart_tag;
 pub mod style;
 pub mod table;
+pub mod textbox;
 pub mod theme;
 pub mod toc;
 pub mod watermark;
@@ -56,6 +57,9 @@ pub use revision::{
 
 // Re-export table types
 pub use table::{CellProperties, MutableCell, MutableRow, MutableTable, TableBorder, TableBorders};
+
+// Re-export text-box authoring types
+pub use textbox::MutableTextBox;
 
 // Re-export comment types
 pub use comment::MutableComment;

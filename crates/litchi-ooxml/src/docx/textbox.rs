@@ -87,6 +87,17 @@ impl TextVerticalAnchor {
             _ => None,
         }
     }
+
+    /// The vertical-anchor token for this anchor.
+    pub fn as_token(self) -> &'static str {
+        match self {
+            Self::Top => "t",
+            Self::Center => "ctr",
+            Self::Bottom => "b",
+            Self::Justified => "just",
+            Self::Distributed => "dist",
+        }
+    }
 }
 
 /// Direction of text within the shape (`wps:bodyPr@vert`).
@@ -123,6 +134,19 @@ impl TextDirection {
             _ => None,
         }
     }
+
+    /// The ST_TextDirection token for this direction.
+    pub fn as_token(self) -> &'static str {
+        match self {
+            Self::Horizontal => "horz",
+            Self::Vertical => "vert",
+            Self::Vertical270 => "vert270",
+            Self::WordArtVertical => "wordArtVert",
+            Self::EastAsianVertical => "eaVert",
+            Self::MongolianVertical => "mongolianVert",
+            Self::WordArtVerticalRtl => "wordArtVertRtl",
+        }
+    }
 }
 
 /// Whether text wraps inside the shape extents (`wps:bodyPr@wrap`).
@@ -142,6 +166,14 @@ impl TextWrap {
             "square" => Some(Self::Square),
             "none" => Some(Self::None),
             _ => None,
+        }
+    }
+
+    /// The wrap token for this mode.
+    pub fn as_token(self) -> &'static str {
+        match self {
+            Self::Square => "square",
+            Self::None => "none",
         }
     }
 }
