@@ -148,6 +148,9 @@ pub mod record_types {
     pub const AC_BEGIN: u16 = 0x0025;
     pub const AC_END: u16 = 0x0026;
     pub const UID: u16 = 0x028B;
+    pub const BEGIN_WEB_EXTENSIONS: u16 = 2068;
+    pub const END_WEB_EXTENSIONS: u16 = 2069;
+    pub const WEB_EXTENSION: u16 = 2070;
 
     // Workbook structure records
     pub const FILE_VERSION: u16 = 0x0080;

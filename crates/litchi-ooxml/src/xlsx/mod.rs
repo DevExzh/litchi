@@ -77,6 +77,7 @@ pub mod threaded_comments;
 pub mod views;
 pub mod volatile_dependencies;
 pub mod vba_project;
+pub mod web_extension_bindings;
 pub mod workbook;
 pub mod workbook_metadata;
 pub mod workbook_protection;
@@ -201,6 +202,11 @@ pub use volatile_dependencies::{
     load_from_package_with_conformance as load_volatile_dependencies_from_package_with_conformance,
     remove_from_package as remove_volatile_dependencies_from_package,
     store_in_package as store_volatile_dependencies_in_package,
+};
+pub use web_extension_bindings::{
+    WEB_EXTENSIONS_EXTENSION_URI, WorksheetWebExtensionBinding,
+    parse_worksheet_web_extension_bindings, replace_worksheet_web_extension_bindings,
+    validate_worksheet_web_extension_apprefs, write_worksheet_web_extension_bindings,
 };
 pub use ole_objects::{
     OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker, OleObjectProperties,

@@ -172,6 +172,7 @@ pub mod drawing;
 
 /// Formula parsing and generation
 pub mod formula;
+pub mod web_extension_bindings;
 
 pub use calculation::{CalculationMode, CalculationProperties};
 pub use cell::XlsbCell;
@@ -212,6 +213,10 @@ pub use table::{
     XlsbTableTotalsRowFunction, XlsbTableType, parse_table_part,
 };
 pub use vba_project::{VbaProject, VbaProjectSignature, VbaProjectSignatureKind};
+pub use web_extension_bindings::{
+    XlsbWebExtensionBinding, XlsbWebExtensionRange, parse_xlsb_web_extension_bindings,
+    validate_xlsb_web_extension_apprefs, write_xlsb_web_extension_bindings,
+};
 pub use workbook::XlsbWorkbook;
 pub use worksheet::{
     XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection, XlsbStrongProtection,
