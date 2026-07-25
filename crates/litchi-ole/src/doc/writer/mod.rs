@@ -64,6 +64,9 @@ pub mod images;
 /// Primitive drawing-shape writer (floating preset-geometry shapes)
 pub mod shapes;
 
+/// Legacy smart-tag/factoid writer input types.
+pub mod smart_tags;
+
 // Re-export public types
 pub use crate::doc::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
 pub use crate::doc::parts::pap::{
@@ -99,6 +102,7 @@ pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, 
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 pub use shapes::{DocDrawingShape, DocShapeKind};
+pub use smart_tags::DocSmartTagEntry;
 pub use sprm::SprmBuilder;
 pub use stylesheet::{DocStyleDefinition, DocStyleRevision, StyleWriteError};
 pub use tap::{

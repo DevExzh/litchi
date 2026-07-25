@@ -6,9 +6,12 @@ use super::fib::FileInformationBlock;
 const FIB_INDEX: usize = 31;
 const BASE_SIZE: usize = 84;
 const WORD97_SIZE: usize = 500;
+const WORD2002_SIZE: usize = 594;
 const DOCINFO5_OFFSET: usize = 0x19A;
+const FACTOID_FLAGS_OFFSET: usize = 0x224;
 const INCLUDE_HEADER_MASK: u16 = 0x1000;
 const INCLUDE_FOOTER_MASK: u16 = 0x2000;
+const EMBED_FACTOIDS_MASK: u16 = 0x0008;
 
 fn corrupted(message: impl Into<String>) -> DocError {
     DocError::Corrupted(message.into())
@@ -693,6 +696,11 @@ impl DocumentProperties {
         self.absolute_u16(DOCINFO5_OFFSET)
             .map(|value| value & INCLUDE_FOOTER_MASK != 0)
     }
+    /// Whether Word should preserve embedded smart-tag/factoid metadata.
+    pub fn embeds_factoids(&self) -> Option<bool> {
+        self.absolute_u16(FACTOID_FLAGS_OFFSET)
+            .map(|value| value & EMBED_FACTOIDS_MASK != 0)
+    }
 
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.base.validate()?;
@@ -731,6 +739,21 @@ impl DocumentProperties {
             docinfo5 |= INCLUDE_FOOTER_MASK;
         }
         data[DOCINFO5_OFFSET..DOCINFO5_OFFSET + 2].copy_from_slice(&docinfo5.to_le_bytes());
+        data
+    }
+
+    pub(crate) fn writer_bytes(
+        facing_pages: bool,
+        include_headers: bool,
+        include_footers: bool,
+        embed_factoids: bool,
+    ) -> Vec<u8> {
+        let mut data = Self::word97_writer_bytes(facing_pages, include_headers, include_footers);
+        if embed_factoids {
+            data.resize(WORD2002_SIZE, 0);
+            data[FACTOID_FLAGS_OFFSET..FACTOID_FLAGS_OFFSET + 2]
+                .copy_from_slice(&EMBED_FACTOIDS_MASK.to_le_bytes());
+        }
         data
     }
 }

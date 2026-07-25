@@ -79,6 +79,7 @@ use super::footnotes::FootnoteEntry;
 use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
 use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
+use super::smart_tags::{DocSmartTagEntry, SmartTagTableData};
 use crate::doc::CommentDateTime;
 use crate::doc::encryption::{
     DocEncryptionProfile, encrypt_document_streams_for_write, validate_writer_password,
@@ -92,6 +93,7 @@ use crate::doc::parts::pap::{
     TabStop, TextBoxTightWrap,
 };
 use crate::doc::parts::{list_names::ListNamesTable, list_templates::ListTemplateTable};
+use crate::doc::SmartTagRecognizerRange;
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
@@ -872,6 +874,10 @@ pub struct DocWriter {
     comments: Vec<CommentEntry>,
     /// Standard bookmarks
     bookmarks: Vec<BookmarkEntry>,
+    /// Embedded smart-tag bookmarks and property bags.
+    smart_tags: Vec<DocSmartTagEntry>,
+    /// Smart-tag recognizer processing-state ranges.
+    smart_tag_recognizer_ranges: Vec<SmartTagRecognizerRange>,
     /// Property revision metadata for the writer's single document section
     section_formatting_revision: Option<FormattingRevision>,
     /// Explicit column geometry for the writer's single document section.
@@ -994,6 +1000,8 @@ impl DocWriter {
             endnotes: Vec::new(),
             comments: Vec::new(),
             bookmarks: Vec::new(),
+            smart_tags: Vec::new(),
+            smart_tag_recognizer_ranges: Vec::new(),
             section_formatting_revision: None,
             section_columns: None,
             section_right_to_left: false,
@@ -1585,6 +1593,19 @@ impl DocWriter {
     /// Add a standard bookmark to the document.
     pub fn add_bookmark(&mut self, entry: BookmarkEntry) {
         self.bookmarks.push(entry);
+    }
+
+    /// Add an inert smart-tag bookmark and property bag.
+    pub fn add_smart_tag(&mut self, entry: DocSmartTagEntry) {
+        self.smart_tags.push(entry);
+    }
+
+    /// Add one contiguous smart-tag recognizer-state range.
+    ///
+    /// Ranges are serialized in insertion order and must form a contiguous CP
+    /// sequence when the document is saved.
+    pub fn add_smart_tag_recognizer_range(&mut self, range: SmartTagRecognizerRange) {
+        self.smart_tag_recognizer_ranges.push(range);
     }
 
     /// Add a list structure definition.
@@ -2645,6 +2666,38 @@ impl DocWriter {
         table_stream.extend_from_slice(&bookmarks.ends);
     }
 
+    fn append_smart_tag_tables(
+        fib: &mut FibBuilder,
+        table_stream: &mut Vec<u8>,
+        smart_tags: &SmartTagTableData,
+    ) {
+        if let Some(data) = &smart_tags.infos {
+            let offset = table_stream.len() as u32;
+            fib.set_sttbf_bkmk_factoid(offset, data.len() as u32);
+            table_stream.extend_from_slice(data);
+        }
+        if let Some(data) = &smart_tags.starts {
+            let offset = table_stream.len() as u32;
+            fib.set_plcf_bkf_factoid(offset, data.len() as u32);
+            table_stream.extend_from_slice(data);
+        }
+        if let Some(data) = &smart_tags.ends {
+            let offset = table_stream.len() as u32;
+            fib.set_plcf_bkl_factoid(offset, data.len() as u32);
+            table_stream.extend_from_slice(data);
+        }
+        if let Some(data) = &smart_tags.factoid_data {
+            let offset = table_stream.len() as u32;
+            fib.set_factoid_data(offset, data.len() as u32);
+            table_stream.extend_from_slice(data);
+        }
+        if let Some(data) = &smart_tags.recognizer_ranges {
+            let offset = table_stream.len() as u32;
+            fib.set_plcf_factoid(offset, data.len() as u32);
+            table_stream.extend_from_slice(data);
+        }
+    }
+
     /// Build header/footer story text and PlcfHdd
     ///
     /// Appends header/footer text to `text_stream`, extends CHPX/PAPX entries and pieces.
@@ -3552,6 +3605,11 @@ impl DocWriter {
         }
 
         let bookmark_tables = Self::build_bookmark_tables(&self.bookmarks, current_cp)?;
+        let smart_tag_tables = super::smart_tags::build_tables(
+            &self.smart_tags,
+            &self.smart_tag_recognizer_ranges,
+            current_cp,
+        )?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists.
         // Per MS-DOC spec: "The total number of character positions is
@@ -3642,7 +3700,11 @@ impl DocWriter {
             doc_grpf_ihdt |= 0x20;
         }
         let facing_pages = self.header_even.is_some() || self.footer_even.is_some();
-        let dop_data = crate::doc::writer::dop::generate_dop(facing_pages, doc_grpf_ihdt);
+        let dop_data = crate::doc::writer::dop::generate_dop(
+            facing_pages,
+            doc_grpf_ihdt,
+            !smart_tag_tables.is_empty(),
+        );
         fib.set_dop(table_offset, dop_data.len() as u32);
         table_stream.extend_from_slice(&dop_data);
         table_offset = table_stream.len() as u32;
@@ -3687,6 +3749,10 @@ impl DocWriter {
         }
         if let Some(bookmarks) = &bookmark_tables {
             Self::append_bookmark_tables(&mut fib, &mut table_stream, bookmarks);
+            table_offset = table_stream.len() as u32;
+        }
+        if !smart_tag_tables.is_empty() {
+            Self::append_smart_tag_tables(&mut fib, &mut table_stream, &smart_tag_tables);
             table_offset = table_stream.len() as u32;
         }
         if let Some(revisions) = &revision_data {
@@ -4439,6 +4505,11 @@ impl DocWriter {
         }
 
         let bookmark_tables = Self::build_bookmark_tables(&self.bookmarks, current_cp)?;
+        let smart_tag_tables = super::smart_tags::build_tables(
+            &self.smart_tags,
+            &self.smart_tag_recognizer_ranges,
+            current_cp,
+        )?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists (same as save()).
         let has_subdocs = footnote_plcfs.is_some()
@@ -4522,7 +4593,11 @@ impl DocWriter {
             doc_grpf_ihdt |= 0x20;
         }
         let facing_pages = self.header_even.is_some() || self.footer_even.is_some();
-        let dop_data = crate::doc::writer::dop::generate_dop(facing_pages, doc_grpf_ihdt);
+        let dop_data = crate::doc::writer::dop::generate_dop(
+            facing_pages,
+            doc_grpf_ihdt,
+            !smart_tag_tables.is_empty(),
+        );
         fib.set_dop(table_offset, dop_data.len() as u32);
         table_stream.extend_from_slice(&dop_data);
         table_offset = table_stream.len() as u32;
@@ -4567,6 +4642,10 @@ impl DocWriter {
         }
         if let Some(bookmarks) = &bookmark_tables {
             Self::append_bookmark_tables(&mut fib, &mut table_stream, bookmarks);
+            table_offset = table_stream.len() as u32;
+        }
+        if !smart_tag_tables.is_empty() {
+            Self::append_smart_tag_tables(&mut fib, &mut table_stream, &smart_tag_tables);
             table_offset = table_stream.len() as u32;
         }
         if let Some(revisions) = &revision_data {
@@ -7647,6 +7726,75 @@ mod tests {
         writer.save(&path).unwrap();
         let mut package = crate::doc::Package::open(&path).unwrap();
         assert_eq!(package.document().unwrap().bookmarks().unwrap(), bookmarks);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn smart_tags_round_trip_through_both_output_paths() {
+        let mut writer = DocWriter::new();
+        writer.add_paragraph("abcdefghijklmnopqrst").unwrap();
+        writer.add_smart_tag(
+            DocSmartTagEntry::new(0, 10, "urn:example:geo", "place")
+                .with_origin(crate::doc::SmartTagOrigin::ExternalRecognizer)
+                .with_native_export(true)
+                .with_property("city", "東京"),
+        );
+        writer.add_smart_tag(
+            DocSmartTagEntry::new(5, 15, "urn:example:geo", "place")
+                .with_sub_entity(true)
+                .with_property("city", "Paris"),
+        );
+        writer.add_smart_tag(DocSmartTagEntry::new(5, 5, "urn:example:point", "cursor"));
+        writer.add_smart_tag_recognizer_range(crate::doc::SmartTagRecognizerRange {
+            start: 0,
+            end: 5,
+            state: crate::doc::SmartTagRecognizerState::Dirty,
+        });
+        writer.add_smart_tag_recognizer_range(crate::doc::SmartTagRecognizerRange {
+            start: 5,
+            end: 20,
+            state: crate::doc::SmartTagRecognizerState::Clean,
+        });
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+        for index in [114usize, 115, 117, 118, 132] {
+            assert!(document.fib().get_table_pointer(index).unwrap().1 > 0);
+        }
+        let smart_tags = document.smart_tags().unwrap().clone();
+        assert_eq!(smart_tags.tags.len(), 3);
+        assert_eq!(smart_tags.store.as_ref().unwrap().types.len(), 2);
+        assert_eq!(
+            smart_tags.tags[0].info.origin,
+            crate::doc::SmartTagOrigin::ExternalRecognizer
+        );
+        assert!(smart_tags.tags[0].is_native);
+        assert_eq!(
+            smart_tags.store.as_ref().unwrap().resolve_property(
+                smart_tags.tags[0].property_bag.properties[0]
+            ),
+            Some(("city", "東京"))
+        );
+        assert_eq!(
+            (smart_tags.tags[1].start_depth, smart_tags.tags[1].end_depth),
+            (3, 0)
+        );
+        assert_eq!(smart_tags.recognizer_ranges.len(), 2);
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-doc-smart-tags-{}-{}.doc",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        writer.save(&path).unwrap();
+        let mut package = crate::doc::Package::open(&path).unwrap();
+        assert_eq!(package.document().unwrap().smart_tags(), Some(&smart_tags));
         std::fs::remove_file(path).unwrap();
     }
 

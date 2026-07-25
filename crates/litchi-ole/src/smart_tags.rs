@@ -201,6 +201,80 @@ impl PropertyBagStore {
         ))
     }
 
+    /// Serialize the shared store without any format-specific property bags.
+    pub fn to_bytes(&self) -> Result<Vec<u8>, SmartTagError> {
+        self.to_bytes_with_bags(&[])
+    }
+
+    /// Serialize the shared store followed by the supplied property bags.
+    ///
+    /// ANSI strings are encoded with `ansi_codepage`; values that are not
+    /// representable are rejected instead of being replaced.
+    pub fn to_bytes_with_bags(
+        &self,
+        bags: &[SmartTagPropertyBag],
+    ) -> Result<Vec<u8>, SmartTagError> {
+        let encoding =
+            litchi_core::encoding::codepage_to_encoding(self.ansi_codepage).ok_or_else(|| {
+                SmartTagError::new(format!(
+                    "unsupported smart-tag ANSI code page {}",
+                    self.ansi_codepage
+                ))
+            })?;
+        let type_count = u32::try_from(self.types.len())
+            .map_err(|_| SmartTagError::new("smart-tag type count exceeds u32"))?;
+        let string_count = u32::try_from(self.strings.len())
+            .map_err(|_| SmartTagError::new("smart-tag string count exceeds u32"))?;
+        let mut type_ids = HashSet::with_capacity(self.types.len());
+        let mut output = Vec::new();
+        output.extend_from_slice(&type_count.to_le_bytes());
+        for kind in &self.types {
+            if !type_ids.insert(kind.id) {
+                return Err(SmartTagError::new(
+                    "PropertyBagStore has duplicate smart-tag type ids",
+                ));
+            }
+            let mut payload = u32::from(kind.id).to_le_bytes().to_vec();
+            append_pb_string(&mut payload, &kind.namespace_uri, encoding)?;
+            append_pb_string(&mut payload, &kind.tag_name, encoding)?;
+            append_pb_string(&mut payload, &kind.download_url, encoding)?;
+            let payload_len = u32::try_from(payload.len())
+                .map_err(|_| SmartTagError::new("FactoidType payload exceeds u32"))?;
+            output.extend_from_slice(&payload_len.to_le_bytes());
+            output.extend_from_slice(&payload);
+        }
+        output.extend_from_slice(&0x000cu16.to_le_bytes());
+        output.extend_from_slice(&0x0100u16.to_le_bytes());
+        output.extend_from_slice(&self.reserved_factoid_count.to_le_bytes());
+        output.extend_from_slice(&string_count.to_le_bytes());
+        for value in &self.strings {
+            append_pb_string(&mut output, value, encoding)?;
+        }
+        for bag in bags {
+            if !type_ids.contains(&bag.type_id) {
+                return Err(SmartTagError::new(
+                    "PropertyBag references an unknown smart-tag type",
+                ));
+            }
+            let property_count = u16::try_from(bag.properties.len()).map_err(|_| {
+                SmartTagError::new("PropertyBag contains more than 65535 properties")
+            })?;
+            output.extend_from_slice(&bag.type_id.to_le_bytes());
+            output.extend_from_slice(&property_count.to_le_bytes());
+            output.extend_from_slice(&0u16.to_le_bytes());
+            for property in &bag.properties {
+                if self.resolve_property(*property).is_none() {
+                    return Err(SmartTagError::new(
+                        "smart-tag property string index is out of range",
+                    ));
+                }
+                output.extend_from_slice(&property.key_index.to_le_bytes());
+                output.extend_from_slice(&property.value_index.to_le_bytes());
+            }
+        }
+        Ok(output)
+    }
+
     /// Parse an exact number of property bags from `data`.
     pub fn parse_bags(
         &self,
@@ -291,6 +365,44 @@ impl PropertyBagStore {
             properties,
         })
     }
+}
+
+fn append_pb_string(
+    output: &mut Vec<u8>,
+    value: &PropertyBagString,
+    ansi_encoding: &'static encoding_rs::Encoding,
+) -> Result<(), SmartTagError> {
+    if value.value.contains('\0') {
+        return Err(SmartTagError::new(
+            "PBString values cannot contain embedded NUL characters",
+        ));
+    }
+    match value.encoding {
+        PropertyBagStringEncoding::Ansi => {
+            let (encoded, _, had_errors) = ansi_encoding.encode(&value.value);
+            if had_errors {
+                return Err(SmartTagError::new(
+                    "PBString is not representable in its ANSI code page",
+                ));
+            }
+            let count = u16::try_from(encoded.len())
+                .ok()
+                .filter(|count| *count <= 0x7fff)
+                .ok_or_else(|| SmartTagError::new("ANSI PBString exceeds 32767 bytes"))?;
+            output.extend_from_slice(&(count | 0x8000).to_le_bytes());
+            output.extend_from_slice(&encoded);
+        },
+        PropertyBagStringEncoding::Utf16 => {
+            let units = value.value.encode_utf16().collect::<Vec<_>>();
+            let count = u16::try_from(units.len())
+                .ok()
+                .filter(|count| *count <= 0x7fff)
+                .ok_or_else(|| SmartTagError::new("UTF-16 PBString exceeds 32767 code units"))?;
+            output.extend_from_slice(&count.to_le_bytes());
+            output.extend(units.into_iter().flat_map(u16::to_le_bytes));
+        },
+    }
+    Ok(())
 }
 
 fn bounded_count(
@@ -459,5 +571,27 @@ mod tests {
             PropertyBagStore::parse_prefix(&data[..8], 1252, SmartTagLimits::default()).is_err()
         );
         assert!(PropertyBagStore::parse_prefix(&data, 99_999, SmartTagLimits::default()).is_err());
+    }
+
+    #[test]
+    fn serializes_store_and_bags_exactly_and_refuses_lossy_ansi() {
+        let data = store_and_bag();
+        let (store, consumed) =
+            PropertyBagStore::parse_prefix(&data, 1252, SmartTagLimits::default()).unwrap();
+        let bags = store
+            .parse_bags_to_end(&data[consumed..], SmartTagLimits::default())
+            .unwrap();
+        assert_eq!(store.to_bytes_with_bags(&bags).unwrap(), data);
+
+        let mut unrepresentable = store.clone();
+        unrepresentable.strings[0] = PropertyBagString {
+            value: "東京".to_string(),
+            encoding: PropertyBagStringEncoding::Ansi,
+        };
+        assert!(unrepresentable.to_bytes_with_bags(&bags).is_err());
+        unrepresentable.strings[0].encoding = PropertyBagStringEncoding::Utf16;
+        assert!(unrepresentable.to_bytes_with_bags(&bags).is_ok());
+        unrepresentable.strings[0].value = "bad\0value".to_string();
+        assert!(unrepresentable.to_bytes_with_bags(&bags).is_err());
     }
 }

@@ -107,6 +107,21 @@ pub struct FibBuilder {
     lcb_plcf_bkf: u32,
     fc_plcf_bkl: u32,
     lcb_plcf_bkl: u32,
+    /// Smart-tag bookmark information (`SttbfBkmkFactoid`).
+    fc_sttbf_bkmk_factoid: u32,
+    lcb_sttbf_bkmk_factoid: u32,
+    /// Smart-tag bookmark starts (`PlcfBkfFactoid`).
+    fc_plcf_bkf_factoid: u32,
+    lcb_plcf_bkf_factoid: u32,
+    /// Smart-tag bookmark ends (`PlcfBklFactoid`).
+    fc_plcf_bkl_factoid: u32,
+    lcb_plcf_bkl_factoid: u32,
+    /// Shared smart-tag property store and bags (`FactoidData`).
+    fc_factoid_data: u32,
+    lcb_factoid_data: u32,
+    /// Smart-tag recognizer-state ranges (`Plcffactoid`).
+    fc_plcf_factoid: u32,
+    lcb_plcf_factoid: u32,
     /// Tracked-revision author table (`SttbfRMark`)
     fc_sttbf_rmark: u32,
     lcb_sttbf_rmark: u32,
@@ -218,6 +233,16 @@ impl FibBuilder {
             lcb_plcf_bkf: 0,
             fc_plcf_bkl: 0,
             lcb_plcf_bkl: 0,
+            fc_sttbf_bkmk_factoid: 0,
+            lcb_sttbf_bkmk_factoid: 0,
+            fc_plcf_bkf_factoid: 0,
+            lcb_plcf_bkf_factoid: 0,
+            fc_plcf_bkl_factoid: 0,
+            lcb_plcf_bkl_factoid: 0,
+            fc_factoid_data: 0,
+            lcb_factoid_data: 0,
+            fc_plcf_factoid: 0,
+            lcb_plcf_factoid: 0,
             fc_sttbf_rmark: 0,
             lcb_sttbf_rmark: 0,
             fc_sttbf_atn_bkmk: 0,
@@ -401,6 +426,31 @@ impl FibBuilder {
     pub fn set_plcf_bkl(&mut self, offset: u32, size: u32) {
         self.fc_plcf_bkl = offset;
         self.lcb_plcf_bkl = size;
+    }
+
+    pub fn set_sttbf_bkmk_factoid(&mut self, offset: u32, size: u32) {
+        self.fc_sttbf_bkmk_factoid = offset;
+        self.lcb_sttbf_bkmk_factoid = size;
+    }
+
+    pub fn set_plcf_bkf_factoid(&mut self, offset: u32, size: u32) {
+        self.fc_plcf_bkf_factoid = offset;
+        self.lcb_plcf_bkf_factoid = size;
+    }
+
+    pub fn set_plcf_bkl_factoid(&mut self, offset: u32, size: u32) {
+        self.fc_plcf_bkl_factoid = offset;
+        self.lcb_plcf_bkl_factoid = size;
+    }
+
+    pub fn set_factoid_data(&mut self, offset: u32, size: u32) {
+        self.fc_factoid_data = offset;
+        self.lcb_factoid_data = size;
+    }
+
+    pub fn set_plcf_factoid(&mut self, offset: u32, size: u32) {
+        self.fc_plcf_factoid = offset;
+        self.lcb_plcf_factoid = size;
     }
 
     /// Set the tracked-revision author table (`SttbfRMark`).
@@ -731,6 +781,11 @@ impl FibBuilder {
         const STTBLISTNAMES: usize = 91;
         const STTBRGTPLC: usize = 96;
         const ATRDEXTRA: usize = 112; // Extended comment metadata
+        const STTBFBKMKFACTOID: usize = 114;
+        const PLCFBKFFACTOID: usize = 115;
+        const PLCFBKLFACTOID: usize = 117;
+        const FACTOIDDATA: usize = 118;
+        const PLCFFACTOID: usize = 132;
         const PLCSPAMOM: usize = 40; // Main document shape position table
         const PLCSPAHDR: usize = 41; // Header document shape position table
         const PLCFTXBXTEXT: usize = 56; // Textbox story text positions
@@ -766,6 +821,36 @@ impl FibBuilder {
         set_field(buf, PLCFATNBKF, self.fc_plcf_atn_bkf, self.lcb_plcf_atn_bkf);
         set_field(buf, PLCFATNBKL, self.fc_plcf_atn_bkl, self.lcb_plcf_atn_bkl);
         set_field(buf, ATRDEXTRA, self.fc_atrd_extra, self.lcb_atrd_extra);
+        set_field(
+            buf,
+            STTBFBKMKFACTOID,
+            self.fc_sttbf_bkmk_factoid,
+            self.lcb_sttbf_bkmk_factoid,
+        );
+        set_field(
+            buf,
+            PLCFBKFFACTOID,
+            self.fc_plcf_bkf_factoid,
+            self.lcb_plcf_bkf_factoid,
+        );
+        set_field(
+            buf,
+            PLCFBKLFACTOID,
+            self.fc_plcf_bkl_factoid,
+            self.lcb_plcf_bkl_factoid,
+        );
+        set_field(
+            buf,
+            FACTOIDDATA,
+            self.fc_factoid_data,
+            self.lcb_factoid_data,
+        );
+        set_field(
+            buf,
+            PLCFFACTOID,
+            self.fc_plcf_factoid,
+            self.lcb_plcf_factoid,
+        );
         set_field(
             buf,
             PLCFBTEPAPX,
