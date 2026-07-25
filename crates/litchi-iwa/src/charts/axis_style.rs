@@ -63,7 +63,7 @@ impl ChartAxisTickMarkLocation {
 }
 
 /// Proto2 extension holding the generated chart-axis style properties.
-const GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD: u32 = 10_000;
+pub(crate) const GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD: u32 = 10_000;
 /// `tschchartaxiscategoryshowaxis` in `TSCH.Generated.ChartAxisStyleArchive`.
 const CATEGORY_AXIS_LINE_VISIBLE_FIELD: u32 = 24;
 /// `tschchartaxisvalueshowaxis` in `TSCH.Generated.ChartAxisStyleArchive`.
@@ -216,7 +216,7 @@ impl AxisStyleSwitch {
 
 /// The single mutable native axis-style payload for one chart axis.
 #[derive(Debug)]
-struct AxisStyleSlot {
+pub(crate) struct AxisStyleSlot {
     archive_name: String,
     object_id: u64,
     message_index: usize,
@@ -565,7 +565,7 @@ fn axis_tick_mark_location(
     }
 }
 
-fn axis_style_slot(
+pub(crate) fn axis_style_slot(
     package: &IWorkPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
@@ -638,7 +638,11 @@ fn axis_style_slot(
 }
 
 impl AxisStyleSlot {
-    fn read<T>(&self, package: &IWorkPackage, read: impl FnOnce(&[u8]) -> Result<T>) -> Result<T> {
+    pub(crate) fn read<T>(
+        &self,
+        package: &IWorkPackage,
+        read: impl FnOnce(&[u8]) -> Result<T>,
+    ) -> Result<T> {
         let archive = package.archive(&self.archive_name)?;
         let object = archive.object(self.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!("chart axis-style {} is missing", self.object_id))
@@ -658,7 +662,7 @@ impl AxisStyleSlot {
         read(message.data.as_slice())
     }
 
-    fn ensure_exclusive(
+    pub(crate) fn ensure_exclusive(
         &self,
         package: &IWorkPackage,
         drawable_object_id: u64,
@@ -702,7 +706,7 @@ impl AxisStyleSlot {
         Ok(())
     }
 
-    fn update(
+    pub(crate) fn update(
         &self,
         package: &mut IWorkPackage,
         patch: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
@@ -849,7 +853,7 @@ fn validate_patched_axis_tick_mark_location(
     Ok(())
 }
 
-fn generated_axis_style_extension(data: &[u8]) -> Result<Option<&[u8]>> {
+pub(crate) fn generated_axis_style_extension(data: &[u8]) -> Result<Option<&[u8]>> {
     tsch::ChartAxisStyleArchive::decode(data)?;
     let fields = parse_wire_fields(data)?;
     let mut extensions = fields
