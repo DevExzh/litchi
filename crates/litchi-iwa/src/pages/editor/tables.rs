@@ -1,5 +1,6 @@
 //! Native table discovery and cell editing for Pages body attachments.
 
+mod appearance;
 mod comments;
 mod formula;
 mod layout;
@@ -33,6 +34,7 @@ use crate::bundle::Bundle;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::protobuf::tst::{TableInfoArchive, TableModelArchive};
+use crate::table_appearance::TableAppearance;
 use crate::table_lock::{TableLockState, table_lock_state_from_message};
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
@@ -70,6 +72,8 @@ pub struct PagesTableInfo {
     pub rows: usize,
     /// Number of addressable columns.
     pub columns: usize,
+    /// Effective alternating-row and automatic-sizing settings.
+    pub appearance: TableAppearance,
     /// Interactive editing lock shown in the Arrange inspector.
     pub lock_state: TableLockState,
 }
@@ -788,6 +792,7 @@ fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
                 name: model.table_name.clone(),
                 rows: model.number_of_rows as usize,
                 columns: model.number_of_columns as usize,
+                appearance: crate::table_appearance::table_appearance(editor.package(), model_id)?,
                 lock_state: table_lock_state_from_message(&message.data)?,
             },
         });

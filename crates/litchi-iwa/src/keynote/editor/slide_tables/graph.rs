@@ -95,6 +95,7 @@ pub(super) fn slide_table_graph(
             rows: model.number_of_rows as usize,
             columns: model.number_of_columns as usize,
             geometry: crate::shapes::geometry_from_drawable(&table_info.super_)?,
+            appearance: crate::table_appearance::table_appearance(editor.package(), model_id)?,
             lock_state,
         },
         table_archive,

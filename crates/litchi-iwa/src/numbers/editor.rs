@@ -38,6 +38,7 @@ use crate::shapes::{
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
+use crate::table_appearance::TableAppearance;
 use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
@@ -84,6 +85,8 @@ pub struct NumbersTableInfo {
     pub name: String,
     pub rows: usize,
     pub columns: usize,
+    /// Effective alternating-row and automatic-sizing settings.
+    pub appearance: TableAppearance,
     /// Interactive editing lock shown in the Arrange inspector.
     pub lock_state: TableLockState,
 }
@@ -203,6 +206,10 @@ impl NumbersEditor {
                     name: descriptor.model.table_name,
                     rows: descriptor.model.number_of_rows as usize,
                     columns: descriptor.model.number_of_columns as usize,
+                    appearance: crate::table_appearance::table_appearance(
+                        &self.package,
+                        descriptor.object_id,
+                    )?,
                     lock_state: crate::table_lock::table_lock_state_for_model(
                         &self.package,
                         archive_name,
@@ -3145,6 +3152,7 @@ mod sheet_movies;
 mod sheet_shapes;
 mod storage;
 mod stroke_layers;
+mod table_appearance;
 mod table_axis_deletion;
 mod table_axis_insertion;
 mod table_bootstrap;

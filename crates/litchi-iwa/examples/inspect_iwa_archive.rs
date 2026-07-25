@@ -16,8 +16,10 @@ use litchi_iwa::protobuf::tsd::GuideStorageArchive;
 use litchi_iwa::protobuf::tsk::{AnnotationAuthorArchive, AnnotationAuthorStorageArchive};
 use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tss::StylesheetArchive;
-use litchi_iwa::protobuf::tst::TableDataList;
-use litchi_iwa::protobuf::tst::{TableInfoArchive, TableModelArchive};
+use litchi_iwa::protobuf::tst::{
+    CellStyleArchive, TableDataList, TableInfoArchive, TableModelArchive, TableStyleArchive,
+    TableStyleNetworkArchive, TableStylePresetArchive,
+};
 use litchi_iwa::protobuf::tswp::{
     BookmarkFieldArchive, CharacterStyleArchive, ColumnStyleArchive, DateTimeSmartFieldArchive,
     DrawableAttachmentArchive, DropCapStyleArchive, HighlightArchive, HyperlinkFieldArchive,
@@ -205,6 +207,26 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 && let Ok(list) = TableDataList::decode(message.data.as_slice())
             {
                 println!("  table_data_list={list:#?}");
+            }
+            if message.type_ == 6_003
+                && let Ok(style) = TableStyleArchive::decode(message.data.as_slice())
+            {
+                println!("  table_style={style:#?}");
+            }
+            if message.type_ == 6_004
+                && let Ok(style) = CellStyleArchive::decode(message.data.as_slice())
+            {
+                println!("  cell_style={style:#?}");
+            }
+            if message.type_ == 6_008
+                && let Ok(preset) = TableStylePresetArchive::decode(message.data.as_slice())
+            {
+                println!("  table_style_preset={preset:#?}");
+            }
+            if message.type_ == 6_247
+                && let Ok(network) = TableStyleNetworkArchive::decode(message.data.as_slice())
+            {
+                println!("  table_style_network={network:#?}");
             }
             if message.type_ == 1
                 && let Ok(document) = kn::DocumentArchive::decode(message.data.as_slice())

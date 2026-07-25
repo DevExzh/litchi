@@ -7,8 +7,10 @@ use crate::bundle::Bundle;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::table_appearance::TableAppearance;
 use crate::table_lock::TableLockState;
 
+mod appearance;
 mod comments;
 mod formula;
 mod graph;
@@ -75,6 +77,8 @@ pub struct KeynoteSlideTableInfo {
     pub rows: usize,
     pub columns: usize,
     pub geometry: DrawableGeometry,
+    /// Effective alternating-row and automatic-sizing settings.
+    pub appearance: TableAppearance,
     /// Interactive editing lock shown in the Arrange inspector.
     pub lock_state: TableLockState,
 }
