@@ -20,6 +20,8 @@ pub const TRANSITIONAL_RELATIONSHIPS_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 pub const STRICT_RELATIONSHIPS_NAMESPACE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships";
+pub const DRAWINGML_NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+pub const STRICT_DRAWINGML_NAMESPACE: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 
 pub const TASK_PANES_RELATIONSHIP_TYPE: &str =
     "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes";
@@ -132,11 +134,160 @@ pub struct WebExtensionBinding {
     pub application_reference: String,
 }
 
-/// Relationship-bearing subset of DrawingML `CT_Blip` used by a snapshot.
+/// Compression state of a DrawingML `CT_Blip`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebExtensionBlipCompression {
+    Email,
+    Screen,
+    Print,
+    HighQualityPrint,
+    None,
+}
+
+impl WebExtensionBlipCompression {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Email => "email",
+            Self::Screen => "screen",
+            Self::Print => "print",
+            Self::HighQualityPrint => "hqprint",
+            Self::None => "none",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "email" => Ok(Self::Email),
+            "screen" => Ok(Self::Screen),
+            "print" => Ok(Self::Print),
+            "hqprint" => Ok(Self::HighQualityPrint),
+            "none" => Ok(Self::None),
+            _ => invalid(format!("invalid snapshot compression state '{value}'")),
+        }
+    }
+}
+
+/// Closed effect-element choice allowed by DrawingML `CT_Blip`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebExtensionSnapshotEffectKind {
+    AlphaBiLevel,
+    AlphaCeiling,
+    AlphaFloor,
+    AlphaInverse,
+    AlphaModulate,
+    AlphaModulateFixed,
+    AlphaReplace,
+    BiLevel,
+    Blur,
+    ColorChange,
+    ColorReplace,
+    Duotone,
+    FillOverlay,
+    Grayscale,
+    HueSaturationLuminance,
+    Luminance,
+    Tint,
+}
+
+impl WebExtensionSnapshotEffectKind {
+    pub fn local_name(self) -> &'static str {
+        match self {
+            Self::AlphaBiLevel => "alphaBiLevel",
+            Self::AlphaCeiling => "alphaCeiling",
+            Self::AlphaFloor => "alphaFloor",
+            Self::AlphaInverse => "alphaInv",
+            Self::AlphaModulate => "alphaMod",
+            Self::AlphaModulateFixed => "alphaModFix",
+            Self::AlphaReplace => "alphaRepl",
+            Self::BiLevel => "biLevel",
+            Self::Blur => "blur",
+            Self::ColorChange => "clrChange",
+            Self::ColorReplace => "clrRepl",
+            Self::Duotone => "duotone",
+            Self::FillOverlay => "fillOverlay",
+            Self::Grayscale => "grayscl",
+            Self::HueSaturationLuminance => "hsl",
+            Self::Luminance => "lum",
+            Self::Tint => "tint",
+        }
+    }
+
+    fn parse(local_name: &str) -> Result<Self> {
+        match local_name {
+            "alphaBiLevel" => Ok(Self::AlphaBiLevel),
+            "alphaCeiling" => Ok(Self::AlphaCeiling),
+            "alphaFloor" => Ok(Self::AlphaFloor),
+            "alphaInv" => Ok(Self::AlphaInverse),
+            "alphaMod" => Ok(Self::AlphaModulate),
+            "alphaModFix" => Ok(Self::AlphaModulateFixed),
+            "alphaRepl" => Ok(Self::AlphaReplace),
+            "biLevel" => Ok(Self::BiLevel),
+            "blur" => Ok(Self::Blur),
+            "clrChange" => Ok(Self::ColorChange),
+            "clrRepl" => Ok(Self::ColorReplace),
+            "duotone" => Ok(Self::Duotone),
+            "fillOverlay" => Ok(Self::FillOverlay),
+            "grayscl" => Ok(Self::Grayscale),
+            "hsl" => Ok(Self::HueSaturationLuminance),
+            "lum" => Ok(Self::Luminance),
+            "tint" => Ok(Self::Tint),
+            _ => invalid(format!("invalid snapshot effect '{local_name}'")),
+        }
+    }
+}
+
+/// A validated, inert DrawingML effect subtree.
+///
+/// The subtree is retained as canonical XML. It is never interpreted as
+/// executable content, and construction rejects text, CDATA, DTDs, excessive
+/// depth, and roots outside the closed `CT_Blip` effect choice.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebExtensionSnapshotEffect {
+    kind: WebExtensionSnapshotEffectKind,
+    xml: String,
+}
+
+impl WebExtensionSnapshotEffect {
+    pub fn from_xml(xml: &[u8]) -> Result<Self> {
+        if xml.len() > MAX_WEB_EXTENSION_XML_BYTES {
+            return invalid(format!(
+                "snapshot effect XML exceeds {MAX_WEB_EXTENSION_XML_BYTES} bytes"
+            ));
+        }
+        let document = parse_xml(xml)?;
+        Self::from_node(document.root()?)
+    }
+
+    pub fn kind(&self) -> WebExtensionSnapshotEffectKind {
+        self.kind
+    }
+
+    pub fn xml(&self) -> &str {
+        &self.xml
+    }
+
+    fn from_node(node: &Node) -> Result<Self> {
+        if !is_drawingml_namespace(&node.namespace) {
+            return invalid(format!(
+                "snapshot effect {} has invalid namespace '{}'",
+                node.local_name, node.namespace
+            ));
+        }
+        let kind = WebExtensionSnapshotEffectKind::parse(&node.local_name)?;
+        Ok(Self {
+            kind,
+            xml: canonical_node_xml(node),
+        })
+    }
+}
+
+/// DrawingML `CT_Blip` metadata used by a web-extension snapshot.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WebExtensionSnapshot {
     pub embedded_relationship_id: Option<String>,
     pub linked_relationship_id: Option<String>,
+    pub compression_state: Option<WebExtensionBlipCompression>,
+    pub effects: Vec<WebExtensionSnapshotEffect>,
 }
 
 /// One inert image relationship owned by a web-extension snapshot.
@@ -262,22 +413,38 @@ pub fn parse_web_extension(xml: &[u8]) -> Result<WebExtension> {
     let snapshot = if is_next(&children, position, WEB_EXTENSION_NAMESPACE, "snapshot") {
         let node = children[position];
         position += 1;
+        reject_unknown_attributes(
+            node,
+            &[
+                ("", "cstate"),
+                (TRANSITIONAL_RELATIONSHIPS_NAMESPACE, "embed"),
+                (TRANSITIONAL_RELATIONSHIPS_NAMESPACE, "link"),
+                (STRICT_RELATIONSHIPS_NAMESPACE, "embed"),
+                (STRICT_RELATIONSHIPS_NAMESPACE, "link"),
+            ],
+        )?;
         let embedded_relationship_id = relationship_attr(node, "embed")?.map(str::to_owned);
         let linked_relationship_id = relationship_attr(node, "link")?.map(str::to_owned);
-        for attribute in &node.attributes {
-            let known_relationship = is_relationship_namespace(&attribute.namespace)
-                && matches!(attribute.local_name.as_str(), "embed" | "link");
-            // CT_Blip has additional unqualified compression/state attributes.
-            if !known_relationship && !attribute.namespace.is_empty() {
-                return invalid(format!(
-                    "unexpected namespaced snapshot attribute {{{}}}{}",
-                    attribute.namespace, attribute.local_name
-                ));
+        let compression_state = attr(node, "", "cstate")
+            .map(WebExtensionBlipCompression::parse)
+            .transpose()?;
+        let snapshot_children = element_children(node);
+        enforce_count("snapshot effect", snapshot_children.len())?;
+        let mut effects = Vec::with_capacity(snapshot_children.len());
+        for (index, child) in snapshot_children.iter().enumerate() {
+            if is_drawingml_namespace(&child.namespace) && child.local_name == "extLst" {
+                if index + 1 != snapshot_children.len() {
+                    return invalid("snapshot extLst must be the final child".into());
+                }
+                continue;
             }
+            effects.push(WebExtensionSnapshotEffect::from_node(child)?);
         }
         Some(WebExtensionSnapshot {
             embedded_relationship_id,
             linked_relationship_id,
+            compression_state,
+            effects,
         })
     } else {
         None
@@ -938,7 +1105,20 @@ pub fn write_web_extension(
             escape_attr(&mut out, id);
             out.push('"');
         }
-        out.push_str("/>");
+        if let Some(compression_state) = snapshot.compression_state {
+            out.push_str(" cstate=\"");
+            out.push_str(compression_state.as_str());
+            out.push('"');
+        }
+        if snapshot.effects.is_empty() {
+            out.push_str("/>");
+        } else {
+            out.push('>');
+            for effect in &snapshot.effects {
+                out.push_str(effect.xml());
+            }
+            out.push_str("</we:snapshot>");
+        }
     }
     out.push_str("</we:webextension>");
     let output = out.into_bytes();
@@ -1241,6 +1421,15 @@ fn validate_model(extension: &WebExtension) -> Result<()> {
         require_nonempty("binding type", &binding.binding_type)?;
         require_nonempty("binding appref", &binding.application_reference)?;
     }
+    if let Some(snapshot) = &extension.snapshot {
+        enforce_count("snapshot effect", snapshot.effects.len())?;
+        for effect in &snapshot.effects {
+            let reparsed = WebExtensionSnapshotEffect::from_xml(effect.xml.as_bytes())?;
+            if reparsed.kind != effect.kind {
+                return invalid("snapshot effect kind does not match its XML root".into());
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1362,6 +1551,52 @@ fn escape_attr(out: &mut String, value: &str) {
             _ => out.push(character),
         }
     }
+}
+
+fn canonical_node_xml(node: &Node) -> String {
+    fn write_node(out: &mut String, node: &Node) {
+        out.push('<');
+        out.push_str(&node.local_name);
+        out.push_str(" xmlns=\"");
+        escape_attr(out, &node.namespace);
+        out.push('"');
+        for (index, attribute) in node.attributes.iter().enumerate() {
+            if attribute.namespace.is_empty() {
+                out.push(' ');
+                out.push_str(&attribute.local_name);
+            } else if attribute.namespace == "http://www.w3.org/XML/1998/namespace" {
+                out.push_str(" xml:");
+                out.push_str(&attribute.local_name);
+            } else {
+                out.push_str(" xmlns:n");
+                out.push_str(&index.to_string());
+                out.push_str("=\"");
+                escape_attr(out, &attribute.namespace);
+                out.push_str("\" n");
+                out.push_str(&index.to_string());
+                out.push(':');
+                out.push_str(&attribute.local_name);
+            }
+            out.push_str("=\"");
+            escape_attr(out, &attribute.value);
+            out.push('"');
+        }
+        if node.children.is_empty() {
+            out.push_str("/>");
+            return;
+        }
+        out.push('>');
+        for child in &node.children {
+            write_node(out, child);
+        }
+        out.push_str("</");
+        out.push_str(&node.local_name);
+        out.push('>');
+    }
+
+    let mut out = String::new();
+    write_node(&mut out, node);
+    out
 }
 
 fn require_nonempty(label: &str, value: &str) -> Result<()> {
@@ -1654,11 +1889,8 @@ fn relationship_attr<'a>(node: &'a Node, local_name: &str) -> Result<Option<&'a 
     }
 }
 
-fn is_relationship_namespace(namespace: &str) -> bool {
-    matches!(
-        namespace,
-        TRANSITIONAL_RELATIONSHIPS_NAMESPACE | STRICT_RELATIONSHIPS_NAMESPACE
-    )
+fn is_drawingml_namespace(namespace: &str) -> bool {
+    matches!(namespace, DRAWINGML_NAMESPACE | STRICT_DRAWINGML_NAMESPACE)
 }
 
 fn optional_bool_attr(node: &Node, namespace: &str, local_name: &str) -> Result<Option<bool>> {
@@ -1726,6 +1958,8 @@ mod tests {
         include_bytes!("../../../test-data/ooxml/web_extensions/visible_taskpanes.xml");
     const LOCAL_HIDDEN_TASK_PANES: &[u8] =
         include_bytes!("../../../test-data/ooxml/web_extensions/hidden_taskpanes.xml");
+    const LOCAL_SNAPSHOT_EFFECTS_EXTENSION: &[u8] =
+        include_bytes!("../../../test-data/ooxml/web_extensions/snapshot_effects_webextension.xml");
 
     #[test]
     fn loads_local_omex_and_registry_fixtures_inertly() {
@@ -1759,6 +1993,100 @@ mod tests {
                 .contains(STRICT_RELATIONSHIPS_NAMESPACE)
         );
         assert_eq!(parse_web_extension(&first).unwrap(), extension);
+    }
+
+    #[test]
+    fn snapshot_compression_and_effect_trees_round_trip() {
+        let extension = parse_web_extension(LOCAL_SNAPSHOT_EFFECTS_EXTENSION).unwrap();
+        let snapshot = extension.snapshot.as_ref().unwrap();
+        assert_eq!(
+            snapshot.compression_state,
+            Some(WebExtensionBlipCompression::HighQualityPrint)
+        );
+        assert_eq!(
+            snapshot
+                .effects
+                .iter()
+                .map(WebExtensionSnapshotEffect::kind)
+                .collect::<Vec<_>>(),
+            vec![
+                WebExtensionSnapshotEffectKind::AlphaModulateFixed,
+                WebExtensionSnapshotEffectKind::Duotone,
+                WebExtensionSnapshotEffectKind::Blur,
+            ]
+        );
+        assert!(snapshot.effects[1].xml().contains("srgbClr"));
+
+        let written = write_web_extension(&extension, OoxmlConformance::Strict).unwrap();
+        let reparsed = parse_web_extension(&written).unwrap();
+        assert_eq!(reparsed, extension);
+        let written = std::str::from_utf8(&written).unwrap();
+        assert!(written.contains("cstate=\"hqprint\""));
+        assert!(written.contains(STRICT_RELATIONSHIPS_NAMESPACE));
+    }
+
+    #[test]
+    fn accepts_every_ct_blip_effect_kind_and_rejects_invalid_markup() {
+        let names = [
+            "alphaBiLevel",
+            "alphaCeiling",
+            "alphaFloor",
+            "alphaInv",
+            "alphaMod",
+            "alphaModFix",
+            "alphaRepl",
+            "biLevel",
+            "blur",
+            "clrChange",
+            "clrRepl",
+            "duotone",
+            "fillOverlay",
+            "grayscl",
+            "hsl",
+            "lum",
+            "tint",
+        ];
+        for name in names {
+            let xml = format!(r#"<a:{name} xmlns:a="{DRAWINGML_NAMESPACE}"/>"#);
+            let effect = WebExtensionSnapshotEffect::from_xml(xml.as_bytes()).unwrap();
+            assert_eq!(effect.kind().local_name(), name);
+            assert_eq!(
+                WebExtensionSnapshotEffect::from_xml(effect.xml().as_bytes()).unwrap(),
+                effect
+            );
+        }
+
+        assert!(
+            WebExtensionSnapshotEffect::from_xml(
+                br#"<a:reflection xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#
+            )
+            .is_err()
+        );
+        assert!(
+            WebExtensionSnapshotEffect::from_xml(
+                br#"<!DOCTYPE x><a:blur xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#
+            )
+            .is_err()
+        );
+        assert!(
+            WebExtensionSnapshotEffect::from_xml(
+                br#"<a:blur xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">text</a:blur>"#
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_snapshot_compression_and_effect_order() {
+        let invalid_compression = format!(
+            r#"<we:webextension xmlns:we="{WEB_EXTENSION_NAMESPACE}" id="x"><we:reference id="a" version="1"/><we:properties/><we:bindings/><we:snapshot cstate="lossless"/></we:webextension>"#
+        );
+        assert!(parse_web_extension(invalid_compression.as_bytes()).is_err());
+
+        let misplaced_extension_list = format!(
+            r#"<we:webextension xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:a="{DRAWINGML_NAMESPACE}" id="x"><we:reference id="a" version="1"/><we:properties/><we:bindings/><we:snapshot><a:extLst/><a:blur/></we:snapshot></we:webextension>"#
+        );
+        assert!(parse_web_extension(misplaced_extension_list.as_bytes()).is_err());
     }
 
     #[test]
@@ -2026,6 +2354,13 @@ mod tests {
         extension.snapshot = Some(WebExtensionSnapshot {
             embedded_relationship_id: Some("rIdSnapshot".into()),
             linked_relationship_id: Some("rIdLinked".into()),
+            compression_state: Some(WebExtensionBlipCompression::HighQualityPrint),
+            effects: vec![
+                WebExtensionSnapshotEffect::from_xml(
+                    br#"<a:alphaModFix xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" amt="50000"/>"#,
+                )
+                .unwrap(),
+            ],
         });
         WebExtensionTaskPanes {
             panes: vec![WebExtensionTaskPane {

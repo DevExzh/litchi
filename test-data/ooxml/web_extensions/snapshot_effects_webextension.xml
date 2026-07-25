@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<we:webextension xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11"
+                 xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                 xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                 id="{00000000-0000-0000-0000-000000000003}"
+                 frozen="0">
+  <we:reference id="snapshot-effects" version="1.0.0.0" storeType="FileSystem"/>
+  <we:properties/>
+  <we:bindings/>
+  <we:snapshot r:embed="rIdSnapshot" cstate="hqprint">
+    <a:alphaModFix amt="50000"/>
+    <a:duotone>
+      <a:srgbClr val="000000"/>
+      <a:srgbClr val="FFFFFF"/>
+    </a:duotone>
+    <a:blur rad="12700" grow="1"/>
+  </we:snapshot>
+</we:webextension>
