@@ -876,6 +876,34 @@ impl Package {
         crate::pptx::theme::validate_theme_graph(&self.opc)
     }
 
+    /// Embed an inert binary payload into a slide as an OLE object shape.
+    ///
+    /// The payload is stored verbatim in the next free
+    /// `/ppt/embeddings/oleObjectN.bin` part, the slide gains the matching
+    /// OLE/package relationship, and a `p:graphicFrame` carrying `p:oleObj`
+    /// is appended to the slide's shape tree. The patched slide is verified
+    /// through the read-side OLE inventory before the operation returns.
+    /// Payloads are never parsed, activated, rendered, or executed.
+    pub fn add_ole_object(
+        &mut self,
+        slide_part_name: &str,
+        kind: crate::pptx::ole::PptxOlePayloadKind,
+        prog_id: Option<&str>,
+        name: Option<&str>,
+        frame: crate::pptx::ole_object::OleObjectFrame,
+        payload: &[u8],
+    ) -> Result<crate::pptx::ole_object::AuthoredOleObject> {
+        crate::pptx::ole_object::add_ole_object(
+            &mut self.opc,
+            slide_part_name,
+            kind,
+            prog_id,
+            name,
+            frame,
+            payload,
+        )
+    }
+
     /// Get mutable access to the underlying OPC package.
     ///
     /// This provides access to lower-level package operations for modification.

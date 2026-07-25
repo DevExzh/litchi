@@ -79,6 +79,7 @@ pub mod modern_comments;
 mod namespace;
 pub mod notes;
 pub mod ole;
+pub mod ole_object;
 pub mod package;
 pub mod parts;
 pub mod presentation;
@@ -173,6 +174,7 @@ pub use notes::{
 pub use ole::{
     PptxOleObject, PptxOleObjectMode, PptxOleObjectTarget, PptxOlePayloadKind,
 };
+pub use ole_object::{AuthoredOleObject, OleObjectFrame, add_ole_object};
 pub use package::Package;
 pub use vba_project::VbaProject;
 pub use parts::{
