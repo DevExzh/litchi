@@ -20,6 +20,10 @@ enum TextWrapFit {
     Text = 1,
 }
 
+const SUPPORTS_PRIMARY_FEATURE_FIELD: u32 = 10_001;
+const SUPPORTS_SECONDARY_FEATURE_FIELD: u32 = 10_002;
+const DEFAULT_RADAR_FILL_STROKE_ALPHA_MULTIPLIER: f32 = 0.15;
+
 /// Native graph differences that cannot be shared across iWork applications.
 #[allow(deprecated)]
 pub(crate) fn source_chart_objects(
@@ -28,6 +32,7 @@ pub(crate) fn source_chart_objects(
     kind: ChartKind,
     data: ChartData,
     geometry: DrawableGeometry,
+    stylesheet_id: u64,
     paragraph_style_id: u64,
     profile: ChartApplicationProfile,
 ) -> Result<Vec<ArchiveObject>> {
@@ -170,7 +175,7 @@ pub(crate) fn source_chart_objects(
             ids.chart_style,
             CHART_STYLE_MESSAGE_TYPE,
             tsch::ChartStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             tsch::generated::ChartStyleArchive {
                 tschchartinfodefaultshowborder: Some(false),
@@ -181,12 +186,13 @@ pub(crate) fn source_chart_objects(
                 tschchartinfodefaultintersetgap: Some(default_gap_spacing.between_sets().percent()),
                 ..Default::default()
             },
+            &[SUPPORTS_PRIMARY_FEATURE_FIELD],
         )?,
         extension_style_object(
             ids.chart_non_style,
             CHART_NON_STYLE_MESSAGE_TYPE,
             tsch::ChartNonStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             tsch::generated::ChartNonStyleArchive {
                 tschchartinfodefaultshowlegend: Some(true),
@@ -194,73 +200,91 @@ pub(crate) fn source_chart_objects(
                 tschchartinfodefaultskiphiddendata: Some(false),
                 ..Default::default()
             },
+            &[],
         )?,
         extension_style_object(
             ids.legend_style,
             LEGEND_STYLE_MESSAGE_TYPE,
             tsch::LegendStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             tsch::generated::LegendStyleArchive {
                 tschlegendmodeldefaultopacity: Some(1.0),
                 ..Default::default()
             },
+            &[],
         )?,
         extension_style_object(
             ids.legend_non_style,
             LEGEND_NON_STYLE_MESSAGE_TYPE,
             tsch::LegendNonStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             tsch::generated::LegendNonStyleArchive::default(),
+            &[],
         )?,
         extension_style_object(
             ids.value_axis_styles[0],
             AXIS_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             default_axis_style(),
+            &[SUPPORTS_PRIMARY_FEATURE_FIELD],
         )?,
         extension_style_object(
             ids.value_axis_styles[1],
             AXIS_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             default_axis_style(),
+            &[SUPPORTS_PRIMARY_FEATURE_FIELD],
         )?,
         extension_style_object(
             ids.value_axis_non_styles[0],
             AXIS_NON_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisNonStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             default_axis_non_style(),
+            &[
+                SUPPORTS_PRIMARY_FEATURE_FIELD,
+                SUPPORTS_SECONDARY_FEATURE_FIELD,
+            ],
         )?,
         extension_style_object(
             ids.value_axis_non_styles[1],
             AXIS_NON_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisNonStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             default_axis_non_style(),
+            &[
+                SUPPORTS_PRIMARY_FEATURE_FIELD,
+                SUPPORTS_SECONDARY_FEATURE_FIELD,
+            ],
         )?,
         extension_style_object(
             ids.category_axis_style,
             AXIS_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             default_axis_style(),
+            &[SUPPORTS_PRIMARY_FEATURE_FIELD],
         )?,
         extension_style_object(
             ids.category_axis_non_style,
             AXIS_NON_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisNonStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             default_axis_non_style(),
+            &[
+                SUPPORTS_PRIMARY_FEATURE_FIELD,
+                SUPPORTS_SECONDARY_FEATURE_FIELD,
+            ],
         )?,
     ]);
     for (identifier, index) in ids.series_styles.into_iter().zip(0..) {
@@ -268,9 +292,13 @@ pub(crate) fn source_chart_objects(
             identifier,
             SERIES_STYLE_MESSAGE_TYPE,
             tsch::ChartSeriesStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
+                super_: Some(source_style(stylesheet_id)),
             },
             default_series_style(index),
+            &[
+                SUPPORTS_PRIMARY_FEATURE_FIELD,
+                SUPPORTS_SECONDARY_FEATURE_FIELD,
+            ],
         )?);
     }
     Ok(objects)
@@ -323,6 +351,7 @@ fn extension_style_object(
     message_type: u32,
     base: impl Message,
     extension: impl Message,
+    supported_feature_fields: &[u32],
 ) -> Result<ArchiveObject> {
     let mut data = base.encode_to_vec();
     append_length_delimited_field(
@@ -330,6 +359,9 @@ fn extension_style_object(
         CURRENT_STYLE_EXTENSION_FIELD,
         &extension.encode_to_vec(),
     )?;
+    for &field in supported_feature_fields {
+        append_varint_field(&mut data, field, 1)?;
+    }
     chart_object(
         identifier,
         message_type,
@@ -337,6 +369,13 @@ fn extension_style_object(
         STANDARD_MESSAGE_VERSION,
         &[],
     )
+}
+
+fn source_style(stylesheet_id: u64) -> tss::StyleArchive {
+    tss::StyleArchive {
+        stylesheet: Some(reference(stylesheet_id)),
+        ..Default::default()
+    }
 }
 
 #[allow(deprecated)]
@@ -408,7 +447,12 @@ fn default_series_style(index: usize) -> tsch::generated::ChartSeriesStyleArchiv
         tschchartseriescolumnfill: Some(fill.clone()),
         tschchartseriesbarfill: Some(fill.clone()),
         tschchartseriesareafill: Some(fill.clone()),
-        tschchartseriespiefill: Some(fill),
+        tschchartseriespiefill: Some(fill.clone()),
+        tschchartseriesradarareafill: Some(fill),
+        tschchartseriesradarareafilluseseriesstroke: Some(true),
+        tschchartseriesradarareafilluseseriesstrokealphamultiplier: Some(
+            DEFAULT_RADAR_FILL_STROKE_ALPHA_MULTIPLIER,
+        ),
         ..Default::default()
     }
 }

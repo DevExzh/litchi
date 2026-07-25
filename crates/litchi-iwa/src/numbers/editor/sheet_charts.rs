@@ -48,7 +48,9 @@ use crate::charts::source::{
     CHART_STYLE_MESSAGE_TYPE, ChartApplicationProfile, LEGEND_NON_STYLE_MESSAGE_TYPE,
     LEGEND_STYLE_MESSAGE_TYPE, SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE,
     STANDIN_MESSAGE_TYPE, SourceChartObjectIds, chart_data, chart_geometry, chart_grid,
-    drawable_geometry, geometry_archive, reference, require_creatable_kind, source_chart_objects,
+    drawable_geometry, geometry_archive, local_chart_style_ids, reference, register_chart_styles,
+    require_creatable_kind, source_chart_objects, unregister_chart_styles,
+    validate_chart_styles_registered,
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
 use crate::data_reference_registry::{
@@ -141,6 +143,7 @@ impl NumbersEditor {
             kind,
             data.clone(),
             geometry,
+            theme.stylesheet_id,
             theme.paragraph_style_id,
             ChartApplicationProfile::Numbers,
         )?;
@@ -152,6 +155,12 @@ impl NumbersEditor {
             }
             Ok(())
         })?;
+        register_chart_styles(
+            &mut staged,
+            theme.stylesheet_id,
+            &archive_name,
+            &ids.style_ids(),
+        )?;
         patch_numbers_sheet_drawable_reference(
             &mut staged,
             &archive_name,
@@ -178,6 +187,12 @@ impl NumbersEditor {
         set_package_last_object_identifier(&mut staged, ids.last())?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        validate_chart_styles_registered(
+            verified.package(),
+            theme.stylesheet_id,
+            &archive_name,
+            &ids.style_ids(),
+        )?;
         let created = chart_graph(&verified, sheet_id, ids.drawable)?;
         if created.info.kind != kind
             || created.info.direction != ChartSeriesDirection::Rows
@@ -323,6 +338,8 @@ impl NumbersEditor {
         source_drawable_object_id: u64,
     ) -> Result<NumbersSheetChartInfo> {
         let source = chart_graph(self, sheet_id, source_drawable_object_id)?;
+        let source_style_ids =
+            local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut staged = self.package.clone();
         let first_identifier = next_object_identifier(&staged)?;
         let mut remap = HashMap::with_capacity(source.object_ids.len());
@@ -347,6 +364,23 @@ impl NumbersEditor {
                 archive.insert_object(cloned)
             })?;
         }
+        let new_style_ids = source_style_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers chart clone has no style identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let theme = chart_theme_context(&staged)?;
+        register_chart_styles(
+            &mut staged,
+            theme.stylesheet_id,
+            &source.archive_name,
+            &new_style_ids,
+        )?;
 
         let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat("Numbers chart clone has no drawable identifier".to_owned())
@@ -382,7 +416,6 @@ impl NumbersEditor {
             )?;
         }
         if let Some(source_preset_id) = source.private_preset_id {
-            let theme = chart_theme_context(&staged)?;
             let new_preset_id = remap.get(&source_preset_id).copied().ok_or_else(|| {
                 Error::InvalidFormat("Numbers chart clone has no preset identifier".to_owned())
             })?;
@@ -415,6 +448,12 @@ impl NumbersEditor {
         clone_component_data_references(&mut staged, source.component_id, &remap)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        validate_chart_styles_registered(
+            verified.package(),
+            theme.stylesheet_id,
+            &source.archive_name,
+            &new_style_ids,
+        )?;
         let created = chart_graph(&verified, sheet_id, new_drawable_id)?;
         let expected_object_ids = source
             .object_ids
@@ -448,6 +487,8 @@ impl NumbersEditor {
         drawable_object_id: u64,
     ) -> Result<RemovedNumbersSheetChart> {
         let source = chart_graph(self, sheet_id, drawable_object_id)?;
+        let style_ids =
+            local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
         comments.clear_comment(drawable_object_id)?;
         let mut staged = comments.into_package();
@@ -458,8 +499,14 @@ impl NumbersEditor {
             Some(drawable_object_id),
             None,
         )?;
+        let theme = chart_theme_context(&staged)?;
+        unregister_chart_styles(
+            &mut staged,
+            theme.stylesheet_id,
+            &source.archive_name,
+            &style_ids,
+        )?;
         if let Some(preset_id) = source.private_preset_id {
-            let theme = chart_theme_context(&staged)?;
             patch_theme_chart_preset(&mut staged, &theme, Some(preset_id), None)?;
         }
         for identifier in &source.object_ids {

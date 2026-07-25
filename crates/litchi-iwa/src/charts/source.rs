@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 mod build;
 mod data;
 mod ids;
+mod stylesheet;
 
 pub(crate) use build::source_chart_objects;
 pub(crate) use data::{
@@ -12,6 +13,10 @@ pub(crate) use data::{
     require_creatable_kind,
 };
 pub(crate) use ids::SourceChartObjectIds;
+pub(crate) use stylesheet::{
+    local_chart_style_ids, register_chart_styles, unregister_chart_styles,
+    validate_chart_styles_registered,
+};
 
 use prost::Message;
 
@@ -20,7 +25,8 @@ use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tn, tsch, tsd, tsk, tsp, tss};
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
 use crate::wire::{
-    append_length_delimited_field, patch_varint_field, transform_length_delimited_fields_at_path,
+    append_length_delimited_field, append_varint_field, patch_varint_field,
+    transform_length_delimited_fields_at_path,
 };
 use crate::{Error, Result};
 

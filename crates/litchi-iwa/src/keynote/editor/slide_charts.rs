@@ -47,7 +47,9 @@ use crate::charts::source::{
     ChartApplicationProfile, LEGEND_NON_STYLE_MESSAGE_TYPE, LEGEND_STYLE_MESSAGE_TYPE,
     SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
     SourceChartObjectIds, chart_data, chart_geometry, chart_grid, drawable_geometry,
-    geometry_archive, reference, require_creatable_kind, source_chart_objects,
+    geometry_archive, local_chart_style_ids, reference, register_chart_styles,
+    require_creatable_kind, source_chart_objects, unregister_chart_styles,
+    validate_chart_styles_registered,
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
 use crate::data_reference_registry::{
@@ -145,6 +147,7 @@ impl KeynoteEditor {
             kind,
             data.clone(),
             geometry,
+            theme.stylesheet_id,
             theme.paragraph_style_id,
             ChartApplicationProfile::Keynote,
         )?;
@@ -156,6 +159,12 @@ impl KeynoteEditor {
             }
             Ok(())
         })?;
+        register_chart_styles(
+            &mut staged,
+            theme.stylesheet_id,
+            &archive_name,
+            &ids.style_ids(),
+        )?;
         patch_slide_drawable_references(
             &mut staged,
             &archive_name,
@@ -185,6 +194,12 @@ impl KeynoteEditor {
         set_package_last_object_identifier(&mut staged, ids.last())?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        validate_chart_styles_registered(
+            verified.package(),
+            theme.stylesheet_id,
+            &archive_name,
+            &ids.style_ids(),
+        )?;
         let created = chart_graph(&verified, slide_index, ids.drawable)?;
         if created.info.kind != kind
             || created.info.direction != ChartSeriesDirection::Rows
@@ -338,6 +353,8 @@ impl KeynoteEditor {
         source_drawable_object_id: u64,
     ) -> Result<KeynoteSlideChartInfo> {
         let source = chart_graph(self, slide_index, source_drawable_object_id)?;
+        let source_style_ids =
+            local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
         let mut remap = HashMap::with_capacity(source.object_ids.len());
@@ -362,6 +379,25 @@ impl KeynoteEditor {
                 archive.insert_object(cloned)
             })?;
         }
+        let new_style_ids = source_style_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote chart clone has no style identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let graph = ObjectGraph::read(&staged)?;
+        let context = text_box_create::text_box_context(&graph, slide_index)?;
+        let theme = chart_theme_context(&staged, &graph, context.theme_id)?;
+        register_chart_styles(
+            &mut staged,
+            theme.stylesheet_id,
+            &source.archive_name,
+            &new_style_ids,
+        )?;
 
         let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat("Keynote chart clone has no drawable identifier".to_owned())
@@ -389,9 +425,6 @@ impl KeynoteEditor {
             Some(new_drawable_id),
         )?;
         if let Some(source_preset_id) = source.private_preset_id {
-            let graph = ObjectGraph::read(&staged)?;
-            let context = text_box_create::text_box_context(&graph, slide_index)?;
-            let theme = chart_theme_context(&staged, &graph, context.theme_id)?;
             let new_preset_id = remap.get(&source_preset_id).copied().ok_or_else(|| {
                 Error::InvalidFormat("Keynote chart clone has no preset identifier".to_owned())
             })?;
@@ -424,6 +457,12 @@ impl KeynoteEditor {
         clone_component_data_references(&mut staged, source.component_id, &remap)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        validate_chart_styles_registered(
+            verified.package(),
+            theme.stylesheet_id,
+            &source.archive_name,
+            &new_style_ids,
+        )?;
         let created = chart_graph(&verified, slide_index, new_drawable_id)?;
         let expected_object_ids = source
             .object_ids
@@ -457,6 +496,8 @@ impl KeynoteEditor {
         drawable_object_id: u64,
     ) -> Result<RemovedKeynoteSlideChart> {
         let source = chart_graph(self, slide_index, drawable_object_id)?;
+        let style_ids =
+            local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         comments.clear_comment(drawable_object_id)?;
         let mut staged = comments.into_package();
@@ -467,10 +508,16 @@ impl KeynoteEditor {
             Some(drawable_object_id),
             None,
         )?;
+        let graph = ObjectGraph::read(&staged)?;
+        let context = text_box_create::text_box_context(&graph, slide_index)?;
+        let theme = chart_theme_context(&staged, &graph, context.theme_id)?;
+        unregister_chart_styles(
+            &mut staged,
+            theme.stylesheet_id,
+            &source.archive_name,
+            &style_ids,
+        )?;
         if let Some(preset_id) = source.private_preset_id {
-            let graph = ObjectGraph::read(&staged)?;
-            let context = text_box_create::text_box_context(&graph, slide_index)?;
-            let theme = chart_theme_context(&staged, &graph, context.theme_id)?;
             patch_theme_chart_preset(&mut staged, &theme, Some(preset_id), None)?;
         }
         for identifier in &source.object_ids {

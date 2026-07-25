@@ -12,7 +12,10 @@ use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::charts::IWorkChartArchive;
-use crate::charts::source::{CHART_MESSAGE_TYPE, SERIES_NON_STYLE_MESSAGE_TYPE};
+use crate::charts::source::{
+    CHART_MESSAGE_TYPE, SERIES_NON_STYLE_MESSAGE_TYPE, register_chart_styles,
+    unregister_chart_styles,
+};
 use crate::charts::unique_chart_object_archive_name;
 use crate::package_metadata::{
     add_component_object_uuids, component_identifier_for_entry, component_uuid_identifiers,
@@ -94,12 +97,19 @@ where
         drawable_label,
         expected.len(),
     )?;
+    let stylesheet_id = chart_stylesheet_id(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
     let current = read_values_from_graph(package, &graph, &default, &read)?;
     if current == expected {
         return Ok(());
     }
 
-    let canonical_empty = canonical_empty_chart_series_non_style_data()?;
+    let canonical_empty =
+        canonical_empty_chart_series_non_style_data_with_stylesheet(stylesheet_id)?;
     let mut next_identifier = next_object_identifier(package)?;
     let mut final_ids = graph
         .slots
@@ -143,6 +153,16 @@ where
     for (slot, data) in updates {
         slot.replace(package, data)?;
     }
+    let mut removals_by_archive = HashMap::<String, Vec<u64>>::new();
+    for slot in &removals {
+        removals_by_archive
+            .entry(slot.archive_name.clone())
+            .or_default()
+            .push(slot.object_id);
+    }
+    for (archive_name, identifiers) in &removals_by_archive {
+        unregister_chart_styles(package, stylesheet_id, archive_name, identifiers)?;
+    }
     for slot in &removals {
         package.update_archive(&slot.archive_name, |archive| {
             archive.remove_object(slot.object_id).ok_or_else(|| {
@@ -165,6 +185,7 @@ where
             }
             Ok(())
         })?;
+        register_chart_styles(package, stylesheet_id, chart_archive_name, &created_ids)?;
     }
 
     patch_chart_series_non_style_references(
@@ -198,6 +219,72 @@ where
         )));
     }
     Ok(())
+}
+
+fn chart_stylesheet_id(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+) -> Result<u64> {
+    let chart_archive = package.archive(chart_archive_name)?;
+    let chart_object = chart_archive.object(drawable_object_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} is missing"
+        ))
+    })?;
+    let messages = chart_object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
+        .collect::<Vec<_>>();
+    let [message] = messages.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} must have exactly one chart payload"
+        )));
+    };
+    let chart = IWorkChartArchive::decode(message.data.as_slice())?;
+    let chart = chart.chart.as_ref().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} has no chart archive"
+        ))
+    })?;
+    let style_id = chart
+        .series_theme_styles
+        .first()
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} has no series theme style"
+            ))
+        })?;
+    let style_archive_name =
+        unique_chart_object_archive_name(package, style_id, "chart series style object")?;
+    let style_archive = package.archive(&style_archive_name)?;
+    let style_object = style_archive
+        .object(style_id)
+        .ok_or_else(|| Error::InvalidFormat(format!("chart series style {style_id} is missing")))?;
+    let style_messages = style_object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == crate::charts::source::SERIES_STYLE_MESSAGE_TYPE)
+        .collect::<Vec<_>>();
+    let [style_message] = style_messages.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "chart series style {style_id} must have exactly one series-style payload"
+        )));
+    };
+    tsch::ChartSeriesStyleArchive::decode(style_message.data.as_slice())?
+        .super_
+        .and_then(|style| style.stylesheet)
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "chart series style {style_id} has no document stylesheet"
+            ))
+        })
 }
 
 fn read_values_from_graph<T>(
@@ -547,9 +634,28 @@ fn chart_series_non_style_object(identifier: u64, data: Vec<u8>) -> Result<Archi
 }
 
 /// Return the native empty private series non-style payload.
+#[cfg(test)]
 pub(crate) fn canonical_empty_chart_series_non_style_data() -> Result<Vec<u8>> {
+    canonical_empty_chart_series_non_style_data_with_style(tss::StyleArchive::default())
+}
+
+fn canonical_empty_chart_series_non_style_data_with_stylesheet(
+    stylesheet_id: u64,
+) -> Result<Vec<u8>> {
+    canonical_empty_chart_series_non_style_data_with_style(tss::StyleArchive {
+        stylesheet: Some(tsp::Reference {
+            identifier: stylesheet_id,
+            ..Default::default()
+        }),
+        ..Default::default()
+    })
+}
+
+fn canonical_empty_chart_series_non_style_data_with_style(
+    style: tss::StyleArchive,
+) -> Result<Vec<u8>> {
     let mut data = tsch::ChartSeriesNonStyleArchive {
-        super_: Some(tss::StyleArchive::default()),
+        super_: Some(style),
     }
     .encode_to_vec();
     append_varint_field(&mut data, SUPPORTS_CUSTOM_NUMBER_FORMAT_FIELD, 1)?;

@@ -69,6 +69,21 @@ impl SourceChartObjectIds {
         identifiers
     }
 
+    pub(crate) fn style_ids(self) -> Vec<u64> {
+        let mut identifiers = Vec::with_capacity(16);
+        identifiers.extend([
+            self.chart_style,
+            self.chart_non_style,
+            self.legend_style,
+            self.legend_non_style,
+        ]);
+        identifiers.extend(self.value_axis_styles);
+        identifiers.extend(self.value_axis_non_styles);
+        identifiers.extend([self.category_axis_style, self.category_axis_non_style]);
+        identifiers.extend(self.series_styles);
+        identifiers
+    }
+
     pub(crate) const fn last(self) -> u64 {
         self.series_styles[SERIES_STYLE_COUNT - 1]
     }

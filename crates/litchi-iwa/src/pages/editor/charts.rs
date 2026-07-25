@@ -47,7 +47,9 @@ use crate::charts::source::{
     ChartApplicationProfile, LEGEND_NON_STYLE_MESSAGE_TYPE, LEGEND_STYLE_MESSAGE_TYPE,
     SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
     SourceChartObjectIds, chart_data, chart_geometry, chart_grid, drawable_geometry,
-    geometry_archive, reference, require_creatable_kind, source_chart_objects,
+    geometry_archive, local_chart_style_ids, reference, register_chart_styles,
+    require_creatable_kind, source_chart_objects, unregister_chart_styles,
+    validate_chart_styles_registered,
 };
 use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
 use crate::data_reference_registry::{
@@ -145,6 +147,7 @@ impl PagesEditor {
             kind,
             data.clone(),
             geometry,
+            theme.stylesheet_id,
             theme.paragraph_style_id,
             ChartApplicationProfile::Pages,
         )?;
@@ -165,6 +168,12 @@ impl PagesEditor {
             }
             Ok(())
         })?;
+        register_chart_styles(
+            &mut staged,
+            theme.stylesheet_id,
+            &archive_name,
+            &ids.style_ids(),
+        )?;
         let mut text_editor = IWorkTextEditor::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
@@ -201,6 +210,12 @@ impl PagesEditor {
         set_package_last_object_identifier(&mut staged, attachment_id)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        validate_chart_styles_registered(
+            verified.package(),
+            theme.stylesheet_id,
+            &archive_name,
+            &ids.style_ids(),
+        )?;
         let created = body_chart_graph(&verified, ids.drawable)?;
         let mut expected_object_ids = chart_object_ids;
         expected_object_ids.push(attachment_id);
@@ -362,6 +377,8 @@ impl PagesEditor {
         anchor_character_index: usize,
     ) -> Result<PagesBodyChartInfo> {
         let source = body_chart_graph(self, source_drawable_object_id)?;
+        let source_style_ids =
+            local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
         let mut remap = HashMap::with_capacity(source.object_ids.len());
@@ -386,6 +403,28 @@ impl PagesEditor {
                 archive.insert_object(cloned)
             })?;
         }
+        let new_style_ids = source_style_ids
+            .iter()
+            .map(|identifier| {
+                remap.get(identifier).copied().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Pages chart clone has no style identifier for {identifier}"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let root = root_document(&staged)?;
+        let theme_id = root
+            .theme
+            .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
+            .identifier;
+        let theme = chart_theme_context(&staged, theme_id)?;
+        register_chart_styles(
+            &mut staged,
+            theme.stylesheet_id,
+            &source.archive_name,
+            &new_style_ids,
+        )?;
 
         let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat("Pages chart clone has no drawable identifier".to_owned())
@@ -435,12 +474,6 @@ impl PagesEditor {
         )?;
         patch_pages_zorder(&mut staged, None, Some(new_drawable_id))?;
         if let Some(source_preset_id) = source.private_preset_id {
-            let root = root_document(&staged)?;
-            let theme_id = root
-                .theme
-                .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
-                .identifier;
-            let theme = chart_theme_context(&staged, theme_id)?;
             let new_preset_id = remap.get(&source_preset_id).copied().ok_or_else(|| {
                 Error::InvalidFormat("Pages chart clone has no preset identifier".to_owned())
             })?;
@@ -473,6 +506,12 @@ impl PagesEditor {
         clone_component_data_references(&mut staged, source.component_id, &remap)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        validate_chart_styles_registered(
+            verified.package(),
+            theme.stylesheet_id,
+            &source.archive_name,
+            &new_style_ids,
+        )?;
         let created = body_chart_graph(&verified, new_drawable_id)?;
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".into()))?;
@@ -505,6 +544,8 @@ impl PagesEditor {
     /// Remove a body chart, its attachment, and any crate-owned private styles.
     pub fn remove_body_chart(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyChart> {
         let source = body_chart_graph(self, drawable_object_id)?;
+        let style_ids =
+            local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         comments.clear_comment(drawable_object_id)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
@@ -512,13 +553,19 @@ impl PagesEditor {
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
         patch_pages_zorder(&mut staged, Some(drawable_object_id), None)?;
+        let root = root_document(&staged)?;
+        let theme_id = root
+            .theme
+            .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
+            .identifier;
+        let theme = chart_theme_context(&staged, theme_id)?;
+        unregister_chart_styles(
+            &mut staged,
+            theme.stylesheet_id,
+            &source.archive_name,
+            &style_ids,
+        )?;
         if let Some(preset_id) = source.private_preset_id {
-            let root = root_document(&staged)?;
-            let theme_id = root
-                .theme
-                .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
-                .identifier;
-            let theme = chart_theme_context(&staged, theme_id)?;
             patch_theme_chart_preset(&mut staged, &theme, Some(preset_id), None)?;
         }
         for identifier in &source.object_ids {

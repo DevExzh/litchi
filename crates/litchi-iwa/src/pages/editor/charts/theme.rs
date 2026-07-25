@@ -6,6 +6,7 @@ pub(super) struct ChartThemeContext {
     pub(super) archive_name: String,
     pub(super) component_id: u64,
     pub(super) theme_id: u64,
+    pub(super) stylesheet_id: u64,
     pub(super) paragraph_style_id: u64,
 }
 
@@ -29,6 +30,13 @@ pub(super) fn chart_theme_context(
         )));
     };
     let theme = IWorkThemeArchive::decode(&message.data)?;
+    let stylesheet_id = theme
+        .base
+        .document_stylesheet
+        .as_ref()
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| Error::InvalidFormat("Pages theme has no document stylesheet".into()))?;
     let paragraph_style_id = theme
         .extensions
         .text
@@ -51,6 +59,7 @@ pub(super) fn chart_theme_context(
         archive_name,
         component_id,
         theme_id,
+        stylesheet_id,
         paragraph_style_id,
     })
 }
