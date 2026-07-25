@@ -382,6 +382,20 @@ pub struct MutableWorkbookData {
     pub pivot_tables: Vec<WritablePivotTable>,
     /// Person list for threaded comments
     pub person_list: Option<crate::xlsx::PersonList>,
+    /// Chart sheets authored in this workbook, in insertion order
+    pub chart_sheets: Vec<super::chart_sheet::MutableChartSheet>,
+    /// Sheet slots in workbook order, interleaving worksheets and
+    /// chartsheets by insertion position
+    pub(crate) sheet_order: Vec<SheetSlot>,
+}
+
+/// One slot in the workbook's ordered sheet list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SheetSlot {
+    /// Index into `MutableWorkbookData::worksheets`
+    Worksheet(usize),
+    /// Index into `MutableWorkbookData::chart_sheets`
+    ChartSheet(usize),
 }
 
 impl MutableWorkbookData {
@@ -397,6 +411,8 @@ impl MutableWorkbookData {
             modified: false,
             pivot_tables: Vec::new(),
             person_list: None,
+            chart_sheets: Vec::new(),
+            sheet_order: Vec::new(),
         };
 
         // Add a default worksheet
@@ -407,11 +423,57 @@ impl MutableWorkbookData {
 
     /// Add a new worksheet.
     pub fn add_worksheet(&mut self, name: String) -> &mut MutableWorksheet {
-        let sheet_id = (self.worksheets.len() + 1) as u32;
+        let sheet_id = (self.worksheets.len() + self.chart_sheets.len() + 1) as u32;
         let worksheet = MutableWorksheet::new(name, sheet_id);
         self.worksheets.push(worksheet);
+        self.sheet_order
+            .push(SheetSlot::Worksheet(self.worksheets.len() - 1));
         self.modified = true;
         self.worksheets.last_mut().unwrap()
+    }
+
+    /// Add a new chartsheet hosting the given chart.
+    ///
+    /// The name must be a valid Excel sheet name and unique (case-insensitive)
+    /// across worksheets and chartsheets. Charts with external-data parts,
+    /// user-shapes parts, or additional relationships are rejected; pivot
+    /// charts created with `WorksheetChart::into_pivot_chart` are supported
+    /// and validated at save time like worksheet pivot charts.
+    pub fn add_chart_sheet(
+        &mut self,
+        name: &str,
+        chart: super::sheet::WorksheetChart,
+    ) -> SheetResult<&mut super::chart_sheet::MutableChartSheet> {
+        super::chart_sheet::validate_chart_sheet_name(name)?;
+        super::chart_sheet::validate_chart_sheet_chart(&chart)?;
+        let duplicate = self
+            .worksheets
+            .iter()
+            .map(|worksheet| worksheet.name())
+            .chain(self.chart_sheets.iter().map(|sheet| sheet.name()))
+            .any(|existing| existing.eq_ignore_ascii_case(name));
+        if duplicate {
+            return Err(format!("workbook already has a sheet named '{name}'").into());
+        }
+        if self.chart_sheets.len() >= super::chart_sheet::MAX_CHART_SHEETS {
+            return Err("chartsheet count limit exceeded".into());
+        }
+        let sheet_id = (self.worksheets.len() + self.chart_sheets.len() + 1) as u32;
+        self.chart_sheets
+            .push(super::chart_sheet::MutableChartSheet::new(
+                name.to_string(),
+                sheet_id,
+                chart,
+            ));
+        self.sheet_order
+            .push(SheetSlot::ChartSheet(self.chart_sheets.len() - 1));
+        self.modified = true;
+        Ok(self.chart_sheets.last_mut().unwrap())
+    }
+
+    /// Sheet slots in workbook order (worksheets and chartsheets interleaved).
+    pub(crate) fn sheet_order(&self) -> &[SheetSlot] {
+        &self.sheet_order
     }
 
     /// Get a worksheet by index.
@@ -631,9 +693,41 @@ impl MutableWorkbookData {
     ///
     /// # Arguments
     /// * `worksheet_rel_ids` - Vector of relationship IDs for worksheets (e.g., ["rId1", "rId2", ...])
+    ///
+    /// Retained for tests; the save pipeline uses
+    /// [`Self::generate_workbook_xml_ordered`].
+    #[cfg(test)]
     pub(crate) fn generate_workbook_xml_with_external_rels(
         &self,
         worksheet_rel_ids: &[String],
+        pivot_cache_rel_ids: &[(u32, String)],
+        external_reference_ids: &[String],
+    ) -> SheetResult<String> {
+        let sheet_entries: Vec<(String, u32, String)> = self
+            .worksheets
+            .iter()
+            .enumerate()
+            .map(|(index, ws)| {
+                let rel_id = worksheet_rel_ids
+                    .get(index)
+                    .map(|s| s.as_str())
+                    .unwrap_or("rId1"); // Fallback, shouldn't happen
+                (ws.name().to_string(), ws.sheet_id(), rel_id.to_string())
+            })
+            .collect();
+        self.generate_workbook_xml_ordered(
+            &sheet_entries,
+            pivot_cache_rel_ids,
+            external_reference_ids,
+        )
+    }
+
+    /// Generate workbook.xml with sheet entries given in workbook order as
+    /// `(name, sheet_id, relationship_id)` triples, covering both worksheets
+    /// and chartsheets.
+    pub(crate) fn generate_workbook_xml_ordered(
+        &self,
+        sheet_entries: &[(String, u32, String)],
         pivot_cache_rel_ids: &[(u32, String)],
         external_reference_ids: &[String],
     ) -> SheetResult<String> {
@@ -683,18 +777,12 @@ impl MutableWorkbookData {
         xml.push_str("</bookViews>");
 
         xml.push_str("<sheets>");
-        for (index, ws) in self.worksheets.iter().enumerate() {
-            let sheet_id = ws.sheet_id();
-            let rel_id = worksheet_rel_ids
-                .get(index)
-                .map(|s| s.as_str())
-                .unwrap_or("rId1"); // Fallback, shouldn't happen
-
+        for (name, sheet_id, rel_id) in sheet_entries {
             // Sheet elements are always self-closing (tab colors are in worksheet XML, not here)
             write!(
                 xml,
                 r#"<sheet name="{}" sheetId="{}" r:id="{}"/>"#,
-                escape_xml(ws.name()),
+                escape_xml(name),
                 sheet_id,
                 rel_id
             )

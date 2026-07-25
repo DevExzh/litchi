@@ -1852,4 +1852,38 @@ mod tests {
         .unwrap();
         assert!(worksheet.add_pivot_chart(chart, "").is_err());
     }
+
+    #[test]
+    fn authored_pivot_chartsheet_round_trips_through_save() {
+        use crate::xlsx::{ChartAnchor, Workbook, WorksheetChart};
+
+        let mut workbook = workbook_with_pivot_table();
+        let chart = WorksheetChart::bar_chart(
+            "Sales by Region",
+            "Sheet1!$E$2:$E$3",
+            "Sheet1!$F$2:$F$3",
+            ChartAnchor::new(0, 0, 10, 15),
+        )
+        .unwrap()
+        .into_pivot_chart("PivotTable1");
+        workbook.add_chart_sheet("Pivot Chart", chart).unwrap();
+        let path = temp_xlsx_path("pivot-chartsheet");
+        workbook.save(&path).unwrap();
+
+        let reopened = Workbook::open(&path).unwrap();
+        std::fs::remove_file(&path).ok();
+        let sheets = load_pivot_charts(reopened.package()).unwrap();
+        assert_eq!(sheets.len(), 1);
+        assert_eq!(sheets[0].worksheet_name, "Pivot Chart");
+        assert_eq!(sheets[0].sheet_kind, PivotChartSheetKind::Chartsheet);
+        assert_eq!(sheets[0].worksheet_part_name, "/xl/chartsheets/sheet1.xml");
+        assert_eq!(sheets[0].pivot_charts.len(), 1);
+        let chart = &sheets[0].pivot_charts[0];
+        // The unqualified authored name was normalized and resolved.
+        assert_eq!(chart.pivot_source.name, "Sheet1!PivotTable1");
+        assert_eq!(chart.pivot_table.name, "PivotTable1");
+        assert_eq!(chart.pivot_table.sheet_name, "Sheet1");
+        let options = chart.series[0].pivot_options.as_ref().unwrap();
+        assert_eq!(options.drop_zone_visible, Some(true));
+    }
 }

@@ -1,5 +1,6 @@
 //! Mutable worksheet and workbook writer components for XLSX.
 
+pub mod chart_sheet;
 pub mod shape;
 pub mod sheet;
 pub mod strings;
@@ -8,6 +9,7 @@ pub mod table;
 pub mod workbook;
 
 // Re-export main types
+pub use chart_sheet::MutableChartSheet;
 pub use shape::{
     XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
     XlsxShapeSpec,

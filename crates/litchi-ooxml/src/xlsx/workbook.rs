@@ -1550,6 +1550,48 @@ impl Workbook {
             .add_worksheet(name.to_string())
     }
 
+    /// Add a chartsheet hosting the given chart.
+    ///
+    /// The chartsheet is appended to the workbook's sheet list in insertion
+    /// order (interleaved with worksheets) and is emitted on save as a
+    /// `/xl/chartsheets/` part with its own drawing and chart parts. The
+    /// chart can be a classic chart or a pivot chart built with
+    /// `WorksheetChart::into_pivot_chart`; the pivot-table binding is
+    /// validated at save time like worksheet pivot charts.
+    ///
+    /// # Arguments
+    /// * `name` - Chartsheet name (valid Excel sheet name, unique across sheets)
+    /// * `chart` - The chart to host on the chartsheet
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi_ooxml::xlsx::{Workbook, WorksheetChart, ChartAnchor};
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// let chart = WorksheetChart::bar_chart(
+    ///     "Sales", "Sheet1!$A$2:$A$4", "Sheet1!$B$2:$B$4",
+    ///     ChartAnchor::new(0, 0, 10, 15),
+    /// )?;
+    /// wb.add_chart_sheet("Sales Chart", chart)?;
+    /// wb.save("output.xlsx")?;
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+    /// ```
+    pub fn add_chart_sheet(
+        &mut self,
+        name: &str,
+        chart: crate::xlsx::WorksheetChart,
+    ) -> SheetResult<&mut crate::xlsx::writer::MutableChartSheet> {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        self.mutable_data
+            .as_mut()
+            .unwrap()
+            .add_chart_sheet(name, chart)
+    }
+
     /// Define a named range.
     ///
     /// Named ranges allow you to refer to cells or ranges by meaningful names.
@@ -1952,6 +1994,30 @@ impl Workbook {
     }
 
     /// Update workbook parts with modified data.
+    /// Validate an authored pivot chart's binding against the workbook's
+    /// pivot tables, returning a normalized copy with the canonical
+    /// sheet-qualified pivot-source name. Returns `None` for ordinary charts.
+    fn normalized_pivot_chart_model(
+        chart: &crate::charts::Chart,
+        host_sheet_name: &str,
+        authored_pivot_tables: &[(String, String)],
+    ) -> SheetResult<Option<crate::charts::Chart>> {
+        if chart.pivot_source.is_none() {
+            return Ok(None);
+        }
+        let mut normalized = chart.clone();
+        let pivot_source = normalized
+            .pivot_source
+            .as_mut()
+            .expect("pivot source presence checked above");
+        pivot_source.name = crate::xlsx::pivot_chart::resolve_authored_pivot_source_name(
+            &pivot_source.name,
+            host_sheet_name,
+            authored_pivot_tables,
+        )?;
+        Ok(Some(normalized))
+    }
+
     fn update_workbook_parts(&mut self, data: &mut MutableWorkbookData) -> SheetResult<()> {
         use litchi_opc::constants::content_type as ct;
         use litchi_opc::constants::relationship_type as rt;
@@ -2378,24 +2444,12 @@ impl Workbook {
                     // workbook's pivot tables and normalize the pivot-source
                     // name to its sheet-qualified form, so saved packages
                     // are valid by construction.
-                    let normalized_pivot_chart;
-                    let chart_model = if chart.chart.pivot_source.is_some() {
-                        let mut normalized = chart.chart.clone();
-                        let pivot_source = normalized
-                            .pivot_source
-                            .as_mut()
-                            .expect("pivot source presence checked above");
-                        pivot_source.name =
-                            crate::xlsx::pivot_chart::resolve_authored_pivot_source_name(
-                                &pivot_source.name,
-                                ws.name(),
-                                &authored_pivot_tables,
-                            )?;
-                        normalized_pivot_chart = normalized;
-                        &normalized_pivot_chart
-                    } else {
-                        &chart.chart
-                    };
+                    let normalized_chart = Self::normalized_pivot_chart_model(
+                        &chart.chart,
+                        ws.name(),
+                        &authored_pivot_tables,
+                    )?;
+                    let chart_model = normalized_chart.as_ref().unwrap_or(&chart.chart);
 
                     let mut chart_part =
                         BlobPart::new(chart_uri.clone(), ct::DML_CHART.to_string(), Vec::new());
@@ -2776,6 +2830,64 @@ impl Workbook {
             worksheet_rel_ids.push(rid);
         }
 
+        // Emit chartsheet parts: chartsheet XML, its drawing part with an
+        // absolute-anchored graphic frame, and the hosted chart part.
+        let mut chartsheet_rel_ids: Vec<String> = Vec::with_capacity(data.chart_sheets.len());
+        for (chartsheet_index, chart_sheet) in data.chart_sheets.iter().enumerate() {
+            let chartsheet_name = format!("sheet{}.xml", chartsheet_index + 1);
+            let drawing_name = format!("drawingChartsheet{}.xml", chartsheet_index + 1);
+            let chart_name = format!("chart{}_1", chart_sheet.sheet_id());
+
+            // Chart part, with the same pivot-binding validation and
+            // normalization applied to worksheet charts.
+            let normalized_chart = Self::normalized_pivot_chart_model(
+                &chart_sheet.chart().chart,
+                chart_sheet.name(),
+                &authored_pivot_tables,
+            )?;
+            let chart_model = normalized_chart
+                .as_ref()
+                .unwrap_or(&chart_sheet.chart().chart);
+            let chart_xml = crate::xlsx::chart::generate_chart_xml_with_external_data_id(
+                chart_model,
+                None,
+                None,
+            )
+            .map_err(|e| format!("Failed to generate chart XML: {e}"))?;
+            let chart_uri = PackURI::new(format!("/xl/charts/{chart_name}.xml"))?;
+            self.package.add_part(Box::new(BlobPart::new(
+                chart_uri,
+                ct::DML_CHART.to_string(),
+                chart_xml,
+            )));
+
+            // Drawing part: one absolute anchor referencing the chart.
+            let drawing_uri = PackURI::new(format!("/xl/drawings/{drawing_name}"))?;
+            let mut drawing_part = BlobPart::new(
+                drawing_uri,
+                ct::OFC_DRAWING.to_string(),
+                crate::xlsx::writer::chart_sheet::chart_sheet_drawing_xml(chart_sheet.name())
+                    .into_bytes(),
+            );
+            drawing_part.relate_to(&format!("../charts/{chart_name}.xml"), rt::CHART);
+            self.package.add_part(Box::new(drawing_part));
+
+            // Chartsheet part referencing the drawing.
+            let chartsheet_uri = PackURI::new(format!("/xl/chartsheets/{chartsheet_name}"))?;
+            let mut chartsheet_part = BlobPart::new(
+                chartsheet_uri,
+                crate::xlsx::writer::chart_sheet::CHARTSHEET_CONTENT_TYPE.to_string(),
+                crate::xlsx::writer::chart_sheet::chart_sheet_part_xml()?,
+            );
+            chartsheet_part.relate_to(&format!("../drawings/{drawing_name}"), rt::DRAWING);
+            self.package.add_part(Box::new(chartsheet_part));
+
+            chartsheet_rel_ids.push(temp_wb_part.relate_to(
+                &format!("chartsheets/{chartsheet_name}"),
+                crate::xlsx::writer::chart_sheet::CHARTSHEET_RELATIONSHIP_TYPE,
+            ));
+        }
+
         // Update shared strings
         let ss_xml = data.shared_strings.to_xml()?;
         let ss_uri = PackURI::new("/xl/sharedStrings.xml")?;
@@ -2801,8 +2913,30 @@ impl Workbook {
             .iter()
             .map(|link| link.relationship_id.clone())
             .collect();
-        let workbook_xml = data.generate_workbook_xml_with_external_rels(
-            &worksheet_rel_ids,
+        let sheet_entries: Vec<(String, u32, String)> = data
+            .sheet_order()
+            .iter()
+            .map(|slot| match *slot {
+                crate::xlsx::writer::workbook::SheetSlot::Worksheet(index) => {
+                    let worksheet = &data.worksheets[index];
+                    (
+                        worksheet.name().to_string(),
+                        worksheet.sheet_id(),
+                        worksheet_rel_ids[index].clone(),
+                    )
+                },
+                crate::xlsx::writer::workbook::SheetSlot::ChartSheet(index) => {
+                    let chart_sheet = &data.chart_sheets[index];
+                    (
+                        chart_sheet.name().to_string(),
+                        chart_sheet.sheet_id(),
+                        chartsheet_rel_ids[index].clone(),
+                    )
+                },
+            })
+            .collect();
+        let workbook_xml = data.generate_workbook_xml_ordered(
+            &sheet_entries,
             &pivot_cache_rel_ids,
             &external_reference_ids,
         )?;
