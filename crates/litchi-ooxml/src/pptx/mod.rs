@@ -154,7 +154,9 @@ pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
 pub use hyperlinks::Hyperlink;
 pub use ink::{INK_CONTENT_TYPE, PptxInkAnnotation, StoredInkAnnotation, store_slide_ink_annotation};
-pub use laser::{LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint};
+pub use laser::{
+    LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint, store_slide_laser_trace,
+};
 pub use master_layout::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
     PlaceholderSpec, SlideLayoutKind, add_slide_layout, add_slide_master,

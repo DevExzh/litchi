@@ -537,6 +537,255 @@ fn limit(what: &str) -> OoxmlError {
     invalid(format!("{what} exceeds the supported safety limit"))
 }
 
+impl PptxLaserTracePoint {
+    /// Create a trace point from a stored time offset and EMU coordinates.
+    ///
+    /// `time` is the universal-time-offset lexical form used by producers;
+    /// it is validated for shape (non-empty, bounded, no markup characters)
+    /// but never interpreted.
+    pub fn new(time: &str, x: i64, y: i64) -> Result<Self> {
+        if time.is_empty() || time.len() > MAX_TIME_OFFSET_BYTES {
+            return Err(invalid("laser trace point has an invalid time offset"));
+        }
+        if time
+            .chars()
+            .any(|character| matches!(character, '<' | '>' | '&' | '"' | '\''))
+        {
+            return Err(invalid(
+                "laser trace point time offset contains markup characters",
+            ));
+        }
+        Ok(Self {
+            time: time.to_string(),
+            x,
+            y,
+        })
+    }
+}
+
+/// Store one laser-pointer trace onto a slide as a PowerPoint 2010
+/// `p14:laserTraceLst` extension.
+///
+/// The points are validated and serialized verbatim into a new
+/// `p14:tracePtLst`; the slide gains the `p:ext` extension block (creating
+/// `p:extLst` when absent) while preserving its namespace dialect. Slides
+/// that already carry a laser extension are rejected — replacement is not
+/// supported in this pass. Traces are never replayed, rendered,
+/// interpolated, or executed.
+pub fn store_slide_laser_trace(
+    package: &mut litchi_opc::OpcPackage,
+    slide_name: &litchi_opc::PackURI,
+    points: &[PptxLaserTracePoint],
+) -> Result<()> {
+    if points.is_empty() {
+        return Err(invalid("laser trace requires at least one point"));
+    }
+    if points.len() > MAX_LASER_POINTS {
+        return Err(limit("laser trace-point count"));
+    }
+    let slide = package.get_part(slide_name)?;
+    if slide.content_type() != ct::PML_SLIDE {
+        return Err(invalid(
+            "laser-trace storage requires a PresentationML slide part",
+        ));
+    }
+    if !load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default())?.is_empty() {
+        return Err(invalid(
+            "slide already contains a laser-trace extension; replacement is not supported",
+        ));
+    }
+
+    let mut fragment = String::with_capacity(points.len() * 48 + 256);
+    fragment.push_str("<p:ext xmlns:p=\"");
+    fragment.push_str(slide_dialect(slide.blob())?);
+    fragment.push_str("\" xmlns:p14=\"");
+    fragment.push_str(P14_NAMESPACE);
+    fragment.push_str("\" uri=\"");
+    fragment.push_str(LASER_TRACE_EXTENSION_URI);
+    fragment.push_str("\"><p14:laserTraceLst><p14:tracePtLst>");
+    for point in points {
+        fragment.push_str("<p14:tracePt t=\"");
+        fragment.push_str(&point.time);
+        fragment.push_str("\" x=\"");
+        fragment.push_str(&point.x.to_string());
+        fragment.push_str("\" y=\"");
+        fragment.push_str(&point.y.to_string());
+        fragment.push_str("\"/>");
+    }
+    fragment.push_str("</p14:tracePtLst></p14:laserTraceLst></p:ext>");
+
+    let updated = insert_laser_extension(slide.blob(), &fragment)?;
+    // Self-check: the patched slide must read back through the discovery path.
+    let probe = litchi_opc::BlobPart::new(
+        slide_name.clone(),
+        ct::PML_SLIDE.into(),
+        updated.clone(),
+    );
+    let traces = load_slide_laser_traces(0, &probe, &mut LaserLoadLimits::default())?;
+    if traces.len() != 1 || traces[0].points().len() != points.len() {
+        return Err(invalid(
+            "laser-trace storage failed read-back validation",
+        ));
+    }
+    package.get_part_mut(slide_name)?.set_blob(updated);
+    Ok(())
+}
+
+/// The slide's PresentationML namespace URI as a string slice.
+fn slide_dialect(xml: &[u8]) -> Result<&'static str> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        {
+            Event::Start(element) | Event::Empty(element) => {
+                let (namespace, _) = reader.resolver().resolve_element(element.name());
+                return Ok(match namespace {
+                    ResolveResult::Bound(Namespace(value))
+                        if value == crate::pptx::namespace::STRICT_PRESENTATIONML_NAMESPACE =>
+                    {
+                        "http://purl.oclc.org/ooxml/presentationml/main"
+                    },
+                    _ => "http://schemas.openxmlformats.org/presentationml/2006/main",
+                });
+            },
+            Event::Eof => return Err(invalid("slide XML has no root element")),
+            _ => {},
+        }
+    }
+}
+
+/// Insert the extension fragment into the slide's extension list (creating
+/// it when absent, directly before the slide end tag).
+fn insert_laser_extension(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
+    if xml.len() > MAX_SLIDE_XML_BYTES {
+        return Err(limit("slide XML bytes"));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut root_seen = false;
+    let mut ext_lst_depth = None;
+    let mut ext_lst_end = None;
+    let mut empty_ext_lst: Option<(usize, usize)> = None;
+    let mut root_end = None;
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("slide XML offset overflow"))?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error_marker)?;
+        match event {
+            Event::Start(element) => {
+                increment_nodes(&mut nodes)?;
+                depth = depth.checked_add(1).ok_or_else(|| limit("slide XML depth"))?;
+                if depth > MAX_XML_DEPTH {
+                    return Err(limit("slide XML depth"));
+                }
+                if depth == 1 {
+                    if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
+                        return Err(invalid(
+                            "slide XML must have one PresentationML sld root element",
+                        ));
+                    }
+                    root_seen = true;
+                }
+                if depth == 2 && is_presentationml_name(&namespace, element.name(), b"extLst") {
+                    if ext_lst_depth.replace(depth).is_some() {
+                        return Err(invalid("slide has multiple extension lists"));
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                increment_nodes(&mut nodes)?;
+                if !root_seen {
+                    if !is_presentationml_name(&namespace, element.name(), b"sld") {
+                        return Err(invalid(
+                            "slide XML must have one PresentationML sld root element",
+                        ));
+                    }
+                    root_seen = true;
+                }
+                if depth + 1 == 2 && is_presentationml_name(&namespace, element.name(), b"extLst")
+                {
+                    // Empty `<p:extLst/>`: replace it with an expanded form
+                    // wrapping the fragment.
+                    if ext_lst_depth.replace(usize::MAX).is_some() {
+                        return Err(invalid("slide has multiple extension lists"));
+                    }
+                    empty_ext_lst = Some((
+                        start,
+                        usize::try_from(reader.buffer_position())
+                            .map_err(|_| invalid("slide XML offset overflow"))?,
+                    ));
+                }
+            },
+            Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid("invalid slide XML nesting"));
+                }
+                if ext_lst_depth == Some(depth)
+                    && is_presentationml_name(&namespace, element.name(), b"extLst")
+                {
+                    ext_lst_end = Some(start);
+                }
+                if depth == 1 {
+                    root_end = Some(start);
+                }
+                depth -= 1;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTDs and processing instructions are rejected"));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if depth != 0 || !root_seen {
+        return Err(invalid("unterminated or missing PresentationML slide root"));
+    }
+    let root_end = root_end.ok_or_else(|| invalid("slide is missing its end tag"))?;
+
+    let mut output;
+    if let Some((start, end)) = empty_ext_lst {
+        // Empty `<p:extLst/>`: replace it with an expanded element wrapping
+        // the fragment.
+        let element = xml[start..end]
+            .trim_ascii_end();
+        let open = element
+            .strip_suffix(b"/>")
+            .ok_or_else(|| invalid("slide extension list is not an empty element"))?;
+        output = Vec::with_capacity(xml.len() + fragment.len() + 16);
+        output.extend_from_slice(&xml[..start]);
+        output.extend_from_slice(open);
+        output.extend_from_slice(b">");
+        output.extend_from_slice(fragment.as_bytes());
+        output.extend_from_slice(b"</p:extLst>");
+        output.extend_from_slice(&xml[end..]);
+        return Ok(output);
+    }
+    if let Some(position) = ext_lst_end {
+        output = Vec::with_capacity(xml.len() + fragment.len());
+        output.extend_from_slice(&xml[..position]);
+        output.extend_from_slice(fragment.as_bytes());
+        output.extend_from_slice(&xml[position..]);
+        return Ok(output);
+    }
+    // No extension list: create one before the slide end tag.
+    output = Vec::with_capacity(xml.len() + fragment.len() + 24);
+    output.extend_from_slice(&xml[..root_end]);
+    output.extend_from_slice(b"<p:extLst xmlns:p=\"");
+    output.extend_from_slice(slide_dialect(xml)?.as_bytes());
+    output.extend_from_slice(b"\">");
+    output.extend_from_slice(fragment.as_bytes());
+    output.extend_from_slice(b"</p:extLst>");
+    output.extend_from_slice(&xml[root_end..]);
+    Ok(output)
+}
+
+fn xml_error_marker(error: impl std::fmt::Display) -> OoxmlError {
+    OoxmlError::Xml(error.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -571,6 +820,118 @@ mod tests {
 
         assert!(
             scan_slide_laser_traces(0, xml.as_bytes(), &mut LaserLoadLimits::default()).is_err()
+        );
+    }
+
+    fn slide_package(tail: &str) -> (litchi_opc::OpcPackage, litchi_opc::PackURI) {
+        let mut package = litchi_opc::OpcPackage::new();
+        let name = litchi_opc::PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let xml = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld>{tail}</p:sld>"#
+        );
+        package.add_part(Box::new(litchi_opc::BlobPart::new(
+            name.clone(),
+            ct::PML_SLIDE.into(),
+            xml.into_bytes(),
+        )));
+        (package, name)
+    }
+
+    fn sample_points() -> Vec<PptxLaserTracePoint> {
+        vec![
+            PptxLaserTracePoint::new("0", 914_400, 457_200).unwrap(),
+            PptxLaserTracePoint::new("2500ms", -12, 34).unwrap(),
+        ]
+    }
+
+    #[test]
+    fn stores_laser_trace_and_discovers_it_round_trip() {
+        let (mut package, slide_name) = slide_package("");
+        let points = sample_points();
+        store_slide_laser_trace(&mut package, &slide_name, &points).unwrap();
+
+        let slide = package.get_part(&slide_name).unwrap();
+        let traces =
+            load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default()).unwrap();
+        assert_eq!(traces.len(), 1);
+        assert_eq!(traces[0].points(), points.as_slice());
+
+        // A second trace on the same slide is rejected (no replacement).
+        assert!(store_slide_laser_trace(&mut package, &slide_name, &points).is_err());
+    }
+
+    #[test]
+    fn stores_laser_trace_into_existing_and_empty_extension_lists() {
+        // Existing non-empty extLst.
+        let (mut package, slide_name) = slide_package(
+            r#"<p:extLst><p:ext uri="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"/></p:extLst>"#,
+        );
+        store_slide_laser_trace(&mut package, &slide_name, &sample_points()).unwrap();
+        let slide = package.get_part(&slide_name).unwrap();
+        let xml = String::from_utf8(slide.blob().to_vec()).unwrap();
+        assert!(xml.contains("{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"));
+        assert_eq!(
+            load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default())
+                .unwrap()
+                .len(),
+            1
+        );
+
+        // Empty extLst element.
+        let (mut package, slide_name) = slide_package("<p:extLst/>");
+        store_slide_laser_trace(&mut package, &slide_name, &sample_points()).unwrap();
+        let slide = package.get_part(&slide_name).unwrap();
+        let traces =
+            load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default()).unwrap();
+        assert_eq!(traces.len(), 1);
+        assert_eq!(traces[0].point_count(), 2);
+    }
+
+    #[test]
+    fn stores_laser_trace_in_strict_dialect() {
+        let mut package = litchi_opc::OpcPackage::new();
+        let name = litchi_opc::PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let xml = r#"<p:sld xmlns:p="http://purl.oclc.org/ooxml/presentationml/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld></p:sld>"#;
+        package.add_part(Box::new(litchi_opc::BlobPart::new(
+            name.clone(),
+            ct::PML_SLIDE.into(),
+            xml.as_bytes().to_vec(),
+        )));
+        store_slide_laser_trace(&mut package, &name, &sample_points()).unwrap();
+        let slide = package.get_part(&name).unwrap();
+        let xml = String::from_utf8(slide.blob().to_vec()).unwrap();
+        assert!(xml.contains("xmlns:p=\"http://purl.oclc.org/ooxml/presentationml/main\""));
+        assert_eq!(
+            load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default())
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_laser_storage_inputs() {
+        let (mut package, slide_name) = slide_package("");
+        // No points.
+        assert!(store_slide_laser_trace(&mut package, &slide_name, &[]).is_err());
+        // Bad time offsets.
+        assert!(PptxLaserTracePoint::new("", 0, 0).is_err());
+        assert!(PptxLaserTracePoint::new("a<b", 0, 0).is_err());
+        // Non-slide part.
+        let wrong = litchi_opc::PackURI::new("/ppt/presentation.xml").unwrap();
+        package.add_part(Box::new(litchi_opc::BlobPart::new(
+            wrong.clone(),
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+                .into(),
+            b"<p:presentation/>".to_vec(),
+        )));
+        assert!(store_slide_laser_trace(&mut package, &wrong, &sample_points()).is_err());
+        // Rejection leaves the slide without an extension list.
+        let slide = package.get_part(&slide_name).unwrap();
+        assert!(
+            load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default())
+                .unwrap()
+                .is_empty()
         );
     }
 }

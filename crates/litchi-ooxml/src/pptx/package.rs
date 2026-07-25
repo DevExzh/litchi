@@ -591,6 +591,22 @@ impl Package {
         self.presentation()?.laser_traces()
     }
 
+    /// Store one laser-pointer trace onto a slide as a PowerPoint 2010
+    /// `p14:laserTraceLst` extension.
+    ///
+    /// Points are validated and serialized verbatim; the slide gains the
+    /// `p:ext` extension block (creating `p:extLst` when absent) while
+    /// preserving its namespace dialect. Slides that already carry a laser
+    /// extension are rejected. Traces are never replayed, rendered,
+    /// interpolated, or executed.
+    pub fn add_laser_trace(
+        &mut self,
+        slide_name: &PackURI,
+        points: &[crate::pptx::PptxLaserTracePoint],
+    ) -> Result<()> {
+        crate::pptx::store_slide_laser_trace(&mut self.opc, slide_name, points)
+    }
+
     /// Discover persisted slide-show event records from presentation slides.
     ///
     /// Event records are returned as inert historical metadata only. This
