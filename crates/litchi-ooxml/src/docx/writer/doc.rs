@@ -12,6 +12,7 @@ use super::note::Note;
 use super::ole_object::MutableOleObject;
 use super::paragraph::MutableParagraph;
 use super::section::SectionProperties;
+use super::smartart::{MAX_SMART_ARTS, MutableSmartArt};
 use super::table::MutableTable;
 use super::theme::MutableTheme;
 use super::toc::TableOfContents;
@@ -61,6 +62,8 @@ pub struct MutableDocument {
     ole_shape_ids: HashSet<String>,
     /// Next VML shape number tried when allocating OLE object identities.
     next_ole_shape_number: u32,
+    /// Next SmartArt anchor number used when allocating anchor keys.
+    next_smartart_anchor: u32,
 }
 
 /// First VML shape number used when allocating OLE object identities
@@ -218,6 +221,7 @@ impl MutableDocument {
             section_dirty: false,
             ole_shape_ids: HashSet::new(),
             next_ole_shape_number: FIRST_OLE_SHAPE_NUMBER,
+            next_smartart_anchor: 1,
         }
     }
 
@@ -248,6 +252,7 @@ impl MutableDocument {
             section_dirty: false,
             ole_shape_ids: HashSet::new(),
             next_ole_shape_number: FIRST_OLE_SHAPE_NUMBER,
+            next_smartart_anchor: 1,
         })
     }
 
@@ -477,6 +482,28 @@ impl MutableDocument {
             BodyElement::PreservedAltChunk(raw, _) => raw.contains(shape_id),
             _ => false,
         })
+    }
+
+    /// Add a SmartArt (DrawingML diagram) graphic in a new paragraph at the
+    /// end of the document.
+    ///
+    /// Assigns the anchor key binding the four diagram relationship IDs at
+    /// save time. The data/layout/quick-style/colors parts are generated
+    /// under `/word/diagrams/`, and the diagram is discoverable through
+    /// [`crate::docx::Document::smart_arts`] after save and reopen. The
+    /// optional pre-rendered drawing part is not generated; Word and
+    /// LibreOffice re-render from the layout and data parts.
+    pub fn add_smart_art(&mut self, mut smartart: MutableSmartArt) -> Result<&mut MutableSmartArt> {
+        if self.collect_smart_arts().len() >= MAX_SMART_ARTS {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "SmartArt count exceeds {MAX_SMART_ARTS}"
+            )));
+        }
+        let number = self.next_smartart_anchor;
+        self.next_smartart_anchor = number.saturating_add(1);
+        smartart.anchor_key = format!("smartart{number}");
+        self.modified = true;
+        Ok(self.add_paragraph().add_smart_art(smartart))
     }
 
     /// Add a page break.
@@ -1024,6 +1051,23 @@ impl MutableDocument {
         }
 
         objects
+    }
+
+    /// Collect all SmartArt diagrams from the document in document order.
+    pub(crate) fn collect_smart_arts(&self) -> Vec<&MutableSmartArt> {
+        let mut smartarts = Vec::new();
+
+        for element in &self.body.elements {
+            if let BodyElement::Paragraph(para) = element {
+                for para_element in &para.elements {
+                    if let super::paragraph::ParagraphElement::SmartArt(smartart) = para_element {
+                        smartarts.push(smartart);
+                    }
+                }
+            }
+        }
+
+        smartarts
     }
 
     /// Generate header XML content.

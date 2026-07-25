@@ -14,6 +14,7 @@ use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
 use super::ole_object::MutableOleObject;
 use super::run::MutableRun;
+use super::smartart::MutableSmartArt;
 use super::textbox::MutableTextBox;
 use super::revision::{MutableRevision, ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode};
 use super::section::SectionProperties;
@@ -31,6 +32,8 @@ pub(crate) enum ParagraphElement {
     TextBox(MutableTextBox),
     /// Embedded OLE/package object (`w:object` with `o:OLEObject`).
     OleObject(MutableOleObject),
+    /// SmartArt (DrawingML diagram) anchor with `dgm:relIds`.
+    SmartArt(MutableSmartArt),
     /// Bookmark start marker
     BookmarkStart(MutableBookmark),
     /// Bookmark end marker (ID only)
@@ -92,6 +95,14 @@ impl ParagraphElement {
             Self::OleObject(object) => {
                 xml.push_str("<w:r>");
                 object.to_xml(xml, None, None)?;
+                xml.push_str("</w:r>");
+                Ok(())
+            },
+            // Without a relationship mapper the serializer emits
+            // deterministic `{{SMARTART_*}}` placeholders.
+            Self::SmartArt(smartart) => {
+                xml.push_str("<w:r>");
+                smartart.to_xml(xml, None)?;
                 xml.push_str("</w:r>");
                 Ok(())
             },
@@ -177,6 +188,13 @@ impl ParagraphElement {
                     rel_mapper.get_ole_object_id(object.shape_id()),
                     rel_mapper.get_ole_preview_id(object.shape_id()),
                 )?;
+                xml.push_str("</w:r>");
+                Ok(())
+            },
+            // SmartArt diagram relationships resolve by anchor key.
+            Self::SmartArt(smartart) => {
+                xml.push_str("<w:r>");
+                smartart.to_xml(xml, rel_mapper.get_smart_art_ids(smartart.anchor_key()))?;
                 xml.push_str("</w:r>");
                 Ok(())
             },
@@ -389,6 +407,19 @@ impl MutableParagraph {
         self.elements.push(ParagraphElement::OleObject(object));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::OleObject(object) => object,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Add a SmartArt (DrawingML diagram) anchor to the paragraph.
+    ///
+    /// Crate-internal: public authoring goes through
+    /// [`crate::docx::writer::MutableDocument::add_smart_art`], which assigns
+    /// the anchor key first.
+    pub(crate) fn add_smart_art(&mut self, smartart: MutableSmartArt) -> &mut MutableSmartArt {
+        self.elements.push(ParagraphElement::SmartArt(smartart));
+        match self.elements.last_mut().unwrap() {
+            ParagraphElement::SmartArt(smartart) => smartart,
             _ => unreachable!(),
         }
     }

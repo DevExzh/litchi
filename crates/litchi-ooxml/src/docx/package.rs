@@ -2114,6 +2114,7 @@ impl Package {
                 let hyperlink_urls = mutable_doc.collect_hyperlink_urls();
                 let images = mutable_doc.collect_images();
                 let ole_objects = mutable_doc.collect_ole_objects();
+                let smart_arts = mutable_doc.collect_smart_arts();
                 let has_header = mutable_doc.has_header();
                 let has_footer = mutable_doc.has_footer();
                 let section_header_footer_parts =
@@ -2292,6 +2293,62 @@ impl Package {
                         let rid = temp_part.relate_to(&preview_partname, rt::IMAGE);
                         rel_mapper.add_ole_preview(object.shape_id(), rid);
                     }
+                }
+
+                // Add SmartArt diagram parts (data, layout, quick style,
+                // colors) and their relationships. The optional pre-rendered
+                // drawing part is not generated; Word and LibreOffice
+                // re-render from the layout and data parts.
+                let mut diagram_index = 0u32;
+                for smartart in &smart_arts {
+                    // Allocate non-colliding part names under /word/diagrams/.
+                    let (data_name, layout_name, quick_style_name, colors_name) = loop {
+                        diagram_index = diagram_index.checked_add(1).ok_or_else(|| {
+                            OoxmlError::InvalidFormat(
+                                "SmartArt diagram part name space exhausted".to_string(),
+                            )
+                        })?;
+                        let names = (
+                            format!("/word/diagrams/data{diagram_index}.xml"),
+                            format!("/word/diagrams/layout{diagram_index}.xml"),
+                            format!("/word/diagrams/quickStyle{diagram_index}.xml"),
+                            format!("/word/diagrams/colors{diagram_index}.xml"),
+                        );
+                        let taken = [&names.0, &names.1, &names.2, &names.3].iter().any(|name| {
+                            PackURI::new(*name)
+                                .map(|uri| self.opc.get_part(&uri).is_ok())
+                                .unwrap_or(true)
+                        });
+                        if !taken {
+                            break names;
+                        }
+                    };
+                    let parts = smartart.generate_parts();
+                    for (partname, content_type, xml) in [
+                        (&data_name, ct::DML_DIAGRAM_DATA, parts.data_xml),
+                        (&layout_name, ct::DML_DIAGRAM_LAYOUT, parts.layout_xml),
+                        (&quick_style_name, ct::DML_DIAGRAM_STYLE, parts.quick_style_xml),
+                        (&colors_name, ct::DML_DIAGRAM_COLORS, parts.colors_xml),
+                    ] {
+                        let uri = PackURI::new(partname)
+                            .map_err(|e| OoxmlError::InvalidUri(format!("diagram URI: {}", e)))?;
+                        self.opc.add_part(Box::new(BlobPart::new(
+                            uri,
+                            content_type.to_string(),
+                            xml.into_bytes(),
+                        )));
+                    }
+                    let rel_ids = crate::docx::writer::smartart::SmartArtRelIds {
+                        data: temp_part
+                            .relate_to(&data_name, crate::diagrams::DIAGRAM_DATA_REL),
+                        layout: temp_part
+                            .relate_to(&layout_name, crate::diagrams::DIAGRAM_LAYOUT_REL),
+                        quick_style: temp_part
+                            .relate_to(&quick_style_name, crate::diagrams::DIAGRAM_QUICK_STYLE_REL),
+                        colors: temp_part
+                            .relate_to(&colors_name, crate::diagrams::DIAGRAM_COLORS_REL),
+                    };
+                    rel_mapper.add_smart_art(smartart.anchor_key(), rel_ids);
                 }
 
                 // Add header/footer parts and relationships

@@ -180,6 +180,8 @@ pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use settings::{AttachedTemplate, DocumentSettings, ProtectionType, SmartTagType};
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
+// Re-export the shared semantic SmartArt model for authoring.
+pub use crate::diagrams::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use statistics::DocumentStatistics;
 pub use styles::{Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
@@ -205,7 +207,7 @@ pub use writer::{
     MutableContentControl, MutableDocument, MutableField, MutableHyperlink,
     MutableInlineImage, MutableParagraph, MutableRevision, MutableRun, MutableSmartTag,
     MutableSmartTagAttribute, MutableStyle, MutableTable, MutableTextBox, MutableTheme,
-    MutableOleObject, MAX_OLE_PAYLOAD_BYTES, PageNumberFormat,
+    MutableOleObject, MAX_OLE_PAYLOAD_BYTES, MutableSmartArt, MAX_SMART_ARTS, PageNumberFormat,
     PageOrientation, RevisionContentControl, RevisionKind, RevisionMetadata, RowRevisionKind,
     CellRevisionKind, TableCellMergeRevisionState, TableRevisionKind, RunContent,
     DocumentGridType, NoteNumberRestart, SectionColumn, SectionColumns, SectionDocumentGrid,

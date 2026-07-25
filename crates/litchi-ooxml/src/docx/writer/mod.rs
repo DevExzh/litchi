@@ -17,6 +17,7 @@ pub(crate) mod relmap;
 pub mod run;
 pub mod section;
 pub mod smart_tag;
+pub mod smartart;
 pub mod style;
 pub mod table;
 pub mod textbox;
@@ -64,6 +65,9 @@ pub use textbox::MutableTextBox;
 
 // Re-export embedded-object authoring types
 pub use ole_object::{MAX_OLE_PAYLOAD_BYTES, MutableOleObject};
+
+// Re-export SmartArt authoring types
+pub use smartart::{MAX_SMART_ARTS, MutableSmartArt};
 
 // Re-export comment types
 pub use comment::MutableComment;
