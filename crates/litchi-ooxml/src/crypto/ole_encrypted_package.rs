@@ -1,6 +1,13 @@
 use crate::error::{OoxmlError, Result};
 use litchi_cfb::writer::OleWriter;
 use litchi_ole::OleFile;
+use litchi_ole::office_crypto::data_spaces::{
+    DataSpaceDefinition, DataSpaceMap, DataSpaceMapEntry, DataSpaceReference,
+    DataSpaceReferenceKind, DataSpaceVersion, DataSpaceVersionInfo, ENCRYPTION_TRANSFORM_ID,
+    ENCRYPTION_TRANSFORM_NAME, EncryptionTransformInfo, TransformInfoHeader, inspect_data_spaces,
+    write_data_space_definition, write_data_space_map, write_encryption_transform,
+    write_version_info,
+};
 
 /// Build an OLE compound file that wraps the given OOXML `EncryptionInfo`
 /// and `EncryptedPackage` streams with the standard StrongEncryptionDataSpace
@@ -9,10 +16,35 @@ pub(crate) fn build_ole_encrypted_package(
     encryption_info: &[u8],
     encrypted_package: &[u8],
 ) -> Result<Vec<u8>> {
-    let dataspace_map = build_dataspace_map_stream();
-    let dataspace_def = build_dataspace_definition_stream();
-    let transform_primary = build_transform_primary_stream();
-    let dataspace_version = build_dataspace_version_stream();
+    let dataspace_map = write_data_space_map(&DataSpaceMap {
+        entries: vec![DataSpaceMapEntry {
+            references: vec![DataSpaceReference {
+                kind: DataSpaceReferenceKind::Stream,
+                component: "EncryptedPackage".to_string(),
+            }],
+            data_space_name: "StrongEncryptionDataSpace".to_string(),
+        }],
+    })
+    .map_err(data_space_error)?;
+    let dataspace_def = write_data_space_definition(&DataSpaceDefinition {
+        transforms: vec!["StrongEncryptionTransform".to_string()],
+    })
+    .map_err(data_space_error)?;
+    let transform_primary = write_encryption_transform(&EncryptionTransformInfo {
+        header: TransformInfoHeader {
+            transform_id: ENCRYPTION_TRANSFORM_ID.to_string(),
+            transform_name: ENCRYPTION_TRANSFORM_NAME.to_string(),
+            reader: DataSpaceVersion::V1_0,
+            updater: DataSpaceVersion::V1_0,
+            writer: DataSpaceVersion::V1_0,
+        },
+        encryption_name: None,
+        encryption_block_size: 16,
+        cipher_mode: 0,
+    })
+    .map_err(data_space_error)?;
+    let dataspace_version =
+        write_version_info(&DataSpaceVersionInfo::default()).map_err(data_space_error)?;
 
     let ds_root = "\u{0006}DataSpaces";
 
@@ -92,6 +124,23 @@ pub(crate) fn parse_ole_encrypted_package(bytes: &[u8]) -> Result<(Vec<u8>, Vec<
     let mut ole = OleFile::open(cursor).map_err(|e| {
         OoxmlError::InvalidFormat(format!("invalid OLE container for encrypted OOXML: {}", e))
     })?;
+    // LibreOffice has historically emitted otherwise valid encrypted
+    // packages without DataSpaces. Preserve that compatibility fallback, but
+    // require a complete, exact StrongEncryption graph whenever it is present.
+    if let Some(graph) = inspect_data_spaces(&mut ole).map_err(data_space_error)?
+        && graph.map.entries.as_slice()
+            != [DataSpaceMapEntry {
+                references: vec![DataSpaceReference {
+                    kind: DataSpaceReferenceKind::Stream,
+                    component: "EncryptedPackage".to_string(),
+                }],
+                data_space_name: "StrongEncryptionDataSpace".to_string(),
+            }]
+    {
+        return Err(OoxmlError::InvalidFormat(
+            "encrypted OOXML has an invalid StrongEncryptionDataSpace map".into(),
+        ));
+    }
 
     let encryption_info = ole.open_stream(&["EncryptionInfo"]).map_err(|e| {
         OoxmlError::InvalidFormat(format!("failed to read EncryptionInfo stream: {}", e))
@@ -104,84 +153,64 @@ pub(crate) fn parse_ole_encrypted_package(bytes: &[u8]) -> Result<(Vec<u8>, Vec<
     Ok((encryption_info, encrypted_package))
 }
 
-fn write_unicode_lpp4(buf: &mut Vec<u8>, s: &str) {
-    let mut bytes = Vec::with_capacity(s.len() * 2);
-    for ch in s.encode_utf16() {
-        let b = ch.to_le_bytes();
-        bytes.push(b[0]);
-        bytes.push(b[1]);
+fn data_space_error(error: impl std::fmt::Display) -> OoxmlError {
+    OoxmlError::InvalidFormat(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_cfb::OleWriter;
+    use litchi_ole::office_crypto::data_spaces::{
+        ENCRYPTION_TRANSFORM_ID, inspect_data_spaces_bytes,
+    };
+
+    #[test]
+    fn encrypted_package_wrapper_has_valid_typed_data_spaces() {
+        let encryption_info = [3, 0, 2, 0, 0, 0, 0, 0];
+        let encrypted_package = [4, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4];
+        let bytes = build_ole_encrypted_package(&encryption_info, &encrypted_package).unwrap();
+
+        let graph = inspect_data_spaces_bytes(&bytes).unwrap().unwrap();
+        assert!(graph.irm.is_none());
+        assert_eq!(
+            graph.map.entries[0].data_space_name,
+            "StrongEncryptionDataSpace"
+        );
+        assert_eq!(
+            graph.transforms[0].header.transform_id,
+            ENCRYPTION_TRANSFORM_ID
+        );
+        assert_eq!(
+            graph.transforms[0]
+                .encryption
+                .as_ref()
+                .unwrap()
+                .encryption_block_size,
+            16
+        );
+        let (parsed_info, parsed_package) = parse_ole_encrypted_package(&bytes).unwrap();
+        assert_eq!(parsed_info, encryption_info);
+        assert_eq!(parsed_package, encrypted_package);
     }
-    let len = bytes.len() as u32;
-    buf.extend_from_slice(&len.to_le_bytes());
-    buf.extend_from_slice(&bytes);
-    if (len % 4) == 2 {
-        buf.extend_from_slice(&0u16.to_le_bytes());
+
+    #[test]
+    fn accepts_libreoffice_package_without_data_spaces() {
+        let encryption_info = [3, 0, 2, 0, 0, 0, 0, 0];
+        let encrypted_package = [0; 8];
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["EncryptionInfo"], &encryption_info)
+            .unwrap();
+        writer
+            .create_stream(&["EncryptedPackage"], &encrypted_package)
+            .unwrap();
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+
+        let (parsed_info, parsed_package) =
+            parse_ole_encrypted_package(&bytes.into_inner()).unwrap();
+        assert_eq!(parsed_info, encryption_info);
+        assert_eq!(parsed_package, encrypted_package);
     }
-}
-
-fn write_utf8_lpp4_null(buf: &mut Vec<u8>) {
-    buf.extend_from_slice(&0u32.to_le_bytes());
-    buf.extend_from_slice(&0u32.to_le_bytes());
-}
-
-fn build_dataspace_map_stream() -> Vec<u8> {
-    let mut buf = Vec::new();
-    buf.extend_from_slice(&8u32.to_le_bytes());
-    buf.extend_from_slice(&1u32.to_le_bytes());
-
-    let entry_start = buf.len();
-    buf.extend_from_slice(&0u32.to_le_bytes());
-    buf.extend_from_slice(&1u32.to_le_bytes());
-    buf.extend_from_slice(&0u32.to_le_bytes());
-    write_unicode_lpp4(&mut buf, "EncryptedPackage");
-    write_unicode_lpp4(&mut buf, "StrongEncryptionDataSpace");
-    let entry_len = (buf.len() - entry_start) as u32;
-    buf[entry_start..entry_start + 4].copy_from_slice(&entry_len.to_le_bytes());
-
-    buf
-}
-
-fn build_dataspace_definition_stream() -> Vec<u8> {
-    let mut buf = Vec::new();
-    buf.extend_from_slice(&8u32.to_le_bytes());
-    buf.extend_from_slice(&1u32.to_le_bytes());
-    write_unicode_lpp4(&mut buf, "StrongEncryptionTransform");
-    buf
-}
-
-fn build_transform_primary_stream() -> Vec<u8> {
-    let mut buf = Vec::new();
-
-    let header_start = buf.len();
-    buf.extend_from_slice(&0u32.to_le_bytes());
-    buf.extend_from_slice(&1u32.to_le_bytes());
-    write_unicode_lpp4(&mut buf, "{FF9A3F03-56EF-4613-BDD5-5A41C1D07246}");
-    let header_len = (buf.len() - header_start) as u32;
-    buf[header_start..header_start + 4].copy_from_slice(&header_len.to_le_bytes());
-
-    write_unicode_lpp4(&mut buf, "Microsoft.Container.EncryptionTransform");
-    buf.extend_from_slice(&1u16.to_le_bytes());
-    buf.extend_from_slice(&0u16.to_le_bytes());
-    buf.extend_from_slice(&1u16.to_le_bytes());
-    buf.extend_from_slice(&0u16.to_le_bytes());
-    buf.extend_from_slice(&1u16.to_le_bytes());
-    buf.extend_from_slice(&0u16.to_le_bytes());
-
-    buf.extend_from_slice(&0u32.to_le_bytes());
-    write_utf8_lpp4_null(&mut buf);
-    buf.extend_from_slice(&4u32.to_le_bytes());
-
-    buf
-}
-
-fn build_dataspace_version_stream() -> Vec<u8> {
-    let mut buf = Vec::new();
-    write_unicode_lpp4(&mut buf, "Microsoft.Container.DataSpaces");
-    buf.extend_from_slice(&1u16.to_le_bytes());
-    buf.extend_from_slice(&0u16.to_le_bytes());
-    buf.extend_from_slice(&1u16.to_le_bytes());
-    buf.extend_from_slice(&0u16.to_le_bytes());
-    buf.extend_from_slice(&1u16.to_le_bytes());
-    buf.extend_from_slice(&0u16.to_le_bytes());
-    buf
 }

@@ -1,8 +1,8 @@
 /// Constants for OLE file format
 pub mod consts;
 
-/// Shared password-to-open primitives for legacy Office binary formats.
-mod office_crypto;
+/// Shared MS-OFFCRYPTO structures for encryption and rights management.
+pub mod office_crypto;
 
 // CFB substrate types re-exported so callers can reach them through the
 // `litchi::ole` namespace as well as `litchi_cfb` directly.
