@@ -303,6 +303,30 @@ impl WorksheetChart {
         self
     }
 
+    /// Convert this chart into a pivot chart bound to a pivot table by name.
+    ///
+    /// Sets the chart's pivot source to `pivot_table_name` (with the default
+    /// format ID) and gives every existing series without an extension list
+    /// the default all-visible drop-zone options. The name is validated
+    /// against the workbook's pivot tables and normalized to its
+    /// sheet-qualified form when the workbook is saved.
+    pub fn into_pivot_chart(mut self, pivot_table_name: &str) -> Self {
+        self.chart.pivot_source = Some(crate::charts::chart::PivotSource::new(
+            pivot_table_name,
+            crate::xlsx::pivot_chart::DEFAULT_PIVOT_CHART_FORMAT_ID,
+        ));
+        let extension = crate::charts::ChartExtensionList::from_xml(
+            crate::xlsx::pivot_chart::default_pivot_options_extension_xml(),
+        )
+        .expect("default pivot-options extension XML is a valid extLst fragment");
+        for_each_series_mut(&mut self.chart, |series| {
+            if series.extension_list.is_none() {
+                series.extension_list = Some(extension.clone());
+            }
+        });
+        self
+    }
+
     /// Create a simple bar chart from data ranges.
     ///
     /// # Arguments
@@ -660,6 +684,29 @@ impl WorksheetChart {
 pub fn parse_chart_from_xml(chart_xml: &[u8], anchor: ChartAnchor) -> Result<WorksheetChart> {
     let chart = crate::charts::reader::parse_chart(chart_xml)?;
     Ok(WorksheetChart::new(chart, anchor))
+}
+
+fn for_each_series_mut(chart: &mut ChartModel, mut apply: impl FnMut(&mut Series)) {
+    for type_group in &mut chart.plot_area.type_groups {
+        match type_group {
+            TypeGroup::Area(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Area3D(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Bar(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Bar3D(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Bubble(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Doughnut(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Line(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Line3D(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::OfPie(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Pie(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Pie3D(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Radar(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Scatter(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Stock(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Surface(g) => g.common.series.iter_mut().for_each(&mut apply),
+            TypeGroup::Surface3D(g) => g.common.series.iter_mut().for_each(&mut apply),
+        }
+    }
 }
 
 /// Generate chart XML for a worksheet chart.

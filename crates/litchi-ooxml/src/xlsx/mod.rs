@@ -303,10 +303,10 @@ pub use pivot::{
 };
 // Re-export pivot-chart binding types
 pub use pivot_chart::{
-    PIVOT_OPTIONS_EXTENSION_URI, PivotChart, PivotChartBinding, PivotChartDropZoneVisibility,
-    PivotChartFieldType, PivotChartPivotOptions, PivotChartSeries, PivotChartSheetKind,
-    PivotChartSource, WorksheetPivotCharts, load_pivot_charts, load_worksheet_pivot_charts,
-    parse_pivot_chart_binding,
+    DEFAULT_PIVOT_CHART_FORMAT_ID, PIVOT_OPTIONS_EXTENSION_URI, PivotChart, PivotChartBinding,
+    PivotChartDropZoneVisibility, PivotChartFieldType, PivotChartPivotOptions, PivotChartSeries,
+    PivotChartSheetKind, PivotChartSource, WorksheetPivotCharts, load_pivot_charts,
+    load_worksheet_pivot_charts, parse_pivot_chart_binding,
 };
 // Re-export writer types
 pub use writer::{
@@ -315,7 +315,8 @@ pub use writer::{
     Hyperlink as WriterHyperlink, Image, MutableSharedStrings, MutableWorkbookData,
     MutableWorksheet, NamedRange, PageBreak as WriterPageBreak, PageSetup as WriterPageSetup,
     PageSetupProperties as WriterPageSetupProperties, RichTextRun, SheetProtection, StylesBuilder,
-    WorkbookProtection, XlsxShapeSpec,
+    WorkbookProtection, XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec,
+    XlsxGroupSpec, XlsxShapeSpec,
 };
 // Re-export threaded comments types
 pub use threaded_comments::{

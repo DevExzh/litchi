@@ -1748,12 +1748,10 @@ mod tests {
         let (mut package, _) = package_with_pivot_table();
         let workbook_uri = PackURI::new("/custom/book.xml").unwrap();
         let workbook_part = package.get_part_mut(&workbook_uri).unwrap();
-        let updated = std::str::from_utf8(workbook_part.blob())
-            .unwrap()
-            .replace(
-                "</sheets>",
-                r#"<sheet name="Chart1" sheetId="3" r:id="rId4"/></sheets>"#,
-            );
+        let updated = std::str::from_utf8(workbook_part.blob()).unwrap().replace(
+            "</sheets>",
+            r#"<sheet name="Chart1" sheetId="3" r:id="rId4"/></sheets>"#,
+        );
         workbook_part.set_blob(updated.into_bytes());
         workbook_part.relate_to(
             "chartsheets/chart1.xml",
@@ -1773,8 +1771,9 @@ mod tests {
 
     #[test]
     fn poi_fixture_with_chartsheet_reads_pivot_tables() {
-        const POI_CHARTSHEET: &[u8] =
-            include_bytes!("../../../../../test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx");
+        const POI_CHARTSHEET: &[u8] = include_bytes!(
+            "../../../../../test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx"
+        );
         let package = OpcPackage::from_bytes(POI_CHARTSHEET).unwrap();
         let tables = read_pivot_tables(&package).unwrap();
         assert_eq!(tables.len(), 5);

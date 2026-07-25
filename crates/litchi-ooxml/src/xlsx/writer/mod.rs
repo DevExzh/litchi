@@ -8,7 +8,10 @@ pub mod table;
 pub mod workbook;
 
 // Re-export main types
-pub use shape::XlsxShapeSpec;
+pub use shape::{
+    XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
+    XlsxShapeSpec,
+};
 pub use sheet::{
     AutoFilter, CellComment, ConditionalFormat, ConditionalFormatType, DefinedNameBuiltIn,
     FreezePanes, HeaderFooter, Hyperlink, Image, MutableWorksheet, NamedRange, PageBreak,

@@ -35,6 +35,9 @@ use std::str::FromStr;
 /// records drop-zone visibility for a pivot chart.
 pub const PIVOT_OPTIONS_EXTENSION_URI: &str = "{781A3756-C4B2-4CAC-9D66-4F8C8630D5DC}";
 
+/// Default `c:fmtId` written for authored pivot charts (Excel writes 0).
+pub const DEFAULT_PIVOT_CHART_FORMAT_ID: u32 = 0;
+
 const C14_CHART_NAMESPACE: &str = "http://schemas.microsoft.com/office/drawing/2007/8/2/chart";
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -94,6 +97,17 @@ impl PivotChartFieldType {
             _ => None,
         }
     }
+
+    /// The `c14:dropZone*` element name for this field type.
+    pub fn drop_zone_element_name(&self) -> &'static str {
+        match self {
+            Self::AxisRow => "dropZoneCategories",
+            Self::AxisCol => "dropZoneSeries",
+            Self::AxisPage => "dropZoneAxis",
+            Self::AxisValues => "dropZoneValues",
+            Self::DataFields => "dropZoneData",
+        }
+    }
 }
 
 impl FromStr for PivotChartFieldType {
@@ -138,6 +152,29 @@ impl PivotChartPivotOptions {
             .iter()
             .find(|zone| zone.field_type == field_type)
             .map(|zone| zone.visible)
+    }
+
+    /// Drop-zone defaults with every field button visible, matching what
+    /// Excel writes for newly created pivot charts.
+    pub fn all_visible() -> Self {
+        // Emission order follows the CT_PivotOptions element sequence.
+        const DEFAULT_ORDER: [PivotChartFieldType; 5] = [
+            PivotChartFieldType::AxisRow,
+            PivotChartFieldType::DataFields,
+            PivotChartFieldType::AxisCol,
+            PivotChartFieldType::AxisPage,
+            PivotChartFieldType::AxisValues,
+        ];
+        Self {
+            drop_zone_visible: Some(true),
+            drop_zones: DEFAULT_ORDER
+                .iter()
+                .map(|&field_type| PivotChartDropZoneVisibility {
+                    field_type,
+                    visible: true,
+                })
+                .collect(),
+        }
     }
 }
 
@@ -762,9 +799,7 @@ fn load_sheet_pivot_charts(
             ))
         })?;
     let (sheet_kind, expected_content_type) = match relationship.reltype() {
-        rt::WORKSHEET | rt::STRICT_WORKSHEET => {
-            (PivotChartSheetKind::Worksheet, ct::SML_WORKSHEET)
-        },
+        rt::WORKSHEET | rt::STRICT_WORKSHEET => (PivotChartSheetKind::Worksheet, ct::SML_WORKSHEET),
         CHARTSHEET_REL | STRICT_CHARTSHEET_REL => {
             (PivotChartSheetKind::Chartsheet, CHARTSHEET_CONTENT_TYPE)
         },
@@ -941,6 +976,118 @@ fn unquote_sheet_name(sheet: &str) -> String {
     } else {
         sheet.to_string()
     }
+}
+
+/// Quote a sheet name for use in a qualified pivot-source reference,
+/// doubling embedded single quotes (the inverse of `unquote_sheet_name`).
+fn quote_sheet_name(sheet: &str) -> String {
+    let needs_quotes = sheet.is_empty()
+        || sheet.chars().next().is_some_and(|c| c.is_ascii_digit())
+        || !sheet
+            .chars()
+            .all(|c| c == '_' || c == '.' || c.is_alphanumeric());
+    if needs_quotes {
+        format!("'{}'", sheet.replace('\'', "''"))
+    } else {
+        sheet.to_string()
+    }
+}
+
+/// Serialize one series-level `c:extLst` carrying `c14:pivotOptions` drop
+/// zones, for embedding in an authored chart part.
+pub(crate) fn pivot_options_extension_xml(options: &PivotChartPivotOptions) -> Vec<u8> {
+    let mut xml = Vec::new();
+    xml.extend_from_slice(b"<c:extLst xmlns:c=\"");
+    xml.extend_from_slice(crate::common::xml::DRAWINGML_CHART_NAMESPACE);
+    xml.extend_from_slice(b"\"><c:ext uri=\"");
+    xml.extend_from_slice(PIVOT_OPTIONS_EXTENSION_URI.as_bytes());
+    xml.extend_from_slice(b"\" xmlns:c14=\"");
+    xml.extend_from_slice(C14_CHART_NAMESPACE.as_bytes());
+    xml.extend_from_slice(b"\"><c14:pivotOptions>");
+    if let Some(visible) = options.drop_zone_visible {
+        write_drop_zone_element(&mut xml, "dropZoneVisible", visible);
+    }
+    for zone in &options.drop_zones {
+        write_drop_zone_element(
+            &mut xml,
+            zone.field_type.drop_zone_element_name(),
+            zone.visible,
+        );
+    }
+    xml.extend_from_slice(b"</c14:pivotOptions></c:ext></c:extLst>");
+    xml
+}
+
+/// Default all-visible drop-zone extension list for authored pivot charts.
+pub(crate) fn default_pivot_options_extension_xml() -> Vec<u8> {
+    pivot_options_extension_xml(&PivotChartPivotOptions::all_visible())
+}
+
+fn write_drop_zone_element(xml: &mut Vec<u8>, element: &str, visible: bool) {
+    xml.extend_from_slice(b"<c14:");
+    xml.extend_from_slice(element.as_bytes());
+    xml.extend_from_slice(if visible {
+        b" val=\"1\"/>"
+    } else {
+        b" val=\"0\"/>"
+    });
+}
+
+/// Validate an authored pivot-source name against the workbook's authored
+/// pivot tables (`(table name, hosting sheet name)` pairs) using the same
+/// rules as [`resolve_pivot_table`], and return its canonical
+/// sheet-qualified form so saved packages are valid by construction.
+pub(crate) fn resolve_authored_pivot_source_name(
+    pivot_source_name: &str,
+    host_sheet_name: &str,
+    pivot_tables: &[(String, String)],
+) -> Result<String> {
+    let (sheet_prefix, table_name) = split_pivot_source_name(pivot_source_name);
+    if table_name.is_empty() {
+        return Err(invalid(
+            "authored pivot chart has an empty pivot-table name",
+        ));
+    }
+    let folded = table_name.to_lowercase();
+    let candidates = || {
+        pivot_tables
+            .iter()
+            .filter(|(name, _)| name.to_lowercase() == folded)
+    };
+    let found = match sheet_prefix {
+        Some(prefix) => {
+            let wanted = prefix.to_lowercase();
+            candidates()
+                .find(|(_, sheet)| sheet.to_lowercase() == wanted)
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "authored pivot chart references pivot table '{table_name}' on sheet '{prefix}', which does not host it"
+                    ))
+                })?
+        },
+        None => {
+            let host = host_sheet_name.to_lowercase();
+            if let Some(found) = candidates().find(|(_, sheet)| sheet.to_lowercase() == host) {
+                found
+            } else {
+                let mut matches = candidates();
+                match (matches.next(), matches.next()) {
+                    (Some(found), None) => found,
+                    (None, _) => {
+                        return Err(invalid(format!(
+                            "authored pivot chart references missing pivot table '{table_name}'"
+                        )));
+                    },
+                    (Some(_), Some(_)) => {
+                        return Err(invalid(format!(
+                            "authored pivot chart pivot-table name '{table_name}' is ambiguous"
+                        )));
+                    },
+                }
+            }
+        },
+    };
+    Ok(format!("{}!{}", quote_sheet_name(&found.1), found.0))
 }
 
 fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
@@ -1471,6 +1618,238 @@ mod tests {
 
         let charts = load_worksheet_pivot_charts(&package, "Chart2").unwrap();
         assert_eq!(charts.len(), 1);
-        assert!(load_worksheet_pivot_charts(&package, "Sheet1").unwrap().is_empty());
+        assert!(
+            load_worksheet_pivot_charts(&package, "Sheet1")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn default_drop_zone_options_serialize_and_parse_back() {
+        let chart = format!(
+            r#"<c:chartSpace xmlns:c="{C}">
+                <c:pivotSource><c:name>Pivot!PivotOne</c:name><c:fmtId val="0"/></c:pivotSource>
+                <c:chart><c:plotArea><c:barChart><c:ser><c:idx val="0"/>
+                    {}
+                </c:ser></c:barChart></c:plotArea></c:chart>
+            </c:chartSpace>"#,
+            String::from_utf8(default_pivot_options_extension_xml()).unwrap()
+        );
+        let binding = parse_pivot_chart_binding(chart.as_bytes())
+            .unwrap()
+            .unwrap();
+        let options = binding.series[0].pivot_options.as_ref().unwrap();
+        assert_eq!(options.drop_zone_visible, Some(true));
+        for field_type in [
+            PivotChartFieldType::AxisRow,
+            PivotChartFieldType::AxisCol,
+            PivotChartFieldType::AxisPage,
+            PivotChartFieldType::AxisValues,
+            PivotChartFieldType::DataFields,
+        ] {
+            assert_eq!(options.visibility(field_type), Some(true));
+        }
+    }
+
+    #[test]
+    fn authored_pivot_source_names_validate_and_qualify() {
+        fn tables(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+            pairs
+                .iter()
+                .map(|(name, sheet)| (name.to_string(), sheet.to_string()))
+                .collect()
+        }
+        let two = tables(&[("PivotOne", "Data"), ("PivotTwo", "Other")]);
+        // Unqualified names qualify against the resolved table's host sheet.
+        assert_eq!(
+            resolve_authored_pivot_source_name("PivotOne", "Other", &two).unwrap(),
+            "Data!PivotOne"
+        );
+        // Qualified and workbook-prefixed names validate and canonicalize.
+        assert_eq!(
+            resolve_authored_pivot_source_name("Data!PivotOne", "Other", &two).unwrap(),
+            "Data!PivotOne"
+        );
+        assert_eq!(
+            resolve_authored_pivot_source_name("[Book1.xlsx]Data!PivotOne", "Other", &two).unwrap(),
+            "Data!PivotOne"
+        );
+        assert!(resolve_authored_pivot_source_name("Missing", "Other", &two).is_err());
+        // The table exists but is hosted on a different sheet than qualified.
+        assert!(resolve_authored_pivot_source_name("Other!PivotOne", "Other", &two).is_err());
+        // Host-sheet preference disambiguates duplicate table names.
+        let duplicate = tables(&[("PivotOne", "A"), ("PivotOne", "B")]);
+        assert_eq!(
+            resolve_authored_pivot_source_name("PivotOne", "B", &duplicate).unwrap(),
+            "B!PivotOne"
+        );
+        assert!(resolve_authored_pivot_source_name("PivotOne", "C", &duplicate).is_err());
+        // Sheet names that need quoting are quoted and round-trip.
+        let quoted = tables(&[("T", "My Sheet")]);
+        assert_eq!(
+            resolve_authored_pivot_source_name("T", "X", &quoted).unwrap(),
+            "'My Sheet'!T"
+        );
+        let apostrophe = tables(&[("T", "Bob's Sheet")]);
+        let name = resolve_authored_pivot_source_name("T", "X", &apostrophe).unwrap();
+        assert_eq!(name, "'Bob''s Sheet'!T");
+        let (sheet, table) = split_pivot_source_name(&name);
+        assert_eq!(sheet.as_deref(), Some("Bob's Sheet"));
+        assert_eq!(table, "T");
+    }
+
+    fn temp_xlsx_path(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "litchi-pivot-chart-{tag}-{}-{}.xlsx",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+
+    fn workbook_with_pivot_table() -> crate::xlsx::Workbook {
+        use crate::pivot::{
+            PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction,
+        };
+
+        let mut workbook = crate::xlsx::Workbook::create().unwrap();
+        {
+            let worksheet = workbook.worksheet_mut(0).unwrap();
+            worksheet.set_cell_value(1, 1, "Region");
+            worksheet.set_cell_value(1, 2, "Year");
+            worksheet.set_cell_value(1, 3, "Sales");
+            worksheet.set_cell_value(2, 1, "North");
+            worksheet.set_cell_value(2, 2, "2024");
+            worksheet.set_cell_value(2, 3, 10.0);
+            worksheet.set_cell_value(3, 1, "South");
+            worksheet.set_cell_value(3, 2, "2024");
+            worksheet.set_cell_value(3, 3, 20.0);
+        }
+        workbook
+            .add_pivot_table(PivotTable {
+                name: "PivotTable1".into(),
+                source_sheet: Some("Sheet1".into()),
+                source_ref: Some("$A$1:$C$3".into()),
+                field_names: vec!["Region".into(), "Year".into(), "Sales".into()],
+                sheet_name: "Sheet1".into(),
+                cache_id: 0,
+                location_ref: "$E$1".into(),
+                row_fields: vec![PivotFieldRole {
+                    field_name: "Region".into(),
+                    axis: PivotAxis::Row,
+                    position: 0,
+                }],
+                column_fields: vec![PivotFieldRole {
+                    field_name: "Year".into(),
+                    axis: PivotAxis::Column,
+                    position: 0,
+                }],
+                filter_fields: Vec::new(),
+                data_fields: vec![PivotDataField {
+                    field_name: "Sales".into(),
+                    function: PivotValueFunction::Sum,
+                    display_name: None,
+                }],
+            })
+            .unwrap();
+        workbook
+    }
+
+    #[test]
+    fn authored_pivot_chart_round_trips_through_save() {
+        use crate::xlsx::{ChartAnchor, Workbook, WorksheetChart};
+
+        let mut workbook = workbook_with_pivot_table();
+        {
+            let worksheet = workbook.worksheet_mut(0).unwrap();
+            // An ordinary chart coexists with the pivot chart in one drawing.
+            let ordinary = WorksheetChart::bar_chart(
+                "Raw Data",
+                "Sheet1!$A$2:$A$3",
+                "Sheet1!$C$2:$C$3",
+                ChartAnchor::new(1, 10, 7, 24),
+            )
+            .unwrap();
+            worksheet.add_chart(ordinary);
+            let pivot = WorksheetChart::bar_chart(
+                "Sales by Region",
+                "Sheet1!$E$2:$E$3",
+                "Sheet1!$F$2:$F$3",
+                ChartAnchor::new(1, 26, 7, 40),
+            )
+            .unwrap();
+            worksheet.add_pivot_chart(pivot, "PivotTable1").unwrap();
+        }
+        let path = temp_xlsx_path("round-trip");
+        workbook.save(&path).unwrap();
+
+        let reopened = Workbook::open(&path).unwrap();
+        std::fs::remove_file(&path).ok();
+        // The authored pivot table survives the round trip.
+        let tables = reopened.pivot_tables().unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].name, "PivotTable1");
+
+        let sheets = load_pivot_charts(reopened.package()).unwrap();
+        assert_eq!(sheets.len(), 1);
+        assert_eq!(sheets[0].worksheet_name, "Sheet1");
+        assert_eq!(sheets[0].sheet_kind, PivotChartSheetKind::Worksheet);
+        // Exactly the pivot chart is inventoried; the ordinary chart is excluded.
+        assert_eq!(sheets[0].pivot_charts.len(), 1);
+        let chart = &sheets[0].pivot_charts[0];
+        // The pivot-source name was normalized to its sheet-qualified form.
+        assert_eq!(chart.pivot_source.name, "Sheet1!PivotTable1");
+        assert_eq!(chart.pivot_source.format_id, DEFAULT_PIVOT_CHART_FORMAT_ID);
+        assert_eq!(chart.pivot_table.name, "PivotTable1");
+        assert_eq!(chart.pivot_table.sheet_name, "Sheet1");
+        // Default drop-zone options were emitted for the series.
+        let options = chart.series[0].pivot_options.as_ref().unwrap();
+        assert_eq!(options.drop_zone_visible, Some(true));
+        for field_type in [
+            PivotChartFieldType::AxisRow,
+            PivotChartFieldType::AxisCol,
+            PivotChartFieldType::AxisPage,
+            PivotChartFieldType::AxisValues,
+            PivotChartFieldType::DataFields,
+        ] {
+            assert_eq!(options.visibility(field_type), Some(true));
+        }
+    }
+
+    #[test]
+    fn authored_pivot_chart_with_unknown_table_fails_save() {
+        use crate::xlsx::{ChartAnchor, WorksheetChart};
+
+        let mut workbook = workbook_with_pivot_table();
+        {
+            let worksheet = workbook.worksheet_mut(0).unwrap();
+            let chart = WorksheetChart::bar_chart(
+                "Dangling",
+                "Sheet1!$A$2:$A$3",
+                "Sheet1!$C$2:$C$3",
+                ChartAnchor::new(1, 10, 7, 24),
+            )
+            .unwrap();
+            // Adding the chart succeeds; the binding is validated at save time.
+            worksheet.add_pivot_chart(chart, "NoSuchTable").unwrap();
+        }
+        let path = temp_xlsx_path("dangling");
+        assert!(workbook.save(&path).is_err());
+        std::fs::remove_file(&path).ok();
+
+        // An empty pivot table name is rejected immediately.
+        let mut workbook = workbook_with_pivot_table();
+        let worksheet = workbook.worksheet_mut(0).unwrap();
+        let chart = WorksheetChart::bar_chart(
+            "Empty",
+            "Sheet1!$A$2:$A$3",
+            "Sheet1!$C$2:$C$3",
+            ChartAnchor::new(1, 10, 7, 24),
+        )
+        .unwrap();
+        assert!(worksheet.add_pivot_chart(chart, "").is_err());
     }
 }

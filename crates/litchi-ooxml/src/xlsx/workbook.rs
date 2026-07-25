@@ -2159,6 +2159,22 @@ impl Workbook {
             temp_wb_part.relate_to("metadata.xml", rt::SHEET_METADATA);
         }
 
+        // Authored pivot tables as (name, hosting sheet name) pairs, used to
+        // validate authored pivot-chart bindings in the chart loop below.
+        let authored_pivot_tables: Vec<(String, String)> = data
+            .pivot_tables
+            .iter()
+            .map(|pivot| {
+                (
+                    pivot.name.clone(),
+                    data.worksheets
+                        .get(pivot.dest_sheet_index)
+                        .map(|worksheet| worksheet.name().to_string())
+                        .unwrap_or_default(),
+                )
+            })
+            .collect();
+
         // Update worksheet parts and create relationships
         // IMPORTANT: Create relationships for ALL worksheets, not just modified ones
         for (index, ws) in data.worksheets.iter().enumerate() {
@@ -2357,6 +2373,29 @@ impl Workbook {
                         )
                         .into());
                     }
+
+                    // Validate authored pivot-chart bindings against the
+                    // workbook's pivot tables and normalize the pivot-source
+                    // name to its sheet-qualified form, so saved packages
+                    // are valid by construction.
+                    let normalized_pivot_chart;
+                    let chart_model = if chart.chart.pivot_source.is_some() {
+                        let mut normalized = chart.chart.clone();
+                        let pivot_source = normalized
+                            .pivot_source
+                            .as_mut()
+                            .expect("pivot source presence checked above");
+                        pivot_source.name =
+                            crate::xlsx::pivot_chart::resolve_authored_pivot_source_name(
+                                &pivot_source.name,
+                                ws.name(),
+                                &authored_pivot_tables,
+                            )?;
+                        normalized_pivot_chart = normalized;
+                        &normalized_pivot_chart
+                    } else {
+                        &chart.chart
+                    };
 
                     let mut chart_part =
                         BlobPart::new(chart_uri.clone(), ct::DML_CHART.to_string(), Vec::new());
@@ -2669,7 +2708,7 @@ impl Workbook {
                     }
 
                     let chart_xml = crate::xlsx::chart::generate_chart_xml_with_external_data_id(
-                        &chart.chart,
+                        chart_model,
                         external_data_relationship_id.as_deref(),
                         user_shapes_relationship_id.as_deref(),
                     )

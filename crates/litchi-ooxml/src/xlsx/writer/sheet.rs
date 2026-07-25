@@ -16,7 +16,9 @@ use crate::xlsx::sheet_protection::{
 };
 use crate::xlsx::table::Table;
 use crate::xlsx::views::{SheetPane, SheetSelection, SheetView};
-use crate::xlsx::writer::shape::XlsxShapeSpec;
+use crate::xlsx::writer::shape::{
+    ShapeEmitter, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
+};
 /// Writer module for creating and modifying Excel worksheets.
 use litchi_core::sheet::{CellValue, Result as SheetResult};
 use litchi_core::{id::generate_guid_braced, xml::escape::escape_xml};
@@ -417,6 +419,10 @@ pub struct MutableWorksheet {
     images: Vec<Image>,
     /// DrawingML shapes and text boxes authored for the worksheet
     shapes: Vec<XlsxShapeSpec>,
+    /// DrawingML shape groups authored for the worksheet
+    groups: Vec<XlsxGroupSpec>,
+    /// DrawingML connection shapes authored for the worksheet
+    connections: Vec<XlsxConnectionShapeSpec>,
     /// Row outline levels (row -> level)
     row_outline_levels: HashMap<u32, u8>,
     /// Column outline levels (col -> level)
@@ -469,6 +475,8 @@ impl MutableWorksheet {
             conditional_formats: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
+            groups: Vec::new(),
+            connections: Vec::new(),
             row_outline_levels: HashMap::new(),
             column_outline_levels: HashMap::new(),
             rich_text_cells: HashMap::new(),
@@ -728,6 +736,33 @@ impl MutableWorksheet {
     pub fn add_chart(&mut self, chart: WorksheetChart) {
         self.charts.push(chart);
         self.modified = true;
+    }
+
+    /// Add a pivot chart bound to a pivot table by name.
+    ///
+    /// The chart (built with the `WorksheetChart` constructors) is converted
+    /// into a pivot chart: its pivot source is set to `pivot_table_name` and
+    /// every series without an extension list receives the default
+    /// all-visible drop-zone options. The name is validated against the
+    /// workbook's pivot tables and normalized to its sheet-qualified form at
+    /// save time, so the saved package is valid by construction.
+    ///
+    /// # Arguments
+    ///
+    /// * `chart` - The WorksheetChart to add with its positioning
+    /// * `pivot_table_name` - Name of the pivot table the chart binds to,
+    ///   optionally sheet-qualified (for example `Sheet1!PivotTable1`)
+    pub fn add_pivot_chart(
+        &mut self,
+        chart: WorksheetChart,
+        pivot_table_name: &str,
+    ) -> SheetResult<()> {
+        if pivot_table_name.is_empty() {
+            return Err("pivot table name cannot be empty".into());
+        }
+        self.charts.push(chart.into_pivot_chart(pivot_table_name));
+        self.modified = true;
+        Ok(())
     }
 
     /// Get the charts in this worksheet.
@@ -1491,11 +1526,81 @@ impl MutableWorksheet {
         Ok(self.shapes.remove(index))
     }
 
+    /// Total number of authored top-level drawing objects (shapes, groups,
+    /// and connection shapes), used to enforce the per-worksheet limit.
+    fn drawing_object_count(&self) -> usize {
+        self.shapes.len() + self.groups.len() + self.connections.len()
+    }
+
+    /// Add a shape group (`xdr:grpSp`) to the worksheet's drawing part.
+    ///
+    /// Group children may be text boxes, plain shapes, nested groups, and
+    /// connection shapes; anchors of children are ignored inside the group.
+    pub fn add_group(&mut self, group: XlsxGroupSpec) -> SheetResult<()> {
+        group.validate(self.drawing_object_count())?;
+        self.groups.push(group);
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Get all authored shape groups in the worksheet.
+    pub fn groups(&self) -> &[XlsxGroupSpec] {
+        &self.groups
+    }
+
+    /// Remove the authored group at `index`, returning it.
+    pub fn remove_group(&mut self, index: usize) -> SheetResult<XlsxGroupSpec> {
+        if index >= self.groups.len() {
+            return Err(format!(
+                "group index {index} out of bounds ({} groups)",
+                self.groups.len()
+            )
+            .into());
+        }
+        self.modified = true;
+        Ok(self.groups.remove(index))
+    }
+
+    /// Add a connection shape (`xdr:cxnSp`) to the worksheet's drawing part.
+    ///
+    /// The start/end sites reference other authored shapes by name; the
+    /// references are resolved to drawing object IDs when the drawing XML is
+    /// generated, and unknown names fail serialization.
+    pub fn add_connection(&mut self, connection: XlsxConnectionShapeSpec) -> SheetResult<()> {
+        connection.validate(self.drawing_object_count())?;
+        self.connections.push(connection);
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Get all authored connection shapes in the worksheet.
+    pub fn connections(&self) -> &[XlsxConnectionShapeSpec] {
+        &self.connections
+    }
+
+    /// Remove the authored connection shape at `index`, returning it.
+    pub fn remove_connection(&mut self, index: usize) -> SheetResult<XlsxConnectionShapeSpec> {
+        if index >= self.connections.len() {
+            return Err(format!(
+                "connection index {index} out of bounds ({} connections)",
+                self.connections.len()
+            )
+            .into());
+        }
+        self.modified = true;
+        Ok(self.connections.remove(index))
+    }
+
     /// Generate drawing XML for images and charts.
     ///
     /// This generates the xl/drawings/drawing{N}.xml file content.
     pub fn generate_drawing_xml(&self) -> SheetResult<Option<String>> {
-        if self.images.is_empty() && self.charts.is_empty() && self.shapes.is_empty() {
+        if self.images.is_empty()
+            && self.charts.is_empty()
+            && self.shapes.is_empty()
+            && self.groups.is_empty()
+            && self.connections.is_empty()
+        {
             return Ok(None);
         }
         for chart in &self.charts {
@@ -1641,17 +1746,27 @@ impl MutableWorksheet {
             xml.push_str("<xdr:clientData/></xdr:twoCellAnchor>");
         }
 
-        // Add authored shapes after pictures and charts; they consume no
-        // drawing-part relationships, so the positional rId scheme for images
-        // and charts is unaffected. Object IDs continue the same sequence.
+        // Add authored shapes, groups, and connectors after pictures and
+        // charts; they consume no drawing-part relationships, so the
+        // positional rId scheme for images and charts is unaffected. Object
+        // IDs continue the same sequence, allocated by the emitter, which
+        // also resolves connection-site name references.
         let shape_id_offset = (self.images.len() + self.charts.len()) as u32;
-        for (idx, shape) in self.shapes.iter().enumerate() {
-            crate::xlsx::writer::shape::write_shape_anchor_xml(
-                &mut xml,
-                shape,
-                shape_id_offset + idx as u32 + 1,
-            )
-            .map_err(|e| format!("XML write error: {e}"))?;
+        let mut emitter = ShapeEmitter::new(shape_id_offset + 1);
+        for shape in &self.shapes {
+            emitter
+                .write_anchored_shape(&mut xml, shape)
+                .map_err(|e| format!("XML write error: {e}"))?;
+        }
+        for group in &self.groups {
+            emitter
+                .write_anchored_group(&mut xml, group)
+                .map_err(|e| format!("XML write error: {e}"))?;
+        }
+        for connection in &self.connections {
+            emitter
+                .write_anchored_connection(&mut xml, connection)
+                .map_err(|e| format!("XML write error: {e}"))?;
         }
 
         xml.push_str("</xdr:wsDr>");
