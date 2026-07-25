@@ -4,8 +4,8 @@ use std::env;
 use std::path::Path;
 
 use litchi_iwa::charts::{
-    ChartData, ChartKind, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesSymbol,
-    ChartSeriesSymbolFill, ChartSeriesSymbolShape, ChartSeriesSymbolSize,
+    ChartData, ChartKind, ChartSeriesConnectionLine, ChartSeriesStroke, ChartSeriesStrokePattern,
+    ChartSeriesSymbol, ChartSeriesSymbolFill, ChartSeriesSymbolShape, ChartSeriesSymbolSize,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
@@ -51,6 +51,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )),
         None,
     ];
+    let connection_lines = [
+        ChartSeriesConnectionLine::Straight,
+        ChartSeriesConnectionLine::Curved,
+    ];
 
     let mut numbers = NumbersDocumentBuilder::new()
         .sheet_name("Symbol CRUD")
@@ -74,6 +78,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         chart.drawable_object_id,
         &outlines,
     )?;
+    numbers.set_sheet_chart_series_connection_lines(
+        sheet_id,
+        chart.drawable_object_id,
+        &connection_lines,
+    )?;
     assert_eq!(
         numbers.sheet_chart_series_symbols(sheet_id, chart.drawable_object_id)?,
         symbols
@@ -85,6 +94,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         numbers.sheet_chart_series_symbol_outlines(sheet_id, chart.drawable_object_id)?,
         outlines
+    );
+    assert_eq!(
+        numbers.sheet_chart_series_connection_lines(sheet_id, chart.drawable_object_id)?,
+        connection_lines
     );
     numbers.save(output.join("series-symbol.numbers"))?;
 
@@ -104,6 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     pages.set_body_chart_series_symbols(chart.drawable_object_id, &symbols)?;
     pages.set_body_chart_series_symbol_fills(chart.drawable_object_id, &fills)?;
     pages.set_body_chart_series_symbol_outlines(chart.drawable_object_id, &outlines)?;
+    pages.set_body_chart_series_connection_lines(chart.drawable_object_id, &connection_lines)?;
     assert_eq!(
         pages.body_chart_series_symbols(chart.drawable_object_id)?,
         symbols
@@ -115,6 +129,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         pages.body_chart_series_symbol_outlines(chart.drawable_object_id)?,
         outlines
+    );
+    assert_eq!(
+        pages.body_chart_series_connection_lines(chart.drawable_object_id)?,
+        connection_lines
     );
     pages.save(output.join("series-symbol.pages"))?;
 
@@ -135,6 +153,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     keynote.set_slide_chart_series_symbols(0, chart.drawable_object_id, &symbols)?;
     keynote.set_slide_chart_series_symbol_fills(0, chart.drawable_object_id, &fills)?;
     keynote.set_slide_chart_series_symbol_outlines(0, chart.drawable_object_id, &outlines)?;
+    keynote.set_slide_chart_series_connection_lines(
+        0,
+        chart.drawable_object_id,
+        &connection_lines,
+    )?;
     assert_eq!(
         keynote.slide_chart_series_symbols(0, chart.drawable_object_id)?,
         symbols
@@ -146,6 +169,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         keynote.slide_chart_series_symbol_outlines(0, chart.drawable_object_id)?,
         outlines
+    );
+    assert_eq!(
+        keynote.slide_chart_series_connection_lines(0, chart.drawable_object_id)?,
+        connection_lines
     );
     keynote.save(output.join("series-symbol.key"))?;
 
