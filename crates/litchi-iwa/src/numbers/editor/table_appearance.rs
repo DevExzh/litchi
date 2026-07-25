@@ -56,7 +56,10 @@ mod tests {
             row_sizing: TableRowSizing::FitCellContents,
             gridlines: TableGridlines {
                 body_horizontal: TableGridlineVisibility::Hidden,
-                body_vertical: TableGridlineVisibility::Visible,
+                header_columns_horizontal: TableGridlineVisibility::Visible,
+                body_vertical: TableGridlineVisibility::Hidden,
+                header_rows_vertical: TableGridlineVisibility::Visible,
+                footer_rows_vertical: TableGridlineVisibility::Hidden,
             },
         };
 

@@ -89,13 +89,19 @@ impl TableGridlineVisibility {
     }
 }
 
-/// Body-gridline visibility for a native iWork table.
+/// Gridline visibility for each native iWork table region.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct TableGridlines {
     /// Horizontal lines between body rows, excluding header-column lines.
     pub body_horizontal: TableGridlineVisibility,
+    /// Horizontal lines between rows inside the header-column region.
+    pub header_columns_horizontal: TableGridlineVisibility,
     /// Vertical lines between body columns, excluding header-row and footer lines.
     pub body_vertical: TableGridlineVisibility,
+    /// Vertical lines between columns inside the header-row region.
+    pub header_rows_vertical: TableGridlineVisibility,
+    /// Vertical lines between columns inside the footer-row region.
+    pub footer_rows_vertical: TableGridlineVisibility,
 }
 
 /// Effective appearance settings backed by a native table-style inheritance chain.
@@ -105,7 +111,7 @@ pub struct TableAppearance {
     pub row_banding: TableRowBanding,
     /// Automatic row-height behavior.
     pub row_sizing: TableRowSizing,
-    /// Horizontal and vertical body-gridline visibility.
+    /// Horizontal and vertical gridline visibility by table region.
     pub gridlines: TableGridlines,
 }
 
@@ -263,7 +269,10 @@ fn inherited_table_appearance(
     let mut banded_rows = None;
     let mut auto_resize = None;
     let mut horizontal_gridlines = None;
+    let mut header_column_gridlines = None;
     let mut vertical_gridlines = None;
+    let mut header_row_gridlines = None;
+    let mut footer_row_gridlines = None;
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {
         let Some(identifier) = style_id else {
             return Ok(TableAppearance {
@@ -273,8 +282,17 @@ fn inherited_table_appearance(
                     body_horizontal: TableGridlineVisibility::from_native(
                         horizontal_gridlines.unwrap_or(true),
                     ),
+                    header_columns_horizontal: TableGridlineVisibility::from_native(
+                        header_column_gridlines.unwrap_or(true),
+                    ),
                     body_vertical: TableGridlineVisibility::from_native(
                         vertical_gridlines.unwrap_or(true),
+                    ),
+                    header_rows_vertical: TableGridlineVisibility::from_native(
+                        header_row_gridlines.unwrap_or(true),
+                    ),
+                    footer_rows_vertical: TableGridlineVisibility::from_native(
+                        footer_row_gridlines.unwrap_or(true),
                     ),
                 },
             });
@@ -288,24 +306,43 @@ fn inherited_table_appearance(
         banded_rows = banded_rows.or(overrides.banded_rows);
         auto_resize = auto_resize.or(overrides.auto_resize);
         horizontal_gridlines = horizontal_gridlines.or(overrides.horizontal_body_gridlines);
+        header_column_gridlines =
+            header_column_gridlines.or(overrides.horizontal_header_column_gridlines);
         vertical_gridlines = vertical_gridlines.or(overrides.vertical_body_gridlines);
+        header_row_gridlines = header_row_gridlines.or(overrides.vertical_header_row_gridlines);
+        footer_row_gridlines = footer_row_gridlines.or(overrides.vertical_footer_row_gridlines);
         if let (
             Some(banded_rows),
             Some(auto_resize),
             Some(horizontal_gridlines),
+            Some(header_column_gridlines),
             Some(vertical_gridlines),
+            Some(header_row_gridlines),
+            Some(footer_row_gridlines),
         ) = (
             banded_rows,
             auto_resize,
             horizontal_gridlines,
+            header_column_gridlines,
             vertical_gridlines,
+            header_row_gridlines,
+            footer_row_gridlines,
         ) {
             return Ok(TableAppearance {
                 row_banding: TableRowBanding::from_native(banded_rows),
                 row_sizing: TableRowSizing::from_native(auto_resize),
                 gridlines: TableGridlines {
                     body_horizontal: TableGridlineVisibility::from_native(horizontal_gridlines),
+                    header_columns_horizontal: TableGridlineVisibility::from_native(
+                        header_column_gridlines,
+                    ),
                     body_vertical: TableGridlineVisibility::from_native(vertical_gridlines),
+                    header_rows_vertical: TableGridlineVisibility::from_native(
+                        header_row_gridlines,
+                    ),
+                    footer_rows_vertical: TableGridlineVisibility::from_native(
+                        footer_row_gridlines,
+                    ),
                 },
             });
         }
@@ -362,12 +399,15 @@ fn table_style_variation(
             stylesheet: Some(reference(stylesheet_id)),
             ..Default::default()
         },
-        override_count: Some(4),
+        override_count: Some(7),
         table_properties: Some(tst::TableStylePropertiesArchive {
             banded_rows: Some(appearance.row_banding.native()),
             auto_resize: Some(appearance.row_sizing.native()),
             h_strokes_visible: Some(appearance.gridlines.body_horizontal.native()),
             v_strokes_visible: Some(appearance.gridlines.body_vertical.native()),
+            table_hc_divider_visible: Some(appearance.gridlines.header_columns_horizontal.native()),
+            table_hr_divider_visible: Some(appearance.gridlines.header_rows_vertical.native()),
+            table_footer_divider_visible: Some(appearance.gridlines.footer_rows_vertical.native()),
             ..Default::default()
         }),
     }

@@ -8,13 +8,22 @@ const BANDED_ROWS_FIELD: u32 = 1;
 const AUTO_RESIZE_FIELD: u32 = 22;
 const VERTICAL_BODY_GRIDLINES_FIELD: u32 = 33;
 const HORIZONTAL_BODY_GRIDLINES_FIELD: u32 = 34;
+const LEGACY_VERTICAL_HEADER_ROW_GRIDLINES_FIELD: u32 = 35;
+const LEGACY_HORIZONTAL_HEADER_COLUMN_GRIDLINES_FIELD: u32 = 36;
+const LEGACY_VERTICAL_FOOTER_ROW_GRIDLINES_FIELD: u32 = 37;
+const HORIZONTAL_HEADER_COLUMN_GRIDLINES_FIELD: u32 = 42;
+const VERTICAL_HEADER_ROW_GRIDLINES_FIELD: u32 = 43;
+const VERTICAL_FOOTER_ROW_GRIDLINES_FIELD: u32 = 44;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct TableAppearanceOverrides {
     pub(super) banded_rows: Option<bool>,
     pub(super) auto_resize: Option<bool>,
     pub(super) horizontal_body_gridlines: Option<bool>,
+    pub(super) horizontal_header_column_gridlines: Option<bool>,
     pub(super) vertical_body_gridlines: Option<bool>,
+    pub(super) vertical_header_row_gridlines: Option<bool>,
+    pub(super) vertical_footer_row_gridlines: Option<bool>,
 }
 
 pub(super) fn table_appearance_overrides(data: &[u8]) -> Result<TableAppearanceOverrides> {
@@ -45,11 +54,41 @@ pub(super) fn table_appearance_overrides(data: &[u8]) -> Result<TableAppearanceO
             HORIZONTAL_BODY_GRIDLINES_FIELD,
             "horizontal body gridlines",
         )?,
+        horizontal_header_column_gridlines: strict_optional_bool(
+            properties,
+            HORIZONTAL_HEADER_COLUMN_GRIDLINES_FIELD,
+            "horizontal header-column gridlines",
+        )?
+        .or(strict_optional_bool(
+            properties,
+            LEGACY_HORIZONTAL_HEADER_COLUMN_GRIDLINES_FIELD,
+            "legacy horizontal header-column gridlines",
+        )?),
         vertical_body_gridlines: strict_optional_bool(
             properties,
             VERTICAL_BODY_GRIDLINES_FIELD,
             "vertical body gridlines",
         )?,
+        vertical_header_row_gridlines: strict_optional_bool(
+            properties,
+            VERTICAL_HEADER_ROW_GRIDLINES_FIELD,
+            "vertical header-row gridlines",
+        )?
+        .or(strict_optional_bool(
+            properties,
+            LEGACY_VERTICAL_HEADER_ROW_GRIDLINES_FIELD,
+            "legacy vertical header-row gridlines",
+        )?),
+        vertical_footer_row_gridlines: strict_optional_bool(
+            properties,
+            VERTICAL_FOOTER_ROW_GRIDLINES_FIELD,
+            "vertical footer-row gridlines",
+        )?
+        .or(strict_optional_bool(
+            properties,
+            LEGACY_VERTICAL_FOOTER_ROW_GRIDLINES_FIELD,
+            "legacy vertical footer-row gridlines",
+        )?),
     })
 }
 
@@ -102,7 +141,13 @@ mod tests {
                 banded_rows: Some(true),
                 auto_resize: Some(false),
                 h_strokes_visible: Some(false),
-                v_strokes_visible: Some(true),
+                hc_separator_visible: Some(false),
+                v_strokes_visible: Some(false),
+                hr_separator_visible: Some(false),
+                footer_separator_visible: Some(true),
+                table_hc_divider_visible: Some(true),
+                table_hr_divider_visible: Some(true),
+                table_footer_divider_visible: Some(false),
                 ..Default::default()
             }),
             ..Default::default()
@@ -114,9 +159,27 @@ mod tests {
                 banded_rows: Some(true),
                 auto_resize: Some(false),
                 horizontal_body_gridlines: Some(false),
-                vertical_body_gridlines: Some(true),
+                horizontal_header_column_gridlines: Some(true),
+                vertical_body_gridlines: Some(false),
+                vertical_header_row_gridlines: Some(true),
+                vertical_footer_row_gridlines: Some(false),
             }
         );
+
+        let legacy_style = tst::TableStyleArchive {
+            table_properties: Some(tst::TableStylePropertiesArchive {
+                hc_separator_visible: Some(true),
+                hr_separator_visible: Some(false),
+                footer_separator_visible: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let legacy = table_appearance_overrides(&legacy_style).unwrap();
+        assert_eq!(legacy.horizontal_header_column_gridlines, Some(true));
+        assert_eq!(legacy.vertical_header_row_gridlines, Some(false));
+        assert_eq!(legacy.vertical_footer_row_gridlines, Some(true));
 
         let mut duplicate_properties = style;
         duplicate_properties.extend_from_slice(&[0x5a, 0x00]);

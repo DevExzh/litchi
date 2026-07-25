@@ -2,9 +2,15 @@
 
 use std::path::PathBuf;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::keynote::{
+    KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
+};
+use litchi_iwa::numbers::{
+    NumbersDocumentBuilder, NumbersEditor, NumbersTableHeaderCount, NumbersTableHeaderSettings,
+};
+use litchi_iwa::pages::{
+    PagesDocumentBuilder, PagesEditor, PagesTableHeaderCount, PagesTableHeaderSettings,
+};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_appearance::{
     TableAppearance, TableGridlineVisibility, TableGridlines, TableRowBanding, TableRowSizing,
@@ -15,7 +21,10 @@ const APPEARANCE: TableAppearance = TableAppearance {
     row_sizing: TableRowSizing::FitCellContents,
     gridlines: TableGridlines {
         body_horizontal: TableGridlineVisibility::Hidden,
-        body_vertical: TableGridlineVisibility::Visible,
+        header_columns_horizontal: TableGridlineVisibility::Visible,
+        body_vertical: TableGridlineVisibility::Hidden,
+        header_rows_vertical: TableGridlineVisibility::Visible,
+        footer_rows_vertical: TableGridlineVisibility::Hidden,
     },
 };
 
@@ -33,6 +42,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_dimensions(6, 3)
         .build()?;
     let numbers_table = numbers.tables()?.remove(0);
+    numbers.set_table_header_settings(
+        numbers_table.object_id,
+        NumbersTableHeaderSettings {
+            header_rows: Some(NumbersTableHeaderCount::ONE),
+            header_columns: Some(NumbersTableHeaderCount::ONE),
+            footer_rows: Some(NumbersTableHeaderCount::ONE),
+            ..Default::default()
+        },
+    )?;
     numbers.set_table_appearance(numbers_table.object_id, APPEARANCE)?;
     numbers.save(&numbers_path)?;
     assert_eq!(
@@ -46,6 +64,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .body_table("Appearance", 6, 3)
         .build()?;
     let pages_table = pages.tables()?.remove(0);
+    pages.set_table_header_settings(
+        pages_table.model_object_id,
+        PagesTableHeaderSettings {
+            header_rows: Some(PagesTableHeaderCount::ONE),
+            header_columns: Some(PagesTableHeaderCount::ONE),
+            footer_rows: Some(PagesTableHeaderCount::ONE),
+            ..Default::default()
+        },
+    )?;
     pages.set_body_table_appearance(pages_table.model_object_id, APPEARANCE)?;
     pages.save(&pages_path)?;
     assert_eq!(
@@ -66,6 +93,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         DrawableSize {
             width: 1_280.0,
             height: 600.0,
+        },
+    )?;
+    keynote.set_slide_table_header_settings(
+        0,
+        keynote_table.model_object_id,
+        KeynoteTableHeaderSettings {
+            header_rows: Some(KeynoteTableHeaderCount::ONE),
+            header_columns: Some(KeynoteTableHeaderCount::ONE),
+            footer_rows: Some(KeynoteTableHeaderCount::ONE),
+            ..Default::default()
         },
     )?;
     keynote.set_slide_table_appearance(0, keynote_table.model_object_id, APPEARANCE)?;
