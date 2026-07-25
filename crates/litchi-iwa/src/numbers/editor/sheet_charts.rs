@@ -19,6 +19,7 @@ mod border_stroke;
 mod caption;
 mod category_labels;
 mod donut_inner_radius;
+mod font;
 mod gaps;
 mod graph;
 mod hidden_data;

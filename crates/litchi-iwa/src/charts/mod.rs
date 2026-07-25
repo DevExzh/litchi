@@ -27,6 +27,7 @@ pub(crate) mod category_labels;
 mod data;
 mod direction;
 pub(crate) mod donut_inner_radius;
+pub(crate) mod font;
 pub(crate) mod gaps;
 pub(crate) mod hidden_data;
 mod kind;
@@ -74,6 +75,7 @@ pub use category_labels::{
 pub use data::ChartData;
 pub use direction::ChartSeriesDirection;
 pub use donut_inner_radius::ChartDonutInnerRadius;
+pub use font::ChartFont;
 pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};

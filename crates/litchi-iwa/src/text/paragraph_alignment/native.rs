@@ -81,18 +81,18 @@ const EXACT_LINE_SPACING_MODE: i32 = 2;
 const MAXIMUM_LINE_SPACING_MODE: i32 = 3;
 const BETWEEN_LINE_SPACING_MODE: i32 = 4;
 
-pub(super) struct ParagraphStyleLocation {
-    pub(super) archive_name: String,
-    pub(super) message: RawMessage,
-    pub(super) style: tswp::ParagraphStyleArchive,
+pub(crate) struct ParagraphStyleLocation {
+    pub(crate) archive_name: String,
+    pub(crate) message: RawMessage,
+    pub(crate) style: tswp::ParagraphStyleArchive,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub(super) struct ParagraphStyleOverrides {
-    pub(super) bold: Option<bool>,
-    pub(super) italic: Option<bool>,
+pub(crate) struct ParagraphStyleOverrides {
+    pub(crate) bold: Option<bool>,
+    pub(crate) italic: Option<bool>,
     pub(super) point_size: Option<TextPointSize>,
-    pub(super) font: Option<TextFont>,
+    pub(crate) font: Option<TextFont>,
     pub(super) font_color: Option<RgbaColor>,
     pub(super) capitalization: Option<TextCapitalization>,
     pub(super) script: Option<TextScript>,
@@ -146,9 +146,33 @@ impl ParagraphStyleOverrides {
     pub(super) fn is_empty(&self) -> bool {
         self.count() == 0
     }
+
+    pub(crate) fn is_chart_font_only(&self) -> bool {
+        (self.font.is_some() || self.bold.is_some() || self.italic.is_some())
+            && self.point_size.is_none()
+            && self.font_color.is_none()
+            && self.capitalization.is_none()
+            && self.script.is_none()
+            && self.baseline_shift.is_none()
+            && self.character_spacing.is_none()
+            && self.ligatures.is_none()
+            && self.outline.is_none()
+            && self.shadow.is_none()
+            && self.background.is_none()
+            && self.underline.is_none()
+            && self.strikethrough.is_none()
+            && self.alignment.is_none()
+            && self.line_spacing.is_none()
+            && self.space_before.is_none()
+            && self.space_after.is_none()
+            && self.first_line_indent.is_none()
+            && self.left_indent.is_none()
+            && self.right_indent.is_none()
+            && self.tab_stops.is_none()
+    }
 }
 
-pub(super) fn locate_style(
+pub(crate) fn locate_style(
     package: &IWorkPackage,
     style_id: u64,
 ) -> Result<ParagraphStyleLocation> {
@@ -186,14 +210,14 @@ pub(super) fn inherited_alignment(
     inheritance::alignment(package, first_style_id)
 }
 
-pub(super) fn inherited_text_style(
+pub(crate) fn inherited_text_style(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextStyle> {
     inheritance::text_style(package, first_style_id)
 }
 
-pub(super) fn inherited_text_font(package: &IWorkPackage, first_style_id: u64) -> Result<TextFont> {
+pub(crate) fn inherited_text_font(package: &IWorkPackage, first_style_id: u64) -> Result<TextFont> {
     inheritance::text_font(package, first_style_id)
 }
 
@@ -295,7 +319,7 @@ pub(super) fn inherited_tab_stops(
     inheritance::tab_stops(package, first_style_id)
 }
 
-pub(super) fn direct_overrides(
+pub(crate) fn direct_overrides(
     style: &tswp::ParagraphStyleArchive,
     raw: &[u8],
 ) -> Result<Option<ParagraphStyleOverrides>> {
@@ -619,7 +643,7 @@ pub(super) fn direct_overrides(
     Ok(exact.then_some(overrides))
 }
 
-pub(super) fn variation_object(
+pub(crate) fn variation_object(
     identifier: u64,
     parent_style_id: u64,
     stylesheet_id: u64,
@@ -1093,7 +1117,7 @@ pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool
     Ok(storage_references == 1)
 }
 
-pub(super) fn parent_style_id(style: &tswp::ParagraphStyleArchive, style_id: u64) -> Result<u64> {
+pub(crate) fn parent_style_id(style: &tswp::ParagraphStyleArchive, style_id: u64) -> Result<u64> {
     style
         .super_
         .parent
@@ -1106,7 +1130,7 @@ pub(super) fn parent_style_id(style: &tswp::ParagraphStyleArchive, style_id: u64
         })
 }
 
-pub(super) fn stylesheet_id(style: &tswp::ParagraphStyleArchive, style_id: u64) -> Result<u64> {
+pub(crate) fn stylesheet_id(style: &tswp::ParagraphStyleArchive, style_id: u64) -> Result<u64> {
     style
         .super_
         .stylesheet

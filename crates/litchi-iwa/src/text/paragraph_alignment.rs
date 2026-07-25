@@ -1,6 +1,6 @@
 //! Composable native paragraph-style CRUD shared by Pages, Numbers, and Keynote.
 
-mod native;
+pub(crate) mod native;
 mod storage;
 
 use std::borrow::Cow;

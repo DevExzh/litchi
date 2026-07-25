@@ -30,7 +30,7 @@ mod number_attachment;
 mod number_attachment_object;
 mod number_attachment_storage;
 mod number_attachment_types;
-mod paragraph_alignment;
+pub(crate) mod paragraph_alignment;
 mod paragraph_list;
 mod paragraph_tabs;
 mod position;
@@ -38,7 +38,7 @@ mod smart_field_object;
 pub mod storage;
 mod storage_wire;
 pub mod style;
-mod style_registry;
+pub(crate) mod style_registry;
 mod text_comment;
 mod text_comment_types;
 

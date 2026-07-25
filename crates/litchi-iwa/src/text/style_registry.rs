@@ -28,7 +28,7 @@ pub(super) fn object_archive_name(package: &IWorkPackage, identifier: u64) -> Re
     found.ok_or_else(|| Error::InvalidFormat(format!("iWork object {identifier} is missing")))
 }
 
-pub(super) fn unregister_owner_reference_if_unused(
+pub(crate) fn unregister_owner_reference_if_unused(
     package: &mut IWorkPackage,
     owner_archive_name: &str,
     style_archive_name: &str,
@@ -59,7 +59,7 @@ pub(super) fn unregister_owner_reference_if_unused(
     remove_component_external_reference(package, owner_component, style_component, style_id)
 }
 
-pub(super) fn register_private_style(
+pub(crate) fn register_private_style(
     package: &mut IWorkPackage,
     owner_archive_name: &str,
     style_archive_name: &str,
@@ -77,7 +77,7 @@ pub(super) fn register_private_style(
     Ok(())
 }
 
-pub(super) fn register_style_reference(
+pub(crate) fn register_style_reference(
     package: &mut IWorkPackage,
     owner_archive_name: &str,
     style_archive_name: &str,
@@ -151,7 +151,7 @@ pub(super) fn insert_private_style(
     })
 }
 
-pub(super) fn unregister_private_style(
+pub(crate) fn unregister_private_style(
     package: &mut IWorkPackage,
     owner_archive_name: &str,
     style_archive_name: &str,
