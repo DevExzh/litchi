@@ -313,11 +313,11 @@ fn collect_source_values(
     Ok(())
 }
 
-fn is_bibliography_root(namespace: &str, local_name: &str) -> bool {
+pub(crate) fn is_bibliography_root(namespace: &str, local_name: &str) -> bool {
     is_bibliography_namespace(namespace) && matches!(local_name, "Sources" | "Source")
 }
 
-fn is_bibliography_node(node: &XmlNode) -> bool {
+pub(crate) fn is_bibliography_node(node: &XmlNode) -> bool {
     node.namespace
         .as_deref()
         .is_some_and(is_bibliography_namespace)
@@ -340,22 +340,22 @@ fn unqualified_attribute<'a>(node: &'a XmlNode, local_name: &str) -> Option<&'a 
 }
 
 #[derive(Debug)]
-struct XmlNode {
-    namespace: Option<String>,
-    local_name: String,
-    attributes: Vec<XmlAttribute>,
-    text: String,
-    children: Vec<Self>,
+pub(crate) struct XmlNode {
+    pub(crate) namespace: Option<String>,
+    pub(crate) local_name: String,
+    pub(crate) attributes: Vec<XmlAttribute>,
+    pub(crate) text: String,
+    pub(crate) children: Vec<Self>,
 }
 
 #[derive(Debug)]
-struct XmlAttribute {
-    namespace: Option<String>,
-    local_name: String,
-    value: String,
+pub(crate) struct XmlAttribute {
+    pub(crate) namespace: Option<String>,
+    pub(crate) local_name: String,
+    pub(crate) value: String,
 }
 
-fn parse_xml_tree(xml: &[u8]) -> Result<XmlNode> {
+pub(crate) fn parse_xml_tree(xml: &[u8]) -> Result<XmlNode> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut stack = Vec::new();
@@ -504,7 +504,7 @@ fn utf8_name(value: &[u8]) -> Result<String> {
         .map_err(|error| OoxmlError::Xml(error.to_string()))
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
+pub(crate) fn invalid(message: impl Into<String>) -> OoxmlError {
     OoxmlError::InvalidFormat(message.into())
 }
 

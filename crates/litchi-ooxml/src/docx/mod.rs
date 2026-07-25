@@ -51,6 +51,7 @@
 
 pub mod alt_chunk;
 pub mod bibliography;
+pub mod bibliography_writer;
 pub mod bookmark;
 pub mod chart;
 pub mod comment;
@@ -100,6 +101,9 @@ pub use bibliography::{
     BibliographySource, BibliographySourceStore, BibliographySourceValue,
     LEGACY_WORD_BIBLIOGRAPHY_NAMESPACE, OOXML_BIBLIOGRAPHY_NAMESPACE,
     STRICT_OOXML_BIBLIOGRAPHY_NAMESPACE,
+};
+pub use bibliography_writer::{
+    BibliographyPerson, BibliographySourceBuilder, BibliographySourceKind,
 };
 pub use bookmark::Bookmark;
 pub use chart::{

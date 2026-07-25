@@ -1282,6 +1282,105 @@ impl Package {
         Ok(true)
     }
 
+    /// Locate the document's bibliography source store, if one exists.
+    ///
+    /// Returns the Custom XML item GUID and the store payload. Word keeps a
+    /// single current source list; when several stores exist the first in
+    /// package order is used and the rest are left untouched.
+    fn bibliography_store_item(&self) -> Result<Option<(String, Vec<u8>)>> {
+        let stores = self.bibliography_source_stores()?;
+        let Some(store) = stores.first() else {
+            return Ok(None);
+        };
+        let item_id = store
+            .data_store_item_id()
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(
+                    "bibliography source store has no Custom XML item GUID".into(),
+                )
+            })?
+            .to_owned();
+        let item = self
+            .find_custom_xml_data_store(&item_id)?
+            .ok_or_else(|| {
+                OoxmlError::PartNotFound(format!(
+                    "bibliography source store item '{item_id}'"
+                ))
+            })?;
+        Ok(Some((item_id, item.xml)))
+    }
+
+    /// Add a typed bibliography source to the document's source store.
+    ///
+    /// When no store exists, one is created as a Custom XML data store with
+    /// the bibliography namespace registered. Otherwise the source is
+    /// appended in place, preserving untouched entries, style metadata, and
+    /// the store's relationship/content-type graph. Duplicate tags are
+    /// rejected. Returns the Custom XML item GUID of the store.
+    pub fn add_bibliography_source(
+        &mut self,
+        source: crate::docx::bibliography_writer::BibliographySourceBuilder,
+    ) -> Result<String> {
+        if let Some((item_id, xml)) = self.bibliography_store_item()? {
+            let updated = crate::docx::bibliography_writer::add_source_xml(&xml, &source)?;
+            self.update_custom_xml_data_store(&item_id, updated.into_bytes())?;
+            // Re-validate the mutated store through the read side.
+            self.bibliography_source_stores()?;
+            Ok(item_id)
+        } else {
+            let xml = crate::docx::bibliography_writer::new_store_xml(&[source])?;
+            let item = self.add_custom_xml_data_store(NewCustomXmlDataStore {
+                xml: xml.into_bytes(),
+                content_type: "application/xml".to_string(),
+                item_id: crate::docx::bibliography_writer::DEFAULT_STORE_ITEM_ID.to_string(),
+                schema_references: vec![
+                    crate::docx::OOXML_BIBLIOGRAPHY_NAMESPACE.to_string(),
+                ],
+                conformance: crate::custom_xml_data::CustomXmlConformance::Transitional,
+            })?;
+            Ok(item
+                .properties
+                .map(|properties| properties.item_id)
+                .unwrap_or_else(|| {
+                    crate::docx::bibliography_writer::DEFAULT_STORE_ITEM_ID.to_string()
+                }))
+        }
+    }
+
+    /// Remove the bibliography source with the given tag from the source
+    /// store. Returns whether a source was removed.
+    pub fn remove_bibliography_source(&mut self, tag: &str) -> Result<bool> {
+        let Some((item_id, xml)) = self.bibliography_store_item()? else {
+            return Ok(false);
+        };
+        let (updated, removed) = crate::docx::bibliography_writer::remove_source_xml(&xml, tag)?;
+        if removed {
+            self.update_custom_xml_data_store(&item_id, updated.into_bytes())?;
+            // Re-validate the mutated store through the read side.
+            self.bibliography_source_stores()?;
+        }
+        Ok(removed)
+    }
+
+    /// Replace the bibliography source with the given tag, preserving entry
+    /// order and all untouched entries. Fails when the tag does not exist.
+    pub fn replace_bibliography_source(
+        &mut self,
+        tag: &str,
+        source: crate::docx::bibliography_writer::BibliographySourceBuilder,
+    ) -> Result<()> {
+        let Some((item_id, xml)) = self.bibliography_store_item()? else {
+            return Err(OoxmlError::PartNotFound(
+                "no bibliography source store exists".to_string(),
+            ));
+        };
+        let updated = crate::docx::bibliography_writer::replace_source_xml(&xml, tag, &source)?;
+        self.update_custom_xml_data_store(&item_id, updated.into_bytes())?;
+        // Re-validate the mutated store through the read side.
+        self.bibliography_source_stores()?;
+        Ok(())
+    }
+
     /// Reorder main-document data-store relationships by item GUID.
     pub fn reorder_custom_xml_data_stores(&mut self, ordered_item_ids: &[String]) -> Result<()> {
         let source_part_name = self.opc.main_document_part()?.partname().clone();
