@@ -37,6 +37,8 @@ enum DocumentElement {
     Table(Table),
     /// A text list element
     List(List),
+    /// A standalone drawing frame (image or text box) at body level
+    Frame(crate::elements::element::Element),
 }
 
 /// A mutable ODT document that supports in-place modifications.
@@ -76,6 +78,10 @@ pub struct MutableDocument {
     source_package: Option<OwnedPackage>,
     /// Authoritative original content XML used by byte-preserving inline mutations.
     content_xml: Option<String>,
+    /// Authored picture payloads written into the package on save.
+    pending_images: Vec<crate::odt::frame::PendingImage>,
+    /// Monotonic counter for authored frame names (1-based).
+    next_frame_number: usize,
 }
 
 impl MutableDocument {
@@ -132,6 +138,8 @@ impl MutableDocument {
             styles_xml,
             source_package,
             content_xml: Some(content_xml),
+            pending_images: Vec::new(),
+            next_frame_number: 1,
         })
     }
 
@@ -152,6 +160,8 @@ impl MutableDocument {
             styles_xml: None,
             source_package: None,
             content_xml: None,
+            pending_images: Vec::new(),
+            next_frame_number: 1,
         }
     }
 
@@ -2409,6 +2419,114 @@ impl MutableDocument {
         }
     }
 
+    /// Insert an image frame as a new paragraph at a specific index.
+    ///
+    /// The payload is sniffed (PNG, JPEG, and GIF are accepted), stored
+    /// verbatim under `Pictures/` in the package, and referenced from a
+    /// `draw:frame`/`draw:image` element with the given geometry and anchor.
+    /// Returns the allocated package path of the picture part.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odf::{MutableDocument, OdfFrameAnchor, OdfLength};
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let mut doc = MutableDocument::new();
+    /// let png = b"\x89PNG\r\n\x1a\n".as_slice();
+    /// let path = doc.insert_image(
+    ///     0,
+    ///     png,
+    ///     &OdfLength::centimeters(10.0),
+    ///     &OdfLength::centimeters(4.0),
+    ///     OdfFrameAnchor::AsChar,
+    /// )?;
+    /// assert!(path.starts_with("Pictures/"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn insert_image(
+        &mut self,
+        index: usize,
+        image: &[u8],
+        width: &crate::odt::OdfLength,
+        height: &crate::odt::OdfLength,
+        anchor: crate::odt::OdfFrameAnchor,
+    ) -> Result<String> {
+        use crate::odt::frame;
+        let format = frame::validate_image_payload(image)?;
+        let path = frame::allocate_picture_path(format.extension(), |candidate| {
+            // Picture numbering is global: a stem taken by any supported
+            // extension blocks the whole index.
+            let taken = |path: &str| {
+                self.pending_images.iter().any(|pending| pending.path == path)
+                    || self
+                        .source_package
+                        .as_ref()
+                        .is_some_and(|package| package.has_file(path).unwrap_or(false))
+            };
+            if taken(candidate) {
+                return true;
+            }
+            let stem = candidate.trim_end_matches(format.extension());
+            ["png", "jpg", "gif"]
+                .iter()
+                .any(|extension| taken(&format!("{stem}{extension}")))
+        })?;
+        let name = format!("Frame {}", self.next_frame_number);
+        let frame_element = frame::image_frame_element(&name, width, height, anchor, &path)?;
+        let mut paragraph_element = crate::elements::element::Element::new("text:p");
+        paragraph_element.add_child(frame_element);
+        let paragraph = Paragraph::from_element(paragraph_element)?;
+
+        if index > self.elements.len() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "Index {} out of bounds (length: {})",
+                index,
+                self.elements.len()
+            )));
+        }
+        self.invalidate_content_xml();
+        self.elements
+            .insert(index, DocumentElement::Paragraph(paragraph));
+        self.pending_images.push(frame::PendingImage {
+            path: path.clone(),
+            bytes: image.to_vec(),
+        });
+        self.next_frame_number += 1;
+        Ok(path)
+    }
+
+    /// Insert a plain-text text-box frame as a new paragraph at a specific index.
+    ///
+    /// The box is a `draw:frame` wrapping `draw:text-box`; newlines in `text`
+    /// become separate paragraphs in the box story. Returns the frame name.
+    pub fn insert_text_box(
+        &mut self,
+        index: usize,
+        text: &str,
+        width: &crate::odt::OdfLength,
+        height: &crate::odt::OdfLength,
+        anchor: crate::odt::OdfFrameAnchor,
+    ) -> Result<String> {
+        use crate::odt::frame;
+        let name = format!("Text Box {}", self.next_frame_number);
+        let frame_element = frame::text_box_frame_element(&name, width, height, anchor, text)?;
+
+        if index > self.elements.len() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "Index {} out of bounds (length: {})",
+                index,
+                self.elements.len()
+            )));
+        }
+        self.invalidate_content_xml();
+        self.elements
+            .insert(index, DocumentElement::Frame(frame_element));
+        self.next_frame_number += 1;
+        Ok(name)
+    }
+
     /// Remove a paragraph at a specific index.
     ///
     /// # Arguments
@@ -2628,6 +2746,7 @@ impl MutableDocument {
                 DocumentElement::Heading(h) => h.text().map(|t| t.len()).unwrap_or(0),
                 DocumentElement::Table(_) => 256,
                 DocumentElement::List(_) => 256,
+                DocumentElement::Frame(_) => 256,
             })
             .sum::<usize>();
         let mut body = String::with_capacity(estimated);
@@ -2650,6 +2769,9 @@ impl MutableDocument {
                 DocumentElement::List(list) => {
                     let elem: crate::elements::element::Element = list.clone().into();
                     body.push_str(&elem.to_xml_string());
+                },
+                DocumentElement::Frame(frame) => {
+                    body.push_str(&frame.to_xml_string());
                 },
             }
         }
@@ -2791,6 +2913,11 @@ impl MutableDocument {
         // Add meta.xml (regenerated with current metadata)
         let meta_xml = self.generate_meta_xml();
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
+
+        // Add authored picture payloads.
+        for pending in &self.pending_images {
+            writer.add_file(&pending.path, &pending.bytes)?;
+        }
 
         if let Some(package) = &self.source_package {
             writer.copy_auxiliary_files_from(package)?;
@@ -3282,5 +3409,116 @@ mod tests {
         assert_eq!(pages[0].region(HeaderFooterKind::Header).unwrap().xml, rich);
         let styles = String::from_utf8(round_trip.get_file("styles.xml").unwrap()).unwrap();
         assert!(styles.contains(layout));
+    }
+
+    #[test]
+    fn insert_image_round_trips_through_package_and_read_api() {
+        use crate::odt::{OdfFrameAnchor, OdfLength};
+
+        let mut doc = MutableDocument::new();
+        doc.add_paragraph("Before image").unwrap();
+        let png = minimal_png();
+        let path = doc
+            .insert_image(
+                1,
+                &png,
+                &OdfLength::centimeters(10.0),
+                &OdfLength::centimeters(4.0),
+                OdfFrameAnchor::AsChar,
+            )
+            .unwrap();
+        assert_eq!(path, "Pictures/image1.png");
+        doc.add_paragraph("After image").unwrap();
+        assert!(doc.insert_image(99, &png, &OdfLength::points(1.0), &OdfLength::points(1.0), OdfFrameAnchor::Page).is_err());
+        assert!(doc.insert_image(0, b"not-an-image", &OdfLength::points(1.0), &OdfLength::points(1.0), OdfFrameAnchor::Page).is_err());
+
+        let round_trip = Document::from_bytes(doc.to_bytes().unwrap()).unwrap();
+        // Text content survives around the frame.
+        let text = round_trip.text().unwrap();
+        assert!(text.contains("Before image"));
+        assert!(text.contains("After image"));
+        // The frame is discoverable with identity, geometry, and anchor.
+        let images = round_trip.images().unwrap();
+        assert_eq!(images.len(), 1);
+        let frame = images[0].frame.as_ref().unwrap();
+        assert_eq!(frame.width.as_deref(), Some("10cm"));
+        assert_eq!(frame.height.as_deref(), Some("4cm"));
+        assert_eq!(frame.anchor_type.as_deref(), Some("as-char"));
+        assert_eq!(images[0].package_path(), Some("Pictures/image1.png"));
+        // Payload is stored verbatim.
+        assert_eq!(round_trip.image_bytes(&images[0]).unwrap(), Some(png));
+    }
+
+    #[test]
+    fn insert_image_coexists_with_existing_media() {
+        use crate::odt::{OdfFrameAnchor, OdfLength};
+
+        let mut doc = MutableDocument::new();
+        let first = doc
+            .insert_image(0, &minimal_png(), &OdfLength::points(8.0), &OdfLength::points(8.0), OdfFrameAnchor::Page)
+            .unwrap();
+        let second = doc
+            .insert_image(1, &minimal_jpeg(), &OdfLength::points(8.0), &OdfLength::points(8.0), OdfFrameAnchor::Page)
+            .unwrap();
+        assert_eq!(first, "Pictures/image1.png");
+        assert_eq!(second, "Pictures/image2.jpg");
+
+        let round_trip = Document::from_bytes(doc.to_bytes().unwrap()).unwrap();
+        let images = round_trip.images().unwrap();
+        assert_eq!(images.len(), 2);
+        let mut paths: Vec<_> = images.iter().filter_map(|image| image.package_path()).collect();
+        paths.sort_unstable();
+        assert_eq!(paths, ["Pictures/image1.png", "Pictures/image2.jpg"]);
+    }
+
+    #[test]
+    fn insert_text_box_round_trips_story_text() {
+        use crate::odt::{OdfFrameAnchor, OdfLength};
+
+        let mut doc = MutableDocument::new();
+        doc.add_paragraph("Intro").unwrap();
+        let name = doc
+            .insert_text_box(
+                1,
+                "boxed <text> & more\nsecond line",
+                &OdfLength::inches(2.0),
+                &OdfLength::inches(1.0),
+                OdfFrameAnchor::Paragraph,
+            )
+            .unwrap();
+        assert_eq!(name, "Text Box 1");
+
+        let round_trip = Document::from_bytes(doc.to_bytes().unwrap()).unwrap();
+        let content = String::from_utf8(round_trip.get_file("content.xml").unwrap()).unwrap();
+        assert!(content.contains("draw:text-box"));
+        assert!(content.contains("boxed &lt;text&gt; &amp; more"));
+        assert!(content.contains("second line"));
+        assert!(content.contains("text:anchor-type=\"paragraph\""));
+        assert!(round_trip.text().unwrap().contains("Intro"));
+    }
+
+    fn minimal_png() -> Vec<u8> {
+        // 1x1 transparent PNG.
+        let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+        bytes.extend_from_slice(&[0, 0, 0, 13]);
+        bytes.extend_from_slice(b"IHDR");
+        bytes.extend_from_slice(&[0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]);
+        bytes.extend_from_slice(&[0x1f, 0x15, 0xc4, 0x89]);
+        bytes.extend_from_slice(&[0, 0, 0, 11]);
+        bytes.extend_from_slice(b"IDAT");
+        bytes.extend_from_slice(&[0x78, 0x9c, 0x62, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d]);
+        bytes.extend_from_slice(&[0x0a, 0x2d, 0xb4]);
+        bytes.extend_from_slice(&[0, 0, 0, 0]);
+        bytes.extend_from_slice(b"IEND");
+        bytes.extend_from_slice(&[0xae, 0x42, 0x60, 0x82]);
+        bytes
+    }
+
+    fn minimal_jpeg() -> Vec<u8> {
+        let mut bytes = b"\xff\xd8\xff\xe0".to_vec();
+        bytes.extend_from_slice(&[0, 16]);
+        bytes.extend_from_slice(b"JFIF\0");
+        bytes.extend_from_slice(&[1, 1, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xd9]);
+        bytes
     }
 }

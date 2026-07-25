@@ -62,6 +62,7 @@ mod document;
 mod dynamic_text;
 pub(crate) mod header_footer;
 mod header_footer_content;
+mod frame;
 mod index;
 pub(crate) use index::expanded_attributes;
 mod index_mark;
@@ -105,6 +106,7 @@ pub use index_mark::{
     TextAlphabeticalMarkMetadata, TextIndexMark, TextIndexMarkFragments, TextIndexMarkKind,
     insert_text_index_mark_xml, remove_text_index_mark_xml, replace_text_index_mark_xml,
 };
+pub use frame::{OdfFrameAnchor, OdfImageFormat, OdfLength};
 pub use mutable::MutableDocument;
 pub use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
