@@ -304,14 +304,56 @@ struct HeaderStoryData {
     plcfhdd: Vec<u8>,
     fields: Vec<u8>,
     char_count: u32,
-    /// Story-relative anchor CPs of header text boxes, paired with their
-    /// index into `DocWriter::header_shapes` (in insertion order).
-    shape_anchor_cps: Vec<(u32, u32)>,
+    /// Story-relative anchor CPs of header floating items with their kind
+    /// (in story order, which is CP-ascending by construction).
+    shape_anchor_cps: Vec<(u32, FloatingAnchorKind)>,
 }
 
 /// PlcfHdd slot of the odd page header, which Word uses as the default
 /// header when the document does not use facing pages.
 const HEADER_SLOT_ODD: usize = 7;
+/// PlcfHdd slot of the even page header.
+const HEADER_SLOT_EVEN: usize = 6;
+/// PlcfHdd slot of the first page header.
+const HEADER_SLOT_FIRST: usize = 10;
+
+/// Which header a floating text box or picture is anchored in.
+///
+/// The writer emits the section properties each kind needs automatically:
+/// even headers enable DOP `fFacingPages`, first-page headers enable SEP
+/// `fTitlePage`, because appending the anchor creates the corresponding
+/// header story.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocHeaderKind {
+    /// Odd page header; Word's default header.
+    Odd,
+    /// Even page header (requires facing pages, enabled automatically).
+    Even,
+    /// First page header (requires a different first page, enabled
+    /// automatically).
+    FirstPage,
+}
+
+impl DocHeaderKind {
+    /// The PlcfHdd slot holding this header kind's story.
+    fn slot(self) -> usize {
+        match self {
+            Self::Odd => HEADER_SLOT_ODD,
+            Self::Even => HEADER_SLOT_EVEN,
+            Self::FirstPage => HEADER_SLOT_FIRST,
+        }
+    }
+}
+
+/// A floating-item anchor paragraph appended to a header's paragraphs.
+struct HeaderAnchor {
+    /// PlcfHdd slot of the header holding the anchor.
+    slot: usize,
+    /// Paragraph index within that slot's paragraph list.
+    paragraph_index: usize,
+    /// Which floating item the anchor belongs to.
+    kind: FloatingAnchorKind,
+}
 
 struct CommentStoryData {
     owners: Vec<u8>,
@@ -848,11 +890,13 @@ pub struct DocWriter {
     pictures: Vec<WriterPicture>,
     /// Primitive drawing shapes embedded via [`DocWriter::insert_floating_shape`]
     shapes: Vec<WriterShape>,
-    /// Text boxes anchored in the header story (odd header), in insertion order.
+    /// Text boxes anchored in the header story, in insertion order.
     header_shapes: Vec<WriterShape>,
-    /// Paragraph indices within `header_odd` holding the text box anchors,
-    /// in insertion order (one per `header_shapes` entry).
-    header_shape_anchors: Vec<usize>,
+    /// Pictures anchored in the header story, in insertion order.
+    header_pictures: Vec<WriterPicture>,
+    /// Anchor paragraphs appended to header paragraph lists, in insertion
+    /// order (one per header floating item).
+    header_anchors: Vec<HeaderAnchor>,
     /// Next shape id to allocate (shared by pictures and drawing shapes).
     next_shape_id: u32,
     /// Password-to-open settings. The password is wiped when replaced, cleared, or dropped.
@@ -960,7 +1004,8 @@ impl DocWriter {
             pictures: Vec::new(),
             shapes: Vec::new(),
             header_shapes: Vec::new(),
-            header_shape_anchors: Vec::new(),
+            header_pictures: Vec::new(),
+            header_anchors: Vec::new(),
             next_shape_id: super::images::FIRST_PICTURE_SHAPE_ID,
             encryption: None,
         }
@@ -1252,35 +1297,95 @@ impl DocWriter {
         self.insert_shape_run(shape, position, Some(text.into()))
     }
 
-    /// Insert a text box anchored in the header story (the odd page header,
-    /// which Word also uses as the default header).
+    /// Insert a text box anchored in the given header.
     ///
-    /// The anchor is a single 0x0008 paragraph appended to the odd header's
+    /// The anchor is a single 0x0008 paragraph appended to that header's
     /// paragraphs (created when absent); position and wrapping work like
     /// [`Self::insert_floating_text_box`], but the shape position is recorded
     /// in the Header Document's PlcfSpaHdr, the text goes to the header
     /// textbox story (counted in ccpHdrTxbx, linked through PlcfHdrtxbxTxt),
     /// and the shape joins the Header Document drawing of the fcDggInfo
-    /// OfficeArtContent. Header shapes use their own shape-id cluster
+    /// OfficeArtContent. Header floating items use their own shape-id cluster
     /// starting at 2049, so they never collide with main-story shapes.
     ///
     /// Set or replace header paragraphs BEFORE calling this method: the
-    /// anchor lives in paragraphs this method appends, and replacing the odd
+    /// anchor lives in paragraphs this method appends, and replacing the
     /// header's paragraph list afterwards drops the anchor.
     pub fn insert_header_text_box(
         &mut self,
+        kind: DocHeaderKind,
         shape: super::shapes::DocDrawingShape,
         position: super::images::FloatingPosition,
         text: impl Into<String>,
     ) -> Result<(), DocWriteError> {
-        let shape_index = u32::try_from(self.header_shapes.len()).map_err(|_| {
+        let shape_id = self.allocate_header_shape_id()?;
+        let item_index = u32::try_from(self.header_shapes.len()).map_err(|_| {
             DocWriteError::InvalidData(
                 "DOC header text box count exceeds the 32-bit range".to_string(),
             )
         })?;
-        let shape_id = super::images::HEADER_FIRST_SHAPE_ID + shape_index;
-        let anchor_index = self.header_odd.as_ref().map_or(0, Vec::len);
-        let anchor_paragraph = HeaderFooterParagraph::from_runs(
+        self.header_shapes.push(WriterShape {
+            shape,
+            shape_id,
+            position,
+            text: Some(text.into()),
+        });
+        self.append_header_anchor(kind, FloatingAnchorKind::Shape(item_index))
+    }
+
+    /// Insert a floating picture anchored in the given header (the classic
+    /// letterhead logo / watermark pattern).
+    ///
+    /// Anchoring works like [`Self::insert_header_text_box`]: the picture is
+    /// written as a PICF block with an embedded BLIP in the Data stream
+    /// (bytes stored verbatim), referenced by sprmCPicLocation on the 0x0008
+    /// anchor character, positioned through the PlcfSpaHdr, and rendered as a
+    /// picture-frame shape in the Header Document drawing.
+    pub fn insert_header_picture(
+        &mut self,
+        kind: DocHeaderKind,
+        picture: super::images::DocPicture,
+        position: super::images::FloatingPosition,
+    ) -> Result<(), DocWriteError> {
+        let shape_id = self.allocate_header_shape_id()?;
+        let item_index = u32::try_from(self.header_pictures.len()).map_err(|_| {
+            DocWriteError::InvalidData(
+                "DOC header picture count exceeds the 32-bit range".to_string(),
+            )
+        })?;
+        self.header_pictures.push(WriterPicture {
+            picture,
+            shape_id,
+            floating: Some(position),
+        });
+        self.append_header_anchor(kind, FloatingAnchorKind::Picture(item_index))
+    }
+
+    /// Allocate the next header-drawing shape id from the header cluster.
+    fn allocate_header_shape_id(&mut self) -> Result<u32, DocWriteError> {
+        let count = self.header_shapes.len() + self.header_pictures.len();
+        let index = u32::try_from(count).map_err(|_| {
+            DocWriteError::InvalidData(
+                "DOC header floating item count exceeds the 32-bit range".to_string(),
+            )
+        })?;
+        Ok(super::images::HEADER_FIRST_SHAPE_ID + index)
+    }
+
+    /// Append a 0x0008 anchor paragraph to the given header and record it.
+    fn append_header_anchor(
+        &mut self,
+        kind: DocHeaderKind,
+        anchor_kind: FloatingAnchorKind,
+    ) -> Result<(), DocWriteError> {
+        let paragraphs = match kind {
+            DocHeaderKind::Odd => &mut self.header_odd,
+            DocHeaderKind::Even => &mut self.header_even,
+            DocHeaderKind::FirstPage => &mut self.header_first,
+        };
+        let paragraphs = paragraphs.get_or_insert_with(Vec::new);
+        let paragraph_index = paragraphs.len();
+        paragraphs.push(HeaderFooterParagraph::from_runs(
             vec![(
                 "\u{0008}".to_string(),
                 CharacterFormatting {
@@ -1289,16 +1394,11 @@ impl DocWriter {
                 },
             )],
             ParagraphFormatting::default(),
-        );
-        self.header_odd
-            .get_or_insert_with(Vec::new)
-            .push(anchor_paragraph);
-        self.header_shape_anchors.push(anchor_index);
-        self.header_shapes.push(WriterShape {
-            shape,
-            shape_id,
-            position,
-            text: Some(text.into()),
+        ));
+        self.header_anchors.push(HeaderAnchor {
+            slot: kind.slot(),
+            paragraph_index,
+            kind: anchor_kind,
         });
         Ok(())
     }
@@ -2559,6 +2659,7 @@ impl DocWriter {
         pieces: &mut Vec<Piece>,
         current_cp_total: &mut u32,
         font_builder: &mut FontTableBuilder,
+        header_pic_offsets: &[u32],
     ) -> Result<Option<HeaderStoryData>, DocWriteError> {
         // Short-circuit if nothing set
         if self.header_even.is_none()
@@ -2607,7 +2708,7 @@ impl DocWriter {
         let mut header_cp: u32 = 0;
         let mut cp_starts: [u32; 12] = [0; 12];
         let mut field_char_cps = Vec::new();
-        let mut shape_anchor_cps: Vec<(u32, u32)> = Vec::new();
+        let mut shape_anchor_cps: Vec<(u32, FloatingAnchorKind)> = Vec::new();
 
         for i in 0..12 {
             cp_starts[i] = header_cp;
@@ -2617,22 +2718,16 @@ impl DocWriter {
                 let mut story_chars = 0u32;
 
                 for (paragraph_index, paragraph) in paragraphs.iter().enumerate() {
-                    // Odd-header paragraphs appended by insert_header_text_box
-                    // hold 0x0008 text box anchors; record their story CPs.
-                    if i == HEADER_SLOT_ODD
-                        && let Some(ordinal) = self
-                            .header_shape_anchors
-                            .iter()
-                            .position(|&anchor| anchor == paragraph_index)
-                    {
-                        shape_anchor_cps.push((
-                            header_cp + story_chars,
-                            u32::try_from(ordinal).map_err(|_| {
-                                DocWriteError::InvalidData(
-                                    "DOC header text box count exceeds the 32-bit range".to_string(),
-                                )
-                            })?,
-                        ));
+                    // Paragraphs appended by insert_header_text_box /
+                    // insert_header_picture hold 0x0008 anchors; record their
+                    // story CPs and the anchored item kind.
+                    let anchor_kind = self
+                        .header_anchors
+                        .iter()
+                        .find(|anchor| anchor.slot == i && anchor.paragraph_index == paragraph_index)
+                        .map(|anchor| anchor.kind);
+                    if let Some(kind) = anchor_kind {
+                        shape_anchor_cps.push((header_cp + story_chars, kind));
                     }
                     let fc_para_start = checked_text_fc(text_fc_start, text_stream.len())?;
                     let mut paragraph_chars = 0u32;
@@ -2668,11 +2763,19 @@ impl DocWriter {
                             text_stream.extend_from_slice(&unit.to_le_bytes());
                         }
                         let run_fc_end = checked_text_fc(text_fc_start, text_stream.len())?;
-                        chpx_entries.push((
-                            run_fc_start,
-                            run_fc_end,
-                            build_chpx_grpprl(formatting, font_builder),
-                        ));
+                        // Header picture anchors also carry sprmCPicLocation
+                        // pointing at the picture's Data-stream block.
+                        let mut grpprl = build_chpx_grpprl(formatting, font_builder);
+                        if let Some(FloatingAnchorKind::Picture(pic_index)) = anchor_kind {
+                            let pic_offset = header_pic_offsets.get(pic_index as usize).ok_or_else(|| {
+                                DocWriteError::InvalidData(format!(
+                                    "DOC header picture index {pic_index} is out of range"
+                                ))
+                            })?;
+                            grpprl.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
+                            grpprl.extend_from_slice(&pic_offset.to_le_bytes());
+                        }
+                        chpx_entries.push((run_fc_start, run_fc_end, grpprl));
                         last_chpx = Some(chpx_entries.len() - 1);
                         paragraph_chars =
                             paragraph_chars.checked_add(run_chars).ok_or_else(|| {
@@ -3287,6 +3390,17 @@ impl DocWriter {
             &mut font_builder,
         )?;
 
+        // Header pictures: append their OfficeArtWordDrawing blocks to the
+        // Data stream so the header story can point sprmCPicLocation at them.
+        let mut header_pic_offsets: Vec<u32> = Vec::with_capacity(self.header_pictures.len());
+        for entry in &self.header_pictures {
+            let pic_offset = u32::try_from(data_stream.len()).map_err(|_| {
+                DocWriteError::InvalidData("DOC Data stream exceeds 32-bit FC space".to_string())
+            })?;
+            super::images::write_picture_block(&entry.picture, entry.shape_id, &mut data_stream);
+            header_pic_offsets.push(pic_offset);
+        }
+
         // Build header/footer story
         let header_plcfhdd = self.build_header_story(
             text_fc_start,
@@ -3296,6 +3410,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
+            &header_pic_offsets,
         )?;
 
         // Comments follow headers and precede endnotes in the concatenated CP space.
@@ -3379,12 +3494,39 @@ impl DocWriter {
             ));
         }
 
-        // Build header textbox story (after the main textbox story).
-        let header_texts: Vec<&str> = self
-            .header_shapes
-            .iter()
-            .map(|entry| entry.text.as_deref().expect("header shapes are text boxes"))
-            .collect();
+        // Build header textbox story (after the main textbox story). Entry
+        // order follows the header-story anchors so the FTXBXS indices match
+        // the ClientTextbox TXIDs emitted into the header drawing below.
+        let header_textbox_ids: Vec<u32> = header_plcfhdd
+            .as_ref()
+            .map(|header| {
+                header
+                    .shape_anchor_cps
+                    .iter()
+                    .filter_map(|&(_, kind)| match kind {
+                        FloatingAnchorKind::Shape(index) => {
+                            Some(self.header_shapes[index as usize].shape_id)
+                        },
+                        FloatingAnchorKind::Picture(_) => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let header_texts: Vec<&str> = header_plcfhdd
+            .as_ref()
+            .map(|header| {
+                header
+                    .shape_anchor_cps
+                    .iter()
+                    .filter_map(|&(_, kind)| match kind {
+                        FloatingAnchorKind::Shape(index) => self.header_shapes[index as usize]
+                            .text
+                            .as_deref(),
+                        FloatingAnchorKind::Picture(_) => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let mut hdr_txbx_start_cps: Vec<u32> = Vec::new();
         let mut ccp_hdr_txbx = 0u32;
         if !header_texts.is_empty() {
@@ -3713,7 +3855,7 @@ impl DocWriter {
         // PlcfSpaHdr), the textbox story PLCs, and the drawing group
         // (fcDggInfo OfficeArtContent) that anchors the shapes to the
         // document's drawing layer.
-        let header_anchor_cps: &[(u32, u32)] = header_plcfhdd
+        let header_anchor_cps: &[(u32, FloatingAnchorKind)] = header_plcfhdd
             .as_ref()
             .map(|header| header.shape_anchor_cps.as_slice())
             .unwrap_or(&[]);
@@ -3753,17 +3895,37 @@ impl DocWriter {
             let header_floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> =
                 header_anchor_cps
                     .iter()
-                    .map(|&(anchor_cp, shape_index)| {
-                        let entry = &self.header_shapes[shape_index as usize];
-                        super::images::FloatingShapeInfo {
-                            anchor_cp,
-                            shape_id: entry.shape_id,
-                            content: super::images::FloatingShapeContent::Primitive(&entry.shape),
-                            width_twips: entry.shape.width_twips(),
-                            height_twips: entry.shape.height_twips(),
-                            position: &entry.position,
-                            text: entry.text.as_deref(),
-                        }
+                    .map(|&(anchor_cp, kind)| match kind {
+                        FloatingAnchorKind::Shape(shape_index) => {
+                            let entry = &self.header_shapes[shape_index as usize];
+                            super::images::FloatingShapeInfo {
+                                anchor_cp,
+                                shape_id: entry.shape_id,
+                                content: super::images::FloatingShapeContent::Primitive(
+                                    &entry.shape,
+                                ),
+                                width_twips: entry.shape.width_twips(),
+                                height_twips: entry.shape.height_twips(),
+                                position: &entry.position,
+                                text: entry.text.as_deref(),
+                            }
+                        },
+                        FloatingAnchorKind::Picture(picture_index) => {
+                            let entry = &self.header_pictures[picture_index as usize];
+                            super::images::FloatingShapeInfo {
+                                anchor_cp,
+                                shape_id: entry.shape_id,
+                                content: super::images::FloatingShapeContent::Picture(
+                                    &entry.picture,
+                                ),
+                                width_twips: entry.picture.width_twips(),
+                                height_twips: entry.picture.height_twips(),
+                                position: entry.floating.as_ref().expect(
+                                    "header pictures always have a floating position",
+                                ),
+                                text: None,
+                            }
+                        },
                     })
                     .collect();
             if !txbx_start_cps.is_empty() {
@@ -3779,10 +3941,8 @@ impl DocWriter {
                 table_offset = table_stream.len() as u32;
             }
             if !hdr_txbx_start_cps.is_empty() {
-                let hdr_shape_ids: Vec<u32> =
-                    self.header_shapes.iter().map(|entry| entry.shape_id).collect();
                 let plcf_hdr_txbx = super::shapes::build_plcf_txbx_txt(
-                    &hdr_shape_ids,
+                    &header_textbox_ids,
                     &hdr_txbx_start_cps,
                     ccp_hdr_txbx,
                 );
@@ -4120,6 +4280,17 @@ impl DocWriter {
             &mut font_builder,
         )?;
 
+        // Header pictures: append their OfficeArtWordDrawing blocks to the
+        // Data stream so the header story can point sprmCPicLocation at them.
+        let mut header_pic_offsets: Vec<u32> = Vec::with_capacity(self.header_pictures.len());
+        for entry in &self.header_pictures {
+            let pic_offset = u32::try_from(data_stream.len()).map_err(|_| {
+                DocWriteError::InvalidData("DOC Data stream exceeds 32-bit FC space".to_string())
+            })?;
+            super::images::write_picture_block(&entry.picture, entry.shape_id, &mut data_stream);
+            header_pic_offsets.push(pic_offset);
+        }
+
         let header_plcfhdd = self.build_header_story(
             text_fc_start,
             &mut text_stream,
@@ -4128,6 +4299,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
+            &header_pic_offsets,
         )?;
 
         let comment_story = Self::build_comment_story(
@@ -4209,12 +4381,39 @@ impl DocWriter {
             ));
         }
 
-        // Build header textbox story (after the main textbox story).
-        let header_texts: Vec<&str> = self
-            .header_shapes
-            .iter()
-            .map(|entry| entry.text.as_deref().expect("header shapes are text boxes"))
-            .collect();
+        // Build header textbox story (after the main textbox story). Entry
+        // order follows the header-story anchors so the FTXBXS indices match
+        // the ClientTextbox TXIDs emitted into the header drawing below.
+        let header_textbox_ids: Vec<u32> = header_plcfhdd
+            .as_ref()
+            .map(|header| {
+                header
+                    .shape_anchor_cps
+                    .iter()
+                    .filter_map(|&(_, kind)| match kind {
+                        FloatingAnchorKind::Shape(index) => {
+                            Some(self.header_shapes[index as usize].shape_id)
+                        },
+                        FloatingAnchorKind::Picture(_) => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let header_texts: Vec<&str> = header_plcfhdd
+            .as_ref()
+            .map(|header| {
+                header
+                    .shape_anchor_cps
+                    .iter()
+                    .filter_map(|&(_, kind)| match kind {
+                        FloatingAnchorKind::Shape(index) => self.header_shapes[index as usize]
+                            .text
+                            .as_deref(),
+                        FloatingAnchorKind::Picture(_) => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let mut hdr_txbx_start_cps: Vec<u32> = Vec::new();
         let mut ccp_hdr_txbx = 0u32;
         if !header_texts.is_empty() {
@@ -4523,7 +4722,7 @@ impl DocWriter {
         // PlcfSpaHdr), the textbox story PLCs, and the drawing group
         // (fcDggInfo OfficeArtContent) that anchors the shapes to the
         // document's drawing layer.
-        let header_anchor_cps: &[(u32, u32)] = header_plcfhdd
+        let header_anchor_cps: &[(u32, FloatingAnchorKind)] = header_plcfhdd
             .as_ref()
             .map(|header| header.shape_anchor_cps.as_slice())
             .unwrap_or(&[]);
@@ -4563,17 +4762,37 @@ impl DocWriter {
             let header_floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> =
                 header_anchor_cps
                     .iter()
-                    .map(|&(anchor_cp, shape_index)| {
-                        let entry = &self.header_shapes[shape_index as usize];
-                        super::images::FloatingShapeInfo {
-                            anchor_cp,
-                            shape_id: entry.shape_id,
-                            content: super::images::FloatingShapeContent::Primitive(&entry.shape),
-                            width_twips: entry.shape.width_twips(),
-                            height_twips: entry.shape.height_twips(),
-                            position: &entry.position,
-                            text: entry.text.as_deref(),
-                        }
+                    .map(|&(anchor_cp, kind)| match kind {
+                        FloatingAnchorKind::Shape(shape_index) => {
+                            let entry = &self.header_shapes[shape_index as usize];
+                            super::images::FloatingShapeInfo {
+                                anchor_cp,
+                                shape_id: entry.shape_id,
+                                content: super::images::FloatingShapeContent::Primitive(
+                                    &entry.shape,
+                                ),
+                                width_twips: entry.shape.width_twips(),
+                                height_twips: entry.shape.height_twips(),
+                                position: &entry.position,
+                                text: entry.text.as_deref(),
+                            }
+                        },
+                        FloatingAnchorKind::Picture(picture_index) => {
+                            let entry = &self.header_pictures[picture_index as usize];
+                            super::images::FloatingShapeInfo {
+                                anchor_cp,
+                                shape_id: entry.shape_id,
+                                content: super::images::FloatingShapeContent::Picture(
+                                    &entry.picture,
+                                ),
+                                width_twips: entry.picture.width_twips(),
+                                height_twips: entry.picture.height_twips(),
+                                position: entry.floating.as_ref().expect(
+                                    "header pictures always have a floating position",
+                                ),
+                                text: None,
+                            }
+                        },
                     })
                     .collect();
             if !txbx_start_cps.is_empty() {
@@ -4589,10 +4808,8 @@ impl DocWriter {
                 table_offset = table_stream.len() as u32;
             }
             if !hdr_txbx_start_cps.is_empty() {
-                let hdr_shape_ids: Vec<u32> =
-                    self.header_shapes.iter().map(|entry| entry.shape_id).collect();
                 let plcf_hdr_txbx = super::shapes::build_plcf_txbx_txt(
-                    &hdr_shape_ids,
+                    &header_textbox_ids,
                     &hdr_txbx_start_cps,
                     ccp_hdr_txbx,
                 );
@@ -8013,6 +8230,58 @@ mod tests {
             )
             .unwrap();
         assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
+    }
+}
+
+#[cfg(test)]
+mod header_kind_tests {
+    use super::*;
+
+    #[test]
+    fn header_kinds_map_to_plcfhdd_slots() {
+        assert_eq!(DocHeaderKind::Odd.slot(), HEADER_SLOT_ODD);
+        assert_eq!(DocHeaderKind::Even.slot(), HEADER_SLOT_EVEN);
+        assert_eq!(DocHeaderKind::FirstPage.slot(), HEADER_SLOT_FIRST);
+        // The writer's slot assignment matches the MS-DOC PlcfHdd layout:
+        // even header 6, odd header 7, first-page header 10.
+        assert_eq!((HEADER_SLOT_EVEN, HEADER_SLOT_ODD, HEADER_SLOT_FIRST), (6, 7, 10));
+    }
+
+    #[test]
+    fn header_shape_ids_use_the_header_cluster() {
+        let mut writer = DocWriter::new();
+        writer
+            .insert_header_picture(
+                DocHeaderKind::Odd,
+                crate::doc::writer::images::DocPicture::from_parts(
+                    vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+                    480,
+                    240,
+                )
+                .unwrap(),
+                crate::doc::writer::images::FloatingPosition::new(0, 0),
+            )
+            .unwrap();
+        writer
+            .insert_header_text_box(
+                DocHeaderKind::Even,
+                crate::doc::writer::shapes::DocDrawingShape::new(
+                    crate::doc::writer::shapes::DocShapeKind::Rectangle,
+                    1440,
+                    720,
+                )
+                .unwrap(),
+                crate::doc::writer::images::FloatingPosition::new(0, 0),
+                "box",
+            )
+            .unwrap();
+        // One shared cluster for both kinds, in insertion order.
+        assert_eq!(writer.header_pictures[0].shape_id, 2049);
+        assert_eq!(writer.header_shapes[0].shape_id, 2050);
+        // Anchors landed in the right header paragraph lists.
+        assert_eq!(writer.header_odd.as_ref().unwrap().len(), 1);
+        assert_eq!(writer.header_even.as_ref().unwrap().len(), 1);
+        assert!(writer.header_first.is_none());
     }
 }
 

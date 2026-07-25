@@ -10,7 +10,8 @@ use litchi_ole::doc::parts::headers::HeaderFooterType;
 use litchi_ole::doc::shapes::extract_drawing_shapes;
 use litchi_ole::doc::writer::{DocDrawingShape, DocShapeKind, DocWriter, FloatingPosition};
 use litchi_ole::doc::{
-    HeaderFooterParagraph, Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin,
+    DocHeaderKind, HeaderFooterParagraph, Package, ShapeHorizontalOrigin, ShapeTextWrap,
+    ShapeVerticalOrigin,
 };
 use litchi_ole::escher::EscherShapeType;
 use std::io::Cursor;
@@ -38,6 +39,7 @@ fn write_doc_with_header_text_box() -> Vec<u8> {
     // Header text box (the watermark).
     writer
         .insert_header_text_box(
+            DocHeaderKind::Odd,
             DocDrawingShape::new(DocShapeKind::Rectangle, 4000, 2000)
                 .unwrap()
                 .with_fill(0xEE, 0xEE, 0xFF)

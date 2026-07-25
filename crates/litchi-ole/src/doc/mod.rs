@@ -77,6 +77,7 @@ pub use document::Document;
 pub use encryption::DocEncryptionProfile;
 pub use footnote::{Endnote, Footnote};
 pub use header_footer::HeaderFooter;
+pub use parts::headers::HeaderFooterType;
 pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use package::{DocEncryptionKind, DocError, DocOpenOptions, Package};
@@ -197,8 +198,8 @@ pub use tracked_revision::{
 pub use vba::VbaProjectStorage;
 pub use writer::{
     AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,
-    DocDrawingShape, DocPicture, DocShapeKind, DocStyleDefinition, DocStyleRevision, DocWriteError,
-    DocWriter, DropCap, DropCapType, FloatingPosition,
+    DocDrawingShape, DocHeaderKind, DocPicture, DocShapeKind, DocStyleDefinition, DocStyleRevision,
+    DocWriteError, DocWriter, DropCap, DropCapType, FloatingPosition,
     FontAlignment, FormattingRevision, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
     FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
     FrameVerticalPosition, HeaderFooterParagraph, LegacyAutoNumbering, LegacyBorderPosition,

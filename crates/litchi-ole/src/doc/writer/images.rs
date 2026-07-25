@@ -823,15 +823,21 @@ pub(crate) fn build_dgg_info(
         );
     }
 
-    // OfficeArtBStoreContainer: one FBSE (with embedded BLIP) per picture.
-    // (Only the Main Document drawing can contain pictures.)
+    // OfficeArtBStoreContainer: one FBSE (with embedded BLIP) per picture in
+    // either drawing. Main-drawing pictures are indexed first; the header
+    // drawing's pib indices continue after them.
     let bstore_start = out.len();
-    let picture_count = main_shapes
+    let main_picture_count = main_shapes
         .iter()
         .filter(|shape| matches!(shape.content, FloatingShapeContent::Picture(_)))
         .count();
+    let picture_count = main_picture_count
+        + header_shapes
+            .iter()
+            .filter(|shape| matches!(shape.content, FloatingShapeContent::Picture(_)))
+            .count();
     write_record_header(&mut out, VERSION_CONTAINER, picture_count as u16, RECORD_BSTORE_CONTAINER, 0);
-    for shape in main_shapes {
+    for shape in main_shapes.iter().chain(header_shapes.iter()) {
         if let FloatingShapeContent::Picture(picture) = shape.content {
             write_bse_with_embedded_blip(&mut out, picture, shape.shape_id);
         }
@@ -858,7 +864,7 @@ pub(crate) fn build_dgg_info(
             DGID_HEADER_DOCUMENT as u16,
             HEADER_FIRST_SHAPE_ID,
             header_shapes,
-            OPT_PIB_FIRST_BSE + picture_count as u32,
+            OPT_PIB_FIRST_BSE + main_picture_count as u32,
         );
     }
 

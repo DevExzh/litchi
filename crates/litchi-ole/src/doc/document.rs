@@ -2104,11 +2104,49 @@ impl Document {
         &self.header_shape_anchors
     }
 
+    /// Map a header-story-relative character position to the header it
+    /// belongs to.
+    fn header_kind_at_cp(&self, story_relative_cp: u32) -> Option<super::parts::headers::HeaderFooterType> {
+        let (story_base, _) = self.fib.get_header_range()?;
+        let absolute_cp = story_base.checked_add(story_relative_cp)?;
+        self.headers_table.as_ref().and_then(|table| {
+            table
+                .stories()
+                .iter()
+                .find(|story| {
+                    story.story_type.is_header()
+                        && absolute_cp >= story.start_cp
+                        && absolute_cp < story.end_cp
+                })
+                .map(|story| story.story_type)
+        })
+    }
+
+    /// Get the header type containing a header-story character position.
+    ///
+    /// Floating-shape anchors in the Header Document carry CPs relative to
+    /// the start of the header story (see [`Self::header_shape_positions`]);
+    /// this maps such a CP to the header (odd, even, or first-page) whose
+    /// story range contains it. Returns `None` when the document has no
+    /// matching header story.
+    pub fn header_story_kind_at_cp(
+        &self,
+        cp: u32,
+    ) -> Option<super::parts::headers::HeaderFooterType> {
+        self.header_kind_at_cp(cp)
+    }
+
     /// Resolve text box entries against a textbox story range.
+    ///
+    /// For header-story text boxes, the header kind is resolved through the
+    /// box's shape: its Spa anchor CP lives in the header story (the textbox
+    /// story has its own CP space), and the header owning that CP answers
+    /// the kind.
     fn resolve_text_boxes(
         &self,
         entries: &[super::parts::textbox::TextBoxEntry],
         story_range: Option<(u32, u32)>,
+        in_header_story: bool,
     ) -> Vec<super::parts::textbox::DocTextBox> {
         let Some((story_start, _)) = story_range else {
             return Vec::new();
@@ -2122,9 +2160,18 @@ impl Document {
                 );
                 // The range of each text box ends with a trailing CR.
                 let text = raw.strip_suffix('\r').unwrap_or(raw);
+                let header_kind = if in_header_story {
+                    self.header_shape_anchors
+                        .iter()
+                        .find(|anchor| anchor.spa.shape_id == entry.shape_id)
+                        .and_then(|anchor| self.header_kind_at_cp(anchor.cp))
+                } else {
+                    None
+                };
                 super::parts::textbox::DocTextBox {
                     shape_id: entry.shape_id,
                     text: text.to_string(),
+                    header_kind,
                 }
             })
             .collect()
@@ -2138,18 +2185,21 @@ impl Document {
     /// Paragraphs within a text box are separated by '\r'. Returns an empty
     /// vector when the document has no textbox story.
     pub fn text_boxes(&self) -> Vec<super::parts::textbox::DocTextBox> {
-        self.resolve_text_boxes(&self.textbox_entries, self.fib.get_textbox_range())
+        self.resolve_text_boxes(&self.textbox_entries, self.fib.get_textbox_range(), false)
     }
 
     /// Get the text boxes anchored in the header/footer story.
     ///
     /// Like [`Self::text_boxes`], but for the header textbox story (counted
-    /// by ccpHdrTxbx, linked through PlcfHdrtxbxTxt). Returns an empty vector
-    /// when the document has no header textbox story.
+    /// by ccpHdrTxbx, linked through PlcfHdrtxbxTxt). Each entry's
+    /// `header_kind` reports the header (odd, even, or first-page) the box is
+    /// anchored in. Returns an empty vector when the document has no header
+    /// textbox story.
     pub fn header_text_boxes(&self) -> Vec<super::parts::textbox::DocTextBox> {
         self.resolve_text_boxes(
             &self.header_textbox_entries,
             self.fib.get_header_textbox_range(),
+            true,
         )
     }
 

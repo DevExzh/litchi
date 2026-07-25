@@ -39,6 +39,9 @@ pub struct DocTextBox {
     /// Plain text content. Paragraphs are separated by '\r'; the trailing
     /// paragraph mark that terminates the text in the story is stripped.
     pub text: String,
+    /// Which header the text box is anchored in, for header-story text
+    /// boxes; `None` for main-story text boxes.
+    pub header_kind: Option<super::headers::HeaderFooterType>,
 }
 
 /// Parse a PlcftxbxTxt, returning the real (non-reusable) text box entries
