@@ -9,10 +9,11 @@ use crate::charts::{
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
     ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
     ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
-    ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
-    ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartSeriesTrendline, ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
+    ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
+    ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
+    ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+    ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -2890,6 +2891,105 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
                 0,
                 source.drawable_object_id,
                 ChartSeriesIndex::from_zero_based(2),
+            )
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_series_trendline_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let defaults = vec![ChartSeriesTrendline::None; 2];
+    let customized = vec![
+        ChartSeriesTrendline::Linear,
+        ChartSeriesTrendline::MovingAverage,
+    ];
+
+    assert_eq!(
+        editor
+            .slide_chart_series_trendlines(0, source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_series_trendlines(0, source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    editor
+        .set_slide_chart_series_trendlines(0, source.drawable_object_id, &customized)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_series_trendline(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(1),
+            )
+            .unwrap(),
+        ChartSeriesTrendline::MovingAverage
+    );
+
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    for series in 0..2 {
+        editor
+            .set_slide_chart_series_trendline(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(series),
+                ChartSeriesTrendline::None,
+            )
+            .unwrap();
+    }
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_series_trendlines(0, source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_series_trendlines(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+
+    let before_rejected = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_slide_chart_series_trendlines(0, source.drawable_object_id, &customized[..1],)
+            .is_err()
+    );
+    assert!(
+        reopened
+            .slide_chart_series_trendline(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(2),
+            )
+            .is_err()
+    );
+    assert!(
+        reopened
+            .set_slide_chart_series_trendline(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(0),
+                ChartSeriesTrendline::Unsupported(1),
             )
             .is_err()
     );
