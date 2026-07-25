@@ -236,6 +236,32 @@ impl<R: Read + Seek> Package<R> {
         super::vba::discover_vba_project_storages(&self.ole.list_streams())
     }
 
+    /// Parse all discovered MS-OVBA projects and expose their inert source.
+    ///
+    /// Source is decompressed and decoded according to the project code page,
+    /// but is never compiled, interpreted, or executed. Explicit limits are
+    /// applied before CFB streams are allocated and while compressed containers
+    /// expand.
+    pub fn vba_projects(
+        &mut self,
+        limits: &crate::ovba::VbaLimits,
+    ) -> std::result::Result<Vec<crate::ovba::VbaProject>, crate::ovba::VbaError> {
+        let storages = self.vba_project_storages();
+        let mut projects = Vec::with_capacity(storages.len());
+        for storage in storages {
+            if !storage.is_structurally_complete() {
+                continue;
+            }
+            let path: Vec<&str> = storage
+                .project_root_path()
+                .iter()
+                .map(String::as_str)
+                .collect();
+            projects.push(crate::ovba::VbaProject::open(&mut self.ole, &path, limits)?);
+        }
+        Ok(projects)
+    }
+
     /// Read the legacy Custom XML Data Storage without resolving schema URIs.
     pub fn custom_xml_data_store(
         &mut self,

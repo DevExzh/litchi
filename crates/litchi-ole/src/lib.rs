@@ -10,6 +10,11 @@ pub mod custom_xml_data;
 /// Shared MS-OSHARED smart-tag property-bag structures.
 pub mod smart_tags;
 
+/// Shared bounded MS-OVBA project, module, and compression APIs.
+pub mod ovba {
+    pub use litchi_cfb::ovba::*;
+}
+
 // CFB substrate types re-exported so callers can reach them through the
 // `litchi::ole` namespace as well as `litchi_cfb` directly.
 pub use litchi_cfb::{

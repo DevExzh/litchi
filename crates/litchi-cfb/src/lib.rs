@@ -12,6 +12,7 @@ pub mod consts;
 mod directory_name;
 mod file;
 mod metadata;
+pub mod ovba;
 pub mod writer;
 
 pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};

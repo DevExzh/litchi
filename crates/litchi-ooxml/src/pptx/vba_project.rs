@@ -33,6 +33,15 @@ impl VbaProject {
     pub fn project_part_name(&self) -> &PackURI {
         &self.project_part_name
     }
+
+    /// Parse the `vbaProject.bin` CFB payload as inert MS-OVBA source.
+    pub fn read_project(
+        &self,
+        package: &OpcPackage,
+        limits: &crate::vba::VbaLimits,
+    ) -> std::result::Result<crate::vba::VbaProject, crate::vba::VbaError> {
+        crate::vba::read_project_part(package, &self.project_part_name, limits)
+    }
 }
 
 /// Discover one structurally conforming Presentation VBA-project relationship.

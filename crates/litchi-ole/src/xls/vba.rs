@@ -598,4 +598,24 @@ mod tests {
         assert!(workbook.vba_metadata().has_project_storage());
         assert!(!workbook.vba_metadata().has_project_marker());
     }
+
+    #[test]
+    fn parses_real_xls_vba_project_and_inert_module_source() {
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/poi/test-data/spreadsheet/SimpleMacro.xls");
+        let mut workbook = XlsWorkbook::new(std::fs::File::open(fixture).unwrap()).unwrap();
+        let project = workbook
+            .vba_project(&litchi_cfb::ovba::VbaLimits::default())
+            .unwrap()
+            .unwrap();
+
+        assert!(!project.name().is_empty());
+        assert!(!project.modules().is_empty());
+        assert!(
+            project
+                .modules()
+                .iter()
+                .any(|module| module.source().text().contains("Sub "))
+        );
+    }
 }

@@ -1179,6 +1179,29 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         crate::xls::vba::discover_vba_project_storage(&self.ole_file.list_streams())
     }
 
+    /// Parse the `_VBA_PROJECT_CUR` MS-OVBA project and expose inert source.
+    ///
+    /// The method returns `None` when no structurally complete VBA project is
+    /// present. Source is only decompressed and decoded; it is never compiled,
+    /// interpreted, or executed.
+    pub fn vba_project(
+        &mut self,
+        limits: &crate::ovba::VbaLimits,
+    ) -> std::result::Result<Option<crate::ovba::VbaProject>, crate::ovba::VbaError> {
+        let Some(storage) = self.vba_project_storage() else {
+            return Ok(None);
+        };
+        if !storage.is_structurally_complete() {
+            return Ok(None);
+        }
+        let path: Vec<&str> = storage
+            .root_storage_path()
+            .iter()
+            .map(String::as_str)
+            .collect();
+        crate::ovba::VbaProject::open(&mut self.ole_file, &path, limits).map(Some)
+    }
+
     pub fn environment(&self) -> &crate::xls::environment::XlsWorkbookEnvironment {
         &self.environment
     }

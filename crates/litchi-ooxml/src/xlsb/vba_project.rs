@@ -77,6 +77,18 @@ impl VbaProject {
     pub fn signatures(&self) -> &[VbaProjectSignature] {
         &self.signatures
     }
+
+    /// Parse the `vbaProject.bin` CFB payload as inert MS-OVBA source.
+    ///
+    /// Declared signature payloads remain separate opaque relationship
+    /// metadata and are not treated as trust decisions.
+    pub fn read_project(
+        &self,
+        package: &OpcPackage,
+        limits: &crate::vba::VbaLimits,
+    ) -> std::result::Result<crate::vba::VbaProject, crate::vba::VbaError> {
+        crate::vba::read_project_part(package, &self.project_part_name, limits)
+    }
 }
 
 /// Discover one structurally conforming XLSB VBA-project relationship graph.

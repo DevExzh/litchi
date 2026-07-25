@@ -46,6 +46,19 @@ impl VbaProject {
     pub fn supplemental_data_part_name(&self) -> &PackURI {
         &self.supplemental_data_part_name
     }
+
+    /// Parse the `vbaProject.bin` CFB payload as inert MS-OVBA source.
+    ///
+    /// The relationship graph remains independently inspectable through this
+    /// type. This method only decompresses and decodes source; it never
+    /// compiles, interprets, or executes VBA.
+    pub fn read_project(
+        &self,
+        package: &OpcPackage,
+        limits: &crate::vba::VbaLimits,
+    ) -> std::result::Result<crate::vba::VbaProject, crate::vba::VbaError> {
+        crate::vba::read_project_part(package, &self.project_part_name, limits)
+    }
 }
 
 /// Discover one structurally conforming Word VBA-project relationship graph.
