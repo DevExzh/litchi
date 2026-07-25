@@ -27,6 +27,7 @@ mod rounded_corners;
 mod series_error_bar_auto_fit;
 mod series_error_bars;
 mod series_fill;
+mod series_stroke;
 mod series_trendline;
 mod series_value_label_affixes;
 mod series_value_label_auto_fit;
@@ -624,13 +625,13 @@ mod tests {
         ChartErrorBarCustomValues, ChartErrorBarDirection, ChartErrorBarFixedValue,
         ChartGapPercentage, ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility,
         ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-        ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesTrendline,
-        ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-        ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
-        ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
-        ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
-        ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-        ChartValueAxisSteps,
+        ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
+        ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+        ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+        ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+        ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
+        ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
+        ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -672,6 +673,14 @@ mod tests {
 
     fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
         ShapeStroke::new(
+            RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
+            StrokeWidth::new(width).unwrap(),
+            pattern,
+        )
+    }
+
+    fn chart_series_stroke(pattern: ChartSeriesStrokePattern, width: f32) -> ChartSeriesStroke {
+        ChartSeriesStroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
             StrokeWidth::new(width).unwrap(),
             pattern,
@@ -2854,6 +2863,77 @@ mod tests {
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
             .unwrap();
         assert!(reopened.media_assets().unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_inherited_series_stroke_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let defaults = vec![None, None];
+        assert_eq!(
+            editor
+                .sheet_chart_series_strokes(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            defaults
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_series_strokes(sheet_id, source.drawable_object_id, &defaults)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let first = ChartSeriesIndex::from_zero_based(0);
+        let second = ChartSeriesIndex::from_zero_based(1);
+        let rounded = chart_series_stroke(ChartSeriesStrokePattern::RoundedDash, 3.5);
+        let medium = chart_series_stroke(ChartSeriesStrokePattern::MediumDash, 2.0);
+        editor
+            .set_sheet_chart_series_strokes(
+                sheet_id,
+                source.drawable_object_id,
+                &[Some(rounded), Some(medium)],
+            )
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_series_strokes(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            vec![Some(rounded), Some(medium)]
+        );
+        editor
+            .set_sheet_chart_series_stroke(sheet_id, source.drawable_object_id, first, None)
+            .unwrap();
+        assert_eq!(
+            editor
+                .reset_sheet_chart_series_stroke(sheet_id, source.drawable_object_id, first,)
+                .unwrap(),
+            None
+        );
+
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_series_stroke(sheet_id, source.drawable_object_id, first)
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_series_stroke(sheet_id, source.drawable_object_id, second)
+                .unwrap(),
+            Some(medium)
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_series_strokes(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            vec![Some(rounded), Some(medium)]
+        );
     }
 
     #[test]

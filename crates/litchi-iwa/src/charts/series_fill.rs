@@ -8,8 +8,8 @@ use prost::Message;
 
 use crate::charts::ChartKind;
 use crate::charts::series_style::{
-    ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD, chart_series_style_slots,
-    generated_chart_series_style_extension,
+    ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
+    effective_chart_series_style_slots, generated_chart_series_style_extension,
 };
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
@@ -101,7 +101,7 @@ pub(crate) fn chart_series_fills(
     series_count: usize,
 ) -> Result<Vec<ShapeFill>> {
     let storage = ChartSeriesFillKind::for_chart_kind(kind)?;
-    effective_slots(
+    effective_chart_series_style_slots(
         package,
         chart_archive_name,
         drawable_object_id,
@@ -130,7 +130,7 @@ pub(crate) fn set_chart_series_fills(
         )));
     }
     let storage = ChartSeriesFillKind::for_chart_kind(kind)?;
-    let slots = effective_slots(
+    let slots = effective_chart_series_style_slots(
         package,
         chart_archive_name,
         drawable_object_id,
@@ -188,7 +188,7 @@ pub(crate) fn reset_chart_series_fill(
     series_index: usize,
 ) -> Result<ShapeFill> {
     let storage = ChartSeriesFillKind::for_chart_kind(kind)?;
-    let slots = effective_slots(
+    let slots = effective_chart_series_style_slots(
         package,
         chart_archive_name,
         drawable_object_id,
@@ -284,29 +284,6 @@ pub(crate) fn set_chart_series_image_fill_data(
     }
     *package = staged;
     Ok(image)
-}
-
-fn effective_slots(
-    package: &IWorkPackage,
-    chart_archive_name: &str,
-    drawable_object_id: u64,
-    drawable_label: &str,
-    series_count: usize,
-) -> Result<Vec<ChartSeriesStyleSlot>> {
-    let mut slots = chart_series_style_slots(
-        package,
-        chart_archive_name,
-        drawable_object_id,
-        drawable_label,
-    )?;
-    if slots.len() < series_count {
-        return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} has {} series styles for {series_count} series",
-            slots.len()
-        )));
-    }
-    slots.truncate(series_count);
-    Ok(slots)
 }
 
 fn read_effective_fill(

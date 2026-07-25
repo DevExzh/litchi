@@ -10,9 +10,9 @@ use crate::charts::{
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
     ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
     ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
-    ChartSeriesIndex, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -65,6 +65,14 @@ fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
 
 fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
     ShapeStroke::new(
+        RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
+        StrokeWidth::new(width).unwrap(),
+        pattern,
+    )
+}
+
+fn chart_series_stroke(pattern: ChartSeriesStrokePattern, width: f32) -> ChartSeriesStroke {
+    ChartSeriesStroke::new(
         RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
         StrokeWidth::new(width).unwrap(),
         pattern,
@@ -1909,6 +1917,76 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
         .remove_slide_chart(0, duplicate.drawable_object_id)
         .unwrap();
     assert!(reopened.media_assets().unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_inherited_series_stroke_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let defaults = vec![None, None];
+    assert_eq!(
+        editor
+            .slide_chart_series_strokes(0, source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_series_strokes(0, source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let first = ChartSeriesIndex::from_zero_based(0);
+    let second = ChartSeriesIndex::from_zero_based(1);
+    let rounded = chart_series_stroke(ChartSeriesStrokePattern::RoundedDash, 3.5);
+    let medium = chart_series_stroke(ChartSeriesStrokePattern::MediumDash, 2.0);
+    editor
+        .set_slide_chart_series_strokes(
+            0,
+            source.drawable_object_id,
+            &[Some(rounded), Some(medium)],
+        )
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_series_strokes(0, duplicate.drawable_object_id)
+            .unwrap(),
+        vec![Some(rounded), Some(medium)]
+    );
+    editor
+        .set_slide_chart_series_stroke(0, source.drawable_object_id, first, None)
+        .unwrap();
+    assert_eq!(
+        editor
+            .reset_slide_chart_series_stroke(0, source.drawable_object_id, first)
+            .unwrap(),
+        None
+    );
+
+    let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_series_stroke(0, source.drawable_object_id, first)
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_series_stroke(0, source.drawable_object_id, second)
+            .unwrap(),
+        Some(medium)
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_series_strokes(0, duplicate.drawable_object_id)
+            .unwrap(),
+        vec![Some(rounded), Some(medium)]
+    );
 }
 
 #[test]

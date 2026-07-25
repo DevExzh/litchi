@@ -135,6 +135,30 @@ pub(crate) fn chart_series_style_slots(
         .collect()
 }
 
+/// Resolve the effective style slot for every data series.
+pub(crate) fn effective_chart_series_style_slots(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    series_count: usize,
+) -> Result<Vec<ChartSeriesStyleSlot>> {
+    let mut slots = chart_series_style_slots(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
+    if slots.len() < series_count {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} has {} series styles for {series_count} series",
+            slots.len()
+        )));
+    }
+    slots.truncate(series_count);
+    Ok(slots)
+}
+
 impl ChartSeriesStyleSlot {
     pub(crate) fn archive_name(&self) -> &str {
         &self.archive_name

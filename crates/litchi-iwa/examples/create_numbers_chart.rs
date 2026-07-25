@@ -7,7 +7,8 @@ use litchi_iwa::charts::{
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartData, ChartErrorBarDirection,
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
     ChartKind, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAffixes,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAffixes,
     ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
@@ -69,6 +70,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ShapeGradientAngle::from_degrees(0.0)?,
             )),
             ShapeFill::Solid(RgbaColor::new(0.10, 0.65, 0.35, 1.0, RgbColorSpace::Srgb)?),
+        ],
+    )?;
+    editor.set_sheet_chart_series_strokes(
+        sheet_id,
+        chart.drawable_object_id,
+        &[
+            Some(ChartSeriesStroke::new(
+                RgbaColor::black(),
+                StrokeWidth::new(3.5)?,
+                ChartSeriesStrokePattern::RoundedDash,
+            )),
+            Some(ChartSeriesStroke::new(
+                RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
+                StrokeWidth::new(2.0)?,
+                ChartSeriesStrokePattern::MediumDash,
+            )),
         ],
     )?;
     editor.set_sheet_chart_border_visible(sheet_id, chart.drawable_object_id, true)?;
