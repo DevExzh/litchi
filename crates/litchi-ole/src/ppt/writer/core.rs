@@ -51,14 +51,15 @@ use super::master_drawing::build_master_ppdrawing;
 use super::notes::{NotesContainerBuilder, NotesPage};
 use super::persist::{PersistPtrBuilder, UserEditAtom};
 use super::records::{
-    RecordBuilder, create_docinfo_list_container, create_document_atom, create_end_document,
-    create_environment_minimal, create_main_master_container, create_slide_list_with_text_master,
-    record_type, wrap_dg_into_ppdrawing, wrap_dgg_into_ppdrawing_group,
+    RecordBuilder, create_document_atom, create_end_document, create_environment_minimal,
+    create_main_master_container, create_slide_list_with_text_master, record_type,
+    wrap_dg_into_ppdrawing, wrap_dgg_into_ppdrawing_group,
 };
 use super::shape_style::{
     ArrowStyle, FillStyle, LineCapStyle, LineJoinStyle, LineStyle, LineStyleConfig, ShadowStyle,
     ShapeStyle,
 };
+use super::smart_tags::{PowerPointSmartTagDefinition, PowerPointSmartTagIndex};
 #[allow(unused_imports)]
 use super::shapes::ShapeKind;
 use super::slide_timing::SlideTiming;
@@ -532,7 +533,7 @@ fn convert_shape_to_escher(
             });
 
     // Get text content - prefer paragraphs with formatting
-    let paragraphs = props.paragraphs.clone().or_else(|| {
+    let mut paragraphs = props.paragraphs.clone().or_else(|| {
         if props.alignment == TextAlignment::Left {
             None
         } else {
@@ -541,6 +542,32 @@ fn convert_shape_to_escher(
                 .as_ref()
                 .map(|text| vec![Paragraph::new(text.clone()).align(props.alignment.into())])
         }
+    });
+    let smart_tag_runs = paragraphs.as_mut().and_then(|paragraphs| {
+        if !paragraphs
+            .iter()
+            .flat_map(|paragraph| &paragraph.runs)
+            .any(|run| !run.smart_tag_indices.is_empty())
+        {
+            return None;
+        }
+        let mut mappings = Vec::new();
+        for (ordinal, run) in paragraphs
+            .iter_mut()
+            .flat_map(|paragraph| &mut paragraph.runs)
+            .enumerate()
+        {
+            run.style.pp9_run_id = Some(
+                u8::try_from(ordinal % 16).expect("a modulo-16 run identifier always fits u8"),
+            );
+            mappings.push(
+                run.smart_tag_indices
+                    .iter()
+                    .map(|index| index.as_u32())
+                    .collect(),
+            );
+        }
+        Some(mappings)
     });
     let text = if paragraphs.is_some() {
         None // Don't use plain text if paragraphs are available
@@ -575,6 +602,7 @@ fn convert_shape_to_escher(
         line_end_cap_style: line.end_cap_style,
         text,
         paragraphs,
+        smart_tag_runs,
         text_type: 4,           // OTHER for regular shapes
         placeholder_type: None, // Not a placeholder for regular shapes
         has_shadow,
@@ -659,6 +687,8 @@ pub struct PptWriter {
     fonts: Vec<FontEntity>,
     /// Custom slide shows (named shows)
     custom_shows: Vec<CustomShow>,
+    /// Document-wide PowerPoint 11 smart-tag property bags.
+    smart_tags: Vec<PowerPointSmartTagDefinition>,
     /// Optional typed override for the slide editing view.
     slide_view_info: Option<PowerPointSlideViewInfo>,
     /// Optional typed notes editing view.
@@ -721,6 +751,7 @@ impl PptWriter {
             hyperlinks: HyperlinkCollection::new(),
             fonts: vec![FontEntity::arial()], // Default font
             custom_shows: Vec::new(),
+            smart_tags: Vec::new(),
             slide_view_info: None,
             notes_view_info: None,
             presentation_header_footer: None,
@@ -776,6 +807,27 @@ impl PptWriter {
         self.modify_password = None;
     }
 
+    /// Add a document-wide PowerPoint 11 smart tag and return its zero-based index.
+    ///
+    /// The returned index can be attached to one or more rich-text runs with
+    /// [`super::text_format::TextRun::with_smart_tag`].
+    pub fn add_smart_tag(
+        &mut self,
+        definition: PowerPointSmartTagDefinition,
+    ) -> Result<PowerPointSmartTagIndex, PptWriteError> {
+        super::smart_tags::validate_definition(&definition)?;
+        let index = u32::try_from(self.smart_tags.len()).map_err(|_| {
+            PptWriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
+        })?;
+        self.smart_tags.push(definition);
+        Ok(PowerPointSmartTagIndex::new(index))
+    }
+
+    /// Return the number of document-wide smart tags.
+    pub fn smart_tag_count(&self) -> usize {
+        self.smart_tags.len()
+    }
+
     /// Return the configured value through the redacted typed password model.
     pub fn modify_password(&self) -> Option<PowerPointModifyPassword> {
         self.modify_password.as_ref().map(|value| {
@@ -798,6 +850,36 @@ impl PptWriter {
         if let Some(value) = &self.modify_password {
             validate_modify_password(value.password.as_str())
                 .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    fn validate_smart_tag_references(&self) -> Result<(), PptWriteError> {
+        let smart_tag_count = u32::try_from(self.smart_tags.len()).map_err(|_| {
+            PptWriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
+        })?;
+        for run in self
+            .slides
+            .iter()
+            .flat_map(|slide| &slide.shapes)
+            .filter_map(|shape| shape.properties.paragraphs.as_ref())
+            .flatten()
+            .flat_map(|paragraph| &paragraph.runs)
+            .filter(|run| !run.smart_tag_indices.is_empty())
+        {
+            if run.text.is_empty() {
+                return Err(PptWriteError::InvalidData(
+                    "PowerPoint smart tags cannot be attached to an empty text run".to_string(),
+                ));
+            }
+            for index in &run.smart_tag_indices {
+                if index.as_u32() >= smart_tag_count {
+                    return Err(PptWriteError::InvalidData(format!(
+                        "PowerPoint text run references missing smart tag {}",
+                        index.as_u32()
+                    )));
+                }
+            }
         }
         Ok(())
     }
@@ -1939,9 +2021,11 @@ impl PptWriter {
     }
 
     fn build_docinfo_list(&self) -> Result<Vec<u8>, PptWriteError> {
-        Ok(create_docinfo_list_container(
+        let ppt11 = super::smart_tags::build_document_binary_tag(&self.smart_tags)?;
+        Ok(super::records::create_docinfo_list_container_with_binary_tags(
             self.slide_view_info.as_ref(),
             self.notes_view_info.as_ref(),
+            ppt11.as_deref(),
         )?)
     }
 
@@ -1978,6 +2062,7 @@ impl PptWriter {
     /// - PersistPtr directory - [MS-PPT] Section 2.4.16
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), PptWriteError> {
         self.validate_encryption()?;
+        self.validate_smart_tag_references()?;
         let modify_password_tag = self.build_modify_password_programmable_tag()?;
         let header_footers = self.serialize_header_footers()?;
         // 1) We'll write DocumentContainer at stream offset 0
@@ -2398,6 +2483,7 @@ impl PptWriter {
         writer: &mut W,
     ) -> Result<(), PptWriteError> {
         self.validate_encryption()?;
+        self.validate_smart_tag_references()?;
         let modify_password_tag = self.build_modify_password_programmable_tag()?;
         let header_footers = self.serialize_header_footers()?;
         // Same logic as save(), but writing to provided writer
@@ -3241,6 +3327,151 @@ mod tests {
         let result = writer.write_to(&mut buffer);
         assert!(result.is_ok());
         assert!(!buffer.get_ref().is_empty());
+    }
+
+    #[test]
+    fn smart_tags_round_trip_through_both_output_paths() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        let tokyo = writer
+            .add_smart_tag(
+                PowerPointSmartTagDefinition::new("urn:example:geo", "place")
+                    .with_property("city", "東京"),
+            )
+            .unwrap();
+        let paris = writer
+            .add_smart_tag(
+                PowerPointSmartTagDefinition::new("urn:example:geo", "place")
+                    .with_property("city", "Paris"),
+            )
+            .unwrap();
+        writer
+            .add_rich_textbox(
+                slide,
+                10,
+                10,
+                300,
+                100,
+                vec![Paragraph::with_runs(vec![
+                    super::super::text_format::TextRun::new("Tokyo").with_smart_tag(tokyo),
+                    super::super::text_format::TextRun::new(" and "),
+                    super::super::text_format::TextRun::new("Paris")
+                        .with_smart_tags([tokyo, paris]),
+                ])],
+            )
+            .unwrap();
+        let hyperlink = writer.add_hyperlink(Hyperlink::url("https://example.invalid/"));
+        writer
+            .set_last_shape_hyperlink(slide, hyperlink)
+            .unwrap();
+        let encoded_shape =
+            convert_shape_to_escher(&writer.slides[slide].shapes[0], &writer.hyperlinks);
+        assert_eq!(
+            encoded_shape
+                .paragraphs
+                .as_ref()
+                .unwrap()[0]
+                .runs
+                .iter()
+                .map(|run| run.style.pp9_run_id)
+                .collect::<Vec<_>>(),
+            vec![Some(0), Some(1), Some(2)]
+        );
+
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let mut package =
+            crate::ppt::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+        let presentation = package.presentation().unwrap();
+        let store = presentation.smart_tags().unwrap().unwrap();
+        assert_eq!(store.types.len(), 1);
+        assert_eq!(store.tags.len(), 2);
+        assert_eq!(store.tags[0].properties[0].value, "東京");
+        let shape_tags = presentation.shape_programmable_tags().unwrap();
+        assert_eq!(shape_tags.len(), 1);
+        let tags = &shape_tags[0].programmable_tags;
+        assert_eq!(tags.powerpoint9().unwrap().runs.len(), 3);
+        assert_eq!(
+            tags.powerpoint11().unwrap().runs[0].smart_tag_indices,
+            vec![tokyo.as_u32()]
+        );
+        assert!(
+            tags.powerpoint11().unwrap().runs[1]
+                .smart_tag_indices
+                .is_empty()
+        );
+        assert_eq!(
+            tags.powerpoint11().unwrap().runs[2].smart_tag_indices,
+            vec![tokyo.as_u32(), paris.as_u32()]
+        );
+        drop(presentation);
+        drop(package);
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-ppt-smart-tags-{}-{}.ppt",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        writer.save(&path).unwrap();
+        let mut package = crate::ppt::Package::open(&path).unwrap();
+        let presentation = package.presentation().unwrap();
+        assert_eq!(presentation.smart_tags().unwrap(), Some(store));
+        assert_eq!(
+            presentation.shape_programmable_tags().unwrap()[0]
+                .programmable_tags
+                .powerpoint11()
+                .unwrap()
+                .runs[2]
+                .smart_tag_indices,
+            vec![tokyo.as_u32(), paris.as_u32()]
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_missing_smart_tag_references() {
+        let mut source = PptWriter::new();
+        let dangling = source
+            .add_smart_tag(PowerPointSmartTagDefinition::new("urn:test", "dangling"))
+            .unwrap();
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        writer
+            .add_rich_textbox(
+                slide,
+                0,
+                0,
+                100,
+                50,
+                vec![Paragraph::with_runs(vec![
+                    super::super::text_format::TextRun::new("invalid")
+                        .with_smart_tag(dangling),
+                ])],
+            )
+            .unwrap();
+        assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
+
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        let tag = writer
+            .add_smart_tag(PowerPointSmartTagDefinition::new("urn:test", "empty"))
+            .unwrap();
+        writer
+            .add_rich_textbox(
+                slide,
+                0,
+                0,
+                100,
+                50,
+                vec![Paragraph::with_runs(vec![
+                    super::super::text_format::TextRun::new("").with_smart_tag(tag),
+                ])],
+            )
+            .unwrap();
+        assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
     }
 
     #[test]

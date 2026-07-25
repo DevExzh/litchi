@@ -5,6 +5,7 @@
 //!
 //! Reference: [MS-PPT] Section 2.9 - Text Formatting
 
+use super::smart_tags::PowerPointSmartTagIndex;
 use zerocopy_derive::*;
 
 // =============================================================================
@@ -426,6 +427,8 @@ pub struct TextRun {
     pub symbol_font_index: Option<u16>,
     /// Baseline position as a percentage of line height
     pub baseline_position: Option<i16>,
+    /// Zero-based indices into the presentation-wide PowerPoint 11 smart-tag store.
+    pub smart_tag_indices: Vec<PowerPointSmartTagIndex>,
 }
 
 impl TextRun {
@@ -441,6 +444,7 @@ impl TextRun {
             ansi_font_index: None,
             symbol_font_index: None,
             baseline_position: None,
+            smart_tag_indices: Vec::new(),
         }
     }
 
@@ -539,6 +543,26 @@ impl TextRun {
     pub fn pp9_run_id(mut self, id: u8) -> Self {
         self.style.pp9_run_id = Some(id);
         self
+    }
+
+    /// Attach one document-wide PowerPoint 11 smart tag to this text run.
+    pub fn with_smart_tag(mut self, index: PowerPointSmartTagIndex) -> Self {
+        self.smart_tag_indices.push(index);
+        self
+    }
+
+    /// Attach document-wide PowerPoint 11 smart tags to this text run.
+    pub fn with_smart_tags(
+        mut self,
+        indices: impl IntoIterator<Item = PowerPointSmartTagIndex>,
+    ) -> Self {
+        self.smart_tag_indices.extend(indices);
+        self
+    }
+
+    /// Attach one document-wide PowerPoint 11 smart tag in place.
+    pub fn add_smart_tag(&mut self, index: PowerPointSmartTagIndex) {
+        self.smart_tag_indices.push(index);
     }
 
     /// Set font size in points

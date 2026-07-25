@@ -75,6 +75,9 @@ pub mod table;
 /// Native chart authoring (embedded BIFF8 chart OLE objects)
 pub mod chart;
 
+/// PowerPoint 11 smart-tag authoring.
+pub mod smart_tags;
+
 // Re-export public types from core
 pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
 pub use crate::ppt::encryption::PptEncryptionProfile;
@@ -98,6 +101,7 @@ pub use shape_style::{FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, Shape
 pub use shapes::{Shape, ShapeCollection, ShapeKind};
 pub use slide_timing::SlideTiming;
 pub use sound_collection::build_sound_collection;
+pub use smart_tags::{PowerPointSmartTagDefinition, PowerPointSmartTagIndex};
 pub use table::{DEFAULT_COLUMN_WIDTH_PT, DEFAULT_ROW_HEIGHT_PT, MAX_TABLE_DIMENSION, Table};
 pub use chart::{Chart, ChartKind, ChartSeries};
 pub use text_format::{

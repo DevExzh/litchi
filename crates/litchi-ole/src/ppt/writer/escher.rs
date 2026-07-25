@@ -874,6 +874,8 @@ pub struct UserShapeData {
     pub text: Option<String>,
     /// Rich text paragraphs (with formatting)
     pub paragraphs: Option<Vec<super::text_format::Paragraph>>,
+    /// PowerPoint 11 document smart-tag indices for each rich-text run.
+    pub smart_tag_runs: Option<Vec<Vec<u32>>>,
     /// Text type for TextHeaderAtom (0=Title, 1=Body, 2=Notes, 4=Other)
     pub text_type: u32,
     /// Placeholder type for notes/master shapes (None = not a placeholder)
@@ -943,6 +945,7 @@ impl Default for UserShapeData {
             line_end_cap_style: None,
             text: None,
             paragraphs: None,
+            smart_tag_runs: None,
             text_type: 4,           // OTHER by default
             placeholder_type: None, // Not a placeholder by default
             has_shadow: false,
@@ -1194,20 +1197,29 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
 
     // ClientData with animation, placeholders, or hyperlinks
     // MUST come BEFORE ClientTextbox per POI (addChildBefore(clientData, EscherTextboxRecord.RECORD_ID))
-    if let Some(ref animation_info) = shape.animation_info {
+    let mut client_data = if let Some(ref animation_info) = shape.animation_info {
         // Animation takes priority - write AnimationInfo to ClientData
-        let client_data = build_client_data_with_animation(animation_info)?;
-        container.add_data(&client_data);
+        Some(build_client_data_with_animation(animation_info)?)
     } else if let Some(placeholder_type) = shape.placeholder_type {
-        let client_data = build_client_data_with_placeholder(placeholder_type)?;
-        container.add_data(&client_data);
+        Some(build_client_data_with_placeholder(placeholder_type)?)
     } else if let Some(hyperlink_id) = shape.hyperlink_id {
-        let client_data = build_client_data_with_hyperlink(
+        Some(build_client_data_with_hyperlink(
             hyperlink_id,
             shape.hyperlink_action,
             shape.hyperlink_jump,
             shape.hyperlink_type,
-        )?;
+        )?)
+    } else {
+        None
+    };
+    if let Some(runs) = &shape.smart_tag_runs
+        && let Some(programmable_tags) =
+            super::smart_tags::build_shape_programmable_tags(runs)
+                .map_err(|error| std::io::Error::other(error.to_string()))?
+    {
+        append_client_data_payload(&mut client_data, &programmable_tags)?;
+    }
+    if let Some(client_data) = client_data {
         container.add_data(&client_data);
     }
 
@@ -1223,6 +1235,40 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
     }
 
     container.build()
+}
+
+fn append_client_data_payload(
+    client_data: &mut Option<Vec<u8>>,
+    payload: &[u8],
+) -> Result<(), PptError> {
+    let data = client_data.get_or_insert_with(|| {
+        let mut bytes = Vec::with_capacity(8);
+        bytes.extend_from_slice(&0x000fu16.to_le_bytes());
+        bytes.extend_from_slice(&record_type::CLIENT_DATA.to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes
+    });
+    let declared = data
+        .get(4..8)
+        .and_then(|bytes| bytes.try_into().ok())
+        .map(u32::from_le_bytes)
+        .ok_or_else(|| std::io::Error::other("invalid ClientData record header"))?;
+    if data.len() != usize::try_from(declared).unwrap_or(usize::MAX).saturating_add(8) {
+        return Err(std::io::Error::other(
+            "ClientData record length does not match its payload",
+        ));
+    }
+    let new_length = u32::try_from(data.len().saturating_sub(8))
+        .ok()
+        .and_then(|length| {
+            u32::try_from(payload.len())
+                .ok()
+                .and_then(|addition| length.checked_add(addition))
+        })
+        .ok_or_else(|| std::io::Error::other("ClientData payload exceeds u32"))?;
+    data.extend_from_slice(payload);
+    data[4..8].copy_from_slice(&new_length.to_le_bytes());
+    Ok(())
 }
 
 /// Build ClientData record with InteractiveInfo for hyperlink

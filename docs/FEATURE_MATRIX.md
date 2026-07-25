@@ -383,7 +383,7 @@ conversion, fonts, and image conversion are optional.
 | Audio/video | 🟡 | ✅ | 🟡 | Sound collections and linked/embedded media metadata; authoring coverage is bounded |
 | Embedded OLE objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve package storages; payloads remain inert |
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |
-| Smart tags | 🟡 | ✅ | ❌ | PowerPoint 11 smart-tag stores use the shared bounded MS-OSHARED property-bag codec with codepage-aware ANSI strings; recognizers, download URLs, and schemas remain inert |
+| Smart tags | ✅ | ✅ | ✅ | PowerPoint 11 smart-tag stores use the shared bounded MS-OSHARED property-bag codec; typed authoring writes deduplicated Unicode type/string tables in the document `___PPT11` extension and validated `StyleTextProp9`/`StyleTextProp11` shape-run mappings, including coexistence with other client data; recognizers, download URLs, and schemas remain inert |
 | Presentation settings/metadata | ✅ | ✅ | ✅ | Slide-show, print, HTML publish, broadcast, envelope, routing, and privacy metadata |
 | Modify password/protection | ✅ | ✅ | ✅ | Password and protection metadata; policy is not enforced |
 | Password encryption | ✅ | ✅ | ✅ | Supported PPT encryption profiles |

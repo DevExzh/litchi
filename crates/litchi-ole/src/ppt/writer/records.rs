@@ -543,6 +543,20 @@ pub fn create_docinfo_list_container(
     slide_view_info: Option<&PowerPointSlideViewInfo>,
     notes_view_info: Option<&PowerPointSlideViewInfo>,
 ) -> Result<Vec<u8>, PptError> {
+    create_docinfo_list_container_with_binary_tags(
+        slide_view_info,
+        notes_view_info,
+        std::iter::empty(),
+    )
+}
+
+/// Create a DocInfo List and append validated `ProgBinaryTag` records to its
+/// single `DocProgTagsContainer`.
+pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
+    slide_view_info: Option<&PowerPointSlideViewInfo>,
+    notes_view_info: Option<&PowerPointSlideViewInfo>,
+    additional_binary_tags: impl IntoIterator<Item = &'a [u8]>,
+) -> Result<Vec<u8>, PptError> {
     let mut list = RecordBuilder::new(0x0F, 0, record_type::DOC_INFO_LIST);
 
     // SheetProperties (1044) container with timestamp atom
@@ -589,9 +603,38 @@ pub fn create_docinfo_list_container(
     bin.write_data(&BinaryTagData::DOCINFO.to_bytes());
     prog_bin.write_child(&bin.build()?);
     prog_tags.write_child(&prog_bin.build()?);
+    for tag in additional_binary_tags {
+        validate_complete_record(tag, 0x0f, record_type::PROG_BINARY_TAG)?;
+        prog_tags.write_child(tag);
+    }
     list.write_child(&prog_tags.build()?);
 
     list.build()
+}
+
+fn validate_complete_record(
+    data: &[u8],
+    expected_version: u8,
+    expected_type: u16,
+) -> Result<(), PptError> {
+    let header = data
+        .get(..8)
+        .ok_or_else(|| std::io::Error::other("programmable tag record is truncated"))?;
+    let version_instance = u16::from_le_bytes([header[0], header[1]]);
+    let record_type = u16::from_le_bytes([header[2], header[3]]);
+    let length = usize::try_from(u32::from_le_bytes([
+        header[4], header[5], header[6], header[7],
+    ]))
+    .map_err(|_| std::io::Error::other("programmable tag length overflows usize"))?;
+    if version_instance & 0x000f != u16::from(expected_version)
+        || record_type != expected_type
+        || length.checked_add(8) != Some(data.len())
+    {
+        return Err(std::io::Error::other(
+            "invalid additional DocProgBinaryTag record",
+        ));
+    }
+    Ok(())
 }
 
 /// Create the historical minimal DocInfo List with a default slide view.

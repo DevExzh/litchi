@@ -311,8 +311,9 @@ pub use vba_info::{PowerPointVbaInfo, PowerPointVbaProjectStorage};
 
 // Re-export writer types
 pub use writer::{
-    FreeformGeometry, GeometryRect, PptWriteError, PptWriter, ShapePathType, ShapeProperties,
-    ShapeType, TabAlign, TabStop, TextAlignment, TextDirection, TextFontAlign,
+    FreeformGeometry, GeometryRect, PowerPointSmartTagDefinition, PowerPointSmartTagIndex,
+    PptWriteError, PptWriter, ShapePathType, ShapeProperties, ShapeType, TabAlign, TabStop,
+    TextAlignment, TextDirection, TextFontAlign,
 };
 
 // Animation and transition support

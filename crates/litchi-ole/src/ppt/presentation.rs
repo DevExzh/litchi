@@ -885,6 +885,12 @@ impl Presentation {
         )
     }
 
+    /// Return the inert document-wide PowerPoint 11 smart-tag store.
+    pub fn smart_tags(&self) -> Result<Option<crate::ppt::PowerPointSmartTagStore>> {
+        let document = self.live_document_record()?;
+        crate::ppt::PowerPointSmartTagStore::parse(&document)
+    }
+
     /// Return all shape programmable tags with caller-supplied resource limits.
     pub fn shape_programmable_tags_with_limits(
         &self,
