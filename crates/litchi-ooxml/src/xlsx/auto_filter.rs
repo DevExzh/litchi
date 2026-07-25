@@ -100,6 +100,51 @@ pub struct DateGroupItem {
     grouping: DateTimeGrouping,
 }
 impl DateGroupItem {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        year: u16,
+        month: Option<u8>,
+        day: Option<u8>,
+        hour: Option<u8>,
+        minute: Option<u8>,
+        second: Option<u8>,
+        grouping: DateTimeGrouping,
+    ) -> Result<Self> {
+        if year > 9999
+            || month.is_some_and(|value| !(1..=12).contains(&value))
+            || day.is_some_and(|value| !(1..=31).contains(&value))
+            || hour.is_some_and(|value| value > 23)
+            || minute.is_some_and(|value| value > 59)
+            || second.is_some_and(|value| value > 59)
+        {
+            return Err(invalid("date-group component is out of range"));
+        }
+        let required = match grouping {
+            DateTimeGrouping::Year => 0,
+            DateTimeGrouping::Month => 1,
+            DateTimeGrouping::Day => 2,
+            DateTimeGrouping::Hour => 3,
+            DateTimeGrouping::Minute => 4,
+            DateTimeGrouping::Second => 5,
+        };
+        if ![month, day, hour, minute, second]
+            .iter()
+            .take(required)
+            .all(Option::is_some)
+        {
+            return Err(invalid("date-group components do not match grouping"));
+        }
+        Ok(Self {
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            grouping,
+        })
+    }
+
     pub fn year(&self) -> u16 {
         self.year
     }
@@ -136,6 +181,22 @@ pub struct FilterValues {
     items: Vec<FilterItem>,
 }
 impl FilterValues {
+    pub fn new(blank: bool, calendar_type: CalendarType, items: Vec<FilterItem>) -> Result<Self> {
+        if items.len() > MAX_ITEMS {
+            return Err(invalid("too many filter values"));
+        }
+        for item in &items {
+            if let FilterItem::Value(value) = item {
+                bounded(value)?;
+            }
+        }
+        Ok(Self {
+            blank,
+            calendar_type,
+            items,
+        })
+    }
+
     pub fn blank(&self) -> bool {
         self.blank
     }
@@ -176,6 +237,12 @@ pub struct CustomFilter {
     value: String,
 }
 impl CustomFilter {
+    pub fn new(operator: CustomFilterOperator, value: impl Into<String>) -> Result<Self> {
+        let value = value.into();
+        bounded(&value)?;
+        Ok(Self { operator, value })
+    }
+
     pub fn operator(&self) -> CustomFilterOperator {
         self.operator
     }
@@ -190,6 +257,15 @@ pub struct CustomFilters {
     filters: Vec<CustomFilter>,
 }
 impl CustomFilters {
+    pub fn new(and: bool, filters: Vec<CustomFilter>) -> Result<Self> {
+        if !(1..=2).contains(&filters.len()) {
+            return Err(invalid(
+                "customFilters requires one or two customFilter children",
+            ));
+        }
+        Ok(Self { and, filters })
+    }
+
     pub fn and(&self) -> bool {
         self.and
     }
@@ -287,6 +363,23 @@ pub struct DynamicFilter {
     max_value: Option<f64>,
 }
 impl DynamicFilter {
+    pub fn new(
+        filter_type: DynamicFilterType,
+        value: Option<f64>,
+        max_value: Option<f64>,
+    ) -> Result<Self> {
+        if value.is_some_and(|value| !value.is_finite())
+            || max_value.is_some_and(|value| !value.is_finite())
+        {
+            return Err(invalid("non-finite filter number"));
+        }
+        Ok(Self {
+            filter_type,
+            value,
+            max_value,
+        })
+    }
+
     pub fn filter_type(&self) -> DynamicFilterType {
         self.filter_type
     }
@@ -304,6 +397,13 @@ pub struct ColorFilter {
     cell_color: bool,
 }
 impl ColorFilter {
+    pub fn new(differential_format_id: u32, cell_color: bool) -> Self {
+        Self {
+            differential_format_id,
+            cell_color,
+        }
+    }
+
     pub fn differential_format_id(&self) -> u32 {
         self.differential_format_id
     }
@@ -382,6 +482,13 @@ pub struct IconFilter {
     icon_id: Option<u32>,
 }
 impl IconFilter {
+    pub fn new(icon_set: FilterIconSet, icon_id: Option<u32>) -> Result<Self> {
+        if icon_id.is_some_and(|value| value >= icon_set.cardinality()) {
+            return Err(invalid("iconFilter iconId exceeds icon-set cardinality"));
+        }
+        Ok(Self { icon_set, icon_id })
+    }
+
     pub fn icon_set(&self) -> FilterIconSet {
         self.icon_set
     }
@@ -398,6 +505,22 @@ pub struct Top10Filter {
     filter_value: Option<f64>,
 }
 impl Top10Filter {
+    pub fn new(top: bool, percent: bool, value: f64, filter_value: Option<f64>) -> Result<Self> {
+        if !value.is_finite()
+            || filter_value.is_some_and(|value| !value.is_finite())
+            || value < 0.0
+            || (percent && value > 100.0)
+        {
+            return Err(invalid("top10 val is out of range"));
+        }
+        Ok(Self {
+            top,
+            percent,
+            value,
+            filter_value,
+        })
+    }
+
     pub fn top(&self) -> bool {
         self.top
     }
@@ -430,6 +553,33 @@ pub struct FilterColumnDefinition {
     pub payload: Option<FilterColumnPayload>,
 }
 impl FilterColumnDefinition {
+    pub fn new(column_id: u32) -> Result<Self> {
+        if column_id >= MAX_COLUMNS as u32 {
+            return Err(invalid("filterColumn colId is outside worksheet range"));
+        }
+        Ok(Self {
+            column_id,
+            hidden_button: false,
+            show_button: true,
+            payload: None,
+        })
+    }
+
+    pub fn set_hidden_button(&mut self, value: bool) -> &mut Self {
+        self.hidden_button = value;
+        self
+    }
+
+    pub fn set_show_button(&mut self, value: bool) -> &mut Self {
+        self.show_button = value;
+        self
+    }
+
+    pub fn set_payload(&mut self, value: Option<FilterColumnPayload>) -> &mut Self {
+        self.payload = value;
+        self
+    }
+
     pub fn column_id(&self) -> u32 {
         self.column_id
     }
@@ -1605,6 +1755,62 @@ mod tests {
         assert_eq!(sort.sort_method, Some(SortMethod::None));
         assert_eq!(sort.conditions.len(), 2);
     }
+
+    #[test]
+    fn authored_filter_payloads_round_trip_through_shared_serializer() {
+        let payloads = vec![
+            FilterColumnPayload::Values(
+                FilterValues::new(
+                    true,
+                    CalendarType::Gregorian,
+                    vec![
+                        FilterItem::Value("North".into()),
+                        FilterItem::DateGroup(
+                            DateGroupItem::new(
+                                2026,
+                                Some(7),
+                                Some(26),
+                                None,
+                                None,
+                                None,
+                                DateTimeGrouping::Day,
+                            )
+                            .unwrap(),
+                        ),
+                    ],
+                )
+                .unwrap(),
+            ),
+            FilterColumnPayload::Custom(
+                CustomFilters::new(
+                    true,
+                    vec![
+                        CustomFilter::new(CustomFilterOperator::GreaterThan, "10").unwrap(),
+                        CustomFilter::new(CustomFilterOperator::LessThan, "20").unwrap(),
+                    ],
+                )
+                .unwrap(),
+            ),
+            FilterColumnPayload::Dynamic(
+                DynamicFilter::new(DynamicFilterType::ThisMonth, Some(1.5), Some(2.5)).unwrap(),
+            ),
+            FilterColumnPayload::Color(ColorFilter::new(4, false)),
+            FilterColumnPayload::Icon(
+                IconFilter::new(FilterIconSet::ThreeArrows, Some(2)).unwrap(),
+            ),
+            FilterColumnPayload::Top10(Top10Filter::new(false, true, 25.0, Some(9.0)).unwrap()),
+        ];
+        let mut authored = AutoFilterDefinition::new(Some(FilterRange::new("A1:F20").unwrap()));
+        for (column_id, payload) in payloads.into_iter().enumerate() {
+            let mut column = FilterColumnDefinition::new(column_id as u32).unwrap();
+            column.set_payload(Some(payload));
+            authored.columns.push(column);
+        }
+
+        let xml = write_auto_filter_fragment(&authored).unwrap();
+        assert_eq!(parse_auto_filter_fragment(&xml).unwrap(), authored);
+    }
+
     #[test]
     fn rejects_malformed_and_security_cases() {
         for xml in [

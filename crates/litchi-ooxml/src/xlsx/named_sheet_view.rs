@@ -195,6 +195,69 @@ pub struct NamedSheetViewSortCondition {
     rich_sort_key: Option<String>,
 }
 impl NamedSheetViewSortCondition {
+    /// Create a value-based sort condition for a worksheet range.
+    pub fn new(kind: NamedSheetViewSortConditionKind, reference: NamedSheetViewRange) -> Self {
+        Self {
+            kind,
+            reference,
+            descending: false,
+            sort_by: SortBy::Value,
+            custom_list: None,
+            differential_format_id: None,
+            icon_set: None,
+            icon_id: None,
+            rich_sort_key: None,
+        }
+    }
+
+    pub fn set_descending(&mut self, value: bool) -> &mut Self {
+        self.descending = value;
+        self
+    }
+
+    /// Set an optional custom value order.
+    pub fn set_custom_list(&mut self, value: Option<String>) -> Result<&mut Self> {
+        if value
+            .as_ref()
+            .is_some_and(|value| value.chars().count() > 32_767)
+        {
+            return Err(invalid("customList exceeds 32767 characters"));
+        }
+        self.custom_list = value;
+        Ok(self)
+    }
+
+    /// Configure icon sorting, validating the icon index against its set.
+    pub fn set_icon_sort(
+        &mut self,
+        icon_set: NamedSheetViewIconSet,
+        icon_id: Option<u32>,
+    ) -> Result<&mut Self> {
+        if icon_id.is_some_and(|id| icon_set.cardinality().is_some_and(|count| id >= count)) {
+            return Err(invalid("iconId is outside icon set"));
+        }
+        self.sort_by = SortBy::Icon;
+        self.differential_format_id = None;
+        self.icon_set = Some(icon_set);
+        self.icon_id = icon_id;
+        Ok(self)
+    }
+
+    /// Set the rich-value sort key. Standard sort conditions reject this metadata.
+    pub fn set_rich_sort_key(&mut self, value: Option<String>) -> Result<&mut Self> {
+        if self.kind != NamedSheetViewSortConditionKind::RichValue && value.is_some() {
+            return Err(invalid("standard sort condition cannot have richSortKey"));
+        }
+        if value
+            .as_ref()
+            .is_some_and(|value| value.chars().count() > 255)
+        {
+            return Err(invalid("richSortKey exceeds 255 characters"));
+        }
+        self.rich_sort_key = value;
+        Ok(self)
+    }
+
     pub fn kind(&self) -> NamedSheetViewSortConditionKind {
         self.kind
     }
@@ -231,6 +294,38 @@ pub struct NamedSheetViewSortRule {
     condition: Option<NamedSheetViewSortCondition>,
 }
 impl NamedSheetViewSortRule {
+    pub fn new(column_id: u32) -> Result<Self> {
+        validate_column_id(column_id)?;
+        Ok(Self {
+            column_id,
+            id: None,
+            differential_format: None,
+            condition: None,
+        })
+    }
+
+    pub fn set_id(&mut self, id: Option<NamedSheetViewGuid>) -> &mut Self {
+        self.id = id;
+        self
+    }
+
+    pub fn set_condition(
+        &mut self,
+        condition: Option<NamedSheetViewSortCondition>,
+    ) -> Result<&mut Self> {
+        if condition
+            .as_ref()
+            .is_some_and(|condition| condition.differential_format_id.is_some())
+            != self.differential_format.is_some()
+        {
+            return Err(invalid(
+                "sortRule dxf presence does not match sortCondition dxfId",
+            ));
+        }
+        self.condition = condition;
+        Ok(self)
+    }
+
     pub fn column_id(&self) -> u32 {
         self.column_id
     }
@@ -252,6 +347,40 @@ pub struct NamedSheetViewSortRules {
     extensions: Vec<NamedSheetViewExtension>,
 }
 impl NamedSheetViewSortRules {
+    pub fn new() -> Self {
+        Self {
+            sort_method: SortMethod::None,
+            case_sensitive: false,
+            rules: Vec::new(),
+            extensions: Vec::new(),
+        }
+    }
+
+    pub fn set_sort_method(&mut self, value: SortMethod) -> &mut Self {
+        self.sort_method = value;
+        self
+    }
+
+    pub fn set_case_sensitive(&mut self, value: bool) -> &mut Self {
+        self.case_sensitive = value;
+        self
+    }
+
+    pub fn add_rule(&mut self, rule: NamedSheetViewSortRule) -> Result<&mut Self> {
+        if self.rules.len() >= 64 {
+            return Err(invalid("sortRules exceeds 64 rules"));
+        }
+        self.rules.push(rule);
+        Ok(self)
+    }
+
+    pub fn remove_rule(&mut self, column_id: u32) -> Option<NamedSheetViewSortRule> {
+        self.rules
+            .iter()
+            .position(|rule| rule.column_id == column_id)
+            .map(|index| self.rules.remove(index))
+    }
+
     pub fn sort_method(&self) -> SortMethod {
         self.sort_method
     }
@@ -265,6 +394,11 @@ impl NamedSheetViewSortRules {
         &self.extensions
     }
 }
+impl Default for NamedSheetViewSortRules {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedSheetViewColumnFilter {
     column_id: u32,
@@ -274,6 +408,44 @@ pub struct NamedSheetViewColumnFilter {
     extensions: Vec<NamedSheetViewExtension>,
 }
 impl NamedSheetViewColumnFilter {
+    pub fn new(column_id: u32) -> Result<Self> {
+        validate_column_id(column_id)?;
+        Ok(Self {
+            column_id,
+            id: None,
+            differential_format: None,
+            filters: Vec::new(),
+            extensions: Vec::new(),
+        })
+    }
+
+    pub fn set_id(&mut self, id: Option<NamedSheetViewGuid>) -> &mut Self {
+        self.id = id;
+        self
+    }
+
+    /// Add a filter payload for this column.
+    ///
+    /// The shared SpreadsheetML auto-filter serializer validates the payload
+    /// before this model is mutated.
+    pub fn add_filter(&mut self, filter: FilterColumnDefinition) -> Result<&mut Self> {
+        if self.filters.len() >= MAX_FILTERS {
+            return Err(invalid("too many filter payloads"));
+        }
+        if filter.column_id != self.column_id {
+            return Err(invalid(
+                "named-sheet-view filter colId does not match columnFilter colId",
+            ));
+        }
+        filter_payload_markup(&filter)?;
+        self.filters.push(filter);
+        Ok(self)
+    }
+
+    pub fn clear_filters(&mut self) {
+        self.filters.clear();
+    }
+
     pub fn column_id(&self) -> u32 {
         self.column_id
     }
@@ -300,6 +472,47 @@ pub struct NamedSheetViewFilter {
     extensions: Vec<NamedSheetViewExtension>,
 }
 impl NamedSheetViewFilter {
+    pub fn new(filter_id: NamedSheetViewGuid) -> Self {
+        Self {
+            filter_id,
+            reference: None,
+            table_id: None,
+            column_filters: Vec::new(),
+            sort_rules: None,
+            extensions: Vec::new(),
+        }
+    }
+
+    pub fn set_reference(&mut self, value: Option<NamedSheetViewRange>) -> &mut Self {
+        self.reference = value;
+        self
+    }
+
+    pub fn set_table_id(&mut self, value: Option<u32>) -> &mut Self {
+        self.table_id = value;
+        self
+    }
+
+    pub fn add_column_filter(&mut self, filter: NamedSheetViewColumnFilter) -> Result<&mut Self> {
+        if self.column_filters.len() >= MAX_COLUMNS {
+            return Err(invalid("too many named-sheet-view column filters"));
+        }
+        self.column_filters.push(filter);
+        Ok(self)
+    }
+
+    pub fn remove_column_filter(&mut self, column_id: u32) -> Option<NamedSheetViewColumnFilter> {
+        self.column_filters
+            .iter()
+            .position(|filter| filter.column_id == column_id)
+            .map(|index| self.column_filters.remove(index))
+    }
+
+    pub fn set_sort_rules(&mut self, value: Option<NamedSheetViewSortRules>) -> &mut Self {
+        self.sort_rules = value;
+        self
+    }
+
     pub fn filter_id(&self) -> &NamedSheetViewGuid {
         &self.filter_id
     }
@@ -360,6 +573,24 @@ impl NamedSheetView {
     pub fn extensions(&self) -> &[NamedSheetViewExtension] {
         &self.extensions
     }
+
+    pub fn add_filter(&mut self, filter: NamedSheetViewFilter) -> Result<&mut Self> {
+        if self.filters.len() >= MAX_FILTERS {
+            return Err(invalid("too many named-sheet-view filters"));
+        }
+        self.filters.push(filter);
+        Ok(self)
+    }
+
+    pub fn remove_filter(
+        &mut self,
+        filter_id: &NamedSheetViewGuid,
+    ) -> Option<NamedSheetViewFilter> {
+        self.filters
+            .iter()
+            .position(|filter| &filter.filter_id == filter_id)
+            .map(|index| self.filters.remove(index))
+    }
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedSheetViews {
@@ -373,15 +604,18 @@ impl NamedSheetViews {
     /// A Named Sheet Views part requires at least one `namedSheetView`, so an
     /// empty collection is deliberately not constructible through this API.
     pub fn new(view: NamedSheetView) -> Self {
+        let mut namespace_declarations =
+            vec![("xmlns".into(), std::str::from_utf8(NSV).unwrap().into())];
+        if view_has_filter_payload(&view) {
+            namespace_declarations
+                .push(("xmlns:x".into(), std::str::from_utf8(CORE).unwrap().into()));
+        }
         Self {
             views: vec![view],
             extensions: Vec::new(),
             // Match the parser's retained root declarations so a freshly
             // constructed value has parse/write round-trip equality too.
-            namespace_declarations: vec![(
-                "xmlns".into(),
-                std::str::from_utf8(NSV).unwrap().into(),
-            )],
+            namespace_declarations,
         }
     }
 
@@ -395,6 +629,15 @@ impl NamedSheetViews {
         }
         if self.views.iter().any(|existing| existing.id == view.id) {
             return Err(invalid("duplicate named sheet view GUID"));
+        }
+        if view_has_filter_payload(&view)
+            && !self
+                .namespace_declarations
+                .iter()
+                .any(|(name, _)| name == "xmlns:x")
+        {
+            self.namespace_declarations
+                .push(("xmlns:x".into(), std::str::from_utf8(CORE).unwrap().into()));
         }
         self.views.push(view);
         Ok(self)
@@ -799,13 +1042,15 @@ fn require_worksheet(part: &dyn Part) -> Result<()> {
 }
 
 fn has_filter_payload(value: &NamedSheetViews) -> bool {
-    value.views.iter().any(|view| {
-        view.filters.iter().any(|filter| {
-            filter
-                .column_filters
-                .iter()
-                .any(|column| column.filters.iter().any(|filter| filter.payload.is_some()))
-        })
+    value.views.iter().any(view_has_filter_payload)
+}
+
+fn view_has_filter_payload(view: &NamedSheetView) -> bool {
+    view.filters.iter().any(|filter| {
+        filter
+            .column_filters
+            .iter()
+            .any(|column| column.filters.iter().any(|filter| filter.payload.is_some()))
     })
 }
 
@@ -1909,6 +2154,15 @@ fn validate_name(v: &str) -> Result<()> {
     }
     Ok(())
 }
+fn validate_column_id(value: u32) -> Result<()> {
+    if value >= MAX_COLUMNS as u32 {
+        Err(invalid(
+            "named-sheet-view colId exceeds worksheet column limit",
+        ))
+    } else {
+        Ok(())
+    }
+}
 fn validate_view_collection(views: &[NamedSheetView]) -> Result<()> {
     if views.is_empty() {
         return Err(invalid(
@@ -2074,7 +2328,10 @@ fn xml_error(v: impl std::fmt::Display) -> OoxmlError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsx::auto_filter::{FilterColumnPayload, FilterItem};
+    use crate::xlsx::auto_filter::{
+        CalendarType, DateGroupItem, DateTimeGrouping, FilterColumnPayload, FilterItem,
+        FilterValues, IconFilter, Top10Filter,
+    };
     use litchi_opc::{OpcPackage, PackURI};
 
     fn libreoffice_fixture() -> OpcPackage {
@@ -2178,6 +2435,114 @@ mod tests {
         assert_eq!(removed.name(), "Shared");
         assert!(authored.remove_view("Missing").unwrap().is_none());
         assert!(authored.remove_view("Personal").is_err());
+    }
+
+    #[test]
+    fn authors_detailed_value_date_and_sort_metadata() {
+        let filter_id = NamedSheetViewGuid::new("{11111111-2222-3333-4444-555555555555}").unwrap();
+        let mut column = NamedSheetViewColumnFilter::new(1).unwrap();
+        let mut payload = FilterColumnDefinition::new(1).unwrap();
+        payload.set_payload(Some(FilterColumnPayload::Values(
+            FilterValues::new(
+                true,
+                CalendarType::Gregorian,
+                vec![
+                    FilterItem::Value("North".into()),
+                    FilterItem::DateGroup(
+                        DateGroupItem::new(
+                            2026,
+                            Some(7),
+                            Some(26),
+                            None,
+                            None,
+                            None,
+                            DateTimeGrouping::Day,
+                        )
+                        .unwrap(),
+                    ),
+                ],
+            )
+            .unwrap(),
+        )));
+        column.add_filter(payload).unwrap();
+
+        let mut condition = NamedSheetViewSortCondition::new(
+            NamedSheetViewSortConditionKind::RichValue,
+            NamedSheetViewRange::new("B2:B20").unwrap(),
+        );
+        condition
+            .set_descending(true)
+            .set_custom_list(Some("North,South".into()))
+            .unwrap()
+            .set_rich_sort_key(Some("Region".into()))
+            .unwrap();
+        let mut rule = NamedSheetViewSortRule::new(1).unwrap();
+        rule.set_condition(Some(condition)).unwrap();
+        let mut rules = NamedSheetViewSortRules::new();
+        rules
+            .set_sort_method(SortMethod::PinYin)
+            .set_case_sensitive(true)
+            .add_rule(rule)
+            .unwrap();
+
+        let mut filter = NamedSheetViewFilter::new(filter_id);
+        filter
+            .set_reference(Some(NamedSheetViewRange::new("A1:C20").unwrap()))
+            .set_table_id(Some(7))
+            .add_column_filter(column)
+            .unwrap()
+            .set_sort_rules(Some(rules));
+        let mut view = NamedSheetView::with_id(
+            "Regional",
+            NamedSheetViewGuid::new("{01234567-89AB-CDEF-0123-456789ABCDEF}").unwrap(),
+        )
+        .unwrap();
+        view.add_filter(filter).unwrap();
+        let authored = NamedSheetViews::new(view);
+
+        let xml = authored.to_xml().unwrap();
+        let text = std::str::from_utf8(&xml).unwrap();
+        assert!(text.contains(r#"<x:filters blank="1" calendarType="gregorian">"#));
+        assert!(text.contains(r#"<x:filter val="North"/>"#));
+        assert!(text.contains(
+            r#"<x:dateGroupItem year="2026" month="7" day="26" dateTimeGrouping="day"/>"#
+        ));
+        assert!(text.contains(
+            r#"<richSortCondition ref="B2:B20" descending="1" customList="North,South" richSortKey="Region"/>"#
+        ));
+        assert_eq!(parse_named_sheet_views(&xml).unwrap(), authored);
+    }
+
+    #[test]
+    fn detailed_authoring_rejects_invalid_relationships_and_filter_values() {
+        let mut column = NamedSheetViewColumnFilter::new(3).unwrap();
+        assert!(
+            column
+                .add_filter(FilterColumnDefinition::new(2).unwrap())
+                .is_err()
+        );
+        assert!(
+            DateGroupItem::new(
+                2026,
+                None,
+                Some(26),
+                None,
+                None,
+                None,
+                DateTimeGrouping::Day,
+            )
+            .is_err()
+        );
+        assert!(Top10Filter::new(true, true, 101.0, None).is_err());
+        assert!(
+            IconFilter::new(
+                crate::xlsx::auto_filter::FilterIconSet::ThreeArrows,
+                Some(3)
+            )
+            .is_err()
+        );
+
+        assert!(NamedSheetViewColumnFilter::new(MAX_COLUMNS as u32).is_err());
     }
 
     #[test]
