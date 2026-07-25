@@ -165,6 +165,14 @@ impl MutableDocument {
         }
     }
 
+    /// Override the root MIME type written by `to_bytes`.
+    ///
+    /// Used by the web-template authoring model to emit the legacy
+    /// `application/vnd.oasis.opendocument.text-web` MIME type.
+    pub(crate) fn set_mimetype(&mut self, mimetype: impl Into<String>) {
+        self.mimetype = mimetype.into();
+    }
+
     /// Return typed dynamic fields from the current authoritative content XML.
     pub fn dynamic_text_fields(&self) -> Result<Vec<OdfDynamicTextField>> {
         self.with_content_xml(FieldParser::parse_dynamic_text_fields)

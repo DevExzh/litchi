@@ -562,7 +562,7 @@ pub use odm::{
     MasterDocument, MasterDocumentBuilder, MasterDocumentElement, MasterSection,
     MasterSubdocument, MutableMasterDocument,
 };
-pub use oth::WebDocument;
+pub use oth::{MutableWebDocument, WebDocument, WebDocumentBuilder};
 pub use outline_style::{
     MAX_OUTLINE_LEVELS, OdfListLevelPositionMode, OdfOutlineAttribute, OdfOutlineLevelStyle,
     OdfOutlineListLevelProperties, OdfOutlineNumberFormat, OdfOutlinePositiveInteger,

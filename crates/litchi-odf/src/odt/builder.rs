@@ -1753,10 +1753,18 @@ impl DocumentBuilder {
     /// # }
     /// ```
     pub fn build(self) -> Result<Vec<u8>> {
+        self.build_package(crate::constants::ODF_TEXT)
+    }
+
+    /// Build the document package with an explicit root MIME type.
+    ///
+    /// Used by the web-template authoring model to emit the legacy
+    /// `application/vnd.oasis.opendocument.text-web` MIME type.
+    pub(crate) fn build_package(self, mimetype: &str) -> Result<Vec<u8>> {
         let mut writer = PackageWriter::new();
 
         // Set MIME type
-        writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
+        writer.set_mimetype(mimetype)?;
 
         // Add content.xml
         let content_xml = self.generate_content_xml();
@@ -1796,6 +1804,234 @@ impl DocumentBuilder {
         let bytes = self.build()?;
         std::fs::write(path, bytes)?;
         Ok(())
+    }
+}
+
+impl DocumentBuilder {
+    /// Add a validated value-range form to the document.
+    pub fn add_value_range_form(&mut self, form: &crate::OdfValueRangeForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .value_range_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .image_frame_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .password_file_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.value_range_forms.push(form.clone());
+        Ok(self)
+    }
+}
+
+impl DocumentBuilder {
+    /// Add a validated form containing formatted-text, number, date, or time controls.
+    pub fn add_typed_value_form(&mut self, form: &crate::OdfTypedValueForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .typed_value_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .value_range_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .image_frame_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .password_file_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.typed_value_forms.push(form.clone());
+        Ok(self)
+    }
+}
+
+impl DocumentBuilder {
+    /// Adds a form whose final child is an inert `form:connection-resource`.
+    pub fn add_connection_resource_form(
+        &mut self,
+        form: &crate::OdfConnectionResourceForm,
+    ) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .connection_resource_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .grid_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .typed_value_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .value_range_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .image_frame_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .password_file_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.connection_resource_forms.push(form.clone());
+        Ok(self)
+    }
+
+    pub fn add_grid_form(&mut self, form: &crate::OdfGridForm) -> Result<&mut Self> {
+        form.to_xml_fragment()?;
+        if self
+            .grid_forms
+            .iter()
+            .any(|existing| existing.name == form.name)
+            || self
+                .typed_value_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .value_range_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .image_frame_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .password_file_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .generic_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .visual_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .selection_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .interactive_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .control_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+            || self
+                .property_forms
+                .iter()
+                .any(|existing| existing.name == form.name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate form '{}'",
+                form.name
+            )));
+        }
+        self.grid_forms.push(form.clone());
+        Ok(self)
     }
 }
 
@@ -2268,233 +2504,5 @@ mod tests {
         let mut builder = DocumentBuilder::new();
         builder.add_bulleted_list(vec![]).unwrap();
         assert_eq!(builder.elements.len(), 1);
-    }
-}
-
-impl DocumentBuilder {
-    /// Add a validated value-range form to the document.
-    pub fn add_value_range_form(&mut self, form: &crate::OdfValueRangeForm) -> Result<&mut Self> {
-        form.to_xml_fragment()?;
-        if self
-            .value_range_forms
-            .iter()
-            .any(|existing| existing.name == form.name)
-            || self
-                .image_frame_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .password_file_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .generic_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .visual_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .selection_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .interactive_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .control_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .property_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-        {
-            return Err(litchi_core::Error::InvalidFormat(format!(
-                "duplicate form '{}'",
-                form.name
-            )));
-        }
-        self.value_range_forms.push(form.clone());
-        Ok(self)
-    }
-}
-
-impl DocumentBuilder {
-    /// Add a validated form containing formatted-text, number, date, or time controls.
-    pub fn add_typed_value_form(&mut self, form: &crate::OdfTypedValueForm) -> Result<&mut Self> {
-        form.to_xml_fragment()?;
-        if self
-            .typed_value_forms
-            .iter()
-            .any(|existing| existing.name == form.name)
-            || self
-                .value_range_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .image_frame_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .password_file_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .generic_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .visual_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .selection_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .interactive_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .control_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .property_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-        {
-            return Err(litchi_core::Error::InvalidFormat(format!(
-                "duplicate form '{}'",
-                form.name
-            )));
-        }
-        self.typed_value_forms.push(form.clone());
-        Ok(self)
-    }
-}
-
-impl DocumentBuilder {
-    /// Adds a form whose final child is an inert `form:connection-resource`.
-    pub fn add_connection_resource_form(
-        &mut self,
-        form: &crate::OdfConnectionResourceForm,
-    ) -> Result<&mut Self> {
-        form.to_xml_fragment()?;
-        if self
-            .connection_resource_forms
-            .iter()
-            .any(|existing| existing.name == form.name)
-            || self
-                .grid_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .typed_value_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .value_range_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .image_frame_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .password_file_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .generic_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .visual_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .selection_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .interactive_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .control_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .property_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-        {
-            return Err(litchi_core::Error::InvalidFormat(format!(
-                "duplicate form '{}'",
-                form.name
-            )));
-        }
-        self.connection_resource_forms.push(form.clone());
-        Ok(self)
-    }
-
-    pub fn add_grid_form(&mut self, form: &crate::OdfGridForm) -> Result<&mut Self> {
-        form.to_xml_fragment()?;
-        if self
-            .grid_forms
-            .iter()
-            .any(|existing| existing.name == form.name)
-            || self
-                .typed_value_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .value_range_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .image_frame_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .password_file_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .generic_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .visual_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .selection_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .interactive_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .control_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-            || self
-                .property_forms
-                .iter()
-                .any(|existing| existing.name == form.name)
-        {
-            return Err(litchi_core::Error::InvalidFormat(format!(
-                "duplicate form '{}'",
-                form.name
-            )));
-        }
-        self.grid_forms.push(form.clone());
-        Ok(self)
     }
 }

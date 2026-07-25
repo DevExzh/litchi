@@ -91,6 +91,17 @@ impl WebDocument {
         self.document.original_bytes()
     }
 
+    /// Convert this template into an atomic mutable web template.
+    pub fn into_mutable(self) -> Result<super::MutableWebDocument> {
+        super::MutableWebDocument::from_document(self.document)
+    }
+
+    /// Clone this template into an atomic mutable web template.
+    pub fn to_mutable(&self) -> Result<super::MutableWebDocument> {
+        let document = Document::from_bytes(self.document.original_bytes().to_vec())?;
+        super::MutableWebDocument::from_document(document)
+    }
+
     /// Clone the exact original package bytes.
     pub fn to_bytes(&self) -> Vec<u8> {
         self.as_bytes().to_vec()
