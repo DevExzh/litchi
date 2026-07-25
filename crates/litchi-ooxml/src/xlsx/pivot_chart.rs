@@ -8,6 +8,10 @@
 //! workbook part graph to the typed pivot-table model, and validates the
 //! binding in the same style as the slicer-cache and timeline modules.
 //!
+//! Pivot charts are enumerated both on worksheets (anchored through the
+//! worksheet drawing part) and on chartsheets (whose drawing part holds the
+//! chart directly); sheets of other kinds are skipped gracefully.
+//!
 //! Everything here is read-only and inert: no pivot refresh, no cache
 //! rebuild, and no rendering.
 
@@ -32,6 +36,12 @@ use std::str::FromStr;
 pub const PIVOT_OPTIONS_EXTENSION_URI: &str = "{781A3756-C4B2-4CAC-9D66-4F8C8630D5DC}";
 
 const C14_CHART_NAMESPACE: &str = "http://schemas.microsoft.com/office/drawing/2007/8/2/chart";
+const CHARTSHEET_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
+const STRICT_CHARTSHEET_REL: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet";
+const CHARTSHEET_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
 const MAX_CHART_PART_BYTES: usize = 32 * 1024 * 1024;
 const MAX_WORKBOOK_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DRAWING_PART_BYTES: usize = 32 * 1024 * 1024;
@@ -180,14 +190,25 @@ pub struct PivotChart {
     pub pivot_table: PivotTable,
 }
 
-/// Pivot charts anchored on one worksheet.
+/// Kind of sheet hosting one or more pivot charts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PivotChartSheetKind {
+    /// An ordinary worksheet anchoring charts through its drawing part
+    Worksheet,
+    /// A chartsheet whose drawing part holds its chart directly
+    Chartsheet,
+}
+
+/// Pivot charts anchored on one worksheet or chartsheet.
 #[derive(Debug, Clone)]
 pub struct WorksheetPivotCharts {
-    /// Worksheet name from the workbook
+    /// Sheet name from the workbook
     pub worksheet_name: String,
-    /// Worksheet part name (for example `/xl/worksheets/sheet1.xml`)
+    /// Sheet part name (for example `/xl/worksheets/sheet1.xml`)
     pub worksheet_part_name: String,
-    /// Pivot charts anchored on the worksheet, in drawing order
+    /// Kind of the hosting sheet
+    pub sheet_kind: PivotChartSheetKind,
+    /// Pivot charts anchored on the sheet, in drawing order
     pub pivot_charts: Vec<PivotChart>,
 }
 
@@ -279,23 +300,30 @@ pub fn parse_pivot_chart_binding(xml: &[u8]) -> Result<Option<PivotChartBinding>
     }))
 }
 
-/// Load all worksheet-anchored pivot charts in a workbook package.
+/// Load all pivot charts in a workbook package.
 ///
-/// One entry is returned per worksheet that anchors at least one pivot
-/// chart; worksheets without pivot charts are omitted. Every returned chart
-/// has its `c:pivotSource` name resolved to the typed pivot-table model read
-/// from the package graph; broken or dangling bindings are errors.
+/// One entry is returned per worksheet or chartsheet that anchors at least
+/// one pivot chart; sheets without pivot charts are omitted, and sheets of
+/// other kinds (dialog or macro sheets) are skipped gracefully. Every
+/// returned chart has its `c:pivotSource` name resolved to the typed
+/// pivot-table model read from the package graph; broken or dangling
+/// bindings are errors.
 pub fn load_pivot_charts(package: &OpcPackage) -> Result<Vec<WorksheetPivotCharts>> {
     let workbook_part = package.main_document_part()?;
     let sheets = parse_workbook_sheets(workbook_part.blob())?;
     let tables = read_pivot_tables(package).map_err(|error| invalid(error.to_string()))?;
     let mut output = Vec::new();
     for sheet in &sheets {
-        let (part_name, charts) = load_sheet_pivot_charts(package, workbook_part, sheet, &tables)?;
+        let Some((part_name, sheet_kind, charts)) =
+            load_sheet_pivot_charts(package, workbook_part, sheet, &tables)?
+        else {
+            continue;
+        };
         if !charts.is_empty() {
             output.push(WorksheetPivotCharts {
                 worksheet_name: sheet.name.clone(),
                 worksheet_part_name: part_name.to_string(),
+                sheet_kind,
                 pivot_charts: charts,
             });
         }
@@ -303,7 +331,8 @@ pub fn load_pivot_charts(package: &OpcPackage) -> Result<Vec<WorksheetPivotChart
     Ok(output)
 }
 
-/// Load the pivot charts anchored on one worksheet, addressed by sheet name.
+/// Load the pivot charts anchored on one worksheet or chartsheet, addressed
+/// by sheet name. Sheets of other kinds yield an empty list.
 pub fn load_worksheet_pivot_charts(
     package: &OpcPackage,
     sheet_name: &str,
@@ -315,7 +344,10 @@ pub fn load_worksheet_pivot_charts(
         .iter()
         .find(|sheet| sheet.name == sheet_name)
         .ok_or_else(|| invalid(format!("worksheet '{sheet_name}' not found")))?;
-    let (_, charts) = load_sheet_pivot_charts(package, workbook_part, sheet, &tables)?;
+    let Some((_, _, charts)) = load_sheet_pivot_charts(package, workbook_part, sheet, &tables)?
+    else {
+        return Ok(Vec::new());
+    };
     Ok(charts)
 }
 
@@ -719,7 +751,7 @@ fn load_sheet_pivot_charts(
     workbook_part: &dyn Part,
     sheet: &WorksheetInfo,
     tables: &[PivotTable],
-) -> Result<(PackURI, Vec<PivotChart>)> {
+) -> Result<Option<(PackURI, PivotChartSheetKind, Vec<PivotChart>)>> {
     let relationship = workbook_part
         .rels()
         .get(&sheet.relationship_id)
@@ -729,13 +761,17 @@ fn load_sheet_pivot_charts(
                 sheet.name, sheet.relationship_id
             ))
         })?;
-    if !matches!(relationship.reltype(), rt::WORKSHEET | rt::STRICT_WORKSHEET) {
-        return Err(invalid(format!(
-            "worksheet '{}' relationship has invalid type '{}'",
-            sheet.name,
-            relationship.reltype()
-        )));
-    }
+    let (sheet_kind, expected_content_type) = match relationship.reltype() {
+        rt::WORKSHEET | rt::STRICT_WORKSHEET => {
+            (PivotChartSheetKind::Worksheet, ct::SML_WORKSHEET)
+        },
+        CHARTSHEET_REL | STRICT_CHARTSHEET_REL => {
+            (PivotChartSheetKind::Chartsheet, CHARTSHEET_CONTENT_TYPE)
+        },
+        // Dialog sheets, macro sheets, and other kinds cannot anchor charts
+        // and are skipped gracefully.
+        _ => return Ok(None),
+    };
     if relationship.is_external() {
         return Err(invalid(format!(
             "worksheet '{}' relationship cannot be external",
@@ -744,9 +780,9 @@ fn load_sheet_pivot_charts(
     }
     let sheet_uri = relationship.target_partname()?;
     let sheet_part = package.get_part(&sheet_uri)?;
-    if sheet_part.content_type() != ct::SML_WORKSHEET {
+    if sheet_part.content_type() != expected_content_type {
         return Err(OoxmlError::InvalidContentType {
-            expected: ct::SML_WORKSHEET.into(),
+            expected: expected_content_type.into(),
             got: sheet_part.content_type().into(),
         });
     }
@@ -824,7 +860,7 @@ fn load_sheet_pivot_charts(
             });
         }
     }
-    Ok((sheet_uri, charts))
+    Ok(Some((sheet_uri, sheet_kind, charts)))
 }
 
 /// Resolve a `c:pivotSource` name to the typed pivot-table model.
@@ -1118,16 +1154,42 @@ mod tests {
         )
     }
 
+    fn chartsheet_drawing_xml(chart_relationship_id: &str) -> String {
+        format!(
+            r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:c="{C}" xmlns:r="{R}">
+                <xdr:absoluteAnchor>
+                    <xdr:pos x="0" y="0"/><xdr:ext cx="8582025" cy="5838825"/>
+                    <xdr:graphicFrame><a:graphic><a:graphicData>
+                        <c:chart r:id="{chart_relationship_id}"/>
+                    </a:graphicData></a:graphic></xdr:graphicFrame>
+                    <xdr:clientData/>
+                </xdr:absoluteAnchor>
+            </xdr:wsDr>"#
+        )
+    }
+
     fn package_with_pivot_chart(chart_xml: &str) -> (OpcPackage, PackURI) {
+        package_with_chart_variants(chart_xml, None)
+    }
+
+    fn package_with_chart_variants(
+        chart_xml: &str,
+        chartsheet_chart_xml: Option<&str>,
+    ) -> (OpcPackage, PackURI) {
         let mut package = OpcPackage::new();
         let chart_uri = PackURI::new("/xl/charts/chart1.xml").unwrap();
+        let chartsheet_sheet_entry = chartsheet_chart_xml
+            .map(|_| r#"<sheet name="ChartSheet1" sheetId="3" r:id="rId4"/>"#)
+            .unwrap_or_default();
         let mut workbook_part = BlobPart::new(
             PackURI::new("/xl/workbook.xml").unwrap(),
             ct::SML_SHEET_MAIN.to_string(),
             format!(
                 r#"<workbook xmlns="{SML}" xmlns:r="{R}">
                     <sheets><sheet name="Pivot" sheetId="1" r:id="rId1"/>
-                        <sheet name="Source" sheetId="2" r:id="rId2"/></sheets>
+                        <sheet name="Source" sheetId="2" r:id="rId2"/>{chartsheet_sheet_entry}</sheets>
                     <pivotCaches><pivotCache cacheId="7" r:id="rId3"/></pivotCaches>
                 </workbook>"#
             )
@@ -1139,6 +1201,9 @@ mod tests {
             "pivotCache/pivotCacheDefinition1.xml",
             rt::PIVOT_CACHE_DEFINITION,
         );
+        if chartsheet_chart_xml.is_some() {
+            workbook_part.relate_to("chartsheets/sheet1.xml", CHARTSHEET_REL);
+        }
         let mut sheet_part = BlobPart::new(
             PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
             ct::SML_WORKSHEET.to_string(),
@@ -1210,6 +1275,30 @@ mod tests {
             .into_bytes(),
         )));
         package.add_part(Box::new(table_part));
+        if let Some(chartsheet_chart_xml) = chartsheet_chart_xml {
+            let mut chartsheet_part = BlobPart::new(
+                PackURI::new("/xl/chartsheets/sheet1.xml").unwrap(),
+                CHARTSHEET_CONTENT_TYPE.to_string(),
+                format!(
+                    r#"<chartsheet xmlns="{SML}" xmlns:r="{R}"><drawing r:id="rId1"/></chartsheet>"#
+                )
+                .into_bytes(),
+            );
+            chartsheet_part.relate_to("../drawings/drawing2.xml", rt::DRAWING);
+            let mut chartsheet_drawing_part = BlobPart::new(
+                PackURI::new("/xl/drawings/drawing2.xml").unwrap(),
+                ct::OFC_DRAWING.to_string(),
+                chartsheet_drawing_xml("rId1").into_bytes(),
+            );
+            chartsheet_drawing_part.relate_to("../charts/chart2.xml", rt::CHART);
+            package.add_part(Box::new(chartsheet_part));
+            package.add_part(Box::new(chartsheet_drawing_part));
+            package.add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/charts/chart2.xml").unwrap(),
+                ct::DML_CHART.to_string(),
+                chartsheet_chart_xml.as_bytes().to_vec(),
+            )));
+        }
         (package, chart_uri)
     }
 
@@ -1221,6 +1310,7 @@ mod tests {
         assert_eq!(sheets.len(), 1);
         assert_eq!(sheets[0].worksheet_name, "Pivot");
         assert_eq!(sheets[0].worksheet_part_name, "/xl/worksheets/sheet1.xml");
+        assert_eq!(sheets[0].sheet_kind, PivotChartSheetKind::Worksheet);
         assert_eq!(sheets[0].pivot_charts.len(), 1);
         let chart = &sheets[0].pivot_charts[0];
         assert_eq!(chart.part_name, chart_uri.to_string());
@@ -1293,6 +1383,49 @@ mod tests {
     }
 
     #[test]
+    fn resolves_chartsheet_hosted_pivot_chart() {
+        // A workbook with a chartsheet hosting a pivot chart bound to the
+        // same pivot table as the worksheet-hosted chart.
+        let (package, _) = package_with_chart_variants(
+            &pivot_chart_xml("Pivot!PivotOne"),
+            Some(&pivot_chart_xml("[Book1.xlsx]Pivot!PivotOne")),
+        );
+        let sheets = load_pivot_charts(&package).unwrap();
+        assert_eq!(sheets.len(), 2);
+        let worksheet_entry = sheets
+            .iter()
+            .find(|entry| entry.worksheet_name == "Pivot")
+            .unwrap();
+        assert_eq!(worksheet_entry.sheet_kind, PivotChartSheetKind::Worksheet);
+        let chartsheet_entry = sheets
+            .iter()
+            .find(|entry| entry.worksheet_name == "ChartSheet1")
+            .unwrap();
+        assert_eq!(chartsheet_entry.sheet_kind, PivotChartSheetKind::Chartsheet);
+        assert_eq!(
+            chartsheet_entry.worksheet_part_name,
+            "/xl/chartsheets/sheet1.xml"
+        );
+        assert_eq!(chartsheet_entry.pivot_charts.len(), 1);
+        let chart = &chartsheet_entry.pivot_charts[0];
+        assert_eq!(chart.part_name, "/xl/charts/chart2.xml");
+        assert_eq!(chart.pivot_table.name, "PivotOne");
+        assert_eq!(chart.pivot_table.sheet_name, "Pivot");
+
+        // The per-sheet accessor works for chartsheets too.
+        let charts = load_worksheet_pivot_charts(&package, "ChartSheet1").unwrap();
+        assert_eq!(charts.len(), 1);
+        assert_eq!(charts[0].pivot_table.name, "PivotOne");
+
+        // A dangling binding on a chartsheet is still an error.
+        let (package, _) = package_with_chart_variants(
+            &pivot_chart_xml("Pivot!PivotOne"),
+            Some(&pivot_chart_xml("Pivot!MissingTable")),
+        );
+        assert!(load_pivot_charts(&package).is_err());
+    }
+
+    #[test]
     fn poi_fixture_pivot_chart_part_parses() {
         let package = OpcPackage::from_bytes(POI_PIVOT_CHART).unwrap();
         let chart_part = package
@@ -1307,5 +1440,37 @@ mod tests {
         assert_eq!(sheet.as_deref(), Some("Sheet2"));
         assert_eq!(table, "PivotTable2");
         assert!(!binding.series.is_empty());
+    }
+
+    #[test]
+    fn poi_fixture_pivot_tables_and_chartsheet_chart_load() {
+        let package = OpcPackage::from_bytes(POI_PIVOT_CHART).unwrap();
+        // The workbook contains a chartsheet; the pivot-table read path that
+        // used to reject it now tolerates it.
+        let tables = read_pivot_tables(&package).unwrap();
+        assert_eq!(tables.len(), 5);
+        assert!(
+            tables
+                .iter()
+                .any(|table| table.name == "PivotTable2" && table.sheet_name == "Sheet2")
+        );
+
+        // The chartsheet-hosted pivot chart resolves through binding
+        // validation to its qualified pivot table.
+        let sheets = load_pivot_charts(&package).unwrap();
+        assert_eq!(sheets.len(), 1);
+        assert_eq!(sheets[0].worksheet_name, "Chart2");
+        assert_eq!(sheets[0].sheet_kind, PivotChartSheetKind::Chartsheet);
+        assert_eq!(sheets[0].worksheet_part_name, "/xl/chartsheets/sheet1.xml");
+        assert_eq!(sheets[0].pivot_charts.len(), 1);
+        let chart = &sheets[0].pivot_charts[0];
+        assert_eq!(chart.part_name, "/xl/charts/chart1.xml");
+        assert_eq!(chart.pivot_source.name, "[CVT23.tmp]Sheet2!PivotTable2");
+        assert_eq!(chart.pivot_table.name, "PivotTable2");
+        assert_eq!(chart.pivot_table.sheet_name, "Sheet2");
+
+        let charts = load_worksheet_pivot_charts(&package, "Chart2").unwrap();
+        assert_eq!(charts.len(), 1);
+        assert!(load_worksheet_pivot_charts(&package, "Sheet1").unwrap().is_empty());
     }
 }

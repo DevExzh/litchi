@@ -35,13 +35,10 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
                     worksheet.name, worksheet.relationship_id
                 )
             })?;
+        // Non-worksheet sheets (chartsheets, dialog sheets, macro sheets)
+        // cannot host pivot tables and are skipped rather than rejected.
         if !matches!(rel.reltype(), rt::WORKSHEET | rt::STRICT_WORKSHEET) {
-            return Err(format!(
-                "worksheet '{}' relationship has invalid type '{}'",
-                worksheet.name,
-                rel.reltype()
-            )
-            .into());
+            continue;
         }
         if rel.is_external() {
             return Err(format!(
@@ -77,10 +74,12 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
     let mut tables = Vec::new();
 
     for ws_info in workbook.sheets {
-        let sheet_uri = worksheet_uris
-            .get(&ws_info.relationship_id)
-            .ok_or("resolved worksheet URI is missing")?
-            .clone();
+        // Sheets skipped above (chartsheets and other non-worksheet kinds)
+        // have no resolved worksheet URI and are ignored here as well.
+        let Some(sheet_uri) = worksheet_uris.get(&ws_info.relationship_id) else {
+            continue;
+        };
+        let sheet_uri = sheet_uri.clone();
         let sheet_part = package.get_part(&sheet_uri)?;
         let sheet_rels = sheet_part.rels();
 
@@ -1742,6 +1741,48 @@ mod tests {
         assert_eq!(tables[0].source_ref.as_deref(), Some("$A$1:$B$3"));
         assert_eq!(tables[0].field_names, ["Cache Region"]);
         assert_eq!(tables[0].row_fields[0].field_name, "Cache Region");
+    }
+
+    #[test]
+    fn tolerates_chartsheet_entries_in_sheet_walk() {
+        let (mut package, _) = package_with_pivot_table();
+        let workbook_uri = PackURI::new("/custom/book.xml").unwrap();
+        let workbook_part = package.get_part_mut(&workbook_uri).unwrap();
+        let updated = std::str::from_utf8(workbook_part.blob())
+            .unwrap()
+            .replace(
+                "</sheets>",
+                r#"<sheet name="Chart1" sheetId="3" r:id="rId4"/></sheets>"#,
+            );
+        workbook_part.set_blob(updated.into_bytes());
+        workbook_part.relate_to(
+            "chartsheets/chart1.xml",
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet",
+        );
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/custom/chartsheets/chart1.xml").unwrap(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml"
+                .to_string(),
+            Vec::new(),
+        )));
+
+        let tables = read_pivot_tables(&package).unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].name, "PivotOne");
+    }
+
+    #[test]
+    fn poi_fixture_with_chartsheet_reads_pivot_tables() {
+        const POI_CHARTSHEET: &[u8] =
+            include_bytes!("../../../../../test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx");
+        let package = OpcPackage::from_bytes(POI_CHARTSHEET).unwrap();
+        let tables = read_pivot_tables(&package).unwrap();
+        assert_eq!(tables.len(), 5);
+        assert!(
+            tables
+                .iter()
+                .any(|table| table.name == "PivotTable2" && table.sheet_name == "Sheet2")
+        );
     }
 
     #[test]

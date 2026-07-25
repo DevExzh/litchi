@@ -1,4 +1,8 @@
-//! Namespace-aware parsing for SpreadsheetDrawing worksheet parts.
+//! Namespace-aware parsing for SpreadsheetDrawing worksheet and chartsheet parts.
+//!
+//! Both `xdr:twoCellAnchor` (worksheets) and `xdr:absoluteAnchor`
+//! (chartsheets) are understood; absolute anchors record a zero placeholder
+//! anchor because they carry EMU positions rather than cell markers.
 
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -39,6 +43,7 @@ pub(crate) struct ParsedChart {
 enum Context {
     Root,
     TwoCellAnchor,
+    AbsoluteAnchor,
     From,
     To,
     Marker(MarkerTarget, MarkerField),
@@ -207,6 +212,18 @@ impl Parser {
             self.anchor = Some(PendingAnchor::default());
             return Ok(Context::TwoCellAnchor);
         }
+        if parent == Context::Root
+            && is_spreadsheet_drawing_name(namespace, element.name(), b"absoluteAnchor")
+        {
+            if self.anchor.is_some() {
+                return Err(invalid("nested drawing anchor"));
+            }
+            if self.drawing.pictures.len() + self.drawing.charts.len() >= MAX_DRAWING_ANCHORS {
+                return Err(invalid("drawing exceeds the anchor limit"));
+            }
+            self.anchor = Some(PendingAnchor::default());
+            return Ok(Context::AbsoluteAnchor);
+        }
         if parent == Context::TwoCellAnchor
             && is_spreadsheet_drawing_name(namespace, element.name(), b"from")
         {
@@ -276,6 +293,7 @@ impl Parser {
         match context {
             Context::Marker(target, field) => self.finish_marker(target, field),
             Context::TwoCellAnchor => self.finish_anchor(),
+            Context::AbsoluteAnchor => self.finish_absolute_anchor(),
             _ => Ok(()),
         }
     }
@@ -316,16 +334,20 @@ impl Parser {
     }
 
     fn finish_anchor(&mut self) -> Result<()> {
-        let pending = self
+        let PendingAnchor {
+            from,
+            to,
+            picture_relationship_id,
+            chart_relationship_id,
+            description,
+        } = self
             .anchor
             .take()
             .ok_or_else(|| invalid("missing pending drawing anchor"))?;
-        let (from_col, from_col_offset, from_row, from_row_offset) = pending
-            .from
+        let (from_col, from_col_offset, from_row, from_row_offset) = from
             .ok_or_else(|| invalid("drawing anchor is missing from marker"))?
             .finish("drawing from marker")?;
-        let (to_col, to_col_offset, to_row, to_row_offset) = pending
-            .to
+        let (to_col, to_col_offset, to_row, to_row_offset) = to
             .ok_or_else(|| invalid("drawing anchor is missing to marker"))?
             .finish("drawing to marker")?;
         if from_col >= 16_384 || to_col >= 16_384 || from_row >= 1_048_576 || to_row >= 1_048_576 {
@@ -348,16 +370,52 @@ impl Parser {
             to_row,
             to_row_offset,
         );
-        match (
-            pending.picture_relationship_id,
-            pending.chart_relationship_id,
-        ) {
-            (Some(relationship_id), None) => self.drawing.pictures.push(ParsedPicture {
+        Self::push_anchor_object(
+            &mut self.drawing,
+            picture_relationship_id,
+            chart_relationship_id,
+            description,
+            anchor,
+        )
+    }
+
+    /// Finish an `xdr:absoluteAnchor` (the only anchor kind chartsheets
+    /// use). It carries EMU positions instead of cell markers, so the
+    /// recorded anchor is a zero placeholder; callers that only need the
+    /// anchored chart or picture are unaffected.
+    fn finish_absolute_anchor(&mut self) -> Result<()> {
+        let PendingAnchor {
+            picture_relationship_id,
+            chart_relationship_id,
+            description,
+            ..
+        } = self
+            .anchor
+            .take()
+            .ok_or_else(|| invalid("missing pending drawing anchor"))?;
+        Self::push_anchor_object(
+            &mut self.drawing,
+            picture_relationship_id,
+            chart_relationship_id,
+            description,
+            ChartAnchor::new(0, 0, 0, 0),
+        )
+    }
+
+    fn push_anchor_object(
+        drawing: &mut ParsedDrawing,
+        picture_relationship_id: Option<String>,
+        chart_relationship_id: Option<String>,
+        description: Option<String>,
+        anchor: ChartAnchor,
+    ) -> Result<()> {
+        match (picture_relationship_id, chart_relationship_id) {
+            (Some(relationship_id), None) => drawing.pictures.push(ParsedPicture {
                 anchor,
                 relationship_id,
-                description: pending.description,
+                description,
             }),
-            (None, Some(relationship_id)) => self.drawing.charts.push(ParsedChart {
+            (None, Some(relationship_id)) => drawing.charts.push(ParsedChart {
                 anchor,
                 relationship_id,
             }),
@@ -458,6 +516,30 @@ mod tests {
         assert_eq!(drawing.charts.len(), 1);
         assert_eq!(drawing.charts[0].relationship_id, "chart-rel");
         assert_eq!(drawing.charts[0].anchor.to_col, 9);
+    }
+
+    #[test]
+    fn parses_chartsheet_absolute_anchor_chart() {
+        // Chartsheet drawings anchor their chart through xdr:absoluteAnchor.
+        let xml = r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <xdr:absoluteAnchor><xdr:pos x="0" y="0"/><xdr:ext cx="8582025" cy="5838825"/>
+                <xdr:graphicFrame macro=""><a:graphic><a:graphicData>
+                    <c:chart r:id="chart-rel"/>
+                </a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:absoluteAnchor>
+        </xdr:wsDr>"#;
+
+        let drawing = parse_drawing_xml(xml).unwrap().unwrap();
+        assert!(drawing.pictures.is_empty());
+        assert_eq!(drawing.charts.len(), 1);
+        assert_eq!(drawing.charts[0].relationship_id, "chart-rel");
+        // Absolute anchors record a zero placeholder anchor.
+        assert_eq!(drawing.charts[0].anchor.to_col, 0);
+
+        let empty = r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"><xdr:absoluteAnchor/></xdr:wsDr>"#;
+        assert!(parse_drawing_xml(empty).is_err());
     }
 
     #[test]

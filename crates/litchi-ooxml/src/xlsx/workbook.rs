@@ -3244,7 +3244,8 @@ impl Workbook {
             .collect())
     }
 
-    /// Load the typed pivot-chart bindings anchored on one worksheet.
+    /// Load the typed pivot-chart bindings anchored on one worksheet or
+    /// chartsheet.
     ///
     /// Each returned pivot chart has its `c:pivotSource` name resolved to the
     /// typed pivot-table model; broken or dangling bindings are errors.

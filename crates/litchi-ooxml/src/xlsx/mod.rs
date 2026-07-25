@@ -304,8 +304,8 @@ pub use pivot::{
 // Re-export pivot-chart binding types
 pub use pivot_chart::{
     PIVOT_OPTIONS_EXTENSION_URI, PivotChart, PivotChartBinding, PivotChartDropZoneVisibility,
-    PivotChartFieldType, PivotChartPivotOptions, PivotChartSeries, PivotChartSource,
-    WorksheetPivotCharts, load_pivot_charts, load_worksheet_pivot_charts,
+    PivotChartFieldType, PivotChartPivotOptions, PivotChartSeries, PivotChartSheetKind,
+    PivotChartSource, WorksheetPivotCharts, load_pivot_charts, load_worksheet_pivot_charts,
     parse_pivot_chart_binding,
 };
 // Re-export writer types
