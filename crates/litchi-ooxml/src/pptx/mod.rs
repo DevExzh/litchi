@@ -154,6 +154,7 @@ pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
 pub use hyperlinks::Hyperlink;
 pub use ink::{INK_CONTENT_TYPE, PptxInkAnnotation, StoredInkAnnotation, store_slide_ink_annotation};
+pub(crate) mod slide_patch;
 pub use laser::{
     LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint, store_slide_laser_trace,
 };
