@@ -9,8 +9,10 @@ use crate::charts::{
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
     ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
     ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
-    ChartShadow, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelDecimalPlaces,
+    ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
+    ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
+    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -2697,6 +2699,103 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
     assert!(
         reopened
             .slide_chart_series_value_label_affix(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(2),
+            )
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_series_value_label_number_format_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let defaults = vec![ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT; 2];
+    let fixed_two = ChartSeriesValueLabelNumberFormat::new(
+        ChartSeriesValueLabelDecimalPlaces::fixed(2).unwrap(),
+        ChartSeriesValueLabelNegativeStyle::Parentheses,
+        false,
+    );
+    let customized = vec![fixed_two, ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT];
+
+    assert_eq!(
+        editor
+            .slide_chart_series_value_label_number_formats(0, source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_series_value_label_number_formats(0, source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    editor
+        .set_slide_chart_series_value_label_number_formats(
+            0,
+            source.drawable_object_id,
+            &customized,
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_series_value_label_number_format(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(0),
+            )
+            .unwrap(),
+        fixed_two
+    );
+
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    editor
+        .set_slide_chart_series_value_label_number_format(
+            0,
+            source.drawable_object_id,
+            ChartSeriesIndex::from_zero_based(0),
+            ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT,
+        )
+        .unwrap();
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_series_value_label_number_formats(0, source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_series_value_label_number_formats(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+
+    let before_rejected = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_slide_chart_series_value_label_number_formats(
+                0,
+                source.drawable_object_id,
+                &customized[..1],
+            )
+            .is_err()
+    );
+    assert!(
+        reopened
+            .slide_chart_series_value_label_number_format(
                 0,
                 source.drawable_object_id,
                 ChartSeriesIndex::from_zero_based(2),

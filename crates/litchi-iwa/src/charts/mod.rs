@@ -38,6 +38,7 @@ pub(crate) mod series_non_style;
 pub(crate) mod series_style;
 pub(crate) mod series_value_label_affixes;
 pub(crate) mod series_value_label_location;
+pub(crate) mod series_value_label_number_format;
 pub(crate) mod series_value_labels;
 pub(crate) mod shadow;
 pub(crate) mod source;
@@ -62,6 +63,10 @@ pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
 pub use series_value_label_affixes::ChartSeriesValueLabelAffixes;
 pub use series_value_label_location::ChartSeriesValueLabelLocation;
+pub use series_value_label_number_format::{
+    ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelFixedDecimalPlaces,
+    ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
+};
 pub use series_value_labels::{ChartSeriesIndex, ChartSeriesValueLabelVisibility};
 pub use shadow::ChartShadow;
 

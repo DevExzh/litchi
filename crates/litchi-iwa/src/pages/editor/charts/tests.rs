@@ -9,8 +9,10 @@ use crate::charts::{
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
     ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
     ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
-    ChartShadow, ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelDecimalPlaces,
+    ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
+    ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
+    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::shapes::{
     RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
@@ -2832,6 +2834,106 @@ fn scratch_document_supports_native_series_value_label_affix_crud() {
     assert!(
         reopened
             .body_chart_series_value_label_affix(
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(2),
+            )
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+    reopened
+        .remove_body_chart(source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
+}
+
+#[test]
+fn scratch_document_supports_native_series_value_label_number_format_crud() {
+    const BODY_TEXT: &str = "Chart value-label number formats";
+
+    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let source = editor
+        .add_body_chart(
+            BODY_TEXT.encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let defaults = vec![ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT; 2];
+    let fixed_two = ChartSeriesValueLabelNumberFormat::new(
+        ChartSeriesValueLabelDecimalPlaces::fixed(2).unwrap(),
+        ChartSeriesValueLabelNegativeStyle::Parentheses,
+        false,
+    );
+    let customized = vec![fixed_two, ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT];
+
+    assert_eq!(
+        editor
+            .body_chart_series_value_label_number_formats(source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_body_chart_series_value_label_number_formats(source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    editor
+        .set_body_chart_series_value_label_number_formats(source.drawable_object_id, &customized)
+        .unwrap();
+    assert_eq!(
+        editor
+            .body_chart_series_value_label_number_format(
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(0),
+            )
+            .unwrap(),
+        fixed_two
+    );
+
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    editor
+        .set_body_chart_series_value_label_number_format(
+            source.drawable_object_id,
+            ChartSeriesIndex::from_zero_based(0),
+            ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT,
+        )
+        .unwrap();
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body_chart_series_value_label_number_formats(source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    assert_eq!(
+        reopened
+            .body_chart_series_value_label_number_formats(duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+
+    let before_rejected = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_body_chart_series_value_label_number_formats(
+                source.drawable_object_id,
+                &customized[..1],
+            )
+            .is_err()
+    );
+    assert!(
+        reopened
+            .body_chart_series_value_label_number_format(
                 source.drawable_object_id,
                 ChartSeriesIndex::from_zero_based(2),
             )
