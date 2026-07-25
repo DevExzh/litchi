@@ -94,7 +94,9 @@ pub use content_control::{ContentControlType, MutableContentControl};
 pub use theme::{ColorScheme, MutableTheme};
 
 // Re-export watermark types
-pub use watermark::Watermark;
+pub use watermark::{
+    ImageWatermark, ImageWatermarkAnchor, MAX_WATERMARK_IMAGE_BYTES, Watermark, WatermarkLayout,
+};
 
 // Re-export TOC types
 pub use toc::TableOfContents;

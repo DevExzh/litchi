@@ -393,7 +393,7 @@ impl WatermarkCandidate {
         // Word writes rotation:315 for diagonal watermarks and omits the
         // rotation declaration for horizontal ones.
         let layout = match self.rotation {
-            Some(rotation) if rotation == 315.0 => WatermarkLayout::Diagonal,
+            Some(315.0) => WatermarkLayout::Diagonal,
             _ => WatermarkLayout::Horizontal,
         };
         Some(Watermark {

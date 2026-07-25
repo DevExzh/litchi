@@ -110,7 +110,7 @@ pub use chart::{
 pub use comment::Comment;
 pub use content_control::ContentControl;
 pub use custom_xml::{CustomXmlBinding, CustomXmlPart, NewCustomXmlDataStore};
-pub use document::Document;
+pub use document::{Document, ImageWatermarkPart};
 pub use drawing::{DrawingObject, ShapeType};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::CompareField;
@@ -214,7 +214,8 @@ pub use writer::{
     DocumentGridType, NoteNumberRestart, SectionColumn, SectionColumns, SectionDocumentGrid,
     SectionHeaderFooterPart, SectionHeaderFooterReference, SectionNoteProperties,
     SectionPageNumbering, SectionProperties, SectionTextDirection, TableBorder, TableBorders,
-    TableOfContents, Watermark,
+    TableOfContents, Watermark, WatermarkLayout, ImageWatermark, ImageWatermarkAnchor,
+    MAX_WATERMARK_IMAGE_BYTES,
     generate_styles_xml,
 };
 // Note: writer::Note is not re-exported to avoid naming conflict with footnote::Note

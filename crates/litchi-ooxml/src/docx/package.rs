@@ -2415,10 +2415,32 @@ impl Package {
 
                 // Handle watermark headers before generating document XML
                 // This ensures header relationships are properly set up
-                if mutable_doc.has_watermark() {
+                if mutable_doc.has_watermark() || mutable_doc.has_image_watermark() {
                     // Generate user header content if exists (will be merged with watermark)
                     let user_header_content = if mutable_doc.has_header() {
                         mutable_doc.generate_header_xml()?
+                    } else {
+                        None
+                    };
+
+                    // Store the watermark image as an ordinary media part,
+                    // shared by all three headers.
+                    let image_media_name = if let Some(image_watermark) =
+                        mutable_doc.image_watermark.as_ref()
+                    {
+                        let media_name = format!(
+                            "/word/media/watermarkImage1.{}",
+                            image_watermark.format().extension()
+                        );
+                        let media_uri = PackURI::new(&media_name).map_err(|e| {
+                            OoxmlError::InvalidUri(format!("watermark image URI: {}", e))
+                        })?;
+                        self.opc.add_part(Box::new(BlobPart::new(
+                            media_uri,
+                            image_watermark.format().mime_type().to_string(),
+                            image_watermark.data().to_vec(),
+                        )));
+                        Some(media_name)
                     } else {
                         None
                     };
@@ -2432,58 +2454,73 @@ impl Package {
 
                     for (idx, (header_uri_path, header_filename)) in header_types.iter().enumerate()
                     {
+                        let mut watermark_xml = String::new();
                         if let Some(wm) = mutable_doc.watermark.as_ref() {
-                            let watermark_xml = wm.to_header_xml((idx + 1) as u32)?;
+                            watermark_xml.push_str(&wm.to_header_xml((idx + 1) as u32)?);
+                        }
 
-                            // Merge user header content with watermark for the default header
-                            let header_xml = if idx == 0
-                                && let Some(ref user_content) = user_header_content
-                            {
-                                // Extract user paragraphs from the <w:hdr>...</w:hdr> wrapper
-                                let user_paragraphs = if let Some(start) = user_content.find("<w:p")
-                                {
-                                    if let Some(end) = user_content.rfind("</w:hdr>") {
-                                        &user_content[start..end]
-                                    } else {
-                                        ""
-                                    }
+                        let header_uri = PackURI::new(*header_uri_path).map_err(|e| {
+                            OoxmlError::InvalidUri(format!("header URI: {}", e))
+                        })?;
+                        let mut header_part = BlobPart::new(
+                            header_uri,
+                            ct::WML_HEADER.to_string(),
+                            Vec::new(),
+                        );
+
+                        // The image watermark references the media part
+                        // through a relationship owned by this header part.
+                        if let (Some(image_watermark), Some(media_name)) = (
+                            mutable_doc.image_watermark.as_ref(),
+                            image_media_name.as_deref(),
+                        ) {
+                            let media_target = media_name
+                                .strip_prefix("/word/")
+                                .unwrap_or(media_name);
+                            let rel_id = header_part.relate_to(media_target, rt::IMAGE);
+                            watermark_xml.push_str(
+                                &image_watermark.to_header_xml((idx + 1) as u32, &rel_id)?,
+                            );
+                        }
+
+                        // Merge user header content with watermark for the default header
+                        let header_xml = if idx == 0
+                            && let Some(ref user_content) = user_header_content
+                        {
+                            // Extract user paragraphs from the <w:hdr>...</w:hdr> wrapper
+                            let user_paragraphs = if let Some(start) = user_content.find("<w:p") {
+                                if let Some(end) = user_content.rfind("</w:hdr>") {
+                                    &user_content[start..end]
                                 } else {
                                     ""
-                                };
-
-                                // Combine watermark and user content
-                                format!(
-                                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{}{}</w:hdr>"#,
-                                    watermark_xml, user_paragraphs
-                                )
+                                }
                             } else {
-                                // Just watermark for first and even headers
-                                format!(
-                                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{}</w:hdr>"#,
-                                    watermark_xml
-                                )
+                                ""
                             };
 
-                            let header_uri = PackURI::new(*header_uri_path).map_err(|e| {
-                                OoxmlError::InvalidUri(format!("header URI: {}", e))
-                            })?;
+                            // Combine watermark and user content
+                            format!(
+                                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{}{}</w:hdr>"#,
+                                watermark_xml, user_paragraphs
+                            )
+                        } else {
+                            // Just watermark for first and even headers
+                            format!(
+                                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{}</w:hdr>"#,
+                                watermark_xml
+                            )
+                        };
 
-                            let header_part = BlobPart::new(
-                                header_uri,
-                                ct::WML_HEADER.to_string(),
-                                header_xml.into_bytes(),
-                            );
+                        header_part.set_blob(header_xml.into_bytes());
+                        self.opc.add_part(Box::new(header_part));
 
-                            self.opc.add_part(Box::new(header_part));
-
-                            // Add relationship for the default header
-                            if idx == 0 {
-                                let rid = temp_part.relate_to(header_filename, rt::HEADER);
-                                rel_mapper.set_header_id(rid);
-                            } else {
-                                // Other headers are added but not set in rel_mapper (they're referenced in sectPr)
-                                temp_part.relate_to(header_filename, rt::HEADER);
-                            }
+                        // Add relationship for the default header
+                        if idx == 0 {
+                            let rid = temp_part.relate_to(header_filename, rt::HEADER);
+                            rel_mapper.set_header_id(rid);
+                        } else {
+                            // Other headers are added but not set in rel_mapper (they're referenced in sectPr)
+                            temp_part.relate_to(header_filename, rt::HEADER);
                         }
                     }
                 }

@@ -211,6 +211,17 @@ impl HeaderFooter {
         let xml = self.semantic_xml()?;
         Watermark::from_header_xml(xml.as_slice())
     }
+
+    /// Return picture watermark anchors embedded in this header.
+    ///
+    /// Each anchor carries the relationship ID of the `v:imagedata`
+    /// reference plus the shape geometry; resolving the media part bytes
+    /// requires the header part's relationships (see
+    /// [`crate::docx::Document::image_watermarks`]).
+    pub fn image_watermarks(&self) -> Result<Vec<crate::docx::writer::ImageWatermarkAnchor>> {
+        let xml = self.semantic_xml()?;
+        crate::docx::writer::ImageWatermarkAnchor::from_header_xml(xml.as_slice())
+    }
 }
 
 #[cfg(test)]

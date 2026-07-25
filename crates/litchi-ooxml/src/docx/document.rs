@@ -78,6 +78,25 @@ pub struct Document<'a> {
     opc: &'a OpcPackage,
 }
 
+/// A picture watermark discovered in a document header, with its media part
+/// resolved through the header part's relationships.
+///
+/// The payload is an inert borrowed byte view into the package; it is never
+/// decoded, executed, or displayed.
+#[derive(Debug)]
+pub struct ImageWatermarkPart<'a> {
+    /// Part name of the header carrying the watermark shape.
+    pub source_header_name: String,
+    /// Relationship ID of the `v:imagedata` reference in the header.
+    pub relationship_id: String,
+    /// Part name of the media part (e.g. `/word/media/watermarkImage1.png`).
+    pub part_name: String,
+    /// Declared OPC content type of the media part.
+    pub content_type: &'a str,
+    /// Original payload bytes held by the package.
+    pub bytes: &'a [u8],
+}
+
 impl<'a> Document<'a> {
     /// Create a new Document from a DocumentPart and OpcPackage reference.
     ///
@@ -861,6 +880,56 @@ impl<'a> Document<'a> {
             }
         }
         Ok(watermarks)
+    }
+
+    /// Return picture watermarks from document headers with their media
+    /// parts resolved.
+    ///
+    /// Each entry pairs a `v:imagedata` anchor discovered in a header with
+    /// the relationship-resolved media part name and payload bytes. The
+    /// payload is an inert byte view; it is never decoded or displayed.
+    pub fn image_watermarks(&self) -> Result<Vec<ImageWatermarkPart<'_>>> {
+        let main_part = self.opc.main_document_part()?;
+        let mut parts = Vec::new();
+        for rel in main_part.rels().iter() {
+            if rel.reltype() != relationship_type::HEADER {
+                continue;
+            }
+            let target = rel.target_partname()?;
+            let header_part = self.opc.get_part(&target)?;
+            let header = HeaderFooter::from_part(header_part, WdHeaderFooter::Primary)?;
+            for anchor in header.image_watermarks()? {
+                let image_rel = header_part
+                    .rels()
+                    .get(anchor.relationship_id())
+                    .ok_or_else(|| {
+                        OoxmlError::InvalidFormat(format!(
+                            "watermark image relationship '{}' is missing from {}",
+                            anchor.relationship_id(),
+                            target.as_str()
+                        ))
+                    })?;
+                if image_rel.is_external() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "external watermark image relationship is rejected".to_string(),
+                    ));
+                }
+                let image_target = image_rel.target_partname().map_err(|error| {
+                    OoxmlError::InvalidFormat(format!(
+                        "invalid watermark image target: {error}"
+                    ))
+                })?;
+                let image_part = self.opc.get_part(&image_target)?;
+                parts.push(ImageWatermarkPart {
+                    source_header_name: target.as_str().to_owned(),
+                    relationship_id: anchor.relationship_id().to_owned(),
+                    part_name: image_target.as_str().to_owned(),
+                    content_type: image_part.content_type(),
+                    bytes: image_part.blob(),
+                });
+            }
+        }
+        Ok(parts)
     }
 
     /// Get all footers in the document.

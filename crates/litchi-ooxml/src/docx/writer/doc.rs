@@ -17,7 +17,7 @@ use super::vml_shape::MutableVmlShape;
 use super::table::MutableTable;
 use super::theme::MutableTheme;
 use super::toc::TableOfContents;
-use super::watermark::Watermark;
+use super::watermark::{ImageWatermark, Watermark};
 use std::collections::HashSet;
 // Import settings types
 use super::super::settings::ProtectionType;
@@ -49,6 +49,8 @@ pub struct MutableDocument {
     theme: Option<MutableTheme>,
     /// Watermark (optional)
     pub(crate) watermark: Option<Watermark>,
+    /// Image watermark (optional)
+    pub(crate) image_watermark: Option<ImageWatermark>,
     /// Table of Contents configuration (optional)
     toc_config: Option<(usize, TableOfContents)>, // (insertion index, config)
     /// Whether the document has been modified
@@ -222,6 +224,7 @@ impl MutableDocument {
             section: SectionProperties::default(),
             theme: None,
             watermark: None,
+            image_watermark: None,
             modified: false,
             preserved_prefix: None,
             preserved_suffix: None,
@@ -254,6 +257,7 @@ impl MutableDocument {
             section,
             theme: None,
             watermark: None,
+            image_watermark: None,
             modified: false,
             preserved_prefix: Some(parsed.prefix),
             preserved_suffix: Some(parsed.suffix),
@@ -815,6 +819,30 @@ impl MutableDocument {
     /// Check if the document has a watermark.
     pub fn has_watermark(&self) -> bool {
         self.watermark.is_some()
+    }
+
+    /// Set an image watermark for the document.
+    ///
+    /// The image is stored verbatim as a media part and referenced from VML
+    /// watermark shapes in the headers with centered default geometry; it is
+    /// discoverable through [`crate::docx::Document::image_watermarks`] after
+    /// save and reopen.
+    pub fn set_image_watermark(&mut self, watermark: ImageWatermark) {
+        self.image_watermark = Some(watermark);
+        self.modified = true;
+    }
+
+    /// Remove the image watermark from the document.
+    pub fn remove_image_watermark(&mut self) {
+        if self.image_watermark.is_some() {
+            self.image_watermark = None;
+            self.modified = true;
+        }
+    }
+
+    /// Check if the document has an image watermark.
+    pub fn has_image_watermark(&self) -> bool {
+        self.image_watermark.is_some()
     }
 
     /// Add a table of contents at the current position in the document.
