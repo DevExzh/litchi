@@ -38,7 +38,9 @@ impl NumbersEditor {
 mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
-    use crate::table_appearance::{TableRowBanding, TableRowSizing};
+    use crate::table_appearance::{
+        TableGridlineVisibility, TableGridlines, TableRowBanding, TableRowSizing,
+    };
 
     #[test]
     fn scratch_table_appearance_is_copy_on_write() {
@@ -52,6 +54,10 @@ mod tests {
         let appearance = TableAppearance {
             row_banding: TableRowBanding::Enabled,
             row_sizing: TableRowSizing::FitCellContents,
+            gridlines: TableGridlines {
+                body_horizontal: TableGridlineVisibility::Hidden,
+                body_vertical: TableGridlineVisibility::Visible,
+            },
         };
 
         editor

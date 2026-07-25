@@ -1,5 +1,7 @@
 //! Typed, copy-on-write appearance controls shared by native iWork tables.
 
+mod wire;
+
 use std::collections::HashSet;
 
 use prost::Message;
@@ -13,6 +15,7 @@ use crate::protobuf::{tsp, tss, tst};
 use crate::shapes::insert_style_variation;
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
+use wire::{TableAppearanceOverrides, table_appearance_overrides};
 
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const TABLE_STYLE_MESSAGE_TYPE: u32 = 6_003;
@@ -66,6 +69,35 @@ impl TableRowSizing {
     }
 }
 
+/// Whether one family of native table gridlines is drawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TableGridlineVisibility {
+    /// Do not draw this gridline family.
+    Hidden,
+    /// Draw this gridline family using the table style's strokes.
+    #[default]
+    Visible,
+}
+
+impl TableGridlineVisibility {
+    fn from_native(value: bool) -> Self {
+        if value { Self::Visible } else { Self::Hidden }
+    }
+
+    fn native(self) -> bool {
+        matches!(self, Self::Visible)
+    }
+}
+
+/// Body-gridline visibility for a native iWork table.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct TableGridlines {
+    /// Horizontal lines between body rows, excluding header-column lines.
+    pub body_horizontal: TableGridlineVisibility,
+    /// Vertical lines between body columns, excluding header-row and footer lines.
+    pub body_vertical: TableGridlineVisibility,
+}
+
 /// Effective appearance settings backed by a native table-style inheritance chain.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct TableAppearance {
@@ -73,6 +105,8 @@ pub struct TableAppearance {
     pub row_banding: TableRowBanding,
     /// Automatic row-height behavior.
     pub row_sizing: TableRowSizing,
+    /// Horizontal and vertical body-gridline visibility.
+    pub gridlines: TableGridlines,
 }
 
 pub(crate) fn table_appearance(
@@ -228,11 +262,21 @@ fn inherited_table_appearance(
     let mut style_id = Some(first_style_id);
     let mut banded_rows = None;
     let mut auto_resize = None;
+    let mut horizontal_gridlines = None;
+    let mut vertical_gridlines = None;
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {
         let Some(identifier) = style_id else {
             return Ok(TableAppearance {
                 row_banding: TableRowBanding::from_native(banded_rows.unwrap_or(false)),
                 row_sizing: TableRowSizing::from_native(auto_resize.unwrap_or(false)),
+                gridlines: TableGridlines {
+                    body_horizontal: TableGridlineVisibility::from_native(
+                        horizontal_gridlines.unwrap_or(true),
+                    ),
+                    body_vertical: TableGridlineVisibility::from_native(
+                        vertical_gridlines.unwrap_or(true),
+                    ),
+                },
             });
         };
         if !visited.insert(identifier) {
@@ -240,20 +284,29 @@ fn inherited_table_appearance(
                 "iWork table style inheritance cycles at {identifier}"
             )));
         }
-        let (_, style) = decode_unique::<tst::TableStyleArchive>(
-            package,
-            identifier,
-            TABLE_STYLE_MESSAGE_TYPE,
-            "table style",
-        )?;
-        if let Some(properties) = style.table_properties {
-            banded_rows = banded_rows.or(properties.banded_rows);
-            auto_resize = auto_resize.or(properties.auto_resize);
-        }
-        if let (Some(banded_rows), Some(auto_resize)) = (banded_rows, auto_resize) {
+        let (style, overrides) = table_style_with_overrides(package, identifier)?;
+        banded_rows = banded_rows.or(overrides.banded_rows);
+        auto_resize = auto_resize.or(overrides.auto_resize);
+        horizontal_gridlines = horizontal_gridlines.or(overrides.horizontal_body_gridlines);
+        vertical_gridlines = vertical_gridlines.or(overrides.vertical_body_gridlines);
+        if let (
+            Some(banded_rows),
+            Some(auto_resize),
+            Some(horizontal_gridlines),
+            Some(vertical_gridlines),
+        ) = (
+            banded_rows,
+            auto_resize,
+            horizontal_gridlines,
+            vertical_gridlines,
+        ) {
             return Ok(TableAppearance {
                 row_banding: TableRowBanding::from_native(banded_rows),
                 row_sizing: TableRowSizing::from_native(auto_resize),
+                gridlines: TableGridlines {
+                    body_horizontal: TableGridlineVisibility::from_native(horizontal_gridlines),
+                    body_vertical: TableGridlineVisibility::from_native(vertical_gridlines),
+                },
             });
         }
         style_id = style
@@ -265,6 +318,35 @@ fn inherited_table_appearance(
     Err(Error::InvalidFormat(format!(
         "iWork table style inheritance exceeds {MAX_STYLE_INHERITANCE_DEPTH} levels"
     )))
+}
+
+fn table_style_with_overrides(
+    package: &IWorkPackage,
+    identifier: u64,
+) -> Result<(tst::TableStyleArchive, TableAppearanceOverrides)> {
+    let archive_name = object_archive_name(package, identifier)?;
+    let archive = package.archive(&archive_name)?;
+    let object = archive.object(identifier).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork table style {identifier} is missing"))
+    })?;
+    let mut messages = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == TABLE_STYLE_MESSAGE_TYPE);
+    let Some(message) = messages.next() else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table style {identifier} must have exactly one native payload"
+        )));
+    };
+    if messages.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table style {identifier} must have exactly one native payload"
+        )));
+    }
+    Ok((
+        tst::TableStyleArchive::decode(message.data.as_slice())?,
+        table_appearance_overrides(&message.data)?,
+    ))
 }
 
 fn table_style_variation(
@@ -280,10 +362,12 @@ fn table_style_variation(
             stylesheet: Some(reference(stylesheet_id)),
             ..Default::default()
         },
-        override_count: Some(2),
+        override_count: Some(4),
         table_properties: Some(tst::TableStylePropertiesArchive {
             banded_rows: Some(appearance.row_banding.native()),
             auto_resize: Some(appearance.row_sizing.native()),
+            h_strokes_visible: Some(appearance.gridlines.body_horizontal.native()),
+            v_strokes_visible: Some(appearance.gridlines.body_vertical.native()),
             ..Default::default()
         }),
     }

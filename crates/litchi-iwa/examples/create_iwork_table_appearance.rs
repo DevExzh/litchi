@@ -6,11 +6,17 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::table_appearance::{TableAppearance, TableRowBanding, TableRowSizing};
+use litchi_iwa::table_appearance::{
+    TableAppearance, TableGridlineVisibility, TableGridlines, TableRowBanding, TableRowSizing,
+};
 
 const APPEARANCE: TableAppearance = TableAppearance {
     row_banding: TableRowBanding::Enabled,
     row_sizing: TableRowSizing::FitCellContents,
+    gridlines: TableGridlines {
+        body_horizontal: TableGridlineVisibility::Hidden,
+        body_vertical: TableGridlineVisibility::Visible,
+    },
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
