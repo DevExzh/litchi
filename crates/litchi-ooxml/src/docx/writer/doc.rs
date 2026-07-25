@@ -13,6 +13,7 @@ use super::ole_object::MutableOleObject;
 use super::paragraph::MutableParagraph;
 use super::section::SectionProperties;
 use super::smartart::{MAX_SMART_ARTS, MutableSmartArt};
+use super::vml_shape::MutableVmlShape;
 use super::table::MutableTable;
 use super::theme::MutableTheme;
 use super::toc::TableOfContents;
@@ -58,10 +59,13 @@ pub struct MutableDocument {
     preserved_suffix: Option<String>,
     /// Whether section properties must be regenerated instead of preserved verbatim.
     section_dirty: bool,
-    /// VML shape IDs already assigned to embedded OLE objects in this document.
-    ole_shape_ids: HashSet<String>,
+    /// VML shape IDs already assigned to embedded OLE objects and VML shapes
+    /// in this document.
+    assigned_shape_ids: HashSet<String>,
     /// Next VML shape number tried when allocating OLE object identities.
     next_ole_shape_number: u32,
+    /// Next VML shape number tried when allocating VML shape identities.
+    next_vml_shape_number: u32,
     /// Next SmartArt anchor number used when allocating anchor keys.
     next_smartart_anchor: u32,
 }
@@ -69,6 +73,9 @@ pub struct MutableDocument {
 /// First VML shape number used when allocating OLE object identities
 /// (`_x0000_i1025`, matching Word's numbering convention).
 const FIRST_OLE_SHAPE_NUMBER: u32 = 1025;
+/// First VML shape number used when allocating VML shape identities
+/// (`_x0000_s1025`, matching Word's numbering convention).
+const FIRST_VML_SHAPE_NUMBER: u32 = 1025;
 
 /// Document protection settings.
 #[derive(Debug, Clone)]
@@ -219,8 +226,9 @@ impl MutableDocument {
             preserved_prefix: None,
             preserved_suffix: None,
             section_dirty: false,
-            ole_shape_ids: HashSet::new(),
+            assigned_shape_ids: HashSet::new(),
             next_ole_shape_number: FIRST_OLE_SHAPE_NUMBER,
+            next_vml_shape_number: FIRST_VML_SHAPE_NUMBER,
             next_smartart_anchor: 1,
         }
     }
@@ -250,8 +258,9 @@ impl MutableDocument {
             preserved_prefix: Some(parsed.prefix),
             preserved_suffix: Some(parsed.suffix),
             section_dirty: false,
-            ole_shape_ids: HashSet::new(),
+            assigned_shape_ids: HashSet::new(),
             next_ole_shape_number: FIRST_OLE_SHAPE_NUMBER,
+            next_vml_shape_number: FIRST_VML_SHAPE_NUMBER,
             next_smartart_anchor: 1,
         })
     }
@@ -432,7 +441,7 @@ impl MutableDocument {
             let mut number = self.next_ole_shape_number;
             let shape_id = loop {
                 let candidate = format!("_x0000_i{number}");
-                if !self.ole_shape_id_in_use(&candidate) {
+                if !self.shape_id_in_use(&candidate) {
                     break candidate;
                 }
                 number = number.checked_add(1).ok_or_else(|| {
@@ -443,7 +452,7 @@ impl MutableDocument {
             object.shape_id = shape_id;
             object.object_id = number;
         } else {
-            if self.ole_shape_id_in_use(&object.shape_id) {
+            if self.shape_id_in_use(&object.shape_id) {
                 return Err(OoxmlError::InvalidFormat(format!(
                     "OLE shape ID '{}' collides with an existing shape",
                     object.shape_id
@@ -454,15 +463,15 @@ impl MutableDocument {
                 self.next_ole_shape_number = self.next_ole_shape_number.saturating_add(1);
             }
         }
-        self.ole_shape_ids.insert(object.shape_id.clone());
+        self.assigned_shape_ids.insert(object.shape_id.clone());
         self.modified = true;
         Ok(self.add_paragraph().add_ole_object(object))
     }
 
-    /// Check whether a VML shape ID is already used by an embedded OLE object
-    /// or appears in preserved document XML.
-    fn ole_shape_id_in_use(&self, shape_id: &str) -> bool {
-        if self.ole_shape_ids.contains(shape_id) {
+    /// Check whether a VML shape ID is already used by an authored OLE object
+    /// or VML shape, or appears in preserved document XML.
+    fn shape_id_in_use(&self, shape_id: &str) -> bool {
+        if self.assigned_shape_ids.contains(shape_id) {
             return true;
         }
         let preserved_hit = |raw: &str| raw.contains(shape_id);
@@ -482,6 +491,38 @@ impl MutableDocument {
             BodyElement::PreservedAltChunk(raw, _) => raw.contains(shape_id),
             _ => false,
         })
+    }
+
+    /// Add a legacy VML shape in a new paragraph at the end of the document.
+    ///
+    /// Assigns the shape's VML identity (`_x0000_s1025`, …, matching Word's
+    /// numbering convention) when unset, skipping IDs already used by
+    /// authored shapes or present in preserved document XML. A shape with a
+    /// `v:textbox` story is discoverable through
+    /// [`crate::docx::Document::text_boxes`] after save and reopen.
+    pub fn add_vml_shape(&mut self, mut shape: MutableVmlShape) -> Result<&mut MutableVmlShape> {
+        if shape.id.is_empty() {
+            let mut number = self.next_vml_shape_number;
+            let id = loop {
+                let candidate = format!("_x0000_s{number}");
+                if !self.shape_id_in_use(&candidate) {
+                    break candidate;
+                }
+                number = number.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("VML shape ID space exhausted".to_string())
+                })?;
+            };
+            self.next_vml_shape_number = number.saturating_add(1);
+            shape.id = id;
+        } else if self.shape_id_in_use(&shape.id) {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "VML shape ID '{}' collides with an existing shape",
+                shape.id
+            )));
+        }
+        self.assigned_shape_ids.insert(shape.id.clone());
+        self.modified = true;
+        Ok(self.add_paragraph().add_vml_shape(shape))
     }
 
     /// Add a SmartArt (DrawingML diagram) graphic in a new paragraph at the

@@ -23,6 +23,7 @@ pub mod table;
 pub mod textbox;
 pub mod theme;
 pub mod toc;
+pub mod vml_shape;
 pub mod watermark;
 
 // Re-export main document type
@@ -68,6 +69,9 @@ pub use ole_object::{MAX_OLE_PAYLOAD_BYTES, MutableOleObject};
 
 // Re-export SmartArt authoring types
 pub use smartart::{MAX_SMART_ARTS, MutableSmartArt};
+
+// Re-export VML shape authoring types
+pub use vml_shape::{MutableVmlShape, VmlShapeKind, VmlShapePosition};
 
 // Re-export comment types
 pub use comment::MutableComment;

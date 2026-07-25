@@ -20,9 +20,9 @@ use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
 /// Maximum paragraphs in an authored text-box story.
-const MAX_PARAGRAPHS: usize = 1024;
+pub(crate) const MAX_PARAGRAPHS: usize = 1024;
 /// Maximum aggregate story text bytes in an authored text box.
-const MAX_TEXT_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
 
 /// A mutable text box being authored in a document.
 ///
@@ -167,33 +167,12 @@ impl MutableTextBox {
         (inches * EMUS_PER_INCH as f64) as i64
     }
 
-    /// Validate the bounded story limits before serialization.
-    fn validate(&self) -> Result<()> {
-        if self.paragraphs.len() > MAX_PARAGRAPHS {
-            return Err(OoxmlError::InvalidFormat(
-                "text box paragraph limit exceeded".to_string(),
-            ));
-        }
-        let text_bytes: usize = self
-            .paragraphs
-            .iter()
-            .flat_map(|paragraph| paragraph.runs.iter())
-            .map(|run| run.text.len())
-            .sum();
-        if text_bytes > MAX_TEXT_BYTES {
-            return Err(OoxmlError::InvalidFormat(
-                "text box story text limit exceeded".to_string(),
-            ));
-        }
-        Ok(())
-    }
-
     /// Serialize the text box as a `<w:drawing>` inline wordprocessing shape.
     ///
     /// The enclosing `<w:r>` wrapper is emitted by the paragraph writer,
-    /// matching the inline-picture serialization path.
+    /// matching the inline-picture serialization path. The bounded story
+    /// limits are validated by [`write_story_xml`].
     pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
-        self.validate()?;
         let name = escape_xml(&self.name);
         write!(
             xml,
@@ -209,27 +188,50 @@ impl MutableTextBox {
         .map_err(|error| OoxmlError::Xml(error.to_string()))?;
 
         xml.push_str("<wps:txbx><w:txbxContent>");
-        for paragraph in &self.paragraphs {
-            xml.push_str("<w:p>");
-            for run in &paragraph.runs {
-                xml.push_str("<w:r>");
-                write_run_properties(xml, run)?;
-                write!(
-                    xml,
-                    r#"<w:t xml:space="preserve">{}</w:t>"#,
-                    escape_xml(&run.text)
-                )
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-                xml.push_str("</w:r>");
-            }
-            xml.push_str("</w:p>");
-        }
+        write_story_xml(xml, &self.paragraphs)?;
         xml.push_str("</w:txbxContent></wps:txbx>");
 
         write_body_properties(xml, &self.body)?;
         xml.push_str("</wps:wsp></a:graphicData></a:graphic></wp:inline></w:drawing>");
         Ok(())
     }
+}
+
+/// Serialize story paragraphs (`w:p` with runs and basic run properties),
+/// validating the bounded story limits. Shared by the DrawingML text-box and
+/// VML shape writers.
+pub(crate) fn write_story_xml(xml: &mut String, paragraphs: &[TextBoxParagraph]) -> Result<()> {
+    if paragraphs.len() > MAX_PARAGRAPHS {
+        return Err(OoxmlError::InvalidFormat(
+            "text box paragraph limit exceeded".to_string(),
+        ));
+    }
+    let text_bytes: usize = paragraphs
+        .iter()
+        .flat_map(|paragraph| paragraph.runs.iter())
+        .map(|run| run.text.len())
+        .sum();
+    if text_bytes > MAX_TEXT_BYTES {
+        return Err(OoxmlError::InvalidFormat(
+            "text box story text limit exceeded".to_string(),
+        ));
+    }
+    for paragraph in paragraphs {
+        xml.push_str("<w:p>");
+        for run in &paragraph.runs {
+            xml.push_str("<w:r>");
+            write_run_properties(xml, run)?;
+            write!(
+                xml,
+                r#"<w:t xml:space="preserve">{}</w:t>"#,
+                escape_xml(&run.text)
+            )
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            xml.push_str("</w:r>");
+        }
+        xml.push_str("</w:p>");
+    }
+    Ok(())
 }
 
 /// Write the run properties of a story run (`w:b`, `w:i`, `w:u`).

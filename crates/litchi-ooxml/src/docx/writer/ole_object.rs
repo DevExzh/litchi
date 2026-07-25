@@ -229,7 +229,7 @@ fn validate_prog_id(prog_id: &str) -> Result<()> {
 
 /// Validate a VML shape ID: 1–255 characters of ASCII alphanumerics,
 /// underscores, and hyphens.
-fn validate_shape_id(shape_id: &str) -> Result<()> {
+pub(crate) fn validate_shape_id(shape_id: &str) -> Result<()> {
     let valid = !shape_id.is_empty()
         && shape_id.len() <= MAX_SHAPE_ID_LENGTH
         && shape_id

@@ -16,6 +16,7 @@ use super::ole_object::MutableOleObject;
 use super::run::MutableRun;
 use super::smartart::MutableSmartArt;
 use super::textbox::MutableTextBox;
+use super::vml_shape::MutableVmlShape;
 use super::revision::{MutableRevision, ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode};
 use super::section::SectionProperties;
 use super::smart_tag::MutableSmartTag;
@@ -34,6 +35,8 @@ pub(crate) enum ParagraphElement {
     OleObject(MutableOleObject),
     /// SmartArt (DrawingML diagram) anchor with `dgm:relIds`.
     SmartArt(MutableSmartArt),
+    /// Legacy VML shape (`w:pict` with `v:rect`/`v:oval`/…).
+    VmlShape(MutableVmlShape),
     /// Bookmark start marker
     BookmarkStart(MutableBookmark),
     /// Bookmark end marker (ID only)
@@ -103,6 +106,13 @@ impl ParagraphElement {
             Self::SmartArt(smartart) => {
                 xml.push_str("<w:r>");
                 smartart.to_xml(xml, None)?;
+                xml.push_str("</w:r>");
+                Ok(())
+            },
+            // VML shapes carry no relationships; both modes serialize alike.
+            Self::VmlShape(shape) => {
+                xml.push_str("<w:r>");
+                shape.to_xml(xml)?;
                 xml.push_str("</w:r>");
                 Ok(())
             },
@@ -195,6 +205,13 @@ impl ParagraphElement {
             Self::SmartArt(smartart) => {
                 xml.push_str("<w:r>");
                 smartart.to_xml(xml, rel_mapper.get_smart_art_ids(smartart.anchor_key()))?;
+                xml.push_str("</w:r>");
+                Ok(())
+            },
+            // VML shapes carry no relationships; both modes serialize alike.
+            Self::VmlShape(shape) => {
+                xml.push_str("<w:r>");
+                shape.to_xml(xml)?;
                 xml.push_str("</w:r>");
                 Ok(())
             },
@@ -420,6 +437,19 @@ impl MutableParagraph {
         self.elements.push(ParagraphElement::SmartArt(smartart));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::SmartArt(smartart) => smartart,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Add a legacy VML shape to the paragraph.
+    ///
+    /// Crate-internal: public authoring goes through
+    /// [`crate::docx::writer::MutableDocument::add_vml_shape`], which assigns
+    /// the shape identity first.
+    pub(crate) fn add_vml_shape(&mut self, shape: MutableVmlShape) -> &mut MutableVmlShape {
+        self.elements.push(ParagraphElement::VmlShape(shape));
+        match self.elements.last_mut().unwrap() {
+            ParagraphElement::VmlShape(shape) => shape,
             _ => unreachable!(),
         }
     }

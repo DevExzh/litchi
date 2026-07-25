@@ -288,7 +288,7 @@ conversion, fonts, and image conversion are optional.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Images | 🟡 | ✅ | 🟡 | Inline/floating picture and blip extraction; `DocWriter::insert_picture` writes inline PNG/JPEG pictures (OfficeArtWordDrawing in the Data stream) and `insert_floating_picture` writes floating ones (0x0008 anchor + PlcfSpa + fcDggInfo OfficeArtContent) |
-| Drawings and shapes | 🟡 | ✅ | ❌ | OfficeArt/Escher shape extraction only |
+| Drawings and shapes | 🟡 | ✅ | 🟡 | OfficeArt/Escher shape extraction (Data stream + fcDggInfo drawing group); `DocWriter::insert_floating_shape` writes floating rectangles/rounded rectangles/ellipses with fill/line colors (no text-box story) |
 | Embedded OLE/package objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve embedded object storages; payloads remain inert |
 | MathType/MTEF equations | 🟡 | ✅ | ❌ | Equation Native extraction and conversion; no DOC equation authoring |
 | Summary/document properties | ✅ | ✅ | ✅ | OLE property-set reading and editing |
@@ -365,7 +365,7 @@ conversion, fonts, and image conversion are optional.
 | Text, runs, and formatting | ✅ | ✅ | ✅ | Text boxes, placeholders, fonts, colors, paragraphs, and runs |
 | Shapes, groups, and OfficeArt | ✅ | ✅ | ✅ | AutoShapes, groups, anchors, fills, gradients, lines, and Escher records |
 | Pictures | ✅ | ✅ | ✅ | JPEG/PNG/BLIP resources and writer support |
-| Tables | 🟡 | ✅ | ❌ | Table group/grid/cell extraction; no general table authoring API |
+| Tables | ✅ | ✅ | ✅ | Table group/grid/cell extraction and table authoring (rows, columns, cell text, cell dimensions) |
 | Native charts | 🟡 | ✅ | ❌ | Typed inert inventory of embedded MSGraph/Excel.Chart OLE payloads: persist-mapping resolution (incremental-save safe), optional zlib payload decompression, and full BIFF8 chart models (type, series, data links, cached values, titles) via the XLS chart parser, with best-effort slide-frame attribution and per-object failure isolation; no chart authoring or activation |
 | Hyperlinks | ✅ | ✅ | ✅ | URLs and slide navigation |
 | Action/interaction settings | 🟡 | ✅ | 🟡 | Typed action, jump, trigger, and macro metadata with bounded writer integration |
