@@ -9,8 +9,8 @@
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::pivot::model::*;
-use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types as rt, wide_str_with_len};
-use litchi_core::binary;
+use crate::xlsb::records::record_types as rt;
+use crate::xlsb::walker::{PayloadCursor, RecordWalker, malformed};
 
 // Record types used by this stream that have no constant in `records::record_types` yet.
 /// `BrtPCDField14` (MS-XLSB 2.4.725): marks the preceding cache field as ignorable.
@@ -210,208 +210,8 @@ pub fn parse_pivot_cache_definition(data: &[u8]) -> XlsbResult<PivotCacheDefinit
     ))
 }
 
-/// Wraps the shared record iterator with the collection helpers this parser needs.
-struct RecordWalker<'a> {
-    iter: XlsbRecordIter<&'a [u8]>,
-}
-
-impl<'a> RecordWalker<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        RecordWalker {
-            iter: XlsbRecordIter::new(data),
-        }
-    }
-
-    fn next(&mut self) -> XlsbResult<Option<XlsbRecord>> {
-        self.iter.next().transpose()
-    }
-
-    fn required(&mut self, context: &'static str) -> XlsbResult<XlsbRecord> {
-        self.next()?
-            .ok_or_else(|| XlsbError::UnexpectedEndOfStream(context.to_string()))
-    }
-
-    /// Consume records up to and including `end_type`, tolerating nested
-    /// collections of the same record pair.
-    fn skip_collection(
-        &mut self,
-        begin_type: u16,
-        end_type: u16,
-        context: &'static str,
-    ) -> XlsbResult<()> {
-        let mut depth = 1u32;
-        while let Some(record) = self.next()? {
-            if record.header.record_type == begin_type {
-                depth += 1;
-            } else if record.header.record_type == end_type {
-                depth -= 1;
-                if depth == 0 {
-                    return Ok(());
-                }
-            }
-        }
-        Err(XlsbError::UnexpectedEndOfStream(context.to_string()))
-    }
-
-    /// Skip a record the parser does not handle: a balanced collection when
-    /// the type is a known begin record, a single record otherwise.
-    fn skip_unhandled(&mut self, record_type: u16, context: &'static str) -> XlsbResult<()> {
-        if let Some(end_type) = paired_end(record_type) {
-            self.skip_collection(record_type, end_type, context)?;
-        }
-        Ok(())
-    }
-
-    /// Consume everything up to the matching end record of a collection that
-    /// is expected to contain no modelled children.
-    fn expect_end(&mut self, end_type: u16, context: &'static str) -> XlsbResult<()> {
-        while let Some(record) = self.next()? {
-            let record_type = record.header.record_type;
-            if record_type == end_type {
-                return Ok(());
-            }
-            self.skip_unhandled(record_type, context)?;
-        }
-        Err(XlsbError::UnexpectedEndOfStream(context.to_string()))
-    }
-}
-
-/// Map a known begin record type to its matching end record type.
-///
-/// Returns `None` for standalone records and unknown types, which the parser
-/// then skips as single records.
-fn paired_end(record_type: u16) -> Option<u16> {
-    Some(match record_type {
-        rt::BEGIN_PCD_SOURCE => rt::END_PCD_SOURCE,
-        rt::BEGIN_PCDS_RANGE => rt::END_PCDS_RANGE,
-        rt::BEGIN_PCDS_CONSOL => rt::END_PCDS_CONSOL,
-        rt::BEGIN_PCDSC_PAGES => rt::END_PCDSC_PAGES,
-        rt::BEGIN_PCDSC_PAGE => rt::END_PCDSC_PAGE,
-        rt::BEGIN_PCDSCP_ITEM => rt::END_PCDSCP_ITEM,
-        rt::BEGIN_PCDSC_SETS => rt::END_PCDSC_SETS,
-        rt::BEGIN_PCDSC_SET => rt::END_PCDSC_SET,
-        rt::BEGIN_PCD_FIELDS => rt::END_PCD_FIELDS,
-        rt::BEGIN_PCD_FIELD => rt::END_PCD_FIELD,
-        rt::BEGIN_PCDF_ATBL => rt::END_PCDF_ATBL,
-        rt::BEGIN_PCDI_RUN => rt::END_PCDI_RUN,
-        rt::BEGIN_PCDF_GROUP => rt::END_PCDF_GROUP,
-        rt::BEGIN_PCDFG_ITEMS => rt::END_PCDFG_ITEMS,
-        rt::BEGIN_PCDFG_RANGE => rt::END_PCDFG_RANGE,
-        rt::BEGIN_PCDFG_DISCRETE => rt::END_PCDFG_DISCRETE,
-        rt::BEGIN_PCD_HIERARCHIES => rt::END_PCD_HIERARCHIES,
-        rt::BEGIN_PCD_HIERARCHY => rt::END_PCD_HIERARCHY,
-        rt::BEGIN_PCDH_FIELDS_USAGE => rt::END_PCDH_FIELDS_USAGE,
-        rt::BEGIN_PCDHG_LEVELS => rt::END_PCDHG_LEVELS,
-        rt::BEGIN_PCDHG_LEVEL => rt::END_PCDHG_LEVEL,
-        rt::BEGIN_PCDHGL_GROUPS => rt::END_PCDHGL_GROUPS,
-        rt::BEGIN_PCDHGL_GROUP => rt::END_PCDHGL_GROUP,
-        rt::BEGIN_PCDHGLG_MEMBERS => rt::END_PCDHGLG_MEMBERS,
-        rt::BEGIN_PCDHGLG_MEMBER => rt::END_PCDHGLG_MEMBER,
-        rt::BEGIN_PCDSD_TUPLE_CACHE => rt::END_PCDSD_TUPLE_CACHE,
-        rt::BEGIN_PCDSDTC_ENTRIES => rt::END_PCDSDTC_ENTRIES,
-        rt::BEGIN_PCDSDTC_MEMBERS => rt::END_PCDSDTC_MEMBERS,
-        rt::BEGIN_PCDSDTC_MEMBER => rt::END_PCDSDTC_MEMBER,
-        rt::BEGIN_PCDSDTC_QUERIES => rt::END_PCDSDTC_QUERIES,
-        rt::BEGIN_PCDSDTC_QUERY => rt::END_PCDSDTC_QUERY,
-        rt::BEGIN_PCDSDTC_SETS => rt::END_PCDSDTC_SETS,
-        rt::BEGIN_PCDSDTC_SET => rt::END_PCDSDTC_SET,
-        rt::BEGIN_PCDSDTC_MEMBERS_SORT_BY => rt::END_PCDSDTC_MEMBERS_SORT_BY,
-        rt::BEGIN_PCD_SFCI_ENTRIES => rt::END_PCD_SFCI_ENTRIES,
-        rt::BEGIN_PCD_CALC_ITEMS => rt::END_PCD_CALC_ITEMS,
-        rt::BEGIN_PCD_CALC_ITEM => rt::END_PCD_CALC_ITEM,
-        rt::BEGIN_PCD_CALC_MEMS => rt::END_PCD_CALC_MEMS,
-        rt::BEGIN_PCD_CALC_MEM => rt::END_PCD_CALC_MEM,
-        rt::BEGIN_PCD_CALC_MEM14 => rt::END_PCD_CALC_MEM14,
-        rt::BEGIN_PCD_CALC_MEM_EXT => rt::END_PCD_CALC_MEM_EXT,
-        rt::BEGIN_PCD_CALC_MEMS_EXT => rt::END_PCD_CALC_MEMS_EXT,
-        rt::BEGIN_PCD14 => rt::END_PCD14,
-        rt::BEGIN_PR_FILTERS => rt::END_PR_FILTERS,
-        rt::BEGIN_PR_FILTER => rt::END_PR_FILTER,
-        rt::BEGIN_PRF_ITEM => rt::END_PRF_ITEM,
-        rt::BEGIN_PR_FILTERS14 => rt::END_PR_FILTERS14,
-        rt::BEGIN_PR_FILTER14 => rt::END_PR_FILTER14,
-        rt::BEGIN_PRF_ITEM14 => rt::END_PRF_ITEM14,
-        rt::BEGIN_P_NAMES => rt::END_P_NAMES,
-        rt::BEGIN_P_NAME => rt::END_P_NAME,
-        rt::BEGIN_PN_PAIRS => rt::END_PN_PAIRS,
-        rt::BEGIN_PN_PAIR => rt::END_PN_PAIR,
-        rt::BEGIN_ITEM_UNIQUE_NAMES => rt::END_ITEM_UNIQUE_NAMES,
-        rt::FRT_BEGIN => rt::FRT_END,
-        rt::AC_BEGIN => rt::AC_END,
-        BEGIN_PRULE => END_PRULE,
-        BEGIN_PCD_KPIS => END_PCD_KPIS,
-        BEGIN_PCD_KPI => END_PCD_KPI,
-        _ => return None,
-    })
-}
-
-/// Bounds-checked cursor over one record payload.
-struct PayloadCursor<'a> {
-    data: &'a [u8],
-    offset: usize,
-    context: &'static str,
-}
-
-impl<'a> PayloadCursor<'a> {
-    fn new(data: &'a [u8], context: &'static str) -> Self {
-        PayloadCursor {
-            data,
-            offset: 0,
-            context,
-        }
-    }
-
-    fn remaining(&self) -> usize {
-        self.data.len() - self.offset
-    }
-
-    fn guard(&self, needed: usize) -> XlsbResult<()> {
-        if self.remaining() < needed {
-            return Err(XlsbError::InvalidLength {
-                expected: self.offset + needed,
-                found: self.data.len(),
-            });
-        }
-        Ok(())
-    }
-
-    fn read_u8(&mut self) -> XlsbResult<u8> {
-        self.guard(1)?;
-        let value = self.data[self.offset];
-        self.offset += 1;
-        Ok(value)
-    }
-
-    fn read_u16(&mut self) -> XlsbResult<u16> {
-        self.guard(2)?;
-        let value = binary::read_u16_le_at(self.data, self.offset)?;
-        self.offset += 2;
-        Ok(value)
-    }
-
-    fn read_u32(&mut self) -> XlsbResult<u32> {
-        self.guard(4)?;
-        let value = binary::read_u32_le_at(self.data, self.offset)?;
-        self.offset += 4;
-        Ok(value)
-    }
-
-    fn read_i32(&mut self) -> XlsbResult<i32> {
-        Ok(self.read_u32()? as i32)
-    }
-
-    fn read_f64(&mut self) -> XlsbResult<f64> {
-        self.guard(8)?;
-        let value = binary::read_f64_le_at(self.data, self.offset)?;
-        self.offset += 8;
-        Ok(value)
-    }
-
-    /// Read a full-width Boolean (any nonzero value is `true`).
-    fn read_bool8(&mut self) -> XlsbResult<bool> {
-        Ok(self.read_u8()? != 0)
-    }
-
+impl PayloadCursor<'_> {
+    /// Read a `PivotCacheRange` (four signed 32-bit bounds).
     fn read_range(&mut self) -> XlsbResult<PivotCacheRange> {
         let first_row = self.read_i32()?;
         let last_row = self.read_i32()?;
@@ -424,52 +224,8 @@ impl<'a> PayloadCursor<'a> {
             last_column,
         })
     }
-
-    /// Read an `XLWideString` (MS-XLSB 2.5.169).
-    fn read_wide_string(&mut self) -> XlsbResult<String> {
-        let (value, consumed) = wide_str_with_len(&self.data[self.offset..])?;
-        self.offset += consumed;
-        Ok(value)
-    }
-
-    /// Read an `XLNullableWideString` (MS-XLSB 2.5.167).
-    fn read_nullable_wide_string(&mut self) -> XlsbResult<Option<String>> {
-        self.guard(4)?;
-        if binary::read_u32_le_at(self.data, self.offset)? == u32::MAX {
-            self.offset += 4;
-            return Ok(None);
-        }
-        self.read_wide_string().map(Some)
-    }
-
-    /// Read a length-prefixed byte blob (`cce`/`cb` prefixed formula parts).
-    fn read_blob(&mut self) -> XlsbResult<Vec<u8>> {
-        let len = usize::try_from(self.read_u32()?)
-            .map_err(|_| malformed(self.context, "byte blob length overflow"))?;
-        self.guard(len)?;
-        let blob = self.data[self.offset..self.offset + len].to_vec();
-        self.offset += len;
-        Ok(blob)
-    }
-
-    /// Reject payloads with unparsed trailing bytes.
-    fn finish(&self) -> XlsbResult<()> {
-        if self.remaining() != 0 {
-            return Err(malformed(
-                self.context,
-                format!("{} trailing bytes", self.remaining()),
-            ));
-        }
-        Ok(())
-    }
 }
 
-fn malformed(context: &str, detail: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
-        typ: context.to_string(),
-        val: detail.into(),
-    }
-}
 
 /// `BrtBeginPivotCacheDef` payload (MS-XLSB 2.4.168).
 fn parse_definition_payload(data: &[u8]) -> XlsbResult<PivotCacheDefinition> {
@@ -495,7 +251,7 @@ fn parse_definition_payload(data: &[u8]) -> XlsbResult<PivotCacheDefinition> {
     if flags2 & DEF_LOAD_REFRESHED_WHO == 0 {
         // `unused` (4 bytes) exists iff fLoadRefreshedWho is 0.
         cursor.guard(4)?;
-        cursor.offset += 4;
+        cursor.skip(4)?;
     }
     cursor.finish()?;
     Ok(PivotCacheDefinition {
@@ -1361,7 +1117,7 @@ fn parse_hierarchy_ext14(data: &[u8]) -> XlsbResult<PivotCacheHierarchyExt14> {
     let mut cursor = PayloadCursor::new(data, "BrtPCDH14");
     // FRTBlank header (4 bytes, MS-XLSB 2.5.55).
     cursor.guard(4)?;
-    cursor.offset += 4;
+    cursor.skip(4)?;
     let flags = cursor.read_u8()?;
     let hierarchy_count = cursor.read_u32()?;
     let mut hierarchy_indexes = Vec::new();
@@ -1519,7 +1275,7 @@ fn parse_calculated_item(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResu
     let mut cursor = PayloadCursor::new(data, "BrtBeginPCDCalcItem");
     // reserved (4 bytes): MUST be -1 and is ignored.
     cursor.guard(4)?;
-    cursor.offset += 4;
+    cursor.skip(4)?;
     let formula = parse_pivot_formula(&mut cursor)?;
     cursor.finish()?;
     let mut item = CalculatedItem {
@@ -1562,7 +1318,7 @@ fn parse_name(walker: &mut RecordWalker<'_>, data: &[u8]) -> XlsbResult<PivotNam
     let flags = cursor.read_u8()?;
     // Two unnamed padding bytes.
     cursor.guard(2)?;
-    cursor.offset += 2;
+    cursor.skip(2)?;
     cursor.finish()?;
     let mut name = PivotName {
         field_index,
@@ -1595,7 +1351,7 @@ fn parse_name_pairs(
                 let item_index = cursor.read_i32()?;
                 // Three unnamed padding bytes.
                 cursor.guard(3)?;
-                cursor.offset += 3;
+                cursor.skip(3)?;
                 cursor.finish()?;
                 pairs.push(PivotNamePair {
                     physical: flags & PNPAIR_PHYSICAL != 0,
@@ -1738,7 +1494,7 @@ fn parse_calculated_member_ext14(data: &[u8]) -> XlsbResult<CalculatedMemberExt1
     let mut cursor = PayloadCursor::new(data, "BrtBeginPCDCalcMem14");
     // FRTBlank header (4 bytes, MS-XLSB 2.5.55).
     cursor.guard(4)?;
-    cursor.offset += 4;
+    cursor.skip(4)?;
     let flags = cursor.read_u8()?;
     let display_folder = cursor.read_wide_string()?;
     // The long MDX overflow string is present iff bytes remain.
@@ -1762,7 +1518,7 @@ fn parse_pcd14(data: &[u8]) -> XlsbResult<PivotCacheDefinitionExt14> {
     let mut cursor = PayloadCursor::new(data, "BrtBeginPCD14");
     // FRTBlank header (4 bytes, MS-XLSB 2.5.55).
     cursor.guard(4)?;
-    cursor.offset += 4;
+    cursor.skip(4)?;
     let flags = cursor.read_u8()?;
     let cache_id = cursor.read_i32()?;
     cursor.finish()?;

@@ -7,9 +7,19 @@
 //! properties, FRT wrappers, ...) are skipped as balanced collections.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types as rt, wide_str_with_len};
+use crate::xlsb::records::record_types as rt;
+use crate::xlsb::walker::{PayloadCursor, RecordWalker, malformed};
+
+impl PayloadCursor<'_> {
+    /// Read a `DXFId`, mapping `0xFFFFFFFF` to `None` (MS-XLSB 2.5.38).
+    fn read_dxf_id(&mut self) -> XlsbResult<Option<u32>> {
+        Ok(match self.read_u32()? {
+            NO_DXF => None,
+            id => Some(id),
+        })
+    }
+}
 use crate::xlsb::table::model::*;
-use litchi_core::binary;
 
 // `BrtBeginList` flags word (MS-XLSB 2.4.100).
 const LIST_SHOWN_TOTAL_ROW: u32 = 1 << 0;
@@ -120,188 +130,6 @@ fn parse_list_parts(
     ))
 }
 
-/// Wraps the shared record iterator with the collection helpers this parser needs.
-struct RecordWalker<'a> {
-    iter: XlsbRecordIter<&'a [u8]>,
-}
-
-impl<'a> RecordWalker<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        RecordWalker {
-            iter: XlsbRecordIter::new(data),
-        }
-    }
-
-    fn next(&mut self) -> XlsbResult<Option<XlsbRecord>> {
-        self.iter.next().transpose()
-    }
-
-    fn required(&mut self, context: &'static str) -> XlsbResult<XlsbRecord> {
-        self.next()?
-            .ok_or_else(|| XlsbError::UnexpectedEndOfStream(context.to_string()))
-    }
-
-    /// Consume records up to and including `end_type`, tolerating nested
-    /// collections of the same record pair.
-    fn skip_collection(
-        &mut self,
-        begin_type: u16,
-        end_type: u16,
-        context: &'static str,
-    ) -> XlsbResult<()> {
-        let mut depth = 1u32;
-        while let Some(record) = self.next()? {
-            if record.header.record_type == begin_type {
-                depth += 1;
-            } else if record.header.record_type == end_type {
-                depth -= 1;
-                if depth == 0 {
-                    return Ok(());
-                }
-            }
-        }
-        Err(XlsbError::UnexpectedEndOfStream(context.to_string()))
-    }
-
-    /// Skip a record the parser does not handle: a balanced collection when
-    /// the type is a known begin record, a single record otherwise.
-    fn skip_unhandled(&mut self, record_type: u16, context: &'static str) -> XlsbResult<()> {
-        if let Some(end_type) = paired_end(record_type) {
-            self.skip_collection(record_type, end_type, context)?;
-        }
-        Ok(())
-    }
-}
-
-/// Map a known begin record type to its matching end record type.
-///
-/// Returns `None` for standalone records and unknown types, which the parser
-/// then skips as single records.
-fn paired_end(record_type: u16) -> Option<u16> {
-    Some(match record_type {
-        rt::BEGIN_LIST_COLS => rt::END_LIST_COLS,
-        rt::BEGIN_LIST_COL => rt::END_LIST_COL,
-        rt::BEGIN_LIST_XML_CPR => rt::END_LIST_XML_CPR,
-        rt::BEGIN_LIST_PARTS => rt::END_LIST_PARTS,
-        rt::FRT_BEGIN => rt::FRT_END,
-        rt::AC_BEGIN => rt::AC_END,
-        _ => return None,
-    })
-}
-
-/// Bounds-checked cursor over one record payload.
-struct PayloadCursor<'a> {
-    data: &'a [u8],
-    offset: usize,
-    context: &'static str,
-}
-
-impl<'a> PayloadCursor<'a> {
-    fn new(data: &'a [u8], context: &'static str) -> Self {
-        PayloadCursor {
-            data,
-            offset: 0,
-            context,
-        }
-    }
-
-    fn remaining(&self) -> usize {
-        self.data.len() - self.offset
-    }
-
-    fn guard(&self, needed: usize) -> XlsbResult<()> {
-        if self.remaining() < needed {
-            return Err(XlsbError::InvalidLength {
-                expected: self.offset + needed,
-                found: self.data.len(),
-            });
-        }
-        Ok(())
-    }
-
-    fn read_u8(&mut self) -> XlsbResult<u8> {
-        self.guard(1)?;
-        let value = self.data[self.offset];
-        self.offset += 1;
-        Ok(value)
-    }
-
-    fn read_u16(&mut self) -> XlsbResult<u16> {
-        self.guard(2)?;
-        let value = binary::read_u16_le_at(self.data, self.offset)?;
-        self.offset += 2;
-        Ok(value)
-    }
-
-    fn read_u32(&mut self) -> XlsbResult<u32> {
-        self.guard(4)?;
-        let value = binary::read_u32_le_at(self.data, self.offset)?;
-        self.offset += 4;
-        Ok(value)
-    }
-
-    /// Read a `Boolean` encoded as a 32-bit integer (MS-XLSB 2.5.98.3).
-    fn read_bool32(&mut self) -> XlsbResult<u32> {
-        let value = self.read_u32()?;
-        if value > 1 {
-            return Err(malformed(self.context, "non-Boolean 32-bit flag"));
-        }
-        Ok(value)
-    }
-
-    /// Read a `DXFId`, mapping `0xFFFFFFFF` to `None` (MS-XLSB 2.5.38).
-    fn read_dxf_id(&mut self) -> XlsbResult<Option<u32>> {
-        Ok(match self.read_u32()? {
-            NO_DXF => None,
-            id => Some(id),
-        })
-    }
-
-    /// Read an `XLWideString` (MS-XLSB 2.5.169).
-    fn read_wide_string(&mut self) -> XlsbResult<String> {
-        let (value, consumed) = wide_str_with_len(&self.data[self.offset..])?;
-        self.offset += consumed;
-        Ok(value)
-    }
-
-    /// Read an `XLNullableWideString` (MS-XLSB 2.5.167).
-    fn read_nullable_wide_string(&mut self) -> XlsbResult<Option<String>> {
-        self.guard(4)?;
-        if binary::read_u32_le_at(self.data, self.offset)? == u32::MAX {
-            self.offset += 4;
-            return Ok(None);
-        }
-        self.read_wide_string().map(Some)
-    }
-
-    /// Read a length-prefixed byte blob (`cce`/`cb` prefixed formula parts).
-    fn read_blob(&mut self) -> XlsbResult<Vec<u8>> {
-        let len = usize::try_from(self.read_u32()?)
-            .map_err(|_| malformed(self.context, "byte blob length overflow"))?;
-        self.guard(len)?;
-        let blob = self.data[self.offset..self.offset + len].to_vec();
-        self.offset += len;
-        Ok(blob)
-    }
-
-    /// Reject payloads with unparsed trailing bytes.
-    fn finish(&self) -> XlsbResult<()> {
-        if self.remaining() != 0 {
-            return Err(malformed(
-                self.context,
-                format!("{} trailing bytes", self.remaining()),
-            ));
-        }
-        Ok(())
-    }
-}
-
-fn malformed(context: &str, detail: impl Into<String>) -> XlsbError {
-    XlsbError::Unrecognized {
-        typ: context.to_string(),
-        val: detail.into(),
-    }
-}
 
 /// `BrtBeginList` payload (MS-XLSB 2.4.100).
 fn parse_list_payload(data: &[u8]) -> XlsbResult<XlsbTable> {
@@ -482,7 +310,7 @@ fn parse_style_client(data: &[u8]) -> XlsbResult<XlsbTableStyleInfo> {
 fn parse_list14(data: &[u8], table: &mut XlsbTable) -> XlsbResult<()> {
     let mut cursor = PayloadCursor::new(data, "BrtList14");
     cursor.guard(FRT_BLANK_LEN)?;
-    cursor.offset += FRT_BLANK_LEN;
+    cursor.skip(FRT_BLANK_LEN)?;
     table.alternate_text = cursor.read_nullable_wide_string()?;
     table.alternate_text_summary = cursor.read_nullable_wide_string()?;
     cursor.finish()
