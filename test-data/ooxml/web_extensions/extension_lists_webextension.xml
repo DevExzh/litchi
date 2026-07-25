@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<we:webextension xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11"
+                 xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                 xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                 xmlns:vendor="urn:litchi:test:web-extension"
+                 id="{00000000-0000-0000-0000-000000000004}">
+  <we:reference id="extension-lists" version="1.0.0.0" storeType="FileSystem">
+    <we:extLst>
+      <a:ext uri="urn:litchi:reference">
+        <vendor:reference r:id="rIdInert">reference text<![CDATA[<opaque>]]><!--kept--></vendor:reference>
+      </a:ext>
+    </we:extLst>
+  </we:reference>
+  <we:alternateReferences>
+    <we:reference id="alternate" version="2.0.0.0">
+      <we:extLst><a:ext uri="urn:litchi:alternate"><vendor:alternate/></a:ext></we:extLst>
+    </we:reference>
+  </we:alternateReferences>
+  <we:properties/>
+  <we:bindings>
+    <we:binding id="binding-with-extension" type="matrix" appref="sheet-binding">
+      <we:extLst><a:ext uri="urn:litchi:binding"><vendor:binding value="kept"/></a:ext></we:extLst>
+    </we:binding>
+  </we:bindings>
+  <we:snapshot cstate="screen">
+    <a:blur rad="12700"/>
+    <a:extLst><a:ext uri="urn:litchi:snapshot"><vendor:snapshot>snapshot text</vendor:snapshot></a:ext></a:extLst>
+  </we:snapshot>
+  <we:extLst><a:ext uri="urn:litchi:root"><vendor:root><![CDATA[root payload]]></vendor:root></a:ext></we:extLst>
+</we:webextension>

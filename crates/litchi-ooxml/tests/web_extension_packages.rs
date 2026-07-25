@@ -141,13 +141,16 @@ fn authored_task_panes() -> WebExtensionTaskPanes {
                     version: "1.0".into(),
                     store: Some("en-US".into()),
                     store_type: WebExtensionStoreType::Omex,
+                    extension_list: None,
                 },
                 alternate_references: vec![],
                 properties: vec![],
                 bindings: vec![],
                 snapshot: None,
+                extension_list: None,
             },
             snapshot_resources: vec![],
+            extension_list: None,
         }],
     }
 }

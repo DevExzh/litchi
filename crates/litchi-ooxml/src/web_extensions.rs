@@ -39,6 +39,8 @@ const STRICT_IMAGE_RELATIONSHIP_TYPE: &str =
 pub const MAX_WEB_EXTENSION_XML_BYTES: usize = 4 * 1024 * 1024;
 /// Maximum XML nesting depth.
 pub const MAX_WEB_EXTENSION_XML_DEPTH: usize = 128;
+/// Maximum element count in one web-extension XML part or authored fragment.
+pub const MAX_WEB_EXTENSION_XML_NODES: usize = 65_536;
 /// Maximum task panes, alternate references, properties, or bindings per list.
 pub const MAX_WEB_EXTENSION_ITEMS: usize = 4096;
 /// Maximum aggregate decoded string bytes in one XML part.
@@ -119,6 +121,7 @@ pub struct WebExtensionStoreReference {
     pub version: String,
     pub store: Option<String>,
     pub store_type: WebExtensionStoreType,
+    pub extension_list: Option<WebExtensionExtensionList>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,6 +135,89 @@ pub struct WebExtensionBinding {
     pub id: String,
     pub binding_type: String,
     pub application_reference: String,
+    pub extension_list: Option<WebExtensionExtensionList>,
+}
+
+/// Namespace dialect of an MS-OWEXML extension-list element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebExtensionExtensionListKind {
+    WebExtension,
+    TaskPane,
+    DrawingMl,
+    StrictDrawingMl,
+}
+
+impl WebExtensionExtensionListKind {
+    pub fn namespace(self) -> &'static str {
+        match self {
+            Self::WebExtension => WEB_EXTENSION_NAMESPACE,
+            Self::TaskPane => TASK_PANES_NAMESPACE,
+            Self::DrawingMl => DRAWINGML_NAMESPACE,
+            Self::StrictDrawingMl => STRICT_DRAWINGML_NAMESPACE,
+        }
+    }
+
+    fn from_namespace(namespace: &str) -> Result<Self> {
+        match namespace {
+            WEB_EXTENSION_NAMESPACE => Ok(Self::WebExtension),
+            TASK_PANES_NAMESPACE => Ok(Self::TaskPane),
+            DRAWINGML_NAMESPACE => Ok(Self::DrawingMl),
+            STRICT_DRAWINGML_NAMESPACE => Ok(Self::StrictDrawingMl),
+            _ => invalid(format!(
+                "invalid web extension extLst namespace '{namespace}'"
+            )),
+        }
+    }
+}
+
+/// A bounded, self-contained, inert `extLst` fragment.
+///
+/// Unknown extension payloads are retained without interpretation or resource
+/// resolution. Namespace declarations inherited by the source fragment are
+/// materialized on its root so it remains valid when authored elsewhere.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebExtensionExtensionList {
+    kind: WebExtensionExtensionListKind,
+    xml: String,
+}
+
+impl WebExtensionExtensionList {
+    pub fn from_xml(xml: &[u8]) -> Result<Self> {
+        if xml.len() > MAX_WEB_EXTENSION_XML_BYTES {
+            return invalid(format!(
+                "web extension extLst XML exceeds {MAX_WEB_EXTENSION_XML_BYTES} bytes"
+            ));
+        }
+        let document = parse_xml(xml)?;
+        Self::from_node(document.root()?, &document)
+    }
+
+    pub fn kind(&self) -> WebExtensionExtensionListKind {
+        self.kind
+    }
+
+    pub fn as_xml(&self) -> &[u8] {
+        self.xml.as_bytes()
+    }
+
+    pub fn xml(&self) -> &str {
+        &self.xml
+    }
+
+    fn from_node(node: &Node, document: &XmlDocument) -> Result<Self> {
+        if node.local_name != "extLst" {
+            return invalid(format!(
+                "web extension extension fragment root must be extLst, got {}",
+                node.local_name
+            ));
+        }
+        reject_unknown_attributes(node, &[])?;
+        let kind = WebExtensionExtensionListKind::from_namespace(&node.namespace)?;
+        Ok(Self {
+            kind,
+            xml: document.self_contained_fragment(node)?,
+        })
+    }
 }
 
 /// Compression state of a DrawingML `CT_Blip`.
@@ -288,6 +374,7 @@ pub struct WebExtensionSnapshot {
     pub linked_relationship_id: Option<String>,
     pub compression_state: Option<WebExtensionBlipCompression>,
     pub effects: Vec<WebExtensionSnapshotEffect>,
+    pub extension_list: Option<WebExtensionExtensionList>,
 }
 
 /// One inert image relationship owned by a web-extension snapshot.
@@ -321,6 +408,7 @@ pub struct WebExtension {
     pub properties: Vec<WebExtensionProperty>,
     pub bindings: Vec<WebExtensionBinding>,
     pub snapshot: Option<WebExtensionSnapshot>,
+    pub extension_list: Option<WebExtensionExtensionList>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -334,6 +422,7 @@ pub struct WebExtensionTaskPane {
     pub relationship_id: String,
     pub web_extension: WebExtension,
     pub snapshot_resources: Vec<WebExtensionSnapshotResource>,
+    pub extension_list: Option<WebExtensionExtensionList>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -359,7 +448,7 @@ pub fn parse_web_extension(xml: &[u8]) -> Result<WebExtension> {
         WEB_EXTENSION_NAMESPACE,
         "reference",
     )?;
-    let reference = parse_store_reference(reference_node)?;
+    let reference = parse_store_reference(reference_node, &document)?;
 
     let alternate_references = if is_next(
         &children,
@@ -375,7 +464,7 @@ pub fn parse_web_extension(xml: &[u8]) -> Result<WebExtension> {
         refs.into_iter()
             .map(|child| {
                 require_name(child, WEB_EXTENSION_NAMESPACE, "reference")?;
-                parse_store_reference(child)
+                parse_store_reference(child, &document)
             })
             .collect::<Result<Vec<_>>>()?
     } else {
@@ -407,7 +496,7 @@ pub fn parse_web_extension(xml: &[u8]) -> Result<WebExtension> {
     enforce_count("binding", binding_nodes.len())?;
     let bindings = binding_nodes
         .into_iter()
-        .map(parse_binding)
+        .map(|node| parse_binding(node, &document))
         .collect::<Result<Vec<_>>>()?;
 
     let snapshot = if is_next(&children, position, WEB_EXTENSION_NAMESPACE, "snapshot") {
@@ -431,11 +520,13 @@ pub fn parse_web_extension(xml: &[u8]) -> Result<WebExtension> {
         let snapshot_children = element_children(node);
         enforce_count("snapshot effect", snapshot_children.len())?;
         let mut effects = Vec::with_capacity(snapshot_children.len());
+        let mut extension_list = None;
         for (index, child) in snapshot_children.iter().enumerate() {
             if is_drawingml_namespace(&child.namespace) && child.local_name == "extLst" {
                 if index + 1 != snapshot_children.len() {
                     return invalid("snapshot extLst must be the final child".into());
                 }
+                extension_list = Some(WebExtensionExtensionList::from_node(child, &document)?);
                 continue;
             }
             effects.push(WebExtensionSnapshotEffect::from_node(child)?);
@@ -445,14 +536,19 @@ pub fn parse_web_extension(xml: &[u8]) -> Result<WebExtension> {
             linked_relationship_id,
             compression_state,
             effects,
+            extension_list,
         })
     } else {
         None
     };
 
-    if is_next(&children, position, WEB_EXTENSION_NAMESPACE, "extLst") {
+    let extension_list = if is_next(&children, position, WEB_EXTENSION_NAMESPACE, "extLst") {
+        let value = WebExtensionExtensionList::from_node(children[position], &document)?;
         position += 1;
-    }
+        Some(value)
+    } else {
+        None
+    };
     ensure_consumed(&children, position, "webextension")?;
 
     Ok(WebExtension {
@@ -463,6 +559,7 @@ pub fn parse_web_extension(xml: &[u8]) -> Result<WebExtension> {
         properties,
         bindings,
         snapshot,
+        extension_list,
     })
 }
 
@@ -474,7 +571,10 @@ pub fn parse_task_panes(xml: &[u8]) -> Result<Vec<ParsedTaskPane>> {
     reject_unknown_attributes(root, &[])?;
     let children = element_children(root);
     enforce_count("task pane", children.len())?;
-    children.into_iter().map(parse_task_pane).collect()
+    children
+        .into_iter()
+        .map(|node| parse_task_pane(node, &document))
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -485,6 +585,7 @@ pub struct ParsedTaskPane {
     pub row: u32,
     pub locked: bool,
     pub relationship_id: String,
+    pub extension_list: Option<WebExtensionExtensionList>,
 }
 
 /// Resolve and validate the complete package graph for persisted task panes.
@@ -593,6 +694,7 @@ pub fn load_web_extension_task_panes(
             relationship_id: pane.relationship_id,
             web_extension,
             snapshot_resources,
+            extension_list: pane.extension_list,
         });
     }
     Ok(Some(WebExtensionTaskPanes { panes }))
@@ -1090,7 +1192,13 @@ pub fn write_web_extension(
         escape_attr(&mut out, &binding.binding_type);
         out.push_str("\" appref=\"");
         escape_attr(&mut out, &binding.application_reference);
-        out.push_str("\"/>");
+        if let Some(extension_list) = &binding.extension_list {
+            out.push_str("\">");
+            out.push_str(extension_list.xml());
+            out.push_str("</we:binding>");
+        } else {
+            out.push_str("\"/>");
+        }
     }
     out.push_str("</we:bindings>");
     if let Some(snapshot) = &extension.snapshot {
@@ -1110,15 +1218,21 @@ pub fn write_web_extension(
             out.push_str(compression_state.as_str());
             out.push('"');
         }
-        if snapshot.effects.is_empty() {
+        if snapshot.effects.is_empty() && snapshot.extension_list.is_none() {
             out.push_str("/>");
         } else {
             out.push('>');
             for effect in &snapshot.effects {
                 out.push_str(effect.xml());
             }
+            if let Some(extension_list) = &snapshot.extension_list {
+                out.push_str(extension_list.xml());
+            }
             out.push_str("</we:snapshot>");
         }
+    }
+    if let Some(extension_list) = &extension.extension_list {
+        out.push_str(extension_list.xml());
     }
     out.push_str("</we:webextension>");
     let output = out.into_bytes();
@@ -1167,7 +1281,11 @@ pub fn write_task_panes(
         out.push_str(if pane.locked { "true" } else { "false" });
         out.push_str("\"><wetp:webextensionref r:id=\"");
         escape_attr(&mut out, &pane.relationship_id);
-        out.push_str("\"/></wetp:taskpane>");
+        out.push_str("\"/>");
+        if let Some(extension_list) = &pane.extension_list {
+            out.push_str(extension_list.xml());
+        }
+        out.push_str("</wetp:taskpane>");
     }
     out.push_str("</wetp:taskpanes>");
     let output = out.into_bytes();
@@ -1175,7 +1293,7 @@ pub fn write_task_panes(
     Ok(output)
 }
 
-fn parse_task_pane(node: &Node) -> Result<ParsedTaskPane> {
+fn parse_task_pane(node: &Node, document: &XmlDocument) -> Result<ParsedTaskPane> {
     require_name(node, TASK_PANES_NAMESPACE, "taskpane")?;
     reject_unknown_attributes(
         node,
@@ -1222,6 +1340,10 @@ fn parse_task_pane(node: &Node) -> Result<ParsedTaskPane> {
     {
         return invalid("unexpected taskpane child or child order".into());
     }
+    let extension_list = children
+        .get(1)
+        .map(|node| WebExtensionExtensionList::from_node(node, document))
+        .transpose()?;
     Ok(ParsedTaskPane {
         dock_state,
         visible,
@@ -1229,10 +1351,14 @@ fn parse_task_pane(node: &Node) -> Result<ParsedTaskPane> {
         row,
         locked,
         relationship_id,
+        extension_list,
     })
 }
 
-fn parse_store_reference(node: &Node) -> Result<WebExtensionStoreReference> {
+fn parse_store_reference(
+    node: &Node,
+    document: &XmlDocument,
+) -> Result<WebExtensionStoreReference> {
     require_name(node, WEB_EXTENSION_NAMESPACE, "reference")?;
     reject_unknown_attributes(
         node,
@@ -1259,6 +1385,10 @@ fn parse_store_reference(node: &Node) -> Result<WebExtensionStoreReference> {
             .map(WebExtensionStoreType::parse)
             .transpose()?
             .unwrap_or_default(),
+        extension_list: children
+            .first()
+            .map(|node| WebExtensionExtensionList::from_node(node, document))
+            .transpose()?,
     })
 }
 
@@ -1274,7 +1404,7 @@ fn parse_property(node: &Node) -> Result<WebExtensionProperty> {
     })
 }
 
-fn parse_binding(node: &Node) -> Result<WebExtensionBinding> {
+fn parse_binding(node: &Node, document: &XmlDocument) -> Result<WebExtensionBinding> {
     require_name(node, WEB_EXTENSION_NAMESPACE, "binding")?;
     reject_unknown_attributes(node, &[("", "id"), ("", "type"), ("", "appref")])?;
     let children = element_children(node);
@@ -1289,6 +1419,10 @@ fn parse_binding(node: &Node) -> Result<WebExtensionBinding> {
         id: required_attr(node, "", "id")?.to_owned(),
         binding_type: required_attr(node, "", "type")?.to_owned(),
         application_reference: required_attr(node, "", "appref")?.to_owned(),
+        extension_list: children
+            .first()
+            .map(|node| WebExtensionExtensionList::from_node(node, document))
+            .transpose()?,
     })
 }
 
@@ -1420,6 +1554,10 @@ fn validate_model(extension: &WebExtension) -> Result<()> {
         require_nonempty("binding id", &binding.id)?;
         require_nonempty("binding type", &binding.binding_type)?;
         require_nonempty("binding appref", &binding.application_reference)?;
+        validate_extension_list(
+            binding.extension_list.as_ref(),
+            &[WebExtensionExtensionListKind::WebExtension],
+        )?;
     }
     if let Some(snapshot) = &extension.snapshot {
         enforce_count("snapshot effect", snapshot.effects.len())?;
@@ -1429,13 +1567,28 @@ fn validate_model(extension: &WebExtension) -> Result<()> {
                 return invalid("snapshot effect kind does not match its XML root".into());
             }
         }
+        validate_extension_list(
+            snapshot.extension_list.as_ref(),
+            &[
+                WebExtensionExtensionListKind::DrawingMl,
+                WebExtensionExtensionListKind::StrictDrawingMl,
+            ],
+        )?;
     }
+    validate_extension_list(
+        extension.extension_list.as_ref(),
+        &[WebExtensionExtensionListKind::WebExtension],
+    )?;
     Ok(())
 }
 
 fn validate_store_reference(reference: &WebExtensionStoreReference) -> Result<()> {
     require_nonempty("reference id", &reference.id)?;
-    require_nonempty("reference version", &reference.version)
+    require_nonempty("reference version", &reference.version)?;
+    validate_extension_list(
+        reference.extension_list.as_ref(),
+        &[WebExtensionExtensionListKind::WebExtension],
+    )
 }
 
 fn validate_task_pane(pane: &WebExtensionTaskPane) -> Result<()> {
@@ -1444,8 +1597,32 @@ fn validate_task_pane(pane: &WebExtensionTaskPane) -> Result<()> {
     if !pane.width.is_finite() {
         return invalid("task-pane width must be finite".into());
     }
+    validate_extension_list(
+        pane.extension_list.as_ref(),
+        &[WebExtensionExtensionListKind::TaskPane],
+    )?;
     validate_model(&pane.web_extension)?;
     validate_snapshot_resources(pane)
+}
+
+fn validate_extension_list(
+    extension_list: Option<&WebExtensionExtensionList>,
+    allowed: &[WebExtensionExtensionListKind],
+) -> Result<()> {
+    let Some(extension_list) = extension_list else {
+        return Ok(());
+    };
+    if !allowed.contains(&extension_list.kind) {
+        return invalid(format!(
+            "extLst namespace '{}' is not valid at this location",
+            extension_list.kind.namespace()
+        ));
+    }
+    let reparsed = WebExtensionExtensionList::from_xml(extension_list.as_xml())?;
+    if reparsed != *extension_list {
+        return invalid("extLst fragment is not a stable self-contained XML tree".into());
+    }
+    Ok(())
 }
 
 fn validate_snapshot_resources(pane: &WebExtensionTaskPane) -> Result<()> {
@@ -1532,7 +1709,15 @@ fn write_store_reference(out: &mut String, element: &str, reference: &WebExtensi
     }
     out.push_str("\" storeType=\"");
     out.push_str(reference.store_type.as_str());
-    out.push_str("\"/>");
+    if let Some(extension_list) = &reference.extension_list {
+        out.push_str("\">");
+        out.push_str(extension_list.xml());
+        out.push_str("</we:");
+        out.push_str(element);
+        out.push('>');
+    } else {
+        out.push_str("\"/>");
+    }
 }
 
 fn format_f64(value: f64) -> String {
@@ -1653,11 +1838,38 @@ struct Node {
     local_name: String,
     attributes: Vec<Attribute>,
     children: Vec<Node>,
+    raw_fragment: Option<RawFragment>,
+}
+
+#[derive(Debug)]
+struct RawFragment {
+    start: usize,
+    start_tag_end: usize,
+    end: usize,
+    namespaces: Vec<(String, String)>,
+    declared_prefixes: HashSet<String>,
+}
+
+#[derive(Debug)]
+struct NodeFrame {
+    node: Node,
+    namespaces: HashMap<String, String>,
+    extension_depth: Option<usize>,
+    direct_extension_count: usize,
+}
+
+#[derive(Debug, Default)]
+struct XmlBuildState {
+    root: Option<Node>,
+    stack: Vec<NodeFrame>,
+    string_bytes: usize,
+    nodes: usize,
 }
 
 #[derive(Debug)]
 struct XmlDocument {
     root: Option<Node>,
+    xml: Vec<u8>,
 }
 
 impl XmlDocument {
@@ -1665,6 +1877,52 @@ impl XmlDocument {
         self.root
             .as_ref()
             .ok_or_else(|| OoxmlError::InvalidFormat("missing XML root".into()))
+    }
+
+    fn self_contained_fragment(&self, node: &Node) -> Result<String> {
+        let fragment = node.raw_fragment.as_ref().ok_or_else(|| {
+            OoxmlError::InvalidFormat("XML node has no retained fragment bounds".into())
+        })?;
+        if fragment.start > fragment.start_tag_end
+            || fragment.start_tag_end > fragment.end
+            || fragment.end > self.xml.len()
+        {
+            return invalid("invalid retained XML fragment bounds".into());
+        }
+        let raw = &self.xml[fragment.start..fragment.end];
+        let start_tag_end = fragment.start_tag_end - fragment.start;
+        if start_tag_end == 0 || raw.get(start_tag_end - 1) != Some(&b'>') {
+            return invalid("retained XML fragment has an invalid start tag".into());
+        }
+        let mut insert_at = start_tag_end - 1;
+        let mut cursor = insert_at;
+        while cursor > 0 && raw[cursor - 1].is_ascii_whitespace() {
+            cursor -= 1;
+        }
+        if cursor > 0 && raw[cursor - 1] == b'/' {
+            insert_at = cursor - 1;
+        }
+
+        let raw = std::str::from_utf8(raw)
+            .map_err(|error| OoxmlError::Xml(format!("non-UTF-8 extension fragment: {error}")))?;
+        let mut out = String::with_capacity(raw.len() + fragment.namespaces.len() * 48);
+        out.push_str(&raw[..insert_at]);
+        for (prefix, namespace) in &fragment.namespaces {
+            if prefix == "xml" || fragment.declared_prefixes.contains(prefix) {
+                continue;
+            }
+            if prefix.is_empty() {
+                out.push_str(" xmlns=\"");
+            } else {
+                out.push_str(" xmlns:");
+                out.push_str(prefix);
+                out.push_str("=\"");
+            }
+            escape_attr(&mut out, namespace);
+            out.push('"');
+        }
+        out.push_str(&raw[insert_at..]);
+        Ok(out)
     }
 }
 
@@ -1687,84 +1945,120 @@ fn parse_mce_xml(xml: &[u8], namespaces: &[&str]) -> Result<XmlDocument> {
         max_choices_per_alternate: 1024,
     };
     let processed = process_markup_compatibility(xml, &capabilities, &limits)?;
-    parse_xml(processed.xml.as_ref())
+    parse_xml_owned(processed.xml.into_owned())
 }
 
 fn parse_xml(xml: &[u8]) -> Result<XmlDocument> {
-    let mut reader = Reader::from_reader(xml);
+    parse_xml_owned(xml.to_vec())
+}
+
+fn parse_xml_owned(xml: Vec<u8>) -> Result<XmlDocument> {
+    let mut reader = Reader::from_reader(xml.as_slice());
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
-    let mut document = XmlDocument { root: None };
-    let mut stack: Vec<(Node, HashMap<String, String>)> = Vec::new();
-    let mut string_bytes = 0usize;
+    let mut state = XmlBuildState::default();
     let mut xml_version = XmlVersion::Implicit1_0;
     loop {
-        match reader.read_event_into(&mut buffer)? {
+        let event_start = reader.buffer_position() as usize;
+        let event = reader.read_event_into(&mut buffer)?;
+        let event_end = reader.buffer_position() as usize;
+        match event {
             Event::Decl(declaration) => xml_version = declaration.xml_version()?,
             Event::Start(element) => push_element(
                 &reader,
                 &element,
-                &mut document,
-                &mut stack,
-                &mut string_bytes,
+                &mut state,
                 xml_version,
                 false,
+                event_start,
+                event_end,
             )?,
             Event::Empty(element) => push_element(
                 &reader,
                 &element,
-                &mut document,
-                &mut stack,
-                &mut string_bytes,
+                &mut state,
                 xml_version,
                 true,
+                event_start,
+                event_end,
             )?,
             Event::Eof => break,
             Event::DocType(_) => return invalid("DTD is forbidden in web extension XML".into()),
-            Event::Text(text) if !text.as_ref().iter().all(u8::is_ascii_whitespace) => {
+            Event::Text(text)
+                if !extension_text_is_allowed(&state.stack)
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
                 return invalid("text is not permitted in web extension structures".into());
             },
-            Event::CData(text) if !text.as_ref().iter().all(u8::is_ascii_whitespace) => {
+            Event::CData(text)
+                if !extension_text_is_allowed(&state.stack)
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
                 return invalid("CDATA is not permitted in web extension structures".into());
             },
-            Event::End(_) if stack.is_empty() => return invalid("unexpected XML end tag".into()),
+            Event::GeneralRef(_) => {
+                return invalid(
+                    "general entity references are forbidden in web extension XML".into(),
+                );
+            },
+            Event::End(_) if state.stack.is_empty() => {
+                return invalid("unexpected XML end tag".into());
+            },
             Event::End(_) => {
-                let (node, _) = stack.pop().expect("stack checked above");
-                attach_node(&mut document, &mut stack, node)?;
+                let mut frame = state.stack.pop().expect("stack checked above");
+                if let Some(fragment) = frame.node.raw_fragment.as_mut() {
+                    fragment.end = event_end;
+                }
+                attach_node(&mut state.root, &mut state.stack, frame.node)?;
             },
             _ => {},
         }
         buffer.clear();
     }
-    if !stack.is_empty() {
+    if !state.stack.is_empty() {
         return invalid("unclosed XML element".into());
     }
-    if string_bytes > MAX_WEB_EXTENSION_STRING_BYTES {
+    if state.string_bytes > MAX_WEB_EXTENSION_STRING_BYTES {
         return invalid("web extension decoded strings exceed allocation limit".into());
     }
-    Ok(document)
+    drop(reader);
+    Ok(XmlDocument {
+        root: state.root,
+        xml,
+    })
 }
 
 fn push_element(
     reader: &Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
-    document: &mut XmlDocument,
-    stack: &mut Vec<(Node, HashMap<String, String>)>,
-    string_bytes: &mut usize,
+    state: &mut XmlBuildState,
     xml_version: XmlVersion,
     empty: bool,
+    event_start: usize,
+    event_end: usize,
 ) -> Result<()> {
-    if stack.len() >= MAX_WEB_EXTENSION_XML_DEPTH {
+    if state.stack.len() >= MAX_WEB_EXTENSION_XML_DEPTH {
         return invalid(format!(
             "web extension XML depth exceeds {MAX_WEB_EXTENSION_XML_DEPTH}"
         ));
     }
-    let mut namespaces = stack
+    state.nodes = state
+        .nodes
+        .checked_add(1)
+        .ok_or_else(|| OoxmlError::InvalidFormat("web extension node count overflow".into()))?;
+    if state.nodes > MAX_WEB_EXTENSION_XML_NODES {
+        return invalid(format!(
+            "web extension XML node count exceeds {MAX_WEB_EXTENSION_XML_NODES}"
+        ));
+    }
+    let mut namespaces = state
+        .stack
         .last()
-        .map(|(_, namespaces)| namespaces.clone())
+        .map(|frame| frame.namespaces.clone())
         .unwrap_or_default();
     namespaces.insert("xml".into(), "http://www.w3.org/XML/1998/namespace".into());
     let mut raw_attributes = Vec::new();
+    let mut declared_prefixes = HashSet::new();
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
@@ -1774,17 +2068,22 @@ fn push_element(
             .decoded_and_normalized_value(xml_version, reader.decoder())
             .map_err(|error| OoxmlError::Xml(error.to_string()))?
             .into_owned();
-        *string_bytes = string_bytes.saturating_add(name.len() + value.len());
-        if *string_bytes > MAX_WEB_EXTENSION_STRING_BYTES {
+        state.string_bytes = state.string_bytes.saturating_add(name.len() + value.len());
+        if state.string_bytes > MAX_WEB_EXTENSION_STRING_BYTES {
             return invalid("web extension decoded strings exceed allocation limit".into());
         }
         if name == "xmlns" {
+            declared_prefixes.insert(String::new());
             namespaces.insert(String::new(), value);
         } else if let Some(prefix) = name.strip_prefix("xmlns:") {
+            declared_prefixes.insert(prefix.to_owned());
             namespaces.insert(prefix.to_owned(), value);
         } else {
             raw_attributes.push((name, value));
         }
+    }
+    if namespaces.len() > 4096 {
+        return invalid("web extension XML namespace bindings exceed 4096".into());
     }
     let element_name = element.name();
     let raw_name = std::str::from_utf8(element_name.as_ref())
@@ -1793,7 +2092,9 @@ fn push_element(
     let namespace = namespaces.get(prefix).cloned().ok_or_else(|| {
         OoxmlError::InvalidFormat(format!("unbound XML namespace prefix '{prefix}'"))
     })?;
-    *string_bytes = string_bytes.saturating_add(namespace.len() + local_name.len());
+    state.string_bytes = state
+        .string_bytes
+        .saturating_add(namespace.len() + local_name.len());
     let mut attributes = Vec::with_capacity(raw_attributes.len());
     let mut seen = HashSet::new();
     for (raw_name, value) in raw_attributes {
@@ -1814,38 +2115,132 @@ fn push_element(
             value,
         });
     }
+    let capture_fragment = should_capture_extension_list(
+        state.stack.last().map(|frame| &frame.node),
+        &namespace,
+        local_name,
+    );
+    let raw_fragment = capture_fragment.then(|| {
+        let mut namespaces = namespaces
+            .iter()
+            .map(|(prefix, namespace)| (prefix.clone(), namespace.clone()))
+            .collect::<Vec<_>>();
+        namespaces.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+        RawFragment {
+            start: event_start,
+            start_tag_end: event_end,
+            end: if empty { event_end } else { 0 },
+            namespaces,
+            declared_prefixes,
+        }
+    });
     let node = Node {
         namespace,
         local_name: local_name.to_owned(),
         attributes,
         children: Vec::new(),
+        raw_fragment,
+    };
+    if state
+        .stack
+        .last()
+        .is_some_and(|frame| frame.extension_depth == Some(0))
+    {
+        let parent = state.stack.last_mut().expect("parent checked above");
+        let expected_namespace = if parent.node.namespace == STRICT_DRAWINGML_NAMESPACE {
+            STRICT_DRAWINGML_NAMESPACE
+        } else {
+            DRAWINGML_NAMESPACE
+        };
+        require_name(&node, expected_namespace, "ext")?;
+        reject_unknown_attributes(&node, &[("", "uri")])?;
+        required_attr(&node, "", "uri")?;
+        parent.direct_extension_count = parent
+            .direct_extension_count
+            .checked_add(1)
+            .ok_or_else(|| OoxmlError::InvalidFormat("extLst count overflow".into()))?;
+        enforce_count("OfficeArt extension", parent.direct_extension_count)?;
+    }
+    let extension_depth = if capture_fragment {
+        Some(0)
+    } else {
+        state
+            .stack
+            .last()
+            .and_then(|frame| frame.extension_depth)
+            .map(|depth| depth + 1)
     };
     if empty {
-        attach_node(document, stack, node)?;
+        attach_node(&mut state.root, &mut state.stack, node)?;
     } else {
-        stack.push((node, namespaces));
+        state.stack.push(NodeFrame {
+            node,
+            namespaces,
+            extension_depth,
+            direct_extension_count: 0,
+        });
     }
     Ok(())
 }
 
-fn attach_node(
-    document: &mut XmlDocument,
-    stack: &mut [(Node, HashMap<String, String>)],
-    node: Node,
-) -> Result<()> {
-    if let Some((parent, _)) = stack.last_mut() {
-        parent.children.push(node);
-    } else if document.root.replace(node).is_some() {
+fn attach_node(root: &mut Option<Node>, stack: &mut [NodeFrame], node: Node) -> Result<()> {
+    if let Some(parent) = stack.last_mut() {
+        if parent.extension_depth.is_none() {
+            parent.node.children.push(node);
+        }
+    } else if root.replace(node).is_some() {
         return invalid("multiple XML root elements".into());
     }
     Ok(())
+}
+
+fn should_capture_extension_list(parent: Option<&Node>, namespace: &str, local_name: &str) -> bool {
+    if local_name != "extLst" {
+        return false;
+    }
+    let allowed_namespace = matches!(
+        namespace,
+        WEB_EXTENSION_NAMESPACE
+            | TASK_PANES_NAMESPACE
+            | DRAWINGML_NAMESPACE
+            | STRICT_DRAWINGML_NAMESPACE
+    );
+    if !allowed_namespace {
+        return false;
+    }
+    let Some(parent) = parent else {
+        return true;
+    };
+    matches!(
+        (
+            parent.namespace.as_str(),
+            parent.local_name.as_str(),
+            namespace
+        ),
+        (
+            WEB_EXTENSION_NAMESPACE,
+            "webextension" | "reference" | "binding",
+            WEB_EXTENSION_NAMESPACE
+        ) | (
+            WEB_EXTENSION_NAMESPACE,
+            "snapshot",
+            DRAWINGML_NAMESPACE | STRICT_DRAWINGML_NAMESPACE
+        ) | (TASK_PANES_NAMESPACE, "taskpane", TASK_PANES_NAMESPACE)
+    )
+}
+
+fn extension_text_is_allowed(stack: &[NodeFrame]) -> bool {
+    stack
+        .last()
+        .and_then(|frame| frame.extension_depth)
+        .is_some_and(|depth| depth >= 2)
 }
 
 fn split_qname(name: &str) -> (&str, &str) {
     name.split_once(':').unwrap_or(("", name))
 }
 
-fn element_children<'a>(node: &'a Node) -> Vec<&'a Node> {
+fn element_children(node: &Node) -> Vec<&Node> {
     node.children.iter().collect()
 }
 
@@ -1960,6 +2355,10 @@ mod tests {
         include_bytes!("../../../test-data/ooxml/web_extensions/hidden_taskpanes.xml");
     const LOCAL_SNAPSHOT_EFFECTS_EXTENSION: &[u8] =
         include_bytes!("../../../test-data/ooxml/web_extensions/snapshot_effects_webextension.xml");
+    const LOCAL_EXTENSION_LISTS_EXTENSION: &[u8] =
+        include_bytes!("../../../test-data/ooxml/web_extensions/extension_lists_webextension.xml");
+    const LOCAL_EXTENSION_LISTS_TASK_PANES: &[u8] =
+        include_bytes!("../../../test-data/ooxml/web_extensions/extension_lists_taskpanes.xml");
 
     #[test]
     fn loads_local_omex_and_registry_fixtures_inertly() {
@@ -2023,6 +2422,123 @@ mod tests {
         let written = std::str::from_utf8(&written).unwrap();
         assert!(written.contains("cstate=\"hqprint\""));
         assert!(written.contains(STRICT_RELATIONSHIPS_NAMESPACE));
+    }
+
+    #[test]
+    fn preserves_all_extension_list_sites_with_inherited_namespaces_and_mixed_content() {
+        let extension = parse_web_extension(LOCAL_EXTENSION_LISTS_EXTENSION).unwrap();
+        let reference_extension = extension.reference.extension_list.as_ref().unwrap();
+        assert_eq!(
+            reference_extension.kind(),
+            WebExtensionExtensionListKind::WebExtension
+        );
+        assert!(reference_extension.xml().contains("xmlns:vendor="));
+        assert!(reference_extension.xml().contains("xmlns:r="));
+        assert!(reference_extension.xml().contains("reference text"));
+        assert!(reference_extension.xml().contains("<![CDATA[<opaque>]]>"));
+        assert!(reference_extension.xml().contains("<!--kept-->"));
+        assert!(extension.alternate_references[0].extension_list.is_some());
+        assert!(extension.bindings[0].extension_list.is_some());
+        assert_eq!(
+            extension
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .extension_list
+                .as_ref()
+                .unwrap()
+                .kind(),
+            WebExtensionExtensionListKind::DrawingMl
+        );
+        assert!(extension.extension_list.is_some());
+
+        let written = write_web_extension(&extension, OoxmlConformance::Strict).unwrap();
+        assert_eq!(parse_web_extension(&written).unwrap(), extension);
+
+        let panes = parse_task_panes(LOCAL_EXTENSION_LISTS_TASK_PANES).unwrap();
+        let pane_extension = panes[0].extension_list.as_ref().unwrap();
+        assert_eq!(
+            pane_extension.kind(),
+            WebExtensionExtensionListKind::TaskPane
+        );
+        assert!(pane_extension.xml().contains("xmlns:vendor="));
+        assert!(pane_extension.xml().contains("<![CDATA[<pane-data>]]>"));
+        assert!(pane_extension.xml().contains("<!--pane comment-->"));
+    }
+
+    #[test]
+    fn package_crud_round_trips_every_inert_extension_list() {
+        let package = local_fixture_package(
+            LOCAL_EXTENSION_LISTS_TASK_PANES,
+            LOCAL_EXTENSION_LISTS_EXTENSION,
+        );
+        let loaded = load_web_extension_task_panes(&package).unwrap().unwrap();
+        assert!(loaded.panes[0].extension_list.is_some());
+        assert!(loaded.panes[0].web_extension.extension_list.is_some());
+
+        let mut stored = OpcPackage::new();
+        store_web_extension_task_panes(&mut stored, &loaded, OoxmlConformance::Strict).unwrap();
+        assert_eq!(
+            load_web_extension_task_panes(&stored).unwrap(),
+            Some(loaded)
+        );
+    }
+
+    #[test]
+    fn authored_extension_lists_validate_namespace_placement_and_security() {
+        let web = WebExtensionExtensionList::from_xml(
+            br#"<we:extLst xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11"><a:ext xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" uri="urn:test"><v:data xmlns:v="urn:test">text<![CDATA[data]]></v:data></a:ext></we:extLst>"#,
+        )
+        .unwrap();
+        assert_eq!(web.kind(), WebExtensionExtensionListKind::WebExtension);
+        assert_eq!(
+            WebExtensionExtensionList::from_xml(web.as_xml()).unwrap(),
+            web
+        );
+
+        let mut extension = sample_extension();
+        extension.extension_list = Some(web.clone());
+        assert!(write_web_extension(&extension, OoxmlConformance::Transitional).is_ok());
+
+        let mut panes = sample_task_panes();
+        panes.panes[0].extension_list = Some(web);
+        assert!(write_task_panes(&panes, OoxmlConformance::Transitional).is_err());
+        assert!(
+            WebExtensionExtensionList::from_xml(
+                br#"<!DOCTYPE extLst [<!ENTITY x "boom">]><we:extLst xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11">&x;</we:extLst>"#
+            )
+            .is_err()
+        );
+        assert!(
+            WebExtensionExtensionList::from_xml(
+                br#"<v:extLst xmlns:v="urn:not-an-office-namespace"/>"#
+            )
+            .is_err()
+        );
+        assert!(
+            WebExtensionExtensionList::from_xml(
+                br#"<we:extLst xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11" unexpected="1"/>"#
+            )
+            .is_err()
+        );
+        assert!(
+            WebExtensionExtensionList::from_xml(
+                br#"<we:extLst xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ext/></we:extLst>"#
+            )
+            .is_err()
+        );
+        assert!(
+            WebExtensionExtensionList::from_xml(
+                br#"<we:extLst xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11" xmlns:v="urn:test"><v:data/></we:extLst>"#
+            )
+            .is_err()
+        );
+        assert!(
+            WebExtensionExtensionList::from_xml(
+                br#"<we:extLst xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11">text</we:extLst>"#
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -2141,11 +2657,19 @@ mod tests {
                 relationship_id: "rId1".into(),
                 web_extension: sample_extension(),
                 snapshot_resources: vec![],
+                extension_list: None,
             });
         assert!(write_task_panes(&model, OoxmlConformance::Transitional).is_err());
         let mut extension = sample_extension();
         extension.id = "x".repeat(MAX_WEB_EXTENSION_XML_BYTES);
         assert!(write_web_extension(&extension, OoxmlConformance::Transitional).is_err());
+
+        let mut excessive_nodes = format!(
+            r#"<we:extLst xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:a="{DRAWINGML_NAMESPACE}" xmlns:v="urn:test"><a:ext uri="urn:test"><v:data>"#
+        );
+        excessive_nodes.push_str(&"<v:n/>".repeat(MAX_WEB_EXTENSION_XML_NODES));
+        excessive_nodes.push_str("</v:data></a:ext></we:extLst>");
+        assert!(WebExtensionExtensionList::from_xml(excessive_nodes.as_bytes()).is_err());
     }
 
     #[test]
@@ -2334,6 +2858,7 @@ mod tests {
                 version: "1.0.0.0".into(),
                 store: Some("en-us".into()),
                 store_type: WebExtensionStoreType::Omex,
+                extension_list: None,
             },
             alternate_references: vec![],
             properties: vec![WebExtensionProperty {
@@ -2344,8 +2869,10 @@ mod tests {
                 id: "binding-1".into(),
                 binding_type: "matrix".into(),
                 application_reference: "app-ref".into(),
+                extension_list: None,
             }],
             snapshot: Some(WebExtensionSnapshot::default()),
+            extension_list: None,
         }
     }
 
@@ -2361,6 +2888,7 @@ mod tests {
                 )
                 .unwrap(),
             ],
+            extension_list: None,
         });
         WebExtensionTaskPanes {
             panes: vec![WebExtensionTaskPane {
@@ -2387,6 +2915,7 @@ mod tests {
                         },
                     },
                 ],
+                extension_list: None,
             }],
         }
     }
