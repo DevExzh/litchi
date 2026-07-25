@@ -4,12 +4,15 @@ use std::env;
 use std::path::Path;
 
 use litchi_iwa::charts::{
-    ChartData, ChartKind, ChartSeriesSymbol, ChartSeriesSymbolShape, ChartSeriesSymbolSize,
+    ChartData, ChartKind, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesSymbol,
+    ChartSeriesSymbolFill, ChartSeriesSymbolShape, ChartSeriesSymbolSize,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, StrokeWidth,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -30,6 +33,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ChartSeriesSymbolShape::Diamond,
         )),
     ];
+    let fills = [
+        ChartSeriesSymbolFill::Custom(ShapeFill::Solid(RgbaColor::new(
+            0.95,
+            0.25,
+            0.18,
+            1.0,
+            RgbColorSpace::Srgb,
+        )?)),
+        ChartSeriesSymbolFill::SeriesStroke,
+    ];
+    let outlines = [
+        Some(ChartSeriesStroke::new(
+            RgbaColor::black(),
+            StrokeWidth::new(2.5)?,
+            ChartSeriesStrokePattern::RoundedDash,
+        )),
+        None,
+    ];
 
     let mut numbers = NumbersDocumentBuilder::new()
         .sheet_name("Symbol CRUD")
@@ -47,9 +68,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     numbers.set_sheet_chart_title(sheet_id, chart.drawable_object_id, "Typed data symbols")?;
     numbers.set_sheet_chart_series_symbols(sheet_id, chart.drawable_object_id, &symbols)?;
+    numbers.set_sheet_chart_series_symbol_fills(sheet_id, chart.drawable_object_id, &fills)?;
+    numbers.set_sheet_chart_series_symbol_outlines(
+        sheet_id,
+        chart.drawable_object_id,
+        &outlines,
+    )?;
     assert_eq!(
         numbers.sheet_chart_series_symbols(sheet_id, chart.drawable_object_id)?,
         symbols
+    );
+    assert_eq!(
+        numbers.sheet_chart_series_symbol_fills(sheet_id, chart.drawable_object_id)?,
+        fills
+    );
+    assert_eq!(
+        numbers.sheet_chart_series_symbol_outlines(sheet_id, chart.drawable_object_id)?,
+        outlines
     );
     numbers.save(output.join("series-symbol.numbers"))?;
 
@@ -67,9 +102,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     pages.set_body_chart_title(chart.drawable_object_id, "Typed data symbols")?;
     pages.set_body_chart_series_symbols(chart.drawable_object_id, &symbols)?;
+    pages.set_body_chart_series_symbol_fills(chart.drawable_object_id, &fills)?;
+    pages.set_body_chart_series_symbol_outlines(chart.drawable_object_id, &outlines)?;
     assert_eq!(
         pages.body_chart_series_symbols(chart.drawable_object_id)?,
         symbols
+    );
+    assert_eq!(
+        pages.body_chart_series_symbol_fills(chart.drawable_object_id)?,
+        fills
+    );
+    assert_eq!(
+        pages.body_chart_series_symbol_outlines(chart.drawable_object_id)?,
+        outlines
     );
     pages.save(output.join("series-symbol.pages"))?;
 
@@ -88,9 +133,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     keynote.set_slide_chart_title(0, chart.drawable_object_id, "Typed data symbols")?;
     keynote.set_slide_chart_series_symbols(0, chart.drawable_object_id, &symbols)?;
+    keynote.set_slide_chart_series_symbol_fills(0, chart.drawable_object_id, &fills)?;
+    keynote.set_slide_chart_series_symbol_outlines(0, chart.drawable_object_id, &outlines)?;
     assert_eq!(
         keynote.slide_chart_series_symbols(0, chart.drawable_object_id)?,
         symbols
+    );
+    assert_eq!(
+        keynote.slide_chart_series_symbol_fills(0, chart.drawable_object_id)?,
+        fills
+    );
+    assert_eq!(
+        keynote.slide_chart_series_symbol_outlines(0, chart.drawable_object_id)?,
+        outlines
     );
     keynote.save(output.join("series-symbol.key"))?;
 
