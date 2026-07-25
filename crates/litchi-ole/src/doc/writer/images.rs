@@ -614,11 +614,16 @@ pub(crate) struct FloatingShapeInfo<'a> {
     pub height_twips: u32,
     /// Position and wrapping.
     pub position: &'a FloatingPosition,
+    /// Textbox story text when the shape is a text box.
+    pub text: Option<&'a str>,
 }
 
 impl FloatingShapeInfo<'_> {
     /// The MSOSPT shape type for the OfficeArtFSP record instance.
     fn shape_type(&self) -> u16 {
+        if self.text.is_some() {
+            return super::shapes::MSOSPT_TEXT_BOX;
+        }
         match &self.content {
             FloatingShapeContent::Picture(_) => SHAPE_TYPE_PICTURE_FRAME,
             FloatingShapeContent::Primitive(shape) => shape.kind().shape_type(),
@@ -757,8 +762,10 @@ pub(crate) fn build_dgg_info(shapes: &[FloatingShapeInfo<'_>], total_pictures: u
     patch_record_len(&mut out, group_container_start);
 
     // One shape per floating picture or primitive. Pictures reference their
-    // BSE through a 1-based pib index assigned in document order.
+    // BSE through a 1-based pib index assigned in document order; text boxes
+    // reference their FTXBXS entry the same way through the TXID.
     let mut bse_index = OPT_PIB_FIRST_BSE;
+    let mut ftxbxs_index = 0;
     for (index, shape) in shapes.iter().enumerate() {
         let shape_start = out.len();
         write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_SP_CONTAINER, 0);
@@ -788,6 +795,11 @@ pub(crate) fn build_dgg_info(shapes: &[FloatingShapeInfo<'_>], total_pictures: u
         // OfficeArtClientData: present but unused.
         write_record_header(&mut out, VERSION_ATOM, 0, RECORD_CLIENT_DATA, CLIENT_DATA_LEN);
         out.extend_from_slice(&0u32.to_le_bytes());
+        // OfficeArtClientTextbox: links a text box to its FTXBXS entry.
+        if shape.text.is_some() {
+            super::shapes::write_client_textbox(&mut out, ftxbxs_index);
+            ftxbxs_index += 1;
+        }
         patch_record_len(&mut out, shape_start);
     }
 
@@ -978,6 +990,7 @@ mod tests {
                 width_twips: png.width_twips(),
                 height_twips: png.height_twips(),
                 position: &positions[0],
+                text: None,
             },
             FloatingShapeInfo {
                 anchor_cp: 30,
@@ -986,6 +999,7 @@ mod tests {
                 width_twips: jpeg.width_twips(),
                 height_twips: jpeg.height_twips(),
                 position: &positions[1],
+                text: None,
             },
         ]
     }

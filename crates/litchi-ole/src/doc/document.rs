@@ -114,6 +114,9 @@ pub struct Document {
     /// Floating-shape anchors from the Main Document PlcfSpa (empty when the
     /// document has no floating shapes in the main story).
     shape_anchors: Vec<super::parts::spa::ShapeAnchor>,
+    /// Text box entries from the PlcftxbxTxt (empty when the document has no
+    /// textbox story).
+    textbox_entries: Vec<super::parts::textbox::TextBoxEntry>,
     /// Hyperlinks table
     hyperlinks_table: Option<HyperlinksTable>,
     /// List/numbering tables
@@ -227,6 +230,7 @@ impl Document {
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
         let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
+        let textbox_entries = Self::parse_textbox_entries(&fib, &table_stream);
 
         // Parse hyperlinks from fields table
         let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
@@ -298,6 +302,7 @@ impl Document {
             proofing_tables,
             sections,
             shape_anchors,
+            textbox_entries,
             hyperlinks_table,
             list_tables,
             stylesheet,
@@ -366,6 +371,18 @@ impl Document {
     ) -> Vec<super::parts::spa::ShapeAnchor> {
         Self::table_slice(fib, table_stream, super::parts::spa::FIB_INDEX_PLC_SPA_MOM)
             .and_then(|data| super::parts::spa::parse_plcf_spa(data).ok())
+            .unwrap_or_default()
+    }
+
+    /// Parse the textbox story position table (PlcftxbxTxt), if present.
+    ///
+    /// A malformed table yields no entries rather than failing the document.
+    fn parse_textbox_entries(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+    ) -> Vec<super::parts::textbox::TextBoxEntry> {
+        Self::table_slice(fib, table_stream, super::parts::textbox::FIB_INDEX_PLCF_TXBX_TXT)
+            .and_then(|data| super::parts::textbox::parse_plcf_txbx_txt(data).ok())
             .unwrap_or_default()
     }
 
@@ -2046,6 +2063,34 @@ impl Document {
     #[inline]
     pub fn shape_positions(&self) -> &[super::parts::spa::ShapeAnchor] {
         &self.shape_anchors
+    }
+
+    /// Get the text boxes of the document with their plain-text content.
+    ///
+    /// The text comes from the textbox story (the subdocument counted by
+    /// ccpTxbx); each entry's `shape_id` matches the `spid` of the shape's
+    /// OfficeArtFSP record in the drawing layer and the `lid` of its Spa.
+    /// Paragraphs within a text box are separated by '\r'. Returns an empty
+    /// vector when the document has no textbox story.
+    pub fn text_boxes(&self) -> Vec<super::parts::textbox::DocTextBox> {
+        let Some((story_start, _)) = self.fib.get_textbox_range() else {
+            return Vec::new();
+        };
+        self.textbox_entries
+            .iter()
+            .map(|entry| {
+                let raw = self.text_extractor.text_at_range(
+                    story_start + entry.start_cp,
+                    story_start + entry.end_cp,
+                );
+                // The range of each text box ends with a trailing CR.
+                let text = raw.strip_suffix('\r').unwrap_or(raw);
+                super::parts::textbox::DocTextBox {
+                    shape_id: entry.shape_id,
+                    text: text.to_string(),
+                }
+            })
+            .collect()
     }
 
     /// Get all paragraphs in the document.

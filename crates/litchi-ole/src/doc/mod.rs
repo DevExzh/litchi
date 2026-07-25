@@ -119,6 +119,7 @@ pub use parts::fields::EquationField;
 pub use parts::spa::{
     ShapeAnchor, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide, Spa,
 };
+pub use parts::textbox::DocTextBox;
 pub use parts::fields::FormulaField;
 pub use parts::fields::HyperlinkField;
 pub use parts::fields::InfoField;

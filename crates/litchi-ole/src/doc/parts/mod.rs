@@ -42,3 +42,4 @@ pub mod styles;
 pub mod tap;
 pub mod tap_parser;
 pub mod text;
+pub mod textbox;

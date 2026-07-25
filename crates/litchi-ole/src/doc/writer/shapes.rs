@@ -11,12 +11,14 @@
 //! record) which is out of scope for this writer.
 
 use super::core::DocWriteError;
-use super::images::write_opt_record;
+use super::images::{write_opt_record, write_record_header};
 
 // MSOSPT shape types ([MS-ODRAW] 2.4.24).
 const MSOSPT_RECTANGLE: u16 = 0x0001;
 const MSOSPT_ROUND_RECTANGLE: u16 = 0x0002;
 const MSOSPT_ELLIPSE: u16 = 0x0003;
+/// msosptTextBox, used for shapes carrying a textbox story.
+pub(crate) const MSOSPT_TEXT_BOX: u16 = 0x00CA;
 
 // OfficeArt property identifiers ([MS-ODRAW] 2.3).
 /// `fillColor` property ([MS-ODRAW] 2.3.7.2).
@@ -175,6 +177,81 @@ pub(crate) fn write_shape_opt(out: &mut Vec<u8>, shape: &DocDrawingShape) {
     write_opt_record(out, &properties);
 }
 
+// ============================================================================
+// Text boxes: OfficeArtClientTextbox record and PlcftxbxTxt
+// ============================================================================
+
+/// OfficeArtClientTextbox record type ([MS-DOC] 2.9.170, msofbtClientTextbox).
+const RECORD_CLIENT_TEXTBOX: u16 = 0xF00D;
+/// Payload length of the OfficeArtClientTextbox record (one TXID).
+const CLIENT_TEXTBOX_LEN: u32 = 4;
+/// Size of one FTXBXS structure in bytes ([MS-DOC] 2.9.106).
+const FTXBXS_LEN: usize = 22;
+/// Number of shapes in an unlinked textbox chain (FTXBXS `cTxbx`).
+const SINGLE_SHAPE_CHAIN: i32 = 1;
+/// FTXBXS `fReusable` flag marking a structure available for reuse.
+const FTXBXS_REUSABLE: u16 = 1;
+/// FTXBXSReusable `iNextReuse` for the last reusable structure.
+const NO_NEXT_REUSE: i32 = -1;
+/// Ignored FTXBXS `itxbxsDest` value, as written by LibreOffice.
+const ITXBXS_DEST_IGNORED: i32 = -1;
+
+/// Append an OfficeArtClientTextbox record linking a shape to its textbox
+/// story entry. The TXID encodes the 1-based FTXBXS index in its high two
+/// bytes and the zero-based textbox chain index (always 0 here) in its low
+/// two bytes ([MS-DOC] 2.9.170).
+pub(crate) fn write_client_textbox(out: &mut Vec<u8>, ftxbxs_index: u32) {
+    write_record_header(out, 0, 0, RECORD_CLIENT_TEXTBOX, CLIENT_TEXTBOX_LEN);
+    let txid = (ftxbxs_index + 1) << 16;
+    out.extend_from_slice(&txid.to_le_bytes());
+}
+
+/// Build the PlcftxbxTxt ([MS-DOC] 2.8.32): `n + 2` story-relative CPs
+/// followed by `n + 1` FTXBXS records, the last of which is a reusable spare
+/// ([MS-DOC] 2.9.106: "The last FTXBXS in the PLC MUST be a reusable
+/// structure").
+///
+/// * `shape_ids` - spid of each text box, in story order
+/// * `start_cps` - story-relative start CP of each text box's text
+/// * `ccp_txbx` - total textbox story length (including the story-final CR)
+pub(crate) fn build_plcf_txbx_txt(
+    shape_ids: &[u32],
+    start_cps: &[u32],
+    ccp_txbx: u32,
+) -> Vec<u8> {
+    debug_assert_eq!(shape_ids.len(), start_cps.len());
+    let count = shape_ids.len();
+    let mut out = Vec::with_capacity((count + 2) * 4 + (count + 1) * FTXBXS_LEN);
+
+    for &cp in start_cps {
+        out.extend_from_slice(&cp.to_le_bytes());
+    }
+    // The spare entry's range covers just the story-final CR; the final CP is
+    // the story length itself.
+    out.extend_from_slice(&(ccp_txbx - 1).to_le_bytes());
+    out.extend_from_slice(&ccp_txbx.to_le_bytes());
+
+    for &shape_id in shape_ids {
+        // FTXBXNonReusable: chain of a single shape, no edits.
+        out.extend_from_slice(&SINGLE_SHAPE_CHAIN.to_le_bytes()); // cTxbx
+        out.extend_from_slice(&0i32.to_le_bytes()); // cTxbxEdit
+        out.extend_from_slice(&0u16.to_le_bytes()); // fReusable
+        out.extend_from_slice(&ITXBXS_DEST_IGNORED.to_le_bytes()); // itxbxsDest
+        out.extend_from_slice(&(shape_id as i32).to_le_bytes()); // lid
+        out.extend_from_slice(&0i32.to_le_bytes()); // txidUndo
+    }
+
+    // Final reusable spare FTXBXS.
+    out.extend_from_slice(&NO_NEXT_REUSE.to_le_bytes()); // iNextReuse
+    out.extend_from_slice(&0i32.to_le_bytes()); // cReusable
+    out.extend_from_slice(&FTXBXS_REUSABLE.to_le_bytes()); // fReusable
+    out.extend_from_slice(&ITXBXS_DEST_IGNORED.to_le_bytes()); // itxbxsDest
+    out.extend_from_slice(&0i32.to_le_bytes()); // lid
+    out.extend_from_slice(&0i32.to_le_bytes()); // txidUndo
+
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,6 +313,66 @@ mod tests {
         assert_eq!((opid1, val1), (OPT_LINE_STYLE_BOOLEAN, LINE_FLAG_USE_LINE));
         assert_eq!(val0 & FILL_FLAG_FILLED, 0);
         assert_eq!(val1 & LINE_FLAG_LINE, 0);
+    }
+
+    #[test]
+    fn client_textbox_txid_encodes_ftxbxs_index() {
+        let mut out = Vec::new();
+        write_client_textbox(&mut out, 0);
+        let (ver, _inst, record_type, len) = parse_opt_header(&out);
+        assert_eq!((ver, record_type, len), (0, RECORD_CLIENT_TEXTBOX, 4));
+        let txid = u32::from_le_bytes(out[8..12].try_into().unwrap());
+        assert_eq!(txid, 0x0001_0000);
+
+        let mut out = Vec::new();
+        write_client_textbox(&mut out, 4);
+        let txid = u32::from_le_bytes(out[8..12].try_into().unwrap());
+        assert_eq!(txid, 0x0005_0000);
+    }
+
+    #[test]
+    fn plcf_txbx_txt_layout_matches_ms_doc() {
+        // Two text boxes: "Hi" (3 story CPs incl. trailing CR) and "Yo\rHo"
+        // (6 story CPs incl. trailing CR), plus the story-final CR.
+        let shape_ids = [1027, 1028];
+        let start_cps = [0, 3];
+        let ccp_txbx = 3 + 6 + 1;
+
+        let plcf = build_plcf_txbx_txt(&shape_ids, &start_cps, ccp_txbx);
+        // n+2 CPs and n+1 FTXBXS records (the last one reusable).
+        assert_eq!(plcf.len(), 4 * 4 + 3 * FTXBXS_LEN);
+        let cps: Vec<u32> = (0..4)
+            .map(|i| u32::from_le_bytes(plcf[i * 4..i * 4 + 4].try_into().unwrap()))
+            .collect();
+        assert_eq!(cps, vec![0, 3, ccp_txbx - 1, ccp_txbx]);
+
+        let entry = |index: usize| -> &[u8] {
+            let start = 16 + index * FTXBXS_LEN;
+            &plcf[start..start + FTXBXS_LEN]
+        };
+        // First box: chain length 1, not reusable, lid = spid.
+        let first = entry(0);
+        assert_eq!(i32_at(first, 0), 1); // cTxbx
+        assert_eq!(i32_at(first, 4), 0); // cTxbxEdit
+        assert_eq!(u16_at(first, 8), 0); // fReusable
+        assert_eq!(i32_at(first, 14), 1027); // lid
+        assert_eq!(i32_at(first, 18), 0); // txidUndo
+        let second = entry(1);
+        assert_eq!(i32_at(second, 14), 1028);
+        // Final spare FTXBXS: reusable chain terminator, lid = 0.
+        let spare = entry(2);
+        assert_eq!(i32_at(spare, 0), -1); // iNextReuse
+        assert_eq!(i32_at(spare, 4), 0); // cReusable
+        assert_eq!(u16_at(spare, 8), 1); // fReusable
+        assert_eq!(i32_at(spare, 14), 0); // lid
+    }
+
+    fn i32_at(data: &[u8], offset: usize) -> i32 {
+        i32::from_le_bytes(data[offset..offset + 4].try_into().unwrap())
+    }
+
+    fn u16_at(data: &[u8], offset: usize) -> u16 {
+        u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap())
     }
 
     fn parse_opt_header(data: &[u8]) -> (u16, u16, u16, u32) {

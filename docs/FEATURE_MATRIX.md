@@ -288,7 +288,7 @@ conversion, fonts, and image conversion are optional.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Images | 🟡 | ✅ | 🟡 | Inline/floating picture and blip extraction; `DocWriter::insert_picture` writes inline PNG/JPEG pictures (OfficeArtWordDrawing in the Data stream) and `insert_floating_picture` writes floating ones (0x0008 anchor + PlcfSpa + fcDggInfo OfficeArtContent) |
-| Drawings and shapes | 🟡 | ✅ | 🟡 | OfficeArt/Escher shape extraction (Data stream + fcDggInfo drawing group); `DocWriter::insert_floating_shape` writes floating rectangles/rounded rectangles/ellipses with fill/line colors (no text-box story) |
+| Drawings and shapes | 🟡 | ✅ | 🟡 | OfficeArt/Escher shape extraction (Data stream + fcDggInfo drawing group) and textbox story reading; `DocWriter::insert_floating_shape` writes floating rectangles/rounded rectangles/ellipses with fill/line colors, `insert_floating_text_box` adds plain-text boxes (ccpTxbx story + PlcftxbxTxt + ClientTextbox) |
 | Embedded OLE/package objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve embedded object storages; payloads remain inert |
 | MathType/MTEF equations | 🟡 | ✅ | ❌ | Equation Native extraction and conversion; no DOC equation authoring |
 | Summary/document properties | ✅ | ✅ | ✅ | OLE property-set reading and editing |

@@ -781,6 +781,8 @@ struct WriterShape {
     shape_id: u32,
     /// Position and wrapping.
     position: super::images::FloatingPosition,
+    /// Textbox story text when the shape is a text box.
+    text: Option<String>,
 }
 
 /// What kind of floating content a 0x0008 anchor character refers to.
@@ -1136,19 +1138,12 @@ impl DocWriter {
         Ok(())
     }
 
-    /// Insert a floating primitive drawing shape anchored to its own paragraph.
-    ///
-    /// The anchor is a single 0x0008 character with sprmCFSpec applied, and
-    /// the shape is emitted into the document's drawing group (fcDggInfo
-    /// OfficeArtContent) with its position recorded in the Main Document's
-    /// PlcfSpa — the same mechanism as floating pictures ([MS-DOC] 1.3).
-    ///
-    /// Shape text (text boxes) is not supported; see
-    /// [`super::shapes::DocDrawingShape`].
-    pub fn insert_floating_shape(
+    /// Shared tail of `insert_floating_shape`/`insert_floating_text_box`.
+    fn insert_shape_run(
         &mut self,
         shape: super::shapes::DocDrawingShape,
         position: super::images::FloatingPosition,
+        text: Option<String>,
     ) -> Result<(), DocWriteError> {
         let shape_index = u32::try_from(self.shapes.len()).map_err(|_| {
             DocWriteError::InvalidData("DOC shape count exceeds the 32-bit range".to_string())
@@ -1158,6 +1153,7 @@ impl DocWriter {
             shape,
             shape_id,
             position,
+            text,
         });
         self.paragraphs.push(WritableParagraph {
             runs: vec![TextRun {
@@ -1172,6 +1168,41 @@ impl DocWriter {
             formatting: ParagraphFormatting::default(),
         });
         Ok(())
+    }
+
+    /// Insert a floating primitive drawing shape anchored to its own paragraph.
+    ///
+    /// The anchor is a single 0x0008 character with sprmCFSpec applied, and
+    /// the shape is emitted into the document's drawing group (fcDggInfo
+    /// OfficeArtContent) with its position recorded in the Main Document's
+    /// PlcfSpa — the same mechanism as floating pictures ([MS-DOC] 1.3).
+    ///
+    /// Shape text (text boxes) is not supported; see
+    /// [`super::shapes::DocDrawingShape`].
+    pub fn insert_floating_shape(
+        &mut self,
+        shape: super::shapes::DocDrawingShape,
+        position: super::images::FloatingPosition,
+    ) -> Result<(), DocWriteError> {
+        self.insert_shape_run(shape, position, None)
+    }
+
+    /// Insert a floating text box anchored to its own paragraph.
+    ///
+    /// Anchoring and positioning work like [`Self::insert_floating_shape`],
+    /// but the shape is emitted as an msosptTextBox with an
+    /// OfficeArtClientTextbox record whose TXID links it to an entry in the
+    /// textbox story ([MS-DOC] PlcftxbxTxt). The story text is appended to
+    /// the WordDocument stream after the endnote story and counted in
+    /// ccpTxbx. The text is plain: `\n` (or `\r` / `"\r\n"`) separates
+    /// paragraphs; no character or paragraph formatting is applied.
+    pub fn insert_floating_text_box(
+        &mut self,
+        shape: super::shapes::DocDrawingShape,
+        position: super::images::FloatingPosition,
+        text: impl Into<String>,
+    ) -> Result<(), DocWriteError> {
+        self.insert_shape_run(shape, position, Some(text.into()))
     }
 
     /// Allocate the next shape id from the sequence shared by pictures and
@@ -3177,6 +3208,60 @@ impl DocWriter {
             &mut current_cp,
             &mut font_builder,
         )?;
+        // Build textbox story (appends textbox text after the endnote story).
+        // Entry order follows the anchor CPs so the FTXBXS indices match the
+        // ClientTextbox TXIDs emitted into the drawing group below.
+        floating_anchors.sort_by_key(|&(anchor_cp, _)| anchor_cp);
+        let textbox_shapes: Vec<&WriterShape> = floating_anchors
+            .iter()
+            .filter_map(|&(_, kind)| match kind {
+                FloatingAnchorKind::Shape(index) => {
+                    let entry = &self.shapes[index as usize];
+                    entry.text.as_ref().map(|_| entry)
+                },
+                FloatingAnchorKind::Picture(_) => None,
+            })
+            .collect();
+        let mut txbx_start_cps: Vec<u32> = Vec::new();
+        let mut ccp_txbx = 0u32;
+        if !textbox_shapes.is_empty() {
+            let txbx_story_start_cp = current_cp;
+            let fc_story_start = text_fc_start + text_stream.len() as u32;
+            for entry in &textbox_shapes {
+                let text = entry.text.as_deref().expect("filtered on text presence");
+                txbx_start_cps.push(current_cp - txbx_story_start_cp);
+                // '\n' (and '\r' / "\r\n") separate plain-text paragraphs.
+                for paragraph in text.replace("\r\n", "\n").replace('\r', "\n").split('\n') {
+                    let para_len = utf16_code_unit_len(paragraph)?;
+                    for unit in paragraph.encode_utf16() {
+                        text_stream.extend_from_slice(&unit.to_le_bytes());
+                    }
+                    text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+                    current_cp += para_len + 1;
+                }
+                // Trailing CR of this text box's text, as Word writes.
+                text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+                current_cp += 1;
+            }
+            // Story-final CR, included in ccpTxbx.
+            text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+            current_cp += 1;
+            ccp_txbx = current_cp - txbx_story_start_cp;
+            let fc_story_end = text_fc_start + text_stream.len() as u32;
+            chpx_entries.push((fc_story_start, fc_story_end, Vec::new()));
+            papx_entries.push((
+                fc_story_start,
+                fc_story_end,
+                build_papx_grpprl(&ParagraphFormatting::default()),
+            ));
+            pieces.push(Piece::new(
+                txbx_story_start_cp,
+                current_cp,
+                fc_story_start,
+                true,
+            ));
+        }
+
         let bookmark_tables = Self::build_bookmark_tables(&self.bookmarks, current_cp)?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists.
@@ -3186,7 +3271,8 @@ impl DocWriter {
         let has_subdocs = footnote_plcfs.is_some()
             || header_plcfhdd.is_some()
             || comment_story.is_some()
-            || endnote_plcfs.is_some();
+            || endnote_plcfs.is_some()
+            || ccp_txbx > 0;
         if has_subdocs {
             let fc_trailing = text_fc_start + text_stream.len() as u32;
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
@@ -3215,6 +3301,9 @@ impl DocWriter {
         }
         if let Some((_, _, edn_cp)) = &endnote_plcfs {
             fib.set_ccp_edn(*edn_cp);
+        }
+        if ccp_txbx > 0 {
+            fib.set_ccp_txbx(ccp_txbx);
         }
 
         let mut table_offset = table_stream.len() as u32;
@@ -3475,9 +3564,6 @@ impl DocWriter {
         // shapes to the document's drawing layer.
         if !floating_anchors.is_empty() {
             table_offset = table_stream.len() as u32;
-            // Anchors are collected in document order; keep the aCP array
-            // ascending even if a future story interleaves them.
-            floating_anchors.sort_by_key(|&(anchor_cp, _)| anchor_cp);
             let floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> = floating_anchors
                 .iter()
                 .map(|&(anchor_cp, kind)| match kind {
@@ -3492,6 +3578,7 @@ impl DocWriter {
                             position: entry.floating.as_ref().expect(
                                 "floating anchors are only recorded for floating pictures",
                             ),
+                            text: None,
                         }
                     },
                     FloatingAnchorKind::Shape(shape_index) => {
@@ -3503,10 +3590,23 @@ impl DocWriter {
                             width_twips: entry.shape.width_twips(),
                             height_twips: entry.shape.height_twips(),
                             position: &entry.position,
+                            text: entry.text.as_deref(),
                         }
                     },
                 })
                 .collect();
+            if !txbx_start_cps.is_empty() {
+                let txbx_shape_ids: Vec<u32> =
+                    textbox_shapes.iter().map(|entry| entry.shape_id).collect();
+                let plcf_txbx = super::shapes::build_plcf_txbx_txt(
+                    &txbx_shape_ids,
+                    &txbx_start_cps,
+                    ccp_txbx,
+                );
+                fib.set_plcftxbx_txt(table_offset, plcf_txbx.len() as u32);
+                table_stream.extend_from_slice(&plcf_txbx);
+                table_offset = table_stream.len() as u32;
+            }
             let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
             fib.set_plc_spa_mom(table_offset, plcf_spa.len() as u32);
             table_stream.extend_from_slice(&plcf_spa);
@@ -3855,13 +3955,68 @@ impl DocWriter {
             &mut current_cp,
             &mut font_builder,
         )?;
+        // Build textbox story (appends textbox text after the endnote story).
+        // Entry order follows the anchor CPs so the FTXBXS indices match the
+        // ClientTextbox TXIDs emitted into the drawing group below.
+        floating_anchors.sort_by_key(|&(anchor_cp, _)| anchor_cp);
+        let textbox_shapes: Vec<&WriterShape> = floating_anchors
+            .iter()
+            .filter_map(|&(_, kind)| match kind {
+                FloatingAnchorKind::Shape(index) => {
+                    let entry = &self.shapes[index as usize];
+                    entry.text.as_ref().map(|_| entry)
+                },
+                FloatingAnchorKind::Picture(_) => None,
+            })
+            .collect();
+        let mut txbx_start_cps: Vec<u32> = Vec::new();
+        let mut ccp_txbx = 0u32;
+        if !textbox_shapes.is_empty() {
+            let txbx_story_start_cp = current_cp;
+            let fc_story_start = text_fc_start + text_stream.len() as u32;
+            for entry in &textbox_shapes {
+                let text = entry.text.as_deref().expect("filtered on text presence");
+                txbx_start_cps.push(current_cp - txbx_story_start_cp);
+                // '\n' (and '\r' / "\r\n") separate plain-text paragraphs.
+                for paragraph in text.replace("\r\n", "\n").replace('\r', "\n").split('\n') {
+                    let para_len = utf16_code_unit_len(paragraph)?;
+                    for unit in paragraph.encode_utf16() {
+                        text_stream.extend_from_slice(&unit.to_le_bytes());
+                    }
+                    text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+                    current_cp += para_len + 1;
+                }
+                // Trailing CR of this text box's text, as Word writes.
+                text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+                current_cp += 1;
+            }
+            // Story-final CR, included in ccpTxbx.
+            text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+            current_cp += 1;
+            ccp_txbx = current_cp - txbx_story_start_cp;
+            let fc_story_end = text_fc_start + text_stream.len() as u32;
+            chpx_entries.push((fc_story_start, fc_story_end, Vec::new()));
+            papx_entries.push((
+                fc_story_start,
+                fc_story_end,
+                build_papx_grpprl(&ParagraphFormatting::default()),
+            ));
+            pieces.push(Piece::new(
+                txbx_story_start_cp,
+                current_cp,
+                fc_story_start,
+                true,
+            ));
+        }
+
         let bookmark_tables = Self::build_bookmark_tables(&self.bookmarks, current_cp)?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists (same as save()).
         let has_subdocs = footnote_plcfs.is_some()
             || header_plcfhdd.is_some()
             || comment_story.is_some()
-            || endnote_plcfs.is_some();
+            || endnote_plcfs.is_some()
+            || ccp_txbx > 0;
         if has_subdocs {
             let fc_trailing = text_fc_start + text_stream.len() as u32;
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
@@ -3889,6 +4044,9 @@ impl DocWriter {
         }
         if let Some((_, _, edn_cp)) = &endnote_plcfs {
             fib.set_ccp_edn(*edn_cp);
+        }
+        if ccp_txbx > 0 {
+            fib.set_ccp_txbx(ccp_txbx);
         }
 
         let mut table_offset = table_stream.len() as u32;
@@ -4133,9 +4291,6 @@ impl DocWriter {
         // shapes to the document's drawing layer.
         if !floating_anchors.is_empty() {
             table_offset = table_stream.len() as u32;
-            // Anchors are collected in document order; keep the aCP array
-            // ascending even if a future story interleaves them.
-            floating_anchors.sort_by_key(|&(anchor_cp, _)| anchor_cp);
             let floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> = floating_anchors
                 .iter()
                 .map(|&(anchor_cp, kind)| match kind {
@@ -4150,6 +4305,7 @@ impl DocWriter {
                             position: entry.floating.as_ref().expect(
                                 "floating anchors are only recorded for floating pictures",
                             ),
+                            text: None,
                         }
                     },
                     FloatingAnchorKind::Shape(shape_index) => {
@@ -4161,10 +4317,23 @@ impl DocWriter {
                             width_twips: entry.shape.width_twips(),
                             height_twips: entry.shape.height_twips(),
                             position: &entry.position,
+                            text: entry.text.as_deref(),
                         }
                     },
                 })
                 .collect();
+            if !txbx_start_cps.is_empty() {
+                let txbx_shape_ids: Vec<u32> =
+                    textbox_shapes.iter().map(|entry| entry.shape_id).collect();
+                let plcf_txbx = super::shapes::build_plcf_txbx_txt(
+                    &txbx_shape_ids,
+                    &txbx_start_cps,
+                    ccp_txbx,
+                );
+                fib.set_plcftxbx_txt(table_offset, plcf_txbx.len() as u32);
+                table_stream.extend_from_slice(&plcf_txbx);
+                table_offset = table_stream.len() as u32;
+            }
             let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
             fib.set_plc_spa_mom(table_offset, plcf_spa.len() as u32);
             table_stream.extend_from_slice(&plcf_spa);

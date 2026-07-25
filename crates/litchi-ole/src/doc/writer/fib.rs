@@ -141,6 +141,9 @@ pub struct FibBuilder {
     /// Main document shape position table (PlcfSpaMom) offset and size
     fc_plc_spa_mom: u32,
     lcb_plc_spa_mom: u32,
+    /// Textbox story text position table (PlcftxbxTxt) offset and size
+    fc_plcftxbx_txt: u32,
+    lcb_plcftxbx_txt: u32,
     /// Drawing group information (OfficeArtContent) offset and size
     fc_dgg_info: u32,
     lcb_dgg_info: u32,
@@ -230,6 +233,8 @@ impl FibBuilder {
             lcb_plcffld_hdr: 0,
             fc_plc_spa_mom: 0,
             lcb_plc_spa_mom: 0,
+            fc_plcftxbx_txt: 0,
+            lcb_plcftxbx_txt: 0,
             fc_dgg_info: 0,
             lcb_dgg_info: 0,
             fc_min: 0,
@@ -316,6 +321,11 @@ impl FibBuilder {
     /// Set ccpAtn (comment subdocument character count).
     pub fn set_ccp_atn(&mut self, length: u32) {
         self.comment_length = length;
+    }
+
+    /// Set ccpTxbx (textbox story character count).
+    pub fn set_ccp_txbx(&mut self, length: u32) {
+        self.textbox_length = length;
     }
 
     /// Set footnote reference PLCF (PlcffndRef) offset and size
@@ -451,6 +461,12 @@ impl FibBuilder {
     pub fn set_dgg_info(&mut self, offset: u32, size: u32) {
         self.fc_dgg_info = offset;
         self.lcb_dgg_info = size;
+    }
+
+    /// Set textbox story text position table (PlcftxbxTxt) offset and size.
+    pub fn set_plcftxbx_txt(&mut self, offset: u32, size: u32) {
+        self.fc_plcftxbx_txt = offset;
+        self.lcb_plcftxbx_txt = size;
     }
 
     /// Set FibBase fields (Apache POI line 906-914)
@@ -686,6 +702,7 @@ impl FibBuilder {
         const STTBRGTPLC: usize = 96;
         const ATRDEXTRA: usize = 112; // Extended comment metadata
         const PLCSPAMOM: usize = 40; // Main document shape position table
+        const PLCFTXBXTEXT: usize = 56; // Textbox story text positions
         const DGGINFO: usize = 50; // Drawing group information (OfficeArtContent)
 
         // Write field offsets and sizes
@@ -744,6 +761,12 @@ impl FibBuilder {
         set_field(buf, DOP, self.fc_dop, self.lcb_dop);
         set_field(buf, CLX, self.fc_clx, self.lcb_clx);
         set_field(buf, PLCSPAMOM, self.fc_plc_spa_mom, self.lcb_plc_spa_mom);
+        set_field(
+            buf,
+            PLCFTXBXTEXT,
+            self.fc_plcftxbx_txt,
+            self.lcb_plcftxbx_txt,
+        );
         set_field(buf, DGGINFO, self.fc_dgg_info, self.lcb_dgg_info);
 
         Ok(())
