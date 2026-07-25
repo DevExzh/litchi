@@ -26,7 +26,7 @@ impl NumbersEditor {
         series: ChartSeriesIndex,
     ) -> Result<ChartSeriesTrendline> {
         let trendlines = sheet_chart_series_trendlines(self, sheet_id, drawable_object_id)?;
-        trendlines.get(series.zero_based()).copied().ok_or_else(|| {
+        trendlines.get(series.zero_based()).cloned().ok_or_else(|| {
             trendline_index_error("Numbers", drawable_object_id, series, trendlines.len())
         })
     }

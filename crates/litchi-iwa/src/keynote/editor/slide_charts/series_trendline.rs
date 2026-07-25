@@ -26,7 +26,7 @@ impl KeynoteEditor {
         series: ChartSeriesIndex,
     ) -> Result<ChartSeriesTrendline> {
         let trendlines = slide_chart_series_trendlines(self, slide_index, drawable_object_id)?;
-        trendlines.get(series.zero_based()).copied().ok_or_else(|| {
+        trendlines.get(series.zero_based()).cloned().ok_or_else(|| {
             trendline_index_error("Keynote", drawable_object_id, series, trendlines.len())
         })
     }

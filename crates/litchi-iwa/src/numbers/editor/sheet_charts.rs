@@ -573,11 +573,12 @@ mod tests {
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
         ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
         ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-        ChartSeriesTrendline, ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
-        ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
-        ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
-        ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-        ChartValueAxisSteps,
+        ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+        ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+        ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+        ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
+        ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
+        ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -3898,10 +3899,20 @@ mod tests {
         let source = editor
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
-        let defaults = vec![ChartSeriesTrendline::None; 2];
+        let defaults = vec![ChartSeriesTrendline::none(); 2];
         let customized = vec![
-            ChartSeriesTrendline::Linear,
-            ChartSeriesTrendline::MovingAverage,
+            ChartSeriesTrendline::linear()
+                .with_legend_name("Revenue fit")
+                .unwrap()
+                .with_equation_visibility(true)
+                .unwrap()
+                .with_r_squared_visibility(true)
+                .unwrap(),
+            ChartSeriesTrendline::moving_average(
+                ChartSeriesTrendlineMovingAveragePeriod::new(3).unwrap(),
+            )
+            .with_legend_visibility(true)
+            .unwrap(),
         ];
 
         assert_eq!(
@@ -3926,7 +3937,7 @@ mod tests {
                     ChartSeriesIndex::from_zero_based(1),
                 )
                 .unwrap(),
-            ChartSeriesTrendline::MovingAverage
+            customized[1]
         );
 
         let duplicate = editor
@@ -3938,7 +3949,7 @@ mod tests {
                     sheet_id,
                     source.drawable_object_id,
                     ChartSeriesIndex::from_zero_based(series),
-                    ChartSeriesTrendline::None,
+                    ChartSeriesTrendline::none(),
                 )
                 .unwrap();
         }
@@ -3975,16 +3986,8 @@ mod tests {
                 )
                 .is_err()
         );
-        assert!(
-            reopened
-                .set_sheet_chart_series_trendline(
-                    sheet_id,
-                    source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(0),
-                    ChartSeriesTrendline::Unsupported(1),
-                )
-                .is_err()
-        );
+        assert!(ChartSeriesTrendline::unsupported(1).is_err());
+        assert!(ChartSeriesTrendlinePolynomialOrder::new(7).is_err());
         assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
         reopened
             .remove_sheet_chart(sheet_id, source.drawable_object_id)

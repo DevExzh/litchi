@@ -24,7 +24,7 @@ impl PagesEditor {
         series: ChartSeriesIndex,
     ) -> Result<ChartSeriesTrendline> {
         let trendlines = body_chart_series_trendlines(self, drawable_object_id)?;
-        trendlines.get(series.zero_based()).copied().ok_or_else(|| {
+        trendlines.get(series.zero_based()).cloned().ok_or_else(|| {
             trendline_index_error("Pages", drawable_object_id, series, trendlines.len())
         })
     }

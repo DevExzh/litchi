@@ -5,8 +5,8 @@ use std::env;
 use litchi_iwa::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartData, ChartGapPercentage, ChartGapSpacing,
-    ChartKind, ChartRoundedCorners, ChartSeriesTrendline, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartKind, ChartRoundedCorners, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -216,8 +216,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         chart.drawable_object_id,
         &[
-            ChartSeriesTrendline::Linear,
-            ChartSeriesTrendline::MovingAverage,
+            ChartSeriesTrendline::linear()
+                .with_legend_name("Revenue fit")?
+                .with_equation_visibility(true)?
+                .with_r_squared_visibility(true)?,
+            ChartSeriesTrendline::moving_average(ChartSeriesTrendlineMovingAveragePeriod::new(2)?)
+                .with_legend_visibility(true)?,
         ],
     )?;
     editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;

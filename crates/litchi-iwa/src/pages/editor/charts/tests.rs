@@ -9,11 +9,12 @@ use crate::charts::{
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
     ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
     ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-    ChartSeriesTrendline, ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
-    ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
-    ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
-    ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-    ChartValueAxisSteps,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
+    ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
+    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
 use crate::shapes::{
     RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
@@ -3062,10 +3063,20 @@ fn scratch_document_supports_native_series_trendline_crud() {
             SIZE,
         )
         .unwrap();
-    let defaults = vec![ChartSeriesTrendline::None; 2];
+    let defaults = vec![ChartSeriesTrendline::none(); 2];
     let customized = vec![
-        ChartSeriesTrendline::Linear,
-        ChartSeriesTrendline::MovingAverage,
+        ChartSeriesTrendline::linear()
+            .with_legend_name("Revenue fit")
+            .unwrap()
+            .with_equation_visibility(true)
+            .unwrap()
+            .with_r_squared_visibility(true)
+            .unwrap(),
+        ChartSeriesTrendline::moving_average(
+            ChartSeriesTrendlineMovingAveragePeriod::new(3).unwrap(),
+        )
+        .with_legend_visibility(true)
+        .unwrap(),
     ];
 
     assert_eq!(
@@ -3089,7 +3100,7 @@ fn scratch_document_supports_native_series_trendline_crud() {
                 ChartSeriesIndex::from_zero_based(1),
             )
             .unwrap(),
-        ChartSeriesTrendline::MovingAverage
+        customized[1]
     );
 
     let duplicate = editor
@@ -3103,7 +3114,7 @@ fn scratch_document_supports_native_series_trendline_crud() {
             .set_body_chart_series_trendline(
                 source.drawable_object_id,
                 ChartSeriesIndex::from_zero_based(series),
-                ChartSeriesTrendline::None,
+                ChartSeriesTrendline::none(),
             )
             .unwrap();
     }
@@ -3135,15 +3146,8 @@ fn scratch_document_supports_native_series_trendline_crud() {
             )
             .is_err()
     );
-    assert!(
-        reopened
-            .set_body_chart_series_trendline(
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
-                ChartSeriesTrendline::Unsupported(1),
-            )
-            .is_err()
-    );
+    assert!(ChartSeriesTrendline::unsupported(1).is_err());
+    assert!(ChartSeriesTrendlinePolynomialOrder::new(7).is_err());
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
         .remove_body_chart(source.drawable_object_id)

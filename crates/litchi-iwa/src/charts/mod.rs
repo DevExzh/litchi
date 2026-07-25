@@ -63,7 +63,10 @@ pub use pie_labels::ChartPieLabelVisibility;
 pub use pie_start_angle::ChartPieStartAngle;
 pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
-pub use series_trendline::ChartSeriesTrendline;
+pub use series_trendline::{
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesTrendlineType,
+};
 pub use series_value_label_affixes::ChartSeriesValueLabelAffixes;
 pub use series_value_label_auto_fit::ChartSeriesValueLabelAutoFit;
 pub use series_value_label_location::ChartSeriesValueLabelLocation;
