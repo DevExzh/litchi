@@ -248,7 +248,8 @@ pub use revision_information::{
 };
 pub use sections::{Section, SectionList};
 pub use show_events::{
-    PptxSlideShowEvent, PptxSlideShowEventKind, PptxSlideShowTrigger, SHOW_EVENT_EXTENSION_URI,
+    PptxSlideShowEvent, PptxSlideShowEventDraft, PptxSlideShowEventKind, PptxSlideShowTrigger,
+    SHOW_EVENT_EXTENSION_URI, store_slide_show_events,
 };
 pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};

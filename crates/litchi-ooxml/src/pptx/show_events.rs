@@ -572,6 +572,174 @@ fn limit(what: &str) -> OoxmlError {
     invalid(format!("{what} exceeds the supported safety limit"))
 }
 
+/// A slide-show event ready for storage onto a slide.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PptxSlideShowEventDraft {
+    kind: PptxSlideShowEventKind,
+    time: String,
+    object_id: u32,
+    seek_time: Option<String>,
+}
+
+impl PptxSlideShowEventDraft {
+    /// Create a non-seek event (trigger, play, stop, pause, resume, or null).
+    ///
+    /// `time` is validated against the universal-time-offset grammar but is
+    /// never interpreted. Seek events require [`Self::seek`] instead.
+    pub fn new(kind: PptxSlideShowEventKind, time: &str, object_id: u32) -> Result<Self> {
+        if matches!(kind, PptxSlideShowEventKind::Seek) {
+            return Err(invalid(
+                "seek slide-show events require a media-stream offset",
+            ));
+        }
+        validate_time_offset(time)?;
+        Ok(Self {
+            kind,
+            time: time.to_string(),
+            object_id,
+            seek_time: None,
+        })
+    }
+
+    /// Create a seek event with a media-stream offset.
+    pub fn seek(time: &str, object_id: u32, seek_time: &str) -> Result<Self> {
+        validate_time_offset(time)?;
+        validate_time_offset(seek_time)?;
+        Ok(Self {
+            kind: PptxSlideShowEventKind::Seek,
+            time: time.to_string(),
+            object_id,
+            seek_time: Some(seek_time.to_string()),
+        })
+    }
+
+    /// Return the recorded event kind.
+    pub fn kind(&self) -> PptxSlideShowEventKind {
+        self.kind
+    }
+
+    /// Return the stored universal time offset.
+    pub fn time(&self) -> &str {
+        &self.time
+    }
+
+    /// Return the DrawingML object identifier targeted by this event.
+    pub fn object_id(&self) -> u32 {
+        self.object_id
+    }
+
+    /// Return the stored media-stream offset for a seek event.
+    pub fn seek_time(&self) -> Option<&str> {
+        self.seek_time.as_deref()
+    }
+
+    fn element_name(&self) -> &'static str {
+        match self.kind {
+            PptxSlideShowEventKind::Trigger(_) => "triggerEvt",
+            PptxSlideShowEventKind::Play => "playEvt",
+            PptxSlideShowEventKind::Stop => "stopEvt",
+            PptxSlideShowEventKind::Pause => "pauseEvt",
+            PptxSlideShowEventKind::Resume => "resumeEvt",
+            PptxSlideShowEventKind::Seek => "seekEvt",
+            PptxSlideShowEventKind::Null => "nullEvt",
+        }
+    }
+}
+
+fn trigger_token(trigger: PptxSlideShowTrigger) -> &'static str {
+    match trigger {
+        PptxSlideShowTrigger::None => "none",
+        PptxSlideShowTrigger::OnBegin => "onBegin",
+        PptxSlideShowTrigger::OnEnd => "onEnd",
+        PptxSlideShowTrigger::Begin => "begin",
+        PptxSlideShowTrigger::End => "end",
+        PptxSlideShowTrigger::OnClick => "onClick",
+        PptxSlideShowTrigger::OnDoubleClick => "onDblClick",
+        PptxSlideShowTrigger::OnMouseOver => "onMouseOver",
+        PptxSlideShowTrigger::OnMouseOut => "onMouseOut",
+        PptxSlideShowTrigger::OnNext => "onNext",
+        PptxSlideShowTrigger::OnPrevious => "onPrev",
+        PptxSlideShowTrigger::OnStopAudio => "onStopAudio",
+        PptxSlideShowTrigger::OnMediaBookmark => "onMediaBookmark",
+    }
+}
+
+/// Store slide-show event records onto a slide as a PowerPoint 2010
+/// `p14:showEvtLst` extension.
+///
+/// The events are validated and serialized verbatim in caller order; the
+/// slide gains the `p:ext` extension block (patched into an existing
+/// extension list, expanding an empty one, or creating one) while
+/// preserving its namespace dialect. Slides that already carry a show-event
+/// extension are rejected — replacement is not supported in this pass.
+/// Events are never replayed, rendered, or executed.
+pub fn store_slide_show_events(
+    package: &mut litchi_opc::OpcPackage,
+    slide_name: &litchi_opc::PackURI,
+    events: &[PptxSlideShowEventDraft],
+) -> Result<()> {
+    if events.is_empty() {
+        return Err(invalid("slide-show event storage requires at least one event"));
+    }
+    if events.len() > MAX_SHOW_EVENTS {
+        return Err(limit("slide-show event count"));
+    }
+    let slide = package.get_part(slide_name)?;
+    if slide.content_type() != ct::PML_SLIDE {
+        return Err(invalid(
+            "slide-show event storage requires a PresentationML slide part",
+        ));
+    }
+    if !load_slide_show_events(0, slide, &mut ShowEventLoadLimits::default())?.is_empty() {
+        return Err(invalid(
+            "slide already contains a slide-show event extension; replacement is not supported",
+        ));
+    }
+
+    let mut fragment = String::with_capacity(events.len() * 72 + 256);
+    fragment.push_str("<p:ext xmlns:p=\"");
+    fragment.push_str(crate::pptx::slide_patch::slide_dialect(slide.blob())?);
+    fragment.push_str("\" xmlns:p14=\"");
+    fragment.push_str(P14_NAMESPACE);
+    fragment.push_str("\" uri=\"");
+    fragment.push_str(SHOW_EVENT_EXTENSION_URI);
+    fragment.push_str("\"><p14:showEvtLst>");
+    for event in events {
+        fragment.push_str("<p14:");
+        fragment.push_str(event.element_name());
+        if let PptxSlideShowEventKind::Trigger(trigger) = event.kind {
+            fragment.push_str(" type=\"");
+            fragment.push_str(trigger_token(trigger));
+            fragment.push('"');
+        }
+        fragment.push_str(" time=\"");
+        fragment.push_str(&event.time);
+        fragment.push_str("\" objId=\"");
+        fragment.push_str(&event.object_id.to_string());
+        fragment.push('"');
+        if let Some(seek_time) = &event.seek_time {
+            fragment.push_str(" seek=\"");
+            fragment.push_str(seek_time);
+            fragment.push('"');
+        }
+        fragment.push_str("/>");
+    }
+    fragment.push_str("</p14:showEvtLst></p:ext>");
+
+    let updated = crate::pptx::slide_patch::insert_extension_fragment(slide.blob(), &fragment)?;
+    // Self-check: the patched slide must read back through discovery.
+    let probe = litchi_opc::BlobPart::new(slide_name.clone(), ct::PML_SLIDE.into(), updated.clone());
+    let discovered = load_slide_show_events(0, &probe, &mut ShowEventLoadLimits::default())?;
+    if discovered.len() != events.len() {
+        return Err(invalid(
+            "slide-show event storage failed read-back validation",
+        ));
+    }
+    package.get_part_mut(slide_name)?.set_blob(updated);
+    Ok(())
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -610,6 +778,104 @@ mod tests {
 
         assert!(
             scan_slide_show_events(0, xml.as_bytes(), &mut ShowEventLoadLimits::default()).is_err()
+        );
+    }
+
+    fn slide_package(tail: &str) -> (litchi_opc::OpcPackage, litchi_opc::PackURI) {
+        let mut package = litchi_opc::OpcPackage::new();
+        let name = litchi_opc::PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let xml = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld>{tail}</p:sld>"#
+        );
+        package.add_part(Box::new(litchi_opc::BlobPart::new(
+            name.clone(),
+            ct::PML_SLIDE.into(),
+            xml.into_bytes(),
+        )));
+        (package, name)
+    }
+
+    fn sample_events() -> Vec<PptxSlideShowEventDraft> {
+        vec![
+            PptxSlideShowEventDraft::new(
+                PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick),
+                "1.5s",
+                6,
+            )
+            .unwrap(),
+            PptxSlideShowEventDraft::new(PptxSlideShowEventKind::Play, "2s", 4).unwrap(),
+            PptxSlideShowEventDraft::seek("2500ms", 4, "10.379s").unwrap(),
+            PptxSlideShowEventDraft::new(PptxSlideShowEventKind::Null, "3", 5).unwrap(),
+        ]
+    }
+
+    #[test]
+    fn stores_show_events_and_discovers_them_round_trip() {
+        let (mut package, slide_name) = slide_package("");
+        let events = sample_events();
+        store_slide_show_events(&mut package, &slide_name, &events).unwrap();
+
+        let slide = package.get_part(&slide_name).unwrap();
+        let discovered =
+            load_slide_show_events(0, slide, &mut ShowEventLoadLimits::default()).unwrap();
+        assert_eq!(discovered.len(), events.len());
+        assert_eq!(
+            discovered[0].kind(),
+            PptxSlideShowEventKind::Trigger(PptxSlideShowTrigger::OnClick)
+        );
+        assert_eq!(discovered[0].time(), "1.5s");
+        assert_eq!(discovered[0].object_id(), 6);
+        assert_eq!(discovered[1].kind(), PptxSlideShowEventKind::Play);
+        assert_eq!(discovered[2].kind(), PptxSlideShowEventKind::Seek);
+        assert_eq!(discovered[2].seek_time(), Some("10.379s"));
+        assert_eq!(discovered[3].kind(), PptxSlideShowEventKind::Null);
+
+        // A second storage on the same slide is rejected (no replacement).
+        assert!(store_slide_show_events(&mut package, &slide_name, &events).is_err());
+    }
+
+    #[test]
+    fn stores_show_events_into_existing_extension_list() {
+        let (mut package, slide_name) = slide_package(
+            r#"<p:extLst><p:ext uri="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"/></p:extLst>"#,
+        );
+        store_slide_show_events(&mut package, &slide_name, &sample_events()).unwrap();
+        let slide = package.get_part(&slide_name).unwrap();
+        let xml = String::from_utf8(slide.blob().to_vec()).unwrap();
+        assert!(xml.contains("{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"));
+        assert!(xml.contains("p14:showEvtLst"));
+        assert_eq!(
+            load_slide_show_events(0, slide, &mut ShowEventLoadLimits::default())
+                .unwrap()
+                .len(),
+            4
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_show_event_storage() {
+        let (mut package, slide_name) = slide_package("");
+        // No events.
+        assert!(store_slide_show_events(&mut package, &slide_name, &[]).is_err());
+        // Seek without offset, non-seek with bad time.
+        assert!(PptxSlideShowEventDraft::new(PptxSlideShowEventKind::Seek, "1s", 1).is_err());
+        assert!(PptxSlideShowEventDraft::new(PptxSlideShowEventKind::Play, "1..2s", 1).is_err());
+        assert!(PptxSlideShowEventDraft::seek("1s", 1, "bad!!").is_err());
+        // Non-slide part.
+        let wrong = litchi_opc::PackURI::new("/ppt/presentation.xml").unwrap();
+        package.add_part(Box::new(litchi_opc::BlobPart::new(
+            wrong.clone(),
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+                .into(),
+            b"<p:presentation/>".to_vec(),
+        )));
+        assert!(store_slide_show_events(&mut package, &wrong, &sample_events()).is_err());
+        // Rejection leaves the slide without an extension list.
+        let slide = package.get_part(&slide_name).unwrap();
+        assert!(
+            load_slide_show_events(0, slide, &mut ShowEventLoadLimits::default())
+                .unwrap()
+                .is_empty()
         );
     }
 }

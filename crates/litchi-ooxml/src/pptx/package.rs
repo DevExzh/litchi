@@ -615,6 +615,21 @@ impl Package {
         self.presentation()?.show_events()
     }
 
+    /// Store slide-show event records onto a slide as a PowerPoint 2010
+    /// `p14:showEvtLst` extension.
+    ///
+    /// Events are validated and serialized verbatim in caller order; the
+    /// slide gains the `p:ext` extension block while preserving its
+    /// namespace dialect. Slides that already carry a show-event extension
+    /// are rejected. Events are never replayed, rendered, or executed.
+    pub fn add_slide_show_events(
+        &mut self,
+        slide_name: &PackURI,
+        events: &[crate::pptx::PptxSlideShowEventDraft],
+    ) -> Result<()> {
+        crate::pptx::store_slide_show_events(&mut self.opc, slide_name, events)
+    }
+
     /// Discover bounded, inert click and hover action settings on slides.
     ///
     /// Declared targets are never followed, opened, activated, or executed.
