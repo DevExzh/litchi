@@ -166,7 +166,7 @@ conversion, fonts, and image conversion are optional.
 | ChartEx | 🟡 | ✅ | ✅ | Extended chart part model and serialization; integration is more limited than classic charts |
 | Chart sheets | ✅ | ✅ | ✅ | Views, protection, print settings, chart resources, and package graph |
 | Pivot tables and caches | ✅ | ✅ | ✅ | Definitions, cache fields/records, filters, grouping, layouts, and writer support |
-| Pivot charts | 🟡 | ✅ | ❌ | Typed inert chart-to-pivot binding: per-worksheet and chartsheet pivot-chart enumeration through the drawing/chart relationship graph, `c:pivotSource` name/format-id/extension parsing, validated resolution of pivot names (qualified, unqualified, case-insensitive) to typed pivot tables, and per-series drop-zone visibility metadata; authoring is not covered |
+| Pivot charts | ✅ | ✅ | ✅ | Typed inert chart-to-pivot binding: per-worksheet and chartsheet pivot-chart enumeration, `c:pivotSource` parsing, validated pivot-name resolution, and per-series drop-zone metadata; authoring binds classic charts by name with save-time validation/normalization to canonical sheet-qualified names, round-tripping through the read inventory |
 | Structured tables/ListObjects | ✅ | ✅ | ✅ | Columns, formulas, totals, table types, and styles |
 | Structured-reference evaluation | 🟡 | ✅ | N/A | Evaluator supports bounded table references, not complete Excel semantics |
 | Data validation | ✅ | ✅ | ✅ | Standard and extension collections, formulas, prompts, and ranges |
@@ -235,7 +235,7 @@ conversion, fonts, and image conversion are optional.
 | Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | High-level task-pane discovery plus bounded web-extension parsing/serialization; add-ins are never executed |
 | Ink annotations | ✅ | ✅ | ✅ | Bounded inert InkML content-part inventory with slide/relationship/part identity and stored trace counts, plus validated inert InkML storage onto slides (`p:contentPart` + `customXml` relationship, dialect-preserving); no handwriting recognition, rendering, replay, or execution |
 | Laser pointer traces | ✅ | ✅ | ✅ | Bounded inert PowerPoint 2010 slide-show trace inventory with stored time offsets and coordinates, plus validated inert trace storage (new `p14:laserTraceLst` extension, existing/empty/missing `p:extLst` handled, dialect-preserving, read-back self-check); never replayed, rendered, interpolated, or executed |
-| Slide-show event records | 🟡 | ✅ | ❌ | Bounded inert PowerPoint 2010 trigger/media event inventory with slide, event, target object, and stored timeline metadata; events are never replayed or executed |
+| Slide-show event records | ✅ | ✅ | ✅ | Bounded inert PowerPoint 2010 trigger/media event inventory with slide, event, target object, and stored timeline metadata, plus validated inert event storage (`p14:showEvtLst` via the shared extension patcher); events are never replayed or executed |
 | VBA projects/PPTM macros | 🟡 | 🟡 | ❌ | High-level PPTM/PPSM/POTM macro-project metadata validates the MS-OFFMACRO2 Presentation → VBA Project relationship graph; payload contents are never inspected, parsed, or executed by this API, and no macro authoring exists |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
@@ -366,7 +366,7 @@ conversion, fonts, and image conversion are optional.
 | Shapes, groups, and OfficeArt | ✅ | ✅ | ✅ | AutoShapes, groups, anchors, fills, gradients, lines, and Escher records |
 | Pictures | ✅ | ✅ | ✅ | JPEG/PNG/BLIP resources and writer support |
 | Tables | ✅ | ✅ | ✅ | Table group/grid/cell extraction and table authoring (rows, columns, cell text, cell dimensions) |
-| Native charts | 🟡 | ✅ | ❌ | Typed inert inventory of embedded MSGraph/Excel.Chart OLE payloads: persist-mapping resolution (incremental-save safe), optional zlib payload decompression, and full BIFF8 chart models (type, series, data links, cached values, titles) via the XLS chart parser, with best-effort slide-frame attribution and per-object failure isolation; no chart authoring or activation |
+| Native charts | ✅ | ✅ | ✅ | Typed inert inventory of embedded MSGraph/Excel.Chart OLE payloads (persist-mapping resolution, zlib decompression, full BIFF8 chart models) with slide-frame attribution and per-object failure isolation, plus chart authoring: `PptWriter::add_chart` builds bar/line/pie BIFF8 chart workbooks, embeds them as ExOleObjStg with shared ExObjList allocation, and round-trips through the inventory; never activated or rendered |
 | Hyperlinks | ✅ | ✅ | ✅ | URLs and slide navigation |
 | Action/interaction settings | 🟡 | ✅ | 🟡 | Typed action, jump, trigger, and macro metadata with bounded writer integration |
 | Notes | ✅ | ✅ | ✅ | Speaker-note records |
