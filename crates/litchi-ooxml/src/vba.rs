@@ -3,7 +3,7 @@
 use litchi_cfb::OleFile;
 pub use litchi_cfb::ovba::{
     VbaDirectory, VbaError, VbaLimits, VbaModule, VbaModuleKind, VbaModuleMetadata, VbaProject,
-    VbaText, decompress_container,
+    VbaText, compress_container, decompress_container,
 };
 use litchi_opc::{OpcPackage, PackURI};
 use std::io::Cursor;

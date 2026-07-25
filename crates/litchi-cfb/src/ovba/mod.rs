@@ -7,7 +7,7 @@ mod compression;
 mod directory;
 mod project;
 
-pub use compression::decompress_container;
+pub use compression::{compress_container, decompress_container};
 pub use directory::{VbaDirectory, VbaModuleKind, VbaModuleMetadata};
 pub use project::{VbaModule, VbaProject, VbaText};
 

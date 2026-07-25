@@ -1,6 +1,7 @@
-//! MS-OVBA compressed-container decoding.
+//! MS-OVBA compressed-container encoding and decoding.
 
 use super::{VbaError, VbaLimits, check_limit, invalid};
+use std::collections::HashMap;
 
 const CONTAINER_SIGNATURE: u8 = 0x01;
 const CHUNK_SIGNATURE_MASK: u16 = 0x7000;
@@ -10,6 +11,170 @@ const CHUNK_SIZE_MASK: u16 = 0x0fff;
 const CHUNK_HEADER_BYTES: usize = 2;
 const RAW_CHUNK_BYTES: usize = 4096;
 const MIN_COPY_LENGTH_BITS: u32 = 4;
+const MIN_COPY_BYTES: usize = 3;
+
+/// Compress bytes into one complete MS-OVBA `CompressedContainer`.
+///
+/// The encoder follows the greedy matching algorithm in [MS-OVBA] section
+/// 2.4.1.3.19.4 and emits deterministic output. Both the source and encoded
+/// sizes are checked against [`VbaLimits`].
+///
+/// A raw final chunk is padded with zero bytes to 4096 bytes, as required by
+/// [MS-OVBA]. Consequently, decompressing an incompressible final partial
+/// chunk can produce trailing zero bytes beyond the original input.
+pub fn compress_container(decompressed: &[u8], limits: &VbaLimits) -> Result<Vec<u8>, VbaError> {
+    check_limit(
+        "decompressed VBA stream bytes",
+        decompressed.len(),
+        limits.max_decompressed_stream_bytes,
+    )?;
+
+    let mut output = Vec::with_capacity(
+        decompressed
+            .len()
+            .saturating_add(1)
+            .min(limits.max_compressed_stream_bytes),
+    );
+    append_compressed_checked(&mut output, &[CONTAINER_SIGNATURE], limits)?;
+    for chunk in decompressed.chunks(RAW_CHUNK_BYTES) {
+        let encoded = compress_chunk(chunk);
+        append_compressed_checked(&mut output, &encoded, limits)?;
+    }
+    Ok(output)
+}
+
+fn compress_chunk(chunk: &[u8]) -> Vec<u8> {
+    debug_assert!(!chunk.is_empty());
+    debug_assert!(chunk.len() <= RAW_CHUNK_BYTES);
+
+    let mut data = Vec::with_capacity(RAW_CHUNK_BYTES);
+    let mut positions = HashMap::<[u8; MIN_COPY_BYTES], Vec<u16>>::new();
+    let mut current = 0usize;
+
+    while current < chunk.len() && data.len() < RAW_CHUNK_BYTES {
+        let flags_index = data.len();
+        data.push(0);
+        let mut flags = 0u8;
+
+        for token_index in 0..8u32 {
+            if current >= chunk.len() || data.len() >= RAW_CHUNK_BYTES {
+                break;
+            }
+
+            let previous = current;
+            if let Some((length, offset)) = find_match(chunk, current, &positions) {
+                if data.len() + 2 > RAW_CHUNK_BYTES {
+                    return raw_chunk(chunk);
+                }
+                let length_bits = copy_length_bits(current);
+                let token = (((offset - 1) as u16) << length_bits)
+                    | u16::try_from(length - MIN_COPY_BYTES)
+                        .expect("copy length is bounded by a 12-bit field");
+                data.extend_from_slice(&token.to_le_bytes());
+                flags |= 1u8 << token_index;
+                current += length;
+            } else {
+                data.push(chunk[current]);
+                current += 1;
+            }
+
+            for position in previous..current {
+                insert_match_position(chunk, position, &mut positions);
+            }
+        }
+        data[flags_index] = flags;
+    }
+
+    if current < chunk.len() {
+        return raw_chunk(chunk);
+    }
+
+    let total_size = data.len() + CHUNK_HEADER_BYTES;
+    let header = COMPRESSED_CHUNK_FLAG
+        | CHUNK_SIGNATURE
+        | u16::try_from(total_size - 3).expect("compressed chunk is at most 4098 bytes");
+    let mut output = Vec::with_capacity(total_size);
+    output.extend_from_slice(&header.to_le_bytes());
+    output.extend_from_slice(&data);
+    output
+}
+
+fn find_match(
+    chunk: &[u8],
+    current: usize,
+    positions: &HashMap<[u8; MIN_COPY_BYTES], Vec<u16>>,
+) -> Option<(usize, usize)> {
+    let key: [u8; MIN_COPY_BYTES] = chunk
+        .get(current..current + MIN_COPY_BYTES)?
+        .try_into()
+        .expect("slice length is checked");
+    let candidates = positions.get(&key)?;
+    let length_bits = copy_length_bits(current);
+    let maximum_length = ((1usize << length_bits) - 1 + MIN_COPY_BYTES).min(chunk.len() - current);
+    let mut best_length = 0usize;
+    let mut best_candidate = 0usize;
+
+    // Candidates are stored in increasing order. Searching backwards and
+    // replacing only on a longer match preserves the spec's nearest-match
+    // tie behavior.
+    for &candidate in candidates.iter().rev() {
+        let candidate = usize::from(candidate);
+        let mut length = MIN_COPY_BYTES;
+        while length < maximum_length && chunk[current + length] == chunk[candidate + length] {
+            length += 1;
+        }
+        if length > best_length {
+            best_length = length;
+            best_candidate = candidate;
+            if length == maximum_length {
+                break;
+            }
+        }
+    }
+
+    (best_length >= MIN_COPY_BYTES).then(|| (best_length, current - best_candidate))
+}
+
+fn insert_match_position(
+    chunk: &[u8],
+    position: usize,
+    positions: &mut HashMap<[u8; MIN_COPY_BYTES], Vec<u16>>,
+) {
+    let Some(bytes) = chunk.get(position..position + MIN_COPY_BYTES) else {
+        return;
+    };
+    let key: [u8; MIN_COPY_BYTES] = bytes.try_into().expect("slice length is checked");
+    positions
+        .entry(key)
+        .or_default()
+        .push(u16::try_from(position).expect("chunk positions are at most 4095"));
+}
+
+fn raw_chunk(chunk: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(CHUNK_HEADER_BYTES + RAW_CHUNK_BYTES);
+    output.extend_from_slice(&(CHUNK_SIGNATURE | CHUNK_SIZE_MASK).to_le_bytes());
+    output.extend_from_slice(chunk);
+    output.resize(CHUNK_HEADER_BYTES + RAW_CHUNK_BYTES, 0);
+    output
+}
+
+fn append_compressed_checked(
+    output: &mut Vec<u8>,
+    bytes: &[u8],
+    limits: &VbaLimits,
+) -> Result<(), VbaError> {
+    let new_len = output
+        .len()
+        .checked_add(bytes.len())
+        .ok_or_else(|| invalid("compressed VBA size overflow"))?;
+    check_limit(
+        "compressed VBA stream bytes",
+        new_len,
+        limits.max_compressed_stream_bytes,
+    )?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
 
 /// Decompress one complete MS-OVBA `CompressedContainer`.
 ///
@@ -216,6 +381,101 @@ mod tests {
     }
 
     #[test]
+    fn encodes_normative_spec_examples() {
+        let limits = VbaLimits::default();
+        assert_eq!(
+            compress_container(b"abcdefghijklmnopqrstuv.", &limits).unwrap(),
+            NO_COMPRESSION
+        );
+        let normal = compress_container(
+            b"#aaabcdefaaaaghijaaaaaklaaamnopqaaaaaaaaaaaarstuvwxyzaaa",
+            &limits,
+        )
+        .unwrap();
+        assert_eq!(
+            decompress_container(&normal, &limits).unwrap(),
+            b"#aaabcdefaaaaghijaaaaaklaaamnopqaaaaaaaaaaaarstuvwxyzaaa"
+        );
+        assert!(normal.len() <= NORMAL_COMPRESSION.len());
+        assert_eq!(
+            compress_container(&[b'a'; 73], &limits).unwrap(),
+            MAX_COMPRESSION
+        );
+    }
+
+    #[test]
+    fn round_trips_empty_boundary_and_multiple_chunks() {
+        let limits = VbaLimits::default();
+        for input in [
+            Vec::new(),
+            vec![b'x'],
+            vec![b'x'; 16],
+            vec![b'x'; 17],
+            vec![b'x'; RAW_CHUNK_BYTES],
+            vec![b'x'; RAW_CHUNK_BYTES + 1],
+            (0..RAW_CHUNK_BYTES * 3 + 271)
+                .map(|index| b'a' + (index % 23) as u8)
+                .collect(),
+        ] {
+            let compressed = compress_container(&input, &limits).unwrap();
+            assert_eq!(decompress_container(&compressed, &limits).unwrap(), input);
+        }
+    }
+
+    #[test]
+    fn round_trips_across_copy_token_bit_partition_boundaries() {
+        let limits = VbaLimits::default();
+        for size in [
+            15usize, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256, 257, 511, 512, 513,
+            1023, 1024, 1025, 2047, 2048, 2049, 4095, 4096,
+        ] {
+            let input: Vec<u8> = (0..size).map(|index| b'a' + (index % 11) as u8).collect();
+            let compressed = compress_container(&input, &limits).unwrap();
+            assert_eq!(
+                decompress_container(&compressed, &limits).unwrap(),
+                input,
+                "copy-token partition failed at {size} bytes"
+            );
+        }
+    }
+
+    #[test]
+    fn raw_partial_chunk_has_spec_required_zero_padding() {
+        let mut state = 0x1234_5678u32;
+        let input: Vec<u8> = (0..4000)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+                state as u8
+            })
+            .collect();
+
+        let compressed = compress_container(&input, &VbaLimits::default()).unwrap();
+        assert_eq!(&compressed[..3], &[CONTAINER_SIGNATURE, 0xff, 0x3f]);
+        let decoded = decompress_container(&compressed, &VbaLimits::default()).unwrap();
+        assert_eq!(&decoded[..input.len()], input);
+        assert_eq!(decoded.len(), RAW_CHUNK_BYTES);
+        assert!(decoded[input.len()..].iter().all(|byte| *byte == 0));
+    }
+
+    #[test]
+    fn encoding_is_deterministic_and_prefers_nearest_equal_match() {
+        let input = b"abcXabcYabcYabcY";
+        let first = compress_container(input, &VbaLimits::default()).unwrap();
+        let second = compress_container(input, &VbaLimits::default()).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            decompress_container(&first, &VbaLimits::default()).unwrap(),
+            input
+        );
+
+        // At position 8, position 4 supplies the nearest overlapping match
+        // through the end. The token encodes offset 4 and length 8.
+        assert_eq!(&first[first.len() - 2..], &[0x05, 0x30]);
+    }
+
+    #[test]
     fn decodes_raw_chunk() {
         let mut bytes = vec![CONTAINER_SIGNATURE, 0xff, 0x3f];
         bytes.extend((0..RAW_CHUNK_BYTES).map(|value| value as u8));
@@ -240,6 +500,31 @@ mod tests {
         };
         assert!(matches!(
             decompress_container(MAX_COMPRESSION, &limits),
+            Err(VbaError::LimitExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn encoder_enforces_input_and_output_limits() {
+        let input_limits = VbaLimits {
+            max_decompressed_stream_bytes: 3,
+            ..VbaLimits::default()
+        };
+        assert!(matches!(
+            compress_container(b"four", &input_limits),
+            Err(VbaError::LimitExceeded { .. })
+        ));
+
+        let output_limits = VbaLimits {
+            max_compressed_stream_bytes: 1,
+            ..VbaLimits::default()
+        };
+        assert_eq!(
+            compress_container(&[], &output_limits).unwrap(),
+            [CONTAINER_SIGNATURE]
+        );
+        assert!(matches!(
+            compress_container(b"x", &output_limits),
             Err(VbaError::LimitExceeded { .. })
         ));
     }
