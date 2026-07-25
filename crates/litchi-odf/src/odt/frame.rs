@@ -154,6 +154,15 @@ impl OdfImageFormat {
         }
     }
 
+    /// IANA media type used for the package manifest entry.
+    pub const fn media_type(self) -> &'static str {
+        match self {
+            Self::Png => "image/png",
+            Self::Jpeg => "image/jpeg",
+            Self::Gif => "image/gif",
+        }
+    }
+
     /// Detect the format from magic bytes.
     pub fn sniff(bytes: &[u8]) -> Option<Self> {
         const PNG_MAGIC: &[u8] = b"\x89PNG\r\n\x1a\n";

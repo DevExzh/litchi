@@ -49,6 +49,8 @@ pub struct MutablePresentation {
     source_package: Option<OwnedPackage>,
     /// Newly embedded package media, keyed by package path.
     media_files: BTreeMap<String, EmbeddedMedia>,
+    /// Monotonic counter for authored frame names (1-based).
+    next_frame_number: usize,
     /// Inert slide-show settings and custom shows.
     settings: Option<crate::odp::PresentationSettings>,
     /// Inert header/footer/date-time declarations and page bindings.
@@ -95,6 +97,7 @@ impl MutablePresentation {
             styles_xml,
             source_package,
             media_files: BTreeMap::new(),
+            next_frame_number: 1,
             settings,
             declarations: (!declarations.is_empty()).then_some(declarations),
             page_metadata: (!page_metadata.is_empty()).then_some(page_metadata),
@@ -118,6 +121,7 @@ impl MutablePresentation {
             styles_xml: None,
             source_package: None,
             media_files: BTreeMap::new(),
+            next_frame_number: 1,
             settings: None,
             declarations: None,
             page_metadata: None,
@@ -543,6 +547,100 @@ impl MutablePresentation {
             )))
         }
     }
+
+    /// Insert a package-stored image onto a slide.
+    ///
+    /// The payload is sniffed (PNG, JPEG, and GIF are accepted), stored
+    /// verbatim under `Pictures/` in the package with a manifest entry, and
+    /// referenced from a `draw:frame`/`draw:image` element on the slide with
+    /// the given `svg:x`/`svg:y`/`svg:width`/`svg:height` geometry. Picture
+    /// numbering is global across the whole package, including pictures
+    /// already present in a source document.
+    ///
+    /// Returns the allocated package path of the picture part.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odf::{MutablePresentation, OdfLength};
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let mut presentation = MutablePresentation::new();
+    /// presentation.add_slide("Title", "Body")?;
+    /// let png = b"\x89PNG\r\n\x1a\n".as_slice();
+    /// let path = presentation.insert_image(
+    ///     0,
+    ///     png,
+    ///     &OdfLength::centimeters(2.0),
+    ///     &OdfLength::centimeters(3.0),
+    ///     &OdfLength::centimeters(10.0),
+    ///     &OdfLength::centimeters(5.0),
+    /// )?;
+    /// assert!(path.starts_with("Pictures/"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn insert_image(
+        &mut self,
+        slide_index: usize,
+        image: &[u8],
+        x: &crate::odt::OdfLength,
+        y: &crate::odt::OdfLength,
+        width: &crate::odt::OdfLength,
+        height: &crate::odt::OdfLength,
+    ) -> Result<String> {
+        use crate::odt::frame;
+        if slide_index >= self.slides.len() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "Slide index {slide_index} out of bounds"
+            )));
+        }
+        let format = frame::validate_image_payload(image)?;
+        let path = frame::allocate_picture_path(format.extension(), |candidate| {
+            // Picture numbering is global: a stem taken by any supported
+            // extension blocks the whole index.
+            let taken = |path: &str| {
+                self.media_files.contains_key(path)
+                    || self
+                        .source_package
+                        .as_ref()
+                        .is_some_and(|package| package.has_file(path).unwrap_or(false))
+                    || self
+                        .slides
+                        .iter()
+                        .flat_map(|slide| slide.shapes.iter())
+                        .any(|shape| shape.image_href() == Some(path))
+            };
+            if taken(candidate) {
+                return true;
+            }
+            let stem = candidate.trim_end_matches(format.extension());
+            ["png", "jpg", "gif"]
+                .iter()
+                .any(|extension| taken(&format!("{stem}{extension}")))
+        })?;
+
+        let name = format!("Image {}", self.next_frame_number);
+        let shape = Shape {
+            drawing_kind: Some(crate::odp::DrawingShapeKind::Frame),
+            name: Some(name),
+            x: Some(x.as_str().to_string()),
+            y: Some(y.as_str().to_string()),
+            width: Some(width.as_str().to_string()),
+            height: Some(height.as_str().to_string()),
+            ..Shape::new()
+        }
+        .with_image_href(path.clone());
+        self.add_shape(slide_index, shape)?;
+        if let Err(error) = self.embed_media(path.clone(), image.to_vec(), format.media_type()) {
+            // Roll the shape back so a failed insert leaves no trace.
+            self.slides[slide_index].shapes.pop();
+            return Err(error);
+        }
+        self.next_frame_number += 1;
+        Ok(path)
+    }
+
 
     /// Remove a shape from a slide.
     ///
