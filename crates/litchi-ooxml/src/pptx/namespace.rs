@@ -10,9 +10,9 @@ pub(crate) const PRESENTATIONML_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/presentationml/2006/main";
 pub(crate) const STRICT_PRESENTATIONML_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/presentationml/main";
-const RELATIONSHIPS_NAMESPACE: &[u8] =
+pub(crate) const RELATIONSHIPS_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
+pub(crate) const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
 pub(crate) fn is_presentationml_name(

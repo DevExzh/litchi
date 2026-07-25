@@ -568,6 +568,21 @@ impl Package {
         self.presentation()?.ink_annotations()
     }
 
+    /// Store an InkML annotation onto a slide as an inert `p:contentPart`.
+    ///
+    /// The payload is validated as InkML and stored verbatim under
+    /// `/ppt/ink/`; the slide gains a `customXml` relationship and a
+    /// `p:contentPart` reference at the end of its shape tree, preserving
+    /// the slide's namespace dialect. The ink is never rendered, recognized,
+    /// or executed.
+    pub fn add_ink_annotation(
+        &mut self,
+        slide_name: &PackURI,
+        inkml: &[u8],
+    ) -> Result<crate::pptx::StoredInkAnnotation> {
+        crate::pptx::store_slide_ink_annotation(&mut self.opc, slide_name, inkml)
+    }
+
     /// Discover persisted laser-pointer traces from presentation slides.
     ///
     /// Trace points are returned as inert stored data and are never replayed,

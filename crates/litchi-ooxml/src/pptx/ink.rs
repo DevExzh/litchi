@@ -423,8 +423,210 @@ fn invalid(message: impl Into<String>) -> OoxmlError {
     OoxmlError::InvalidFormat(message.into())
 }
 
+fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
+    OoxmlError::Xml(error.to_string())
+}
+
 fn limit(what: &str) -> OoxmlError {
     invalid(format!("{what} exceeds the supported safety limit"))
+}
+
+/// The package outcome of storing an InkML annotation onto a slide.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredInkAnnotation {
+    /// The relationship ID from the slide to the new InkML part.
+    pub relationship_id: String,
+    /// The absolute OPC part name of the stored InkML payload.
+    pub part_name: PackURI,
+}
+
+/// Store an InkML annotation onto a slide as a `p:contentPart` reference.
+///
+/// The payload is validated as InkML (single `inkml:ink` root, bounded size
+/// and structure) and stored verbatim under `/ppt/ink/`; the slide gains a
+/// `customXml` relationship and a `p:contentPart` reference at the end of
+/// its shape tree. The slide's namespace dialect (transitional or Strict)
+/// is preserved. The ink is never rendered, recognized, or executed.
+pub fn store_slide_ink_annotation(
+    package: &mut OpcPackage,
+    slide_name: &PackURI,
+    inkml: &[u8],
+) -> Result<StoredInkAnnotation> {
+    if inkml.len() > MAX_INK_PART_BYTES {
+        return Err(limit("InkML part bytes"));
+    }
+    // Validate root, structure, and trace bounds before mutating anything.
+    inspect_inkml(inkml)?;
+    let slide = package.get_part(slide_name)?;
+    if slide.content_type() != ct::PML_SLIDE {
+        return Err(invalid(
+            "Ink annotation storage requires a PresentationML slide part",
+        ));
+    }
+
+    let part_name = allocate_ink_part_name(package)?;
+    let relationship_id = allocate_relationship_id(slide)?;
+    let fragment = format!(
+        "<p:contentPart xmlns:p=\"{}\" xmlns:r=\"{}\" r:id=\"{relationship_id}\"/>",
+        String::from_utf8_lossy(slide_presentationml_namespace(slide.blob())?),
+        String::from_utf8_lossy(slide_relationships_namespace(slide.blob())?),
+    );
+    let updated = insert_content_part(slide.blob(), fragment.as_bytes())?;
+    let target = part_name.relative_ref(slide_name.base_uri());
+
+    package.get_part_mut(slide_name)?.set_blob(updated);
+    package.add_part(Box::new(litchi_opc::BlobPart::new(
+        part_name.clone(),
+        INK_CONTENT_TYPE.into(),
+        inkml.to_vec(),
+    )));
+    package
+        .get_part_mut(slide_name)?
+        .rels_mut()
+        .add_relationship(rt::CUSTOM_XML.into(), target, relationship_id.clone(), false);
+    Ok(StoredInkAnnotation {
+        relationship_id,
+        part_name,
+    })
+}
+
+/// Allocate the first free `/ppt/ink/inkN.xml` part name.
+fn allocate_ink_part_name(package: &OpcPackage) -> Result<PackURI> {
+    const MAX_INK_PART_INDEX: u32 = 1_000_000;
+    for index in 1..MAX_INK_PART_INDEX {
+        let uri = PackURI::new(format!("/ppt/ink/ink{index}.xml")).map_err(OoxmlError::InvalidUri)?;
+        if package.get_part(&uri).is_err() {
+            return Ok(uri);
+        }
+    }
+    Err(limit("InkML part namespace"))
+}
+
+/// Allocate the first free `rIdN` relationship ID on the slide.
+fn allocate_relationship_id(slide: &dyn Part) -> Result<String> {
+    const MAX_RELATIONSHIP_INDEX: u32 = 1_000_000;
+    for index in 1..MAX_RELATIONSHIP_INDEX {
+        let id = format!("rId{index}");
+        if slide.rels().get(&id).is_none() {
+            return Ok(id);
+        }
+    }
+    Err(limit("slide relationship ID namespace"))
+}
+
+/// The slide's PresentationML namespace (transitional or Strict).
+fn slide_presentationml_namespace(xml: &[u8]) -> Result<&'static [u8]> {
+    Ok(
+        if contains_strict_root(xml, crate::pptx::namespace::STRICT_PRESENTATIONML_NAMESPACE)? {
+            crate::pptx::namespace::STRICT_PRESENTATIONML_NAMESPACE
+        } else {
+            crate::pptx::namespace::PRESENTATIONML_NAMESPACE
+        },
+    )
+}
+
+/// The relationships namespace matching the slide's dialect.
+fn slide_relationships_namespace(xml: &[u8]) -> Result<&'static [u8]> {
+    Ok(
+        if contains_strict_root(xml, crate::pptx::namespace::STRICT_PRESENTATIONML_NAMESPACE)? {
+            crate::pptx::namespace::STRICT_RELATIONSHIPS_NAMESPACE
+        } else {
+            crate::pptx::namespace::RELATIONSHIPS_NAMESPACE
+        },
+    )
+}
+
+/// Whether the slide root binds the Strict PresentationML namespace.
+fn contains_strict_root(xml: &[u8], strict: &[u8]) -> Result<bool> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        match reader.read_event().map_err(xml_error)? {
+            Event::Start(element) | Event::Empty(element) => {
+                let (namespace, _) = reader.resolver().resolve_element(element.name());
+                return Ok(matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == strict));
+            },
+            Event::Eof => return Err(invalid("slide XML has no root element")),
+            _ => {},
+        }
+    }
+}
+
+/// Insert a `p:contentPart` fragment at the end of the slide's shape tree.
+fn insert_content_part(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
+    if xml.len() > MAX_SLIDE_XML_BYTES {
+        return Err(limit("slide XML bytes"));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut root_seen = false;
+    let mut sp_tree_depth = None;
+    let mut position = None;
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("slide XML offset overflow"))?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match event {
+            Event::Start(element) => {
+                increment_nodes(&mut nodes)?;
+                depth = depth.checked_add(1).ok_or_else(|| limit("slide XML depth"))?;
+                if depth > MAX_XML_DEPTH {
+                    return Err(limit("slide XML depth"));
+                }
+                if depth == 1 {
+                    validate_slide_root(&namespace, element.name(), root_seen)?;
+                    root_seen = true;
+                }
+                if is_presentationml_name(&namespace, element.name(), b"spTree")
+                    && sp_tree_depth.replace(depth).is_some()
+                {
+                    return Err(invalid("slide has multiple shape trees"));
+                }
+            },
+            Event::Empty(element) => {
+                increment_nodes(&mut nodes)?;
+                if !root_seen {
+                    validate_slide_root(&namespace, element.name(), false)?;
+                    root_seen = true;
+                }
+                if is_presentationml_name(&namespace, element.name(), b"spTree") {
+                    return Err(invalid("cannot insert into an empty shape tree"));
+                }
+            },
+            Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid("invalid slide XML nesting"));
+                }
+                if sp_tree_depth == Some(depth)
+                    && is_presentationml_name(&namespace, element.name(), b"spTree")
+                {
+                    position = Some(start);
+                }
+                depth -= 1;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTDs and processing instructions are rejected"));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if depth != 0 || !root_seen {
+        return Err(invalid("unterminated or missing PresentationML slide root"));
+    }
+    let position = position.ok_or_else(|| invalid("slide is missing a shape tree"))?;
+    let size = xml
+        .len()
+        .checked_add(fragment.len())
+        .ok_or_else(|| limit("updated slide XML bytes"))?;
+    if size > MAX_SLIDE_XML_BYTES {
+        return Err(limit("updated slide XML bytes"));
+    }
+    let mut output = Vec::with_capacity(size);
+    output.extend_from_slice(&xml[..position]);
+    output.extend_from_slice(fragment);
+    output.extend_from_slice(&xml[position..]);
+    Ok(output)
 }
 
 #[cfg(test)]
@@ -453,5 +655,113 @@ mod tests {
         let summary = inspect_inkml(xml).unwrap();
         assert_eq!(summary.trace_count, 1);
         assert_eq!(summary.trace_group_count, 1);
+    }
+
+    fn slide_package(conformance_pml: &str, conformance_rel: &str) -> (OpcPackage, PackURI) {
+        let mut package = OpcPackage::new();
+        let name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let xml = format!(
+            "<p:sld xmlns:p=\"{conformance_pml}\" xmlns:r=\"{conformance_rel}\">\
+             <p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld></p:sld>"
+        );
+        package.add_part(Box::new(litchi_opc::BlobPart::new(
+            name.clone(),
+            ct::PML_SLIDE.into(),
+            xml.into_bytes(),
+        )));
+        (package, name)
+    }
+
+    const INKML: &[u8] = br#"<ink xmlns="http://www.w3.org/2003/InkML"><traceGroup><trace>1 2 3 4</trace></traceGroup></ink>"#;
+
+    #[test]
+    fn stores_and_discovers_ink_annotation_round_trip() {
+        let (mut package, slide_name) = slide_package(
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        let stored = store_slide_ink_annotation(&mut package, &slide_name, INKML).unwrap();
+        assert_eq!(stored.relationship_id, "rId1");
+        assert_eq!(stored.part_name.as_str(), "/ppt/ink/ink1.xml");
+
+        let part = package.get_part(&stored.part_name).unwrap();
+        assert_eq!(part.content_type(), INK_CONTENT_TYPE);
+        assert_eq!(part.blob(), INKML);
+
+        let slide = package.get_part(&slide_name).unwrap();
+        let relationship = slide.rels().get("rId1").unwrap();
+        assert_eq!(relationship.reltype(), rt::CUSTOM_XML);
+        assert!(!relationship.is_external());
+        let xml = String::from_utf8(slide.blob().to_vec()).unwrap();
+        assert!(xml.contains("<p:contentPart"));
+        assert!(xml.contains("r:id=\"rId1\""));
+
+        // The read-side inventory discovers the stored annotation.
+        let mut limits = InkLoadLimits::default();
+        let annotations =
+            load_slide_ink_annotations(&package, 0, slide, &mut limits).unwrap();
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations[0].relationship_id(), "rId1");
+        assert_eq!(annotations[0].part_name(), &stored.part_name);
+        assert_eq!(annotations[0].trace_count(), 1);
+        assert_eq!(annotations[0].trace_group_count(), 1);
+
+        // A second annotation gets distinct ids.
+        let stored2 = store_slide_ink_annotation(&mut package, &slide_name, INKML).unwrap();
+        assert_eq!(stored2.relationship_id, "rId2");
+        assert_eq!(stored2.part_name.as_str(), "/ppt/ink/ink2.xml");
+        let slide = package.get_part(&slide_name).unwrap();
+        let mut limits = InkLoadLimits::default();
+        let annotations =
+            load_slide_ink_annotations(&package, 0, slide, &mut limits).unwrap();
+        assert_eq!(annotations.len(), 2);
+    }
+
+    #[test]
+    fn stores_ink_annotation_in_strict_dialect() {
+        let (mut package, slide_name) = slide_package(
+            "http://purl.oclc.org/ooxml/presentationml/main",
+            "http://purl.oclc.org/ooxml/officeDocument/relationships",
+        );
+        let stored = store_slide_ink_annotation(&mut package, &slide_name, INKML).unwrap();
+        let slide = package.get_part(&slide_name).unwrap();
+        let xml = String::from_utf8(slide.blob().to_vec()).unwrap();
+        assert!(xml.contains("xmlns:p=\"http://purl.oclc.org/ooxml/presentationml/main\""));
+        assert!(xml.contains("xmlns:r=\"http://purl.oclc.org/ooxml/officeDocument/relationships\""));
+        let mut limits = InkLoadLimits::default();
+        let annotations =
+            load_slide_ink_annotations(&package, 0, slide, &mut limits).unwrap();
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations[0].part_name(), &stored.part_name);
+    }
+
+    #[test]
+    fn rejects_invalid_ink_and_missing_slide() {
+        let (mut package, slide_name) = slide_package(
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        // Not InkML.
+        assert!(store_slide_ink_annotation(&mut package, &slide_name, b"<notInk/>").is_err());
+        // Non-slide part.
+        let wrong = PackURI::new("/ppt/presentation.xml").unwrap();
+        package.add_part(Box::new(litchi_opc::BlobPart::new(
+            wrong.clone(),
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+                .into(),
+            b"<p:presentation/>".to_vec(),
+        )));
+        assert!(store_slide_ink_annotation(&mut package, &wrong, INKML).is_err());
+        // Empty shape tree cannot be patched.
+        let empty_name = PackURI::new("/ppt/slides/slide2.xml").unwrap();
+        package.add_part(Box::new(litchi_opc::BlobPart::new(
+            empty_name.clone(),
+            ct::PML_SLIDE.into(),
+            br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree/></p:cSld></p:sld>"#.to_vec(),
+        )));
+        assert!(store_slide_ink_annotation(&mut package, &empty_name, INKML).is_err());
+        // Rejection leaves the slide untouched.
+        let slide = package.get_part(&slide_name).unwrap();
+        assert!(slide.rels().get("rId1").is_none());
     }
 }
