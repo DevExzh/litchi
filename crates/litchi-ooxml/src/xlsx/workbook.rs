@@ -5,28 +5,6 @@
 
 use crate::common::DocumentProperties;
 use crate::pivot::PivotTable;
-use crate::xlsx::calculation_chain::{
-    CalculationChain, CalculationChainConformance, load_calculation_chain,
-    remove_calculation_chain, store_calculation_chain,
-};
-use crate::xlsx::calculation_properties::{
-    WorkbookCalculationProperties, parse_workbook_calculation_properties,
-};
-use crate::xlsx::named_sheet_view::{
-    NamedSheetViews, load_worksheet_named_sheet_views, remove_worksheet_named_sheet_views,
-    store_worksheet_named_sheet_views,
-};
-use crate::xlsx::xml_maps::{
-    XmlMapConformance, XmlMapInfo, load_from_package_with_conformance as load_xml_maps,
-    remove_from_package as remove_xml_maps, store_in_package as store_xml_maps,
-};
-use crate::xlsx::volatile_dependencies::{
-    VolatileDependencies, VolatileDependenciesConformance,
-    load_from_package_with_conformance as load_volatile_dependencies,
-    remove_from_package as remove_volatile_dependencies,
-    store_in_package as store_volatile_dependencies,
-};
-use crate::xlsx::vba_project::{VbaProject, discover_vba_project};
 use crate::ribbonx::{
     RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
     load_ribbon_customizations, store_ribbon_customization,
@@ -35,28 +13,53 @@ use crate::web_extensions::{
     OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
     remove_web_extension_task_panes, store_web_extension_task_panes,
 };
+use crate::xlsx::calculation_chain::{
+    CalculationChain, CalculationChainConformance, load_calculation_chain,
+    remove_calculation_chain, store_calculation_chain,
+};
+use crate::xlsx::calculation_properties::{
+    WorkbookCalculationProperties, parse_workbook_calculation_properties,
+};
+use crate::xlsx::data_validation::{
+    DataValidationCollection, parse_data_validation_collections,
+    replace_data_validation_collections, validate_data_validation_collections,
+};
 use crate::xlsx::external_links::{
     ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
     build_external_link_part_with_conformance, load_external_link,
 };
-use crate::xlsx::writer::workbook::{
-    generate_pivot_cache_definition_xml, generate_pivot_cache_records_xml,
-    generate_pivot_table_definition_xml, render_pivot_table_sheet_cells,
-};
-use crate::xlsx::writer::{MutableWorkbookData, MutableWorksheet, NamedRange};
-use crate::xlsx::{Cell, SharedStrings, Styles};
-use crate::xlsx::data_validation::{
-    DataValidationCollection, parse_data_validation_collections,
-    replace_data_validation_collections, validate_data_validation_collections,
+use crate::xlsx::named_sheet_view::{
+    NamedSheetViews, load_worksheet_named_sheet_views, remove_worksheet_named_sheet_views,
+    store_worksheet_named_sheet_views,
 };
 use crate::xlsx::sheet_protection::{
     WorksheetProtectedRangeCollection, WorksheetProtection, WorksheetProtectionMetadata,
     parse_worksheet_protection, replace_worksheet_protection,
     validate_worksheet_protection_metadata,
 };
-use crate::xlsx::workbook_protection::{
-    WorkbookProtectionMetadata, parse_workbook_protection,
+use crate::xlsx::vba_project::{VbaProject, discover_vba_project};
+use crate::xlsx::volatile_dependencies::{
+    VolatileDependencies, VolatileDependenciesConformance,
+    load_from_package_with_conformance as load_volatile_dependencies,
+    remove_from_package as remove_volatile_dependencies,
+    store_in_package as store_volatile_dependencies,
 };
+use crate::xlsx::web_extension_bindings::{
+    WorksheetWebExtensionBinding, parse_worksheet_web_extension_bindings,
+    replace_worksheet_web_extension_bindings as patch_worksheet_web_extension_bindings,
+    validate_worksheet_web_extension_apprefs,
+};
+use crate::xlsx::workbook_protection::{WorkbookProtectionMetadata, parse_workbook_protection};
+use crate::xlsx::writer::workbook::{
+    generate_pivot_cache_definition_xml, generate_pivot_cache_records_xml,
+    generate_pivot_table_definition_xml, render_pivot_table_sheet_cells,
+};
+use crate::xlsx::writer::{MutableWorkbookData, MutableWorksheet, NamedRange};
+use crate::xlsx::xml_maps::{
+    XmlMapConformance, XmlMapInfo, load_from_package_with_conformance as load_xml_maps,
+    remove_from_package as remove_xml_maps, store_in_package as store_xml_maps,
+};
+use crate::xlsx::{Cell, SharedStrings, Styles};
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
@@ -99,6 +102,7 @@ pub struct Workbook {
     defined_names: Vec<NamedRange>,
     worksheet_protection_mutations: HashMap<usize, WorksheetProtectionMetadata>,
     worksheet_data_validation_mutations: HashMap<usize, Vec<DataValidationCollection>>,
+    worksheet_web_extension_binding_mutations: HashMap<usize, Vec<WorksheetWebExtensionBinding>>,
 }
 
 fn patch_workbook_external_references(
@@ -151,9 +155,16 @@ fn patch_workbook_external_references(
                     } else if insertion.is_none()
                         && matches!(
                             local,
-                            b"definedNames" | b"calcPr" | b"oleSize" | b"customWorkbookViews"
-                                | b"pivotCaches" | b"smartTagPr" | b"smartTagTypes"
-                                | b"webPublishing" | b"fileRecoveryPr" | b"webPublishObjects"
+                            b"definedNames"
+                                | b"calcPr"
+                                | b"oleSize"
+                                | b"customWorkbookViews"
+                                | b"pivotCaches"
+                                | b"smartTagPr"
+                                | b"smartTagTypes"
+                                | b"webPublishing"
+                                | b"fileRecoveryPr"
+                                | b"webPublishObjects"
                                 | b"extLst"
                         )
                     {
@@ -161,7 +172,7 @@ fn patch_workbook_external_references(
                     }
                 }
                 depth = depth.checked_add(1).ok_or("workbook XML depth overflow")?;
-            }
+            },
             Event::Empty(element) => {
                 let name = element.name().as_ref().to_vec();
                 let local = name.rsplit(|byte| *byte == b':').next().unwrap_or(&name);
@@ -172,15 +183,22 @@ fn patch_workbook_external_references(
                     && insertion.is_none()
                     && matches!(
                         local,
-                        b"definedNames" | b"calcPr" | b"oleSize" | b"customWorkbookViews"
-                            | b"pivotCaches" | b"smartTagPr" | b"smartTagTypes"
-                            | b"webPublishing" | b"fileRecoveryPr" | b"webPublishObjects"
+                        b"definedNames"
+                            | b"calcPr"
+                            | b"oleSize"
+                            | b"customWorkbookViews"
+                            | b"pivotCaches"
+                            | b"smartTagPr"
+                            | b"smartTagTypes"
+                            | b"webPublishing"
+                            | b"fileRecoveryPr"
+                            | b"webPublishObjects"
                             | b"extLst"
                     )
                 {
                     insertion = Some(before);
                 }
-            }
+            },
             Event::End(element) => {
                 depth = depth.checked_sub(1).ok_or("invalid workbook XML depth")?;
                 if active_external_depth == Some(depth) {
@@ -194,9 +212,9 @@ fn patch_workbook_external_references(
                     insertion.get_or_insert(before);
                     break;
                 }
-            }
+            },
             Event::Eof => return Err("workbook XML ended before the root closed".into()),
-            _ => {}
+            _ => {},
         }
     }
 
@@ -210,10 +228,10 @@ fn patch_workbook_external_references(
         let relationship_namespace = match conformance {
             ExternalLinkConformance::Transitional => {
                 "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-            }
+            },
             ExternalLinkConformance::Strict => {
                 "http://purl.oclc.org/ooxml/officeDocument/relationships"
-            }
+            },
         };
         let mut value = format!("<{prefix}externalReferences");
         if !relationship_prefix_bound {
@@ -245,7 +263,7 @@ fn patch_workbook_external_references(
         (None, None) => {
             let position = insertion.ok_or("workbook insertion point is missing")?;
             (position, position)
-        }
+        },
         _ => return Err("workbook externalReferences element is unbalanced".into()),
     };
     let new_len = xml
@@ -280,9 +298,7 @@ impl Workbook {
     }
 
     /// Load persisted Office Add-in task-pane metadata without activating add-ins.
-    pub fn web_extension_task_panes(
-        &self,
-    ) -> crate::error::Result<Option<WebExtensionTaskPanes>> {
+    pub fn web_extension_task_panes(&self) -> crate::error::Result<Option<WebExtensionTaskPanes>> {
         load_web_extension_task_panes(&self.package)
     }
 
@@ -470,6 +486,7 @@ impl Workbook {
             defined_names: Vec::new(),
             worksheet_protection_mutations: HashMap::new(),
             worksheet_data_validation_mutations: HashMap::new(),
+            worksheet_web_extension_binding_mutations: HashMap::new(),
         };
 
         workbook.load_workbook_info()?;
@@ -687,9 +704,7 @@ impl Workbook {
     ///
     /// Password verifier values remain opaque: this method never accepts or
     /// checks a password, and it does not enforce the requested locks.
-    pub fn workbook_protection_metadata(
-        &self,
-    ) -> SheetResult<Option<WorkbookProtectionMetadata>> {
+    pub fn workbook_protection_metadata(&self) -> SheetResult<Option<WorkbookProtectionMetadata>> {
         let workbook_part = self.package.get_part(&self.workbook_uri)?;
         parse_workbook_protection(workbook_part.blob()).map_err(Into::into)
     }
@@ -891,9 +906,10 @@ impl Workbook {
 
     fn external_link_conformance(&self) -> SheetResult<ExternalLinkConformance> {
         let xml = self.package.get_part(&self.workbook_uri)?.blob();
-        if xml.windows(b"http://purl.oclc.org/ooxml/spreadsheetml/main".len()).any(|window| {
-            window == b"http://purl.oclc.org/ooxml/spreadsheetml/main"
-        }) {
+        if xml
+            .windows(b"http://purl.oclc.org/ooxml/spreadsheetml/main".len())
+            .any(|window| window == b"http://purl.oclc.org/ooxml/spreadsheetml/main")
+        {
             Ok(ExternalLinkConformance::Strict)
         } else {
             Ok(ExternalLinkConformance::Transitional)
@@ -925,7 +941,10 @@ impl Workbook {
             };
             needles.iter().any(|needle| text.contains(needle))
         }) {
-            return Err("external-link operation would change an index referenced by formula metadata".into());
+            return Err(
+                "external-link operation would change an index referenced by formula metadata"
+                    .into(),
+            );
         }
         Ok(())
     }
@@ -1471,6 +1490,73 @@ impl Workbook {
         self.replace_worksheet_data_validations(index, candidate)
     }
 
+    /// Return inert Office Add-in range bindings, including any queued mutation.
+    pub fn worksheet_web_extension_bindings(
+        &self,
+        index: usize,
+    ) -> SheetResult<Vec<WorksheetWebExtensionBinding>> {
+        if let Some(value) = self.worksheet_web_extension_binding_mutations.get(&index) {
+            return Ok(value.clone());
+        }
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        let part = self.package.get_part(&uri)?;
+        parse_worksheet_web_extension_bindings(part.blob()).map_err(Into::into)
+    }
+
+    /// Atomically replace all Office Add-in range bindings on one worksheet.
+    ///
+    /// Every non-empty worksheet `appRef` must resolve to exactly one binding
+    /// in the package-level MS-OWEXML task-pane graph.
+    pub fn replace_worksheet_web_extension_bindings(
+        &mut self,
+        index: usize,
+        bindings: Vec<WorksheetWebExtensionBinding>,
+    ) -> SheetResult<()> {
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        let part = self.package.get_part(&uri)?;
+        patch_worksheet_web_extension_bindings(part.blob(), &bindings)?;
+        if !bindings.is_empty() {
+            let task_panes = load_web_extension_task_panes(&self.package)?
+                .ok_or("Worksheet add-in bindings require package task panes")?;
+            let package_bindings = task_panes
+                .panes
+                .iter()
+                .flat_map(|pane| pane.web_extension.bindings.iter().cloned())
+                .collect::<Vec<_>>();
+            validate_worksheet_web_extension_apprefs(&bindings, &package_bindings)?;
+        }
+        self.worksheet_web_extension_binding_mutations
+            .insert(index, bindings);
+        Ok(())
+    }
+
+    /// Atomically update cloned Office Add-in bindings and queue them if valid.
+    pub fn update_worksheet_web_extension_bindings<F>(
+        &mut self,
+        index: usize,
+        update: F,
+    ) -> SheetResult<()>
+    where
+        F: FnOnce(&mut Vec<WorksheetWebExtensionBinding>),
+    {
+        let mut candidate = self.worksheet_web_extension_bindings(index)?;
+        update(&mut candidate);
+        self.replace_worksheet_web_extension_bindings(index, candidate)
+    }
+
+    /// Remove all worksheet-side Office Add-in bindings.
+    pub fn remove_worksheet_web_extension_bindings(&mut self, index: usize) -> SheetResult<()> {
+        self.replace_worksheet_web_extension_bindings(index, Vec::new())
+    }
+
     pub fn remove_worksheet_data_validations(&mut self, index: usize) -> SheetResult<()> {
         self.replace_worksheet_data_validations(index, Vec::new())
     }
@@ -1769,6 +1855,19 @@ impl Workbook {
         if should_update {
             // Take mutable_data temporarily to avoid borrow issues
             if let Some(mut mutable_data) = self.mutable_data.take() {
+                let worksheet_web_extension_bindings = (0..self.worksheets.len())
+                    .map(|index| {
+                        let bindings = self.worksheet_web_extension_bindings(index)?;
+                        Ok((!bindings.is_empty()
+                            || self
+                                .worksheet_web_extension_binding_mutations
+                                .contains_key(&index))
+                        .then_some((index, bindings)))
+                    })
+                    .collect::<SheetResult<Vec<_>>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
                 // The mutable writer rebuilds workbook and worksheet relationship
                 // collections. Detach inert companion parts first so old targets
                 // do not become orphaned, then restore them after materialization.
@@ -1789,6 +1888,10 @@ impl Workbook {
                 self.restore_volatile_dependencies_after_materialization(&volatile_dependencies)?;
                 self.restore_xml_maps_after_materialization(&xml_maps)?;
                 self.restore_named_sheet_views_after_materialization(&named_sheet_views)?;
+                self.restore_worksheet_web_extension_bindings_after_materialization(
+                    &mutable_data,
+                    &worksheet_web_extension_bindings,
+                )?;
                 self.mutable_data = Some(mutable_data);
             }
         }
@@ -1816,14 +1919,13 @@ impl Workbook {
         Ok(())
     }
 
-    fn stage_worksheet_mutations(
-        &self,
-    ) -> SheetResult<Vec<(PackURI, Vec<u8>, Vec<u8>)>> {
+    fn stage_worksheet_mutations(&self) -> SheetResult<Vec<(PackURI, Vec<u8>, Vec<u8>)>> {
         use litchi_opc::constants::content_type as ct;
         let indexes: HashSet<usize> = self
             .worksheet_protection_mutations
             .keys()
             .chain(self.worksheet_data_validation_mutations.keys())
+            .chain(self.worksheet_web_extension_binding_mutations.keys())
             .copied()
             .collect();
         let mut staged = Vec::with_capacity(indexes.len());
@@ -1850,6 +1952,9 @@ impl Workbook {
             if let Some(collections) = self.worksheet_data_validation_mutations.get(&index) {
                 replacement = replace_data_validation_collections(&replacement, collections)?;
             }
+            if let Some(bindings) = self.worksheet_web_extension_binding_mutations.get(&index) {
+                replacement = patch_worksheet_web_extension_bindings(&replacement, bindings)?;
+            }
             staged.push((uri, original, replacement));
         }
         Ok(staged)
@@ -1866,6 +1971,25 @@ impl Workbook {
             chain,
             self.calculation_chain_conformance.unwrap_or_default(),
         )?;
+        Ok(())
+    }
+
+    fn restore_worksheet_web_extension_bindings_after_materialization(
+        &mut self,
+        data: &MutableWorkbookData,
+        bindings_by_index: &[(usize, Vec<WorksheetWebExtensionBinding>)],
+    ) -> SheetResult<()> {
+        for (index, bindings) in bindings_by_index {
+            let worksheet = data
+                .worksheets
+                .get(*index)
+                .ok_or("Worksheet index out of bounds after materialization")?;
+            let uri = PackURI::new(format!("/xl/worksheets/sheet{}.xml", worksheet.sheet_id()))?;
+            let part = self.package.get_part_mut(&uri)?;
+            let replacement = patch_worksheet_web_extension_bindings(part.blob(), bindings)?;
+            part.set_blob(replacement);
+            self.worksheet_web_extension_binding_mutations.remove(index);
+        }
         Ok(())
     }
 
@@ -4476,6 +4600,67 @@ mod tests {
         }
 
         package
+    }
+
+    #[test]
+    fn exposes_and_transactionally_removes_worksheet_web_extension_bindings() {
+        let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
+        let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
+        package.get_part_mut(&worksheet_uri).unwrap().set_blob(
+            include_bytes!("../../../../test-data/ooxml/web_extensions/worksheet_bindings.xml")
+                .to_vec(),
+        );
+        let mut workbook = Workbook::new(package).unwrap();
+
+        let bindings = workbook.worksheet_web_extension_bindings(0).unwrap();
+        assert_eq!(bindings.len(), 2);
+        assert_eq!(bindings[0].application_reference(), "sales-table");
+        let worksheet = workbook.get_worksheet(0).unwrap();
+        assert_eq!(worksheet.web_extension_bindings(), bindings);
+
+        workbook.remove_worksheet_web_extension_bindings(0).unwrap();
+        assert!(
+            workbook
+                .worksheet_web_extension_bindings(0)
+                .unwrap()
+                .is_empty()
+        );
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("bindings-removed.xlsx");
+        workbook.save(&path).unwrap();
+        let reopened = Workbook::open(&path).unwrap();
+        assert!(
+            reopened
+                .worksheet_web_extension_bindings(0)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn preserves_worksheet_web_extension_bindings_during_materialization() {
+        let mut workbook = Workbook::create().unwrap();
+        workbook
+            .package
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+            .unwrap()
+            .set_blob(
+                include_bytes!("../../../../test-data/ooxml/web_extensions/worksheet_bindings.xml")
+                    .to_vec(),
+            );
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "materialized");
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("bindings-preserved.xlsx");
+        workbook.save(&path).unwrap();
+        let reopened = Workbook::open(&path).unwrap();
+        let bindings = reopened.worksheet_web_extension_bindings(0).unwrap();
+        assert_eq!(bindings.len(), 2);
+        assert_eq!(bindings[1].application_reference(), "sales-point");
     }
 
     fn package_with_custom_workbook_parts() -> OpcPackage {

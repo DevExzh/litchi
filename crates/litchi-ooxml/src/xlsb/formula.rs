@@ -450,6 +450,22 @@ impl FormulaResolutionContext {
         context
     }
 
+    /// Whether an XTI resolves to exactly one worksheet in this workbook.
+    pub(crate) fn is_internal_single_sheet_xti(&self, index: u16) -> bool {
+        let Some(xti) = self.external_sheets.get(usize::from(index)) else {
+            return false;
+        };
+        let Some(FormulaSupportingLink::SelfWorkbook) =
+            self.supporting_links.get(xti.external_link as usize)
+        else {
+            return false;
+        };
+        xti.first_sheet >= 0
+            && xti.first_sheet == xti.last_sheet
+            && usize::try_from(xti.first_sheet)
+                .is_ok_and(|sheet| sheet < self.worksheet_names.len())
+    }
+
     /// Bind formula-local `BrtBeginPName` metadata to an exact PivotTable view.
     pub fn for_pivot_formula(&self, scope: FormulaPivotNameScope) -> XlsbResult<Self> {
         let mut context = self.clone();
@@ -3712,10 +3728,12 @@ impl<'a> FormulaCompiler<'a> {
                         self.offset += 1;
                         separators.push(',');
                         let spaced = self.consume_structured_space()?;
-                        if comma_space.replace(spaced).is_some_and(|previous| previous != spaced) {
-                            return Err(self.error(
-                                "structured-reference commas use inconsistent whitespace",
-                            ));
+                        if comma_space
+                            .replace(spaced)
+                            .is_some_and(|previous| previous != spaced)
+                        {
+                            return Err(self
+                                .error("structured-reference commas use inconsistent whitespace"));
                         }
                     },
                     Some(':') => {
@@ -3753,18 +3771,15 @@ impl<'a> FormulaCompiler<'a> {
             unwrapped_trailing_space
         };
         if leading_space != trailing_space {
-            return Err(self.error(
-                "structured-reference square-bracket whitespace is asymmetric",
-            ));
+            return Err(self.error("structured-reference square-bracket whitespace is asymmetric"));
         }
         if self.peek_char() != Some(']') {
             return Err(self.error("expected closing structured-reference bracket"));
         }
         self.offset += 1;
         if nested && items.len() == 1 {
-            return Err(self.error(
-                "redundant nested structured reference cannot be represented faithfully",
-            ));
+            return Err(self
+                .error("redundant nested structured reference cannot be represented faithfully"));
         }
 
         let (row_type, columns) = Self::classify_structured_reference(items, &separators)?;
@@ -3833,9 +3848,9 @@ impl<'a> FormulaCompiler<'a> {
             return Ok(false);
         }
         if &self.input[start..self.offset] != " " {
-            return Err(self.error(
-                "structured-reference whitespace cannot be represented by XLSB flags",
-            ));
+            return Err(
+                self.error("structured-reference whitespace cannot be represented by XLSB flags")
+            );
         }
         Ok(true)
     }
@@ -3920,12 +3935,14 @@ impl<'a> FormulaCompiler<'a> {
         let row_type = match rows.as_slice() {
             [] => FormulaTableRowType::Data,
             [row] => *row,
-            [FormulaTableRowType::Headers, FormulaTableRowType::DataAlternate] => {
-                FormulaTableRowType::DataAndHeaders
-            },
-            [FormulaTableRowType::DataAlternate, FormulaTableRowType::Totals] => {
-                FormulaTableRowType::DataAndTotals
-            },
+            [
+                FormulaTableRowType::Headers,
+                FormulaTableRowType::DataAlternate,
+            ] => FormulaTableRowType::DataAndHeaders,
+            [
+                FormulaTableRowType::DataAlternate,
+                FormulaTableRowType::Totals,
+            ] => FormulaTableRowType::DataAndTotals,
             _ => {
                 return Err(XlsbError::InvalidFormula(
                     "structured-reference row union cannot fit one PtgList".to_string(),
@@ -3990,15 +4007,18 @@ impl<'a> FormulaCompiler<'a> {
             .iter()
             .filter(|table| excel_name_eq(table.display_name(), table_name));
         let table = matches.next().ok_or_else(|| {
-            XlsbError::InvalidFormula(format!("structured reference names missing table {table_name:?}"))
+            XlsbError::InvalidFormula(format!(
+                "structured reference names missing table {table_name:?}"
+            ))
         })?;
         if matches.next().is_some() {
             return Err(XlsbError::InvalidFormula(format!(
                 "structured reference table name {table_name:?} is ambiguous"
             )));
         }
-        let current_sheet = usize::try_from(context.current_sheet)
-            .map_err(|_| XlsbError::InvalidFormula("current worksheet index overflow".to_string()))?;
+        let current_sheet = usize::try_from(context.current_sheet).map_err(|_| {
+            XlsbError::InvalidFormula("current worksheet index overflow".to_string())
+        })?;
         if table.sheet_index() != current_sheet {
             return Err(XlsbError::InvalidFormula(format!(
                 "table {table_name:?} is on worksheet {}, not the formula worksheet {current_sheet}",
@@ -6140,14 +6160,14 @@ mod structured_reference_compiler_tests {
                 .parse()
                 .unwrap();
             assert_eq!(
-                FormulaConverter::try_tokens_to_string_with_context(
-                    &tokens,
-                    &resolution_context,
-                )
-                .unwrap(),
+                FormulaConverter::try_tokens_to_string_with_context(&tokens, &resolution_context,)
+                    .unwrap(),
                 source
             );
-            assert!(matches!(tokens.as_slice(), [FormulaToken::TableReference(_)]));
+            assert!(matches!(
+                tokens.as_slice(),
+                [FormulaToken::TableReference(_)]
+            ));
         }
     }
 
@@ -6190,20 +6210,16 @@ mod structured_reference_compiler_tests {
 
         let ambiguous = vec![
             base_tables[0].clone(),
-            FormulaTableDefinition::try_new(8, 0, "sales", vec!["Item".to_string()])
-                .unwrap(),
+            FormulaTableDefinition::try_new(8, 0, "sales", vec!["Item".to_string()]).unwrap(),
         ];
         let ambiguous_context = FormulaCompilationContext {
             tables: &ambiguous,
             ..context
         };
-        assert!(
-            FormulaCompiler::compile_with_context("Sales[Item]", &ambiguous_context).is_err()
-        );
+        assert!(FormulaCompiler::compile_with_context("Sales[Item]", &ambiguous_context).is_err());
 
-        let wrong_sheet = vec![
-            FormulaTableDefinition::try_new(7, 1, "Sales", vec!["Item".to_string()]).unwrap(),
-        ];
+        let wrong_sheet =
+            vec![FormulaTableDefinition::try_new(7, 1, "Sales", vec!["Item".to_string()]).unwrap()];
         let wrong_sheet_context = FormulaCompilationContext {
             tables: &wrong_sheet,
             ..context

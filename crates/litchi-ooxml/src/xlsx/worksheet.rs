@@ -57,6 +57,9 @@ use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
+use super::web_extension_bindings::{
+    WorksheetWebExtensionBinding, parse_worksheet_web_extension_bindings,
+};
 use super::writer::sheet::Image;
 use super::{
     ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship, ChartRelationshipTarget,
@@ -293,6 +296,7 @@ pub struct Worksheet<'a> {
     col_breaks: Vec<PageBreak>,
     rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
     sparkline_groups: Vec<SparklineGroup>,
+    web_extension_bindings: Vec<WorksheetWebExtensionBinding>,
     tables: Vec<Table>,
     query_tables: Vec<WorksheetQueryTable>,
     images: Vec<Image>,
@@ -338,6 +342,7 @@ impl<'a> Worksheet<'a> {
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
             sparkline_groups: Vec::new(),
+            web_extension_bindings: Vec::new(),
             tables: Vec::new(),
             query_tables: Vec::new(),
             images: Vec::new(),
@@ -370,6 +375,7 @@ impl<'a> Worksheet<'a> {
             discover_named_sheet_views(self.workbook.package(), relationships)?;
 
         self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
+        self.web_extension_bindings = parse_worksheet_web_extension_bindings(content.as_bytes())?;
 
         Ok(())
     }
@@ -406,6 +412,11 @@ impl<'a> Worksheet<'a> {
 
     pub fn sparkline_groups(&self) -> &[SparklineGroup] {
         &self.sparkline_groups
+    }
+
+    /// Inert Office Add-in range bindings embedded in this worksheet.
+    pub fn web_extension_bindings(&self) -> &[WorksheetWebExtensionBinding] {
+        &self.web_extension_bindings
     }
 
     /// Structured tables defined on this worksheet.

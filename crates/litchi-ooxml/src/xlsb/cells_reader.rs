@@ -17,6 +17,7 @@ use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::{RecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
+use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
 use crate::xlsb::worksheet::{
     XlsbAutoFilter, XlsbColumnInfo, XlsbRowInfo, XlsbSheetProtection, XlsbStrongProtection,
 };
@@ -130,6 +131,9 @@ where
     pub data_validation14_settings: Option<DataValidationSettings>,
     /// Classic and Office 2013 conditional-formatting blocks in stream order.
     pub conditional_formattings: Vec<ConditionalFormatting>,
+    /// Inert Office Add-in bindings from the worksheet WEBEXTENSIONS collection.
+    pub web_extension_bindings: Vec<XlsbWebExtensionBinding>,
+    saw_web_extension_collection: bool,
 }
 
 impl<'a, RS> XlsbCellsReader<'a, RS>
@@ -197,6 +201,8 @@ where
             data_validation_settings: None,
             data_validation14_settings: None,
             conditional_formattings: Vec::new(),
+            web_extension_bindings: Vec::new(),
+            saw_web_extension_collection: false,
         })
     }
 
@@ -909,6 +915,22 @@ where
                     self.consume_extension_conditional_formatting(&mut formatting, count, base)?;
                     self.conditional_formattings.push(formatting);
                 },
+                record_types::BEGIN_WEB_EXTENSIONS => {
+                    if self.saw_web_extension_collection {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginWebExtensions".to_string(),
+                            val: "duplicate collection".to_string(),
+                        });
+                    }
+                    if !self.buf.is_empty() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtBeginWebExtensions".to_string(),
+                            val: "begin record must be empty".to_string(),
+                        });
+                    }
+                    self.saw_web_extension_collection = true;
+                    self.consume_web_extension_bindings()?;
+                },
                 0x0082 => {
                     // BrtEndSheet - end of worksheet
                     self.resolve_conditional_formatting_links()?;
@@ -921,6 +943,56 @@ where
         }
 
         Ok(())
+    }
+
+    fn consume_web_extension_bindings(&mut self) -> XlsbResult<()> {
+        let mut app_refs = HashSet::new();
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                record_types::WEB_EXTENSION => {
+                    if self.web_extension_bindings.len() == 65_536 {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "WEBEXTENSIONS".to_string(),
+                            val: "binding count exceeds 65,536".to_string(),
+                        });
+                    }
+                    let binding = XlsbWebExtensionBinding::parse_payload(&self.buf, |index| {
+                        self.formula_context.is_internal_single_sheet_xti(index)
+                    })?;
+                    if !app_refs.insert(binding.application_reference.clone()) {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "WEBEXTENSIONS".to_string(),
+                            val: "duplicate binding appRef".to_string(),
+                        });
+                    }
+                    self.web_extension_bindings.push(binding);
+                },
+                record_types::END_WEB_EXTENSIONS => {
+                    if !self.buf.is_empty() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "BrtEndWebExtensions".to_string(),
+                            val: "end record must be empty".to_string(),
+                        });
+                    }
+                    if self.web_extension_bindings.is_empty() {
+                        return Err(XlsbError::Unrecognized {
+                            typ: "WEBEXTENSIONS".to_string(),
+                            val: "collection requires at least one binding".to_string(),
+                        });
+                    }
+                    return Ok(());
+                },
+                other => {
+                    return Err(XlsbError::Unrecognized {
+                        typ: "WEBEXTENSIONS".to_string(),
+                        val: format!("unexpected record 0x{other:04X}"),
+                    });
+                },
+            }
+        }
     }
 
     fn resolve_conditional_formatting_links(&mut self) -> XlsbResult<()> {

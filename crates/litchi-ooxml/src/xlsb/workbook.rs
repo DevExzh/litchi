@@ -5,11 +5,11 @@ use crate::xlsb::calculation::CalculationProperties;
 use crate::xlsb::error::XlsbResult;
 use crate::xlsb::formula::{
     FormulaExternalBook, FormulaExternalSheet, FormulaPivotViewDefinition,
-    FormulaResolutionContext, FormulaSupportingLink, FormulaTableDefinition, excel_name_eq,
-    XlsbExternalLink, XlsbExternalLinkKind,
+    FormulaResolutionContext, FormulaSupportingLink, FormulaTableDefinition, XlsbExternalLink,
+    XlsbExternalLinkKind, excel_name_eq,
 };
-use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
+use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
 use crate::xlsb::styles_table::{CellFormat, StylesTable};
@@ -389,11 +389,9 @@ impl XlsbWorkbook {
             .len()
             .checked_sub(end - start)
             .and_then(|value| value.checked_add(replacement.len()))
-            .ok_or_else(|| {
-                crate::xlsb::error::XlsbError::InvalidLength {
-                    expected: usize::MAX,
-                    found: original.len(),
-                }
+            .ok_or_else(|| crate::xlsb::error::XlsbError::InvalidLength {
+                expected: usize::MAX,
+                found: original.len(),
             })?;
         let mut updated = Vec::with_capacity(capacity);
         updated.extend_from_slice(&original[..start]);
@@ -626,16 +624,23 @@ impl XlsbWorkbook {
                     break;
                 }
                 expirations.pop();
-                if active.get(&col_first).is_some_and(|entry| entry.1 == row_last) {
+                if active
+                    .get(&col_first)
+                    .is_some_and(|entry| entry.1 == row_last)
+                {
                     active.remove(&col_first);
                 }
             }
-            if let Some((&col_first, &(col_last, _))) = active.range(..=range.col_last).next_back() {
+            if let Some((&col_first, &(col_last, _))) = active.range(..=range.col_last).next_back()
+            {
                 if col_last >= range.col_first {
-                    return Err(crate::xlsb::error::XlsbError::InvalidCellReference(format!(
-                        "merged range {} overlaps an existing range beginning in column {}",
-                        range.to_range_string(), col_first
-                    )));
+                    return Err(crate::xlsb::error::XlsbError::InvalidCellReference(
+                        format!(
+                            "merged range {} overlaps an existing range beginning in column {}",
+                            range.to_range_string(),
+                            col_first
+                        ),
+                    ));
                 }
             }
             active.insert(range.col_first, (range.col_last, range.row_last));
@@ -785,9 +790,9 @@ impl XlsbWorkbook {
         }
         if block_span.is_some() {
             Self::validate_merge_range_collection(&ranges, true)?;
-            if first_post_merge_offset.is_some_and(|offset| {
-                block_span.is_some_and(|(begin, _)| offset < begin)
-            }) {
+            if first_post_merge_offset
+                .is_some_and(|offset| block_span.is_some_and(|(begin, _)| offset < begin))
+            {
                 return Err(crate::xlsb::error::XlsbError::Unrecognized {
                     typ: "BrtMergeCells collection".to_string(),
                     val: "collection occurs after a later worksheet feature".to_string(),
@@ -892,7 +897,9 @@ impl XlsbWorkbook {
                 ));
             }
             let part = self.package.get_part(&relationship.target_partname()?)?;
-            connections = Some(crate::xlsb::connections::parse_connections_part(part.blob())?);
+            connections = Some(crate::xlsb::connections::parse_connections_part(
+                part.blob(),
+            )?);
         }
 
         let mut tables = Vec::new();
@@ -1415,6 +1422,7 @@ impl XlsbWorkbook {
             cells_reader.data_validations,
         );
         worksheet.set_conditional_formattings(cells_reader.conditional_formattings);
+        worksheet.set_web_extension_bindings(cells_reader.web_extension_bindings);
 
         Ok(worksheet)
     }
@@ -2581,8 +2589,7 @@ mod tests {
         assert!(dde.sheet_names().is_empty());
         assert_eq!(dde.declared_names(), &["Rates Item".to_string()]);
 
-        let ole_records =
-            external_data_source_records(2, "rIdPath", "Acme.Server", "Report Item");
+        let ole_records = external_data_source_records(2, "rIdPath", "Acme.Server", "Report Item");
         let ole = parse_external_link_with_relationship_type(
             &ole_records,
             Some(relationship_type::OLE_OBJECT),

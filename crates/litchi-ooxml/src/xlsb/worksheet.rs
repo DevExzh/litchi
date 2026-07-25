@@ -6,6 +6,7 @@ use crate::xlsb::conditional_formatting::ConditionalFormatting;
 use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
+use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
 use litchi_core::sheet::{
     Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet,
 };
@@ -131,6 +132,7 @@ pub struct XlsbWorksheet {
     data_validation_settings: Option<DataValidationSettings>,
     data_validation14_settings: Option<DataValidationSettings>,
     conditional_formattings: Vec<ConditionalFormatting>,
+    web_extension_bindings: Vec<XlsbWebExtensionBinding>,
 }
 
 impl XlsbWorksheet {
@@ -153,6 +155,7 @@ impl XlsbWorksheet {
             data_validation_settings: None,
             data_validation14_settings: None,
             conditional_formattings: Vec::new(),
+            web_extension_bindings: Vec::new(),
         }
     }
 
@@ -222,6 +225,10 @@ impl XlsbWorksheet {
         self.conditional_formattings = conditional_formattings;
     }
 
+    pub(crate) fn set_web_extension_bindings(&mut self, bindings: Vec<XlsbWebExtensionBinding>) {
+        self.web_extension_bindings = bindings;
+    }
+
     /// Get all merged cells
     pub fn merged_cells(&self) -> &[MergedCell] {
         &self.merged_cells
@@ -280,6 +287,11 @@ impl XlsbWorksheet {
     /// Conditional-formatting blocks in worksheet stream order.
     pub fn conditional_formattings(&self) -> &[ConditionalFormatting] {
         &self.conditional_formattings
+    }
+
+    /// Inert Office Add-in range bindings in worksheet stream order.
+    pub fn web_extension_bindings(&self) -> &[XlsbWebExtensionBinding] {
+        &self.web_extension_bindings
     }
 }
 

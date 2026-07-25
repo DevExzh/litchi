@@ -11,9 +11,10 @@ use crate::xlsb::formula::{
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::record_types;
+use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
 use crate::xlsb::writer::RecordWriter;
 use litchi_core::sheet::CellValue;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::io::Write;
 
 /// Cell data for storage
@@ -115,6 +116,8 @@ pub struct MutableXlsbWorksheet {
     data_validation14_settings: DataValidationSettings,
     /// Conditional formatting rules.
     conditional_formattings: Vec<ConditionalFormatting>,
+    /// Inert Office Add-in range bindings.
+    web_extension_bindings: Vec<XlsbWebExtensionBinding>,
     /// Array and shared formula definitions. Cell records contain only a
     /// `PtgExp` reference to one of these definitions.
     formula_groups: Vec<FormulaGroup>,
@@ -231,6 +234,7 @@ impl MutableXlsbWorksheet {
             data_validation_settings: DataValidationSettings::default(),
             data_validation14_settings: DataValidationSettings::default(),
             conditional_formattings: Vec::new(),
+            web_extension_bindings: Vec::new(),
             formula_groups: Vec::new(),
             formula_group_sources: BTreeMap::new(),
             tables: Vec::new(),
@@ -973,11 +977,7 @@ impl MutableXlsbWorksheet {
                 "worksheet table count exceeds the safety limit".to_string(),
             ));
         }
-        if table
-            .display_name
-            .as_deref()
-            .is_none_or(str::is_empty)
-        {
+        if table.display_name.as_deref().is_none_or(str::is_empty) {
             return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                 "structured table requires a display name".to_string(),
             ));
@@ -1069,6 +1069,37 @@ impl MutableXlsbWorksheet {
     /// Get all conditional formatting blocks.
     pub fn conditional_formattings(&self) -> &[ConditionalFormatting] {
         &self.conditional_formattings
+    }
+
+    /// Replace worksheet Office Add-in bindings after validating their payloads
+    /// and unique application references.
+    pub fn set_web_extension_bindings(
+        &mut self,
+        bindings: Vec<XlsbWebExtensionBinding>,
+    ) -> XlsbResult<()> {
+        let mut app_refs = HashSet::with_capacity(bindings.len());
+        for binding in &bindings {
+            binding.to_payload()?;
+            if !app_refs.insert(binding.application_reference.as_str()) {
+                return Err(XlsbError::Unrecognized {
+                    typ: "WEBEXTENSIONS".to_string(),
+                    val: "duplicate binding appRef".to_string(),
+                });
+            }
+        }
+        if bindings.len() > 65_536 {
+            return Err(XlsbError::Unrecognized {
+                typ: "WEBEXTENSIONS".to_string(),
+                val: "binding count exceeds 65,536".to_string(),
+            });
+        }
+        self.web_extension_bindings = bindings;
+        Ok(())
+    }
+
+    /// Office Add-in bindings that will be written to this worksheet.
+    pub fn web_extension_bindings(&self) -> &[XlsbWebExtensionBinding] {
+        &self.web_extension_bindings
     }
 
     /// Get the number of non-empty cells
@@ -1251,6 +1282,14 @@ impl MutableXlsbWorksheet {
                 writer,
                 &self.conditional_formattings,
             )?;
+        }
+
+        if !self.web_extension_bindings.is_empty() {
+            writer.write_record(record_types::BEGIN_WEB_EXTENSIONS, &[])?;
+            for binding in &self.web_extension_bindings {
+                writer.write_record(record_types::WEB_EXTENSION, &binding.to_payload()?)?;
+            }
+            writer.write_record(record_types::END_WEB_EXTENSIONS, &[])?;
         }
 
         // Write table references (BrtBeginListParts / BrtListPart /
@@ -2118,7 +2157,10 @@ mod tests {
     use crate::xlsb::data_validation::DataValidation;
     use crate::xlsb::hyperlinks::Hyperlink;
     use crate::xlsb::merged_cells::MergedCell;
+    use crate::xlsb::records::XlsbRecordIter;
+    use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
     use litchi_core::binary;
+    use std::io::Cursor;
 
     #[test]
     fn test_set_and_get_cell() {
@@ -2128,6 +2170,47 @@ mod tests {
 
         assert_eq!(sheet.get_cell(0, 0).and_then(|v| v.as_str()), Some("Hello"));
         assert_eq!(sheet.get_cell(1, 1).and_then(|v| v.as_float()), Some(42.0));
+    }
+
+    #[test]
+    fn writes_worksheet_web_extension_collection() {
+        let formula = CellParsedFormula {
+            rgce: vec![0x3B, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
+            rgcb: Vec::new(),
+        };
+        let binding =
+            XlsbWebExtensionBinding::new("sales-table", formula, |index| index == 0).unwrap();
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet
+            .set_web_extension_bindings(vec![binding.clone()])
+            .unwrap();
+        let mut buffer = Vec::new();
+        let mut writer = RecordWriter::new(&mut buffer);
+        let mut shared_strings = crate::xlsb::writer::MutableSharedStringsWriter::new();
+        sheet.write(&mut writer, &mut shared_strings).unwrap();
+
+        let records = XlsbRecordIter::new(Cursor::new(buffer))
+            .collect::<XlsbResult<Vec<_>>>()
+            .unwrap();
+        let begin = records
+            .iter()
+            .position(|record| record.header.record_type == record_types::BEGIN_WEB_EXTENSIONS)
+            .unwrap();
+        assert!(records[begin].data.is_empty());
+        assert_eq!(
+            records[begin + 1].header.record_type,
+            record_types::WEB_EXTENSION
+        );
+        assert_eq!(
+            XlsbWebExtensionBinding::parse_payload(&records[begin + 1].data, |index| index == 0)
+                .unwrap(),
+            binding
+        );
+        assert_eq!(
+            records[begin + 2].header.record_type,
+            record_types::END_WEB_EXTENSIONS
+        );
+        assert!(records[begin + 2].data.is_empty());
     }
 
     #[test]
