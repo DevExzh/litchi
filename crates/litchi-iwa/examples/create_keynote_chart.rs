@@ -4,9 +4,11 @@ use std::env;
 
 use litchi_iwa::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartData, ChartGapPercentage, ChartGapSpacing,
-    ChartKind, ChartRoundedCorners, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartAxisTickMarkLocation, ChartCornerRadius, ChartData, ChartErrorBarDirection,
+    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
+    ChartKind, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAffixes,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -209,10 +211,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_legend_visibility(true)?,
         ],
     )?;
+    editor.set_slide_chart_series_error_bars(
+        0,
+        chart.drawable_object_id,
+        &[
+            ChartSeriesErrorBars::FixedValue {
+                direction: ChartErrorBarDirection::PositiveAndNegative,
+                value: ChartErrorBarFixedValue::new(12.5)?,
+            },
+            ChartSeriesErrorBars::Percentage {
+                direction: ChartErrorBarDirection::PositiveOnly,
+                percentage: ChartErrorBarPercentage::new(17)?,
+            },
+        ],
+    )?;
+    editor.set_slide_chart_series_error_bar_auto_fits(
+        0,
+        chart.drawable_object_id,
+        &[
+            ChartSeriesErrorBarAutoFit::Disabled,
+            ChartSeriesErrorBarAutoFit::Enabled,
+        ],
+    )?;
     editor.set_slide_chart_caption(0, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Keynote {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, explicitly number-formatted currency-affixed data value labels placed outside with per-series Auto-Fit, linear and moving-average series trendlines, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
+        "created Keynote {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label, line, and legend, visible category-axis series names, explicitly number-formatted currency-affixed data value labels placed outside with per-series Auto-Fit, linear and moving-average series trendlines, fixed and percentage series error bars with per-series Auto-Fit, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
         chart.kind, chart.drawable_object_id, chart.slide_index
     );
     Ok(())

@@ -454,6 +454,66 @@ pub(crate) fn rewrite_repeated_varint_fields(
     Ok(output)
 }
 
+/// Return every occurrence of an unpacked repeated fixed64 field.
+pub(crate) fn repeated_fixed64_values(data: &[u8], field_number: u32) -> Result<Vec<u64>> {
+    parse_wire_fields(data)?
+        .into_iter()
+        .filter(|field| field.number == field_number)
+        .map(|field| {
+            require_wire_type(&field, 1, "fixed64")?;
+            let bytes: [u8; 8] = data[field.payload_start..field.end]
+                .try_into()
+                .map_err(|_| Error::InvalidFormat("truncated protobuf fixed64".to_owned()))?;
+            Ok(u64::from_le_bytes(bytes))
+        })
+        .collect()
+}
+
+/// Replace an unpacked repeated fixed64 field while preserving unrelated bytes.
+pub(crate) fn rewrite_repeated_fixed64_fields(
+    data: &[u8],
+    field_number: u32,
+    replacements: &[u64],
+) -> Result<Vec<u8>> {
+    let fields = parse_wire_fields(data)?;
+    let matches = fields
+        .into_iter()
+        .filter(|field| field.number == field_number)
+        .collect::<Vec<_>>();
+    for field in &matches {
+        require_wire_type(field, 1, "fixed64")?;
+    }
+    if matches.is_empty() {
+        let mut output = data.to_vec();
+        for replacement in replacements {
+            append_scalar_field(&mut output, field_number, 1, &replacement.to_le_bytes())?;
+        }
+        return Ok(output);
+    }
+
+    let capacity = data
+        .len()
+        .checked_add(replacements.len().saturating_mul(10))
+        .ok_or_else(|| Error::InvalidFormat("protobuf output size overflow".to_owned()))?;
+    let mut output = Vec::with_capacity(capacity);
+    let mut copied = 0usize;
+    for (index, field) in matches.iter().enumerate() {
+        output.extend_from_slice(&data[copied..field.start]);
+        if let Some(replacement) = replacements.get(index) {
+            output.extend_from_slice(&data[field.start..field.key_end]);
+            output.extend_from_slice(&replacement.to_le_bytes());
+        }
+        copied = field.end;
+        if index + 1 == matches.len() {
+            for replacement in &replacements[matches.len().min(replacements.len())..] {
+                append_scalar_field(&mut output, field_number, 1, &replacement.to_le_bytes())?;
+            }
+        }
+    }
+    output.extend_from_slice(&data[copied..]);
+    Ok(output)
+}
+
 /// Transform every occurrence of a repeated length-delimited field while
 /// preserving its original key bytes and the position of unrelated fields.
 pub(crate) fn transform_repeated_length_delimited_fields<F>(
@@ -803,6 +863,24 @@ mod tests {
         let mut packed = original.clone();
         append_length_delimited_field(&mut packed, 2, &[1, 2]).unwrap();
         assert!(rewrite_repeated_varint_fields(&packed, 2, &[10, 20]).is_err());
+    }
+
+    #[test]
+    fn repeated_fixed64_rewrite_preserves_slots_and_append_remove_is_exact() {
+        let mut original = varint_field(90, 1);
+        append_scalar_field(&mut original, 2, 1, &10_u64.to_le_bytes()).unwrap();
+        original.extend(varint_field(91, 2));
+        append_scalar_field(&mut original, 2, 1, &20_u64.to_le_bytes()).unwrap();
+        original.extend(varint_field(92, 3));
+
+        let changed = rewrite_repeated_fixed64_fields(&original, 2, &[11, 21, 31]).unwrap();
+        assert_eq!(repeated_fixed64_values(&changed, 2).unwrap(), [11, 21, 31]);
+        let restored = rewrite_repeated_fixed64_fields(&changed, 2, &[10, 20]).unwrap();
+        assert_eq!(restored, original);
+
+        let mut wrong_wire = original.clone();
+        wrong_wire.extend(varint_field(2, 30));
+        assert!(rewrite_repeated_fixed64_fields(&wrong_wire, 2, &[10, 20]).is_err());
     }
 
     #[test]

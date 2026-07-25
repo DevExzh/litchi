@@ -23,6 +23,8 @@ mod pie_labels;
 mod pie_start_angle;
 mod pie_wedge_explosion;
 mod rounded_corners;
+mod series_error_bar_auto_fit;
+mod series_error_bars;
 mod series_trendline;
 mod series_value_label_affixes;
 mod series_value_label_auto_fit;

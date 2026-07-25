@@ -6,10 +6,11 @@ use std::path::PathBuf;
 use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
-    ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
-    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
+    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
+    ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
+    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
+    ChartSeriesIndex, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
     ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
     ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
@@ -2996,6 +2997,157 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
     );
     assert!(ChartSeriesTrendline::unsupported(1).is_err());
     assert!(ChartSeriesTrendlinePolynomialOrder::new(7).is_err());
+    assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_native_series_error_bar_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let defaults = vec![ChartSeriesErrorBars::None; 2];
+    let customized = vec![
+        ChartSeriesErrorBars::FixedValue {
+            direction: ChartErrorBarDirection::PositiveAndNegative,
+            value: ChartErrorBarFixedValue::new(12.5).unwrap(),
+        },
+        ChartSeriesErrorBars::Percentage {
+            direction: ChartErrorBarDirection::PositiveOnly,
+            percentage: ChartErrorBarPercentage::new(17).unwrap(),
+        },
+    ];
+    let default_auto_fits = vec![ChartSeriesErrorBarAutoFit::Enabled; 2];
+    let customized_auto_fits = vec![
+        ChartSeriesErrorBarAutoFit::Disabled,
+        ChartSeriesErrorBarAutoFit::Enabled,
+    ];
+
+    assert_eq!(
+        editor
+            .slide_chart_series_error_bars(0, source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    assert_eq!(
+        editor
+            .slide_chart_series_error_bar_auto_fits(0, source.drawable_object_id)
+            .unwrap(),
+        default_auto_fits
+    );
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_series_error_bars(0, source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    editor
+        .set_slide_chart_series_error_bars(0, source.drawable_object_id, &customized)
+        .unwrap();
+    editor
+        .set_slide_chart_series_error_bar_auto_fits(
+            0,
+            source.drawable_object_id,
+            &customized_auto_fits,
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_series_error_bar(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(1),
+            )
+            .unwrap(),
+        customized[1]
+    );
+    assert_eq!(
+        editor
+            .slide_chart_series_error_bar_auto_fit(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(0),
+            )
+            .unwrap(),
+        ChartSeriesErrorBarAutoFit::Disabled
+    );
+
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    for series in 0..2 {
+        editor
+            .set_slide_chart_series_error_bar(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(series),
+                ChartSeriesErrorBars::None,
+            )
+            .unwrap();
+    }
+    editor
+        .set_slide_chart_series_error_bar_auto_fits(
+            0,
+            source.drawable_object_id,
+            &default_auto_fits,
+        )
+        .unwrap();
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_series_error_bars(0, source.drawable_object_id)
+            .unwrap(),
+        defaults
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_series_error_bars(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_series_error_bar_auto_fits(0, source.drawable_object_id)
+            .unwrap(),
+        default_auto_fits
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_series_error_bar_auto_fits(0, duplicate.drawable_object_id)
+            .unwrap(),
+        customized_auto_fits
+    );
+
+    let before_rejected = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_slide_chart_series_error_bars(0, source.drawable_object_id, &customized[..1])
+            .is_err()
+    );
+    assert!(
+        reopened
+            .set_slide_chart_series_error_bar_auto_fits(
+                0,
+                source.drawable_object_id,
+                &customized_auto_fits[..1],
+            )
+            .is_err()
+    );
+    assert!(
+        reopened
+            .slide_chart_series_error_bar(
+                0,
+                source.drawable_object_id,
+                ChartSeriesIndex::from_zero_based(2),
+            )
+            .is_err()
+    );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
         .remove_slide_chart(0, source.drawable_object_id)

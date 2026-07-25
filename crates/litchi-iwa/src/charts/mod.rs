@@ -34,6 +34,8 @@ pub(crate) mod pie_labels;
 pub(crate) mod pie_start_angle;
 pub(crate) mod pie_wedge_explosion;
 pub(crate) mod rounded_corners;
+pub(crate) mod series_error_bar_auto_fit;
+pub(crate) mod series_error_bars;
 pub(crate) mod series_non_style;
 pub(crate) mod series_style;
 pub(crate) mod series_trendline;
@@ -63,6 +65,12 @@ pub use pie_labels::ChartPieLabelVisibility;
 pub use pie_start_angle::ChartPieStartAngle;
 pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
+pub use series_error_bar_auto_fit::ChartSeriesErrorBarAutoFit;
+pub use series_error_bars::{
+    ChartErrorBarCustomValue, ChartErrorBarCustomValues, ChartErrorBarDirection,
+    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartErrorBarStandardDeviationCount,
+    ChartSeriesErrorBars,
+};
 pub use series_trendline::{
     ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
     ChartSeriesTrendlinePolynomialOrder, ChartSeriesTrendlineType,

@@ -24,6 +24,8 @@ mod pie_labels;
 mod pie_start_angle;
 mod pie_wedge_explosion;
 mod rounded_corners;
+mod series_error_bar_auto_fit;
+mod series_error_bars;
 mod series_trendline;
 mod series_value_label_affixes;
 mod series_value_label_auto_fit;
@@ -570,15 +572,17 @@ mod tests {
     use super::*;
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-        ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartGapPercentage,
-        ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
-        ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesIndex,
-        ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-        ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-        ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
-        ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
-        ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-        ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+        ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius,
+        ChartErrorBarCustomValues, ChartErrorBarDirection, ChartErrorBarFixedValue,
+        ChartGapPercentage, ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility,
+        ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
+        ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesTrendline,
+        ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+        ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
+        ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
+        ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
+        ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+        ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -3988,6 +3992,162 @@ mod tests {
         );
         assert!(ChartSeriesTrendline::unsupported(1).is_err());
         assert!(ChartSeriesTrendlinePolynomialOrder::new(7).is_err());
+        assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_native_series_error_bar_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let defaults = vec![ChartSeriesErrorBars::None; 2];
+        let customized = vec![
+            ChartSeriesErrorBars::FixedValue {
+                direction: ChartErrorBarDirection::PositiveAndNegative,
+                value: ChartErrorBarFixedValue::new(12.5).unwrap(),
+            },
+            ChartSeriesErrorBars::CustomValues {
+                direction: ChartErrorBarDirection::PositiveOnly,
+                values: ChartErrorBarCustomValues::new([1.0, 2.0, 3.0], []).unwrap(),
+            },
+        ];
+        let default_auto_fits = vec![ChartSeriesErrorBarAutoFit::Enabled; 2];
+        let customized_auto_fits = vec![
+            ChartSeriesErrorBarAutoFit::Disabled,
+            ChartSeriesErrorBarAutoFit::Enabled,
+        ];
+
+        assert_eq!(
+            editor
+                .sheet_chart_series_error_bars(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            defaults
+        );
+        assert_eq!(
+            editor
+                .sheet_chart_series_error_bar_auto_fits(sheet_id, source.drawable_object_id,)
+                .unwrap(),
+            default_auto_fits
+        );
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_series_error_bars(sheet_id, source.drawable_object_id, &defaults)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        editor
+            .set_sheet_chart_series_error_bars(sheet_id, source.drawable_object_id, &customized)
+            .unwrap();
+        editor
+            .set_sheet_chart_series_error_bar_auto_fits(
+                sheet_id,
+                source.drawable_object_id,
+                &customized_auto_fits,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_series_error_bar(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartSeriesIndex::from_zero_based(1),
+                )
+                .unwrap(),
+            customized[1]
+        );
+        assert_eq!(
+            editor
+                .sheet_chart_series_error_bar_auto_fit(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartSeriesIndex::from_zero_based(0),
+                )
+                .unwrap(),
+            ChartSeriesErrorBarAutoFit::Disabled
+        );
+
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        for series in 0..2 {
+            editor
+                .set_sheet_chart_series_error_bar(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartSeriesIndex::from_zero_based(series),
+                    ChartSeriesErrorBars::None,
+                )
+                .unwrap();
+        }
+        editor
+            .set_sheet_chart_series_error_bar_auto_fits(
+                sheet_id,
+                source.drawable_object_id,
+                &default_auto_fits,
+            )
+            .unwrap();
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_series_error_bars(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            defaults
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_series_error_bars(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            customized
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_series_error_bar_auto_fits(sheet_id, source.drawable_object_id,)
+                .unwrap(),
+            default_auto_fits
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_series_error_bar_auto_fits(sheet_id, duplicate.drawable_object_id,)
+                .unwrap(),
+            customized_auto_fits
+        );
+
+        let before_rejected = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_sheet_chart_series_error_bars(
+                    sheet_id,
+                    source.drawable_object_id,
+                    &customized[..1],
+                )
+                .is_err()
+        );
+        assert!(
+            reopened
+                .set_sheet_chart_series_error_bar_auto_fits(
+                    sheet_id,
+                    source.drawable_object_id,
+                    &customized_auto_fits[..1],
+                )
+                .is_err()
+        );
+        assert!(
+            reopened
+                .sheet_chart_series_error_bar(
+                    sheet_id,
+                    source.drawable_object_id,
+                    ChartSeriesIndex::from_zero_based(2),
+                )
+                .is_err()
+        );
         assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
         reopened
             .remove_sheet_chart(sheet_id, source.drawable_object_id)
