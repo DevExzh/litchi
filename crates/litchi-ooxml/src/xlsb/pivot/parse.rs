@@ -17,15 +17,6 @@ use crate::xlsb::walker::{PayloadCursor, RecordWalker, malformed};
 const PCD_FIELD14: u16 = 1141;
 /// `BrtPCDH14` (MS-XLSB 2.4.726): named-set extension of a cache hierarchy.
 const PCD_H14: u16 = 1037;
-/// `BrtBeginPRule` / `BrtEndPRule` (MS-XLSB 2.4.186): unmodelled pivot rule.
-const BEGIN_PRULE: u16 = 247;
-const END_PRULE: u16 = 248;
-/// `BrtBeginPCDKPIs` / `BrtEndPCDKPIs` (MS-XLSB 2.4.149): unmodelled KPI collection.
-const BEGIN_PCD_KPIS: u16 = 269;
-const END_PCD_KPIS: u16 = 270;
-/// `BrtBeginPCDKPI` / `BrtEndPCDKPI` (MS-XLSB 2.4.148): unmodelled KPI.
-const BEGIN_PCD_KPI: u16 = 271;
-const END_PCD_KPI: u16 = 272;
 
 // `BrtBeginPivotCacheDef` flags byte 1 (MS-XLSB 2.4.168).
 const DEF_SAVE_DATA: u8 = 1 << 0;

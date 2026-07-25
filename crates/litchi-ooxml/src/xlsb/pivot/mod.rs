@@ -16,6 +16,7 @@
 
 mod model;
 mod parse;
+pub(crate) mod write;
 
 pub use model::*;
 pub use parse::parse_pivot_cache_definition;

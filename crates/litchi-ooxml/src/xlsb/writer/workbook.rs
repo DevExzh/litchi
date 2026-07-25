@@ -52,6 +52,7 @@ pub struct XlsbWorkbookWriter {
     calculation_properties: CalculationProperties,
     is_1904: bool,
     connections: Option<crate::xlsb::connections::XlsbConnections>,
+    pivot_caches: Vec<(u32, Vec<u8>)>,
 }
 
 /// Minimal Worksheet Binary Index payload for an empty worksheet.
@@ -82,6 +83,7 @@ impl XlsbWorkbookWriter {
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
             connections: None,
+            pivot_caches: Vec::new(),
         }
     }
 
@@ -175,6 +177,30 @@ impl XlsbWorkbookWriter {
         self.connections.as_ref()
     }
 
+    /// Attach a PivotCache definition (MS-XLSB 2.1.7.38) to the workbook.
+    ///
+    /// The definition is serialized immediately, so model content the
+    /// serializer cannot represent losslessly is rejected here rather than
+    /// at save time. Returns the allocated workbook PivotCache identifier
+    /// (`idSx`), unique per writer. Cache contents are stored verbatim and
+    /// are never refreshed, contacted, or evaluated.
+    pub fn add_pivot_cache(
+        &mut self,
+        definition: &crate::xlsb::pivot::PivotCacheDefinition,
+    ) -> XlsbResult<u32> {
+        let bytes = crate::xlsb::pivot::write::write_pivot_cache_definition(definition)?;
+        let cache_id = u32::try_from(self.pivot_caches.len())
+            .ok()
+            .and_then(|next| next.checked_add(1))
+            .ok_or_else(|| {
+                crate::xlsb::error::XlsbError::InvalidFormula(
+                    "PivotCache identifier overflow".to_string(),
+                )
+            })?;
+        self.pivot_caches.push((cache_id, bytes));
+        Ok(cache_id)
+    }
+
     /// Get a mutable reference to a worksheet by index
     pub fn get_worksheet_mut(&mut self, index: usize) -> Option<&mut MutableXlsbWorksheet> {
         self.worksheets.get_mut(index)
@@ -245,6 +271,21 @@ impl XlsbWorkbookWriter {
                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
                     "connections.bin",
                 );
+        }
+
+        // PivotCache Definition parts (one per attached cache, related from
+        // the workbook part; the relationships and BrtBeginPivotCacheID
+        // records were already emitted by add_workbook_part).
+        for (index, (_cache_id, bytes)) in self.pivot_caches.iter().enumerate() {
+            let cache_uri = PackURI::new(format!(
+                "/xl/pivotCache/pivotCacheDefinition{}.bin",
+                index + 1
+            ))?;
+            package.add_part(Box::new(BlobPart::new(
+                cache_uri,
+                "application/vnd.ms-excel.pivotCacheDefinition".to_string(),
+                bytes.clone(),
+            )));
         }
 
         // Save package to output
@@ -505,21 +546,19 @@ impl XlsbWorkbookWriter {
         package: &mut OpcPackage,
         formula_sheet_ranges: &[(u32, u32)],
     ) -> XlsbResult<()> {
-        let mut workbook_data = Vec::new();
-        let mut writer = RecordWriter::new(&mut workbook_data);
-
-        // Write workbook structure
-        self.write_workbook(&mut writer, formula_sheet_ranges)?;
-
-        // Create workbook part
+        // Create the workbook part with an empty blob first so that all
+        // relationships are attached (with concrete IDs) before the workbook
+        // stream is serialized: BrtBeginPivotCacheID records reference
+        // relationship IDs.
         let workbook_uri = PackURI::new("/xl/workbook.bin")?;
         let mut workbook_part = BlobPart::new(
             workbook_uri.clone(),
             "application/vnd.ms-excel.sheet.binary.macroEnabled.main".to_string(),
-            workbook_data,
+            Vec::new(),
         );
 
         // Add relationships from workbook to worksheets and styles
+        let mut pivot_cache_rel_ids = Vec::with_capacity(self.pivot_caches.len());
         {
             let rels = workbook_part.rels_mut();
             for i in 0..self.worksheets.len() {
@@ -549,7 +588,23 @@ impl XlsbWorkbookWriter {
                 "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
                 "theme/theme1.xml",
             );
+
+            // PivotCache Definition relationships; the BrtBeginPivotCacheID
+            // records below carry these relationship IDs.
+            for (index, (cache_id, _)) in self.pivot_caches.iter().enumerate() {
+                let relationship = rels.get_or_add(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
+                    &format!("pivotCache/pivotCacheDefinition{}.bin", index + 1),
+                );
+                pivot_cache_rel_ids.push((*cache_id, relationship.r_id().to_string()));
+            }
         }
+
+        // Write workbook structure
+        let mut workbook_data = Vec::new();
+        let mut writer = RecordWriter::new(&mut workbook_data);
+        self.write_workbook(&mut writer, formula_sheet_ranges, &pivot_cache_rel_ids)?;
+        workbook_part.set_blob(workbook_data);
 
         // Add part to package
         package.add_part(Box::new(workbook_part));
@@ -574,6 +629,7 @@ impl XlsbWorkbookWriter {
     /// BrtWbProp (0x0099)
     /// [BrtBeginBookViews/BrtBookView/BrtEndBookViews]
     /// BrtBeginBundleShs / BrtBundleSh / BrtEndBundleShs (0x008F / 0x009C / 0x0090)
+    /// [BrtBeginPivotCacheIDs / BrtBeginPivotCacheID / BrtEndPivotCacheID / BrtEndPivotCacheIDs]
     /// BrtBeginExternals / BrtSupSelf / BrtExternSheet / BrtEndExternals
     /// [BrtCalcProp]
     /// BrtEndBook (0x0084)
@@ -585,6 +641,7 @@ impl XlsbWorkbookWriter {
         &self,
         writer: &mut RecordWriter<W>,
         formula_sheet_ranges: &[(u32, u32)],
+        pivot_cache_rel_ids: &[(u32, String)],
     ) -> XlsbResult<()> {
         // BrtBeginBook
         writer.write_record(record_types::BEGIN_BOOK, &[])?;
@@ -603,6 +660,9 @@ impl XlsbWorkbookWriter {
         // BrtBeginBundleShs / BrtBundleSh / BrtEndBundleShs - sheet metadata
         self.write_bundle_sheets(writer)?;
 
+        // PivotCache identifiers, if any caches were attached.
+        Self::write_pivot_cache_ids(writer, pivot_cache_rel_ids)?;
+
         // EXTERNALS block with self-references, mirroring SheetJS and
         // [MS-XLSB] examples. This creates a minimal but fully valid
         // extern sheet table for the workbook.
@@ -619,6 +679,30 @@ impl XlsbWorkbookWriter {
         // BrtEndBook
         writer.write_record(record_types::END_BOOK, &[])?;
 
+        Ok(())
+    }
+
+    /// Write the PivotCache ID collection (BrtBeginPivotCacheIDs,
+    /// MS-XLSB 2.4.170): one BrtBeginPivotCacheID record per attached cache,
+    /// pairing the workbook cache identifier (`idSx`) with the relationship
+    /// ID of its PivotCache Definition part.
+    fn write_pivot_cache_ids<W: Write>(
+        writer: &mut RecordWriter<W>,
+        pivot_cache_rel_ids: &[(u32, String)],
+    ) -> XlsbResult<()> {
+        if pivot_cache_rel_ids.is_empty() {
+            return Ok(());
+        }
+        writer.write_record(record_types::BEGIN_PIVOT_CACHE_IDS, &[])?;
+        for (cache_id, rel_id) in pivot_cache_rel_ids {
+            let mut data = Vec::with_capacity(rel_id.len() * 2 + 8);
+            let mut temp_writer = RecordWriter::new(&mut data);
+            temp_writer.write_u32(*cache_id)?;
+            temp_writer.write_wide_string(rel_id)?;
+            writer.write_record(record_types::BEGIN_PIVOT_CACHE_ID, &data)?;
+            writer.write_record(record_types::END_PIVOT_CACHE_ID, &[])?;
+        }
+        writer.write_record(record_types::END_PIVOT_CACHE_IDS, &[])?;
         Ok(())
     }
 
