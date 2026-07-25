@@ -896,6 +896,34 @@ impl Package {
         crate::pptx::theme::attach_theme_to_master(&mut self.opc, master_part_name, theme_part_name)
     }
 
+    /// Store a theme override on a slide layout or slide part.
+    ///
+    /// The override is validated and serialized deterministically; an
+    /// existing override relationship on the parent is reused, otherwise a
+    /// new `/ppt/theme/themeOverrideN.xml` part and relationship are
+    /// created. Returns the override part name.
+    pub fn store_theme_override(
+        &mut self,
+        parent_part_name: &str,
+        value: &crate::pptx::ThemeOverride,
+    ) -> Result<String> {
+        crate::pptx::store_theme_override(&mut self.opc, parent_part_name, value)
+    }
+
+    /// Read the theme override attached to a slide layout or slide part.
+    pub fn theme_override(
+        &self,
+        parent_part_name: &str,
+    ) -> Result<Option<crate::pptx::ThemeOverride>> {
+        crate::pptx::theme_override(&self.opc, parent_part_name)
+    }
+
+    /// Remove the theme override from a slide layout or slide part,
+    /// deleting the override part when it becomes orphaned.
+    pub fn remove_theme_override(&mut self, parent_part_name: &str) -> Result<bool> {
+        crate::pptx::remove_theme_override(&mut self.opc, parent_part_name)
+    }
+
     /// Replace the color scheme (`a:clrScheme`) of an existing theme part,
     /// leaving the rest of the part untouched.
     pub fn store_theme_color_scheme(

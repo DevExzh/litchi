@@ -28,11 +28,15 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::BlobPart;
 use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use std::fmt::Write as FmtWrite;
 
 const A_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_THEME_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/theme";
+const STRICT_THEME_OVERRIDE_REL: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/themeOverride";
 
 /// Bounded-input ceiling for every theme part this module parses or patches.
 const MAX_PART_XML_BYTES: usize = 8 * 1024 * 1024;
@@ -61,6 +65,10 @@ const DEFAULT_FORMAT_SCHEME_XML: &str = "<a:fmtScheme name=\"Office\"><a:fillSty
 
 fn invalid(message: impl Into<String>) -> OoxmlError {
     OoxmlError::InvalidFormat(message.into())
+}
+
+fn limit(what: &str) -> OoxmlError {
+    invalid(format!("{what} exceeds the supported safety limit"))
 }
 
 // ============================================================================
@@ -187,6 +195,41 @@ impl SystemColorKind {
             Self::WindowFrame => "windowFrame",
             Self::WindowText => "windowText",
         }
+    }
+
+    /// Parse a system color token (`ST_SystemColorVal`).
+    pub fn from_token(token: &str) -> Option<Self> {
+        Some(match token {
+            "activeBorder" => Self::ActiveBorder,
+            "activeCaption" => Self::ActiveCaption,
+            "appWorkspace" => Self::AppWorkspace,
+            "background" => Self::Background,
+            "btnFace" => Self::ButtonFace,
+            "btnHighlight" => Self::ButtonHighlight,
+            "btnShadow" => Self::ButtonShadow,
+            "btnText" => Self::ButtonText,
+            "captionText" => Self::CaptionText,
+            "gradientActiveCaption" => Self::GradientActiveCaption,
+            "gradientInactiveCaption" => Self::GradientInactiveCaption,
+            "grayText" => Self::GrayText,
+            "highlight" => Self::Highlight,
+            "highlightText" => Self::HighlightText,
+            "hotLight" => Self::HotLight,
+            "inactiveBorder" => Self::InactiveBorder,
+            "inactiveCaption" => Self::InactiveCaption,
+            "inactiveCaptionText" => Self::InactiveCaptionText,
+            "infoBk" => Self::InfoBackground,
+            "infoText" => Self::InfoText,
+            "menu" => Self::Menu,
+            "menuBar" => Self::MenuBar,
+            "menuHighlight" => Self::MenuHighlight,
+            "menuText" => Self::MenuText,
+            "scrollBar" => Self::ScrollBar,
+            "window" => Self::Window,
+            "windowFrame" => Self::WindowFrame,
+            "windowText" => Self::WindowText,
+            _ => return None,
+        })
     }
 }
 
@@ -520,8 +563,391 @@ pub fn store_theme_font_scheme(
 }
 
 // ============================================================================
-// Graph validation
+// Theme overrides
 // ============================================================================
+
+/// A theme override (`a:themeOverride`, ECMA-376 §14.2.7): the color and/or
+/// font scheme a slide layout or slide applies on top of its master's theme.
+///
+/// Format-scheme overrides are not modeled; unknown content is tolerated on
+/// read and never fabricated on write.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ThemeOverride {
+    /// The overriding color scheme.
+    pub color_scheme: Option<ThemeColorScheme>,
+    /// The overriding font scheme.
+    pub font_scheme: Option<ThemeFontScheme>,
+}
+
+impl ThemeOverride {
+    /// An empty override; attach schemes with the `with_*` builders.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the overriding color scheme.
+    pub fn with_color_scheme(mut self, scheme: ThemeColorScheme) -> Self {
+        self.color_scheme = Some(scheme);
+        self
+    }
+
+    /// Set the overriding font scheme.
+    pub fn with_font_scheme(mut self, scheme: ThemeFontScheme) -> Self {
+        self.font_scheme = Some(scheme);
+        self
+    }
+}
+
+impl ThemeColorSlot {
+    /// Parse a slot element name (`dk1`, `lt1`, ...).
+    pub fn from_token(token: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|slot| slot.as_str() == token)
+    }
+}
+
+/// Serialize a theme override part (`a:themeOverride` root).
+fn theme_override_xml(value: &ThemeOverride) -> Result<String> {
+    let mut xml = String::with_capacity(1024);
+    xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+    xml.push_str(r#"<a:themeOverride xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#);
+    if let Some(scheme) = &value.color_scheme {
+        push_color_scheme(&mut xml, scheme, false);
+    }
+    if let Some(scheme) = &value.font_scheme {
+        push_font_scheme(&mut xml, scheme, false);
+    }
+    xml.push_str("</a:themeOverride>");
+    Ok(xml)
+}
+
+/// Parse a theme override part, tolerating unknown content.
+fn parse_theme_override(xml: &[u8]) -> Result<ThemeOverride> {
+    const MAX_OVERRIDE_XML: usize = 8 * 1024 * 1024;
+    const MAX_NODES: usize = 100_000;
+    const MAX_DEPTH: usize = 64;
+    const MAX_SCRIPT_FONTS: usize = 1_024;
+    if xml.len() > MAX_OVERRIDE_XML {
+        return Err(limit("theme override XML bytes"));
+    }
+    let processed = crate::common::mce::process_ooxml(xml)?;
+    if processed.len() > MAX_OVERRIDE_XML {
+        return Err(limit("processed theme override XML bytes"));
+    }
+    let mut reader = NsReader::from_reader(processed.as_ref());
+    let mut value = ThemeOverride::default();
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut root_seen = false;
+    // Which scheme collection is open: 1 = clrScheme, 2 = fontScheme.
+    let mut open_scheme: Option<u8> = None;
+    let mut current_slot: Option<ThemeColorSlot> = None;
+    let mut colors: Vec<(ThemeColorSlot, ThemeColorValue)> = Vec::new();
+    let mut color_scheme_name = String::new();
+    let mut font_scheme_name = String::new();
+    let mut major: Option<ThemeFontFace> = None;
+    let mut minor: Option<ThemeFontFace> = None;
+    let mut font_target: Option<bool> = None; // false = major, true = minor
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        let is_empty = matches!(&event, Event::Empty(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                nodes += 1;
+                if nodes > MAX_NODES {
+                    return Err(limit("theme override XML structure"));
+                }
+                let local_name = element.local_name();
+                let local = std::str::from_utf8(local_name.as_ref())
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                let is_dml = matches!(
+                    namespace,
+                    ResolveResult::Bound(Namespace(uri))
+                        if uri == crate::common::xml::DRAWINGML_NAMESPACE
+                            || uri == crate::common::xml::STRICT_DRAWINGML_NAMESPACE
+                );
+                if !root_seen {
+                    if !is_dml || local != "themeOverride" {
+                        return Err(invalid("invalid theme override root or namespace"));
+                    }
+                    root_seen = true;
+                    if !is_empty {
+                        depth = 1;
+                    }
+                    continue;
+                }
+                match open_scheme {
+                    None if is_dml && local == "clrScheme" && depth == 1 => {
+                        open_scheme = Some(1);
+                        color_scheme_name = attribute_value(&element, b"name")?.unwrap_or_default();
+                    },
+                    None if is_dml && local == "fontScheme" && depth == 1 => {
+                        open_scheme = Some(2);
+                        font_scheme_name = attribute_value(&element, b"name")?.unwrap_or_default();
+                    },
+                    Some(1) if is_dml => {
+                        if let Some(slot) = ThemeColorSlot::from_token(local) {
+                            if current_slot.replace(slot).is_some() {
+                                return Err(invalid("nested theme color slots"));
+                            }
+                        } else if let Some(slot) = current_slot {
+                            let color = match local {
+                                "srgbClr" => {
+                                    let value = attribute_value(&element, b"val")?
+                                        .ok_or_else(|| invalid("srgbClr lacks a val"))?;
+                                    ThemeColorValue::srgb(&value)?
+                                },
+                                "sysClr" => {
+                                    let token = attribute_value(&element, b"val")?
+                                        .ok_or_else(|| invalid("sysClr lacks a val"))?;
+                                    let kind = SystemColorKind::from_token(&token)
+                                        .ok_or_else(|| invalid("unknown system color kind"))?;
+                                    ThemeColorValue::system(
+                                        kind,
+                                        attribute_value(&element, b"lastClr")?.as_deref(),
+                                    )?
+                                },
+                                _ => {
+                                    return Err(invalid(
+                                        "theme color slot has no srgbClr/sysClr color",
+                                    ));
+                                },
+                            };
+                            colors.push((slot, color));
+                        }
+                    },
+                    Some(2) if is_dml => match local {
+                        "majorFont" => font_target = Some(false),
+                        "minorFont" => font_target = Some(true),
+                        "latin" | "ea" | "cs" => {
+                            let typeface = attribute_value(&element, b"typeface")?
+                                .ok_or_else(|| invalid("theme font lacks a typeface"))?;
+                            let face = if font_target == Some(true) {
+                                minor.get_or_insert_with(|| ThemeFontFace::new(""))
+                            } else {
+                                major.get_or_insert_with(|| ThemeFontFace::new(""))
+                            };
+                            match local {
+                                "latin" => face.latin = typeface,
+                                "ea" => face.ea = typeface,
+                                _ => face.cs = typeface,
+                            }
+                        },
+                        "font" => {
+                            let script = attribute_value(&element, b"script")?.unwrap_or_default();
+                            let typeface = attribute_value(&element, b"typeface")?
+                                .ok_or_else(|| invalid("theme script font lacks a typeface"))?;
+                            let face = if font_target == Some(true) {
+                                minor.get_or_insert_with(|| ThemeFontFace::new(""))
+                            } else {
+                                major.get_or_insert_with(|| ThemeFontFace::new(""))
+                            };
+                            if face.script_fonts.len() >= MAX_SCRIPT_FONTS {
+                                return Err(limit("theme script font count"));
+                            }
+                            face.script_fonts.push(ThemeScriptFont { script, typeface });
+                        },
+                        _ => {},
+                    },
+                    _ => {},
+                }
+                if !is_empty {
+                    depth += 1;
+                    if depth > MAX_DEPTH {
+                        return Err(limit("theme override XML depth"));
+                    }
+                }
+            },
+            Event::End(element) => {
+                let local = element.local_name();
+                if current_slot.is_some_and(|slot| slot.as_str().as_bytes() == local.as_ref()) {
+                    current_slot = None;
+                } else if open_scheme.is_some()
+                    && matches!(local.as_ref(), b"clrScheme" | b"fontScheme")
+                {
+                    open_scheme = None;
+                }
+                if depth == 0 {
+                    return Err(invalid("unbalanced theme override XML"));
+                }
+                depth -= 1;
+            },
+            Event::DocType(_) => return Err(invalid("DTDs are rejected")),
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if !root_seen || depth != 0 {
+        return Err(invalid("unterminated theme override document"));
+    }
+
+    if !colors.is_empty() {
+        let mut scheme = ThemeColorScheme::new(color_scheme_name);
+        for (slot, color) in colors {
+            scheme = scheme.with_color(slot, color);
+        }
+        value.color_scheme = Some(scheme);
+    }
+    if major.is_some() || minor.is_some() {
+        let major = major.ok_or_else(|| invalid("theme font scheme lacks a major font"))?;
+        let minor = minor.ok_or_else(|| invalid("theme font scheme lacks a minor font"))?;
+        value.font_scheme = Some(ThemeFontScheme::new(font_scheme_name, major, minor));
+    }
+    Ok(value)
+}
+
+fn attribute_value(element: &BytesStart<'_>, name: &[u8]) -> Result<Option<String>> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() == name {
+            let value = std::str::from_utf8(attribute.value.as_ref())
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            return Ok(Some(
+                quick_xml::escape::unescape(value)
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                    .into_owned(),
+            ));
+        }
+    }
+    Ok(None)
+}
+
+/// Store a theme override on a slide layout or slide part.
+///
+/// The override is validated (at least one scheme, complete color scheme)
+/// and serialized deterministically; an existing override relationship on
+/// the parent is reused (part content replaced, relationship id kept),
+/// otherwise a new `/ppt/theme/themeOverrideN.xml` part and relationship
+/// are created. The stored part is verified through the override parser.
+/// Returns the override part name.
+pub fn store_theme_override(
+    package: &mut OpcPackage,
+    parent_part_name: &str,
+    value: &ThemeOverride,
+) -> Result<String> {
+    if value.color_scheme.is_none() && value.font_scheme.is_none() {
+        return Err(invalid("theme override requires at least one scheme"));
+    }
+    if let Some(scheme) = &value.color_scheme {
+        require_color_scheme(scheme)?;
+    }
+    if let Some(scheme) = &value.font_scheme {
+        require_font_scheme(scheme)?;
+    }
+    let parent_uri = PackURI::new(parent_part_name)
+        .map_err(|error| OoxmlError::InvalidUri(format!("theme override parent: {error}")))?;
+    let parent = package.get_part(&parent_uri)?;
+    if !matches!(parent.content_type(), ct::PML_SLIDE | ct::PML_SLIDE_LAYOUT) {
+        return Err(invalid(
+            "theme overrides attach to slide layout or slide parts only",
+        ));
+    }
+    let xml = theme_override_xml(value)?;
+
+    // Reuse an existing override part + relationship when present.
+    let existing = parent.rels().iter().find(|relationship| {
+        matches!(relationship.reltype(), rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL)
+            && !relationship.is_external()
+    });
+    if let Some(relationship) = existing {
+        let uri = relationship.target_partname().map_err(|error| {
+            OoxmlError::InvalidRelationship(format!("theme override target: {error}"))
+        })?;
+        if package.get_part(&uri).is_err() {
+            return Err(OoxmlError::InvalidRelationship(
+                "theme override relationship targets a missing part".to_string(),
+            ));
+        }
+        package.get_part_mut(&uri)?.set_blob(xml.into_bytes());
+        // Verify the stored part parses back to the same model.
+        let stored = package.get_part(&uri)?.blob().to_vec();
+        if parse_theme_override(&stored)? != *value {
+            return Err(invalid("theme override failed read-back validation"));
+        }
+        invalidate_signatures(package)?;
+        return Ok(uri.to_string());
+    }
+
+    let index = next_part_index(package, "/ppt/theme/themeOverride", ".xml")?;
+    let uri = PackURI::new(format!("/ppt/theme/themeOverride{index}.xml"))
+        .map_err(|error| OoxmlError::InvalidUri(format!("theme override partname: {error}")))?;
+    package.add_part(Box::new(BlobPart::new(
+        uri.clone(),
+        ct::OFC_THEME_OVERRIDE.to_string(),
+        xml.into_bytes(),
+    )));
+    let target = uri.relative_ref(parent_uri.base_uri());
+    package
+        .get_part_mut(&parent_uri)?
+        .relate_to(&target, rt::THEME_OVERRIDE);
+    let stored = package.get_part(&uri)?.blob().to_vec();
+    if parse_theme_override(&stored)? != *value {
+        return Err(invalid("theme override failed read-back validation"));
+    }
+    invalidate_signatures(package)?;
+    Ok(uri.to_string())
+}
+
+/// Read the theme override attached to a slide layout or slide part.
+pub fn theme_override(package: &OpcPackage, parent_part_name: &str) -> Result<Option<ThemeOverride>> {
+    let parent_uri = PackURI::new(parent_part_name)
+        .map_err(|error| OoxmlError::InvalidUri(format!("theme override parent: {error}")))?;
+    let parent = package.get_part(&parent_uri)?;
+    let Some(relationship) = parent.rels().iter().find(|relationship| {
+        matches!(relationship.reltype(), rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL)
+            && !relationship.is_external()
+    }) else {
+        return Ok(None);
+    };
+    let uri = relationship.target_partname().map_err(|error| {
+        OoxmlError::InvalidRelationship(format!("theme override target: {error}"))
+    })?;
+    let part = package.get_part(&uri)?;
+    if part.content_type() != ct::OFC_THEME_OVERRIDE {
+        return Err(invalid("theme override part has an invalid content type"));
+    }
+    Ok(Some(parse_theme_override(part.blob())?))
+}
+
+/// Remove the theme override from a slide layout or slide part, deleting
+/// the override part when it becomes orphaned.
+pub fn remove_theme_override(package: &mut OpcPackage, parent_part_name: &str) -> Result<bool> {
+    let parent_uri = PackURI::new(parent_part_name)
+        .map_err(|error| OoxmlError::InvalidUri(format!("theme override parent: {error}")))?;
+    let parent = package.get_part(&parent_uri)?;
+    let Some(relationship) = parent.rels().iter().find(|relationship| {
+        matches!(relationship.reltype(), rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL)
+            && !relationship.is_external()
+    }) else {
+        return Ok(false);
+    };
+    let uri = relationship.target_partname().map_err(|error| {
+        OoxmlError::InvalidRelationship(format!("theme override target: {error}"))
+    })?;
+    let relationship_id = relationship.r_id().to_string();
+    package
+        .get_part_mut(&parent_uri)?
+        .rels_mut()
+        .remove(&relationship_id);
+    let orphaned = !package.iter_parts().any(|part| {
+        part.partname() != &parent_uri
+            && part.rels().iter().any(|relationship| {
+                matches!(relationship.reltype(), rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL)
+                    && !relationship.is_external()
+                    && relationship.target_partname().is_ok_and(|target| target == uri)
+            })
+    });
+    if orphaned {
+        package.remove_part(&uri);
+    }
+    invalidate_signatures(package)?;
+    Ok(true)
+}
+
 
 /// Validate the master/layout/theme graph of a package.
 ///
@@ -1341,5 +1767,110 @@ mod tests {
             .map(|relationship| relationship.r_id().to_string())
             .collect();
         assert_eq!(first_rels, second_rels);
+    }
+
+    fn default_layout_name(package: &Package) -> String {
+        package
+            .presentation()
+            .unwrap()
+            .slide_masters()
+            .unwrap()
+            .first()
+            .unwrap()
+            .slide_layouts()
+            .unwrap()
+            .first()
+            .unwrap()
+            .part()
+            .part()
+            .partname()
+            .to_string()
+    }
+
+    fn sample_override() -> ThemeOverride {
+        ThemeOverride::new()
+            .with_color_scheme(corporate_colors())
+            .with_font_scheme(corporate_fonts())
+    }
+
+    #[test]
+    fn theme_override_round_trips_through_store_and_reopen() {
+        let mut package = Package::new().unwrap();
+        let layout = default_layout_name(&package);
+        let value = sample_override();
+        let part_name = package
+            .store_theme_override(&layout, &value)
+            .unwrap();
+        assert_eq!(part_name, "/ppt/theme/themeOverride1.xml");
+
+        // Read back before and after a package round-trip.
+        assert_eq!(package.theme_override(&layout).unwrap(), Some(value.clone()));
+        let reopened = roundtrip(&package);
+        assert_eq!(reopened.theme_override(&layout).unwrap(), Some(value));
+        let uri = PackURI::new(&part_name).unwrap();
+        assert_eq!(
+            reopened.opc_package().get_part(&uri).unwrap().content_type(),
+            ct::OFC_THEME_OVERRIDE
+        );
+    }
+
+    #[test]
+    fn theme_override_replacement_reuses_part_and_relationship() {
+        let mut package = Package::new().unwrap();
+        let layout = default_layout_name(&package);
+        let first_name = package
+            .store_theme_override(&layout, &sample_override())
+            .unwrap();
+        let replacement = ThemeOverride::new().with_color_scheme(corporate_colors());
+        let second_name = package
+            .store_theme_override(&layout, &replacement)
+            .unwrap();
+        assert_eq!(first_name, second_name);
+        assert_eq!(
+            package.theme_override(&layout).unwrap(),
+            Some(replacement)
+        );
+    }
+
+    #[test]
+    fn theme_override_removal_deletes_orphaned_part() {
+        let mut package = Package::new().unwrap();
+        let layout = default_layout_name(&package);
+        let part_name = package
+            .store_theme_override(&layout, &sample_override())
+            .unwrap();
+        assert!(package.remove_theme_override(&layout).unwrap());
+        assert_eq!(package.theme_override(&layout).unwrap(), None);
+        let uri = PackURI::new(&part_name).unwrap();
+        assert!(package.opc_package().get_part(&uri).is_err());
+        // Second removal is a no-op.
+        assert!(!package.remove_theme_override(&layout).unwrap());
+    }
+
+    #[test]
+    fn theme_override_rejects_invalid_parents_and_empty_values() {
+        let mut package = Package::new().unwrap();
+        let layout = default_layout_name(&package);
+        // Empty override.
+        assert!(
+            package
+                .store_theme_override(&layout, &ThemeOverride::new())
+                .is_err()
+        );
+        // Master part is not a valid override parent.
+        let master = package.add_slide_master().unwrap();
+        assert!(
+            package
+                .store_theme_override(&master.part_name, &sample_override())
+                .is_err()
+        );
+        // Missing parent part.
+        assert!(
+            package
+                .store_theme_override("/ppt/slideLayouts/nope.xml", &sample_override())
+                .is_err()
+        );
+        // Rejections staged nothing.
+        assert_eq!(package.theme_override(&layout).unwrap(), None);
     }
 }
