@@ -75,7 +75,7 @@ pub use category_labels::{
 pub use data::ChartData;
 pub use direction::ChartSeriesDirection;
 pub use donut_inner_radius::ChartDonutInnerRadius;
-pub use font::ChartFont;
+pub use font::{ChartFont, ChartFontSize};
 pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};

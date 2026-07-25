@@ -3,7 +3,7 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{ChartData, ChartFont, ChartKind};
+use litchi_iwa::charts::{ChartData, ChartFont, ChartFontSize, ChartKind};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = Path::new(&output);
     std::fs::create_dir_all(output)?;
     let font = ChartFont::named("AvenirNext-DemiBold")?.with_bold(true);
+    let size = ChartFontSize::from_points(18.0)?;
 
     let mut numbers = NumbersDocumentBuilder::new()
         .sheet_name("Chart Font CRUD")
@@ -37,9 +38,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     numbers.set_sheet_chart_title(sheet_id, chart.drawable_object_id, "Avenir Next Demi Bold")?;
     numbers.set_sheet_chart_font(sheet_id, chart.drawable_object_id, font.clone())?;
+    numbers.set_sheet_chart_font_size(sheet_id, chart.drawable_object_id, size)?;
     assert_eq!(
         numbers.sheet_chart_font(sheet_id, chart.drawable_object_id)?,
         font
+    );
+    assert_eq!(
+        numbers.sheet_chart_font_size(sheet_id, chart.drawable_object_id)?,
+        size
     );
     numbers.save(output.join("chart-font-crate.numbers"))?;
 
@@ -57,7 +63,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     pages.set_body_chart_title(chart.drawable_object_id, "Avenir Next Demi Bold")?;
     pages.set_body_chart_font(chart.drawable_object_id, font.clone())?;
+    pages.set_body_chart_font_size(chart.drawable_object_id, size)?;
     assert_eq!(pages.body_chart_font(chart.drawable_object_id)?, font);
+    assert_eq!(pages.body_chart_font_size(chart.drawable_object_id)?, size);
     pages.save(output.join("chart-font-crate.pages"))?;
 
     let mut keynote = KeynoteDocumentBuilder::new()
@@ -75,7 +83,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     keynote.set_slide_chart_title(0, chart.drawable_object_id, "Avenir Next Demi Bold")?;
     keynote.set_slide_chart_font(0, chart.drawable_object_id, font.clone())?;
+    keynote.set_slide_chart_font_size(0, chart.drawable_object_id, size)?;
     assert_eq!(keynote.slide_chart_font(0, chart.drawable_object_id)?, font);
+    assert_eq!(
+        keynote.slide_chart_font_size(0, chart.drawable_object_id)?,
+        size
+    );
     keynote.save(output.join("chart-font-crate.key"))?;
 
     println!("created typed chart-font fixtures in {}", output.display());

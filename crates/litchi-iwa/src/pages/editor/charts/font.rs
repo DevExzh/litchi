@@ -1,11 +1,12 @@
 //! Chart-wide font CRUD for Pages body charts.
 
 use super::*;
-use crate::charts::ChartFont;
 use crate::charts::font::{
-    chart_font as read_native_font, reset_chart_font as reset_native_font,
-    set_chart_font as set_native_font,
+    chart_font as read_native_font, chart_font_size as read_native_font_size,
+    reset_chart_font as reset_native_font, reset_chart_font_size as reset_native_font_size,
+    set_chart_font as set_native_font, set_chart_font_size as set_native_font_size,
 };
+use crate::charts::{ChartFont, ChartFontSize};
 
 impl PagesEditor {
     /// Read the uniform effective font used by one body chart.
@@ -55,6 +56,58 @@ impl PagesEditor {
         *self = PagesEditor::from_bytes(&staged.to_bytes()?)?;
         Ok(true)
     }
+
+    /// Read the uniform effective point size used by one body chart.
+    pub fn body_chart_font_size(&self, drawable_object_id: u64) -> Result<ChartFontSize> {
+        let graph = body_chart_graph(self, drawable_object_id)?;
+        read_native_font_size(
+            self.package(),
+            &graph.archive_name,
+            drawable_object_id,
+            "Pages",
+        )
+    }
+
+    /// Set the uniform point size used by every semantic text slot in one chart.
+    pub fn set_body_chart_font_size(
+        &mut self,
+        drawable_object_id: u64,
+        size: ChartFontSize,
+    ) -> Result<()> {
+        let graph = body_chart_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_native_font_size(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            "Pages",
+            size,
+        )?;
+        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified.body_chart_font_size(drawable_object_id)? != size {
+            return Err(Error::InvalidFormat(
+                "Pages chart font-size update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Reset crate-owned point-size overrides to the inherited theme size.
+    pub fn reset_body_chart_font_size(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = body_chart_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        if !reset_native_font_size(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            "Pages",
+        )? {
+            return Ok(false);
+        }
+        *self = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        Ok(true)
+    }
 }
 
 #[cfg(test)]
@@ -82,11 +135,18 @@ mod tests {
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
         let inherited = editor.body_chart_font(chart.drawable_object_id).unwrap();
+        let inherited_size = editor
+            .body_chart_font_size(chart.drawable_object_id)
+            .unwrap();
         let demi = ChartFont::named("AvenirNext-DemiBold")
             .unwrap()
             .with_bold(true);
+        let large = ChartFontSize::from_points(18.0).unwrap();
         editor
             .set_body_chart_font(chart.drawable_object_id, demi.clone())
+            .unwrap();
+        editor
+            .set_body_chart_font_size(chart.drawable_object_id, large)
             .unwrap();
         let duplicate = editor
             .duplicate_body_chart(
@@ -100,11 +160,21 @@ mod tests {
                 .unwrap(),
             demi
         );
+        assert_eq!(
+            editor
+                .body_chart_font_size(duplicate.drawable_object_id)
+                .unwrap(),
+            large
+        );
         let italic = ChartFont::named("AvenirNext-Italic")
             .unwrap()
             .with_italic(true);
+        let larger = ChartFontSize::from_points(24.0).unwrap();
         editor
             .set_body_chart_font(duplicate.drawable_object_id, italic.clone())
+            .unwrap();
+        editor
+            .set_body_chart_font_size(duplicate.drawable_object_id, larger)
             .unwrap();
         assert_eq!(
             editor.body_chart_font(chart.drawable_object_id).unwrap(),
@@ -116,10 +186,33 @@ mod tests {
                 .unwrap(),
             italic
         );
+        assert_eq!(
+            editor
+                .body_chart_font_size(chart.drawable_object_id)
+                .unwrap(),
+            large
+        );
         assert!(
             editor
                 .reset_body_chart_font(duplicate.drawable_object_id)
                 .unwrap()
+        );
+        assert_eq!(
+            editor
+                .body_chart_font_size(duplicate.drawable_object_id)
+                .unwrap(),
+            larger
+        );
+        assert!(
+            editor
+                .reset_body_chart_font_size(duplicate.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .body_chart_font_size(duplicate.drawable_object_id)
+                .unwrap(),
+            inherited_size
         );
         editor
             .remove_body_chart(duplicate.drawable_object_id)
@@ -130,8 +223,25 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(
+            editor
+                .body_chart_font_size(chart.drawable_object_id)
+                .unwrap(),
+            large
+        );
+        assert!(
+            editor
+                .reset_body_chart_font_size(chart.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
             editor.body_chart_font(chart.drawable_object_id).unwrap(),
             inherited
+        );
+        assert_eq!(
+            editor
+                .body_chart_font_size(chart.drawable_object_id)
+                .unwrap(),
+            inherited_size
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }

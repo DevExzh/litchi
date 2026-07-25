@@ -91,7 +91,7 @@ pub(crate) struct ParagraphStyleLocation {
 pub(crate) struct ParagraphStyleOverrides {
     pub(crate) bold: Option<bool>,
     pub(crate) italic: Option<bool>,
-    pub(super) point_size: Option<TextPointSize>,
+    pub(crate) point_size: Option<TextPointSize>,
     pub(crate) font: Option<TextFont>,
     pub(super) font_color: Option<RgbaColor>,
     pub(super) capitalization: Option<TextCapitalization>,
@@ -143,13 +143,15 @@ impl ParagraphStyleOverrides {
             + u32::from(self.tab_stops.is_some())
     }
 
-    pub(super) fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.count() == 0
     }
 
-    pub(crate) fn is_chart_font_only(&self) -> bool {
-        (self.font.is_some() || self.bold.is_some() || self.italic.is_some())
-            && self.point_size.is_none()
+    pub(crate) fn is_chart_font_format_only(&self) -> bool {
+        (self.font.is_some()
+            || self.bold.is_some()
+            || self.italic.is_some()
+            || self.point_size.is_some())
             && self.font_color.is_none()
             && self.capitalization.is_none()
             && self.script.is_none()
