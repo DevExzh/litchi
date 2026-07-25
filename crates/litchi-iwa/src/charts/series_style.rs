@@ -23,7 +23,12 @@ pub(crate) struct ChartSeriesStyleSlot {
     message_index: usize,
 }
 
-/// Resolve every unique theme/private series style referenced by one chart.
+/// Resolve one effective series style per native series index.
+///
+/// Native documents keep the baseline styles in `series_theme_styles` and
+/// overlay sparse `series_private_styles` entries by index. Source-built
+/// charts generally own their theme-style objects directly and have no
+/// private overlays.
 pub(crate) fn chart_series_style_slots(
     package: &IWorkPackage,
     chart_archive_name: &str,
@@ -52,30 +57,51 @@ pub(crate) fn chart_series_style_slots(
             "{drawable_label} chart {drawable_object_id} has no chart archive"
         ))
     })?;
-    let private_styles = chart
-        .series_private_styles
-        .as_ref()
-        .into_iter()
-        .flat_map(|styles| styles.entries.iter().map(|entry| &entry.reference));
-    let mut seen = HashSet::new();
-    let identifiers = chart
-        .series_theme_styles
-        .iter()
-        .chain(private_styles)
-        .map(|reference| reference.identifier)
-        .map(|identifier| {
-            if identifier == 0 || !seen.insert(identifier) {
-                return Err(Error::InvalidFormat(format!(
-                    "{drawable_label} chart {drawable_object_id} has an invalid or repeated series style {identifier}"
-                )));
-            }
-            Ok(identifier)
-        })
-        .collect::<Result<Vec<_>>>()?;
-    if identifiers.is_empty() {
+    if chart.series_theme_styles.is_empty() {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} has no series styles"
         )));
+    }
+    let mut identifiers = chart
+        .series_theme_styles
+        .iter()
+        .map(|reference| reference.identifier)
+        .collect::<Vec<_>>();
+    let mut seen = HashSet::new();
+    for &identifier in &identifiers {
+        if identifier == 0 || !seen.insert(identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} has an invalid or repeated series theme style {identifier}"
+            )));
+        }
+    }
+    if let Some(private_styles) = chart.series_private_styles.as_ref() {
+        let private_count = usize::try_from(private_styles.count).map_err(|_| {
+            Error::InvalidFormat("chart private series-style count exceeds usize".to_owned())
+        })?;
+        if private_count != private_styles.entries.len() {
+            return Err(Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} declares {private_count} private series styles but stores {} entries",
+                private_styles.entries.len()
+            )));
+        }
+        let mut private_indices = HashSet::new();
+        for entry in &private_styles.entries {
+            let index = usize::try_from(entry.index).map_err(|_| {
+                Error::InvalidFormat("chart private series-style index exceeds usize".to_owned())
+            })?;
+            let identifier = entry.reference.identifier;
+            if index >= identifiers.len()
+                || !private_indices.insert(index)
+                || identifier == 0
+                || !seen.insert(identifier)
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "{drawable_label} chart {drawable_object_id} has an invalid private series style {identifier} at index {index}"
+                )));
+            }
+            identifiers[index] = identifier;
+        }
     }
 
     identifiers

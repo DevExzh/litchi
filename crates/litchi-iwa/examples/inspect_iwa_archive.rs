@@ -90,7 +90,10 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             {
                 println!("  numbers_chart_mediator={mediator:#?}");
             }
-            if matches!(message.type_, 0 | 8 | 153 | 205 | 212 | 213 | 3_056 | 5_021) {
+            if matches!(
+                message.type_,
+                0 | 8 | 153 | 205 | 212 | 213 | 3_056 | 5_021 | 5_028 | 5_029
+            ) {
                 let hex = message
                     .data
                     .iter()

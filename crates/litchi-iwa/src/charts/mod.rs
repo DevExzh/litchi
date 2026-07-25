@@ -37,6 +37,7 @@ pub(crate) mod rounded_corners;
 pub(crate) mod series_non_style;
 pub(crate) mod series_style;
 pub(crate) mod series_value_label_affixes;
+pub(crate) mod series_value_label_auto_fit;
 pub(crate) mod series_value_label_location;
 pub(crate) mod series_value_label_number_format;
 pub(crate) mod series_value_labels;
@@ -62,6 +63,7 @@ pub use pie_start_angle::ChartPieStartAngle;
 pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
 pub use series_value_label_affixes::ChartSeriesValueLabelAffixes;
+pub use series_value_label_auto_fit::ChartSeriesValueLabelAutoFit;
 pub use series_value_label_location::ChartSeriesValueLabelLocation;
 pub use series_value_label_number_format::{
     ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelFixedDecimalPlaces,

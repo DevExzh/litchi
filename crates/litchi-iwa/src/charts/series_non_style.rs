@@ -226,8 +226,6 @@ fn chart_series_non_style_graph(
     drawable_label: &str,
     series_count: usize,
 ) -> Result<ChartSeriesNonStyleGraph> {
-    let series_count_u32 = u32::try_from(series_count)
-        .map_err(|_| Error::InvalidFormat("chart series count exceeds u32".to_owned()))?;
     let chart_archive = package.archive(chart_archive_name)?;
     let chart_object = chart_archive.object(drawable_object_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -257,12 +255,12 @@ fn chart_series_non_style_graph(
     })?;
     let sparse = chart.series_non_styles.as_ref();
     if let Some(sparse) = sparse
-        && sparse.count != 0
-        && sparse.count != series_count_u32
+        && usize::try_from(sparse.count).ok() != Some(sparse.entries.len())
     {
         return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} series non-style count {} does not match series count {series_count}",
-            sparse.count
+            "{drawable_label} chart {drawable_object_id} declares {} series non-styles but stores {} entries",
+            sparse.count,
+            sparse.entries.len()
         )));
     }
     let mut slots = vec![None; series_count];
@@ -462,13 +460,9 @@ fn patch_chart_series_non_style_references(
             })
             .collect::<Result<Vec<_>>>()?;
         chart_payload.series_non_styles = Some(tsp::SparseReferenceArray {
-            count: if entries.is_empty() {
-                0
-            } else {
-                u32::try_from(identifiers.len()).map_err(|_| {
-                    Error::InvalidFormat("chart series count exceeds u32".to_owned())
-                })?
-            },
+            count: u32::try_from(entries.len()).map_err(|_| {
+                Error::InvalidFormat("chart series non-style count exceeds u32".to_owned())
+            })?,
             entries,
         });
         let data = chart.encode()?;
