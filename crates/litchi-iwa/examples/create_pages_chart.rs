@@ -16,8 +16,9 @@ use litchi_iwa::charts::{
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill,
-    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-    ShapeShadowOpacity, ShapeStroke, StrokePattern, StrokeWidth,
+    ShapeGradient, ShapeGradientAngle, ShapeShadowAngle, ShapeShadowAppearance,
+    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeStroke, StrokePattern,
+    StrokeWidth,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -53,6 +54,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_background_fill(
         chart.drawable_object_id,
         &ShapeFill::Solid(RgbaColor::new(0.85, 0.92, 1.0, 1.0, RgbColorSpace::Srgb)?),
+    )?;
+    editor.set_body_chart_series_fills(
+        chart.drawable_object_id,
+        &[
+            ShapeFill::Gradient(ShapeGradient::linear(
+                RgbaColor::new(0.95, 0.25, 0.18, 1.0, RgbColorSpace::Srgb)?,
+                RgbaColor::new(0.55, 0.05, 0.35, 1.0, RgbColorSpace::Srgb)?,
+                ShapeGradientAngle::from_degrees(0.0)?,
+            )),
+            ShapeFill::Solid(RgbaColor::new(0.10, 0.65, 0.35, 1.0, RgbColorSpace::Srgb)?),
+        ],
     )?;
     editor.set_body_chart_border_visible(chart.drawable_object_id, true)?;
     editor.set_body_chart_border_stroke(

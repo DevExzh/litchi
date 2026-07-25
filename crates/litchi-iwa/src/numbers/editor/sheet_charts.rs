@@ -26,6 +26,7 @@ mod pie_wedge_explosion;
 mod rounded_corners;
 mod series_error_bar_auto_fit;
 mod series_error_bars;
+mod series_fill;
 mod series_trendline;
 mod series_value_label_affixes;
 mod series_value_label_auto_fit;
@@ -2763,6 +2764,96 @@ mod tests {
             .remove_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
         assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_inherited_series_fill_crud() {
+        let image_bytes = fixture("test-data/images/png/lena.png");
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let defaults = editor
+            .sheet_chart_series_fills(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(defaults.len(), 2);
+        assert!(
+            defaults
+                .iter()
+                .all(|fill| matches!(fill, ShapeFill::Solid(_)))
+        );
+        assert_ne!(defaults[0], defaults[1]);
+        let baseline = editor.to_bytes().unwrap();
+        editor
+            .set_sheet_chart_series_fills(sheet_id, source.drawable_object_id, &defaults)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let first = ChartSeriesIndex::from_zero_based(0);
+        let second = ChartSeriesIndex::from_zero_based(1);
+        editor
+            .set_sheet_chart_series_fill(
+                sheet_id,
+                source.drawable_object_id,
+                first,
+                &ShapeFill::None,
+            )
+            .unwrap();
+        let image = editor
+            .set_sheet_chart_series_image_fill(
+                sheet_id,
+                source.drawable_object_id,
+                second,
+                "lena.png",
+                &image_bytes,
+                ShapeImageFillTechnique::ScaleToFit,
+                None,
+            )
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_series_fills(sheet_id, duplicate.drawable_object_id)
+                .unwrap(),
+            vec![ShapeFill::None, ShapeFill::Image(image.clone())]
+        );
+        assert_eq!(
+            editor
+                .reset_sheet_chart_series_fill(sheet_id, source.drawable_object_id, first)
+                .unwrap(),
+            defaults[0]
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_series_fill(sheet_id, source.drawable_object_id, first)
+                .unwrap(),
+            defaults[0]
+        );
+        assert_eq!(
+            reopened
+                .sheet_chart_series_fill(sheet_id, source.drawable_object_id, second)
+                .unwrap(),
+            ShapeFill::Image(image.clone())
+        );
+        assert_eq!(
+            reopened
+                .extract_media(image.data_identifier().unwrap().get())
+                .unwrap(),
+            image_bytes
+        );
+        reopened
+            .remove_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        assert_eq!(reopened.media_assets().unwrap().len(), 1);
+        reopened
+            .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
+            .unwrap();
+        assert!(reopened.media_assets().unwrap().is_empty());
     }
 
     #[test]

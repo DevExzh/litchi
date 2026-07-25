@@ -136,6 +136,14 @@ pub(crate) fn chart_series_style_slots(
 }
 
 impl ChartSeriesStyleSlot {
+    pub(crate) fn archive_name(&self) -> &str {
+        &self.archive_name
+    }
+
+    pub(crate) const fn object_id(&self) -> u64 {
+        self.object_id
+    }
+
     pub(crate) fn read<T>(
         &self,
         package: &IWorkPackage,
@@ -158,6 +166,56 @@ impl ChartSeriesStyleSlot {
             )));
         }
         read(message.data.as_slice())
+    }
+
+    /// Resolve one property through the native series-style parent chain.
+    ///
+    /// Sparse private styles store only their overrides and point at a theme
+    /// style through `TSS.StyleArchive.parent`. Callers return `None` when the
+    /// current style does not define the requested property.
+    pub(crate) fn read_inherited<T>(
+        &self,
+        package: &IWorkPackage,
+        read: impl Fn(&[u8]) -> Result<Option<T>> + Copy,
+    ) -> Result<Option<T>> {
+        let mut identifier = self.object_id;
+        let mut archive_name = self.archive_name.clone();
+        let mut visited = HashSet::new();
+        loop {
+            if !visited.insert(identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "chart series style parent cycle contains {identifier}"
+                )));
+            }
+            let archive = package.archive(&archive_name)?;
+            let object = archive.object(identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!("chart series style {identifier} is missing"))
+            })?;
+            let messages = object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == SERIES_STYLE_MESSAGE_TYPE)
+                .collect::<Vec<_>>();
+            let [message] = messages.as_slice() else {
+                return Err(Error::InvalidFormat(format!(
+                    "chart series style {identifier} must have exactly one series-style payload"
+                )));
+            };
+            if let Some(value) = read(message.data.as_slice())? {
+                return Ok(Some(value));
+            }
+            let parent = tsch::ChartSeriesStyleArchive::decode(message.data.as_slice())?
+                .super_
+                .and_then(|style| style.parent)
+                .map(|reference| reference.identifier)
+                .filter(|identifier| *identifier != 0);
+            let Some(parent) = parent else {
+                return Ok(None);
+            };
+            identifier = parent;
+            archive_name =
+                unique_chart_object_archive_name(package, parent, "chart series parent style")?;
+        }
     }
 
     /// Reject a mutation that would silently affect another chart.

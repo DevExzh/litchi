@@ -1828,6 +1828,90 @@ fn scratch_presentation_supports_native_chart_background_fill_crud() {
 }
 
 #[test]
+fn scratch_presentation_supports_inherited_series_fill_crud() {
+    let image_bytes = fixture("test-data/images/png/lena.png");
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let source = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let defaults = editor
+        .slide_chart_series_fills(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(defaults.len(), 2);
+    assert!(
+        defaults
+            .iter()
+            .all(|fill| matches!(fill, ShapeFill::Solid(_)))
+    );
+    assert_ne!(defaults[0], defaults[1]);
+    let baseline = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_series_fills(0, source.drawable_object_id, &defaults)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let first = ChartSeriesIndex::from_zero_based(0);
+    let second = ChartSeriesIndex::from_zero_based(1);
+    editor
+        .set_slide_chart_series_fill(0, source.drawable_object_id, first, &ShapeFill::None)
+        .unwrap();
+    let image = editor
+        .set_slide_chart_series_image_fill(
+            0,
+            source.drawable_object_id,
+            second,
+            "lena.png",
+            &image_bytes,
+            ShapeImageFillTechnique::ScaleToFit,
+            None,
+        )
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_series_fills(0, duplicate.drawable_object_id)
+            .unwrap(),
+        vec![ShapeFill::None, ShapeFill::Image(image.clone())]
+    );
+    assert_eq!(
+        editor
+            .reset_slide_chart_series_fill(0, source.drawable_object_id, first)
+            .unwrap(),
+        defaults[0]
+    );
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_chart_series_fill(0, source.drawable_object_id, first)
+            .unwrap(),
+        defaults[0]
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_series_fill(0, source.drawable_object_id, second)
+            .unwrap(),
+        ShapeFill::Image(image.clone())
+    );
+    assert_eq!(
+        reopened
+            .extract_media(image.data_identifier().unwrap().get())
+            .unwrap(),
+        image_bytes
+    );
+    reopened
+        .remove_slide_chart(0, source.drawable_object_id)
+        .unwrap();
+    assert_eq!(reopened.media_assets().unwrap().len(), 1);
+    reopened
+        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.media_assets().unwrap().is_empty());
+}
+
+#[test]
 fn scratch_presentation_supports_native_chart_shadow_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
