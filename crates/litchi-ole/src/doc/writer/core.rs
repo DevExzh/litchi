@@ -613,9 +613,12 @@ struct TextRun {
     text: String,
     /// Character formatting
     formatting: CharacterFormatting,
-    /// Index into `DocWriter::pictures` when this run is an inline picture
-    /// (a single 0x0001 picture character).
+    /// Index into `DocWriter::pictures` when this run is a picture
+    /// (a single 0x0001 inline or 0x0008 floating picture character).
     picture_index: Option<u32>,
+    /// Index into `DocWriter::shapes` when this run is a floating
+    /// drawing-shape anchor (a single 0x0008 character).
+    shape_index: Option<u32>,
 }
 
 /// Represents a paragraph
@@ -637,6 +640,7 @@ fn writable_paragraph_from_runs(
             text: String::new(),
             formatting: CharacterFormatting::default(),
             picture_index: None,
+            shape_index: None,
         }]
     } else {
         runs.into_iter()
@@ -644,6 +648,7 @@ fn writable_paragraph_from_runs(
                 text,
                 formatting,
                 picture_index: None,
+                shape_index: None,
             })
             .collect()
     };
@@ -761,8 +766,30 @@ struct WritableTable {
 struct WriterPicture {
     /// The picture data and display dimensions.
     picture: super::images::DocPicture,
+    /// Shape id allocated at insert time (shared sequence with shapes).
+    shape_id: u32,
     /// Position and wrapping when the picture floats; `None` for inline.
     floating: Option<super::images::FloatingPosition>,
+}
+
+/// A primitive drawing shape queued for the drawing layer.
+#[derive(Debug, Clone)]
+struct WriterShape {
+    /// The shape geometry, size, and colors.
+    shape: super::shapes::DocDrawingShape,
+    /// Shape id allocated at insert time (shared sequence with pictures).
+    shape_id: u32,
+    /// Position and wrapping.
+    position: super::images::FloatingPosition,
+}
+
+/// What kind of floating content a 0x0008 anchor character refers to.
+#[derive(Debug, Clone, Copy)]
+enum FloatingAnchorKind {
+    /// Index into `DocWriter::pictures`.
+    Picture(u32),
+    /// Index into `DocWriter::shapes`.
+    Shape(u32),
 }
 
 /// DOC file writer
@@ -810,6 +837,10 @@ pub struct DocWriter {
     styles: Vec<super::stylesheet::DocStyleDefinition>,
     /// Inline pictures embedded via [`DocWriter::insert_picture`]
     pictures: Vec<WriterPicture>,
+    /// Primitive drawing shapes embedded via [`DocWriter::insert_floating_shape`]
+    shapes: Vec<WriterShape>,
+    /// Next shape id to allocate (shared by pictures and drawing shapes).
+    next_shape_id: u32,
     /// Password-to-open settings. The password is wiped when replaced, cleared, or dropped.
     encryption: Option<DocWriterEncryption>,
 }
@@ -880,6 +911,8 @@ impl DocWriter {
             numbering: NumberingWriter::new(),
             styles: Vec::new(),
             pictures: Vec::new(),
+            shapes: Vec::new(),
+            next_shape_id: super::images::FIRST_PICTURE_SHAPE_ID,
             encryption: None,
         }
     }
@@ -972,6 +1005,7 @@ impl DocWriter {
                 text: text.to_string(),
                 formatting: CharacterFormatting::default(),
                 picture_index: None,
+                shape_index: None,
             }],
             formatting: ParagraphFormatting::default(),
         });
@@ -1005,6 +1039,7 @@ impl DocWriter {
                 text: text.to_string(),
                 formatting: char_fmt,
                 picture_index: None,
+                shape_index: None,
             }],
             formatting: para_fmt,
         });
@@ -1029,6 +1064,7 @@ impl DocWriter {
                 text,
                 formatting,
                 picture_index: None,
+                shape_index: None,
             });
         }
         self.paragraphs.push(WritableParagraph {
@@ -1079,7 +1115,12 @@ impl DocWriter {
         let picture_index = u32::try_from(self.pictures.len()).map_err(|_| {
             DocWriteError::InvalidData("DOC picture count exceeds the 32-bit range".to_string())
         })?;
-        self.pictures.push(WriterPicture { picture, floating });
+        let shape_id = self.allocate_shape_id()?;
+        self.pictures.push(WriterPicture {
+            picture,
+            shape_id,
+            floating,
+        });
         self.paragraphs.push(WritableParagraph {
             runs: vec![TextRun {
                 text: anchor.to_string(),
@@ -1088,10 +1129,60 @@ impl DocWriter {
                     ..CharacterFormatting::default()
                 },
                 picture_index: Some(picture_index),
+                shape_index: None,
             }],
             formatting: ParagraphFormatting::default(),
         });
         Ok(())
+    }
+
+    /// Insert a floating primitive drawing shape anchored to its own paragraph.
+    ///
+    /// The anchor is a single 0x0008 character with sprmCFSpec applied, and
+    /// the shape is emitted into the document's drawing group (fcDggInfo
+    /// OfficeArtContent) with its position recorded in the Main Document's
+    /// PlcfSpa — the same mechanism as floating pictures ([MS-DOC] 1.3).
+    ///
+    /// Shape text (text boxes) is not supported; see
+    /// [`super::shapes::DocDrawingShape`].
+    pub fn insert_floating_shape(
+        &mut self,
+        shape: super::shapes::DocDrawingShape,
+        position: super::images::FloatingPosition,
+    ) -> Result<(), DocWriteError> {
+        let shape_index = u32::try_from(self.shapes.len()).map_err(|_| {
+            DocWriteError::InvalidData("DOC shape count exceeds the 32-bit range".to_string())
+        })?;
+        let shape_id = self.allocate_shape_id()?;
+        self.shapes.push(WriterShape {
+            shape,
+            shape_id,
+            position,
+        });
+        self.paragraphs.push(WritableParagraph {
+            runs: vec![TextRun {
+                text: "\u{0008}".to_string(),
+                formatting: CharacterFormatting {
+                    special: Some(true),
+                    ..CharacterFormatting::default()
+                },
+                picture_index: None,
+                shape_index: Some(shape_index),
+            }],
+            formatting: ParagraphFormatting::default(),
+        });
+        Ok(())
+    }
+
+    /// Allocate the next shape id from the sequence shared by pictures and
+    /// drawing shapes (group shape ids start one below the first picture id).
+    fn allocate_shape_id(&mut self) -> Result<u32, DocWriteError> {
+        let shape_id = self.next_shape_id;
+        self.next_shape_id = self
+            .next_shape_id
+            .checked_add(1)
+            .ok_or_else(|| DocWriteError::InvalidData("DOC shape ids exhausted".to_string()))?;
+        Ok(shape_id)
     }
 
     /// Add a hyperlink paragraph using Word field codes (HYPERLINK)
@@ -2583,6 +2674,7 @@ impl DocWriter {
                             text: String::new(),
                             formatting: CharacterFormatting::default(),
                             picture_index: None,
+                            shape_index: None,
                         }],
                         formatting: ParagraphFormatting::default(),
                     }],
@@ -2831,7 +2923,7 @@ impl DocWriter {
         // Per POI's TextPieceTable.writeTo() lines 427-433
         let mut text_stream = Vec::new();
         let mut data_stream: Vec<u8> = Vec::new();
-        let mut floating_anchors: Vec<(u32, u32)> = Vec::new();
+        let mut floating_anchors: Vec<(u32, FloatingAnchorKind)> = Vec::new();
         let mut current_cp = 0u32; // Character position in document
         let mut pieces = Vec::new();
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
@@ -2885,7 +2977,8 @@ impl DocWriter {
                 )?;
                 // Pictures: append the OfficeArtWordDrawing block to the
                 // Data stream and point sprmCPicLocation at it. Floating
-                // pictures also record their anchor CP for the PlcfSpa.
+                // pictures and shapes also record their anchor CP for the
+                // PlcfSpa.
                 let grpprl = if let Some(picture_index) = run.picture_index {
                     let entry = self.pictures.get(picture_index as usize).ok_or_else(|| {
                         DocWriteError::InvalidData(format!(
@@ -2897,10 +2990,12 @@ impl DocWriter {
                             "DOC Data stream exceeds 32-bit FC space".to_string(),
                         )
                     })?;
-                    let shape_id = super::images::FIRST_PICTURE_SHAPE_ID + picture_index;
-                    super::images::write_picture_block(&entry.picture, shape_id, &mut data_stream);
+                    super::images::write_picture_block(&entry.picture, entry.shape_id, &mut data_stream);
                     if entry.floating.is_some() {
-                        floating_anchors.push((current_cp + para_chars, picture_index));
+                        floating_anchors.push((
+                            current_cp + para_chars,
+                            FloatingAnchorKind::Picture(picture_index),
+                        ));
                     }
                     let mut grpprl = grpprl;
                     grpprl.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
@@ -2909,6 +3004,12 @@ impl DocWriter {
                 } else {
                     grpprl
                 };
+                if let Some(shape_index) = run.shape_index {
+                    floating_anchors.push((
+                        current_cp + para_chars,
+                        FloatingAnchorKind::Shape(shape_index),
+                    ));
+                }
 
                 // Track field characters in this run
                 let mut utf16_offset = 0u32;
@@ -3369,23 +3470,41 @@ impl DocWriter {
         fib.set_plcfsed(table_offset, section_table.len() as u32);
         table_stream.extend_from_slice(&section_table);
 
-        // Floating pictures: shape position table (PlcfSpaMom) and the drawing
-        // group (fcDggInfo OfficeArtContent) that anchors the shapes to the
-        // document's drawing layer.
+        // Floating pictures and shapes: shape position table (PlcfSpaMom) and
+        // the drawing group (fcDggInfo OfficeArtContent) that anchors the
+        // shapes to the document's drawing layer.
         if !floating_anchors.is_empty() {
             table_offset = table_stream.len() as u32;
+            // Anchors are collected in document order; keep the aCP array
+            // ascending even if a future story interleaves them.
+            floating_anchors.sort_by_key(|&(anchor_cp, _)| anchor_cp);
             let floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> = floating_anchors
                 .iter()
-                .map(|&(anchor_cp, picture_index)| {
-                    let entry = &self.pictures[picture_index as usize];
-                    super::images::FloatingShapeInfo {
-                        anchor_cp,
-                        shape_id: super::images::FIRST_PICTURE_SHAPE_ID + picture_index,
-                        picture: &entry.picture,
-                        position: entry.floating.as_ref().expect(
-                            "floating anchors are only recorded for floating pictures",
-                        ),
-                    }
+                .map(|&(anchor_cp, kind)| match kind {
+                    FloatingAnchorKind::Picture(picture_index) => {
+                        let entry = &self.pictures[picture_index as usize];
+                        super::images::FloatingShapeInfo {
+                            anchor_cp,
+                            shape_id: entry.shape_id,
+                            content: super::images::FloatingShapeContent::Picture(&entry.picture),
+                            width_twips: entry.picture.width_twips(),
+                            height_twips: entry.picture.height_twips(),
+                            position: entry.floating.as_ref().expect(
+                                "floating anchors are only recorded for floating pictures",
+                            ),
+                        }
+                    },
+                    FloatingAnchorKind::Shape(shape_index) => {
+                        let entry = &self.shapes[shape_index as usize];
+                        super::images::FloatingShapeInfo {
+                            anchor_cp,
+                            shape_id: entry.shape_id,
+                            content: super::images::FloatingShapeContent::Primitive(&entry.shape),
+                            width_twips: entry.shape.width_twips(),
+                            height_twips: entry.shape.height_twips(),
+                            position: &entry.position,
+                        }
+                    },
                 })
                 .collect();
             let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
@@ -3393,8 +3512,8 @@ impl DocWriter {
             table_stream.extend_from_slice(&plcf_spa);
             table_offset = table_stream.len() as u32;
 
-            let dgg_info =
-                super::images::build_dgg_info(&floating_shapes, self.pictures.len() as u32);
+            let total_shapes = (self.pictures.len() + self.shapes.len()) as u32;
+            let dgg_info = super::images::build_dgg_info(&floating_shapes, total_shapes);
             fib.set_dgg_info(table_offset, dgg_info.len() as u32);
             table_stream.extend_from_slice(&dgg_info);
         }
@@ -3494,7 +3613,7 @@ impl DocWriter {
         // Build text stream and piece table
         let mut text_stream = Vec::new();
         let mut data_stream: Vec<u8> = Vec::new();
-        let mut floating_anchors: Vec<(u32, u32)> = Vec::new();
+        let mut floating_anchors: Vec<(u32, FloatingAnchorKind)> = Vec::new();
         let mut current_cp = 0u32;
         let mut pieces = Vec::new();
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
@@ -3544,7 +3663,8 @@ impl DocWriter {
                 )?;
                 // Pictures: append the OfficeArtWordDrawing block to the
                 // Data stream and point sprmCPicLocation at it. Floating
-                // pictures also record their anchor CP for the PlcfSpa.
+                // pictures and shapes also record their anchor CP for the
+                // PlcfSpa.
                 let grpprl = if let Some(picture_index) = run.picture_index {
                     let entry = self.pictures.get(picture_index as usize).ok_or_else(|| {
                         DocWriteError::InvalidData(format!(
@@ -3556,10 +3676,12 @@ impl DocWriter {
                             "DOC Data stream exceeds 32-bit FC space".to_string(),
                         )
                     })?;
-                    let shape_id = super::images::FIRST_PICTURE_SHAPE_ID + picture_index;
-                    super::images::write_picture_block(&entry.picture, shape_id, &mut data_stream);
+                    super::images::write_picture_block(&entry.picture, entry.shape_id, &mut data_stream);
                     if entry.floating.is_some() {
-                        floating_anchors.push((current_cp + para_chars, picture_index));
+                        floating_anchors.push((
+                            current_cp + para_chars,
+                            FloatingAnchorKind::Picture(picture_index),
+                        ));
                     }
                     let mut grpprl = grpprl;
                     grpprl.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
@@ -3568,6 +3690,12 @@ impl DocWriter {
                 } else {
                     grpprl
                 };
+                if let Some(shape_index) = run.shape_index {
+                    floating_anchors.push((
+                        current_cp + para_chars,
+                        FloatingAnchorKind::Shape(shape_index),
+                    ));
+                }
 
                 let mut utf16_offset = 0u32;
                 for ch in run_text.chars() {
@@ -4000,23 +4128,41 @@ impl DocWriter {
         fib.set_plcfsed(table_offset, section_table.len() as u32);
         table_stream.extend_from_slice(&section_table);
 
-        // Floating pictures: shape position table (PlcfSpaMom) and the drawing
-        // group (fcDggInfo OfficeArtContent) that anchors the shapes to the
-        // document's drawing layer.
+        // Floating pictures and shapes: shape position table (PlcfSpaMom) and
+        // the drawing group (fcDggInfo OfficeArtContent) that anchors the
+        // shapes to the document's drawing layer.
         if !floating_anchors.is_empty() {
             table_offset = table_stream.len() as u32;
+            // Anchors are collected in document order; keep the aCP array
+            // ascending even if a future story interleaves them.
+            floating_anchors.sort_by_key(|&(anchor_cp, _)| anchor_cp);
             let floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> = floating_anchors
                 .iter()
-                .map(|&(anchor_cp, picture_index)| {
-                    let entry = &self.pictures[picture_index as usize];
-                    super::images::FloatingShapeInfo {
-                        anchor_cp,
-                        shape_id: super::images::FIRST_PICTURE_SHAPE_ID + picture_index,
-                        picture: &entry.picture,
-                        position: entry.floating.as_ref().expect(
-                            "floating anchors are only recorded for floating pictures",
-                        ),
-                    }
+                .map(|&(anchor_cp, kind)| match kind {
+                    FloatingAnchorKind::Picture(picture_index) => {
+                        let entry = &self.pictures[picture_index as usize];
+                        super::images::FloatingShapeInfo {
+                            anchor_cp,
+                            shape_id: entry.shape_id,
+                            content: super::images::FloatingShapeContent::Picture(&entry.picture),
+                            width_twips: entry.picture.width_twips(),
+                            height_twips: entry.picture.height_twips(),
+                            position: entry.floating.as_ref().expect(
+                                "floating anchors are only recorded for floating pictures",
+                            ),
+                        }
+                    },
+                    FloatingAnchorKind::Shape(shape_index) => {
+                        let entry = &self.shapes[shape_index as usize];
+                        super::images::FloatingShapeInfo {
+                            anchor_cp,
+                            shape_id: entry.shape_id,
+                            content: super::images::FloatingShapeContent::Primitive(&entry.shape),
+                            width_twips: entry.shape.width_twips(),
+                            height_twips: entry.shape.height_twips(),
+                            position: &entry.position,
+                        }
+                    },
                 })
                 .collect();
             let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
@@ -4024,8 +4170,8 @@ impl DocWriter {
             table_stream.extend_from_slice(&plcf_spa);
             table_offset = table_stream.len() as u32;
 
-            let dgg_info =
-                super::images::build_dgg_info(&floating_shapes, self.pictures.len() as u32);
+            let total_shapes = (self.pictures.len() + self.shapes.len()) as u32;
+            let dgg_info = super::images::build_dgg_info(&floating_shapes, total_shapes);
             fib.set_dgg_info(table_offset, dgg_info.len() as u32);
             table_stream.extend_from_slice(&dgg_info);
         }

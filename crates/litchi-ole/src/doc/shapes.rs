@@ -3,9 +3,20 @@
 //! Word documents store drawing objects (shapes, images, text boxes) in the OfficeArt
 //! format (Escher) within the "Data" stream. This module provides access to these shapes.
 
+use crate::doc::parts::fib::FileInformationBlock;
 use crate::escher::{EscherShape, EscherShapeFactory, extract_text_from_escher};
 use litchi_cfb::OleFile;
 use std::io::{Read, Seek};
+
+/// FIB index (into `FileInformationBlock::get_table_pointer`) of the
+/// `fcDggInfo`/`lcbDggInfo` pair holding the document's OfficeArtContent.
+const FIB_INDEX_DGG_INFO: usize = 50;
+
+/// OfficeArt record types used to walk the OfficeArtContent.
+const RECORD_DGG_CONTAINER: u16 = 0xF000;
+const RECORD_DG_CONTAINER: u16 = 0xF002;
+/// Size of an OfficeArt record header in bytes.
+const RECORD_HEADER_LEN: usize = 8;
 
 /// Shape information extracted from a Word document.
 #[derive(Debug, Clone)]
@@ -20,6 +31,13 @@ pub struct DocShape {
     pub is_group: bool,
     /// Child shapes (for group shapes)
     pub children: Vec<DocShape>,
+    /// Fill color as (R, G, B), when the shape sets an explicit `fillColor`.
+    pub fill_color: Option<(u8, u8, u8)>,
+    /// Line color as (R, G, B), when the shape sets an explicit `lineColor`.
+    pub line_color: Option<(u8, u8, u8)>,
+    /// The raw MSOSPT preset-geometry value ([MS-ODRAW] 2.4.24) from the
+    /// shape's OfficeArtFSP record, when the shape has preset geometry.
+    pub native_shape_type: Option<u16>,
 }
 
 impl DocShape {
@@ -35,8 +53,64 @@ impl DocShape {
                 .iter()
                 .map(Self::from_escher)
                 .collect(),
+            fill_color: escher_shape.properties.get_fill_color(),
+            line_color: escher_shape.properties.get_line_color(),
+            native_shape_type: escher_shape.native_shape_type(),
         }
     }
+}
+
+/// Extract shapes from the document's drawing group (fcDggInfo).
+///
+/// The OfficeArtContent in the table stream holds one OfficeArtWordDrawing
+/// per story; each consists of a `dgglbl` byte followed by an
+/// OfficeArtDgContainer with the story's floating shapes.
+fn extract_dgg_shapes(
+    fib: &FileInformationBlock,
+    table_stream: &[u8],
+) -> std::io::Result<Vec<DocShape>> {
+    let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_DGG_INFO) else {
+        return Ok(Vec::new());
+    };
+    if length == 0 {
+        return Ok(Vec::new());
+    }
+    let start = usize::try_from(offset).unwrap_or(usize::MAX);
+    let end = start.saturating_add(usize::try_from(length).unwrap_or(0));
+    let Some(dgg_info) = table_stream.get(start..end) else {
+        return Ok(Vec::new());
+    };
+
+    let mut shapes = Vec::new();
+    // The OfficeArtContent starts with the OfficeArtDggContainer; each
+    // OfficeArtWordDrawing after it is a dgglbl byte + OfficeArtDgContainer.
+    let (first, first_size) = match crate::escher::EscherRecord::parse(dgg_info, 0) {
+        Ok(parsed) => parsed,
+        Err(_) => return Ok(Vec::new()),
+    };
+    if first.record_type_raw != RECORD_DGG_CONTAINER {
+        return Ok(Vec::new());
+    }
+    let mut offset = first_size;
+    while offset + 1 + RECORD_HEADER_LEN <= dgg_info.len() {
+        offset += 1; // OfficeArtWordDrawing dgglbl byte
+        let Ok((record, record_size)) = crate::escher::EscherRecord::parse(dgg_info, offset)
+        else {
+            break;
+        };
+        if record.record_type_raw != RECORD_DG_CONTAINER {
+            break;
+        }
+        shapes.extend(
+            EscherShapeFactory::extract_shapes_from_drawing(
+                &dgg_info[offset..offset + record_size],
+            )?
+            .iter()
+            .map(DocShape::from_escher),
+        );
+        offset += record_size;
+    }
+    Ok(shapes)
 }
 
 /// Extract all shapes from a Word document's Data stream.
@@ -62,6 +136,38 @@ pub fn extract_shapes<R: Read + Seek>(ole: &mut OleFile<R>) -> std::io::Result<V
     let shapes = escher_shapes.iter().map(DocShape::from_escher).collect();
 
     Ok(shapes)
+}
+
+/// Extract all floating shapes from a Word document's drawing group
+/// (the `fcDggInfo` OfficeArtContent in the table stream).
+///
+/// # Arguments
+///
+/// * `ole` - The OLE file containing the document
+///
+/// # Returns
+///
+/// A vector of floating shapes found in the document, or an empty vector if
+/// the document has no drawing group.
+pub fn extract_drawing_shapes<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+) -> std::io::Result<Vec<DocShape>> {
+    let word_document = match ole.open_stream(&["WordDocument"]) {
+        Ok(stream) => stream,
+        Err(_) => return Ok(Vec::new()),
+    };
+    let fib = FileInformationBlock::parse(&word_document)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string()))?;
+    let table_stream_name = if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table_stream = match ole.open_stream(&[table_stream_name]) {
+        Ok(stream) => stream,
+        Err(_) => return Ok(Vec::new()),
+    };
+    extract_dgg_shapes(&fib, &table_stream)
 }
 
 /// Extract text from all shapes in a Word document.
@@ -117,6 +223,9 @@ mod tests {
             text,
             is_group,
             children,
+            fill_color: None,
+            line_color: None,
+            native_shape_type: None,
         }
     }
 

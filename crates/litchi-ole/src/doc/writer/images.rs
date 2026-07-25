@@ -363,7 +363,7 @@ fn picture_uid(picture: &DocPicture, shape_id: u32) -> [u8; BLIP_UID_LEN] {
 }
 
 /// Append an Escher record header ([MS-ODRAW] 2.2.1).
-fn write_record_header(
+pub(crate) fn write_record_header(
     out: &mut Vec<u8>,
     version: u16,
     instance: u16,
@@ -374,6 +374,22 @@ fn write_record_header(
     out.extend_from_slice(&ver_inst.to_le_bytes());
     out.extend_from_slice(&record_type.to_le_bytes());
     out.extend_from_slice(&payload_len.to_le_bytes());
+}
+
+/// Append an OfficeArtOPT record holding simple (non-complex) properties as
+/// (opid, value) pairs.
+pub(crate) fn write_opt_record(out: &mut Vec<u8>, properties: &[(u16, u32)]) {
+    write_record_header(
+        out,
+        VERSION_OPT,
+        properties.len() as u16,
+        RECORD_OPT,
+        properties.len() as u32 * 6,
+    );
+    for &(opid, value) in properties {
+        out.extend_from_slice(&opid.to_le_bytes());
+        out.extend_from_slice(&value.to_le_bytes());
+    }
 }
 
 /// Append the PICF picture descriptor ([MS-DOC] 2.9.161).
@@ -575,20 +591,40 @@ impl FloatingPosition {
     }
 }
 
+/// The visual content of a floating shape in the drawing layer.
+pub(crate) enum FloatingShapeContent<'a> {
+    /// A picture frame whose BLIP is stored in the blip store.
+    Picture(&'a DocPicture),
+    /// A primitive preset-geometry shape (rectangle, ellipse, ...).
+    Primitive(&'a super::shapes::DocDrawingShape),
+}
+
 /// Everything the table-stream builders need to know about one floating
-/// picture anchored in the Main Document.
+/// picture or primitive shape anchored in the Main Document.
 pub(crate) struct FloatingShapeInfo<'a> {
     /// Character position of the 0x0008 anchor character (Main Document CP).
     pub anchor_cp: u32,
-    /// Shape id, shared with the picture's Data-stream block.
+    /// Shape id, shared with the picture's Data-stream block when present.
     pub shape_id: u32,
-    /// The picture itself.
-    pub picture: &'a DocPicture,
+    /// What the shape renders.
+    pub content: FloatingShapeContent<'a>,
+    /// Display width in twips.
+    pub width_twips: u32,
+    /// Display height in twips.
+    pub height_twips: u32,
     /// Position and wrapping.
     pub position: &'a FloatingPosition,
 }
 
 impl FloatingShapeInfo<'_> {
+    /// The MSOSPT shape type for the OfficeArtFSP record instance.
+    fn shape_type(&self) -> u16 {
+        match &self.content {
+            FloatingShapeContent::Picture(_) => SHAPE_TYPE_PICTURE_FRAME,
+            FloatingShapeContent::Primitive(shape) => shape.kind().shape_type(),
+        }
+    }
+
     /// Build the Spa record for this shape.
     fn spa(&self) -> Spa {
         let left = self.position.left_twips;
@@ -597,8 +633,8 @@ impl FloatingShapeInfo<'_> {
             shape_id: self.shape_id,
             left,
             top,
-            right: left + self.picture.width_twips() as i32,
-            bottom: top + self.picture.height_twips() as i32,
+            right: left + self.width_twips as i32,
+            bottom: top + self.height_twips as i32,
             horizontal_origin: self.position.horizontal_origin,
             vertical_origin: self.position.vertical_origin,
             wrap: self.position.wrap,
@@ -649,9 +685,7 @@ const IDCL_FIRST_DRAWING: u32 = 1;
 /// cluster beyond every allocated picture shape id.
 fn spid_max(total_pictures: u32) -> u32 {
     let highest = FIRST_PICTURE_SHAPE_ID + total_pictures;
-    highest
-        .checked_add(SHAPE_IDS_PER_CLUSTER - highest % SHAPE_IDS_PER_CLUSTER)
-        .unwrap_or(u32::MAX)
+    highest.saturating_add(SHAPE_IDS_PER_CLUSTER - highest % SHAPE_IDS_PER_CLUSTER)
 }
 
 /// Build the OfficeArtContent referenced by `fcDggInfo` ([MS-DOC] 2.9.171):
@@ -678,9 +712,15 @@ pub(crate) fn build_dgg_info(shapes: &[FloatingShapeInfo<'_>], total_pictures: u
 
     // OfficeArtBStoreContainer: one FBSE (with embedded BLIP) per picture.
     let bstore_start = out.len();
-    write_record_header(&mut out, VERSION_CONTAINER, shapes.len() as u16, RECORD_BSTORE_CONTAINER, 0);
+    let picture_count = shapes
+        .iter()
+        .filter(|shape| matches!(shape.content, FloatingShapeContent::Picture(_)))
+        .count();
+    write_record_header(&mut out, VERSION_CONTAINER, picture_count as u16, RECORD_BSTORE_CONTAINER, 0);
     for shape in shapes {
-        write_bse_with_embedded_blip(&mut out, shape.picture, shape.shape_id);
+        if let FloatingShapeContent::Picture(picture) = shape.content {
+            write_bse_with_embedded_blip(&mut out, picture, shape.shape_id);
+        }
     }
     patch_record_len(&mut out, bstore_start);
 
@@ -716,23 +756,32 @@ pub(crate) fn build_dgg_info(shapes: &[FloatingShapeInfo<'_>], total_pictures: u
     out.extend_from_slice(&(SP_FLAG_GROUP | SP_FLAG_PATRIARCH).to_le_bytes());
     patch_record_len(&mut out, group_container_start);
 
-    // One picture-frame shape per floating picture.
+    // One shape per floating picture or primitive. Pictures reference their
+    // BSE through a 1-based pib index assigned in document order.
+    let mut bse_index = OPT_PIB_FIRST_BSE;
     for (index, shape) in shapes.iter().enumerate() {
         let shape_start = out.len();
         write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_SP_CONTAINER, 0);
         write_record_header(
             &mut out,
             VERSION_SP,
-            SHAPE_TYPE_PICTURE_FRAME,
+            shape.shape_type(),
             RECORD_SP,
             FSP_PAYLOAD_LEN,
         );
         out.extend_from_slice(&shape.shape_id.to_le_bytes());
         out.extend_from_slice(&(SP_FLAG_HAVE_ANCHOR | SP_FLAG_HAVE_SHAPE_TYPE).to_le_bytes());
-        // OfficeArtOPT: pib referencing this shape's BSE (1-based index).
-        write_record_header(&mut out, VERSION_OPT, 1, RECORD_OPT, OPT_PAYLOAD_LEN);
-        out.extend_from_slice(&OPT_PIB_BLIP_INDEX.to_le_bytes());
-        out.extend_from_slice(&(index as u32 + OPT_PIB_FIRST_BSE).to_le_bytes());
+        match &shape.content {
+            // OfficeArtOPT: pib referencing this picture's BSE.
+            FloatingShapeContent::Picture(_) => {
+                write_opt_record(&mut out, &[(OPT_PIB_BLIP_INDEX, bse_index)]);
+                bse_index += 1;
+            },
+            // OfficeArtOPT: fill/line colors and boolean style properties.
+            FloatingShapeContent::Primitive(primitive) => {
+                super::shapes::write_shape_opt(&mut out, primitive);
+            },
+        }
         // ClientAnchor: index of this shape's anchor CP in the PlcfSpa.
         write_record_header(&mut out, VERSION_ATOM, 0, RECORD_CLIENT_ANCHOR, WORD_CLIENT_ANCHOR_LEN);
         out.extend_from_slice(&(index as u32).to_le_bytes());
@@ -925,13 +974,17 @@ mod tests {
             FloatingShapeInfo {
                 anchor_cp: 12,
                 shape_id: FIRST_PICTURE_SHAPE_ID,
-                picture: png,
+                content: FloatingShapeContent::Picture(png),
+                width_twips: png.width_twips(),
+                height_twips: png.height_twips(),
                 position: &positions[0],
             },
             FloatingShapeInfo {
                 anchor_cp: 30,
                 shape_id: FIRST_PICTURE_SHAPE_ID + 1,
-                picture: jpeg,
+                content: FloatingShapeContent::Picture(jpeg),
+                width_twips: jpeg.width_twips(),
+                height_twips: jpeg.height_twips(),
                 position: &positions[1],
             },
         ]

@@ -61,6 +61,9 @@ pub mod numbering;
 /// Inline picture writer (OfficeArtWordDrawing blocks for the Data stream)
 pub mod images;
 
+/// Primitive drawing-shape writer (floating preset-geometry shapes)
+pub mod shapes;
+
 // Re-export public types
 pub use crate::doc::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
 pub use crate::doc::parts::pap::{
@@ -94,6 +97,7 @@ pub use images::{DocPicture, FloatingPosition, PictureFormat};
 pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, NumberingWriter};
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
+pub use shapes::{DocDrawingShape, DocShapeKind};
 pub use sprm::SprmBuilder;
 pub use stylesheet::{DocStyleDefinition, DocStyleRevision, StyleWriteError};
 pub use tap::{
