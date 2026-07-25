@@ -69,6 +69,9 @@ pub mod custom_shows;
 /// Per-slide timing support
 pub mod slide_timing;
 
+/// Table authoring (OfficeArt table groups with text cells)
+pub mod table;
+
 // Re-export public types from core
 pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
 pub use crate::ppt::encryption::PptEncryptionProfile;
@@ -92,6 +95,7 @@ pub use shape_style::{FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, Shape
 pub use shapes::{Shape, ShapeCollection, ShapeKind};
 pub use slide_timing::SlideTiming;
 pub use sound_collection::build_sound_collection;
+pub use table::{DEFAULT_COLUMN_WIDTH_PT, DEFAULT_ROW_HEIGHT_PT, MAX_TABLE_DIMENSION, Table};
 pub use text_format::{
     FontEntity, FontStyle, Paragraph, TabAlign, TabStop, TextAlign, TextColor, TextDirection,
     TextFontAlign, TextRun,

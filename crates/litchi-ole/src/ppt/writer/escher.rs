@@ -971,10 +971,27 @@ pub fn create_dg_container_with_shapes(
     drawing_id: u32,
     shapes: &[UserShapeData],
 ) -> Result<Vec<u8>, PptError> {
+    create_dg_container_with_tables(drawing_id, shapes, &[])
+}
+
+/// Create a DgContainer with user shapes and table groups.
+///
+/// Tables are emitted after the plain shapes inside the slide's
+/// SpgrContainer; each table occupies one group shape id plus one id per
+/// cell. See [`super::table::build_table_spgr_container`] for the record
+/// layout.
+pub(crate) fn create_dg_container_with_tables(
+    drawing_id: u32,
+    shapes: &[UserShapeData],
+    tables: &[super::table::PositionedTable],
+) -> Result<Vec<u8>, PptError> {
+    let table_shape_count: u32 = tables.iter().map(|table| table.table.shape_count()).sum();
     let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::DG_CONTAINER);
 
-    // Total shapes = group + background + user shapes
-    let total_shapes = (shapes.len() as u32).saturating_add(2);
+    // Total shapes = group + background + user shapes + table groups/cells
+    let total_shapes = (shapes.len() as u32)
+        .saturating_add(table_shape_count)
+        .saturating_add(2);
 
     // Add DG record
     let mut dg = EscherBuilder::new(header_version::DG, drawing_id as u16, record_type::DG);
@@ -1011,6 +1028,15 @@ pub fn create_dg_container_with_shapes(
         let shape_spid = bg_spid + 1 + (i as u32);
         let sp_container = create_user_shape_container(shape_spid, shape)?;
         spgr_container.add_data(&sp_container);
+    }
+
+    // Table groups follow the plain shapes; each table's cells take the
+    // consecutive shape ids after its group shape id.
+    let mut table_group_spid = bg_spid + 1 + (shapes.len() as u32);
+    for table in tables {
+        let table_container = super::table::build_table_spgr_container(table, table_group_spid)?;
+        spgr_container.add_data(&table_container);
+        table_group_spid += table.table.shape_count();
     }
 
     // Add SpgrContainer to DgContainer
@@ -1442,7 +1468,7 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
 /// Build ClientTextBox record with plain text content (no formatting)
 /// Based on Apache POI EscherTextboxWrapper and HSLFTextShape
 /// text_type: 0=Title, 1=Body, 2=Notes, 4=Other
-fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>, PptError> {
+pub(crate) fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>, PptError> {
     use super::records::{RecordBuilder, record_type as ppt_rt};
 
     let mut result = Vec::new();

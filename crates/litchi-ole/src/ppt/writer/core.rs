@@ -42,7 +42,7 @@ use super::blip::{BlipStoreBuilder, BlipType};
 use super::comments::SlideComment;
 use super::custom_shows::CustomShow;
 use super::escher::{
-    FreeformGeometry, UserShapeData, create_dg_container_with_shapes, create_dgg_container,
+    FreeformGeometry, UserShapeData, create_dg_container_with_tables, create_dgg_container,
     shape_type as escher_shape_type,
 };
 use super::hyperlink::{Hyperlink, HyperlinkCollection};
@@ -63,6 +63,7 @@ use super::shape_style::{
 use super::shapes::ShapeKind;
 use super::slide_timing::SlideTiming;
 use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
+use super::table::{PositionedTable, Table};
 use super::text_format::{FontEntity, Paragraph, TextAlign};
 use crate::ppt::animation::AnimationInfo;
 use crate::ppt::encryption::{
@@ -388,6 +389,8 @@ impl Default for ShapeProperties {
 struct WritableSlide {
     /// Shapes on this slide
     shapes: Vec<WritableShape>,
+    /// Tables on this slide
+    tables: Vec<PositionedTable>,
     /// Slide notes text (simple)
     notes: Option<String>,
     /// Rich notes page
@@ -405,6 +408,15 @@ struct SerializedHeaderFooters {
     notes_and_handouts: Option<Vec<u8>>,
     main_master: Option<Vec<u8>>,
     slides: Vec<Option<Vec<u8>>>,
+}
+
+impl WritableSlide {
+    /// Number of OfficeArt shapes in this slide's drawing, including the
+    /// group patriarch, the background shape, and every table group/cell.
+    fn escher_shape_count(&self) -> u32 {
+        let table_shapes: u32 = self.tables.iter().map(|t| t.table.shape_count()).sum();
+        2 + self.shapes.len() as u32 + table_shapes
+    }
 }
 
 fn append_child_to_built_container(
@@ -837,6 +849,7 @@ impl PptWriter {
         let index = self.slides.len();
         self.slides.push(WritableSlide {
             shapes: Vec::new(),
+            tables: Vec::new(),
             notes: None,
             notes_page: None,
             comments: Vec::new(),
@@ -1412,6 +1425,37 @@ impl PptWriter {
         Ok(())
     }
 
+    /// Add a table to a slide
+    ///
+    /// The table is emitted as an OfficeArt table group (group shape with
+    /// one rectangle cell shape per grid position), readable through the
+    /// table extraction APIs after save/reopen.
+    ///
+    /// # Arguments
+    ///
+    /// * `slide` - Slide index
+    /// * `x`, `y` - Position of the table's top-left corner (in points)
+    /// * `table` - Table grid, cell texts, and dimensions (see [`Table`])
+    pub fn add_table(
+        &mut self,
+        slide: usize,
+        x: i32,
+        y: i32,
+        table: Table,
+    ) -> Result<(), PptWriteError> {
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+
+        slide_data.tables.push(PositionedTable {
+            x: pt_to_emu_i32(x),
+            y: pt_to_emu_i32(y),
+            table,
+        });
+        Ok(())
+    }
+
     /// Add a picture to a slide
     ///
     /// # Arguments
@@ -1893,7 +1937,7 @@ impl PptWriter {
         let slide_shape_counts: Vec<u32> = self
             .slides
             .iter()
-            .map(|s| 2 + s.shapes.len() as u32) // 2 for group+background, plus user shapes
+            .map(|s| s.escher_shape_count()) // 2 for group+background, plus user shapes and tables
             .collect();
         // Build DggContainer with BStore if pictures are present
         let dgg = if !self.blip_store.is_empty() {
@@ -2075,7 +2119,7 @@ impl PptWriter {
                 .iter()
                 .map(|s| convert_shape_to_escher(s, &self.hyperlinks))
                 .collect();
-            let dg = create_dg_container_with_shapes(drawing_id, &escher_shapes)?;
+            let dg = create_dg_container_with_tables(drawing_id, &escher_shapes, &slide.tables)?;
             let pp_dg = wrap_dg_into_ppdrawing(&dg)?;
             slide_container.write_child(&pp_dg);
 
@@ -2276,7 +2320,7 @@ impl PptWriter {
         let slide_shape_counts: Vec<u32> = self
             .slides
             .iter()
-            .map(|s| 2 + s.shapes.len() as u32)
+            .map(|s| s.escher_shape_count())
             .collect();
         // Build DggContainer with BStore if pictures are present
         let dgg = if !self.blip_store.is_empty() {
@@ -2422,7 +2466,7 @@ impl PptWriter {
                 .iter()
                 .map(|s| convert_shape_to_escher(s, &self.hyperlinks))
                 .collect();
-            let dg = create_dg_container_with_shapes(drawing_id, &escher_shapes)?;
+            let dg = create_dg_container_with_tables(drawing_id, &escher_shapes, &slide.tables)?;
             let pp_dg = wrap_dg_into_ppdrawing(&dg)?;
             slide_container.write_child(&pp_dg);
 
