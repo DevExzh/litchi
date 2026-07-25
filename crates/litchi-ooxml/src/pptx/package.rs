@@ -10,7 +10,10 @@ use crate::ribbonx::{
     RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
     load_ribbon_customizations, store_ribbon_customization,
 };
-use crate::web_extensions::{WebExtensionTaskPanes, load_web_extension_task_panes};
+use crate::web_extensions::{
+    OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
+    remove_web_extension_task_panes, store_web_extension_task_panes,
+};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -730,6 +733,20 @@ impl Package {
     /// Load persisted Office Add-in task-pane metadata without activating add-ins.
     pub fn web_extension_task_panes(&self) -> Result<Option<WebExtensionTaskPanes>> {
         load_web_extension_task_panes(&self.opc)
+    }
+
+    /// Store inert persisted Office Add-in task panes and snapshot resources.
+    pub fn set_web_extension_task_panes(
+        &mut self,
+        task_panes: &WebExtensionTaskPanes,
+        conformance: OoxmlConformance,
+    ) -> Result<()> {
+        store_web_extension_task_panes(&mut self.opc, task_panes, conformance)
+    }
+
+    /// Remove persisted Office Add-in task panes and unreferenced resources.
+    pub fn remove_web_extension_task_panes(&mut self) -> Result<bool> {
+        remove_web_extension_task_panes(&mut self.opc)
     }
 
     /// Load all package-level RibbonX customizations without invoking callbacks.

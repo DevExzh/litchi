@@ -31,7 +31,10 @@ use crate::ribbonx::{
     RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
     load_ribbon_customizations, store_ribbon_customization,
 };
-use crate::web_extensions::{WebExtensionTaskPanes, load_web_extension_task_panes};
+use crate::web_extensions::{
+    OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
+    remove_web_extension_task_panes, store_web_extension_task_panes,
+};
 use crate::xlsx::external_links::{
     ExternalLinkConformance, ExternalLinkEntry, ExternalLinkKind,
     build_external_link_part_with_conformance, load_external_link,
@@ -281,6 +284,20 @@ impl Workbook {
         &self,
     ) -> crate::error::Result<Option<WebExtensionTaskPanes>> {
         load_web_extension_task_panes(&self.package)
+    }
+
+    /// Store inert persisted Office Add-in task panes and snapshot resources.
+    pub fn set_web_extension_task_panes(
+        &mut self,
+        task_panes: &WebExtensionTaskPanes,
+        conformance: OoxmlConformance,
+    ) -> crate::error::Result<()> {
+        store_web_extension_task_panes(&mut self.package, task_panes, conformance)
+    }
+
+    /// Remove persisted Office Add-in task panes and unreferenced resources.
+    pub fn remove_web_extension_task_panes(&mut self) -> crate::error::Result<bool> {
+        remove_web_extension_task_panes(&mut self.package)
     }
 
     /// Load all package-level RibbonX customizations without invoking callbacks.

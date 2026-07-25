@@ -6,7 +6,7 @@
 
 use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
-use litchi_opc::{OpcPackage, Part};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::Reader;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -41,6 +41,10 @@ pub const MAX_WEB_EXTENSION_XML_DEPTH: usize = 128;
 pub const MAX_WEB_EXTENSION_ITEMS: usize = 4096;
 /// Maximum aggregate decoded string bytes in one XML part.
 pub const MAX_WEB_EXTENSION_STRING_BYTES: usize = 8 * 1024 * 1024;
+/// Maximum bytes accepted for one inert snapshot image.
+pub const MAX_WEB_EXTENSION_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
+/// Maximum aggregate snapshot bytes retained from one package.
+pub const MAX_WEB_EXTENSION_TOTAL_SNAPSHOT_BYTES: usize = 256 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OoxmlConformance {
@@ -53,6 +57,13 @@ impl OoxmlConformance {
         match self {
             Self::Transitional => TRANSITIONAL_RELATIONSHIPS_NAMESPACE,
             Self::Strict => STRICT_RELATIONSHIPS_NAMESPACE,
+        }
+    }
+
+    fn image_relationship_type(self) -> &'static str {
+        match self {
+            Self::Transitional => IMAGE_RELATIONSHIP_TYPE,
+            Self::Strict => STRICT_IMAGE_RELATIONSHIP_TYPE,
         }
     }
 }
@@ -128,6 +139,28 @@ pub struct WebExtensionSnapshot {
     pub linked_relationship_id: Option<String>,
 }
 
+/// One inert image relationship owned by a web-extension snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebExtensionSnapshotResource {
+    pub relationship_id: String,
+    pub target: WebExtensionSnapshotTarget,
+}
+
+/// Internal image bytes or an external linked image target.
+///
+/// External targets are retained as strings and are never fetched.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WebExtensionSnapshotTarget {
+    Internal {
+        part_name: PackURI,
+        content_type: String,
+        data: Vec<u8>,
+    },
+    External {
+        target: String,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebExtension {
     pub id: String,
@@ -149,6 +182,7 @@ pub struct WebExtensionTaskPane {
     pub locked: bool,
     pub relationship_id: String,
     pub web_extension: WebExtension,
+    pub snapshot_resources: Vec<WebExtensionSnapshotResource>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -249,20 +283,7 @@ pub fn parse_web_extension(xml: &[u8]) -> Result<WebExtension> {
         None
     };
 
-    if is_next(&children, position, WEB_EXTENSION_NAMESPACE, "extLst")
-        || is_next(
-            &children,
-            position,
-            "http://schemas.openxmlformats.org/drawingml/2006/main",
-            "extLst",
-        )
-        || is_next(
-            &children,
-            position,
-            "http://purl.oclc.org/ooxml/drawingml/main",
-            "extLst",
-        )
-    {
+    if is_next(&children, position, WEB_EXTENSION_NAMESPACE, "extLst") {
         position += 1;
     }
     ensure_consumed(&children, position, "webextension")?;
@@ -331,6 +352,9 @@ pub fn load_web_extension_task_panes(
         .iter()
         .map(|pane| pane.relationship_id.as_str())
         .collect();
+    if referenced_ids.len() != parsed_panes.len() {
+        return invalid("task panes contain duplicate relationship IDs".into());
+    }
     for child_relationship in task_panes_part.rels().iter() {
         if child_relationship.reltype() != WEB_EXTENSION_RELATIONSHIP_TYPE {
             return invalid(format!(
@@ -348,6 +372,8 @@ pub fn load_web_extension_task_panes(
     }
 
     let mut panes = Vec::with_capacity(parsed_panes.len());
+    let mut total_snapshot_bytes = 0usize;
+    let mut extension_names = HashSet::new();
     for pane in parsed_panes {
         let child_relationship = task_panes_part
             .rels()
@@ -371,6 +397,12 @@ pub fn load_web_extension_task_panes(
                 pane.relationship_id
             ))
         })?;
+        if !extension_names.insert(extension_name.clone()) {
+            return invalid(format!(
+                "multiple task panes target web extension part '{}'",
+                extension_name.as_str()
+            ));
+        }
         let extension_part = package.get_part(&extension_name).map_err(|error| {
             OoxmlError::PartNotFound(format!(
                 "web extension part '{}': {error}",
@@ -379,7 +411,12 @@ pub fn load_web_extension_task_panes(
         })?;
         require_content_type(extension_part, WEB_EXTENSION_CONTENT_TYPE)?;
         let web_extension = parse_web_extension(extension_part.blob())?;
-        validate_snapshot_relationships(package, extension_part, &web_extension)?;
+        let snapshot_resources = load_snapshot_resources(
+            package,
+            extension_part,
+            &web_extension,
+            &mut total_snapshot_bytes,
+        )?;
         panes.push(WebExtensionTaskPane {
             dock_state: pane.dock_state,
             visible: pane.visible,
@@ -388,9 +425,461 @@ pub fn load_web_extension_task_panes(
             locked: pane.locked,
             relationship_id: pane.relationship_id,
             web_extension,
+            snapshot_resources,
         });
     }
     Ok(Some(WebExtensionTaskPanes { panes }))
+}
+
+/// Create or replace the package-level persisted task-pane graph.
+///
+/// Add-in references, bindings, properties, and snapshot resources are stored
+/// as inert data. External snapshot links are never contacted.
+pub fn store_web_extension_task_panes(
+    package: &mut OpcPackage,
+    task_panes: &WebExtensionTaskPanes,
+    conformance: OoxmlConformance,
+) -> Result<()> {
+    let task_panes_xml = write_task_panes(task_panes, conformance)?;
+    let existing = existing_web_extension_graph(package)?;
+    let task_panes_name = existing
+        .as_ref()
+        .map(|graph| graph.task_panes_name.clone())
+        .map_or_else(|| next_task_panes_part_name(package), Ok)?;
+    let mut reserved = HashSet::new();
+    reserved.insert(task_panes_name.clone());
+    let mut planned = Vec::with_capacity(task_panes.panes.len() + 1);
+    let mut task_relationships = Vec::with_capacity(task_panes.panes.len());
+    let mut total_snapshot_bytes = 0usize;
+    let mut counted_snapshot_parts = HashSet::new();
+    let existing_extensions = existing
+        .as_ref()
+        .map(|graph| &graph.extensions_by_relationship);
+
+    for (index, pane) in task_panes.panes.iter().enumerate() {
+        let extension_name = match existing_extensions
+            .and_then(|extensions| extensions.get(&pane.relationship_id))
+        {
+            Some(name) => name.clone(),
+            None => next_web_extension_part_name(package, &reserved, index + 1)?,
+        };
+        if !reserved.insert(extension_name.clone()) {
+            return invalid(format!(
+                "multiple task panes target web extension part '{}'",
+                extension_name.as_str()
+            ));
+        }
+        let extension_xml = write_web_extension(&pane.web_extension, conformance)?;
+        let mut relationships = Vec::with_capacity(pane.snapshot_resources.len());
+        for resource in &pane.snapshot_resources {
+            let (target, external) = match &resource.target {
+                WebExtensionSnapshotTarget::Internal {
+                    part_name,
+                    content_type,
+                    data,
+                } => {
+                    reserved.insert(part_name.clone());
+                    if counted_snapshot_parts.insert(part_name.clone()) {
+                        total_snapshot_bytes = total_snapshot_bytes
+                            .checked_add(data.len())
+                            .ok_or_else(|| {
+                                OoxmlError::InvalidFormat(
+                                    "aggregate snapshot byte count overflow".into(),
+                                )
+                            })?;
+                        if total_snapshot_bytes > MAX_WEB_EXTENSION_TOTAL_SNAPSHOT_BYTES {
+                            return invalid(format!(
+                                "aggregate snapshot images exceed {MAX_WEB_EXTENSION_TOTAL_SNAPSHOT_BYTES} bytes"
+                            ));
+                        }
+                    }
+                    add_or_match_planned_part(
+                        &mut planned,
+                        PlannedPart {
+                            name: part_name.clone(),
+                            content_type: content_type.clone(),
+                            data: data.clone(),
+                            relationships: Vec::new(),
+                        },
+                    )?;
+                    (part_name.relative_ref(extension_name.base_uri()), false)
+                },
+                WebExtensionSnapshotTarget::External { target } => (target.clone(), true),
+            };
+            relationships.push(PlannedRelationship {
+                id: resource.relationship_id.clone(),
+                relationship_type: conformance.image_relationship_type().into(),
+                target,
+                external,
+            });
+        }
+        add_or_match_planned_part(
+            &mut planned,
+            PlannedPart {
+                name: extension_name.clone(),
+                content_type: WEB_EXTENSION_CONTENT_TYPE.into(),
+                data: extension_xml,
+                relationships,
+            },
+        )?;
+        task_relationships.push(PlannedRelationship {
+            id: pane.relationship_id.clone(),
+            relationship_type: WEB_EXTENSION_RELATIONSHIP_TYPE.into(),
+            target: extension_name.relative_ref(task_panes_name.base_uri()),
+            external: false,
+        });
+    }
+    add_or_match_planned_part(
+        &mut planned,
+        PlannedPart {
+            name: task_panes_name.clone(),
+            content_type: TASK_PANES_CONTENT_TYPE.into(),
+            data: task_panes_xml,
+            relationships: task_relationships,
+        },
+    )?;
+
+    let old_parts = existing
+        .as_ref()
+        .map_or(&[][..], |graph| graph.owned_parts.as_slice());
+    preflight_planned_parts(package, &planned, old_parts)?;
+    install_planned_parts(package, planned, old_parts)?;
+
+    let root_relationship_id = existing
+        .as_ref()
+        .map(|graph| graph.root_relationship_id.clone())
+        .unwrap_or_else(|| next_package_relationship_id(package));
+    if existing.is_some() {
+        package.rels_mut().remove(&root_relationship_id);
+    }
+    package.rels_mut().add_relationship(
+        TASK_PANES_RELATIONSHIP_TYPE.into(),
+        task_panes_name.as_str().trim_start_matches('/').into(),
+        root_relationship_id,
+        false,
+    );
+
+    if let Some(existing) = existing {
+        remove_unreferenced_parts(package, &existing.owned_parts, &reserved);
+    }
+    let _ = package.clear_digital_signatures();
+    Ok(())
+}
+
+/// Remove the package-level task-pane relationship and graph.
+///
+/// Parts still referenced elsewhere remain in the package.
+pub fn remove_web_extension_task_panes(package: &mut OpcPackage) -> Result<bool> {
+    let Some(existing) = existing_web_extension_graph(package)? else {
+        return Ok(false);
+    };
+    package.rels_mut().remove(&existing.root_relationship_id);
+    remove_unreferenced_parts(package, &existing.owned_parts, &HashSet::new());
+    let _ = package.clear_digital_signatures();
+    Ok(true)
+}
+
+#[derive(Debug)]
+struct ExistingWebExtensionGraph {
+    root_relationship_id: String,
+    task_panes_name: PackURI,
+    extensions_by_relationship: HashMap<String, PackURI>,
+    owned_parts: Vec<PackURI>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PlannedRelationship {
+    id: String,
+    relationship_type: String,
+    target: String,
+    external: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PlannedPart {
+    name: PackURI,
+    content_type: String,
+    data: Vec<u8>,
+    relationships: Vec<PlannedRelationship>,
+}
+
+fn existing_web_extension_graph(package: &OpcPackage) -> Result<Option<ExistingWebExtensionGraph>> {
+    let Some(loaded) = load_web_extension_task_panes(package)? else {
+        return Ok(None);
+    };
+    let relationship = package
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP_TYPE)
+        .ok_or_else(|| {
+            OoxmlError::InvalidRelationship("loaded task panes have no package relationship".into())
+        })?;
+    let task_panes_name = relationship.target_partname().map_err(|error| {
+        OoxmlError::InvalidRelationship(format!("invalid task-pane target: {error}"))
+    })?;
+    let task_panes_part = package.get_part(&task_panes_name)?;
+    let mut extensions_by_relationship = HashMap::with_capacity(loaded.panes.len());
+    let mut owned = HashSet::new();
+    owned.insert(task_panes_name.clone());
+    for pane in loaded.panes {
+        let child_relationship = task_panes_part
+            .rels()
+            .get(&pane.relationship_id)
+            .ok_or_else(|| {
+                OoxmlError::InvalidRelationship(format!(
+                    "task pane references missing relationship '{}'",
+                    pane.relationship_id
+                ))
+            })?;
+        let extension_name = child_relationship.target_partname().map_err(|error| {
+            OoxmlError::InvalidRelationship(format!(
+                "invalid web extension target '{}': {error}",
+                pane.relationship_id
+            ))
+        })?;
+        if extensions_by_relationship
+            .insert(pane.relationship_id.clone(), extension_name.clone())
+            .is_some()
+        {
+            return invalid(format!(
+                "duplicate task-pane relationship ID '{}'",
+                pane.relationship_id
+            ));
+        }
+        owned.insert(extension_name);
+        for resource in pane.snapshot_resources {
+            if let WebExtensionSnapshotTarget::Internal { part_name, .. } = resource.target {
+                owned.insert(part_name);
+            }
+        }
+    }
+    let mut owned_parts: Vec<_> = owned.into_iter().collect();
+    owned_parts.sort_by(|left, right| left.as_str().cmp(right.as_str()));
+    Ok(Some(ExistingWebExtensionGraph {
+        root_relationship_id: relationship.r_id().to_owned(),
+        task_panes_name,
+        extensions_by_relationship,
+        owned_parts,
+    }))
+}
+
+fn next_web_extension_part_name(
+    package: &OpcPackage,
+    reserved: &HashSet<PackURI>,
+    preferred_index: usize,
+) -> Result<PackURI> {
+    for offset in 0..=MAX_WEB_EXTENSION_ITEMS {
+        let index = preferred_index
+            .checked_add(offset)
+            .ok_or_else(|| OoxmlError::InvalidFormat("web extension part index overflow".into()))?;
+        let candidate = PackURI::new(format!("/webextensions/webextension{index}.xml"))
+            .map_err(OoxmlError::InvalidUri)?;
+        if !reserved.contains(&candidate)
+            && package
+                .iter_parts()
+                .all(|part| part.partname() != &candidate)
+        {
+            return Ok(candidate);
+        }
+    }
+    invalid("no free web extension part name".into())
+}
+
+fn next_task_panes_part_name(package: &OpcPackage) -> Result<PackURI> {
+    for index in 1..=MAX_WEB_EXTENSION_ITEMS + 1 {
+        let suffix = if index == 1 {
+            String::new()
+        } else {
+            index.to_string()
+        };
+        let candidate = PackURI::new(format!("/webextensions/taskpanes{suffix}.xml"))
+            .map_err(OoxmlError::InvalidUri)?;
+        if package
+            .iter_parts()
+            .all(|part| part.partname() != &candidate)
+        {
+            return Ok(candidate);
+        }
+    }
+    invalid("no free task-pane part name".into())
+}
+
+fn next_package_relationship_id(package: &OpcPackage) -> String {
+    for index in 1..=u32::MAX {
+        let candidate = format!("rIdWebExtensionTaskPanes{index}");
+        if package.rels().get(&candidate).is_none() {
+            return candidate;
+        }
+    }
+    unreachable!("finite relationship collection cannot consume every u32 ID")
+}
+
+fn add_or_match_planned_part(planned: &mut Vec<PlannedPart>, part: PlannedPart) -> Result<()> {
+    if let Some(existing) = planned.iter().find(|existing| existing.name == part.name) {
+        if existing == &part {
+            return Ok(());
+        }
+        return invalid(format!(
+            "conflicting authored resources target '{}'",
+            part.name.as_str()
+        ));
+    }
+    planned.push(part);
+    Ok(())
+}
+
+fn preflight_planned_parts(
+    package: &OpcPackage,
+    planned: &[PlannedPart],
+    old_parts: &[PackURI],
+) -> Result<()> {
+    let old_parts: HashSet<_> = old_parts.iter().collect();
+    for part in planned {
+        if let Ok(existing) = package.get_part(&part.name) {
+            if !old_parts.contains(&part.name) {
+                return invalid(format!(
+                    "authored web extension part '{}' already exists outside the replaced graph",
+                    part.name.as_str()
+                ));
+            }
+            if existing.content_type() != part.content_type {
+                return invalid(format!(
+                    "cannot change content type of existing part '{}'",
+                    part.name.as_str()
+                ));
+            }
+            if part.content_type.starts_with("image/")
+                && existing.blob() != part.data
+                && package_part_is_referenced_outside(package, &part.name, &old_parts)
+            {
+                return invalid(format!(
+                    "cannot replace shared snapshot resource '{}'",
+                    part.name.as_str()
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn install_planned_parts(
+    package: &mut OpcPackage,
+    planned: Vec<PlannedPart>,
+    old_parts: &[PackURI],
+) -> Result<()> {
+    let old_parts: HashSet<_> = old_parts.iter().collect();
+    let mut added = Vec::new();
+    let mut replacements = Vec::new();
+    for part in planned {
+        if old_parts.contains(&part.name) {
+            replacements.push(part);
+            continue;
+        }
+        let name = part.name.clone();
+        let value = planned_blob_part(part);
+        if let Err(error) = package.try_add_part(Box::new(value)) {
+            for name in added {
+                package.remove_part(&name);
+            }
+            return Err(error.into());
+        }
+        added.push(name);
+    }
+    for part in replacements {
+        let existing = package.get_part_mut(&part.name)?;
+        existing.set_blob(part.data);
+        let relationship_ids: Vec<_> = existing
+            .rels()
+            .iter()
+            .map(|relationship| relationship.r_id().to_owned())
+            .collect();
+        for id in relationship_ids {
+            existing.rels_mut().remove(&id);
+        }
+        for relationship in part.relationships {
+            existing.rels_mut().add_relationship(
+                relationship.relationship_type,
+                relationship.target,
+                relationship.id,
+                relationship.external,
+            );
+        }
+    }
+    Ok(())
+}
+
+fn planned_blob_part(part: PlannedPart) -> BlobPart {
+    let mut value = BlobPart::new(part.name, part.content_type, part.data);
+    for relationship in part.relationships {
+        value.rels_mut().add_relationship(
+            relationship.relationship_type,
+            relationship.target,
+            relationship.id,
+            relationship.external,
+        );
+    }
+    value
+}
+
+fn remove_unreferenced_parts(
+    package: &mut OpcPackage,
+    candidates: &[PackURI],
+    retained: &HashSet<PackURI>,
+) {
+    loop {
+        let removable: Vec<_> = candidates
+            .iter()
+            .filter(|name| {
+                !retained.contains(*name)
+                    && package.get_part(name).is_ok()
+                    && !package_part_is_referenced(package, name)
+            })
+            .cloned()
+            .collect();
+        if removable.is_empty() {
+            break;
+        }
+        for name in removable {
+            package.remove_part(&name);
+        }
+    }
+}
+
+fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
+    package.rels().iter().any(|relationship| {
+        !relationship.is_external()
+            && relationship
+                .target_partname()
+                .is_ok_and(|name| name == *target)
+    }) || package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|name| name == *target)
+        })
+    })
+}
+
+fn package_part_is_referenced_outside(
+    package: &OpcPackage,
+    target: &PackURI,
+    allowed_sources: &HashSet<&PackURI>,
+) -> bool {
+    package.rels().iter().any(|relationship| {
+        !relationship.is_external()
+            && relationship
+                .target_partname()
+                .is_ok_and(|name| name == *target)
+    }) || package.iter_parts().any(|part| {
+        !allowed_sources.contains(part.partname())
+            && part.rels().iter().any(|relationship| {
+                !relationship.is_external()
+                    && relationship
+                        .target_partname()
+                        .is_ok_and(|name| name == *target)
+            })
+    })
 }
 
 /// Deterministically serialize a single web extension part.
@@ -452,7 +941,9 @@ pub fn write_web_extension(
         out.push_str("/>");
     }
     out.push_str("</we:webextension>");
-    Ok(out.into_bytes())
+    let output = out.into_bytes();
+    parse_web_extension(&output)?;
+    Ok(output)
 }
 
 /// Deterministically serialize task-pane metadata and relationship IDs.
@@ -461,6 +952,8 @@ pub fn write_task_panes(
     conformance: OoxmlConformance,
 ) -> Result<Vec<u8>> {
     enforce_count("task pane", task_panes.panes.len())?;
+    let mut relationship_ids = HashSet::new();
+    let mut extension_ids = HashSet::new();
     let mut out = String::with_capacity(512 + task_panes.panes.len() * 160);
     out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
     out.push_str("<wetp:taskpanes xmlns:wetp=\"");
@@ -470,6 +963,18 @@ pub fn write_task_panes(
     out.push_str("\">");
     for pane in &task_panes.panes {
         validate_task_pane(pane)?;
+        if !relationship_ids.insert(pane.relationship_id.as_str()) {
+            return invalid(format!(
+                "duplicate task-pane relationship ID '{}'",
+                pane.relationship_id
+            ));
+        }
+        if !extension_ids.insert(pane.web_extension.id.as_str()) {
+            return invalid(format!(
+                "duplicate web extension instance ID '{}'",
+                pane.web_extension.id
+            ));
+        }
         out.push_str("<wetp:taskpane dockstate=\"");
         escape_attr(&mut out, &pane.dock_state);
         out.push_str("\" visibility=\"");
@@ -485,7 +990,9 @@ pub fn write_task_panes(
         out.push_str("\"/></wetp:taskpane>");
     }
     out.push_str("</wetp:taskpanes>");
-    Ok(out.into_bytes())
+    let output = out.into_bytes();
+    parse_task_panes(&output)?;
+    Ok(output)
 }
 
 fn parse_task_pane(node: &Node) -> Result<ParsedTaskPane> {
@@ -529,7 +1036,9 @@ fn parse_task_pane(node: &Node) -> Result<ParsedTaskPane> {
         .ok_or_else(|| OoxmlError::InvalidFormat("webextensionref requires r:id".into()))?
         .to_owned();
     if children.len() > 2
-        || (children.len() == 2 && !matches!(children[1].local_name.as_str(), "extLst" | "float"))
+        || (children.len() == 2
+            && (children[1].namespace != TASK_PANES_NAMESPACE
+                || children[1].local_name != "extLst"))
     {
         return invalid("unexpected taskpane child or child order".into());
     }
@@ -556,9 +1065,9 @@ fn parse_store_reference(node: &Node) -> Result<WebExtensionStoreReference> {
     )?;
     let children = element_children(node);
     if children.len() > 1
-        || children
-            .first()
-            .is_some_and(|child| child.local_name != "extLst")
+        || children.first().is_some_and(|child| {
+            child.namespace != WEB_EXTENSION_NAMESPACE || child.local_name != "extLst"
+        })
     {
         return invalid("reference permits only one trailing extLst".into());
     }
@@ -590,9 +1099,9 @@ fn parse_binding(node: &Node) -> Result<WebExtensionBinding> {
     reject_unknown_attributes(node, &[("", "id"), ("", "type"), ("", "appref")])?;
     let children = element_children(node);
     if children.len() > 1
-        || children
-            .first()
-            .is_some_and(|child| child.local_name != "extLst")
+        || children.first().is_some_and(|child| {
+            child.namespace != WEB_EXTENSION_NAMESPACE || child.local_name != "extLst"
+        })
     {
         return invalid("binding permits only one trailing extLst".into());
     }
@@ -603,27 +1112,33 @@ fn parse_binding(node: &Node) -> Result<WebExtensionBinding> {
     })
 }
 
-fn validate_snapshot_relationships(
+fn load_snapshot_resources(
     package: &OpcPackage,
     part: &dyn Part,
     extension: &WebExtension,
-) -> Result<()> {
-    let mut referenced = HashSet::new();
+    total_snapshot_bytes: &mut usize,
+) -> Result<Vec<WebExtensionSnapshotResource>> {
+    let mut referenced = HashMap::new();
     if let Some(snapshot) = &extension.snapshot {
         if let Some(id) = &snapshot.embedded_relationship_id {
-            referenced.insert(id.as_str());
+            if referenced.insert(id.as_str(), false).is_some() {
+                return invalid("snapshot embed and link IDs must differ".into());
+            }
         }
         if let Some(id) = &snapshot.linked_relationship_id {
-            referenced.insert(id.as_str());
+            if referenced.insert(id.as_str(), true).is_some() {
+                return invalid("snapshot embed and link IDs must differ".into());
+            }
         }
     }
+    let mut resources = Vec::with_capacity(referenced.len());
     for relationship in part.rels().iter() {
-        if !referenced.contains(relationship.r_id()) {
+        let Some(linked) = referenced.remove(relationship.r_id()) else {
             return invalid(format!(
                 "web extension part has unreferenced relationship '{}'",
                 relationship.r_id()
             ));
-        }
+        };
         if !matches!(
             relationship.reltype(),
             IMAGE_RELATIONSHIP_TYPE | STRICT_IMAGE_RELATIONSHIP_TYPE
@@ -634,10 +1149,19 @@ fn validate_snapshot_relationships(
             ));
         }
         if relationship.is_external() {
-            return invalid(format!(
-                "external snapshot relationship '{}' is not loaded",
-                relationship.r_id()
-            ));
+            if !linked {
+                return invalid(format!(
+                    "embedded snapshot relationship '{}' must be internal",
+                    relationship.r_id()
+                ));
+            }
+            resources.push(WebExtensionSnapshotResource {
+                relationship_id: relationship.r_id().to_owned(),
+                target: WebExtensionSnapshotTarget::External {
+                    target: relationship.target_ref().to_owned(),
+                },
+            });
+            continue;
         }
         let image_name = relationship.target_partname().map_err(|error| {
             OoxmlError::InvalidRelationship(format!("invalid snapshot target: {error}"))
@@ -652,17 +1176,52 @@ fn validate_snapshot_relationships(
                 image.content_type()
             ));
         }
-    }
-    for id in referenced {
-        if !part
-            .rels()
-            .iter()
-            .any(|relationship| relationship.r_id() == id)
-        {
-            return invalid(format!("snapshot references missing relationship '{id}'"));
+        if image.rels().iter().next().is_some() {
+            return invalid(format!(
+                "snapshot image '{}' must not have relationships",
+                image_name.as_str()
+            ));
         }
+        if image.blob().len() > MAX_WEB_EXTENSION_SNAPSHOT_BYTES {
+            return invalid(format!(
+                "snapshot image '{}' exceeds {MAX_WEB_EXTENSION_SNAPSHOT_BYTES} bytes",
+                image_name.as_str()
+            ));
+        }
+        *total_snapshot_bytes = total_snapshot_bytes
+            .checked_add(image.blob().len())
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat("aggregate snapshot byte count overflow".into())
+            })?;
+        if *total_snapshot_bytes > MAX_WEB_EXTENSION_TOTAL_SNAPSHOT_BYTES {
+            return invalid(format!(
+                "aggregate snapshot images exceed {MAX_WEB_EXTENSION_TOTAL_SNAPSHOT_BYTES} bytes"
+            ));
+        }
+        resources.push(WebExtensionSnapshotResource {
+            relationship_id: relationship.r_id().to_owned(),
+            target: WebExtensionSnapshotTarget::Internal {
+                part_name: image_name,
+                content_type: image.content_type().to_owned(),
+                data: image.blob().to_vec(),
+            },
+        });
     }
-    Ok(())
+    if let Some((id, _)) = referenced.into_iter().next() {
+        return invalid(format!("snapshot references missing relationship '{id}'"));
+    }
+    let embedded_id = extension
+        .snapshot
+        .as_ref()
+        .and_then(|snapshot| snapshot.embedded_relationship_id.as_deref());
+    resources.sort_by(|left, right| {
+        let left_order = usize::from(Some(left.relationship_id.as_str()) != embedded_id);
+        let right_order = usize::from(Some(right.relationship_id.as_str()) != embedded_id);
+        left_order
+            .cmp(&right_order)
+            .then_with(|| left.relationship_id.cmp(&right.relationship_id))
+    });
+    Ok(resources)
 }
 
 fn validate_model(extension: &WebExtension) -> Result<()> {
@@ -696,7 +1255,79 @@ fn validate_task_pane(pane: &WebExtensionTaskPane) -> Result<()> {
     if !pane.width.is_finite() {
         return invalid("task-pane width must be finite".into());
     }
-    validate_model(&pane.web_extension)
+    validate_model(&pane.web_extension)?;
+    validate_snapshot_resources(pane)
+}
+
+fn validate_snapshot_resources(pane: &WebExtensionTaskPane) -> Result<()> {
+    let mut expected = HashMap::new();
+    if let Some(snapshot) = &pane.web_extension.snapshot {
+        if let Some(id) = snapshot.embedded_relationship_id.as_deref() {
+            require_nonempty("embedded snapshot relationship ID", id)?;
+            expected.insert(id, false);
+        }
+        if let Some(id) = snapshot.linked_relationship_id.as_deref() {
+            require_nonempty("linked snapshot relationship ID", id)?;
+            if expected.insert(id, true).is_some() {
+                return invalid("snapshot embed and link IDs must differ".into());
+            }
+        }
+    }
+    if expected.len() != pane.snapshot_resources.len() {
+        return invalid("snapshot relationship and resource counts differ".into());
+    }
+    let mut resource_ids = HashSet::new();
+    for resource in &pane.snapshot_resources {
+        require_nonempty(
+            "snapshot resource relationship ID",
+            &resource.relationship_id,
+        )?;
+        if !resource_ids.insert(resource.relationship_id.as_str()) {
+            return invalid(format!(
+                "duplicate snapshot resource relationship ID '{}'",
+                resource.relationship_id
+            ));
+        }
+        let Some(linked) = expected.get(resource.relationship_id.as_str()) else {
+            return invalid(format!(
+                "snapshot resource '{}' is not referenced by the web extension",
+                resource.relationship_id
+            ));
+        };
+        match &resource.target {
+            WebExtensionSnapshotTarget::Internal {
+                part_name,
+                content_type,
+                data,
+            } => {
+                if part_name.as_str() == "/" {
+                    return invalid("snapshot image cannot target the package root".into());
+                }
+                if !content_type.starts_with("image/") {
+                    return invalid(format!(
+                        "snapshot resource '{}' has non-image content type '{}'",
+                        resource.relationship_id, content_type
+                    ));
+                }
+                if data.len() > MAX_WEB_EXTENSION_SNAPSHOT_BYTES {
+                    return invalid(format!(
+                        "snapshot resource '{}' exceeds {MAX_WEB_EXTENSION_SNAPSHOT_BYTES} bytes",
+                        resource.relationship_id
+                    ));
+                }
+            },
+            WebExtensionSnapshotTarget::External { target } => {
+                if !*linked {
+                    return invalid(format!(
+                        "embedded snapshot resource '{}' cannot be external",
+                        resource.relationship_id
+                    ));
+                }
+                require_nonempty("external snapshot target", target)?;
+            },
+        }
+    }
+    Ok(())
 }
 
 fn write_store_reference(out: &mut String, element: &str, reference: &WebExtensionStoreReference) {
@@ -1107,8 +1738,7 @@ mod tests {
         );
         assert!(panes.panes[0].visible);
 
-        let registry =
-            local_fixture_package(LOCAL_HIDDEN_TASK_PANES, LOCAL_REGISTRY_EXTENSION);
+        let registry = local_fixture_package(LOCAL_HIDDEN_TASK_PANES, LOCAL_REGISTRY_EXTENSION);
         let panes = load_web_extension_task_panes(&registry).unwrap().unwrap();
         assert_eq!(
             panes.panes[0].web_extension.reference.store_type,
@@ -1162,6 +1792,10 @@ mod tests {
             r#"<wetp:taskpanes xmlns:wetp="{TASK_PANES_NAMESPACE}" xmlns:r="{TRANSITIONAL_RELATIONSHIPS_NAMESPACE}"><wetp:taskpane dockstate="right" visibility="1" width="NaN" row="0"><wetp:webextensionref r:id="rId1"/></wetp:taskpane></wetp:taskpanes>"#
         );
         assert!(parse_task_panes(bad_width.as_bytes()).is_err());
+        let obsolete_float = format!(
+            r#"<wetp:taskpanes xmlns:wetp="{TASK_PANES_NAMESPACE}" xmlns:r="{TRANSITIONAL_RELATIONSHIPS_NAMESPACE}"><wetp:taskpane dockstate="right" visibility="1" width="320" row="0"><wetp:webextensionref r:id="rId1"/><wetp:float/></wetp:taskpane></wetp:taskpanes>"#
+        );
+        assert!(parse_task_panes(obsolete_float.as_bytes()).is_err());
     }
 
     #[test]
@@ -1178,8 +1812,12 @@ mod tests {
                 locked: false,
                 relationship_id: "rId1".into(),
                 web_extension: sample_extension(),
+                snapshot_resources: vec![],
             });
         assert!(write_task_panes(&model, OoxmlConformance::Transitional).is_err());
+        let mut extension = sample_extension();
+        extension.id = "x".repeat(MAX_WEB_EXTENSION_XML_BYTES);
+        assert!(write_web_extension(&extension, OoxmlConformance::Transitional).is_err());
     }
 
     #[test]
@@ -1195,6 +1833,97 @@ mod tests {
 
         let dangling = synthetic_package(false, WEB_EXTENSION_CONTENT_TYPE, "missing");
         assert!(load_web_extension_task_panes(&dangling).is_err());
+    }
+
+    #[test]
+    fn package_crud_round_trips_embedded_and_linked_snapshots() {
+        let mut package = OpcPackage::new();
+        let authored = sample_task_panes();
+        store_web_extension_task_panes(&mut package, &authored, OoxmlConformance::Transitional)
+            .unwrap();
+        assert_eq!(
+            load_web_extension_task_panes(&package).unwrap(),
+            Some(authored.clone())
+        );
+
+        let task_panes_name = package
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP_TYPE)
+            .unwrap()
+            .target_partname()
+            .unwrap();
+        let extension_name = package
+            .get_part(&task_panes_name)
+            .unwrap()
+            .rels()
+            .get("rId1")
+            .unwrap()
+            .target_partname()
+            .unwrap();
+        let extension = package.get_part(&extension_name).unwrap();
+        assert!(!extension.rels().get("rIdSnapshot").unwrap().is_external());
+        assert!(extension.rels().get("rIdLinked").unwrap().is_external());
+
+        let mut replacement = authored;
+        replacement.panes[0].web_extension.snapshot = None;
+        replacement.panes[0].snapshot_resources.clear();
+        replacement.panes[0].visible = false;
+        store_web_extension_task_panes(&mut package, &replacement, OoxmlConformance::Strict)
+            .unwrap();
+        assert_eq!(
+            load_web_extension_task_panes(&package).unwrap(),
+            Some(replacement)
+        );
+        assert!(
+            package
+                .get_part(&PackURI::new("/media/web-extension-snapshot.png").unwrap())
+                .is_err()
+        );
+
+        assert!(remove_web_extension_task_panes(&mut package).unwrap());
+        assert!(load_web_extension_task_panes(&package).unwrap().is_none());
+        assert!(!remove_web_extension_task_panes(&mut package).unwrap());
+        assert_eq!(package.part_count(), 0);
+    }
+
+    #[test]
+    fn package_store_rejects_resource_mismatches_without_mutation() {
+        let mut package = OpcPackage::new();
+        let mut malformed = sample_task_panes();
+        malformed.panes[0].snapshot_resources.pop();
+        assert!(
+            store_web_extension_task_panes(
+                &mut package,
+                &malformed,
+                OoxmlConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert_eq!(package.part_count(), 0);
+        assert_eq!(package.rels().iter().count(), 0);
+
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/media/web-extension-snapshot.png").unwrap(),
+            "image/png".into(),
+            vec![9, 9, 9],
+        )));
+        assert!(
+            store_web_extension_task_panes(
+                &mut package,
+                &sample_task_panes(),
+                OoxmlConformance::Transitional,
+            )
+            .is_err()
+        );
+        assert_eq!(package.part_count(), 1);
+        assert_eq!(
+            package
+                .get_part(&PackURI::new("/media/web-extension-snapshot.png").unwrap())
+                .unwrap()
+                .blob(),
+            &[9, 9, 9]
+        );
     }
 
     fn synthetic_package(
@@ -1289,6 +2018,41 @@ mod tests {
                 application_reference: "app-ref".into(),
             }],
             snapshot: Some(WebExtensionSnapshot::default()),
+        }
+    }
+
+    fn sample_task_panes() -> WebExtensionTaskPanes {
+        let mut extension = sample_extension();
+        extension.snapshot = Some(WebExtensionSnapshot {
+            embedded_relationship_id: Some("rIdSnapshot".into()),
+            linked_relationship_id: Some("rIdLinked".into()),
+        });
+        WebExtensionTaskPanes {
+            panes: vec![WebExtensionTaskPane {
+                dock_state: "right".into(),
+                visible: true,
+                width: 320.0,
+                row: 0,
+                locked: false,
+                relationship_id: "rId1".into(),
+                web_extension: extension,
+                snapshot_resources: vec![
+                    WebExtensionSnapshotResource {
+                        relationship_id: "rIdSnapshot".into(),
+                        target: WebExtensionSnapshotTarget::Internal {
+                            part_name: PackURI::new("/media/web-extension-snapshot.png").unwrap(),
+                            content_type: "image/png".into(),
+                            data: vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a],
+                        },
+                    },
+                    WebExtensionSnapshotResource {
+                        relationship_id: "rIdLinked".into(),
+                        target: WebExtensionSnapshotTarget::External {
+                            target: "https://example.invalid/inert-snapshot.png".into(),
+                        },
+                    },
+                ],
+            }],
         }
     }
 }
