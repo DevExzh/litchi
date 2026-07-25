@@ -10,6 +10,9 @@
 
 use super::core::DocWriteError;
 use crate::doc::parts::images::PictureType;
+use crate::doc::parts::spa::{
+    SPA_LEN, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide, Spa,
+};
 
 /// Size of the PICF picture descriptor header ([MS-DOC] 2.9.161).
 const PICF_HEADER_LEN: usize = 0x44;
@@ -21,16 +24,26 @@ const PICF_MM_SHAPE: i16 = 0x64;
 const SCALE_100_PERCENT: i16 = 1000;
 
 // Escher record types ([MS-ODRAW] 2.3).
+const RECORD_DGG_CONTAINER: u16 = 0xF000;
+const RECORD_BSTORE_CONTAINER: u16 = 0xF001;
+const RECORD_DG_CONTAINER: u16 = 0xF002;
+const RECORD_SPGR_CONTAINER: u16 = 0xF003;
 const RECORD_SP_CONTAINER: u16 = 0xF004;
+const RECORD_DGG: u16 = 0xF006;
 const RECORD_BSE: u16 = 0xF007;
+const RECORD_DG: u16 = 0xF008;
+const RECORD_SPGR: u16 = 0xF009;
 const RECORD_SP: u16 = 0xF00A;
 const RECORD_OPT: u16 = 0xF00B;
 const RECORD_CLIENT_ANCHOR: u16 = 0xF010;
+const RECORD_CLIENT_DATA: u16 = 0xF011;
 const RECORD_BLIP_JPEG: u16 = 0xF01D;
 const RECORD_BLIP_PNG: u16 = 0xF01E;
 
 // Escher record versions.
 const VERSION_CONTAINER: u16 = 0xF;
+const VERSION_DG: u16 = 0x0;
+const VERSION_SPGR: u16 = 0x1;
 const VERSION_BSE: u16 = 0x2;
 const VERSION_SP: u16 = 0x2;
 const VERSION_OPT: u16 = 0x3;
@@ -42,6 +55,10 @@ const SHAPE_TYPE_PICTURE_FRAME: u16 = 0x4B;
 const SP_FLAG_HAVE_ANCHOR: u32 = 0x0200;
 /// OfficeArtFSP `fHaveShapeType` flag.
 const SP_FLAG_HAVE_SHAPE_TYPE: u32 = 0x0800;
+/// OfficeArtFSP `fGroup` flag, set on the group shape of a drawing.
+const SP_FLAG_GROUP: u32 = 0x0001;
+/// OfficeArtFSP `fPatriarch` flag, set on the topmost group shape.
+const SP_FLAG_PATRIARCH: u32 = 0x0004;
 /// OfficeArt `pib` property (0x0104) with the fBid bit set, meaning the
 /// value is a 1-based index of the BSE within the same drawing block.
 const OPT_PIB_BLIP_INDEX: u16 = 0x4104;
@@ -74,6 +91,10 @@ const BSE_NO_DELAY_STREAM: u32 = u32::MAX;
 /// Shape id assigned to the first inline picture. Word numbers inline shapes
 /// starting at 1025 in documents without an OfficeArtDgContainer.
 pub(crate) const FIRST_PICTURE_SHAPE_ID: u32 = 1025;
+/// Shape id of the group shape that parents the shapes of a drawing.
+const GROUP_SHAPE_ID: u32 = 1024;
+/// Number of shape ids in one OfficeArt drawing cluster.
+const SHAPE_IDS_PER_CLUSTER: u32 = 1024;
 
 /// Twips per inch; the writer assumes 96 DPI when converting pixel sizes.
 const TWIPS_PER_INCH: u32 = 1440;
@@ -411,23 +432,14 @@ fn write_shape_container(out: &mut Vec<u8>, shape_id: u32) {
     out.extend_from_slice(&[0; CLIENT_ANCHOR_PAYLOAD_LEN as usize]);
 }
 
-/// Append an OfficeArtWordDrawing block (PICF + shape container + BSE with an
-/// embedded BLIP) to the Data stream.
-pub(crate) fn write_picture_block(picture: &DocPicture, shape_id: u32, out: &mut Vec<u8>) {
+/// Append an OfficeArtFBSE record with the embedded OfficeArtBlip record for
+/// a picture. Used both for the Data-stream picture blocks and for the
+/// BStoreContainer inside the drawing group of floating pictures.
+fn write_bse_with_embedded_blip(out: &mut Vec<u8>, picture: &DocPicture, shape_id: u32) {
     let blip_payload_len = (BLIP_UID_LEN + 1 + picture.data.len()) as u32;
     let blip_record_len = RECORD_HEADER_LEN as u32 + blip_payload_len;
     let bse_payload_len = BSE_HEADER_LEN as u32 + blip_record_len;
 
-    let block_start = out.len();
-    // lcb covers the PICF header plus everything that follows it.
-    let lcb = PICF_HEADER_LEN as u32
-        + SHAPE_CONTAINER_LEN
-        + RECORD_HEADER_LEN as u32
-        + bse_payload_len;
-    write_picf(out, picture, lcb);
-    write_shape_container(out, shape_id);
-
-    // OfficeArtFBSE with the embedded OfficeArtBlip record.
     write_record_header(
         out,
         VERSION_BSE,
@@ -458,8 +470,289 @@ pub(crate) fn write_picture_block(picture: &DocPicture, shape_id: u32, out: &mut
     out.extend_from_slice(&picture_uid(picture, shape_id));
     out.push(BLIP_EMBEDDED_MARKER);
     out.extend_from_slice(&picture.data);
+}
+
+/// Append an OfficeArtWordDrawing block (PICF + shape container + BSE with an
+/// embedded BLIP) to the Data stream.
+pub(crate) fn write_picture_block(picture: &DocPicture, shape_id: u32, out: &mut Vec<u8>) {
+    let blip_payload_len = (BLIP_UID_LEN + 1 + picture.data.len()) as u32;
+    let blip_record_len = RECORD_HEADER_LEN as u32 + blip_payload_len;
+    let bse_payload_len = BSE_HEADER_LEN as u32 + blip_record_len;
+
+    let block_start = out.len();
+    // lcb covers the PICF header plus everything that follows it.
+    let lcb = PICF_HEADER_LEN as u32
+        + SHAPE_CONTAINER_LEN
+        + RECORD_HEADER_LEN as u32
+        + bse_payload_len;
+    write_picf(out, picture, lcb);
+    write_shape_container(out, shape_id);
+    write_bse_with_embedded_blip(out, picture, shape_id);
 
     debug_assert_eq!(out.len() - block_start, lcb as usize);
+}
+
+// ============================================================================
+// Floating pictures: PlcfSpa and OfficeArtContent (DggInfo)
+// ============================================================================
+
+/// Position and wrapping of a floating picture.
+///
+/// The position is the top-left corner of the picture in twips, relative to
+/// the origins selected by [`ShapeHorizontalOrigin`] and
+/// [`ShapeVerticalOrigin`]. The size comes from the [`DocPicture`] display
+/// dimensions. Defaults match a typical Word floating picture: page-relative
+/// offsets, square wrapping on both sides, in front of the text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FloatingPosition {
+    /// Left offset in twips relative to the horizontal origin.
+    left_twips: i32,
+    /// Top offset in twips relative to the vertical origin.
+    top_twips: i32,
+    /// Horizontal position origin (Spa `bx`).
+    horizontal_origin: ShapeHorizontalOrigin,
+    /// Vertical position origin (Spa `by`).
+    vertical_origin: ShapeVerticalOrigin,
+    /// Text-wrapping style (Spa `wr`).
+    wrap: ShapeTextWrap,
+    /// Wrap side restriction (Spa `wrk`).
+    wrap_side: ShapeWrapSide,
+    /// Whether the picture appears behind the text (Spa `fBelowText`).
+    behind_text: bool,
+    /// Whether the anchor is locked to its paragraph (Spa `fAnchorLock`).
+    anchor_locked: bool,
+}
+
+impl FloatingPosition {
+    /// Create a position from offsets in twips, defaulting to page-relative
+    /// origins and square wrapping in front of the text.
+    pub fn new(left_twips: i32, top_twips: i32) -> Self {
+        Self {
+            left_twips,
+            top_twips,
+            horizontal_origin: ShapeHorizontalOrigin::Page,
+            vertical_origin: ShapeVerticalOrigin::Page,
+            wrap: ShapeTextWrap::Square,
+            wrap_side: ShapeWrapSide::Both,
+            behind_text: false,
+            anchor_locked: false,
+        }
+    }
+
+    /// Set the horizontal and vertical position origins.
+    pub fn with_origins(
+        mut self,
+        horizontal: ShapeHorizontalOrigin,
+        vertical: ShapeVerticalOrigin,
+    ) -> Self {
+        self.horizontal_origin = horizontal;
+        self.vertical_origin = vertical;
+        self
+    }
+
+    /// Set the text-wrapping style.
+    pub fn with_text_wrap(mut self, wrap: ShapeTextWrap) -> Self {
+        self.wrap = wrap;
+        self
+    }
+
+    /// Set the wrap side restriction.
+    pub fn with_wrap_side(mut self, wrap_side: ShapeWrapSide) -> Self {
+        self.wrap_side = wrap_side;
+        self
+    }
+
+    /// Place the picture behind (or in front of) the text.
+    pub fn behind_text(mut self, behind_text: bool) -> Self {
+        self.behind_text = behind_text;
+        self
+    }
+
+    /// Lock the anchor to its paragraph.
+    pub fn lock_anchor(mut self, anchor_locked: bool) -> Self {
+        self.anchor_locked = anchor_locked;
+        self
+    }
+}
+
+/// Everything the table-stream builders need to know about one floating
+/// picture anchored in the Main Document.
+pub(crate) struct FloatingShapeInfo<'a> {
+    /// Character position of the 0x0008 anchor character (Main Document CP).
+    pub anchor_cp: u32,
+    /// Shape id, shared with the picture's Data-stream block.
+    pub shape_id: u32,
+    /// The picture itself.
+    pub picture: &'a DocPicture,
+    /// Position and wrapping.
+    pub position: &'a FloatingPosition,
+}
+
+impl FloatingShapeInfo<'_> {
+    /// Build the Spa record for this shape.
+    fn spa(&self) -> Spa {
+        let left = self.position.left_twips;
+        let top = self.position.top_twips;
+        Spa {
+            shape_id: self.shape_id,
+            left,
+            top,
+            right: left + self.picture.width_twips() as i32,
+            bottom: top + self.picture.height_twips() as i32,
+            horizontal_origin: self.position.horizontal_origin,
+            vertical_origin: self.position.vertical_origin,
+            wrap: self.position.wrap,
+            wrap_side: self.position.wrap_side,
+            below_text: self.position.behind_text,
+            anchor_locked: self.position.anchor_locked,
+        }
+    }
+}
+
+/// Build the PlcfSpa for the Main Document ([MS-DOC] 2.8.27).
+///
+/// `shapes` must be ordered by ascending anchor CP (guaranteed by the
+/// writer's append-only story). `final_cp` is the document's ccpText; the
+/// final CP entry is undefined per spec but must exceed all anchor CPs.
+pub(crate) fn build_plcf_spa(shapes: &[FloatingShapeInfo<'_>], final_cp: u32) -> Vec<u8> {
+    let mut out = Vec::with_capacity((shapes.len() + 1) * 4 + shapes.len() * SPA_LEN);
+    for shape in shapes {
+        out.extend_from_slice(&shape.anchor_cp.to_le_bytes());
+    }
+    out.extend_from_slice(&final_cp.to_le_bytes());
+    for shape in shapes {
+        out.extend_from_slice(&shape.spa().to_bytes());
+    }
+    out
+}
+
+/// OfficeArtWordDrawing `dgglbl` value for the Main Document drawing.
+const DGGLBL_MAIN_DOCUMENT: u8 = 0x00;
+/// OfficeArtFDG `csp` counting mode: shapes plus the group shape.
+const DG_GROUP_SHAPE_COUNT: u32 = 1;
+/// OfficeArtFSP payload length (spid + flags).
+const FSP_PAYLOAD_LEN: u32 = 8;
+/// OfficeArtSpgr payload length (empty group bounds rectangle).
+const SPGR_PAYLOAD_LEN: u32 = 16;
+/// Word's ClientAnchor payload: a 4-byte index into the PlcfSpa aCP array.
+const WORD_CLIENT_ANCHOR_LEN: u32 = 4;
+/// OfficeArtClientData payload length used by Word for shapes.
+const CLIENT_DATA_LEN: u32 = 4;
+/// OfficeArtFDGG cluster-table entry count for a single drawing.
+const DGG_SINGLE_CLUSTER: u32 = 1;
+/// OfficeArtFDG `recInstance`: identifier of the drawing (1-based).
+const DG_INSTANCE_FIRST_DRAWING: u16 = 1;
+/// OfficeArtIDCL `dgid` of the single drawing written by this writer.
+const IDCL_FIRST_DRAWING: u32 = 1;
+
+/// Compute the OfficeArtFDGG `spidMax`: the start of the next shape-id
+/// cluster beyond every allocated picture shape id.
+fn spid_max(total_pictures: u32) -> u32 {
+    let highest = FIRST_PICTURE_SHAPE_ID + total_pictures;
+    highest
+        .checked_add(SHAPE_IDS_PER_CLUSTER - highest % SHAPE_IDS_PER_CLUSTER)
+        .unwrap_or(u32::MAX)
+}
+
+/// Build the OfficeArtContent referenced by `fcDggInfo` ([MS-DOC] 2.9.171):
+/// an OfficeArtDggContainer (drawing defaults plus the blip store) followed
+/// by the Main Document's OfficeArtWordDrawing (dgglbl + OfficeArtDgContainer
+/// holding one picture-frame shape per floating picture).
+pub(crate) fn build_dgg_info(shapes: &[FloatingShapeInfo<'_>], total_pictures: u32) -> Vec<u8> {
+    let mut out = Vec::new();
+
+    // ── OfficeArtDggContainer ──
+    let dgg_container_start = out.len();
+    write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_DGG_CONTAINER, 0);
+
+    // OfficeArtFDGG: spidMax, cluster table, saved shape/drawing counts.
+    const DGG_PAYLOAD_LEN: u32 = 24; // 4 header fields + one OfficeArtIDCL
+    write_record_header(&mut out, VERSION_ATOM, 0, RECORD_DGG, DGG_PAYLOAD_LEN);
+    out.extend_from_slice(&spid_max(total_pictures).to_le_bytes()); // spidMax
+    out.extend_from_slice(&DGG_SINGLE_CLUSTER.to_le_bytes()); // cidcl
+    let shape_count = shapes.len() as u32 + DG_GROUP_SHAPE_COUNT;
+    out.extend_from_slice(&shape_count.to_le_bytes()); // cspSaved
+    out.extend_from_slice(&DGG_SINGLE_CLUSTER.to_le_bytes()); // cdgSaved
+    out.extend_from_slice(&IDCL_FIRST_DRAWING.to_le_bytes()); // rgidcl[0].dgid
+    out.extend_from_slice(&shape_count.to_le_bytes()); // rgidcl[0].cspidCur
+
+    // OfficeArtBStoreContainer: one FBSE (with embedded BLIP) per picture.
+    let bstore_start = out.len();
+    write_record_header(&mut out, VERSION_CONTAINER, shapes.len() as u16, RECORD_BSTORE_CONTAINER, 0);
+    for shape in shapes {
+        write_bse_with_embedded_blip(&mut out, shape.picture, shape.shape_id);
+    }
+    patch_record_len(&mut out, bstore_start);
+
+    patch_record_len(&mut out, dgg_container_start);
+
+    // ── OfficeArtWordDrawing for the Main Document ──
+    out.push(DGGLBL_MAIN_DOCUMENT);
+    let dg_container_start = out.len();
+    write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_DG_CONTAINER, 0);
+
+    // OfficeArtFDG: shape count (including the group shape) and next free spid.
+    write_record_header(
+        &mut out,
+        VERSION_DG,
+        DG_INSTANCE_FIRST_DRAWING,
+        RECORD_DG,
+        8,
+    );
+    out.extend_from_slice(&shape_count.to_le_bytes()); // csp
+    out.extend_from_slice(&(FIRST_PICTURE_SHAPE_ID + shapes.len() as u32).to_le_bytes()); // spidCur
+
+    // OfficeArtSpgrContainer: the drawing's group shape plus all shapes.
+    let spgr_container_start = out.len();
+    write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_SPGR_CONTAINER, 0);
+
+    // Group shape: empty bounds rectangle and a group/patriarch FSP.
+    let group_container_start = out.len();
+    write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_SP_CONTAINER, 0);
+    write_record_header(&mut out, VERSION_SPGR, 0, RECORD_SPGR, SPGR_PAYLOAD_LEN);
+    out.extend_from_slice(&[0; SPGR_PAYLOAD_LEN as usize]);
+    write_record_header(&mut out, VERSION_SP, 0, RECORD_SP, FSP_PAYLOAD_LEN);
+    out.extend_from_slice(&GROUP_SHAPE_ID.to_le_bytes());
+    out.extend_from_slice(&(SP_FLAG_GROUP | SP_FLAG_PATRIARCH).to_le_bytes());
+    patch_record_len(&mut out, group_container_start);
+
+    // One picture-frame shape per floating picture.
+    for (index, shape) in shapes.iter().enumerate() {
+        let shape_start = out.len();
+        write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_SP_CONTAINER, 0);
+        write_record_header(
+            &mut out,
+            VERSION_SP,
+            SHAPE_TYPE_PICTURE_FRAME,
+            RECORD_SP,
+            FSP_PAYLOAD_LEN,
+        );
+        out.extend_from_slice(&shape.shape_id.to_le_bytes());
+        out.extend_from_slice(&(SP_FLAG_HAVE_ANCHOR | SP_FLAG_HAVE_SHAPE_TYPE).to_le_bytes());
+        // OfficeArtOPT: pib referencing this shape's BSE (1-based index).
+        write_record_header(&mut out, VERSION_OPT, 1, RECORD_OPT, OPT_PAYLOAD_LEN);
+        out.extend_from_slice(&OPT_PIB_BLIP_INDEX.to_le_bytes());
+        out.extend_from_slice(&(index as u32 + OPT_PIB_FIRST_BSE).to_le_bytes());
+        // ClientAnchor: index of this shape's anchor CP in the PlcfSpa.
+        write_record_header(&mut out, VERSION_ATOM, 0, RECORD_CLIENT_ANCHOR, WORD_CLIENT_ANCHOR_LEN);
+        out.extend_from_slice(&(index as u32).to_le_bytes());
+        // OfficeArtClientData: present but unused.
+        write_record_header(&mut out, VERSION_ATOM, 0, RECORD_CLIENT_DATA, CLIENT_DATA_LEN);
+        out.extend_from_slice(&0u32.to_le_bytes());
+        patch_record_len(&mut out, shape_start);
+    }
+
+    patch_record_len(&mut out, spgr_container_start);
+    patch_record_len(&mut out, dg_container_start);
+
+    out
+}
+
+/// Back-patch the payload length of a container record header written with a
+/// zero placeholder length.
+fn patch_record_len(out: &mut [u8], record_start: usize) {
+    let payload_len = (out.len() - record_start - RECORD_HEADER_LEN) as u32;
+    out[record_start + 4..record_start + 8].copy_from_slice(&payload_len.to_le_bytes());
 }
 
 #[cfg(test)]
@@ -615,5 +908,262 @@ mod tests {
             .unwrap();
         assert_eq!(blip.blip_type(), Some(BlipType::Jpeg));
         assert_eq!(blip.picture_data(), picture.data());
+    }
+
+    // ── Floating pictures ──
+
+    use crate::doc::parts::spa::{
+        ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide,
+    };
+
+    fn floating_shapes<'a>(
+        png: &'a DocPicture,
+        jpeg: &'a DocPicture,
+        positions: &'a [FloatingPosition],
+    ) -> Vec<FloatingShapeInfo<'a>> {
+        vec![
+            FloatingShapeInfo {
+                anchor_cp: 12,
+                shape_id: FIRST_PICTURE_SHAPE_ID,
+                picture: png,
+                position: &positions[0],
+            },
+            FloatingShapeInfo {
+                anchor_cp: 30,
+                shape_id: FIRST_PICTURE_SHAPE_ID + 1,
+                picture: jpeg,
+                position: &positions[1],
+            },
+        ]
+    }
+
+    fn sample_positions() -> [FloatingPosition; 2] {
+        [
+            FloatingPosition::new(1440, 720)
+                .with_origins(ShapeHorizontalOrigin::Page, ShapeVerticalOrigin::Paragraph)
+                .with_text_wrap(ShapeTextWrap::Square)
+                .lock_anchor(true),
+            FloatingPosition::new(2880, 1440)
+                .with_text_wrap(ShapeTextWrap::None)
+                .behind_text(true),
+        ]
+    }
+
+    #[test]
+    fn floating_position_builder_defaults() {
+        let position = FloatingPosition::new(100, 200);
+        assert_eq!(position.horizontal_origin, ShapeHorizontalOrigin::Page);
+        assert_eq!(position.vertical_origin, ShapeVerticalOrigin::Page);
+        assert_eq!(position.wrap, ShapeTextWrap::Square);
+        assert_eq!(position.wrap_side, ShapeWrapSide::Both);
+        assert!(!position.behind_text);
+        assert!(!position.anchor_locked);
+    }
+
+    #[test]
+    fn plcf_spa_layout_matches_ms_doc() {
+        let png = DocPicture::new(png_bytes()).unwrap();
+        let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
+        let positions = sample_positions();
+        let shapes = floating_shapes(&png, &jpeg, &positions);
+
+        let plcf = build_plcf_spa(&shapes, 500);
+        let anchors = crate::doc::parts::spa::parse_plcf_spa(&plcf).unwrap();
+        assert_eq!(anchors.len(), 2);
+        assert_eq!(anchors[0].cp, 12);
+        assert_eq!(anchors[1].cp, 30);
+
+        let first = &anchors[0].spa;
+        assert_eq!(first.shape_id, FIRST_PICTURE_SHAPE_ID);
+        assert_eq!((first.left, first.top), (1440, 720));
+        assert_eq!(first.width() as u32, png.width_twips());
+        assert_eq!(first.height() as u32, png.height_twips());
+        assert_eq!(first.horizontal_origin, ShapeHorizontalOrigin::Page);
+        assert_eq!(first.vertical_origin, ShapeVerticalOrigin::Paragraph);
+        assert_eq!(first.wrap, ShapeTextWrap::Square);
+        assert!(first.anchor_locked);
+
+        let second = &anchors[1].spa;
+        assert_eq!(second.shape_id, FIRST_PICTURE_SHAPE_ID + 1);
+        assert_eq!(second.wrap, ShapeTextWrap::None);
+        assert!(second.below_text);
+
+        // The final CP is ccpText and exceeds every anchor CP.
+        let final_cp = u32::from_le_bytes(plcf[8..12].try_into().unwrap());
+        assert_eq!(final_cp, 500);
+    }
+
+    /// Collect all Escher records in a byte slice as (offset, ver, instance, type, len).
+    /// Handles the OfficeArtWordDrawing dgglbl byte between top-level records.
+    fn collect_records(data: &[u8], start: usize, end: usize) -> Vec<(usize, u16, u16, u16, u32)> {
+        fn walk(
+            data: &[u8],
+            start: usize,
+            end: usize,
+            records: &mut Vec<(usize, u16, u16, u16, u32)>,
+        ) {
+            let mut offset = start;
+            while offset + RECORD_HEADER_LEN <= end {
+                let (ver, inst, record_type, len) = parse_record_header(data, offset);
+                records.push((offset, ver, inst, record_type, len));
+                if ver == VERSION_CONTAINER {
+                    walk(
+                        data,
+                        offset + RECORD_HEADER_LEN,
+                        offset + RECORD_HEADER_LEN + len as usize,
+                        records,
+                    );
+                }
+                offset += RECORD_HEADER_LEN + len as usize;
+            }
+        }
+
+        let mut records = Vec::new();
+        let (_ver, _inst, _record_type, len) = parse_record_header(data, start);
+        let dgg_container_end = start + RECORD_HEADER_LEN + len as usize;
+        walk(data, start, dgg_container_end, &mut records);
+        // Skip the OfficeArtWordDrawing dgglbl byte before the DgContainer.
+        walk(data, dgg_container_end + 1, end, &mut records);
+        records
+    }
+
+    #[test]
+    fn dgg_info_layout_matches_ms_odraw() {
+        let png = DocPicture::new(png_bytes()).unwrap();
+        let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
+        let positions = sample_positions();
+        let shapes = floating_shapes(&png, &jpeg, &positions);
+
+        let dgg = build_dgg_info(&shapes, 3);
+        let records = collect_records(&dgg, 0, dgg.len());
+
+        // Top level: DggContainer, then dgglbl + DgContainer.
+        let (off, ver, _inst, record_type, len) = records[0];
+        assert_eq!((off, ver, record_type), (0, VERSION_CONTAINER, RECORD_DGG_CONTAINER));
+        let dg_container_offset = off + RECORD_HEADER_LEN + len as usize;
+        assert_eq!(dgg[dg_container_offset], DGGLBL_MAIN_DOCUMENT);
+
+        // Dgg: cluster table and counts.
+        let dgg_record = records
+            .iter()
+            .find(|record| record.3 == RECORD_DGG)
+            .unwrap();
+        let dgg_payload = &dgg[dgg_record.0 + RECORD_HEADER_LEN..];
+        let spid_max = u32::from_le_bytes(dgg_payload[0..4].try_into().unwrap());
+        assert_eq!(spid_max, 2 * SHAPE_IDS_PER_CLUSTER);
+        assert_eq!(
+            u32::from_le_bytes(dgg_payload[4..8].try_into().unwrap()),
+            DGG_SINGLE_CLUSTER
+        );
+        // cspSaved = 2 shapes + group; cdgSaved = 1 drawing.
+        assert_eq!(u32::from_le_bytes(dgg_payload[8..12].try_into().unwrap()), 3);
+        assert_eq!(u32::from_le_bytes(dgg_payload[12..16].try_into().unwrap()), 1);
+
+        // BStoreContainer holds one BSE per picture.
+        let bstore = records
+            .iter()
+            .find(|record| record.3 == RECORD_BSTORE_CONTAINER)
+            .unwrap();
+        assert_eq!(bstore.2, 2);
+        let bses: Vec<_> = records.iter().filter(|record| record.3 == RECORD_BSE).collect();
+        assert_eq!(bses.len(), 2);
+
+        // Dg: shape count includes the group shape; spidCur is next free.
+        let dg = records.iter().find(|record| record.3 == RECORD_DG).unwrap();
+        let dg_payload = &dgg[dg.0 + RECORD_HEADER_LEN..];
+        assert_eq!(u32::from_le_bytes(dg_payload[0..4].try_into().unwrap()), 3);
+        assert_eq!(
+            u32::from_le_bytes(dg_payload[4..8].try_into().unwrap()),
+            FIRST_PICTURE_SHAPE_ID + 2
+        );
+
+        // Group shape with fGroup|fPatriarch, then one picture shape per picture.
+        let sps: Vec<_> = records.iter().filter(|record| record.3 == RECORD_SP).collect();
+        assert_eq!(sps.len(), 3);
+        let (group_spid, group_flags) = (
+            u32::from_le_bytes(dgg[sps[0].0 + 8..sps[0].0 + 12].try_into().unwrap()),
+            u32::from_le_bytes(dgg[sps[0].0 + 12..sps[0].0 + 16].try_into().unwrap()),
+        );
+        assert_eq!(group_spid, GROUP_SHAPE_ID);
+        assert_eq!(group_flags, SP_FLAG_GROUP | SP_FLAG_PATRIARCH);
+        for (index, sp) in sps[1..].iter().enumerate() {
+            let spid = u32::from_le_bytes(dgg[sp.0 + 8..sp.0 + 12].try_into().unwrap());
+            assert_eq!(spid, FIRST_PICTURE_SHAPE_ID + index as u32);
+            assert_eq!(sp.2, SHAPE_TYPE_PICTURE_FRAME);
+        }
+
+        // OPT pib references the BSEs 1-based, in order.
+        let opts: Vec<_> = records.iter().filter(|record| record.3 == RECORD_OPT).collect();
+        assert_eq!(opts.len(), 2);
+        for (index, opt) in opts.iter().enumerate() {
+            let prop = u16::from_le_bytes(dgg[opt.0 + 8..opt.0 + 10].try_into().unwrap());
+            let value = u32::from_le_bytes(dgg[opt.0 + 10..opt.0 + 14].try_into().unwrap());
+            assert_eq!(prop, OPT_PIB_BLIP_INDEX);
+            assert_eq!(value, index as u32 + OPT_PIB_FIRST_BSE);
+        }
+
+        // ClientAnchor records index into the PlcfSpa aCP array, in order.
+        let anchors: Vec<_> = records
+            .iter()
+            .filter(|record| record.3 == RECORD_CLIENT_ANCHOR)
+            .collect();
+        assert_eq!(anchors.len(), 2);
+        for (index, anchor) in anchors.iter().enumerate() {
+            let value = u32::from_le_bytes(
+                dgg[anchor.0 + 8..anchor.0 + 12].try_into().unwrap(),
+            );
+            assert_eq!(value, index as u32);
+        }
+
+        // Spids across the drawing are unique.
+        let mut spids: Vec<u32> = sps
+            .iter()
+            .map(|sp| u32::from_le_bytes(dgg[sp.0 + 8..sp.0 + 12].try_into().unwrap()))
+            .collect();
+        spids.sort_unstable();
+        spids.dedup();
+        assert_eq!(spids.len(), 3);
+    }
+
+    #[cfg(feature = "imgconv")]
+    #[test]
+    fn dgg_info_bse_blips_parse_with_crate_reader() {
+        use litchi_imgconv::{Blip, BlipStoreEntry, BlipType};
+
+        let png = DocPicture::new(png_bytes()).unwrap();
+        let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
+        let positions = sample_positions();
+        let shapes = floating_shapes(&png, &jpeg, &positions);
+
+        let dgg = build_dgg_info(&shapes, 2);
+        let records = collect_records(&dgg, 0, dgg.len());
+        let bses: Vec<_> = records.iter().filter(|record| record.3 == RECORD_BSE).collect();
+        assert_eq!(bses.len(), 2);
+
+        let expected = [
+            (BlipType::Png, png.data()),
+            (BlipType::Jpeg, jpeg.data()),
+        ];
+        for (bse_record, (blip_type, payload)) in bses.iter().zip(expected.iter()) {
+            let bse_payload =
+                &dgg[bse_record.0 + RECORD_HEADER_LEN..bse_record.0 + RECORD_HEADER_LEN + bse_record.4 as usize];
+            let bse = BlipStoreEntry::parse(bse_payload).unwrap();
+            assert_eq!(bse.blip_type, *blip_type);
+            assert!(!bse.is_delay_loaded());
+            let blip =
+                Blip::parse(&bse_payload[BSE_HEADER_LEN..BSE_HEADER_LEN + bse.size as usize])
+                    .unwrap();
+            assert_eq!(blip.picture_data(), *payload);
+        }
+    }
+
+    #[test]
+    fn spid_max_rounds_up_to_next_cluster() {
+        assert_eq!(spid_max(0), 2 * SHAPE_IDS_PER_CLUSTER);
+        assert_eq!(spid_max(1), 2 * SHAPE_IDS_PER_CLUSTER);
+        assert_eq!(
+            spid_max(SHAPE_IDS_PER_CLUSTER),
+            3 * SHAPE_IDS_PER_CLUSTER
+        );
     }
 }

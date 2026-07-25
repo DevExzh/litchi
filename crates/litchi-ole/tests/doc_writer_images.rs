@@ -6,8 +6,10 @@
 #![cfg(feature = "imgconv")]
 
 use litchi_ole::doc::image::PictureFields;
-use litchi_ole::doc::writer::{DocPicture, DocWriter, PictureFormat};
-use litchi_ole::doc::{Package, Run};
+use litchi_ole::doc::writer::{DocPicture, DocWriter, FloatingPosition, PictureFormat};
+use litchi_ole::doc::{
+    Package, Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin,
+};
 use litchi_imgconv::BlipType;
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
@@ -164,4 +166,179 @@ fn document_without_pictures_keeps_empty_data_stream() {
     let document = package.document().unwrap();
     assert_eq!(document.text().unwrap(), "plain text\r");
     assert!(picture_runs(&document).is_empty());
+    assert!(document.shape_positions().is_empty());
 }
+
+/// Character position of the floating anchor in the shared test document:
+/// "before pictures" (15) + CR (1) + inline picture paragraph (2) = 18.
+const FLOATING_ANCHOR_CP: u32 = 18;
+
+fn write_doc_with_inline_and_floating(jpeg_bytes: &[u8]) -> (Vec<u8>, u32, u32) {
+    let png_picture = DocPicture::new(make_png(32, 16)).unwrap();
+    let jpeg_picture = DocPicture::new(jpeg_bytes.to_vec()).unwrap();
+    let floating_dims = (jpeg_picture.width_twips(), jpeg_picture.height_twips());
+
+    let mut writer = DocWriter::new();
+    writer.add_paragraph("before pictures").unwrap();
+    writer.insert_picture(png_picture).unwrap();
+    writer
+        .insert_floating_picture(
+            jpeg_picture,
+            FloatingPosition::new(1440, 720)
+                .with_origins(
+                    ShapeHorizontalOrigin::Page,
+                    ShapeVerticalOrigin::Paragraph,
+                )
+                .with_text_wrap(ShapeTextWrap::Square)
+                .lock_anchor(true),
+        )
+        .unwrap();
+    writer.add_paragraph("after pictures").unwrap();
+
+    let mut cursor = Cursor::new(Vec::new());
+    writer.write_to(&mut cursor).unwrap();
+    (cursor.into_inner(), floating_dims.0, floating_dims.1)
+}
+
+#[test]
+fn inline_and_floating_pictures_round_trip_through_doc_reader() {
+    let jpeg_bytes = jpeg_fixture();
+    let (doc_bytes, floating_width, floating_height) = write_doc_with_inline_and_floating(&jpeg_bytes);
+
+    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let document = package.document().unwrap();
+
+    let text = document.text().unwrap();
+    assert!(text.contains("before pictures"));
+    assert!(text.contains("after pictures"));
+
+    // Two picture runs: the inline 0x0001 anchor and the floating 0x0008 anchor.
+    let runs = picture_runs(&document);
+    assert_eq!(runs.len(), 2);
+    assert_eq!(runs[0].text().unwrap(), "\u{0001}");
+    assert_eq!(runs[1].text().unwrap(), "\u{0008}");
+
+    // The floating picture's bytes and format survive the round trip.
+    let floating_image = runs[1].image().unwrap();
+    let extracted = document.image_data(floating_image).unwrap();
+    assert_eq!(extracted.blip_type(), Some(BlipType::Jpeg));
+    assert_eq!(extracted.raw_data(), jpeg_bytes.as_slice());
+
+    // The SPA carries the anchor CP, position rectangle, origins, and wrap.
+    let positions = document.shape_positions();
+    assert_eq!(positions.len(), 1);
+    let anchor = &positions[0];
+    assert_eq!(anchor.cp, FLOATING_ANCHOR_CP);
+    let spa = &anchor.spa;
+    assert_eq!((spa.left, spa.top), (1440, 720));
+    assert_eq!(spa.width() as u32, floating_width);
+    assert_eq!(spa.height() as u32, floating_height);
+    assert_eq!(spa.horizontal_origin, ShapeHorizontalOrigin::Page);
+    assert_eq!(spa.vertical_origin, ShapeVerticalOrigin::Paragraph);
+    assert_eq!(spa.wrap, ShapeTextWrap::Square);
+    assert!(spa.anchor_locked);
+    assert!(!spa.below_text);
+    // Inline picture spid is 1025, so the floating shape id is 1026.
+    assert_eq!(spa.shape_id, 1026);
+}
+
+#[test]
+fn floating_picture_writes_valid_dgg_info() {
+    use litchi_ole::doc::parts::fib::FileInformationBlock;
+    use litchi_ole::escher::EscherRecord;
+
+    const FIB_INDEX_DGG_INFO: usize = 50;
+    const RECORD_DGG_CONTAINER: u16 = 0xF000;
+    const RECORD_BSTORE_CONTAINER: u16 = 0xF001;
+    const RECORD_DG_CONTAINER: u16 = 0xF002;
+    const RECORD_SPGR_CONTAINER: u16 = 0xF003;
+    const RECORD_BSE: u16 = 0xF007;
+    const RECORD_SP: u16 = 0xF00A;
+    const RECORD_CLIENT_ANCHOR: u16 = 0xF010;
+
+    let jpeg_bytes = jpeg_fixture();
+    let (doc_bytes, _, _) = write_doc_with_inline_and_floating(&jpeg_bytes);
+
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let word_document = ole.open_stream(&["WordDocument"]).unwrap();
+    let table_stream = ole.open_stream(&["1Table"]).unwrap();
+    let fib = FileInformationBlock::parse(&word_document).unwrap();
+
+    // fcDggInfo must point at a non-empty OfficeArtContent.
+    let (dgg_offset, dgg_len) = fib.get_table_pointer(FIB_INDEX_DGG_INFO).unwrap();
+    assert!(dgg_len > 0);
+    let dgg = &table_stream[dgg_offset as usize..(dgg_offset + dgg_len) as usize];
+
+    // Top level: DggContainer, dgglbl byte, DgContainer.
+    let (dgg_container, dgg_container_size) = EscherRecord::parse(dgg, 0).unwrap();
+    assert_eq!(dgg_container.record_type_raw, RECORD_DGG_CONTAINER);
+    let dgglbl = dgg[dgg_container_size];
+    assert_eq!(dgglbl, 0, "dgglbl 0 = Main Document drawing");
+    let (dg_container, _) = EscherRecord::parse(dgg, dgg_container_size + 1).unwrap();
+    assert_eq!(dg_container.record_type_raw, RECORD_DG_CONTAINER);
+
+    // The BStoreContainer holds one BSE whose embedded BLIP is the JPEG.
+    let mut offset = 0;
+    let mut bse_count = 0;
+    while offset < dgg_container.data.len() {
+        let (record, size) = EscherRecord::parse(dgg_container.data, offset).unwrap();
+        if record.record_type_raw == RECORD_BSTORE_CONTAINER {
+            let mut bse_offset = 0;
+            while bse_offset < record.data.len() {
+                let (bse, bse_size) = EscherRecord::parse(record.data, bse_offset).unwrap();
+                assert_eq!(bse.record_type_raw, RECORD_BSE);
+                assert!(
+                    bse.data
+                        .windows(jpeg_bytes.len())
+                        .any(|window| window == jpeg_bytes.as_slice()),
+                    "embedded BLIP must contain the original JPEG bytes"
+                );
+                bse_count += 1;
+                bse_offset += bse_size;
+            }
+        }
+        offset += size;
+    }
+    assert_eq!(bse_count, 1);
+
+    // The drawing holds the group shape plus one picture-frame shape whose
+    // spid matches the SPA lid; its ClientAnchor indexes the PlcfSpa aCP.
+    fn walk_shapes(
+        data: &[u8],
+        spids: &mut Vec<u32>,
+        client_anchors: &mut Vec<u32>,
+        spgr_containers: &mut usize,
+    ) {
+        let mut offset = 0;
+        while offset + 8 <= data.len() {
+            let Ok((record, size)) = EscherRecord::parse(data, offset) else {
+                break;
+            };
+            match record.record_type_raw {
+                RECORD_SPGR_CONTAINER => *spgr_containers += 1,
+                RECORD_SP => {
+                    let spid = u32::from_le_bytes(record.data[0..4].try_into().unwrap());
+                    spids.push(spid);
+                },
+                RECORD_CLIENT_ANCHOR => {
+                    let index = u32::from_le_bytes(record.data[0..4].try_into().unwrap());
+                    client_anchors.push(index);
+                },
+                _ => {},
+            }
+            if record.version == 0xF {
+                walk_shapes(record.data, spids, client_anchors, spgr_containers);
+            }
+            offset += size;
+        }
+    }
+    let mut spids = Vec::new();
+    let mut client_anchors = Vec::new();
+    let mut spgr_containers = 0;
+    walk_shapes(dg_container.data, &mut spids, &mut client_anchors, &mut spgr_containers);
+
+    assert_eq!(spgr_containers, 1);
+    assert_eq!(spids, vec![1024, 1026], "group shape + floating picture");
+    assert_eq!(client_anchors, vec![0]);
+}
+

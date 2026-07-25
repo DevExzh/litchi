@@ -116,6 +116,9 @@ pub use parts::fields::BarcodeField;
 pub use parts::fields::BidiOutlineField;
 pub use parts::fields::EmbedField;
 pub use parts::fields::EquationField;
+pub use parts::spa::{
+    ShapeAnchor, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide, Spa,
+};
 pub use parts::fields::FormulaField;
 pub use parts::fields::HyperlinkField;
 pub use parts::fields::InfoField;
@@ -194,7 +197,7 @@ pub use vba::VbaProjectStorage;
 pub use writer::{
     AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,
     DocPicture, DocStyleDefinition, DocStyleRevision, DocWriteError, DocWriter, DropCap,
-    DropCapType,
+    DropCapType, FloatingPosition,
     FontAlignment, FormattingRevision, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
     FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
     FrameVerticalPosition, HeaderFooterParagraph, LegacyAutoNumbering, LegacyBorderPosition,

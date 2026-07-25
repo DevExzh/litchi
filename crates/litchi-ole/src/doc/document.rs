@@ -111,6 +111,9 @@ pub struct Document {
     proofing_tables: Result<ProofingTables>,
     /// Section ranges, layout, and property revision marks
     sections: SectionsTable,
+    /// Floating-shape anchors from the Main Document PlcfSpa (empty when the
+    /// document has no floating shapes in the main story).
+    shape_anchors: Vec<super::parts::spa::ShapeAnchor>,
     /// Hyperlinks table
     hyperlinks_table: Option<HyperlinksTable>,
     /// List/numbering tables
@@ -223,6 +226,7 @@ impl Document {
         let proofing_tables = ProofingTables::parse(&fib, &table_stream);
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
+        let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
 
         // Parse hyperlinks from fields table
         let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
@@ -293,6 +297,7 @@ impl Document {
             list_templates,
             proofing_tables,
             sections,
+            shape_anchors,
             hyperlinks_table,
             list_tables,
             stylesheet,
@@ -349,6 +354,19 @@ impl Document {
     /// Parse the CLX once for both property bin tables.
     fn parse_piece_table(fib: &FileInformationBlock, table_stream: &[u8]) -> Option<PieceTable> {
         Self::table_slice(fib, table_stream, 33).and_then(PieceTable::parse)
+    }
+
+    /// Parse the Main Document shape position table (PlcfSpaMom), if present.
+    ///
+    /// A malformed table yields no anchors rather than failing the document;
+    /// floating shapes simply lose their positioning information.
+    fn parse_shape_anchors(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+    ) -> Vec<super::parts::spa::ShapeAnchor> {
+        Self::table_slice(fib, table_stream, super::parts::spa::FIB_INDEX_PLC_SPA_MOM)
+            .and_then(|data| super::parts::spa::parse_plcf_spa(data).ok())
+            .unwrap_or_default()
     }
 
     /// Parse each MTEF stream in a scoped arena and retain an owned rendering.
@@ -2015,6 +2033,19 @@ impl Document {
     #[inline]
     pub fn data_stream(&self) -> Option<&[u8]> {
         self.data_stream.as_deref()
+    }
+
+    /// Get the floating-shape anchors of the Main Document.
+    ///
+    /// Each entry maps the character position of a 0x0008 floating-shape
+    /// anchor character to its positioning attributes ([MS-DOC] Spa): the
+    /// shape id (which matches the `spid` of the shape's OfficeArtFSP), the
+    /// position rectangle in twips, the position origins, and the
+    /// text-wrapping style. Returns an empty slice when the document has no
+    /// floating shapes in the main story.
+    #[inline]
+    pub fn shape_positions(&self) -> &[super::parts::spa::ShapeAnchor] {
+        &self.shape_anchors
     }
 
     /// Get all paragraphs in the document.

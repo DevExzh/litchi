@@ -37,6 +37,7 @@ pub mod proofing;
 pub mod revisions;
 pub mod saved_by;
 pub mod sections;
+pub mod spa;
 pub mod styles;
 pub mod tap;
 pub mod tap_parser;

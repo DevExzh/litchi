@@ -756,6 +756,15 @@ struct WritableTable {
     rows: Vec<TableRow>,
 }
 
+/// A picture queued for embedding, with its placement mode.
+#[derive(Debug, Clone)]
+struct WriterPicture {
+    /// The picture data and display dimensions.
+    picture: super::images::DocPicture,
+    /// Position and wrapping when the picture floats; `None` for inline.
+    floating: Option<super::images::FloatingPosition>,
+}
+
 /// DOC file writer
 ///
 /// Provides methods to create and modify DOC files.
@@ -800,7 +809,7 @@ pub struct DocWriter {
     /// User-defined styles appended after the fifteen fixed style slots
     styles: Vec<super::stylesheet::DocStyleDefinition>,
     /// Inline pictures embedded via [`DocWriter::insert_picture`]
-    pictures: Vec<super::images::DocPicture>,
+    pictures: Vec<WriterPicture>,
     /// Password-to-open settings. The password is wiped when replaced, cleared, or dropped.
     encryption: Option<DocWriterEncryption>,
 }
@@ -1040,13 +1049,40 @@ impl DocWriter {
         &mut self,
         picture: super::images::DocPicture,
     ) -> Result<(), DocWriteError> {
+        self.insert_picture_run(picture, None, "\u{0001}")
+    }
+
+    /// Insert a floating picture anchored to its own paragraph.
+    ///
+    /// The anchor is a single 0x0008 character with sprmCFSpec and
+    /// sprmCPicLocation applied ([MS-DOC] 1.3). The picture data is stored
+    /// like an inline picture's, and the anchor character position is
+    /// recorded in the Main Document's PlcfSpa together with an
+    /// OfficeArtContent drawing group (fcDggInfo) holding the picture-frame
+    /// shape, so readers can resolve the anchor to position and image.
+    pub fn insert_floating_picture(
+        &mut self,
+        picture: super::images::DocPicture,
+        position: super::images::FloatingPosition,
+    ) -> Result<(), DocWriteError> {
+        self.insert_picture_run(picture, Some(position), "\u{0008}")
+    }
+
+    /// Shared tail of `insert_picture`/`insert_floating_picture`: queue the
+    /// picture and append a single-character anchor paragraph.
+    fn insert_picture_run(
+        &mut self,
+        picture: super::images::DocPicture,
+        floating: Option<super::images::FloatingPosition>,
+        anchor: &str,
+    ) -> Result<(), DocWriteError> {
         let picture_index = u32::try_from(self.pictures.len()).map_err(|_| {
             DocWriteError::InvalidData("DOC picture count exceeds the 32-bit range".to_string())
         })?;
-        self.pictures.push(picture);
+        self.pictures.push(WriterPicture { picture, floating });
         self.paragraphs.push(WritableParagraph {
             runs: vec![TextRun {
-                text: "\u{0001}".to_string(),
+                text: anchor.to_string(),
                 formatting: CharacterFormatting {
                     special: Some(true),
                     ..CharacterFormatting::default()
@@ -2795,6 +2831,7 @@ impl DocWriter {
         // Per POI's TextPieceTable.writeTo() lines 427-433
         let mut text_stream = Vec::new();
         let mut data_stream: Vec<u8> = Vec::new();
+        let mut floating_anchors: Vec<(u32, u32)> = Vec::new();
         let mut current_cp = 0u32; // Character position in document
         let mut pieces = Vec::new();
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
@@ -2846,10 +2883,11 @@ impl DocWriter {
                     &mut font_builder,
                     revision_data.as_ref(),
                 )?;
-                // Inline pictures: append the OfficeArtWordDrawing block to the
-                // Data stream and point sprmCPicLocation at it.
+                // Pictures: append the OfficeArtWordDrawing block to the
+                // Data stream and point sprmCPicLocation at it. Floating
+                // pictures also record their anchor CP for the PlcfSpa.
                 let grpprl = if let Some(picture_index) = run.picture_index {
-                    let picture = self.pictures.get(picture_index as usize).ok_or_else(|| {
+                    let entry = self.pictures.get(picture_index as usize).ok_or_else(|| {
                         DocWriteError::InvalidData(format!(
                             "DOC picture index {picture_index} is out of range"
                         ))
@@ -2860,7 +2898,10 @@ impl DocWriter {
                         )
                     })?;
                     let shape_id = super::images::FIRST_PICTURE_SHAPE_ID + picture_index;
-                    super::images::write_picture_block(picture, shape_id, &mut data_stream);
+                    super::images::write_picture_block(&entry.picture, shape_id, &mut data_stream);
+                    if entry.floating.is_some() {
+                        floating_anchors.push((current_cp + para_chars, picture_index));
+                    }
                     let mut grpprl = grpprl;
                     grpprl.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
                     grpprl.extend_from_slice(&pic_offset.to_le_bytes());
@@ -3328,6 +3369,36 @@ impl DocWriter {
         fib.set_plcfsed(table_offset, section_table.len() as u32);
         table_stream.extend_from_slice(&section_table);
 
+        // Floating pictures: shape position table (PlcfSpaMom) and the drawing
+        // group (fcDggInfo OfficeArtContent) that anchors the shapes to the
+        // document's drawing layer.
+        if !floating_anchors.is_empty() {
+            table_offset = table_stream.len() as u32;
+            let floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> = floating_anchors
+                .iter()
+                .map(|&(anchor_cp, picture_index)| {
+                    let entry = &self.pictures[picture_index as usize];
+                    super::images::FloatingShapeInfo {
+                        anchor_cp,
+                        shape_id: super::images::FIRST_PICTURE_SHAPE_ID + picture_index,
+                        picture: &entry.picture,
+                        position: entry.floating.as_ref().expect(
+                            "floating anchors are only recorded for floating pictures",
+                        ),
+                    }
+                })
+                .collect();
+            let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
+            fib.set_plc_spa_mom(table_offset, plcf_spa.len() as u32);
+            table_stream.extend_from_slice(&plcf_spa);
+            table_offset = table_stream.len() as u32;
+
+            let dgg_info =
+                super::images::build_dgg_info(&floating_shapes, self.pictures.len() as u32);
+            fib.set_dgg_info(table_offset, dgg_info.len() as u32);
+            table_stream.extend_from_slice(&dgg_info);
+        }
+
         // 11. Set FibBase fields (Apache POI line 906-914)
         // fcMin = start of text (after FIB)
         // fcMac = end of text (captured before FKPs)
@@ -3423,6 +3494,7 @@ impl DocWriter {
         // Build text stream and piece table
         let mut text_stream = Vec::new();
         let mut data_stream: Vec<u8> = Vec::new();
+        let mut floating_anchors: Vec<(u32, u32)> = Vec::new();
         let mut current_cp = 0u32;
         let mut pieces = Vec::new();
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
@@ -3470,10 +3542,11 @@ impl DocWriter {
                     &mut font_builder,
                     revision_data.as_ref(),
                 )?;
-                // Inline pictures: append the OfficeArtWordDrawing block to the
-                // Data stream and point sprmCPicLocation at it.
+                // Pictures: append the OfficeArtWordDrawing block to the
+                // Data stream and point sprmCPicLocation at it. Floating
+                // pictures also record their anchor CP for the PlcfSpa.
                 let grpprl = if let Some(picture_index) = run.picture_index {
-                    let picture = self.pictures.get(picture_index as usize).ok_or_else(|| {
+                    let entry = self.pictures.get(picture_index as usize).ok_or_else(|| {
                         DocWriteError::InvalidData(format!(
                             "DOC picture index {picture_index} is out of range"
                         ))
@@ -3484,7 +3557,10 @@ impl DocWriter {
                         )
                     })?;
                     let shape_id = super::images::FIRST_PICTURE_SHAPE_ID + picture_index;
-                    super::images::write_picture_block(picture, shape_id, &mut data_stream);
+                    super::images::write_picture_block(&entry.picture, shape_id, &mut data_stream);
+                    if entry.floating.is_some() {
+                        floating_anchors.push((current_cp + para_chars, picture_index));
+                    }
                     let mut grpprl = grpprl;
                     grpprl.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
                     grpprl.extend_from_slice(&pic_offset.to_le_bytes());
@@ -3923,6 +3999,36 @@ impl DocWriter {
         table_offset = table_stream.len() as u32;
         fib.set_plcfsed(table_offset, section_table.len() as u32);
         table_stream.extend_from_slice(&section_table);
+
+        // Floating pictures: shape position table (PlcfSpaMom) and the drawing
+        // group (fcDggInfo OfficeArtContent) that anchors the shapes to the
+        // document's drawing layer.
+        if !floating_anchors.is_empty() {
+            table_offset = table_stream.len() as u32;
+            let floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> = floating_anchors
+                .iter()
+                .map(|&(anchor_cp, picture_index)| {
+                    let entry = &self.pictures[picture_index as usize];
+                    super::images::FloatingShapeInfo {
+                        anchor_cp,
+                        shape_id: super::images::FIRST_PICTURE_SHAPE_ID + picture_index,
+                        picture: &entry.picture,
+                        position: entry.floating.as_ref().expect(
+                            "floating anchors are only recorded for floating pictures",
+                        ),
+                    }
+                })
+                .collect();
+            let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
+            fib.set_plc_spa_mom(table_offset, plcf_spa.len() as u32);
+            table_stream.extend_from_slice(&plcf_spa);
+            table_offset = table_stream.len() as u32;
+
+            let dgg_info =
+                super::images::build_dgg_info(&floating_shapes, self.pictures.len() as u32);
+            fib.set_dgg_info(table_offset, dgg_info.len() as u32);
+            table_stream.extend_from_slice(&dgg_info);
+        }
 
         // Set FibBase fields
         let cb_mac = word_document_stream.len() as u32;

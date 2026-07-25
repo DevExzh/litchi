@@ -138,6 +138,12 @@ pub struct FibBuilder {
     /// Header/footer field table (PlcfFldHdr) offset and size
     fc_plcffld_hdr: u32,
     lcb_plcffld_hdr: u32,
+    /// Main document shape position table (PlcfSpaMom) offset and size
+    fc_plc_spa_mom: u32,
+    lcb_plc_spa_mom: u32,
+    /// Drawing group information (OfficeArtContent) offset and size
+    fc_dgg_info: u32,
+    lcb_dgg_info: u32,
 
     // FibBase fields that need to be set (Apache POI line 906-914)
     fc_min: u32, // Start of text in WordDocument stream
@@ -222,6 +228,10 @@ impl FibBuilder {
             lcb_plcffld_mom: 0,
             fc_plcffld_hdr: 0,
             lcb_plcffld_hdr: 0,
+            fc_plc_spa_mom: 0,
+            lcb_plc_spa_mom: 0,
+            fc_dgg_info: 0,
+            lcb_dgg_info: 0,
             fc_min: 0,
             fc_mac: 0,
             cb_mac: 0,
@@ -429,6 +439,18 @@ impl FibBuilder {
     pub fn set_plcffld_hdr(&mut self, offset: u32, size: u32) {
         self.fc_plcffld_hdr = offset;
         self.lcb_plcffld_hdr = size;
+    }
+
+    /// Set main document shape position table (PlcSpaMom) offset and size.
+    pub fn set_plc_spa_mom(&mut self, offset: u32, size: u32) {
+        self.fc_plc_spa_mom = offset;
+        self.lcb_plc_spa_mom = size;
+    }
+
+    /// Set drawing group information (OfficeArtContent) offset and size.
+    pub fn set_dgg_info(&mut self, offset: u32, size: u32) {
+        self.fc_dgg_info = offset;
+        self.lcb_dgg_info = size;
     }
 
     /// Set FibBase fields (Apache POI line 906-914)
@@ -663,6 +685,8 @@ impl FibBuilder {
         const STTBLISTNAMES: usize = 91;
         const STTBRGTPLC: usize = 96;
         const ATRDEXTRA: usize = 112; // Extended comment metadata
+        const PLCSPAMOM: usize = 40; // Main document shape position table
+        const DGGINFO: usize = 50; // Drawing group information (OfficeArtContent)
 
         // Write field offsets and sizes
         set_field(buf, STSHF, self.fc_stshf, self.lcb_stshf);
@@ -719,6 +743,8 @@ impl FibBuilder {
         set_field(buf, STTBRGTPLC, self.fc_sttb_rgtplc, self.lcb_sttb_rgtplc);
         set_field(buf, DOP, self.fc_dop, self.lcb_dop);
         set_field(buf, CLX, self.fc_clx, self.lcb_clx);
+        set_field(buf, PLCSPAMOM, self.fc_plc_spa_mom, self.lcb_plc_spa_mom);
+        set_field(buf, DGGINFO, self.fc_dgg_info, self.lcb_dgg_info);
 
         Ok(())
     }
