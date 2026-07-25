@@ -65,6 +65,7 @@ fn body_chart_series_error_bars(
 ) -> Result<Vec<ChartSeriesErrorBars>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",
@@ -86,6 +87,7 @@ fn set_body_chart_series_error_bars(
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",

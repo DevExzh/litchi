@@ -79,6 +79,7 @@ fn sheet_chart_series_strokes(
 ) -> Result<Vec<Option<ChartSeriesStroke>>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Numbers",
@@ -105,6 +106,7 @@ fn set_sheet_chart_series_strokes(
     }
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Numbers",
@@ -138,6 +140,7 @@ fn reset_sheet_chart_series_stroke(
 ) -> Result<Option<ChartSeriesStroke>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Numbers",

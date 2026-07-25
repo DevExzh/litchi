@@ -70,6 +70,7 @@ fn sheet_chart_series_error_bar_auto_fits(
 ) -> Result<Vec<ChartSeriesErrorBarAutoFit>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Numbers",
@@ -92,6 +93,7 @@ fn set_sheet_chart_series_error_bar_auto_fits(
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Numbers",

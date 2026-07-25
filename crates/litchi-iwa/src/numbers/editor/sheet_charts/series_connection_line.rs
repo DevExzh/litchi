@@ -69,6 +69,7 @@ fn read(
 ) -> Result<Vec<ChartSeriesConnectionLine>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Numbers",
@@ -95,6 +96,7 @@ fn set(
     }
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Numbers",

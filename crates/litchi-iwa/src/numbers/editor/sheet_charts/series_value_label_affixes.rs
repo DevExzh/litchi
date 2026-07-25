@@ -71,6 +71,7 @@ fn sheet_chart_series_value_label_affixes(
 ) -> Result<Vec<ChartSeriesValueLabelAffixes>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Numbers",
@@ -94,6 +95,7 @@ fn set_sheet_chart_series_value_label_affixes(
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Numbers",

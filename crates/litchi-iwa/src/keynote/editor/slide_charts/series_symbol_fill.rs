@@ -185,6 +185,7 @@ fn set(
 
 fn series_count(graph: &SlideChartGraph, drawable_object_id: u64) -> Result<usize> {
     value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Keynote",

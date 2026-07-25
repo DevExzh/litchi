@@ -94,6 +94,7 @@ fn body_chart_series_fills(
 ) -> Result<Vec<ShapeFill>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",
@@ -119,6 +120,7 @@ fn set_body_chart_series_fills(
     }
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",
@@ -151,6 +153,7 @@ fn reset_body_chart_series_fill(
 ) -> Result<ShapeFill> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",
@@ -188,6 +191,7 @@ fn set_body_chart_series_image_fill(
 ) -> Result<ShapeImageFill> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",

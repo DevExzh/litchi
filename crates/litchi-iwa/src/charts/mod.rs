@@ -44,6 +44,7 @@ pub(crate) mod series_style;
 pub(crate) mod series_symbol;
 pub(crate) mod series_symbol_fill;
 pub(crate) mod series_symbol_outline;
+pub(crate) mod series_topology;
 pub(crate) mod series_trendline;
 pub(crate) mod series_value_label_affixes;
 pub(crate) mod series_value_label_auto_fit;

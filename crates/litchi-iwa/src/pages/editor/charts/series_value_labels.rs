@@ -1,6 +1,7 @@
 //! Native per-series value-label CRUD for Pages charts.
 
 use super::*;
+use crate::charts::series_topology::chart_series_count;
 use crate::charts::series_value_label_location::{
     chart_series_value_label_locations as read_native_locations,
     set_chart_series_value_label_locations as set_native_locations,
@@ -121,6 +122,7 @@ fn body_chart_series_value_label_visibilities(
 ) -> Result<Vec<ChartSeriesValueLabelVisibility>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",
@@ -143,6 +145,7 @@ fn set_body_chart_series_value_label_visibilities(
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",
@@ -191,6 +194,7 @@ fn body_chart_series_value_label_locations(
 ) -> Result<Vec<ChartSeriesValueLabelLocation>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",
@@ -213,6 +217,7 @@ fn set_body_chart_series_value_label_locations(
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",
@@ -257,18 +262,13 @@ fn set_body_chart_series_value_label_locations(
 }
 
 pub(super) fn value_label_series_count(
+    kind: ChartKind,
     direction: ChartSeriesDirection,
     data: &ChartData,
     drawable_label: &str,
     drawable_object_id: u64,
 ) -> Result<usize> {
-    match direction {
-        ChartSeriesDirection::Rows => Ok(data.row_names().len()),
-        ChartSeriesDirection::Columns => Ok(data.column_names().len()),
-        ChartSeriesDirection::Unsupported(value) => Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} has unsupported series direction {value}"
-        ))),
-    }
+    chart_series_count(kind, direction, data, drawable_label, drawable_object_id)
 }
 
 fn value_label_index_error(

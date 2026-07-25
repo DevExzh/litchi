@@ -61,6 +61,7 @@ impl PagesEditor {
 fn read(editor: &PagesEditor, drawable_object_id: u64) -> Result<Vec<ChartSeriesConnectionLine>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",
@@ -86,6 +87,7 @@ fn set(
     }
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Pages",

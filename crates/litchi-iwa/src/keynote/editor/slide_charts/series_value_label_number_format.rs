@@ -82,6 +82,7 @@ fn slide_chart_series_value_label_number_formats(
 ) -> Result<Vec<ChartSeriesValueLabelNumberFormat>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Keynote",
@@ -105,6 +106,7 @@ fn set_slide_chart_series_value_label_number_formats(
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Keynote",

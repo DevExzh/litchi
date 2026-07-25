@@ -1,6 +1,8 @@
 //! Native chart drawable, style, and optional mediator construction.
 
 use super::*;
+use crate::charts::ChartSeriesDirection;
+use crate::charts::series_topology::chart_series_count;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
@@ -38,7 +40,13 @@ pub(crate) fn source_chart_objects(
 ) -> Result<Vec<ArchiveObject>> {
     let default_gap_spacing = ChartGapSpacing::NATIVE_DEFAULT;
     let paragraph_styles = repeated_references(profile.paragraph_style_count(), paragraph_style_id);
-    let series_count = data.row_names().len();
+    let series_count = chart_series_count(
+        kind,
+        ChartSeriesDirection::Rows,
+        &data,
+        "source-built",
+        ids.drawable,
+    )?;
     let mut chart = IWorkChartArchive::new(
         tsch::ChartDrawableArchive {
             super_: Some(tsd::DrawableArchive {

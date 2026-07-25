@@ -105,6 +105,7 @@ fn slide_chart_series_fills(
 ) -> Result<Vec<ShapeFill>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Keynote",
@@ -131,6 +132,7 @@ fn set_slide_chart_series_fills(
     }
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Keynote",
@@ -164,6 +166,7 @@ fn reset_slide_chart_series_fill(
 ) -> Result<ShapeFill> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Keynote",
@@ -202,6 +205,7 @@ fn set_slide_chart_series_image_fill(
 ) -> Result<ShapeImageFill> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Keynote",

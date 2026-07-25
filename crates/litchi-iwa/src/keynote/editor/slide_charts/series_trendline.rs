@@ -69,6 +69,7 @@ fn slide_chart_series_trendlines(
 ) -> Result<Vec<ChartSeriesTrendline>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Keynote",
@@ -91,6 +92,7 @@ fn set_slide_chart_series_trendlines(
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
+        graph.info.kind,
         graph.info.direction,
         &graph.info.data,
         "Keynote",
