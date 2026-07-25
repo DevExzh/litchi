@@ -43,6 +43,7 @@ pub(crate) fn validate_sheet_image(image: &crate::OdfImage) -> Result<()> {
         ("svg:title", frame.title.as_deref()),
         ("svg:desc", frame.description.as_deref()),
         ("text:anchor-type", frame.anchor_type.as_deref()),
+        ("table:end-cell-address", frame.end_cell_address.as_deref()),
         ("table:name", frame.sheet_name.as_deref()),
         ("draw:image xml:id", image.xml_id.as_deref()),
         ("draw:filter-name", image.filter_name.as_deref()),
@@ -264,6 +265,7 @@ pub(crate) fn write_sheet_images(out: &mut String, images: &[crate::OdfImage]) -
             attribute(out, "svg:y", frame.y.as_deref());
             attribute(out, "svg:width", frame.width.as_deref());
             attribute(out, "svg:height", frame.height.as_deref());
+            attribute(out, "table:end-cell-address", frame.end_cell_address.as_deref());
             out.push('>');
             if let Some(title) = &frame.title {
                 out.push_str("<svg:title>");

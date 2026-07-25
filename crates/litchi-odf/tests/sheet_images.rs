@@ -1,8 +1,11 @@
 use litchi_odf::{
-    MutableSpreadsheet, OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource, Spreadsheet,
-    SpreadsheetBuilder,
+    CellValue, MutableSpreadsheet, OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource, OdfLength,
+    OpenDocumentPackage, OwnedPackage, Spreadsheet, SpreadsheetBuilder,
 };
 use std::io::{Cursor, Write};
+
+const PNG_PAYLOAD: &[u8] = b"\x89PNG\r\n\x1a\nfake-png-payload";
+const GIF_PAYLOAD: &[u8] = b"GIF89afake-gif-payload";
 
 fn linked_image(href: &str) -> OdfImage {
     OdfImage {
@@ -117,6 +120,185 @@ fn parses_libreoffice_table_shapes_references_alternatives_and_invalid_forms() {
     let mut invalid = linked_image("relative.png");
     invalid.frame.as_mut().unwrap().width = Some("-1cm".to_string());
     assert!(builder.add_sheet_image(invalid).is_err());
+}
+
+#[test]
+fn insert_image_round_trips_discoverable_package_pictures() {
+    let mut mutable = MutableSpreadsheet::new();
+    mutable.add_sheet("Data").unwrap();
+    mutable.add_sheet("Live Data").unwrap();
+    mutable
+        .set_cell(0, 0, 0, CellValue::Text("keep".to_string()))
+        .unwrap();
+
+    let first = mutable
+        .insert_image(
+            0,
+            0,
+            0,
+            PNG_PAYLOAD,
+            &OdfLength::centimeters(5.0),
+            &OdfLength::centimeters(3.0),
+        )
+        .unwrap();
+    let second = mutable
+        .insert_image(
+            0,
+            2,
+            3,
+            GIF_PAYLOAD,
+            &OdfLength::millimeters(20.0),
+            &OdfLength::millimeters(10.0),
+        )
+        .unwrap();
+    let third = mutable
+        .insert_image(
+            1,
+            1,
+            1,
+            PNG_PAYLOAD,
+            &OdfLength::centimeters(1.0),
+            &OdfLength::centimeters(1.0),
+        )
+        .unwrap();
+    assert_eq!(first, "Pictures/image1.png");
+    assert_eq!(second, "Pictures/image2.gif");
+    assert_eq!(third, "Pictures/image3.png");
+
+    let bytes = mutable.to_bytes().unwrap();
+
+    // Payloads are stored verbatim with manifest media types.
+    let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+    assert_eq!(package.get_file(&first).unwrap(), PNG_PAYLOAD);
+    assert_eq!(package.get_file(&second).unwrap(), GIF_PAYLOAD);
+    let manifest = package.package().unwrap();
+    assert_eq!(
+        manifest.manifest().get_media_type(&first),
+        Some("image/png")
+    );
+    assert_eq!(
+        manifest.manifest().get_media_type(&second),
+        Some("image/gif")
+    );
+
+    // The media-level scan discovers the frames with sheet attribution.
+    let generic = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let scanned = generic.images().unwrap();
+    assert_eq!(scanned.len(), 3);
+    let data_frames: Vec<_> = scanned
+        .iter()
+        .filter(|image| {
+            image
+                .frame
+                .as_ref()
+                .and_then(|frame| frame.sheet_name.as_deref())
+                == Some("Data")
+        })
+        .collect();
+    assert_eq!(data_frames.len(), 2);
+    let frame = data_frames[0].frame.as_ref().unwrap();
+    assert!(frame.sheet_shape);
+    assert_eq!(frame.anchor_type.as_deref(), Some("cell"));
+    assert_eq!(frame.width.as_deref(), Some("5cm"));
+    assert_eq!(frame.height.as_deref(), Some("3cm"));
+    assert_eq!(frame.end_cell_address.as_deref(), Some("Data.A1"));
+    assert_eq!(
+        data_frames[1].frame.as_ref().unwrap().end_cell_address.as_deref(),
+        Some("Data.D3")
+    );
+    let quoted = scanned
+        .iter()
+        .find(|image| {
+            image
+                .frame
+                .as_ref()
+                .and_then(|frame| frame.sheet_name.as_deref())
+                == Some("Live Data")
+        })
+        .unwrap();
+    assert_eq!(
+        quoted.frame.as_ref().unwrap().end_cell_address.as_deref(),
+        Some("'Live Data'.B2")
+    );
+    assert!(
+        matches!(&data_frames[0].source, OdfImageSource::PackagePart { path, .. } if path == &first)
+    );
+    // Payloads resolve through the inert package-part accessor.
+    assert_eq!(
+        generic.image_bytes(data_frames[0]).unwrap().as_deref(),
+        Some(PNG_PAYLOAD)
+    );
+
+    // The sheet model attributes images to their sheets; content is intact.
+    let mut spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
+    let sheets = spreadsheet.sheets().unwrap();
+    assert_eq!(sheets[0].images().len(), 2);
+    assert_eq!(sheets[1].images().len(), 1);
+    assert_eq!(
+        sheets[0].rows().unwrap()[0]
+            .cell(0)
+            .unwrap()
+            .unwrap()
+            .value()
+            .unwrap(),
+        &CellValue::Text("keep".to_string())
+    );
+}
+
+#[test]
+fn insert_image_continues_numbering_across_generations() {
+    let mut mutable = MutableSpreadsheet::new();
+    mutable.add_sheet("Data").unwrap();
+    let first = mutable
+        .insert_image(0, 0, 0, PNG_PAYLOAD, &OdfLength::centimeters(1.0), &OdfLength::centimeters(1.0))
+        .unwrap();
+    let second = mutable
+        .insert_image(0, 0, 1, GIF_PAYLOAD, &OdfLength::centimeters(1.0), &OdfLength::centimeters(1.0))
+        .unwrap();
+    let first_generation = mutable.to_bytes().unwrap();
+
+    let spreadsheet = Spreadsheet::from_bytes(first_generation).unwrap();
+    let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+    let third = mutable
+        .insert_image(0, 1, 0, PNG_PAYLOAD, &OdfLength::centimeters(2.0), &OdfLength::centimeters(2.0))
+        .unwrap();
+    // Existing parts block both their own stems and sibling extensions.
+    assert_eq!(third, "Pictures/image3.png");
+
+    let bytes = mutable.to_bytes().unwrap();
+    let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+    assert_eq!(package.get_file(&first).unwrap(), PNG_PAYLOAD);
+    assert_eq!(package.get_file(&second).unwrap(), GIF_PAYLOAD);
+    assert_eq!(package.get_file(&third).unwrap(), PNG_PAYLOAD);
+    let mut reparsed = Spreadsheet::from_bytes(bytes).unwrap();
+    assert_eq!(reparsed.sheets().unwrap()[0].images().len(), 3);
+}
+
+#[test]
+fn insert_image_preserves_existing_fixture_parts() {
+    let fixture =
+        include_bytes!("../../../test-data/odfdo/tests/samples/simple_table_named_range.ods");
+    let spreadsheet = Spreadsheet::from_bytes(fixture.to_vec()).unwrap();
+    let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+    let path = mutable
+        .insert_image(0, 0, 1, GIF_PAYLOAD, &OdfLength::centimeters(2.0), &OdfLength::centimeters(2.0))
+        .unwrap();
+    assert_eq!(path, "Pictures/image1.gif");
+
+    let bytes = mutable.to_bytes().unwrap();
+    let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+    // Auxiliary parts of the source package survive the edit.
+    assert!(package.has_file("settings.xml").unwrap());
+    assert!(package.has_file("Thumbnails/thumbnail.png").unwrap());
+    assert_eq!(package.get_file(&path).unwrap(), GIF_PAYLOAD);
+
+    let mut reparsed = Spreadsheet::from_bytes(bytes).unwrap();
+    let sheets = reparsed.sheets().unwrap();
+    assert_eq!(sheets[0].name().unwrap(), "Example1");
+    assert_eq!(sheets[0].images().len(), 1);
+    let frame = sheets[0].images()[0].frame.as_ref().unwrap();
+    assert!(frame.sheet_shape);
+    assert_eq!(frame.end_cell_address.as_deref(), Some("Example1.B1"));
 }
 
 fn content_with_shapes(body: &str) -> String {

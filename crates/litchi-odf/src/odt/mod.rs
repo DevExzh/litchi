@@ -62,7 +62,7 @@ mod document;
 mod dynamic_text;
 pub(crate) mod header_footer;
 mod header_footer_content;
-mod frame;
+pub(crate) mod frame;
 mod index;
 pub(crate) use index::expanded_attributes;
 mod index_mark;

@@ -89,6 +89,10 @@ pub struct MutableSpreadsheet {
     tracked_changes: Option<super::tracked_changes::SpreadsheetTrackedChanges>,
     /// Original package retained for copying auxiliary package parts.
     source_package: Option<OwnedPackage>,
+    /// Authored picture payloads awaiting package insertion.
+    pending_images: Vec<crate::odt::frame::PendingImage>,
+    /// Monotonic counter for authored frame names (1-based).
+    next_frame_number: usize,
 }
 
 impl MutableSpreadsheet {
@@ -212,6 +216,8 @@ impl MutableSpreadsheet {
             protection,
             tracked_changes,
             source_package,
+            pending_images: Vec::new(),
+            next_frame_number: 1,
         })
     }
 
@@ -237,6 +243,8 @@ impl MutableSpreadsheet {
             protection: SpreadsheetProtection::default(),
             tracked_changes: None,
             source_package: None,
+            pending_images: Vec::new(),
+            next_frame_number: 1,
         }
     }
 
@@ -1739,6 +1747,119 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Insert a package-stored image into a sheet, anchored to a cell.
+    ///
+    /// The payload is sniffed (PNG, JPEG, and GIF are accepted), stored
+    /// verbatim under `Pictures/` in the package with a manifest entry, and
+    /// referenced from a `draw:frame`/`draw:image` element in the sheet's
+    /// `table:shapes` container. The frame is anchored to the cell at
+    /// (`row`, `col`) through `text:anchor-type="cell"` and
+    /// `table:end-cell-address`; `width` and `height` give the frame
+    /// geometry. Picture numbering is global across the whole package,
+    /// including pictures already present in a source document.
+    ///
+    /// Returns the allocated package path of the picture part.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odf::{MutableSpreadsheet, OdfLength};
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let mut spreadsheet = MutableSpreadsheet::new();
+    /// spreadsheet.add_sheet("Data")?;
+    /// let png = b"\x89PNG\r\n\x1a\n".as_slice();
+    /// let path = spreadsheet.insert_image(
+    ///     0,
+    ///     0,
+    ///     0,
+    ///     png,
+    ///     &OdfLength::centimeters(5.0),
+    ///     &OdfLength::centimeters(3.0),
+    /// )?;
+    /// assert!(path.starts_with("Pictures/"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn insert_image(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        image: &[u8],
+        width: &crate::odt::OdfLength,
+        height: &crate::odt::OdfLength,
+    ) -> Result<String> {
+        use crate::odt::frame;
+        if sheet_index >= self.sheets.len() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "Sheet index {sheet_index} out of bounds"
+            )));
+        }
+        if row >= MAX_EXPANDED_ROWS_PER_SHEET || col >= MAX_EXPANDED_COLUMNS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "image anchor cell ({row}, {col}) exceeds the sheet safety limits"
+            )));
+        }
+        let format = frame::validate_image_payload(image)?;
+        let path = frame::allocate_picture_path(format.extension(), |candidate| {
+            // Picture numbering is global: a stem taken by any supported
+            // extension blocks the whole index.
+            let taken = |path: &str| {
+                self.pending_images.iter().any(|pending| pending.path == path)
+                    || self
+                        .source_package
+                        .as_ref()
+                        .is_some_and(|package| package.has_file(path).unwrap_or(false))
+                    || self
+                        .sheets
+                        .iter()
+                        .flat_map(|sheet| sheet.images.iter())
+                        .any(|image| sheet_image_href(image) == Some(path))
+            };
+            if taken(candidate) {
+                return true;
+            }
+            let stem = candidate.trim_end_matches(format.extension());
+            ["png", "jpg", "gif"]
+                .iter()
+                .any(|extension| taken(&format!("{stem}{extension}")))
+        })?;
+
+        let name = format!("Image {}", self.next_frame_number);
+        let address = sheet_anchor_address(&self.sheets[sheet_index].name, row, col);
+        let image_model = crate::OdfImage {
+            part: crate::OdfImagePart::Content,
+            source: crate::OdfImageSource::PackagePart {
+                href: path.clone(),
+                path: path.clone(),
+                manifest_media_type: None,
+            },
+            frame: Some(crate::OdfImageFrame {
+                name: Some(name),
+                anchor_type: Some("cell".to_string()),
+                width: Some(width.as_str().to_string()),
+                height: Some(height.as_str().to_string()),
+                end_cell_address: Some(address),
+                ..Default::default()
+            }),
+            xml_id: None,
+            filter_name: None,
+            declared_media_type: None,
+            link_type: Some("simple".to_string()),
+            show: Some("embed".to_string()),
+            actuate: Some("onLoad".to_string()),
+            alternative_index: 0,
+        };
+        self.add_sheet_image(sheet_index, image_model)?;
+        self.pending_images.push(frame::PendingImage {
+            path: path.clone(),
+            bytes: image.to_vec(),
+        });
+        self.next_frame_number += 1;
+        Ok(path)
+    }
+
     /// Remove an inert sheet-level image.
     pub fn remove_sheet_image(
         &mut self,
@@ -2201,6 +2322,11 @@ impl MutableSpreadsheet {
         let meta_xml = self.generate_meta_xml();
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
+        // Add authored picture payloads with manifest entries.
+        for pending in &self.pending_images {
+            writer.add_file(&pending.path, &pending.bytes)?;
+        }
+
         if let Some(package) = &self.source_package {
             writer.copy_auxiliary_files_from(package)?;
         }
@@ -2213,6 +2339,63 @@ impl Default for MutableSpreadsheet {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Return the `xlink:href` of a sheet image, regardless of source kind.
+fn sheet_image_href(image: &crate::OdfImage) -> Option<&str> {
+    match &image.source {
+        crate::OdfImageSource::Inline { ignored_href, .. } => ignored_href.as_deref(),
+        crate::OdfImageSource::PackagePart { href, .. }
+        | crate::OdfImageSource::MissingPackagePart { href, .. }
+        | crate::OdfImageSource::Linked { href } => Some(href.as_str()),
+        crate::OdfImageSource::Missing => None,
+    }
+}
+
+/// Spreadsheet column letters for a zero-based column index (`A`, `B`, …,
+/// `Z`, `AA`, …).
+fn column_letters(mut column: usize) -> String {
+    const LETTERS: usize = 26;
+    let mut letters = Vec::new();
+    loop {
+        letters.push(b'A' + (column % LETTERS) as u8);
+        column /= LETTERS;
+        if column == 0 {
+            break;
+        }
+        column -= 1;
+    }
+    letters.reverse();
+    String::from_utf8(letters).expect("column letters are ASCII")
+}
+
+/// The `table:end-cell-address` anchor address for (`row`, `col`) on a
+/// sheet, quoting the sheet name when it is not a bare identifier.
+fn sheet_anchor_address(sheet_name: &str, row: usize, col: usize) -> String {
+    let mut address = String::new();
+    let bare = sheet_name
+        .chars()
+        .next()
+        .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
+        && sheet_name
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_');
+    if bare {
+        address.push_str(sheet_name);
+    } else {
+        address.push('\'');
+        for character in sheet_name.chars() {
+            if character == '\'' {
+                address.push('\'');
+            }
+            address.push(character);
+        }
+        address.push('\'');
+    }
+    address.push('.');
+    address.push_str(&column_letters(col));
+    address.push_str(&(row + 1).to_string());
+    address
 }
 
 #[cfg(test)]
@@ -2961,5 +3144,54 @@ mod tests {
                 .is_err()
         );
         assert_eq!(mutable.sheets()[0].images(), before);
+    }
+
+    #[test]
+    fn column_letters_cover_single_and_double_letter_ranges() {
+        assert_eq!(column_letters(0), "A");
+        assert_eq!(column_letters(25), "Z");
+        assert_eq!(column_letters(26), "AA");
+        assert_eq!(column_letters(27), "AB");
+        assert_eq!(column_letters(51), "AZ");
+        assert_eq!(column_letters(52), "BA");
+        assert_eq!(column_letters(702), "AAA");
+    }
+
+    #[test]
+    fn sheet_anchor_addresses_quote_only_when_needed() {
+        assert_eq!(sheet_anchor_address("Data", 0, 0), "Data.A1");
+        assert_eq!(sheet_anchor_address("Data", 2, 3), "Data.D3");
+        assert_eq!(sheet_anchor_address("Live Data", 1, 1), "'Live Data'.B2");
+        assert_eq!(sheet_anchor_address("1st", 0, 0), "'1st'.A1");
+        assert_eq!(sheet_anchor_address("O'Brien", 0, 2), "'O''Brien'.C1");
+    }
+
+    #[test]
+    fn insert_image_rejects_bad_input() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Data").unwrap();
+        let width = crate::odt::OdfLength::centimeters(1.0);
+        let height = crate::odt::OdfLength::centimeters(1.0);
+        // Unsupported payload formats are rejected.
+        assert!(mutable.insert_image(0, 0, 0, b"BM bitmap", &width, &height).is_err());
+        // Sheet and cell bounds are enforced.
+        assert!(
+            mutable
+                .insert_image(9, 0, 0, b"\x89PNG\r\n\x1a\n", &width, &height)
+                .is_err()
+        );
+        assert!(
+            mutable
+                .insert_image(0, MAX_EXPANDED_ROWS_PER_SHEET, 0, b"\x89PNG\r\n\x1a\n", &width, &height)
+                .is_err()
+        );
+        assert!(
+            mutable
+                .insert_image(0, 0, MAX_EXPANDED_COLUMNS_PER_SHEET, b"\x89PNG\r\n\x1a\n", &width, &height)
+                .is_err()
+        );
+        // Nothing was staged by the rejected inserts.
+        assert!(mutable.pending_images.is_empty());
+        assert!(mutable.sheets()[0].images().is_empty());
     }
 }

@@ -970,6 +970,7 @@ fn parse_frame(
         y: attribute(reader, element, SVG_NAMESPACE, b"y")?,
         width: attribute(reader, element, SVG_NAMESPACE, b"width")?,
         height: attribute(reader, element, SVG_NAMESPACE, b"height")?,
+        end_cell_address: attribute(reader, element, TABLE_NAMESPACE, b"end-cell-address")?,
         page_name: pages.last().and_then(|page| page.name.clone()),
         sheet_name: sheets.last().and_then(|sheet| sheet.name.clone()),
         sheet_shape: false,

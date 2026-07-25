@@ -73,6 +73,9 @@ pub struct OdfImageFrame {
     pub y: Option<String>,
     pub width: Option<String>,
     pub height: Option<String>,
+    /// Cell address anchoring the frame's bottom-right corner
+    /// (`table:end-cell-address`, spreadsheets only).
+    pub end_cell_address: Option<String>,
     pub page_name: Option<String>,
     pub sheet_name: Option<String>,
     /// Whether this frame is a direct child of a spreadsheet `table:shapes` container.
@@ -634,6 +637,7 @@ fn parse_frame(
         y: attribute(reader, element, SVG_NAMESPACE, b"y")?,
         width: attribute(reader, element, SVG_NAMESPACE, b"width")?,
         height: attribute(reader, element, SVG_NAMESPACE, b"height")?,
+        end_cell_address: attribute(reader, element, TABLE_NAMESPACE, b"end-cell-address")?,
         page_name: pages.last().and_then(|page| page.name.clone()),
         sheet_name: sheets.last().and_then(|sheet| sheet.name.clone()),
         sheet_shape,
