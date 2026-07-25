@@ -39,10 +39,11 @@
 //! ```
 
 use super::blip::{BlipStoreBuilder, BlipType};
+use super::chart::{Chart, ChartPlan, PositionedChart};
 use super::comments::SlideComment;
 use super::custom_shows::CustomShow;
 use super::escher::{
-    FreeformGeometry, UserShapeData, create_dg_container_with_tables, create_dgg_container,
+    FreeformGeometry, UserShapeData, create_dg_container_with_charts, create_dgg_container,
     shape_type as escher_shape_type,
 };
 use super::hyperlink::{Hyperlink, HyperlinkCollection};
@@ -50,10 +51,9 @@ use super::master_drawing::build_master_ppdrawing;
 use super::notes::{NotesContainerBuilder, NotesPage};
 use super::persist::{PersistPtrBuilder, UserEditAtom};
 use super::records::{
-    RecordBuilder, create_docinfo_list_container, create_document_atom,
-    create_end_document, create_environment_minimal, create_main_master_container,
-    create_slide_list_with_text_master, record_type, wrap_dg_into_ppdrawing,
-    wrap_dgg_into_ppdrawing_group,
+    RecordBuilder, create_docinfo_list_container, create_document_atom, create_end_document,
+    create_environment_minimal, create_main_master_container, create_slide_list_with_text_master,
+    record_type, wrap_dg_into_ppdrawing, wrap_dgg_into_ppdrawing_group,
 };
 use super::shape_style::{
     ArrowStyle, FillStyle, LineCapStyle, LineJoinStyle, LineStyle, LineStyleConfig, ShadowStyle,
@@ -68,15 +68,14 @@ use super::text_format::{FontEntity, Paragraph, TextAlign};
 use crate::ppt::animation::AnimationInfo;
 use crate::ppt::encryption::{
     PptEncryptionProfile, WriterEncryptionMaterial, encrypt_pictures_for_write,
-    encrypt_powerpoint_document_for_write, prepare_writer_encryption,
-    validate_writer_password,
+    encrypt_powerpoint_document_for_write, prepare_writer_encryption, validate_writer_password,
+};
+use crate::ppt::header_footer::{
+    PowerPointHeaderFooter, PowerPointHeaderFooterParent, PowerPointHeaderFooterParentOrdinal,
+    PowerPointHeaderFooterScope,
 };
 use crate::ppt::modify_password::{
     PowerPointModifyPassword, validate_value as validate_modify_password,
-};
-use crate::ppt::header_footer::{
-    PowerPointHeaderFooter, PowerPointHeaderFooterParent,
-    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope,
 };
 use crate::ppt::view_info::{PowerPointSlideViewInfo, PowerPointViewKind};
 use litchi_cfb::writer::OleWriter;
@@ -391,6 +390,8 @@ struct WritableSlide {
     shapes: Vec<WritableShape>,
     /// Tables on this slide
     tables: Vec<PositionedTable>,
+    /// Native charts on this slide
+    charts: Vec<PositionedChart>,
     /// Slide notes text (simple)
     notes: Option<String>,
     /// Rich notes page
@@ -415,7 +416,7 @@ impl WritableSlide {
     /// group patriarch, the background shape, and every table group/cell.
     fn escher_shape_count(&self) -> u32 {
         let table_shapes: u32 = self.tables.iter().map(|t| t.table.shape_count()).sum();
-        2 + self.shapes.len() as u32 + table_shapes
+        2 + self.shapes.len() as u32 + table_shapes + self.charts.len() as u32
     }
 }
 
@@ -428,12 +429,8 @@ fn append_child_to_built_container(
             "PPT container is missing its record header".to_string(),
         ));
     }
-    let stored_len = u32::from_le_bytes([
-        container[4],
-        container[5],
-        container[6],
-        container[7],
-    ]) as usize;
+    let stored_len =
+        u32::from_le_bytes([container[4], container[5], container[6], container[7]]) as usize;
     if stored_len != container.len() - 8 {
         return Err(PptWriteError::InvalidData(
             "PPT container length does not match its payload".to_string(),
@@ -743,8 +740,7 @@ impl PptWriter {
         profile: PptEncryptionProfile,
     ) -> Result<(), PptWriteError> {
         let password = Zeroizing::new(password.into());
-        validate_writer_password(profile, password.as_str())
-            .map_err(PptWriteError::InvalidData)?;
+        validate_writer_password(profile, password.as_str()).map_err(PptWriteError::InvalidData)?;
         self.encryption = Some(PptWriterEncryption { profile, password });
         Ok(())
     }
@@ -850,6 +846,7 @@ impl PptWriter {
         self.slides.push(WritableSlide {
             shapes: Vec::new(),
             tables: Vec::new(),
+            charts: Vec::new(),
             notes: None,
             notes_page: None,
             comments: Vec::new(),
@@ -971,10 +968,8 @@ impl PptWriter {
         &mut self,
         value: PowerPointHeaderFooter,
     ) -> Result<(), PptWriteError> {
-        let value = Self::validated_header_footer(
-            value,
-            PowerPointHeaderFooterScope::PresentationSlides,
-        )?;
+        let value =
+            Self::validated_header_footer(value, PowerPointHeaderFooterScope::PresentationSlides)?;
         self.presentation_header_footer = Some(value);
         Ok(())
     }
@@ -994,10 +989,8 @@ impl PptWriter {
         &mut self,
         value: PowerPointHeaderFooter,
     ) -> Result<(), PptWriteError> {
-        let value = Self::validated_header_footer(
-            value,
-            PowerPointHeaderFooterScope::NotesAndHandouts,
-        )?;
+        let value =
+            Self::validated_header_footer(value, PowerPointHeaderFooterScope::NotesAndHandouts)?;
         self.notes_and_handouts_header_footer = Some(value);
         Ok(())
     }
@@ -1063,9 +1056,10 @@ impl PptWriter {
 
     /// Remove a header/footer override attached directly to one slide.
     pub fn clear_slide_header_footer(&mut self, slide: usize) -> Result<(), PptWriteError> {
-        let slide = self.slides.get_mut(slide).ok_or_else(|| {
-            PptWriteError::InvalidData(format!("Slide {} does not exist", slide))
-        })?;
+        let slide = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         slide.header_footer = None;
         Ok(())
     }
@@ -1454,6 +1448,88 @@ impl PptWriter {
             table,
         });
         Ok(())
+    }
+
+    /// Add a native chart to a slide
+    ///
+    /// The chart is embedded as an `Excel.Chart.8` OLE object: its data is
+    /// serialized into a BIFF8 chart workbook ([MS-OGRAPH]) persisted as an
+    /// `ExOleObjStg` record, declared in the document `ExObjList`, and
+    /// displayed through an OLE object frame shape on the slide.
+    ///
+    /// # Arguments
+    ///
+    /// * `slide` - Slide index
+    /// * `x`, `y` - Position (in points)
+    /// * `width`, `height` - Size (in points)
+    /// * `chart` - The chart definition (kind, title, categories, series)
+    pub fn add_chart(
+        &mut self,
+        slide: usize,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        chart: Chart,
+    ) -> Result<(), PptWriteError> {
+        if width <= 0 || height <= 0 {
+            return Err(PptWriteError::InvalidData(
+                "chart frame dimensions must be positive".to_string(),
+            ));
+        }
+        let workbook = chart.build_workbook()?;
+        let total: usize = self.slides.iter().map(|slide| slide.charts.len()).sum();
+        if total >= super::chart::MAX_CHART_OBJECTS {
+            return Err(PptWriteError::InvalidData(format!(
+                "presentation exceeds {} chart objects",
+                super::chart::MAX_CHART_OBJECTS
+            )));
+        }
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+        slide_data.charts.push(PositionedChart {
+            x: pt_to_emu_i32(x),
+            y: pt_to_emu_i32(y),
+            width: pt_to_emu_i32(width),
+            height: pt_to_emu_i32(height),
+            workbook,
+        });
+        Ok(())
+    }
+
+    /// Assign external-object and persist identifiers to every chart.
+    ///
+    /// Chart object identifiers continue above the hyperlink identifier seed
+    /// because both share the `ExObjId` namespace ([MS-PPT] 2.10.1).
+    fn plan_charts(
+        &self,
+        persist_builder: &mut PersistPtrBuilder,
+    ) -> Result<Vec<ChartPlan>, PptWriteError> {
+        let total: usize = self.slides.iter().map(|slide| slide.charts.len()).sum();
+        if total > super::chart::MAX_CHART_OBJECTS {
+            return Err(PptWriteError::InvalidData(format!(
+                "presentation exceeds {} chart objects",
+                super::chart::MAX_CHART_OBJECTS
+            )));
+        }
+        let mut next_id = self.hyperlinks.id_seed();
+        let mut plans = Vec::with_capacity(total);
+        for (slide_index, slide) in self.slides.iter().enumerate() {
+            for chart_index in 0..slide.charts.len() {
+                next_id = next_id.checked_add(1).ok_or_else(|| {
+                    PptWriteError::InvalidData("external-object ID space exhausted".to_string())
+                })?;
+                plans.push(ChartPlan {
+                    slide: slide_index,
+                    chart: chart_index,
+                    ex_obj_id: next_id,
+                    persist_id: persist_builder.allocate_id(),
+                });
+            }
+        }
+        Ok(plans)
     }
 
     /// Add a picture to a slide
@@ -2006,8 +2082,9 @@ impl PptWriter {
             doc_container.write_child(&slwt_notes);
         }
 
-        // 2.5.2) ExObjList for hyperlinks (if any)
-        let ex_obj_list = self.hyperlinks.build_ex_obj_list()?;
+        // 2.5.2) ExObjList for hyperlinks and embedded chart objects (if any)
+        let chart_plans = self.plan_charts(&mut persist_builder)?;
+        let ex_obj_list = super::chart::build_ex_obj_list(&self.hyperlinks, &chart_plans)?;
         if !ex_obj_list.is_empty() {
             doc_container.write_child(&ex_obj_list);
         }
@@ -2119,7 +2196,27 @@ impl PptWriter {
                 .iter()
                 .map(|s| convert_shape_to_escher(s, &self.hyperlinks))
                 .collect();
-            let dg = create_dg_container_with_tables(drawing_id, &escher_shapes, &slide.tables)?;
+            // Chart frames referencing this slide's embedded chart objects
+            let chart_frames: Vec<super::chart::ChartFrame> = chart_plans
+                .iter()
+                .filter(|plan| plan.slide == i)
+                .map(|plan| {
+                    let chart = &slide.charts[plan.chart];
+                    super::chart::ChartFrame {
+                        x: chart.x,
+                        y: chart.y,
+                        width: chart.width,
+                        height: chart.height,
+                        ex_obj_id: plan.ex_obj_id,
+                    }
+                })
+                .collect();
+            let dg = create_dg_container_with_charts(
+                drawing_id,
+                &escher_shapes,
+                &slide.tables,
+                &chart_frames,
+            )?;
             let pp_dg = wrap_dg_into_ppdrawing(&dg)?;
             slide_container.write_child(&pp_dg);
 
@@ -2191,6 +2288,18 @@ impl PptWriter {
                 let notes_bytes = notes_builder.build().map_err(std::io::Error::other)?;
                 ppt_stream.extend_from_slice(&notes_bytes);
             }
+        }
+
+        // 3.4) ExOleObjStg persisted storages for embedded chart objects
+        for plan in &chart_plans {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+            })?;
+            persist_builder.set_offset(plan.persist_id, offset);
+            let storage = super::chart::chart_storage_record(
+                &self.slides[plan.slide].charts[plan.chart].workbook,
+            )?;
+            ppt_stream.extend_from_slice(&storage);
         }
 
         let mut pictures_stream = if self.blip_store.is_empty() {
@@ -2317,11 +2426,8 @@ impl PptWriter {
         // 2.3) PPDrawingGroup wrapping Dgg Escher
         // Calculate per-slide shape counts (group + background + user shapes)
         let master_shapes = 6u32;
-        let slide_shape_counts: Vec<u32> = self
-            .slides
-            .iter()
-            .map(|s| s.escher_shape_count())
-            .collect();
+        let slide_shape_counts: Vec<u32> =
+            self.slides.iter().map(|s| s.escher_shape_count()).collect();
         // Build DggContainer with BStore if pictures are present
         let dgg = if !self.blip_store.is_empty() {
             let bstore = self.blip_store.build().map_err(PptWriteError::Io)?;
@@ -2367,8 +2473,9 @@ impl PptWriter {
             doc_container.write_child(&slwt);
         }
 
-        // ExObjList for hyperlinks (if any)
-        let ex_obj_list = self.hyperlinks.build_ex_obj_list()?;
+        // ExObjList for hyperlinks and embedded chart objects (if any)
+        let chart_plans = self.plan_charts(&mut persist_builder)?;
+        let ex_obj_list = super::chart::build_ex_obj_list(&self.hyperlinks, &chart_plans)?;
         if !ex_obj_list.is_empty() {
             doc_container.write_child(&ex_obj_list);
         }
@@ -2420,7 +2527,6 @@ impl PptWriter {
             }
         }
 
-
         if let Some(value) = &modify_password_tag {
             doc_container.write_child(value);
         }
@@ -2466,7 +2572,27 @@ impl PptWriter {
                 .iter()
                 .map(|s| convert_shape_to_escher(s, &self.hyperlinks))
                 .collect();
-            let dg = create_dg_container_with_tables(drawing_id, &escher_shapes, &slide.tables)?;
+            // Chart frames referencing this slide's embedded chart objects
+            let chart_frames: Vec<super::chart::ChartFrame> = chart_plans
+                .iter()
+                .filter(|plan| plan.slide == i)
+                .map(|plan| {
+                    let chart = &slide.charts[plan.chart];
+                    super::chart::ChartFrame {
+                        x: chart.x,
+                        y: chart.y,
+                        width: chart.width,
+                        height: chart.height,
+                        ex_obj_id: plan.ex_obj_id,
+                    }
+                })
+                .collect();
+            let dg = create_dg_container_with_charts(
+                drawing_id,
+                &escher_shapes,
+                &slide.tables,
+                &chart_frames,
+            )?;
             let pp_dg = wrap_dg_into_ppdrawing(&dg)?;
             slide_container.write_child(&pp_dg);
 
@@ -2511,6 +2637,18 @@ impl PptWriter {
 
         // 3.3) Notes containers - DISABLED for testing
         // Notes need more work - SlideListWithText instance=2, proper linking
+
+        // 3.4) ExOleObjStg persisted storages for embedded chart objects
+        for plan in &chart_plans {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+            })?;
+            persist_builder.set_offset(plan.persist_id, offset);
+            let storage = super::chart::chart_storage_record(
+                &self.slides[plan.slide].charts[plan.chart].workbook,
+            )?;
+            ppt_stream.extend_from_slice(&storage);
+        }
 
         let mut pictures_stream = if self.blip_store.is_empty() {
             None

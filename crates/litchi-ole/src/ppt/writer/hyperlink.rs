@@ -409,6 +409,24 @@ impl HyperlinkCollection {
         self.hyperlinks.iter()
     }
 
+    /// Highest allocated external-object identifier (0 when none).
+    ///
+    /// Hyperlink and OLE object identifiers share the `ExObjId` namespace, so
+    /// chart objects authored by [`super::chart`] continue above this seed.
+    pub(crate) fn id_seed(&self) -> u32 {
+        self.next_id.saturating_sub(1)
+    }
+
+    /// `ExHyperlink` child records in allocation order, without the
+    /// `ExObjList` container wrapper. Used when the document `ExObjList` also
+    /// embeds chart objects ([`super::chart::build_ex_obj_list`]).
+    pub(crate) fn build_ex_hyperlink_records(&self) -> Result<Vec<Vec<u8>>, std::io::Error> {
+        self.hyperlinks
+            .iter()
+            .map(|hyperlink| self.build_ex_hyperlink(hyperlink))
+            .collect()
+    }
+
     /// Build ExObjList container for document
     pub fn build_ex_obj_list(&self) -> Result<Vec<u8>, std::io::Error> {
         if self.hyperlinks.is_empty() {

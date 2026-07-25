@@ -971,7 +971,7 @@ pub fn create_dg_container_with_shapes(
     drawing_id: u32,
     shapes: &[UserShapeData],
 ) -> Result<Vec<u8>, PptError> {
-    create_dg_container_with_tables(drawing_id, shapes, &[])
+    create_dg_container_with_charts(drawing_id, shapes, &[], &[])
 }
 
 /// Create a DgContainer with user shapes and table groups.
@@ -980,17 +980,33 @@ pub fn create_dg_container_with_shapes(
 /// SpgrContainer; each table occupies one group shape id plus one id per
 /// cell. See [`super::table::build_table_spgr_container`] for the record
 /// layout.
+#[cfg(test)]
 pub(crate) fn create_dg_container_with_tables(
     drawing_id: u32,
     shapes: &[UserShapeData],
     tables: &[super::table::PositionedTable],
 ) -> Result<Vec<u8>, PptError> {
+    create_dg_container_with_charts(drawing_id, shapes, tables, &[])
+}
+
+/// Create a DgContainer with user shapes, table groups, and chart frames.
+///
+/// Chart frames (OLE object shapes referencing an embedded chart object)
+/// follow the tables, one shape id each. See
+/// [`super::chart::build_chart_sp_container`] for the record layout.
+pub(crate) fn create_dg_container_with_charts(
+    drawing_id: u32,
+    shapes: &[UserShapeData],
+    tables: &[super::table::PositionedTable],
+    charts: &[super::chart::ChartFrame],
+) -> Result<Vec<u8>, PptError> {
     let table_shape_count: u32 = tables.iter().map(|table| table.table.shape_count()).sum();
     let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::DG_CONTAINER);
 
-    // Total shapes = group + background + user shapes + table groups/cells
+    // Total shapes = group + background + user shapes + table groups/cells + chart frames
     let total_shapes = (shapes.len() as u32)
         .saturating_add(table_shape_count)
+        .saturating_add(charts.len() as u32)
         .saturating_add(2);
 
     // Add DG record
@@ -1037,6 +1053,13 @@ pub(crate) fn create_dg_container_with_tables(
         let table_container = super::table::build_table_spgr_container(table, table_group_spid)?;
         spgr_container.add_data(&table_container);
         table_group_spid += table.table.shape_count();
+    }
+
+    // Chart frames follow the tables, one shape id each.
+    for (index, frame) in charts.iter().enumerate() {
+        let chart_container =
+            super::chart::build_chart_sp_container(frame, table_group_spid + index as u32)?;
+        spgr_container.add_data(&chart_container);
     }
 
     // Add SpgrContainer to DgContainer
