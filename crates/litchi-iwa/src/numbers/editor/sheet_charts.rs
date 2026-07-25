@@ -28,6 +28,7 @@ mod series_error_bar_auto_fit;
 mod series_error_bars;
 mod series_fill;
 mod series_stroke;
+mod series_symbol;
 mod series_trendline;
 mod series_value_label_affixes;
 mod series_value_label_auto_fit;

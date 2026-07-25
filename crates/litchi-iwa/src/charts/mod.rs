@@ -40,6 +40,7 @@ pub(crate) mod series_fill;
 pub(crate) mod series_non_style;
 pub(crate) mod series_stroke;
 pub(crate) mod series_style;
+pub(crate) mod series_symbol;
 pub(crate) mod series_trendline;
 pub(crate) mod series_value_label_affixes;
 pub(crate) mod series_value_label_auto_fit;
@@ -75,6 +76,9 @@ pub use series_error_bars::{
 };
 pub use series_fill::ChartSeriesFillKind;
 pub use series_stroke::{ChartSeriesStroke, ChartSeriesStrokeKind, ChartSeriesStrokePattern};
+pub use series_symbol::{
+    ChartSeriesSymbol, ChartSeriesSymbolKind, ChartSeriesSymbolShape, ChartSeriesSymbolSize,
+};
 pub use series_trendline::{
     ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
     ChartSeriesTrendlinePolynomialOrder, ChartSeriesTrendlineType,
