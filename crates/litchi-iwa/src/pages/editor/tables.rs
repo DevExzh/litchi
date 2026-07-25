@@ -3,6 +3,7 @@
 mod comments;
 mod formula;
 mod layout;
+mod lock;
 mod sort;
 mod title;
 mod topology;
@@ -32,6 +33,7 @@ use crate::bundle::Bundle;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::protobuf::tst::{TableInfoArchive, TableModelArchive};
+use crate::table_lock::{TableLockState, table_lock_state_from_message};
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
@@ -68,6 +70,8 @@ pub struct PagesTableInfo {
     pub rows: usize,
     /// Number of addressable columns.
     pub columns: usize,
+    /// Interactive editing lock shown in the Arrange inspector.
+    pub lock_state: TableLockState,
 }
 
 /// Materialized values from one Pages table.
@@ -98,6 +102,7 @@ impl PagesTable {
 #[derive(Debug, Clone)]
 struct PagesTableGraph {
     info: PagesTableInfo,
+    drawable_archive: String,
     attachment_object_id: u64,
     formula_context_ids: Vec<u64>,
 }
@@ -773,6 +778,7 @@ fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
             }
         }
         result.push(PagesTableGraph {
+            drawable_archive: archive_name,
             attachment_object_id: attachment_reference.identifier,
             formula_context_ids,
             info: PagesTableInfo {
@@ -782,6 +788,7 @@ fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
                 name: model.table_name.clone(),
                 rows: model.number_of_rows as usize,
                 columns: model.number_of_columns as usize,
+                lock_state: table_lock_state_from_message(&message.data)?,
             },
         });
     }

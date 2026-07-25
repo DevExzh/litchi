@@ -7,10 +7,12 @@ use crate::bundle::Bundle;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::table_lock::TableLockState;
 
 mod comments;
 mod formula;
 mod graph;
+mod lock;
 mod sort;
 mod storage;
 mod title;
@@ -73,6 +75,8 @@ pub struct KeynoteSlideTableInfo {
     pub rows: usize,
     pub columns: usize,
     pub geometry: DrawableGeometry,
+    /// Interactive editing lock shown in the Arrange inspector.
+    pub lock_state: TableLockState,
 }
 
 /// Materialized non-empty cells from one Keynote table.

@@ -38,6 +38,7 @@ use crate::shapes::{
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
+use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
@@ -83,6 +84,8 @@ pub struct NumbersTableInfo {
     pub name: String,
     pub rows: usize,
     pub columns: usize,
+    /// Interactive editing lock shown in the Arrange inspector.
+    pub lock_state: TableLockState,
 }
 
 /// Stable identity and name of a sheet in workbook order.
@@ -185,15 +188,30 @@ impl NumbersEditor {
     }
 
     pub fn tables(&self) -> Result<Vec<NumbersTableInfo>> {
+        let locations = object_locations(&self.package)?;
         let mut tables = table_models(&self.package)?
             .into_iter()
-            .map(|descriptor| NumbersTableInfo {
-                object_id: descriptor.object_id,
-                name: descriptor.model.table_name,
-                rows: descriptor.model.number_of_rows as usize,
-                columns: descriptor.model.number_of_columns as usize,
+            .map(|descriptor| {
+                let archive_name = locations.get(&descriptor.table_info_id).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers table drawable {} is missing",
+                        descriptor.table_info_id
+                    ))
+                })?;
+                Ok(NumbersTableInfo {
+                    object_id: descriptor.object_id,
+                    name: descriptor.model.table_name,
+                    rows: descriptor.model.number_of_rows as usize,
+                    columns: descriptor.model.number_of_columns as usize,
+                    lock_state: crate::table_lock::table_lock_state_for_model(
+                        &self.package,
+                        archive_name,
+                        descriptor.table_info_id,
+                        descriptor.object_id,
+                    )?,
+                })
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>>>()?;
         tables.sort_by_key(|table| table.object_id);
         Ok(tables)
     }
@@ -3137,6 +3155,7 @@ mod table_dimension;
 mod table_duplicate;
 mod table_formula;
 mod table_headers;
+mod table_lock;
 mod table_move;
 mod table_sort;
 mod table_sparse_storage;

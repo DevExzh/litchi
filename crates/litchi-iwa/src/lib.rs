@@ -147,6 +147,8 @@ pub mod ref_graph;
 pub mod registry;
 pub mod snappy;
 pub mod structured;
+/// Typed native table lock controls shared by Pages, Numbers, and Keynote.
+pub mod table_lock;
 pub mod theme;
 pub mod varint;
 pub(crate) mod wire;

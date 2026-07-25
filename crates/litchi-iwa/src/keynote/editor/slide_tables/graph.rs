@@ -8,6 +8,7 @@ use crate::protobuf::tst::{TableInfoArchive, TableModelArchive};
 #[derive(Debug, Clone)]
 pub(super) struct SlideTableGraph {
     pub(super) info: KeynoteSlideTableInfo,
+    pub(super) table_archive: String,
     pub(super) slide_archive: String,
     pub(super) slide_component_id: u64,
 }
@@ -70,6 +71,7 @@ pub(super) fn slide_table_graph(
     }
     let model_id = table_info.table_model.identifier;
     let model = decode_table_model(&graph, model_id)?;
+    let table_archive = graph.archive_name(drawable_object_id)?.to_owned();
     let slide_archive = graph.archive_name(context.slide_id)?.to_owned();
     let slide_component_id = component_identifier_for_entry(editor.package(), &slide_archive)?
         .ok_or_else(|| {
@@ -77,6 +79,12 @@ pub(super) fn slide_table_graph(
                 "Keynote slide component {slide_archive} is not registered"
             ))
         })?;
+    let lock_state = crate::table_lock::table_lock_state(
+        editor.package(),
+        &table_archive,
+        drawable_object_id,
+        "Keynote",
+    )?;
     Ok(SlideTableGraph {
         info: KeynoteSlideTableInfo {
             slide_index,
@@ -87,7 +95,9 @@ pub(super) fn slide_table_graph(
             rows: model.number_of_rows as usize,
             columns: model.number_of_columns as usize,
             geometry: crate::shapes::geometry_from_drawable(&table_info.super_)?,
+            lock_state,
         },
+        table_archive,
         slide_archive,
         slide_component_id,
     })
