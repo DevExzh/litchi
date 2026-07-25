@@ -498,7 +498,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Formula document | `.odf`, `.otf` | ✅ | ✅ | ✅ | MathML mixed-content model, annotations, lossless source save, validated formula/template package construction from direct MathML roots, and a typed inert MathML tree editor (validated mutation, well-formed serialization with regenerated namespace prefixes, typed schemata builders, atomic `set_math` repackaging); no evaluation |
 | Image document | `.odi`, `.oti` | 🟡 | ✅ | 🟡 | Frames, linked/package/base64 images, text boxes, objects, tables, maps, and exact lossless save |
 | Master document | `.odm`, `.otm` | ✅ | ✅ | ✅ | Paragraphs, linked sections/subdocuments, indexes, styles, encryption, signing, builder, and mutable CRUD |
-| Web template | `.oth` | 🟡 | ✅ | 🟡 | Text semantic reader and exact lossless save; no dedicated authoring model |
+| Web template | `.oth` | ✅ | ✅ | ✅ | Text semantic reader, exact lossless save, and a dedicated authoring model (`WebDocumentBuilder` create-from-scratch, `MutableWebDocument` convert/edit) that re-validates every package through the web reader; `text-web` remains a legacy producer MIME |
 | Database front end | `.odb` | 🟡 | ✅ | 🟡 | Connections, settings, forms, reports, queries, tables, schemas, keys, indices, and package mutation; nothing is executed |
 | Flat OpenDocument | `.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`, `.fodi`, `.fodf` | ✅ | ✅ | ✅ | Family validation and exact lossless save through `FlatOpenDocument`, family-typed wrappers that open flat files through the full packaged semantic readers (text/tables, sheets/cells, slides/notes, drawings, charts, image frames), and mutable text/spreadsheet/presentation variants that splice edits back into the flat XML while preserving unmodified sections byte-identically; `.fodg`/`.fodc`/`.fodi` stay read-only and new binary media cannot be represented in flat saves |
 
@@ -687,7 +687,7 @@ typed VBA code-module model or macro-authoring support.
 | Formula/template | `.odf`, `.otf` | ✅ | 🟡 | Semantic MathML reader, lossless source save, and validated formula/template package construction |
 | Image/template | `.odi`, `.oti` | ✅ | 🟡 | Semantic reader and lossless save |
 | Master document/template | `.odm`, `.otm` | ✅ | ✅ | Semantic reader, builder, and mutable master document |
-| Web template | `.oth` | ✅ | 🟡 | Text-compatible reader and lossless save |
+| Web template | `.oth` | ✅ | ✅ | Text-compatible reader, lossless save, and dedicated authoring |
 | Database front end | `.odb` | ✅ | 🟡 | Semantic configuration plus bounded package mutation; no database execution |
 | Flat OpenDocument | `.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`, `.fodi`, `.fodf` | ✅ | 🟡 | Validation, semantic reading through the packaged family models, and exact lossless save |
 
