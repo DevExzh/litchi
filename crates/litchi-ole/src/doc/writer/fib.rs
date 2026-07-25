@@ -50,6 +50,8 @@ pub struct FibBuilder {
     /// Textbox text position
     textbox_start: u32,
     textbox_length: u32,
+    /// Header textbox story text length
+    header_textbox_length: u32,
     /// Complex (formatted) flag
     is_complex: bool,
 
@@ -144,6 +146,12 @@ pub struct FibBuilder {
     /// Textbox story text position table (PlcftxbxTxt) offset and size
     fc_plcftxbx_txt: u32,
     lcb_plcftxbx_txt: u32,
+    /// Header textbox story text position table (PlcfHdrtxbxTxt) offset and size
+    fc_plcf_hdr_txbx_txt: u32,
+    lcb_plcf_hdr_txbx_txt: u32,
+    /// Header document shape position table (PlcfSpaHdr) offset and size
+    fc_plc_spa_hdr: u32,
+    lcb_plc_spa_hdr: u32,
     /// Drawing group information (OfficeArtContent) offset and size
     fc_dgg_info: u32,
     lcb_dgg_info: u32,
@@ -172,6 +180,7 @@ impl FibBuilder {
             endnote_length: 0,
             textbox_start: 0,
             textbox_length: 0,
+            header_textbox_length: 0,
             is_complex: true, // Use complex format by default
             fc_stshf: 0,
             lcb_stshf: 0,
@@ -235,6 +244,10 @@ impl FibBuilder {
             lcb_plc_spa_mom: 0,
             fc_plcftxbx_txt: 0,
             lcb_plcftxbx_txt: 0,
+            fc_plcf_hdr_txbx_txt: 0,
+            lcb_plcf_hdr_txbx_txt: 0,
+            fc_plc_spa_hdr: 0,
+            lcb_plc_spa_hdr: 0,
             fc_dgg_info: 0,
             lcb_dgg_info: 0,
             fc_min: 0,
@@ -326,6 +339,11 @@ impl FibBuilder {
     /// Set ccpTxbx (textbox story character count).
     pub fn set_ccp_txbx(&mut self, length: u32) {
         self.textbox_length = length;
+    }
+
+    /// Set ccpHdrTxbx (header textbox story character count).
+    pub fn set_ccp_hdr_txbx(&mut self, length: u32) {
+        self.header_textbox_length = length;
     }
 
     /// Set footnote reference PLCF (PlcffndRef) offset and size
@@ -467,6 +485,18 @@ impl FibBuilder {
     pub fn set_plcftxbx_txt(&mut self, offset: u32, size: u32) {
         self.fc_plcftxbx_txt = offset;
         self.lcb_plcftxbx_txt = size;
+    }
+
+    /// Set header textbox story text position table (PlcfHdrtxbxTxt) offset and size.
+    pub fn set_plcf_hdr_txbx_txt(&mut self, offset: u32, size: u32) {
+        self.fc_plcf_hdr_txbx_txt = offset;
+        self.lcb_plcf_hdr_txbx_txt = size;
+    }
+
+    /// Set header document shape position table (PlcfSpaHdr) offset and size.
+    pub fn set_plc_spa_hdr(&mut self, offset: u32, size: u32) {
+        self.fc_plc_spa_hdr = offset;
+        self.lcb_plc_spa_hdr = size;
     }
 
     /// Set FibBase fields (Apache POI line 906-914)
@@ -643,7 +673,7 @@ impl FibBuilder {
         buf[36..40].copy_from_slice(&self.textbox_length.to_le_bytes());
 
         // field_11_ccpHdrTxbx: Character count in header textboxes
-        buf[40..44].copy_from_slice(&0u32.to_le_bytes());
+        buf[40..44].copy_from_slice(&self.header_textbox_length.to_le_bytes());
 
         // field_12-22: Reserved fields
         buf[44..88].fill(0);
@@ -702,7 +732,9 @@ impl FibBuilder {
         const STTBRGTPLC: usize = 96;
         const ATRDEXTRA: usize = 112; // Extended comment metadata
         const PLCSPAMOM: usize = 40; // Main document shape position table
+        const PLCSPAHDR: usize = 41; // Header document shape position table
         const PLCFTXBXTEXT: usize = 56; // Textbox story text positions
+        const PLCFHDRTXBXTEXT: usize = 58; // Header textbox story text positions
         const DGGINFO: usize = 50; // Drawing group information (OfficeArtContent)
 
         // Write field offsets and sizes
@@ -761,11 +793,18 @@ impl FibBuilder {
         set_field(buf, DOP, self.fc_dop, self.lcb_dop);
         set_field(buf, CLX, self.fc_clx, self.lcb_clx);
         set_field(buf, PLCSPAMOM, self.fc_plc_spa_mom, self.lcb_plc_spa_mom);
+        set_field(buf, PLCSPAHDR, self.fc_plc_spa_hdr, self.lcb_plc_spa_hdr);
         set_field(
             buf,
             PLCFTXBXTEXT,
             self.fc_plcftxbx_txt,
             self.lcb_plcftxbx_txt,
+        );
+        set_field(
+            buf,
+            PLCFHDRTXBXTEXT,
+            self.fc_plcf_hdr_txbx_txt,
+            self.lcb_plcf_hdr_txbx_txt,
         );
         set_field(buf, DGGINFO, self.fc_dgg_info, self.lcb_dgg_info);
 

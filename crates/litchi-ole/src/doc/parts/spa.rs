@@ -14,6 +14,8 @@ pub const SPA_LEN: usize = 26;
 /// FIB index (into `FileInformationBlock::get_table_pointer`) of the Main
 /// Document `fcPlcSpaMom`/`lcbPlcSpaMom` pair.
 pub(crate) const FIB_INDEX_PLC_SPA_MOM: usize = 40;
+/// FIB index of the Header Document `fcPlcSpaHdr`/`lcbPlcSpaHdr` pair.
+pub(crate) const FIB_INDEX_PLC_SPA_HDR: usize = 41;
 
 /// Horizontal position origin of a floating shape (Spa `bx`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -304,7 +304,14 @@ struct HeaderStoryData {
     plcfhdd: Vec<u8>,
     fields: Vec<u8>,
     char_count: u32,
+    /// Story-relative anchor CPs of header text boxes, paired with their
+    /// index into `DocWriter::header_shapes` (in insertion order).
+    shape_anchor_cps: Vec<(u32, u32)>,
 }
+
+/// PlcfHdd slot of the odd page header, which Word uses as the default
+/// header when the document does not use facing pages.
+const HEADER_SLOT_ODD: usize = 7;
 
 struct CommentStoryData {
     owners: Vec<u8>,
@@ -841,6 +848,11 @@ pub struct DocWriter {
     pictures: Vec<WriterPicture>,
     /// Primitive drawing shapes embedded via [`DocWriter::insert_floating_shape`]
     shapes: Vec<WriterShape>,
+    /// Text boxes anchored in the header story (odd header), in insertion order.
+    header_shapes: Vec<WriterShape>,
+    /// Paragraph indices within `header_odd` holding the text box anchors,
+    /// in insertion order (one per `header_shapes` entry).
+    header_shape_anchors: Vec<usize>,
     /// Next shape id to allocate (shared by pictures and drawing shapes).
     next_shape_id: u32,
     /// Password-to-open settings. The password is wiped when replaced, cleared, or dropped.
@@ -850,6 +862,39 @@ pub struct DocWriter {
 struct DocWriterEncryption {
     profile: DocEncryptionProfile,
     password: Zeroizing<String>,
+}
+
+/// Append one textbox story (main or header) to the text stream.
+///
+/// Per text box: its paragraphs (each `\r`-terminated, with `\n`/`\r`/`"\r\n"`
+/// as input separators) plus a trailing CR; one story-final CR is included
+/// in the returned story character count. Returns the story-relative start
+/// CP of each text box and the total story length (a ccp value).
+fn write_textbox_story_text(
+    texts: &[&str],
+    text_stream: &mut Vec<u8>,
+    current_cp: &mut u32,
+) -> Result<(Vec<u32>, u32), DocWriteError> {
+    let story_start_cp = *current_cp;
+    let mut start_cps = Vec::with_capacity(texts.len());
+    for text in texts {
+        start_cps.push(*current_cp - story_start_cp);
+        for paragraph in text.replace("\r\n", "\n").replace('\r', "\n").split('\n') {
+            let para_len = utf16_code_unit_len(paragraph)?;
+            for unit in paragraph.encode_utf16() {
+                text_stream.extend_from_slice(&unit.to_le_bytes());
+            }
+            text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+            *current_cp += para_len + 1;
+        }
+        // Trailing CR of this text box's text, as Word writes.
+        text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+        *current_cp += 1;
+    }
+    // Story-final CR, included in the ccp count.
+    text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+    *current_cp += 1;
+    Ok((start_cps, *current_cp - story_start_cp))
 }
 
 fn build_plcffld(field_char_cps: &[(u32, u16)], text_length: u32) -> Vec<u8> {
@@ -914,6 +959,8 @@ impl DocWriter {
             styles: Vec::new(),
             pictures: Vec::new(),
             shapes: Vec::new(),
+            header_shapes: Vec::new(),
+            header_shape_anchors: Vec::new(),
             next_shape_id: super::images::FIRST_PICTURE_SHAPE_ID,
             encryption: None,
         }
@@ -1203,6 +1250,57 @@ impl DocWriter {
         text: impl Into<String>,
     ) -> Result<(), DocWriteError> {
         self.insert_shape_run(shape, position, Some(text.into()))
+    }
+
+    /// Insert a text box anchored in the header story (the odd page header,
+    /// which Word also uses as the default header).
+    ///
+    /// The anchor is a single 0x0008 paragraph appended to the odd header's
+    /// paragraphs (created when absent); position and wrapping work like
+    /// [`Self::insert_floating_text_box`], but the shape position is recorded
+    /// in the Header Document's PlcfSpaHdr, the text goes to the header
+    /// textbox story (counted in ccpHdrTxbx, linked through PlcfHdrtxbxTxt),
+    /// and the shape joins the Header Document drawing of the fcDggInfo
+    /// OfficeArtContent. Header shapes use their own shape-id cluster
+    /// starting at 2049, so they never collide with main-story shapes.
+    ///
+    /// Set or replace header paragraphs BEFORE calling this method: the
+    /// anchor lives in paragraphs this method appends, and replacing the odd
+    /// header's paragraph list afterwards drops the anchor.
+    pub fn insert_header_text_box(
+        &mut self,
+        shape: super::shapes::DocDrawingShape,
+        position: super::images::FloatingPosition,
+        text: impl Into<String>,
+    ) -> Result<(), DocWriteError> {
+        let shape_index = u32::try_from(self.header_shapes.len()).map_err(|_| {
+            DocWriteError::InvalidData(
+                "DOC header text box count exceeds the 32-bit range".to_string(),
+            )
+        })?;
+        let shape_id = super::images::HEADER_FIRST_SHAPE_ID + shape_index;
+        let anchor_index = self.header_odd.as_ref().map_or(0, Vec::len);
+        let anchor_paragraph = HeaderFooterParagraph::from_runs(
+            vec![(
+                "\u{0008}".to_string(),
+                CharacterFormatting {
+                    special: Some(true),
+                    ..CharacterFormatting::default()
+                },
+            )],
+            ParagraphFormatting::default(),
+        );
+        self.header_odd
+            .get_or_insert_with(Vec::new)
+            .push(anchor_paragraph);
+        self.header_shape_anchors.push(anchor_index);
+        self.header_shapes.push(WriterShape {
+            shape,
+            shape_id,
+            position,
+            text: Some(text.into()),
+        });
+        Ok(())
     }
 
     /// Allocate the next shape id from the sequence shared by pictures and
@@ -2509,6 +2607,7 @@ impl DocWriter {
         let mut header_cp: u32 = 0;
         let mut cp_starts: [u32; 12] = [0; 12];
         let mut field_char_cps = Vec::new();
+        let mut shape_anchor_cps: Vec<(u32, u32)> = Vec::new();
 
         for i in 0..12 {
             cp_starts[i] = header_cp;
@@ -2517,7 +2616,24 @@ impl DocWriter {
                 let fc_story_start = checked_text_fc(text_fc_start, text_stream.len())?;
                 let mut story_chars = 0u32;
 
-                for paragraph in paragraphs {
+                for (paragraph_index, paragraph) in paragraphs.iter().enumerate() {
+                    // Odd-header paragraphs appended by insert_header_text_box
+                    // hold 0x0008 text box anchors; record their story CPs.
+                    if i == HEADER_SLOT_ODD
+                        && let Some(ordinal) = self
+                            .header_shape_anchors
+                            .iter()
+                            .position(|&anchor| anchor == paragraph_index)
+                    {
+                        shape_anchor_cps.push((
+                            header_cp + story_chars,
+                            u32::try_from(ordinal).map_err(|_| {
+                                DocWriteError::InvalidData(
+                                    "DOC header text box count exceeds the 32-bit range".to_string(),
+                                )
+                            })?,
+                        ));
+                    }
                     let fc_para_start = checked_text_fc(text_fc_start, text_stream.len())?;
                     let mut paragraph_chars = 0u32;
                     let mut last_chpx = None;
@@ -2662,6 +2778,7 @@ impl DocWriter {
             plcfhdd,
             fields,
             char_count: header_cp,
+            shape_anchor_cps,
         }))
     }
 
@@ -3262,6 +3379,36 @@ impl DocWriter {
             ));
         }
 
+        // Build header textbox story (after the main textbox story).
+        let header_texts: Vec<&str> = self
+            .header_shapes
+            .iter()
+            .map(|entry| entry.text.as_deref().expect("header shapes are text boxes"))
+            .collect();
+        let mut hdr_txbx_start_cps: Vec<u32> = Vec::new();
+        let mut ccp_hdr_txbx = 0u32;
+        if !header_texts.is_empty() {
+            let hdr_story_start_cp = current_cp;
+            let fc_story_start = text_fc_start + text_stream.len() as u32;
+            let (start_cps, ccp) =
+                write_textbox_story_text(&header_texts, &mut text_stream, &mut current_cp)?;
+            hdr_txbx_start_cps = start_cps;
+            ccp_hdr_txbx = ccp;
+            let fc_story_end = text_fc_start + text_stream.len() as u32;
+            chpx_entries.push((fc_story_start, fc_story_end, Vec::new()));
+            papx_entries.push((
+                fc_story_start,
+                fc_story_end,
+                build_papx_grpprl(&ParagraphFormatting::default()),
+            ));
+            pieces.push(Piece::new(
+                hdr_story_start_cp,
+                current_cp,
+                fc_story_start,
+                true,
+            ));
+        }
+
         let bookmark_tables = Self::build_bookmark_tables(&self.bookmarks, current_cp)?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists.
@@ -3304,6 +3451,9 @@ impl DocWriter {
         }
         if ccp_txbx > 0 {
             fib.set_ccp_txbx(ccp_txbx);
+        }
+        if ccp_hdr_txbx > 0 {
+            fib.set_ccp_hdr_txbx(ccp_hdr_txbx);
         }
 
         let mut table_offset = table_stream.len() as u32;
@@ -3559,10 +3709,15 @@ impl DocWriter {
         fib.set_plcfsed(table_offset, section_table.len() as u32);
         table_stream.extend_from_slice(&section_table);
 
-        // Floating pictures and shapes: shape position table (PlcfSpaMom) and
-        // the drawing group (fcDggInfo OfficeArtContent) that anchors the
-        // shapes to the document's drawing layer.
-        if !floating_anchors.is_empty() {
+        // Floating pictures and shapes: shape position tables (PlcfSpaMom /
+        // PlcfSpaHdr), the textbox story PLCs, and the drawing group
+        // (fcDggInfo OfficeArtContent) that anchors the shapes to the
+        // document's drawing layer.
+        let header_anchor_cps: &[(u32, u32)] = header_plcfhdd
+            .as_ref()
+            .map(|header| header.shape_anchor_cps.as_slice())
+            .unwrap_or(&[]);
+        if !floating_anchors.is_empty() || !header_anchor_cps.is_empty() {
             table_offset = table_stream.len() as u32;
             let floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> = floating_anchors
                 .iter()
@@ -3595,6 +3750,22 @@ impl DocWriter {
                     },
                 })
                 .collect();
+            let header_floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> =
+                header_anchor_cps
+                    .iter()
+                    .map(|&(anchor_cp, shape_index)| {
+                        let entry = &self.header_shapes[shape_index as usize];
+                        super::images::FloatingShapeInfo {
+                            anchor_cp,
+                            shape_id: entry.shape_id,
+                            content: super::images::FloatingShapeContent::Primitive(&entry.shape),
+                            width_twips: entry.shape.width_twips(),
+                            height_twips: entry.shape.height_twips(),
+                            position: &entry.position,
+                            text: entry.text.as_deref(),
+                        }
+                    })
+                    .collect();
             if !txbx_start_cps.is_empty() {
                 let txbx_shape_ids: Vec<u32> =
                     textbox_shapes.iter().map(|entry| entry.shape_id).collect();
@@ -3607,13 +3778,42 @@ impl DocWriter {
                 table_stream.extend_from_slice(&plcf_txbx);
                 table_offset = table_stream.len() as u32;
             }
-            let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
-            fib.set_plc_spa_mom(table_offset, plcf_spa.len() as u32);
-            table_stream.extend_from_slice(&plcf_spa);
-            table_offset = table_stream.len() as u32;
+            if !hdr_txbx_start_cps.is_empty() {
+                let hdr_shape_ids: Vec<u32> =
+                    self.header_shapes.iter().map(|entry| entry.shape_id).collect();
+                let plcf_hdr_txbx = super::shapes::build_plcf_txbx_txt(
+                    &hdr_shape_ids,
+                    &hdr_txbx_start_cps,
+                    ccp_hdr_txbx,
+                );
+                fib.set_plcf_hdr_txbx_txt(table_offset, plcf_hdr_txbx.len() as u32);
+                table_stream.extend_from_slice(&plcf_hdr_txbx);
+                table_offset = table_stream.len() as u32;
+            }
+            if !floating_shapes.is_empty() {
+                let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
+                fib.set_plc_spa_mom(table_offset, plcf_spa.len() as u32);
+                table_stream.extend_from_slice(&plcf_spa);
+                table_offset = table_stream.len() as u32;
+            }
+            if !header_floating_shapes.is_empty() {
+                let header_char_count = header_plcfhdd
+                    .as_ref()
+                    .map(|header| header.char_count)
+                    .unwrap_or(0);
+                let plcf_spa_hdr =
+                    super::images::build_plcf_spa(&header_floating_shapes, header_char_count);
+                fib.set_plc_spa_hdr(table_offset, plcf_spa_hdr.len() as u32);
+                table_stream.extend_from_slice(&plcf_spa_hdr);
+                table_offset = table_stream.len() as u32;
+            }
 
             let total_shapes = (self.pictures.len() + self.shapes.len()) as u32;
-            let dgg_info = super::images::build_dgg_info(&floating_shapes, total_shapes);
+            let dgg_info = super::images::build_dgg_info(
+                &floating_shapes,
+                &header_floating_shapes,
+                total_shapes,
+            );
             fib.set_dgg_info(table_offset, dgg_info.len() as u32);
             table_stream.extend_from_slice(&dgg_info);
         }
@@ -4009,6 +4209,36 @@ impl DocWriter {
             ));
         }
 
+        // Build header textbox story (after the main textbox story).
+        let header_texts: Vec<&str> = self
+            .header_shapes
+            .iter()
+            .map(|entry| entry.text.as_deref().expect("header shapes are text boxes"))
+            .collect();
+        let mut hdr_txbx_start_cps: Vec<u32> = Vec::new();
+        let mut ccp_hdr_txbx = 0u32;
+        if !header_texts.is_empty() {
+            let hdr_story_start_cp = current_cp;
+            let fc_story_start = text_fc_start + text_stream.len() as u32;
+            let (start_cps, ccp) =
+                write_textbox_story_text(&header_texts, &mut text_stream, &mut current_cp)?;
+            hdr_txbx_start_cps = start_cps;
+            ccp_hdr_txbx = ccp;
+            let fc_story_end = text_fc_start + text_stream.len() as u32;
+            chpx_entries.push((fc_story_start, fc_story_end, Vec::new()));
+            papx_entries.push((
+                fc_story_start,
+                fc_story_end,
+                build_papx_grpprl(&ParagraphFormatting::default()),
+            ));
+            pieces.push(Piece::new(
+                hdr_story_start_cp,
+                current_cp,
+                fc_story_start,
+                true,
+            ));
+        }
+
         let bookmark_tables = Self::build_bookmark_tables(&self.bookmarks, current_cp)?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists (same as save()).
@@ -4047,6 +4277,9 @@ impl DocWriter {
         }
         if ccp_txbx > 0 {
             fib.set_ccp_txbx(ccp_txbx);
+        }
+        if ccp_hdr_txbx > 0 {
+            fib.set_ccp_hdr_txbx(ccp_hdr_txbx);
         }
 
         let mut table_offset = table_stream.len() as u32;
@@ -4286,10 +4519,15 @@ impl DocWriter {
         fib.set_plcfsed(table_offset, section_table.len() as u32);
         table_stream.extend_from_slice(&section_table);
 
-        // Floating pictures and shapes: shape position table (PlcfSpaMom) and
-        // the drawing group (fcDggInfo OfficeArtContent) that anchors the
-        // shapes to the document's drawing layer.
-        if !floating_anchors.is_empty() {
+        // Floating pictures and shapes: shape position tables (PlcfSpaMom /
+        // PlcfSpaHdr), the textbox story PLCs, and the drawing group
+        // (fcDggInfo OfficeArtContent) that anchors the shapes to the
+        // document's drawing layer.
+        let header_anchor_cps: &[(u32, u32)] = header_plcfhdd
+            .as_ref()
+            .map(|header| header.shape_anchor_cps.as_slice())
+            .unwrap_or(&[]);
+        if !floating_anchors.is_empty() || !header_anchor_cps.is_empty() {
             table_offset = table_stream.len() as u32;
             let floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> = floating_anchors
                 .iter()
@@ -4322,6 +4560,22 @@ impl DocWriter {
                     },
                 })
                 .collect();
+            let header_floating_shapes: Vec<super::images::FloatingShapeInfo<'_>> =
+                header_anchor_cps
+                    .iter()
+                    .map(|&(anchor_cp, shape_index)| {
+                        let entry = &self.header_shapes[shape_index as usize];
+                        super::images::FloatingShapeInfo {
+                            anchor_cp,
+                            shape_id: entry.shape_id,
+                            content: super::images::FloatingShapeContent::Primitive(&entry.shape),
+                            width_twips: entry.shape.width_twips(),
+                            height_twips: entry.shape.height_twips(),
+                            position: &entry.position,
+                            text: entry.text.as_deref(),
+                        }
+                    })
+                    .collect();
             if !txbx_start_cps.is_empty() {
                 let txbx_shape_ids: Vec<u32> =
                     textbox_shapes.iter().map(|entry| entry.shape_id).collect();
@@ -4334,13 +4588,42 @@ impl DocWriter {
                 table_stream.extend_from_slice(&plcf_txbx);
                 table_offset = table_stream.len() as u32;
             }
-            let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
-            fib.set_plc_spa_mom(table_offset, plcf_spa.len() as u32);
-            table_stream.extend_from_slice(&plcf_spa);
-            table_offset = table_stream.len() as u32;
+            if !hdr_txbx_start_cps.is_empty() {
+                let hdr_shape_ids: Vec<u32> =
+                    self.header_shapes.iter().map(|entry| entry.shape_id).collect();
+                let plcf_hdr_txbx = super::shapes::build_plcf_txbx_txt(
+                    &hdr_shape_ids,
+                    &hdr_txbx_start_cps,
+                    ccp_hdr_txbx,
+                );
+                fib.set_plcf_hdr_txbx_txt(table_offset, plcf_hdr_txbx.len() as u32);
+                table_stream.extend_from_slice(&plcf_hdr_txbx);
+                table_offset = table_stream.len() as u32;
+            }
+            if !floating_shapes.is_empty() {
+                let plcf_spa = super::images::build_plcf_spa(&floating_shapes, text_length);
+                fib.set_plc_spa_mom(table_offset, plcf_spa.len() as u32);
+                table_stream.extend_from_slice(&plcf_spa);
+                table_offset = table_stream.len() as u32;
+            }
+            if !header_floating_shapes.is_empty() {
+                let header_char_count = header_plcfhdd
+                    .as_ref()
+                    .map(|header| header.char_count)
+                    .unwrap_or(0);
+                let plcf_spa_hdr =
+                    super::images::build_plcf_spa(&header_floating_shapes, header_char_count);
+                fib.set_plc_spa_hdr(table_offset, plcf_spa_hdr.len() as u32);
+                table_stream.extend_from_slice(&plcf_spa_hdr);
+                table_offset = table_stream.len() as u32;
+            }
 
             let total_shapes = (self.pictures.len() + self.shapes.len()) as u32;
-            let dgg_info = super::images::build_dgg_info(&floating_shapes, total_shapes);
+            let dgg_info = super::images::build_dgg_info(
+                &floating_shapes,
+                &header_floating_shapes,
+                total_shapes,
+            );
             fib.set_dgg_info(table_offset, dgg_info.len() as u32);
             table_stream.extend_from_slice(&dgg_info);
         }

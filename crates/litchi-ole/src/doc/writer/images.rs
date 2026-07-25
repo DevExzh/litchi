@@ -669,6 +669,13 @@ pub(crate) fn build_plcf_spa(shapes: &[FloatingShapeInfo<'_>], final_cp: u32) ->
 
 /// OfficeArtWordDrawing `dgglbl` value for the Main Document drawing.
 const DGGLBL_MAIN_DOCUMENT: u8 = 0x00;
+/// OfficeArtWordDrawing `dgglbl` value for the Header Document drawing.
+const DGGLBL_HEADER_DOCUMENT: u8 = 0x01;
+/// Shape id assigned to the first header-story shape. Each drawing owns a
+/// cluster of shape ids ([MS-ODRAW] OfficeArtIDCL): the Main Document
+/// drawing uses the cluster starting at 1024, the Header Document drawing
+/// the next one.
+pub(crate) const HEADER_FIRST_SHAPE_ID: u32 = FIRST_PICTURE_SHAPE_ID + SHAPE_IDS_PER_CLUSTER;
 /// OfficeArtFDG `csp` counting mode: shapes plus the group shape.
 const DG_GROUP_SHAPE_COUNT: u32 = 1;
 /// OfficeArtFSP payload length (spid + flags).
@@ -679,25 +686,107 @@ const SPGR_PAYLOAD_LEN: u32 = 16;
 const WORD_CLIENT_ANCHOR_LEN: u32 = 4;
 /// OfficeArtClientData payload length used by Word for shapes.
 const CLIENT_DATA_LEN: u32 = 4;
-/// OfficeArtFDGG cluster-table entry count for a single drawing.
-const DGG_SINGLE_CLUSTER: u32 = 1;
-/// OfficeArtFDG `recInstance`: identifier of the drawing (1-based).
-const DG_INSTANCE_FIRST_DRAWING: u16 = 1;
-/// OfficeArtIDCL `dgid` of the single drawing written by this writer.
-const IDCL_FIRST_DRAWING: u32 = 1;
+/// OfficeArtIDCL `dgid` of the Main Document drawing.
+const DGID_MAIN_DOCUMENT: u32 = 1;
+/// OfficeArtIDCL `dgid` of the Header Document drawing.
+const DGID_HEADER_DOCUMENT: u32 = 2;
 
 /// Compute the OfficeArtFDGG `spidMax`: the start of the next shape-id
-/// cluster beyond every allocated picture shape id.
-fn spid_max(total_pictures: u32) -> u32 {
-    let highest = FIRST_PICTURE_SHAPE_ID + total_pictures;
-    highest.saturating_add(SHAPE_IDS_PER_CLUSTER - highest % SHAPE_IDS_PER_CLUSTER)
+/// cluster beyond the highest allocated shape id.
+fn spid_max(highest_shape_id: u32) -> u32 {
+    highest_shape_id
+        .saturating_add(SHAPE_IDS_PER_CLUSTER - highest_shape_id % SHAPE_IDS_PER_CLUSTER)
+}
+
+/// Append one OfficeArtWordDrawing element (dgglbl byte + OfficeArtDgContainer
+/// holding the drawing's group shape and one shape per floating picture or
+/// primitive). `dgid` is the drawing identifier (1 = Main, 2 = Header).
+fn write_dg_container(
+    out: &mut Vec<u8>,
+    dgglbl: u8,
+    dgid: u16,
+    first_shape_id: u32,
+    shapes: &[FloatingShapeInfo<'_>],
+    bse_index_start: u32,
+) {
+    out.push(dgglbl);
+    let dg_container_start = out.len();
+    write_record_header(out, VERSION_CONTAINER, 0, RECORD_DG_CONTAINER, 0);
+
+    // OfficeArtFDG: shape count (including the group shape) and next free spid.
+    let shape_count = shapes.len() as u32 + DG_GROUP_SHAPE_COUNT;
+    write_record_header(out, VERSION_DG, dgid, RECORD_DG, 8);
+    out.extend_from_slice(&shape_count.to_le_bytes()); // csp
+    out.extend_from_slice(&(first_shape_id + shapes.len() as u32).to_le_bytes()); // spidCur
+
+    // OfficeArtSpgrContainer: the drawing's group shape plus all shapes.
+    let spgr_container_start = out.len();
+    write_record_header(out, VERSION_CONTAINER, 0, RECORD_SPGR_CONTAINER, 0);
+
+    // Group shape: empty bounds rectangle and a group/patriarch FSP.
+    let group_container_start = out.len();
+    write_record_header(out, VERSION_CONTAINER, 0, RECORD_SP_CONTAINER, 0);
+    write_record_header(out, VERSION_SPGR, 0, RECORD_SPGR, SPGR_PAYLOAD_LEN);
+    out.extend_from_slice(&[0; SPGR_PAYLOAD_LEN as usize]);
+    write_record_header(out, VERSION_SP, 0, RECORD_SP, FSP_PAYLOAD_LEN);
+    out.extend_from_slice(&GROUP_SHAPE_ID.to_le_bytes());
+    out.extend_from_slice(&(SP_FLAG_GROUP | SP_FLAG_PATRIARCH).to_le_bytes());
+    patch_record_len(out, group_container_start);
+
+    // One shape per floating picture or primitive. Pictures reference their
+    // BSE through a 1-based pib index assigned in document order; text boxes
+    // reference their FTXBXS entry the same way through the TXID (each
+    // drawing's textbox PLC is indexed independently).
+    let mut bse_index = bse_index_start;
+    let mut ftxbxs_index = 0;
+    for (index, shape) in shapes.iter().enumerate() {
+        let shape_start = out.len();
+        write_record_header(out, VERSION_CONTAINER, 0, RECORD_SP_CONTAINER, 0);
+        write_record_header(out, VERSION_SP, shape.shape_type(), RECORD_SP, FSP_PAYLOAD_LEN);
+        out.extend_from_slice(&shape.shape_id.to_le_bytes());
+        out.extend_from_slice(&(SP_FLAG_HAVE_ANCHOR | SP_FLAG_HAVE_SHAPE_TYPE).to_le_bytes());
+        match &shape.content {
+            // OfficeArtOPT: pib referencing this picture's BSE.
+            FloatingShapeContent::Picture(_) => {
+                write_opt_record(out, &[(OPT_PIB_BLIP_INDEX, bse_index)]);
+                bse_index += 1;
+            },
+            // OfficeArtOPT: fill/line colors and boolean style properties.
+            FloatingShapeContent::Primitive(primitive) => {
+                super::shapes::write_shape_opt(out, primitive);
+            },
+        }
+        // ClientAnchor: index of this shape's anchor CP in the PlcfSpa.
+        write_record_header(out, VERSION_ATOM, 0, RECORD_CLIENT_ANCHOR, WORD_CLIENT_ANCHOR_LEN);
+        out.extend_from_slice(&(index as u32).to_le_bytes());
+        // OfficeArtClientData: present but unused.
+        write_record_header(out, VERSION_ATOM, 0, RECORD_CLIENT_DATA, CLIENT_DATA_LEN);
+        out.extend_from_slice(&0u32.to_le_bytes());
+        // OfficeArtClientTextbox: links a text box to its FTXBXS entry.
+        if shape.text.is_some() {
+            super::shapes::write_client_textbox(out, ftxbxs_index);
+            ftxbxs_index += 1;
+        }
+        patch_record_len(out, shape_start);
+    }
+
+    patch_record_len(out, spgr_container_start);
+    patch_record_len(out, dg_container_start);
 }
 
 /// Build the OfficeArtContent referenced by `fcDggInfo` ([MS-DOC] 2.9.171):
 /// an OfficeArtDggContainer (drawing defaults plus the blip store) followed
-/// by the Main Document's OfficeArtWordDrawing (dgglbl + OfficeArtDgContainer
-/// holding one picture-frame shape per floating picture).
-pub(crate) fn build_dgg_info(shapes: &[FloatingShapeInfo<'_>], total_pictures: u32) -> Vec<u8> {
+/// by one OfficeArtWordDrawing per non-empty drawing — the Main Document
+/// drawing first, then the Header Document drawing.
+///
+/// `allocated_main_shapes` counts every shape id allocated in the Main
+/// Document cluster (inline and floating pictures plus main-story shapes);
+/// it only feeds the advisory spidMax/cluster bookkeeping.
+pub(crate) fn build_dgg_info(
+    main_shapes: &[FloatingShapeInfo<'_>],
+    header_shapes: &[FloatingShapeInfo<'_>],
+    allocated_main_shapes: u32,
+) -> Vec<u8> {
     let mut out = Vec::new();
 
     // ── OfficeArtDggContainer ──
@@ -705,24 +794,44 @@ pub(crate) fn build_dgg_info(shapes: &[FloatingShapeInfo<'_>], total_pictures: u
     write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_DGG_CONTAINER, 0);
 
     // OfficeArtFDGG: spidMax, cluster table, saved shape/drawing counts.
-    const DGG_PAYLOAD_LEN: u32 = 24; // 4 header fields + one OfficeArtIDCL
-    write_record_header(&mut out, VERSION_ATOM, 0, RECORD_DGG, DGG_PAYLOAD_LEN);
-    out.extend_from_slice(&spid_max(total_pictures).to_le_bytes()); // spidMax
-    out.extend_from_slice(&DGG_SINGLE_CLUSTER.to_le_bytes()); // cidcl
-    let shape_count = shapes.len() as u32 + DG_GROUP_SHAPE_COUNT;
-    out.extend_from_slice(&shape_count.to_le_bytes()); // cspSaved
-    out.extend_from_slice(&DGG_SINGLE_CLUSTER.to_le_bytes()); // cdgSaved
-    out.extend_from_slice(&IDCL_FIRST_DRAWING.to_le_bytes()); // rgidcl[0].dgid
-    out.extend_from_slice(&shape_count.to_le_bytes()); // rgidcl[0].cspidCur
+    let has_main_drawing = !main_shapes.is_empty();
+    let has_header_drawing = !header_shapes.is_empty();
+    let drawing_count = u32::from(has_main_drawing) + u32::from(has_header_drawing);
+    let highest_shape_id = if has_header_drawing {
+        HEADER_FIRST_SHAPE_ID + header_shapes.len() as u32
+    } else {
+        FIRST_PICTURE_SHAPE_ID + allocated_main_shapes
+    };
+    let dgg_payload_len = 16 + 8 * drawing_count;
+    write_record_header(&mut out, VERSION_ATOM, 0, RECORD_DGG, dgg_payload_len);
+    out.extend_from_slice(&spid_max(highest_shape_id).to_le_bytes()); // spidMax
+    out.extend_from_slice(&drawing_count.to_le_bytes()); // cidcl
+    let saved_shapes = main_shapes.len() as u32
+        + header_shapes.len() as u32
+        + drawing_count * DG_GROUP_SHAPE_COUNT;
+    out.extend_from_slice(&saved_shapes.to_le_bytes()); // cspSaved
+    out.extend_from_slice(&drawing_count.to_le_bytes()); // cdgSaved
+    // rgidcl: one OfficeArtIDCL per drawing, each owning a spid cluster.
+    if has_main_drawing {
+        out.extend_from_slice(&DGID_MAIN_DOCUMENT.to_le_bytes());
+        out.extend_from_slice(&(DG_GROUP_SHAPE_COUNT + allocated_main_shapes).to_le_bytes());
+    }
+    if has_header_drawing {
+        out.extend_from_slice(&DGID_HEADER_DOCUMENT.to_le_bytes());
+        out.extend_from_slice(
+            &(DG_GROUP_SHAPE_COUNT + header_shapes.len() as u32).to_le_bytes(),
+        );
+    }
 
     // OfficeArtBStoreContainer: one FBSE (with embedded BLIP) per picture.
+    // (Only the Main Document drawing can contain pictures.)
     let bstore_start = out.len();
-    let picture_count = shapes
+    let picture_count = main_shapes
         .iter()
         .filter(|shape| matches!(shape.content, FloatingShapeContent::Picture(_)))
         .count();
     write_record_header(&mut out, VERSION_CONTAINER, picture_count as u16, RECORD_BSTORE_CONTAINER, 0);
-    for shape in shapes {
+    for shape in main_shapes {
         if let FloatingShapeContent::Picture(picture) = shape.content {
             write_bse_with_embedded_blip(&mut out, picture, shape.shape_id);
         }
@@ -731,80 +840,27 @@ pub(crate) fn build_dgg_info(shapes: &[FloatingShapeInfo<'_>], total_pictures: u
 
     patch_record_len(&mut out, dgg_container_start);
 
-    // ── OfficeArtWordDrawing for the Main Document ──
-    out.push(DGGLBL_MAIN_DOCUMENT);
-    let dg_container_start = out.len();
-    write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_DG_CONTAINER, 0);
-
-    // OfficeArtFDG: shape count (including the group shape) and next free spid.
-    write_record_header(
-        &mut out,
-        VERSION_DG,
-        DG_INSTANCE_FIRST_DRAWING,
-        RECORD_DG,
-        8,
-    );
-    out.extend_from_slice(&shape_count.to_le_bytes()); // csp
-    out.extend_from_slice(&(FIRST_PICTURE_SHAPE_ID + shapes.len() as u32).to_le_bytes()); // spidCur
-
-    // OfficeArtSpgrContainer: the drawing's group shape plus all shapes.
-    let spgr_container_start = out.len();
-    write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_SPGR_CONTAINER, 0);
-
-    // Group shape: empty bounds rectangle and a group/patriarch FSP.
-    let group_container_start = out.len();
-    write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_SP_CONTAINER, 0);
-    write_record_header(&mut out, VERSION_SPGR, 0, RECORD_SPGR, SPGR_PAYLOAD_LEN);
-    out.extend_from_slice(&[0; SPGR_PAYLOAD_LEN as usize]);
-    write_record_header(&mut out, VERSION_SP, 0, RECORD_SP, FSP_PAYLOAD_LEN);
-    out.extend_from_slice(&GROUP_SHAPE_ID.to_le_bytes());
-    out.extend_from_slice(&(SP_FLAG_GROUP | SP_FLAG_PATRIARCH).to_le_bytes());
-    patch_record_len(&mut out, group_container_start);
-
-    // One shape per floating picture or primitive. Pictures reference their
-    // BSE through a 1-based pib index assigned in document order; text boxes
-    // reference their FTXBXS entry the same way through the TXID.
-    let mut bse_index = OPT_PIB_FIRST_BSE;
-    let mut ftxbxs_index = 0;
-    for (index, shape) in shapes.iter().enumerate() {
-        let shape_start = out.len();
-        write_record_header(&mut out, VERSION_CONTAINER, 0, RECORD_SP_CONTAINER, 0);
-        write_record_header(
+    // ── OfficeArtWordDrawing elements, main drawing first ──
+    if has_main_drawing {
+        write_dg_container(
             &mut out,
-            VERSION_SP,
-            shape.shape_type(),
-            RECORD_SP,
-            FSP_PAYLOAD_LEN,
+            DGGLBL_MAIN_DOCUMENT,
+            DGID_MAIN_DOCUMENT as u16,
+            FIRST_PICTURE_SHAPE_ID,
+            main_shapes,
+            OPT_PIB_FIRST_BSE,
         );
-        out.extend_from_slice(&shape.shape_id.to_le_bytes());
-        out.extend_from_slice(&(SP_FLAG_HAVE_ANCHOR | SP_FLAG_HAVE_SHAPE_TYPE).to_le_bytes());
-        match &shape.content {
-            // OfficeArtOPT: pib referencing this picture's BSE.
-            FloatingShapeContent::Picture(_) => {
-                write_opt_record(&mut out, &[(OPT_PIB_BLIP_INDEX, bse_index)]);
-                bse_index += 1;
-            },
-            // OfficeArtOPT: fill/line colors and boolean style properties.
-            FloatingShapeContent::Primitive(primitive) => {
-                super::shapes::write_shape_opt(&mut out, primitive);
-            },
-        }
-        // ClientAnchor: index of this shape's anchor CP in the PlcfSpa.
-        write_record_header(&mut out, VERSION_ATOM, 0, RECORD_CLIENT_ANCHOR, WORD_CLIENT_ANCHOR_LEN);
-        out.extend_from_slice(&(index as u32).to_le_bytes());
-        // OfficeArtClientData: present but unused.
-        write_record_header(&mut out, VERSION_ATOM, 0, RECORD_CLIENT_DATA, CLIENT_DATA_LEN);
-        out.extend_from_slice(&0u32.to_le_bytes());
-        // OfficeArtClientTextbox: links a text box to its FTXBXS entry.
-        if shape.text.is_some() {
-            super::shapes::write_client_textbox(&mut out, ftxbxs_index);
-            ftxbxs_index += 1;
-        }
-        patch_record_len(&mut out, shape_start);
     }
-
-    patch_record_len(&mut out, spgr_container_start);
-    patch_record_len(&mut out, dg_container_start);
+    if has_header_drawing {
+        write_dg_container(
+            &mut out,
+            DGGLBL_HEADER_DOCUMENT,
+            DGID_HEADER_DOCUMENT as u16,
+            HEADER_FIRST_SHAPE_ID,
+            header_shapes,
+            OPT_PIB_FIRST_BSE + picture_count as u32,
+        );
+    }
 
     out
 }
@@ -1087,10 +1143,21 @@ mod tests {
 
         let mut records = Vec::new();
         let (_ver, _inst, _record_type, len) = parse_record_header(data, start);
-        let dgg_container_end = start + RECORD_HEADER_LEN + len as usize;
-        walk(data, start, dgg_container_end, &mut records);
-        // Skip the OfficeArtWordDrawing dgglbl byte before the DgContainer.
-        walk(data, dgg_container_end + 1, end, &mut records);
+        let mut drawing_offset = start + RECORD_HEADER_LEN + len as usize;
+        walk(data, start, drawing_offset, &mut records);
+        // Each OfficeArtWordDrawing: dgglbl byte followed by a DgContainer.
+        while drawing_offset + 1 + RECORD_HEADER_LEN <= end {
+            let dgglbl = data[drawing_offset];
+            assert!(dgglbl <= 1, "dgglbl must be 0 (main) or 1 (header)");
+            let (_ver, _inst, _record_type, len) = parse_record_header(data, drawing_offset + 1);
+            walk(
+                data,
+                drawing_offset + 1,
+                drawing_offset + 1 + RECORD_HEADER_LEN + len as usize,
+                &mut records,
+            );
+            drawing_offset += 1 + RECORD_HEADER_LEN + len as usize;
+        }
         records
     }
 
@@ -1101,7 +1168,7 @@ mod tests {
         let positions = sample_positions();
         let shapes = floating_shapes(&png, &jpeg, &positions);
 
-        let dgg = build_dgg_info(&shapes, 3);
+        let dgg = build_dgg_info(&shapes, &[], 3);
         let records = collect_records(&dgg, 0, dgg.len());
 
         // Top level: DggContainer, then dgglbl + DgContainer.
@@ -1120,7 +1187,7 @@ mod tests {
         assert_eq!(spid_max, 2 * SHAPE_IDS_PER_CLUSTER);
         assert_eq!(
             u32::from_le_bytes(dgg_payload[4..8].try_into().unwrap()),
-            DGG_SINGLE_CLUSTER
+            1 // one drawing
         );
         // cspSaved = 2 shapes + group; cdgSaved = 1 drawing.
         assert_eq!(u32::from_le_bytes(dgg_payload[8..12].try_into().unwrap()), 3);
@@ -1202,7 +1269,7 @@ mod tests {
         let positions = sample_positions();
         let shapes = floating_shapes(&png, &jpeg, &positions);
 
-        let dgg = build_dgg_info(&shapes, 2);
+        let dgg = build_dgg_info(&shapes, &[], 2);
         let records = collect_records(&dgg, 0, dgg.len());
         let bses: Vec<_> = records.iter().filter(|record| record.3 == RECORD_BSE).collect();
         assert_eq!(bses.len(), 2);
@@ -1226,11 +1293,82 @@ mod tests {
 
     #[test]
     fn spid_max_rounds_up_to_next_cluster() {
-        assert_eq!(spid_max(0), 2 * SHAPE_IDS_PER_CLUSTER);
-        assert_eq!(spid_max(1), 2 * SHAPE_IDS_PER_CLUSTER);
+        assert_eq!(spid_max(FIRST_PICTURE_SHAPE_ID), 2 * SHAPE_IDS_PER_CLUSTER);
+        assert_eq!(spid_max(FIRST_PICTURE_SHAPE_ID + 1), 2 * SHAPE_IDS_PER_CLUSTER);
         assert_eq!(
-            spid_max(SHAPE_IDS_PER_CLUSTER),
+            spid_max(FIRST_PICTURE_SHAPE_ID + SHAPE_IDS_PER_CLUSTER),
             3 * SHAPE_IDS_PER_CLUSTER
         );
+    }
+
+    #[test]
+    fn dgg_info_with_header_drawing_uses_own_cluster() {
+        use crate::doc::writer::shapes::DocDrawingShape;
+
+        let png = DocPicture::new(png_bytes()).unwrap();
+        let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
+        let positions = sample_positions();
+        let main_shapes = floating_shapes(&png, &jpeg, &positions);
+
+        let rect = DocDrawingShape::new(crate::doc::writer::shapes::DocShapeKind::Rectangle, 1440, 720).unwrap();
+        let position = FloatingPosition::new(720, 360);
+        let header_shapes = vec![FloatingShapeInfo {
+            anchor_cp: 0,
+            shape_id: HEADER_FIRST_SHAPE_ID,
+            content: FloatingShapeContent::Primitive(&rect),
+            width_twips: rect.width_twips(),
+            height_twips: rect.height_twips(),
+            position: &position,
+            text: Some("hdr"),
+        }];
+
+        let dgg = build_dgg_info(&main_shapes, &header_shapes, 2);
+        let records = collect_records(&dgg, 0, dgg.len());
+
+        // Two drawings: main (dgglbl 0, Dg instance 1) and header (dgglbl 1,
+        // Dg instance 2). The Dgg cluster table has two entries.
+        let dgg_record = records
+            .iter()
+            .find(|record| record.3 == RECORD_DGG)
+            .unwrap();
+        let dgg_payload = &dgg[dgg_record.0 + RECORD_HEADER_LEN..];
+        assert_eq!(u32::from_le_bytes(dgg_payload[4..8].try_into().unwrap()), 2);
+        assert_eq!(
+            u32::from_le_bytes(dgg_payload[0..4].try_into().unwrap()),
+            3 * SHAPE_IDS_PER_CLUSTER
+        );
+        let dg_records: Vec<_> = records.iter().filter(|record| record.3 == RECORD_DG).collect();
+        assert_eq!(dg_records.len(), 2);
+        assert_eq!(dg_records[0].2, 1);
+        assert_eq!(dg_records[1].2, 2);
+
+        // dgglbl bytes: main then header.
+        let dg_container_offsets: Vec<usize> = records
+            .iter()
+            .filter(|record| record.3 == RECORD_DG_CONTAINER)
+            .map(|record| record.0)
+            .collect();
+        assert_eq!(dg_container_offsets.len(), 2);
+        assert_eq!(dgg[dg_container_offsets[0] - 1], 0);
+        assert_eq!(dgg[dg_container_offsets[1] - 1], 1);
+
+        // The header shape uses the header cluster spid and its own TXID
+        // numbering (0x10000 for the first header text box).
+        let sps: Vec<_> = records.iter().filter(|record| record.3 == RECORD_SP).collect();
+        let spids: Vec<u32> = sps
+            .iter()
+            .map(|sp| u32::from_le_bytes(dgg[sp.0 + 8..sp.0 + 12].try_into().unwrap()))
+            .collect();
+        assert!(spids.contains(&HEADER_FIRST_SHAPE_ID));
+
+        let txid_records: Vec<_> = records
+            .iter()
+            .filter(|record| record.3 == 0xF00D)
+            .collect();
+        assert_eq!(txid_records.len(), 1);
+        let txid = u32::from_le_bytes(
+            dgg[txid_records[0].0 + 8..txid_records[0].0 + 12].try_into().unwrap(),
+        );
+        assert_eq!(txid, 0x0001_0000);
     }
 }

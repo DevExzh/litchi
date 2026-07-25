@@ -114,9 +114,15 @@ pub struct Document {
     /// Floating-shape anchors from the Main Document PlcfSpa (empty when the
     /// document has no floating shapes in the main story).
     shape_anchors: Vec<super::parts::spa::ShapeAnchor>,
+    /// Floating-shape anchors from the Header Document PlcfSpa (empty when
+    /// the document has no floating shapes in the header story).
+    header_shape_anchors: Vec<super::parts::spa::ShapeAnchor>,
     /// Text box entries from the PlcftxbxTxt (empty when the document has no
     /// textbox story).
     textbox_entries: Vec<super::parts::textbox::TextBoxEntry>,
+    /// Text box entries from the PlcfHdrtxbxTxt (empty when the document has
+    /// no header textbox story).
+    header_textbox_entries: Vec<super::parts::textbox::TextBoxEntry>,
     /// Hyperlinks table
     hyperlinks_table: Option<HyperlinksTable>,
     /// List/numbering tables
@@ -230,7 +236,17 @@ impl Document {
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
         let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
-        let textbox_entries = Self::parse_textbox_entries(&fib, &table_stream);
+        let header_shape_anchors = Self::parse_header_shape_anchors(&fib, &table_stream);
+        let textbox_entries = Self::parse_textbox_entries(
+            &fib,
+            &table_stream,
+            super::parts::textbox::FIB_INDEX_PLCF_TXBX_TXT,
+        );
+        let header_textbox_entries = Self::parse_textbox_entries(
+            &fib,
+            &table_stream,
+            super::parts::textbox::FIB_INDEX_PLCF_HDR_TXBX_TXT,
+        );
 
         // Parse hyperlinks from fields table
         let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
@@ -302,7 +318,9 @@ impl Document {
             proofing_tables,
             sections,
             shape_anchors,
+            header_shape_anchors,
             textbox_entries,
+            header_textbox_entries,
             hyperlinks_table,
             list_tables,
             stylesheet,
@@ -374,14 +392,25 @@ impl Document {
             .unwrap_or_default()
     }
 
-    /// Parse the textbox story position table (PlcftxbxTxt), if present.
-    ///
-    /// A malformed table yields no entries rather than failing the document.
+    /// Parse the Header Document shape position table (PlcfSpaHdr), if present.
+    fn parse_header_shape_anchors(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+    ) -> Vec<super::parts::spa::ShapeAnchor> {
+        Self::table_slice(fib, table_stream, super::parts::spa::FIB_INDEX_PLC_SPA_HDR)
+            .and_then(|data| super::parts::spa::parse_plcf_spa(data).ok())
+            .unwrap_or_default()
+    }
+
+    /// Parse a textbox story position table (PlcftxbxTxt / PlcfHdrtxbxTxt),
+    /// if present. A malformed table yields no entries rather than failing
+    /// the document.
     fn parse_textbox_entries(
         fib: &FileInformationBlock,
         table_stream: &[u8],
+        pointer_index: usize,
     ) -> Vec<super::parts::textbox::TextBoxEntry> {
-        Self::table_slice(fib, table_stream, super::parts::textbox::FIB_INDEX_PLCF_TXBX_TXT)
+        Self::table_slice(fib, table_stream, pointer_index)
             .and_then(|data| super::parts::textbox::parse_plcf_txbx_txt(data).ok())
             .unwrap_or_default()
     }
@@ -2065,18 +2094,26 @@ impl Document {
         &self.shape_anchors
     }
 
-    /// Get the text boxes of the document with their plain-text content.
+    /// Get the floating-shape anchors of the Header Document.
     ///
-    /// The text comes from the textbox story (the subdocument counted by
-    /// ccpTxbx); each entry's `shape_id` matches the `spid` of the shape's
-    /// OfficeArtFSP record in the drawing layer and the `lid` of its Spa.
-    /// Paragraphs within a text box are separated by '\r'. Returns an empty
-    /// vector when the document has no textbox story.
-    pub fn text_boxes(&self) -> Vec<super::parts::textbox::DocTextBox> {
-        let Some((story_start, _)) = self.fib.get_textbox_range() else {
+    /// Like [`Self::shape_positions`], but for shapes anchored in the
+    /// header/footer story (positions from the PlcfSpaHdr). Returns an empty
+    /// slice when the document has no floating shapes in the header story.
+    #[inline]
+    pub fn header_shape_positions(&self) -> &[super::parts::spa::ShapeAnchor] {
+        &self.header_shape_anchors
+    }
+
+    /// Resolve text box entries against a textbox story range.
+    fn resolve_text_boxes(
+        &self,
+        entries: &[super::parts::textbox::TextBoxEntry],
+        story_range: Option<(u32, u32)>,
+    ) -> Vec<super::parts::textbox::DocTextBox> {
+        let Some((story_start, _)) = story_range else {
             return Vec::new();
         };
-        self.textbox_entries
+        entries
             .iter()
             .map(|entry| {
                 let raw = self.text_extractor.text_at_range(
@@ -2091,6 +2128,29 @@ impl Document {
                 }
             })
             .collect()
+    }
+
+    /// Get the text boxes of the document with their plain-text content.
+    ///
+    /// The text comes from the textbox story (the subdocument counted by
+    /// ccpTxbx); each entry's `shape_id` matches the `spid` of the shape's
+    /// OfficeArtFSP record in the drawing layer and the `lid` of its Spa.
+    /// Paragraphs within a text box are separated by '\r'. Returns an empty
+    /// vector when the document has no textbox story.
+    pub fn text_boxes(&self) -> Vec<super::parts::textbox::DocTextBox> {
+        self.resolve_text_boxes(&self.textbox_entries, self.fib.get_textbox_range())
+    }
+
+    /// Get the text boxes anchored in the header/footer story.
+    ///
+    /// Like [`Self::text_boxes`], but for the header textbox story (counted
+    /// by ccpHdrTxbx, linked through PlcfHdrtxbxTxt). Returns an empty vector
+    /// when the document has no header textbox story.
+    pub fn header_text_boxes(&self) -> Vec<super::parts::textbox::DocTextBox> {
+        self.resolve_text_boxes(
+            &self.header_textbox_entries,
+            self.fib.get_header_textbox_range(),
+        )
     }
 
     /// Get all paragraphs in the document.

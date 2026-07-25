@@ -13,6 +13,9 @@ pub const FTXBXS_LEN: usize = 22;
 /// FIB index (into `FileInformationBlock::get_table_pointer`) of the
 /// `fcPlcftxbxTxt`/`lcbPlcftxbxTxt` pair.
 pub(crate) const FIB_INDEX_PLCF_TXBX_TXT: usize = 56;
+/// FIB index of the `fcPlcfHdrtxbxTxt`/`lcbPlcfHdrtxbxTxt` pair (header
+/// textbox story).
+pub(crate) const FIB_INDEX_PLCF_HDR_TXBX_TXT: usize = 58;
 
 /// A text box: the shape it belongs to and its text range within the
 /// textbox story (story-relative character positions).
