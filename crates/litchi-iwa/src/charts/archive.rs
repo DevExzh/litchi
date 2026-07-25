@@ -16,6 +16,7 @@ use crate::{Error, Result};
 
 const DRAWABLE_SUPER_FIELD: u32 = 1;
 const CHART_EXTENSION_FIELD: u32 = 10_000;
+const CHART_REFERENCE_LINES_EXTENSION_FIELD: u32 = 10_005;
 const CHART_BASE_FIELDS: std::ops::RangeInclusive<u32> = 1..=24;
 
 /// A native chart drawable with its extension-backed chart payload retained.
@@ -60,6 +61,72 @@ impl IWorkChartArchive {
         Ok(())
     }
 
+    /// Decode the chart's native reference-line graph, if one is present.
+    pub fn reference_lines(&self) -> Result<Option<tsch::ChartReferenceLinesArchive>> {
+        let Some(encoded) = unique_opaque_field(
+            &self.chart_opaque_fields,
+            CHART_REFERENCE_LINES_EXTENSION_FIELD,
+        )?
+        else {
+            return Ok(None);
+        };
+        let fields = parse_wire_fields(encoded)?;
+        let field =
+            unique_field(&fields, CHART_REFERENCE_LINES_EXTENSION_FIELD)?.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "chart reference-line extension disappeared during decoding".to_owned(),
+                )
+            })?;
+        Ok(Some(tsch::ChartReferenceLinesArchive::decode(
+            length_delimited_payload(encoded, field)?,
+        )?))
+    }
+
+    pub(crate) fn set_reference_lines(
+        &mut self,
+        reference_lines: Option<&tsch::ChartReferenceLinesArchive>,
+    ) -> Result<()> {
+        let existing_index = unique_opaque_field_index(
+            &self.chart_opaque_fields,
+            CHART_REFERENCE_LINES_EXTENSION_FIELD,
+        )?;
+        match (existing_index, reference_lines) {
+            (Some(index), Some(reference_lines)) => {
+                self.chart_opaque_fields[index] = encoded_chart_extension(
+                    CHART_REFERENCE_LINES_EXTENSION_FIELD,
+                    reference_lines,
+                )?;
+            },
+            (Some(index), None) => {
+                self.chart_opaque_fields.remove(index);
+            },
+            (None, Some(reference_lines)) => {
+                let encoded = encoded_chart_extension(
+                    CHART_REFERENCE_LINES_EXTENSION_FIELD,
+                    reference_lines,
+                )?;
+                let index = self
+                    .chart_opaque_fields
+                    .iter()
+                    .position(|field| {
+                        parse_wire_fields(field)
+                            .ok()
+                            .and_then(|fields| fields.first().map(|field| field.number))
+                            .is_some_and(|number| number > CHART_REFERENCE_LINES_EXTENSION_FIELD)
+                    })
+                    .unwrap_or(self.chart_opaque_fields.len());
+                self.chart_opaque_fields.insert(index, encoded);
+            },
+            (None, None) => {},
+        }
+        if self.reference_lines()? != reference_lines.cloned() {
+            return Err(Error::InvalidFormat(
+                "chart reference-line extension update failed validation".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Remap the chart's typed object references while retaining opaque fields.
     ///
     /// iWork records object references in both the protobuf payload and IWA
@@ -72,7 +139,7 @@ impl IWorkChartArchive {
         remap: &HashMap<u64, u64>,
         recorded_references: &[u64],
     ) -> Result<()> {
-        let typed_references = self.typed_reference_identifiers();
+        let typed_references = self.typed_reference_identifiers()?;
         if let Some(identifier) = recorded_references.iter().copied().find(|identifier| {
             remap.contains_key(identifier) && !typed_references.contains(identifier)
         }) {
@@ -107,10 +174,14 @@ impl IWorkChartArchive {
             remap_references(&mut chart.paragraph_styles, remap);
             remap_optional_reference(&mut chart.owned_preset, remap);
         }
+        if let Some(mut reference_lines) = self.reference_lines()? {
+            remap_chart_reference_lines(&mut reference_lines, remap);
+            self.set_reference_lines(Some(&reference_lines))?;
+        }
         Ok(())
     }
 
-    fn typed_reference_identifiers(&self) -> HashSet<u64> {
+    fn typed_reference_identifiers(&self) -> Result<HashSet<u64>> {
         let mut identifiers = HashSet::new();
         if let Some(drawable) = self.drawable.super_.as_ref() {
             collect_optional_reference(&mut identifiers, drawable.parent.as_ref());
@@ -136,7 +207,10 @@ impl IWorkChartArchive {
             collect_references(&mut identifiers, &chart.paragraph_styles);
             collect_optional_reference(&mut identifiers, chart.owned_preset.as_ref());
         }
-        identifiers
+        if let Some(reference_lines) = self.reference_lines()? {
+            collect_chart_reference_lines(&mut identifiers, &reference_lines);
+        }
+        Ok(identifiers)
     }
 
     /// Decode a chart drawable without discarding extensions or future fields.
@@ -187,6 +261,109 @@ impl IWorkChartArchive {
         }
         Ok(output)
     }
+}
+
+fn encoded_chart_extension(field_number: u32, message: &impl Message) -> Result<Vec<u8>> {
+    let mut field = Vec::new();
+    append_length_delimited_field(&mut field, field_number, &message.encode_to_vec())?;
+    Ok(field)
+}
+
+fn unique_opaque_field(fields: &[Vec<u8>], field_number: u32) -> Result<Option<&[u8]>> {
+    unique_opaque_field_index(fields, field_number)
+        .map(|index| index.map(|index| fields[index].as_slice()))
+}
+
+fn unique_opaque_field_index(fields: &[Vec<u8>], field_number: u32) -> Result<Option<usize>> {
+    let mut result = None;
+    for (index, encoded) in fields.iter().enumerate() {
+        let parsed = parse_wire_fields(encoded)?;
+        let [field] = parsed.as_slice() else {
+            return Err(Error::InvalidFormat(
+                "stored chart extension is not exactly one wire field".to_owned(),
+            ));
+        };
+        if field.number != field_number {
+            continue;
+        }
+        if result.replace(index).is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "chart extension field {field_number} occurs more than once"
+            )));
+        }
+    }
+    Ok(result)
+}
+
+fn remap_chart_reference_lines(
+    reference_lines: &mut tsch::ChartReferenceLinesArchive,
+    remap: &HashMap<u64, u64>,
+) {
+    let mut uuids = reference_lines
+        .reference_line_non_styles_map
+        .iter()
+        .flat_map(|axis| &axis.reference_line_non_style_items)
+        .map(|item| (item.uuid.lower, item.uuid.upper))
+        .collect::<HashSet<_>>();
+    for axis in &mut reference_lines.reference_line_non_styles_map {
+        for item in &mut axis.reference_line_non_style_items {
+            if remap.contains_key(&item.non_style.identifier) {
+                uuids.remove(&(item.uuid.lower, item.uuid.upper));
+                item.uuid = fresh_chart_reference_uuid(&mut uuids);
+            }
+            remap_reference(&mut item.non_style, remap);
+        }
+    }
+    for axis in &mut reference_lines.reference_line_styles_map {
+        if let Some(styles) = axis.reference_line_styles.as_mut() {
+            for entry in &mut styles.entries {
+                remap_reference(&mut entry.reference, remap);
+            }
+        }
+    }
+    remap_optional_reference(
+        &mut reference_lines.theme_preset_reference_line_style,
+        remap,
+    );
+}
+
+fn fresh_chart_reference_uuid(existing: &mut HashSet<(u64, u64)>) -> tsp::Uuid {
+    loop {
+        let bytes = litchi_core::id::generate_guid_bytes();
+        let mut lower = [0; 8];
+        lower.copy_from_slice(&bytes[..8]);
+        let mut upper = [0; 8];
+        upper.copy_from_slice(&bytes[8..]);
+        let uuid = tsp::Uuid {
+            lower: u64::from_le_bytes(lower),
+            upper: u64::from_le_bytes(upper),
+        };
+        if existing.insert((uuid.lower, uuid.upper)) {
+            return uuid;
+        }
+    }
+}
+
+fn collect_chart_reference_lines(
+    identifiers: &mut HashSet<u64>,
+    reference_lines: &tsch::ChartReferenceLinesArchive,
+) {
+    for axis in &reference_lines.reference_line_non_styles_map {
+        for item in &axis.reference_line_non_style_items {
+            collect_reference(identifiers, &item.non_style);
+        }
+    }
+    for axis in &reference_lines.reference_line_styles_map {
+        if let Some(styles) = axis.reference_line_styles.as_ref() {
+            for entry in &styles.entries {
+                collect_reference(identifiers, &entry.reference);
+            }
+        }
+    }
+    collect_optional_reference(
+        identifiers,
+        reference_lines.theme_preset_reference_line_style.as_ref(),
+    );
 }
 
 fn remap_reference(reference: &mut tsp::Reference, remap: &HashMap<u64, u64>) {

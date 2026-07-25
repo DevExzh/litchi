@@ -72,6 +72,7 @@ pub(super) fn chart_graph(
             context.slide_id
         )));
     }
+    let reference_line_objects = chart_reference_line_objects(&chart)?;
     let payload = chart.chart.as_ref().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Keynote chart {drawable_object_id} has no chart payload"
@@ -189,6 +190,7 @@ pub(super) fn chart_graph(
                 })
             }),
     );
+    local_styles.extend(reference_line_objects);
     local_styles.extend(
         payload
             .series_non_styles

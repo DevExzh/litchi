@@ -27,6 +27,7 @@ mod pie_label_distance;
 mod pie_labels;
 mod pie_start_angle;
 mod pie_wedge_explosion;
+mod reference_lines;
 mod rounded_corners;
 mod series_connection_line;
 mod series_error_bar_auto_fit;
@@ -52,6 +53,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::*;
 use crate::IWorkThemeArchive;
+use crate::charts::reference_lines::chart_reference_line_objects;
 use crate::charts::source::{
     AXIS_NON_STYLE_MESSAGE_TYPE, AXIS_STYLE_MESSAGE_TYPE, CHART_MEDIATOR_MESSAGE_TYPE,
     CHART_MESSAGE_TYPE, CHART_NON_STYLE_MESSAGE_TYPE, CHART_PRESET_MESSAGE_TYPE,

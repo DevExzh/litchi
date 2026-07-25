@@ -83,6 +83,7 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             if message.type_ == 5_021
                 && let Ok(chart) = IWorkChartArchive::decode(message.data.as_slice())
             {
+                println!("  chart_reference_lines={:#?}", chart.reference_lines());
                 println!("  chart_drawable={chart:#?}");
             }
             if message.type_ == 12_006
@@ -92,7 +93,7 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             }
             if matches!(
                 message.type_,
-                0 | 8 | 153 | 205 | 212 | 213 | 3_056 | 5_021 | 5_028 | 5_029
+                0 | 8 | 153 | 205 | 212 | 213 | 3_056 | 5_021 | 5_028 | 5_029 | 5_030 | 5_031
             ) {
                 let hex = message
                     .data

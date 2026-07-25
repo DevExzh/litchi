@@ -190,6 +190,7 @@ pub(super) fn body_chart_graph(
             editor.body_storage_id
         )));
     }
+    let reference_line_objects = chart_reference_line_objects(&chart)?;
     let payload = chart.chart.as_ref().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Pages chart {drawable_object_id} has no chart payload"
@@ -330,6 +331,7 @@ pub(super) fn body_chart_graph(
                     })
                 }),
         );
+        private_styles.extend(reference_line_objects);
         for (identifier, message_type, label) in private_styles {
             if find_object_archive(editor.package(), identifier)? != archive_name {
                 return Err(Error::InvalidFormat(format!(
