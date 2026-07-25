@@ -29,9 +29,14 @@ const MAX_PART_BYTES: usize = 32 * 1024 * 1024;
 const MAX_VIEWS: usize = 1024;
 const MAX_FILTERS: usize = 65_536;
 const MAX_COLUMNS: usize = 16_384;
+const MAX_EXTENSIONS: usize = 65_536;
 const MAX_RETAINED_BYTES: usize = 8 * 1024 * 1024;
 const MAX_MARKUP_BYTES: usize = 1024 * 1024;
 const MAX_NAMESPACE_DECLARATIONS: usize = 256;
+const MAX_FRAGMENT_DEPTH: usize = 256;
+const MAX_FRAGMENT_NODES: usize = 100_000;
+const FRAGMENT_VIEW_ID: &str = "{01234567-89AB-CDEF-0123-456789ABCDEF}";
+const FRAGMENT_FILTER_ID: &str = "{11111111-2222-3333-4444-555555555555}";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedSheetViewGuid(String);
@@ -72,11 +77,49 @@ impl NamedSheetViewMarkup {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedSheetViewDifferentialFormat {
+    markup: NamedSheetViewMarkup,
+}
+impl NamedSheetViewDifferentialFormat {
+    /// Validate and retain one self-contained Named Sheet Views `dxf` element.
+    ///
+    /// The fragment remains inert: fonts, fills, borders, and extension
+    /// payloads are never interpreted or applied by this API.
+    pub fn from_xml(xml: impl AsRef<[u8]>) -> Result<Self> {
+        parse_authored_differential_format(xml.as_ref())
+    }
+
+    /// Construct an empty differential-format element.
+    pub fn empty() -> Self {
+        Self {
+            markup: NamedSheetViewMarkup(
+                format!(
+                    r#"<dxf xmlns="{}"/>"#,
+                    std::str::from_utf8(NSV).expect("constant namespace is UTF-8")
+                )
+                .into_bytes(),
+            ),
+        }
+    }
+
+    pub fn xml(&self) -> &[u8] {
+        self.markup.xml()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NamedSheetViewExtension {
     uri: String,
     markup: NamedSheetViewMarkup,
 }
 impl NamedSheetViewExtension {
+    /// Construct one extension from its URI and bounded XML content.
+    ///
+    /// `content_xml` is inserted below a SpreadsheetML `ext` element and the
+    /// complete result is validated before it can enter the model.
+    pub fn new(uri: impl Into<String>, content_xml: impl AsRef<[u8]>) -> Result<Self> {
+        parse_authored_extension(uri.into(), content_xml.as_ref())
+    }
+
     pub fn uri(&self) -> &str {
         &self.uri
     }
@@ -243,6 +286,24 @@ impl NamedSheetViewSortCondition {
         Ok(self)
     }
 
+    /// Configure sorting by a cell fill or font color.
+    pub fn set_color_sort(
+        &mut self,
+        sort_by: SortBy,
+        differential_format_id: u32,
+    ) -> Result<&mut Self> {
+        if !matches!(sort_by, SortBy::CellColor | SortBy::FontColor) {
+            return Err(invalid(
+                "color sort requires CellColor or FontColor sort kind",
+            ));
+        }
+        self.sort_by = sort_by;
+        self.differential_format_id = Some(differential_format_id);
+        self.icon_set = None;
+        self.icon_id = None;
+        Ok(self)
+    }
+
     /// Set the rich-value sort key. Standard sort conditions reject this metadata.
     pub fn set_rich_sort_key(&mut self, value: Option<String>) -> Result<&mut Self> {
         if self.kind != NamedSheetViewSortConditionKind::RichValue && value.is_some() {
@@ -326,6 +387,21 @@ impl NamedSheetViewSortRule {
         Ok(self)
     }
 
+    pub fn set_differential_format(
+        &mut self,
+        value: Option<NamedSheetViewDifferentialFormat>,
+    ) -> Result<&mut Self> {
+        if let Some(condition) = self.condition.as_ref()
+            && condition.differential_format_id.is_some() != value.is_some()
+        {
+            return Err(invalid(
+                "sortRule dxf presence does not match sortCondition dxfId",
+            ));
+        }
+        self.differential_format = value.map(|value| value.markup);
+        Ok(self)
+    }
+
     pub fn column_id(&self) -> u32 {
         self.column_id
     }
@@ -379,6 +455,15 @@ impl NamedSheetViewSortRules {
             .iter()
             .position(|rule| rule.column_id == column_id)
             .map(|index| self.rules.remove(index))
+    }
+
+    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
+        add_extension(&mut self.extensions, value)?;
+        Ok(self)
+    }
+
+    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
+        remove_extension(&mut self.extensions, uri)
     }
 
     pub fn sort_method(&self) -> SortMethod {
@@ -446,6 +531,23 @@ impl NamedSheetViewColumnFilter {
         self.filters.clear();
     }
 
+    pub fn set_differential_format(
+        &mut self,
+        value: Option<NamedSheetViewDifferentialFormat>,
+    ) -> &mut Self {
+        self.differential_format = value.map(|value| value.markup);
+        self
+    }
+
+    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
+        add_extension(&mut self.extensions, value)?;
+        Ok(self)
+    }
+
+    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
+        remove_extension(&mut self.extensions, uri)
+    }
+
     pub fn column_id(&self) -> u32 {
         self.column_id
     }
@@ -511,6 +613,15 @@ impl NamedSheetViewFilter {
     pub fn set_sort_rules(&mut self, value: Option<NamedSheetViewSortRules>) -> &mut Self {
         self.sort_rules = value;
         self
+    }
+
+    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
+        add_extension(&mut self.extensions, value)?;
+        Ok(self)
+    }
+
+    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
+        remove_extension(&mut self.extensions, uri)
     }
 
     pub fn filter_id(&self) -> &NamedSheetViewGuid {
@@ -591,6 +702,15 @@ impl NamedSheetView {
             .position(|filter| &filter.filter_id == filter_id)
             .map(|index| self.filters.remove(index))
     }
+
+    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
+        add_extension(&mut self.extensions, value)?;
+        Ok(self)
+    }
+
+    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
+        remove_extension(&mut self.extensions, uri)
+    }
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedSheetViews {
@@ -666,6 +786,15 @@ impl NamedSheetViews {
     }
     pub fn extensions(&self) -> &[NamedSheetViewExtension] {
         &self.extensions
+    }
+
+    pub fn add_extension(&mut self, value: NamedSheetViewExtension) -> Result<&mut Self> {
+        add_extension(&mut self.extensions, value)?;
+        Ok(self)
+    }
+
+    pub fn remove_extension(&mut self, uri: &str) -> Option<NamedSheetViewExtension> {
+        remove_extension(&mut self.extensions, uri)
     }
 
     /// Serialize this parsed Named Sheet Views value without evaluating filters
@@ -2140,6 +2269,166 @@ fn parse_extension(e: &BytesStart<'_>, d: Decoder) -> Result<NamedSheetViewExten
         markup: NamedSheetViewMarkup(Vec::new()),
     })
 }
+fn parse_authored_differential_format(xml: &[u8]) -> Result<NamedSheetViewDifferentialFormat> {
+    if xml.is_empty() || xml.len() > MAX_MARKUP_BYTES {
+        return Err(invalid("invalid authored Named Sheet Views dxf size"));
+    }
+    if validate_fragment_content(xml)? != 1 {
+        return Err(invalid(
+            "authored Named Sheet Views dxf must be exactly one XML element",
+        ));
+    }
+    let mut document = fragment_document_prefix();
+    document.extend_from_slice(
+        format!(r#"<nsvFilter filterId="{FRAGMENT_FILTER_ID}"><columnFilter colId="0">"#)
+            .as_bytes(),
+    );
+    document.extend_from_slice(xml);
+    document.extend_from_slice(b"</columnFilter></nsvFilter></namedSheetView></namedSheetViews>");
+    let mut parsed = parse_named_sheet_views(&document)?;
+    let markup = parsed
+        .views
+        .pop()
+        .and_then(|mut view| view.filters.pop())
+        .and_then(|mut filter| filter.column_filters.pop())
+        .and_then(|column| column.differential_format)
+        .ok_or_else(|| invalid("authored fragment must contain exactly one dxf element"))?;
+    Ok(NamedSheetViewDifferentialFormat { markup })
+}
+fn parse_authored_extension(uri: String, content_xml: &[u8]) -> Result<NamedSheetViewExtension> {
+    if uri.is_empty() || uri.len() > 1024 {
+        return Err(invalid("invalid Named Sheet Views extension URI"));
+    }
+    if content_xml.len() > MAX_MARKUP_BYTES {
+        return Err(invalid(
+            "authored Named Sheet Views extension content exceeds size limit",
+        ));
+    }
+    validate_fragment_content(content_xml)?;
+    let mut extension = Vec::with_capacity(content_xml.len().saturating_add(256));
+    extension.extend_from_slice(b"<x:ext");
+    write_xml_attribute(
+        &mut extension,
+        "xmlns:x",
+        std::str::from_utf8(CORE).expect("constant namespace is UTF-8"),
+    );
+    write_xml_attribute(&mut extension, "uri", &uri);
+    if content_xml.is_empty() {
+        extension.extend_from_slice(b"/>");
+    } else {
+        extension.push(b'>');
+        extension.extend_from_slice(content_xml);
+        extension.extend_from_slice(b"</x:ext>");
+    }
+    let mut document = fragment_document_prefix();
+    document.extend_from_slice(b"<extLst>");
+    document.extend_from_slice(&extension);
+    document.extend_from_slice(b"</extLst></namedSheetView></namedSheetViews>");
+    let mut parsed = parse_named_sheet_views(&document)?;
+    parsed
+        .views
+        .pop()
+        .and_then(|mut view| view.extensions.pop())
+        .filter(|extension| extension.uri == uri)
+        .ok_or_else(|| invalid("authored extension did not round-trip"))
+}
+fn validate_fragment_content(content_xml: &[u8]) -> Result<usize> {
+    let mut wrapped = Vec::with_capacity(content_xml.len().saturating_add(13));
+    wrapped.extend_from_slice(b"<root>");
+    wrapped.extend_from_slice(content_xml);
+    wrapped.extend_from_slice(b"</root>");
+    let mut reader = NsReader::from_reader(wrapped.as_slice());
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut roots = 0usize;
+    let mut nodes = 0usize;
+    loop {
+        let event = reader.read_event().map_err(xml_error)?;
+        match event {
+            Event::Start(_) => {
+                if depth == 1 {
+                    roots += 1;
+                    if roots > 1 {
+                        return Err(invalid("authored XML fragment has multiple root elements"));
+                    }
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("extension XML depth overflow"))?;
+                nodes += 1;
+            },
+            Event::Empty(_) => {
+                if depth == 1 {
+                    roots += 1;
+                    if roots > 1 {
+                        return Err(invalid("authored XML fragment has multiple root elements"));
+                    }
+                }
+                nodes += 1;
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("invalid extension XML nesting"))?;
+            },
+            Event::Text(text) if depth == 1 => {
+                if !text
+                    .decode()
+                    .map_err(xml_error)?
+                    .chars()
+                    .all(char::is_whitespace)
+                {
+                    return Err(invalid(
+                        "authored XML fragment must contain XML markup, not text",
+                    ));
+                }
+            },
+            Event::CData(_) if depth == 1 => {
+                return Err(invalid("authored XML fragment must not contain root CDATA"));
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTD and processing instructions are rejected"));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        if depth > MAX_FRAGMENT_DEPTH || nodes > MAX_FRAGMENT_NODES {
+            return Err(invalid(
+                "authored Named Sheet Views extension exceeds structural limits",
+            ));
+        }
+    }
+    if depth != 0 {
+        return Err(invalid("unterminated authored XML fragment"));
+    }
+    Ok(roots)
+}
+fn fragment_document_prefix() -> Vec<u8> {
+    format!(
+        r#"<namedSheetViews xmlns="{}"><namedSheetView name="Fragment" id="{FRAGMENT_VIEW_ID}">"#,
+        std::str::from_utf8(NSV).expect("constant namespace is UTF-8")
+    )
+    .into_bytes()
+}
+fn add_extension(
+    extensions: &mut Vec<NamedSheetViewExtension>,
+    value: NamedSheetViewExtension,
+) -> Result<()> {
+    if extensions.len() >= MAX_EXTENSIONS {
+        return Err(invalid("too many Named Sheet Views extensions"));
+    }
+    extensions.push(value);
+    Ok(())
+}
+fn remove_extension(
+    extensions: &mut Vec<NamedSheetViewExtension>,
+    uri: &str,
+) -> Option<NamedSheetViewExtension> {
+    extensions
+        .iter()
+        .position(|extension| extension.uri == uri)
+        .map(|index| extensions.remove(index))
+}
 fn validate_name(v: &str) -> Result<()> {
     let n = v.chars().count();
     if n == 0
@@ -2543,6 +2832,123 @@ mod tests {
         );
 
         assert!(NamedSheetViewColumnFilter::new(MAX_COLUMNS as u32).is_err());
+    }
+
+    #[test]
+    fn authors_differential_formats_extensions_and_color_sorts() {
+        let dxf = NamedSheetViewDifferentialFormat::from_xml(
+            br#"<dxf xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><x:fill><x:patternFill patternType="solid"><x:fgColor rgb="FFFF0000"/></x:patternFill></x:fill></dxf>"#,
+        )
+        .unwrap();
+        let extension = NamedSheetViewExtension::new(
+            "urn:litchi:named-view",
+            br#"<vendor:payload xmlns:vendor="urn:litchi:test" value="inert"/>"#,
+        )
+        .unwrap();
+
+        let mut condition = NamedSheetViewSortCondition::new(
+            NamedSheetViewSortConditionKind::Standard,
+            NamedSheetViewRange::new("C2:C20").unwrap(),
+        );
+        condition.set_color_sort(SortBy::CellColor, 4).unwrap();
+        let mut rule = NamedSheetViewSortRule::new(2).unwrap();
+        rule.set_differential_format(Some(dxf.clone()))
+            .unwrap()
+            .set_condition(Some(condition))
+            .unwrap();
+        let mut rules = NamedSheetViewSortRules::new();
+        rules
+            .add_rule(rule)
+            .unwrap()
+            .add_extension(extension.clone())
+            .unwrap();
+
+        let mut column = NamedSheetViewColumnFilter::new(2).unwrap();
+        column
+            .set_differential_format(Some(dxf))
+            .add_extension(extension.clone())
+            .unwrap();
+        let mut filter = NamedSheetViewFilter::new(
+            NamedSheetViewGuid::new("{11111111-2222-3333-4444-555555555555}").unwrap(),
+        );
+        filter
+            .set_reference(Some(NamedSheetViewRange::new("A1:C20").unwrap()))
+            .add_column_filter(column)
+            .unwrap()
+            .set_sort_rules(Some(rules))
+            .add_extension(extension.clone())
+            .unwrap();
+        let mut view = NamedSheetView::with_id(
+            "Colors",
+            NamedSheetViewGuid::new("{01234567-89AB-CDEF-0123-456789ABCDEF}").unwrap(),
+        )
+        .unwrap();
+        view.add_filter(filter)
+            .unwrap()
+            .add_extension(extension.clone())
+            .unwrap();
+        let mut authored = NamedSheetViews::new(view);
+        authored.add_extension(extension).unwrap();
+
+        let xml = authored.to_xml().unwrap();
+        let text = std::str::from_utf8(&xml).unwrap();
+        assert_eq!(text.matches("<dxf ").count(), 2);
+        assert!(text.contains(r#"sortBy="cellColor" dxfId="4""#));
+        assert_eq!(text.matches(r#"uri="urn:litchi:named-view""#).count(), 5);
+        assert_eq!(parse_named_sheet_views(&xml).unwrap(), authored);
+
+        let mut workbook = crate::xlsx::Workbook::create().unwrap();
+        workbook.set_named_sheet_views(0, &authored).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("named-view-dxf-extension.xlsx");
+        workbook.save(&path).unwrap();
+        let reopened = crate::xlsx::Workbook::open(&path).unwrap();
+        assert_eq!(reopened.named_sheet_views(0).unwrap(), Some(authored));
+    }
+
+    #[test]
+    fn rejects_unsafe_fragments_and_mismatched_color_sort_formats() {
+        for xml in [
+            br#"<dxf xmlns="urn:wrong"/>"#.as_slice(),
+            br#"<dxf xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews"/><dxf xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews"/>"#,
+            br#"<!DOCTYPE x><dxf xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews"/>"#,
+        ] {
+            assert!(NamedSheetViewDifferentialFormat::from_xml(xml).is_err());
+        }
+        assert!(NamedSheetViewExtension::new("", b"").is_err());
+        assert!(
+            NamedSheetViewExtension::new("urn:test", br#"<x:payload xmlns:x="urn:test">"#,)
+                .is_err()
+        );
+        assert!(
+            NamedSheetViewExtension::new(
+                "urn:test",
+                br#"<x:one xmlns:x="urn:test"/><x:two xmlns:x="urn:test"/>"#,
+            )
+            .is_err()
+        );
+        assert!(NamedSheetViewExtension::new("urn:test", b"not markup").is_err());
+        assert!(
+            NamedSheetViewExtension::new(
+                "urn:test",
+                br#"<?unsafe value?><x:payload xmlns:x="urn:test"/>"#,
+            )
+            .is_err()
+        );
+
+        let mut condition = NamedSheetViewSortCondition::new(
+            NamedSheetViewSortConditionKind::Standard,
+            NamedSheetViewRange::new("A1:A2").unwrap(),
+        );
+        assert!(condition.set_color_sort(SortBy::Value, 0).is_err());
+        condition.set_color_sort(SortBy::FontColor, 0).unwrap();
+        let mut rule = NamedSheetViewSortRule::new(0).unwrap();
+        assert!(rule.set_condition(Some(condition.clone())).is_err());
+        rule.set_differential_format(Some(NamedSheetViewDifferentialFormat::empty()))
+            .unwrap()
+            .set_condition(Some(condition))
+            .unwrap();
+        assert!(rule.set_differential_format(None).is_err());
     }
 
     #[test]

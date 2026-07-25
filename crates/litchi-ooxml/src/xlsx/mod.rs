@@ -180,12 +180,12 @@ pub use ignored_errors::{
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
 pub use named_sheet_view::{
-    NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewExtension, NamedSheetViewFilter,
-    NamedSheetViewGuid, NamedSheetViewIconSet, NamedSheetViewMarkup, NamedSheetViewRange,
-    NamedSheetViewSortCondition, NamedSheetViewSortConditionKind, NamedSheetViewSortRule,
-    NamedSheetViewSortRules, NamedSheetViews, load_worksheet_named_sheet_views,
-    parse_named_sheet_views, remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views,
-    write_named_sheet_views,
+    NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewDifferentialFormat,
+    NamedSheetViewExtension, NamedSheetViewFilter, NamedSheetViewGuid, NamedSheetViewIconSet,
+    NamedSheetViewMarkup, NamedSheetViewRange, NamedSheetViewSortCondition,
+    NamedSheetViewSortConditionKind, NamedSheetViewSortRule, NamedSheetViewSortRules,
+    NamedSheetViews, load_worksheet_named_sheet_views, parse_named_sheet_views,
+    remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views, write_named_sheet_views,
 };
 pub use xml_maps::{
     XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema,
