@@ -121,7 +121,7 @@ conversion, fonts, and image conversion are optional.
 | AltChunk | 🟡 | ✅ | ✅ | Internal/external alternative-format part CRUD; content is not imported or rendered |
 | Charts | ✅ | ✅ | ✅ | Classic chart, style, color-style, and embedded-workbook part graphs; no rendering |
 | Images | ✅ | ✅ | ✅ | Inline/floating image resources and relationships |
-| Drawing/VML shapes | 🟡 | ✅ | ❌ | Shape extraction is available; general-purpose shape authoring is not |
+| Drawing/VML shapes | ✅ | ✅ | ✅ | Shape extraction plus VML authoring: `MutableVmlShape` writes rect/roundrect/ellipse/line presets with fill/stroke colors, inline or floating positions, and `v:textbox` stories that round-trip through the text-box inventory; rotation/z-index and WordArt text paths remain read-only |
 | Embedded fonts | ✅ | ✅ | ✅ | Font table, payloads, obfuscation, licensing checks, and ordered CRUD |
 | Embedded OLE/package objects | ✅ | ✅ | ✅ | Package-level embedded-part discovery plus inert OLE object authoring: validated ProgIDs, Word-convention shape id allocation, `/word/embeddings` parts with content types and relationships, optional preview images, and byte-identical payload round-trips |
 | Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | Word package task-pane discovery plus bounded web-extension parsing/serialization; add-ins are never executed |
