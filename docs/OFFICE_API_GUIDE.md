@@ -181,6 +181,45 @@ for text_box in pkg.text_boxes()? {
 }
 ```
 
+### Authoring Rich Content
+
+Text boxes, SmartArt diagrams, embedded OLE objects, and legacy VML shapes
+can be authored through the mutable document and round-trip through the
+read inventories above:
+
+```rust
+use litchi::ooxml::docx::{MutableTextBox, MutableOleObject, MutableSmartArt, MutableVmlShape, VmlShapeKind};
+use litchi::ooxml::diagrams::{DiagramType, SmartArtBuilder};
+use litchi::ooxml::docx::Package;
+
+let mut pkg = Package::new()?;
+let mut doc = pkg.document_mut()?;
+
+// DrawingML text box with formatted runs and body properties.
+let mut text_box = MutableTextBox::new("Intro Box", 2_743_200, 914_400)?; // 3" x 1"
+text_box.add_run("Bold heading").bold = true;
+text_box.add_paragraph_with_text("Second paragraph");
+doc.add_text_box(text_box);
+
+// SmartArt: definition parts and the dgm:relIds anchor are generated.
+let diagram = SmartArtBuilder::new(DiagramType::Process)
+    .add_items(["Plan", "Build", "Ship"])
+    .build();
+doc.add_smart_art(MutableSmartArt::new(diagram)?);
+
+// Inert embedded OLE payload with a validated ProgID.
+let ole = MutableOleObject::new("Package", vec![0x50, 0x4B, 0x03, 0x04])?;
+doc.add_ole_object(ole);
+
+// Legacy VML shape with fill and stroke colors.
+let mut shape = MutableVmlShape::new(VmlShapeKind::RoundRectangle, 1_828_800, 914_400)?;
+shape.set_fill_color("FFDDEE")?;
+shape.set_stroke_color("336699")?;
+doc.add_vml_shape(shape);
+
+pkg.save("output.docx")?;
+```
+
 ## Excel Spreadsheets (XLSX)
 
 ### Creating Workbooks
@@ -462,6 +501,37 @@ println!("Found in {} shapes", matches.len());
 if slide.is_empty()? {
     println!("Slide is empty");
 }
+```
+
+### Masters, Themes, and Package-Level Authoring
+
+Slide masters, layouts, themes, embedded OLE objects, and ink annotations
+are authored at the package level and re-validated against the read-side
+graph rules:
+
+```rust
+use litchi::ooxml::pptx::{Package, SlideLayoutKind, ThemeColorScheme, ThemeColorSlot, ThemeColorValue, ThemeFontScheme, ThemeFontFace};
+
+let mut pkg = Package::new()?;
+
+// A new slide master with default text styles, plus a typed layout.
+let master = pkg.add_slide_master()?;
+let _layout = pkg.add_slide_layout(&master.part_name, SlideLayoutKind::TitleOnly, "Custom", &[])?;
+
+// A theme with a typed 12-slot color scheme and major/minor fonts.
+let colors = ThemeColorScheme::new("Brand")
+    .with_color(ThemeColorSlot::Accent1, ThemeColorValue::Srgb("4472C4".to_string()));
+let fonts = ThemeFontScheme::new("Brand", ThemeFontFace::new("Calibri Light"), ThemeFontFace::new("Calibri"));
+let theme = pkg.add_theme("Brand", &colors, &fonts)?;
+pkg.attach_theme_to_master(&master.part_name, &theme.part_name)?;
+
+// Inert ink annotation (validated InkML stored verbatim).
+// PackURI comes from the litchi-opc crate.
+let inkml = br#"<ink xmlns="http://www.w3.org/2003/InkML"><traceGroup/></ink>"#;
+let slide = litchi_opc::PackURI::new("/ppt/slides/slide1.xml")?;
+pkg.add_ink_annotation(&slide, inkml)?;
+
+pkg.save("branded.pptx")?;
 ```
 
 ## Unified API
