@@ -301,6 +301,10 @@ pub(super) fn chart_graph(
             ),
             data: chart_data("Keynote", drawable_object_id, payload)?,
             geometry: drawable_geometry("Keynote", drawable_object_id, drawable)?,
+            arrangement: ChartArrangement::new(
+                drawable.locked.unwrap_or(false),
+                drawable.aspect_ratio_locked.unwrap_or(false),
+            ),
         },
         object_ids,
         uuid_object_ids,

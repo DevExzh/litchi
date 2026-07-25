@@ -426,6 +426,10 @@ pub(super) fn body_chart_graph(
             ),
             data: chart_data("Pages", drawable_object_id, payload)?,
             geometry: drawable_geometry("Pages", drawable_object_id, drawable)?,
+            arrangement: ChartArrangement::new(
+                drawable.locked.unwrap_or(false),
+                drawable.aspect_ratio_locked.unwrap_or(false),
+            ),
         },
         object_ids,
         uuid_object_ids,

@@ -12,6 +12,7 @@
 use crate::{Error, IWorkPackage, Result};
 
 mod archive;
+pub(crate) mod arrangement;
 pub(crate) mod axis;
 pub(crate) mod axis_bounds;
 pub(crate) mod axis_label_affixes;
@@ -63,6 +64,7 @@ pub(crate) mod source;
 pub(crate) mod style;
 
 pub use archive::IWorkChartArchive;
+pub use arrangement::ChartArrangement;
 pub use axis::ChartAxis;
 pub use axis_bounds::{ChartAxisBound, ChartValueAxisBounds};
 pub use axis_label_angle::ChartAxisLabelAngle;

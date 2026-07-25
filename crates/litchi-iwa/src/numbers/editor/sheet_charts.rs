@@ -1,5 +1,6 @@
 //! Standalone, inline-data chart CRUD for Numbers sheets.
 
+mod arrangement;
 mod axis;
 mod axis_bounds;
 mod axis_gridlines;
@@ -65,7 +66,9 @@ use crate::charts::source::{
     require_creatable_kind, source_chart_objects, unregister_chart_styles,
     validate_chart_styles_registered,
 };
-use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
+use crate::charts::{
+    ChartArrangement, ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive,
+};
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
 };
@@ -86,6 +89,7 @@ pub struct NumbersSheetChartInfo {
     pub direction: ChartSeriesDirection,
     pub data: ChartData,
     pub geometry: DrawableGeometry,
+    pub arrangement: ChartArrangement,
 }
 
 /// Result of removing a standalone chart and its private object graph.
