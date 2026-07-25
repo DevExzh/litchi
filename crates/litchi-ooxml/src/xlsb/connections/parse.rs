@@ -170,16 +170,22 @@ fn parse_ext_connection(data: &[u8]) -> XlsbResult<XlsbConnection> {
         _ => None, // ignored when fAlwaysUseConnectionFile is set
     };
     let connection_id = cursor.read_u32()?;
+    // `iCredMethod` and `pc` MUST be ignored when the source is not OLE DB or
+    // ODBC (MS-XLSB 2.4.80), so only surface them for database sources.
+    let database_source = matches!(
+        source_type,
+        XlsbConnectionSourceType::OleDb | XlsbConnectionSourceType::Odbc
+    );
     let credential_method = match cursor.read_u8()? {
-        0 => Some(XlsbCredentialMethod::Integrated),
-        1 => Some(XlsbCredentialMethod::None),
-        2 => Some(XlsbCredentialMethod::SingleSignOn),
-        _ => None, // MUST be ignored for non-database sources
+        0 if database_source => Some(XlsbCredentialMethod::Integrated),
+        1 if database_source => Some(XlsbCredentialMethod::None),
+        2 if database_source => Some(XlsbCredentialMethod::SingleSignOn),
+        _ => None,
     };
     let password_state = match pc {
-        1 => Some(XlsbPasswordState::Saved),
-        2 => Some(XlsbPasswordState::NotSaved),
-        _ => None, // MUST be ignored for non-database sources
+        1 if database_source => Some(XlsbPasswordState::Saved),
+        2 if database_source => Some(XlsbPasswordState::NotSaved),
+        _ => None,
     };
     let data_file = if flags2 & CONN_LOAD_DATA_FILE != 0 {
         Some(cursor.read_wide_string()?)

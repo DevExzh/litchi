@@ -9,6 +9,7 @@
 
 mod model;
 mod parse;
+pub(crate) mod write;
 #[cfg(test)]
 mod tests;
 

@@ -6,10 +6,11 @@
 //! refreshed, or executed.
 
 /// `DBType` (MS-XLSB 2.5.31): the data source type of a connection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u32)]
 pub enum XlsbConnectionSourceType {
     /// ODBC data source (`DBTODBC`).
+    #[default]
     Odbc = 1,
     /// DAO data source (`DBTDAO`).
     Dao = 2,
@@ -57,10 +58,11 @@ impl TryFrom<u32> for XlsbConnectionSourceType {
 }
 
 /// `CmdType` (MS-XLSB 2.5.21): the meaning of the database command.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u32)]
 pub enum XlsbCommandType {
     /// No command specified (`CMDNULL`).
+    #[default]
     None = 0,
     /// Cube name within an OLAP database (`CMDCUBE`).
     Cube = 1,
@@ -133,8 +135,10 @@ pub enum XlsbReconnectionType {
 /// How HTML formatting is imported by a Web connection (`wHTMLFmt`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum XlsbHtmlFormat {
     /// No formatting is imported.
+    #[default]
     None = 0,
     /// Rich-text formatting is imported.
     RichText = 1,
@@ -145,7 +149,7 @@ pub enum XlsbHtmlFormat {
 }
 
 /// Database command properties (`BrtBeginECDbProps`, MS-XLSB 2.4.61).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct XlsbDbProperties {
     /// The database command type.
     pub command_type: XlsbCommandType,
@@ -158,7 +162,7 @@ pub struct XlsbDbProperties {
 }
 
 /// OLAP connection properties (`BrtBeginECOlapProps`, MS-XLSB 2.4.62).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct XlsbOlapProperties {
     /// Whether data is retrieved from a local cube file.
     pub local_connection: bool,
@@ -181,7 +185,7 @@ pub struct XlsbOlapProperties {
 }
 
 /// Web connection properties (`BrtBeginECWebProps`, MS-XLSB 2.4.71).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct XlsbWebProperties {
     /// How HTML formatting is imported.
     pub html_format: XlsbHtmlFormat,
@@ -212,7 +216,7 @@ pub struct XlsbWebProperties {
 }
 
 /// The source-specific property block of a connection.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum XlsbConnectionProperties {
     /// ODBC or OLE DB command properties.
     Database(XlsbDbProperties),
@@ -221,13 +225,15 @@ pub enum XlsbConnectionProperties {
     /// Web connection properties.
     Web(XlsbWebProperties),
     /// No property block was stored (other or deleted connection kinds).
+    #[default]
     None,
 }
 
 /// The type of a connection parameter (`pbt`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum XlsbParameterType {
     /// The user is prompted for the value.
+    #[default]
     Prompt,
     /// A stored value (number, string, or Boolean).
     Value,
@@ -251,7 +257,7 @@ pub enum XlsbParameterValue {
 }
 
 /// One connection parameter (`BrtBeginECParam`, MS-XLSB 2.4.63).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct XlsbConnectionParameter {
     /// The parameter type.
     pub parameter_type: XlsbParameterType,
@@ -279,7 +285,7 @@ pub enum XlsbWebTableItem {
 }
 
 /// One external connection (`BrtBeginExtConnection`, MS-XLSB 2.4.80).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct XlsbConnection {
     /// The unique connection identifier (`dwConnID`).
     pub connection_id: u32,

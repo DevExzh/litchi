@@ -51,6 +51,7 @@ pub struct XlsbWorkbookWriter {
     styles: StylesWriter,
     calculation_properties: CalculationProperties,
     is_1904: bool,
+    connections: Option<crate::xlsb::connections::XlsbConnections>,
 }
 
 /// Minimal Worksheet Binary Index payload for an empty worksheet.
@@ -80,6 +81,7 @@ impl XlsbWorkbookWriter {
             styles: StylesWriter::new(),
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
+            connections: None,
         }
     }
 
@@ -120,6 +122,57 @@ impl XlsbWorkbookWriter {
     /// Add a named range (defined name) to the workbook.
     pub fn add_named_range(&mut self, named_range: NamedRange) {
         self.named_ranges.push(named_range);
+    }
+
+    /// Attach an External Data Connections part (MS-XLSB 2.1.7.24) to the
+    /// workbook.
+    ///
+    /// Connection identifiers and names must be unique and non-empty;
+    /// strings, commands, URLs, and credential metadata are stored verbatim
+    /// and are never resolved, contacted, refreshed, or executed.
+    pub fn set_connections(
+        &mut self,
+        connections: crate::xlsb::connections::XlsbConnections,
+    ) -> XlsbResult<()> {
+        for (index, connection) in connections.connections.iter().enumerate() {
+            if connection.name.is_empty() {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "connection {} has an empty name",
+                    index + 1
+                )));
+            }
+            if connection.connection_id == 0 {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "connection '{}' has id 0 (ids must be greater than 0)",
+                    connection.name
+                )));
+            }
+            if connections.connections[..index]
+                .iter()
+                .any(|existing| existing.connection_id == connection.connection_id)
+            {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "duplicate connection id {}",
+                    connection.connection_id
+                )));
+            }
+            if connections.connections[..index]
+                .iter()
+                .any(|existing| existing.name.eq_ignore_ascii_case(&connection.name))
+            {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "duplicate connection name '{}'",
+                    connection.name
+                )));
+            }
+        }
+        self.connections = Some(connections);
+        Ok(())
+    }
+
+    /// The attached External Data Connections part, when set.
+    pub fn connections(&self) -> Option<&crate::xlsb::connections::XlsbConnections> {
+        self.connections.as_ref()
     }
 
     /// Get a mutable reference to a worksheet by index
@@ -175,6 +228,24 @@ impl XlsbWorkbookWriter {
         // so that relationships are created with full knowledge of which parts
         // actually exist.
         self.add_workbook_part(&mut package, &formula_sheet_ranges)?;
+
+        // External Data Connections part (at most one per package, related
+        // from the workbook part).
+        if let Some(connections) = &self.connections {
+            let connections_uri = PackURI::new("/xl/connections.bin")?;
+            package.add_part(Box::new(BlobPart::new(
+                connections_uri.clone(),
+                "application/vnd.ms-excel.connections".to_string(),
+                crate::xlsb::connections::write::write_connections_part(connections)?,
+            )));
+            package
+                .get_part_mut(&PackURI::new("/xl/workbook.bin")?)?
+                .rels_mut()
+                .get_or_add(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
+                    "connections.bin",
+                );
+        }
 
         // Save package to output
         package.to_stream(writer)?;
@@ -1027,6 +1098,97 @@ mod tests {
         workbook.save(&mut output).unwrap();
         let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
         assert_eq!(reader.calculation_properties(), &expected);
+    }
+
+    #[test]
+    fn connections_round_trip_through_save_and_read() {
+        use crate::xlsb::connections::*;
+
+        let connections = XlsbConnections {
+            connections: vec![
+                XlsbConnection {
+                    connection_id: 42,
+                    source_type: XlsbConnectionSourceType::Odbc,
+                    name: "Warehouse".to_string(),
+                    refresh_interval_minutes: 30,
+                    background_query: true,
+                    credential_method: Some(XlsbCredentialMethod::Integrated),
+                    properties: XlsbConnectionProperties::Database(XlsbDbProperties {
+                        command_type: XlsbCommandType::Sql,
+                        connection_string: "Driver={SQL Server};Server=db".to_string(),
+                        command: Some("SELECT * FROM T".to_string()),
+                        server_command: None,
+                    }),
+                    ..XlsbConnection::default()
+                },
+                XlsbConnection {
+                    connection_id: 9,
+                    source_type: XlsbConnectionSourceType::Web,
+                    name: "Web Query".to_string(),
+                    properties: XlsbConnectionProperties::Web(XlsbWebProperties {
+                        html_format: XlsbHtmlFormat::All,
+                        url: Some("https://example.test/q".to_string()),
+                        ..XlsbWebProperties::default()
+                    }),
+                    web_tables: vec![XlsbWebTableItem::Index(1)],
+                    ..XlsbConnection::default()
+                },
+            ],
+        };
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
+        workbook.set_connections(connections.clone()).unwrap();
+        // Validation: zero id, duplicate id, duplicate name (case-insensitive).
+        assert!(workbook
+            .set_connections(XlsbConnections {
+                connections: vec![XlsbConnection {
+                    connection_id: 0,
+                    name: "bad".to_string(),
+                    ..XlsbConnection::default()
+                }],
+            })
+            .is_err());
+        assert!(workbook
+            .set_connections(XlsbConnections {
+                connections: vec![
+                    XlsbConnection {
+                        connection_id: 5,
+                        name: "a".to_string(),
+                        ..XlsbConnection::default()
+                    },
+                    XlsbConnection {
+                        connection_id: 5,
+                        name: "b".to_string(),
+                        ..XlsbConnection::default()
+                    },
+                ],
+            })
+            .is_err());
+        assert!(workbook
+            .set_connections(XlsbConnections {
+                connections: vec![
+                    XlsbConnection {
+                        connection_id: 5,
+                        name: "Dup".to_string(),
+                        ..XlsbConnection::default()
+                    },
+                    XlsbConnection {
+                        connection_id: 6,
+                        name: "dup".to_string(),
+                        ..XlsbConnection::default()
+                    },
+                ],
+            })
+            .is_err());
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let parsed = reader.connections().expect("connections part missing");
+        assert_eq!(parsed, &connections);
+        assert_eq!(parsed.by_id(42).unwrap().name, "Warehouse");
+        assert!(parsed.by_name("Web Query").is_some());
     }
 
     #[test]
