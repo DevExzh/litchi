@@ -291,6 +291,7 @@ conversion, fonts, and image conversion are optional.
 | Drawings and shapes | 🟡 | ✅ | 🟡 | OfficeArt/Escher shape extraction (Data stream + fcDggInfo drawing group) and textbox story reading (main + header); `DocWriter::insert_floating_shape`/`insert_floating_text_box` write main-story shapes and text boxes, `insert_header_text_box`/`insert_header_picture` write odd/even/first-page header text boxes and pictures (PlcfSpaHdr + ccpHdrTxbx + PlcfHdrtxbxTxt) |
 | Embedded OLE/package objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve embedded object storages; payloads remain inert |
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |
+| Smart tags/factoids | 🟡 | ✅ | ❌ | Bounded MS-OSHARED `PropertyBagStore` decoding plus validated `SttbfBkmkFactoid`, start/end bookmark PLCFs, positional property bags, and `Plcffactoid` recognizer-state ranges; recognizers, VBA callbacks, download URLs, and schemas remain inert |
 | MathType/MTEF equations | 🟡 | ✅ | ❌ | Equation Native extraction and conversion; no DOC equation authoring |
 | Summary/document properties | ✅ | ✅ | ✅ | OLE property-set reading and editing |
 | Document protection settings | 🟡 | ✅ | ✅ | Typed settings/hashes; policy is not enforced |
@@ -382,6 +383,7 @@ conversion, fonts, and image conversion are optional.
 | Audio/video | 🟡 | ✅ | 🟡 | Sound collections and linked/embedded media metadata; authoring coverage is bounded |
 | Embedded OLE objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve package storages; payloads remain inert |
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |
+| Smart tags | 🟡 | ✅ | ❌ | PowerPoint 11 smart-tag stores use the shared bounded MS-OSHARED property-bag codec with codepage-aware ANSI strings; recognizers, download URLs, and schemas remain inert |
 | Presentation settings/metadata | ✅ | ✅ | ✅ | Slide-show, print, HTML publish, broadcast, envelope, routing, and privacy metadata |
 | Modify password/protection | ✅ | ✅ | ✅ | Password and protection metadata; policy is not enforced |
 | Password encryption | ✅ | ✅ | ✅ | Supported PPT encryption profiles |

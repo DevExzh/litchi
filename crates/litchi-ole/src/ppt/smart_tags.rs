@@ -3,6 +3,7 @@
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 use crate::consts::PptRecordType;
+use crate::smart_tags::{PropertyBagStore, SmartTagLimits};
 
 /// One smart-tag type declared by the shared property-bag store.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,121 +89,61 @@ fn parse_store(record: &PptRecord, codepage: u32) -> Result<PowerPointSmartTagSt
         ));
     }
     let data = &record.data;
-    let mut offset = 0usize;
-    let bag_count = read_u32(data, &mut offset, "smart-tag bag count")?;
-    let type_count = read_u32(data, &mut offset, "smart-tag type count")?;
-    let type_count = bounded_count(
-        type_count,
-        data.len().saturating_sub(offset),
-        14,
-        "smart-tag type count",
-    )?;
-    let mut types = Vec::with_capacity(type_count);
-    for _ in 0..type_count {
-        let size = usize::try_from(read_u32(data, &mut offset, "factoid size")?)
-            .map_err(|_| PptError::Corrupted("FactoidType size overflows usize".to_string()))?;
-        let end = offset
-            .checked_add(size)
-            .ok_or_else(|| PptError::Corrupted("FactoidType size overflow".to_string()))?;
-        if end > data.len() {
-            return Err(PptError::Corrupted("FactoidType is truncated".to_string()));
-        }
-        let id = read_u32(data, &mut offset, "factoid type id")?;
-        let id = u16::try_from(id)
-            .map_err(|_| PptError::Corrupted("FactoidType id exceeds 0xFFFF".to_string()))?;
-        let namespace_uri = parse_pb_string(data, &mut offset, codepage)?;
-        let tag_name = parse_pb_string(data, &mut offset, codepage)?;
-        let download_url = parse_pb_string(data, &mut offset, codepage)?;
-        if offset != end {
-            return Err(PptError::Corrupted(
-                "FactoidType byte count does not match its contents".to_string(),
-            ));
-        }
-        if types
-            .iter()
-            .any(|kind: &PowerPointSmartTagType| kind.id == id)
-        {
-            return Err(PptError::Corrupted(
-                "PropertyBagStore has duplicate smart-tag type ids".to_string(),
-            ));
-        }
-        types.push(PowerPointSmartTagType {
-            id,
-            namespace_uri,
-            tag_name,
-            download_url,
-        });
-    }
+    let bag_count_bytes = data.get(..4).ok_or_else(|| {
+        PptError::Corrupted("SmartTagStore11Container is missing its bag count".to_string())
+    })?;
+    let bag_count = usize::try_from(u32::from_le_bytes([
+        bag_count_bytes[0],
+        bag_count_bytes[1],
+        bag_count_bytes[2],
+        bag_count_bytes[3],
+    ]))
+    .map_err(|_| PptError::Corrupted("smart-tag bag count overflows usize".to_string()))?;
+    let limits = SmartTagLimits::default();
+    let (shared, consumed) = PropertyBagStore::parse_prefix(&data[4..], codepage, limits)
+        .map_err(|error| PptError::Corrupted(error.to_string()))?;
+    let bags_start = 4usize
+        .checked_add(consumed)
+        .ok_or_else(|| PptError::Corrupted("smart-tag store offset overflows".to_string()))?;
+    let bags = shared
+        .parse_bags(&data[bags_start..], bag_count, limits)
+        .map_err(|error| PptError::Corrupted(error.to_string()))?;
 
-    let header_size = read_u16(data, &mut offset, "property-bag header size")?;
-    let version = read_u16(data, &mut offset, "property-bag version")?;
-    if header_size != 0x000c || version != 0x0100 {
-        return Err(PptError::Corrupted(
-            "PropertyBagStore has an invalid header size or version".to_string(),
-        ));
-    }
-    let _reserved = read_u32(data, &mut offset, "property-bag reserved value")?;
-    let string_count = read_u32(data, &mut offset, "smart-tag string count")?;
-    let string_count = bounded_count(
-        string_count,
-        data.len().saturating_sub(offset),
-        2,
-        "smart-tag string count",
-    )?;
-    let mut string_table = Vec::with_capacity(string_count);
-    for _ in 0..string_count {
-        string_table.push(parse_pb_string(data, &mut offset, codepage)?);
-    }
-
-    let bag_count = bounded_count(
-        bag_count,
-        data.len().saturating_sub(offset),
-        6,
-        "smart-tag bag count",
-    )?;
-    let mut tags = Vec::with_capacity(bag_count);
-    for _ in 0..bag_count {
-        let type_id = read_u16(data, &mut offset, "smart-tag type id")?;
-        let property_count = read_u16(data, &mut offset, "smart-tag property count")?;
-        let reserved = read_u16(data, &mut offset, "smart-tag reserved value")?;
-        if reserved != 0 {
-            return Err(PptError::Corrupted(
-                "PropertyBag has a nonzero reserved field".to_string(),
-            ));
-        }
-        if !types.iter().any(|kind| kind.id == type_id) {
-            return Err(PptError::Corrupted(
-                "PropertyBag references an unknown smart-tag type".to_string(),
-            ));
-        }
-        let property_count = bounded_count(
-            u32::from(property_count),
-            data.len().saturating_sub(offset),
-            8,
-            "smart-tag property count",
-        )?;
-        let mut properties = Vec::with_capacity(property_count);
-        for _ in 0..property_count {
-            let key_index = read_u32(data, &mut offset, "smart-tag property key index")?;
-            let value_index = read_u32(data, &mut offset, "smart-tag property value index")?;
-            let key = resolve_string(&string_table, key_index)?.to_string();
-            let value = resolve_string(&string_table, value_index)?.to_string();
+    let types = shared
+        .types
+        .iter()
+        .map(|kind| PowerPointSmartTagType {
+            id: kind.id,
+            namespace_uri: kind.namespace_uri.value.clone(),
+            tag_name: kind.tag_name.value.clone(),
+            download_url: kind.download_url.value.clone(),
+        })
+        .collect();
+    let string_table = shared
+        .strings
+        .iter()
+        .map(|value| value.value.clone())
+        .collect();
+    let mut tags = Vec::with_capacity(bags.len());
+    for bag in bags {
+        let mut properties = Vec::with_capacity(bag.properties.len());
+        for property in bag.properties {
+            let (key, value) = shared.resolve_property(property).ok_or_else(|| {
+                PptError::Corrupted(
+                    "shared smart-tag property index validation was inconsistent".to_string(),
+                )
+            })?;
             properties.push(PowerPointSmartTagProperty {
-                key_index,
-                value_index,
-                key,
-                value,
+                key_index: property.key_index,
+                value_index: property.value_index,
+                key: key.to_string(),
+                value: value.to_string(),
             });
         }
         tags.push(PowerPointSmartTag {
-            type_id,
+            type_id: bag.type_id,
             properties,
         });
-    }
-    if offset != data.len() {
-        return Err(PptError::Corrupted(
-            "SmartTagStore11Container has trailing bytes".to_string(),
-        ));
     }
     Ok(PowerPointSmartTagStore {
         ansi_codepage: codepage,
@@ -210,80 +151,6 @@ fn parse_store(record: &PptRecord, codepage: u32) -> Result<PowerPointSmartTagSt
         string_table,
         tags,
     })
-}
-
-fn parse_pb_string(data: &[u8], offset: &mut usize, codepage: u32) -> Result<String> {
-    let flags = read_u16(data, offset, "PBString header")?;
-    let count = usize::from(flags & 0x7fff);
-    let ansi = flags & 0x8000 != 0;
-    let byte_count = if ansi {
-        count
-    } else {
-        count
-            .checked_mul(2)
-            .ok_or_else(|| PptError::Corrupted("PBString size overflow".to_string()))?
-    };
-    let end = offset
-        .checked_add(byte_count)
-        .ok_or_else(|| PptError::Corrupted("PBString offset overflow".to_string()))?;
-    let bytes = data
-        .get(*offset..end)
-        .ok_or_else(|| PptError::Corrupted("PBString is truncated".to_string()))?;
-    *offset = end;
-    if ansi {
-        litchi_core::encoding::decode_bytes(bytes, Some(codepage))
-            .ok_or_else(|| PptError::Corrupted("PBString ANSI decoding failed".to_string()))
-    } else {
-        let units: Vec<u16> = bytes
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .take_while(|unit| *unit != 0)
-            .collect();
-        String::from_utf16(&units)
-            .map_err(|_| PptError::Corrupted("PBString contains invalid UTF-16".to_string()))
-    }
-}
-
-fn resolve_string(strings: &[String], index: u32) -> Result<&str> {
-    let index = usize::try_from(index)
-        .map_err(|_| PptError::Corrupted("Smart-tag string index overflow".to_string()))?;
-    strings
-        .get(index)
-        .map(String::as_str)
-        .ok_or_else(|| PptError::Corrupted("Smart-tag string index is out of range".to_string()))
-}
-
-fn bounded_count(value: u32, remaining: usize, item_minimum: usize, name: &str) -> Result<usize> {
-    let value = usize::try_from(value)
-        .map_err(|_| PptError::Corrupted(format!("{name} overflows usize")))?;
-    if value > remaining / item_minimum {
-        return Err(PptError::Corrupted(format!(
-            "{name} exceeds the remaining record data"
-        )));
-    }
-    Ok(value)
-}
-
-fn read_u16(data: &[u8], offset: &mut usize, name: &str) -> Result<u16> {
-    let end = offset
-        .checked_add(2)
-        .ok_or_else(|| PptError::Corrupted(format!("{name} offset overflow")))?;
-    let bytes = data
-        .get(*offset..end)
-        .ok_or_else(|| PptError::Corrupted(format!("{name} is truncated")))?;
-    *offset = end;
-    Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
-}
-
-fn read_u32(data: &[u8], offset: &mut usize, name: &str) -> Result<u32> {
-    let end = offset
-        .checked_add(4)
-        .ok_or_else(|| PptError::Corrupted(format!("{name} offset overflow")))?;
-    let bytes = data
-        .get(*offset..end)
-        .ok_or_else(|| PptError::Corrupted(format!("{name} is truncated")))?;
-    *offset = end;
-    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
 #[cfg(test)]

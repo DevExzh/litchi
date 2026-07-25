@@ -39,6 +39,7 @@ use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
 use super::parts::revisions::RevisionAuthorTable;
 use super::parts::sections::SectionsTable;
+use super::parts::smart_tags::DocumentSmartTags;
 use super::parts::styles::StyleSheet;
 use super::parts::text::TextExtractor;
 use super::table::Table;
@@ -99,6 +100,8 @@ pub struct Document {
     comments_table: CommentsTable,
     /// Standard bookmark tables
     bookmarks_table: BookmarksTable,
+    /// Legacy Word smart-tag bookmarks, property bags, and recognizer ranges.
+    smart_tags: Option<DocumentSmartTags>,
     /// Revision-mark authors
     revision_authors: RevisionAuthorTable,
     /// Fixed associated-document strings
@@ -228,6 +231,7 @@ impl Document {
         let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
         let comments_table = CommentsTable::parse(&fib, &table_stream)?;
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
+        let smart_tags = DocumentSmartTags::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
         let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
         let list_names = ListNamesTable::parse(&fib, &table_stream)?;
@@ -311,6 +315,7 @@ impl Document {
             endnotes_table,
             comments_table,
             bookmarks_table,
+            smart_tags,
             revision_authors,
             associated_strings,
             list_names,
@@ -1774,6 +1779,14 @@ impl Document {
     /// Get all standard bookmarks in start-CP order.
     pub fn bookmarks(&self) -> Result<Vec<Bookmark>> {
         Ok(self.bookmarks_table.bookmarks().to_vec())
+    }
+
+    /// Legacy smart-tag metadata, when the document contains it.
+    ///
+    /// Recognition code and download URLs remain inert; this only exposes the
+    /// validated ranges, property bags, types, and recognizer states.
+    pub fn smart_tags(&self) -> Option<&DocumentSmartTags> {
+        self.smart_tags.as_ref()
     }
 
     /// Get author names used by tracked revisions and related annotations.

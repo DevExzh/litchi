@@ -169,6 +169,10 @@ pub use parts::proofing::{
     ProofingStatus, ProofingTables,
 };
 pub use parts::saved_by::{SavedByEntry, SavedByTable};
+pub use parts::smart_tags::{
+    DocumentSmartTag, DocumentSmartTags, SmartTagBookmarkInfo, SmartTagOrigin,
+    SmartTagRecognizerRange, SmartTagRecognizerState,
+};
 pub use parts::styles::{
     StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleRevisionMark, StyleSheet,
     StyleSheetHeader,

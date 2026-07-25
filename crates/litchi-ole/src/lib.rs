@@ -7,6 +7,9 @@ pub mod office_crypto;
 /// Legacy Office Custom XML Data Storage (`MsoDataStore`).
 pub mod custom_xml_data;
 
+/// Shared MS-OSHARED smart-tag property-bag structures.
+pub mod smart_tags;
+
 // CFB substrate types re-exported so callers can reach them through the
 // `litchi::ole` namespace as well as `litchi_cfb` directly.
 pub use litchi_cfb::{
