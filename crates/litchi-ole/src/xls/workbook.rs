@@ -1055,6 +1055,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         &self.pivot_caches
     }
 
+    /// Read the legacy Custom XML Data Storage without resolving schema URIs.
+    pub fn custom_xml_data_store(
+        &mut self,
+    ) -> crate::custom_xml_data::Result<Option<crate::custom_xml_data::MsoDataStore>> {
+        crate::custom_xml_data::inspect_mso_data_store(&mut self.ole_file)
+    }
+
     pub fn summary_information(&mut self) -> XlsResult<Option<litchi_cfb::PropertySetStream>> {
         match self.ole_file.property_set_stream(&["\u{0005}SummaryInformation"]) {
             Ok(value) => Ok(Some(value)), Err(litchi_cfb::OleError::StreamNotFound) => Ok(None), Err(error) => Err(error.into()),

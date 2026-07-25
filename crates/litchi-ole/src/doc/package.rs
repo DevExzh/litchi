@@ -236,6 +236,13 @@ impl<R: Read + Seek> Package<R> {
         super::vba::discover_vba_project_storages(&self.ole.list_streams())
     }
 
+    /// Read the legacy Custom XML Data Storage without resolving schema URIs.
+    pub fn custom_xml_data_store(
+        &mut self,
+    ) -> crate::custom_xml_data::Result<Option<crate::custom_xml_data::MsoDataStore>> {
+        crate::custom_xml_data::inspect_mso_data_store(&mut self.ole)
+    }
+
     pub fn summary_information(&mut self) -> Result<Option<litchi_cfb::PropertySetStream>> {
         match self.ole.property_set_stream(&["\u{0005}SummaryInformation"]) {
             Ok(value) => Ok(Some(value)),

@@ -4,13 +4,16 @@ pub mod consts;
 /// Shared MS-OFFCRYPTO structures for encryption and rights management.
 pub mod office_crypto;
 
+/// Legacy Office Custom XML Data Storage (`MsoDataStore`).
+pub mod custom_xml_data;
+
 // CFB substrate types re-exported so callers can reach them through the
 // `litchi::ole` namespace as well as `litchi_cfb` directly.
 pub use litchi_cfb::{
-    DirectoryEntry, OleError, OleFile, OleMetadata, OleWriter, PropertySet, PropertySetGuid,
-    OlePropertySetEditor, PropertySetStream, PropertyValue, StandardPropertySet,
-    DOCUMENT_SUMMARY_INFORMATION_FMTID, SUMMARY_INFORMATION_FMTID,
-    USER_DEFINED_PROPERTIES_FMTID, is_ole_file,
+    DOCUMENT_SUMMARY_INFORMATION_FMTID, DirectoryEntry, OleError, OleFile, OleMetadata,
+    OlePropertySetEditor, OleWriter, PropertySet, PropertySetGuid, PropertySetStream,
+    PropertyValue, SUMMARY_INFORMATION_FMTID, StandardPropertySet, USER_DEFINED_PROPERTIES_FMTID,
+    is_ole_file,
 };
 
 pub use litchi_cfb::writer;
@@ -68,10 +71,10 @@ pub mod signature;
 pub mod xls;
 
 pub use embedded_object::{
-    discover_legacy_office_objects, CompObjMetadata, DocObjectDescriptor,
-    LegacyOfficeEmbeddedObject, LegacyOfficeObjectCollection, LegacyOfficeObjectEditor,
-    LegacyOfficeObjectFormat, LegacyOfficeObjectKind, LegacyOfficeObjectLimits,
-    LegacyOfficePreview, LegacyOfficePreviewKind, OleNativePackage,
+    CompObjMetadata, DocObjectDescriptor, LegacyOfficeEmbeddedObject, LegacyOfficeObjectCollection,
+    LegacyOfficeObjectEditor, LegacyOfficeObjectFormat, LegacyOfficeObjectKind,
+    LegacyOfficeObjectLimits, LegacyOfficePreview, LegacyOfficePreviewKind, OleNativePackage,
+    discover_legacy_office_objects,
 };
 
 pub use xls::{XlsError, XlsWorkbook};

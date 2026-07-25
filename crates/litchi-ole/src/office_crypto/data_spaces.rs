@@ -25,6 +25,7 @@ use super::property_integrity::{
     SUMMARY_INFORMATION_STREAM, checksum_matches, parse_encrypted_property_stream_info,
 };
 use super::sensitivity_labels::{SensitivityLabelList, parse_label_info};
+use crate::custom_xml_data::{DataStorePromotion, MsoDataStore, inspect_mso_data_store};
 
 const HEADER_LENGTH: u32 = 8;
 const TRANSFORM_TYPE: u32 = 1;
@@ -198,6 +199,8 @@ pub struct DataSpaceGraph {
     pub summary_information_integrity: Option<PropertyStreamIntegrity>,
     /// Integrity metadata for the public DocumentSummaryInformation property stream.
     pub document_summary_information_integrity: Option<PropertyStreamIntegrity>,
+    /// Public legacy Custom XML mirror and its IRM promotion semantics.
+    pub custom_xml_data_store: Option<MsoDataStore>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -528,7 +531,10 @@ pub fn write_end_user_license(value: &IrmEndUserLicense) -> Result<Vec<u8>, Data
 pub fn inspect_data_spaces<R: Read + Seek>(
     ole: &mut OleFile<R>,
 ) -> Result<Option<DataSpaceGraph>, DataSpaceError> {
+    let custom_xml_data_store = inspect_mso_data_store(ole)
+        .map_err(|error| invalid(format!("MsoDataStore validation failed: {error}")))?;
     if !ole.exists(&[DATA_SPACES_STORAGE]) {
+        validate_custom_xml_promotion(custom_xml_data_store.as_ref(), None)?;
         return Ok(None);
     }
     let version = parse_version_info(&read_stream(ole, &[DATA_SPACES_STORAGE, "Version"])?)?;
@@ -704,6 +710,7 @@ pub fn inspect_data_spaces<R: Read + Seek>(
             "encrypted property hash stream is present without an encryption or IRM transform",
         ));
     }
+    validate_custom_xml_promotion(custom_xml_data_store.as_ref(), irm.as_ref())?;
     Ok(Some(DataSpaceGraph {
         version,
         map,
@@ -714,7 +721,22 @@ pub fn inspect_data_spaces<R: Read + Seek>(
         sensitivity_labels,
         summary_information_integrity,
         document_summary_information_integrity,
+        custom_xml_data_store,
     }))
+}
+
+fn validate_custom_xml_promotion(
+    store: Option<&MsoDataStore>,
+    irm: Option<&IrmDataSpace>,
+) -> Result<(), DataSpaceError> {
+    if store.is_some_and(|store| store.promotion != DataStorePromotion::Unspecified)
+        && irm.is_none()
+    {
+        return Err(invalid(
+            "MsoDataStore promotion marker requires an IRM data space",
+        ));
+    }
+    Ok(())
 }
 
 /// Open an OLE compound file and inspect its DataSpaces graph.
@@ -1579,6 +1601,25 @@ mod tests {
                 ),
             )
             .unwrap();
+        let custom_properties = crate::custom_xml_data::CustomXmlDataProperties {
+            item_id: "{11111111-2222-3333-4444-555555555555}".parse().unwrap(),
+            schema_references: vec!["urn:test".to_string()],
+        };
+        let custom_item = crate::custom_xml_data::CustomXmlDataItem::new(
+            custom_properties.item_id.storage_name(),
+            br#"<test xmlns="urn:test"/>"#.to_vec(),
+            custom_properties,
+        )
+        .unwrap();
+        crate::custom_xml_data::write_mso_data_store(
+            &mut writer,
+            &crate::custom_xml_data::MsoDataStore::new(
+                crate::custom_xml_data::DataStorePromotion::Modified,
+                vec![custom_item],
+            )
+            .unwrap(),
+        )
+        .unwrap();
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
 
@@ -1597,6 +1638,12 @@ mod tests {
             Some(true)
         );
         assert!(graph.document_summary_information_integrity.is_none());
+        let custom_xml = graph.custom_xml_data_store.unwrap();
+        assert_eq!(
+            custom_xml.promotion,
+            crate::custom_xml_data::DataStorePromotion::Modified
+        );
+        assert_eq!(custom_xml.items().len(), 1);
     }
 
     #[test]
@@ -1669,5 +1716,25 @@ mod tests {
             irm.viewer_content_stream.as_deref(),
             Some("0x09DRMViewerContent")
         );
+    }
+
+    #[test]
+    fn rejects_custom_xml_promotion_without_irm() {
+        let store = crate::custom_xml_data::MsoDataStore::new(
+            crate::custom_xml_data::DataStorePromotion::Redundant,
+            Vec::new(),
+        )
+        .unwrap();
+        assert!(validate_custom_xml_promotion(Some(&store), None).is_err());
+
+        let mut writer = OleWriter::new();
+        crate::custom_xml_data::write_mso_data_store(&mut writer, &store).unwrap();
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+        let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
+        assert!(inspect_data_spaces(&mut ole).is_err());
+
+        let unspecified = crate::custom_xml_data::MsoDataStore::default();
+        assert!(validate_custom_xml_promotion(Some(&unspecified), None).is_ok());
     }
 }
