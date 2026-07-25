@@ -23,6 +23,7 @@ pub(crate) mod axis_style;
 pub(crate) mod background_fill;
 pub(crate) mod border;
 pub(crate) mod border_stroke;
+pub(crate) mod category_labels;
 mod data;
 mod direction;
 pub(crate) mod donut_inner_radius;
@@ -66,6 +67,9 @@ pub use axis_label_angle::ChartAxisLabelAngle;
 pub use axis_scale::ChartValueAxisScale;
 pub use axis_steps::{ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartValueAxisSteps};
 pub use axis_style::ChartAxisTickMarkLocation;
+pub use category_labels::{
+    ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartCategoryLabelLayout,
+};
 pub use data::ChartData;
 pub use direction::ChartSeriesDirection;
 pub use donut_inner_radius::ChartDonutInnerRadius;
