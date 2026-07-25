@@ -128,7 +128,7 @@ conversion, fonts, and image conversion are optional.
 | Themes | ✅ | ✅ | ✅ | Theme colors, fonts, and related package parts |
 | Document protection | 🟡 | ✅ | ✅ | Protection settings and hashes; the library does not enforce editing policy |
 | Table of contents | 🟡 | ✅ | ✅ | Typed inert discovery of simple/complex TOC fields, switches, cached results, and dirty/lock state plus field/content authoring; no pagination or automatic refresh |
-| Watermarks | 🟡 | ✅ | ✅ | Typed VML text-watermark discovery in headers plus generated watermark authoring/removal; arbitrary and image watermark variants remain bounded |
+| Watermarks | ✅ | ✅ | ✅ | Typed VML text-watermark discovery in headers plus generated and arbitrary text watermark authoring (layout, semitransparency, font/size/color) with full-fidelity round-trips, image watermark authoring (format/dimension sniffing, scaling, shared media part) with anchor/payload discovery, and removal |
 | Office Math equations in-document | ✅ | ✅ | ✅ | Exact OMML extraction plus validated inline/display equation and math-paragraph authoring; layout and equation evaluation remain renderer responsibilities |
 | SmartArt | ✅ | ✅ | ✅ | Typed inert diagram inventory: parsed `dgm:dataModel` node/connection trees, layout/quick-style/colors part metadata, and pre-rendered drawing references in both dialects; authoring generates the definition parts and `dgm:relIds` anchor and round-trips through the read inventory |
 | DrawingML text boxes and WordArt | ✅ | ✅ | ✅ | Typed inert text-box/WordArt inventory: DrawingML `wps:txbx` and VML `v:textbox` fallbacks (via MCE), body properties (insets, vertical anchor, direction, wrap, autofit), rich story text with basic run formatting, and WordArt warp presets with inert styling flags; inline text-box authoring with presets, extents, formatted runs, and full bodyPr round-trips through the read inventory; WordArt and floating-anchor authoring are not covered |
@@ -164,7 +164,7 @@ conversion, fonts, and image conversion are optional.
 |---------|--------|------|-------|-------|
 | Classic charts | ✅ | ✅ | ✅ | Worksheet anchors, chart graphs, styles, user shapes, images, and external-data parts |
 | ChartEx | 🟡 | ✅ | ✅ | Extended chart part model and serialization; integration is more limited than classic charts |
-| Chart sheets | ✅ | ✅ | ✅ | Views, protection, print settings, chart resources, and package graph |
+| Chart sheets | ✅ | ✅ | ✅ | Views, protection, print settings, chart resources, and package graph; `add_chart_sheet` authoring with interleaved sheet-order preservation, typed chartsheet/drawing emission, and pivot-chart support validated like worksheet pivot charts |
 | Pivot tables and caches | ✅ | ✅ | ✅ | Definitions, cache fields/records, filters, grouping, layouts, and writer support |
 | Pivot charts | ✅ | ✅ | ✅ | Typed inert chart-to-pivot binding: per-worksheet and chartsheet pivot-chart enumeration, `c:pivotSource` parsing, validated pivot-name resolution, and per-series drop-zone metadata; authoring binds classic charts by name with save-time validation/normalization to canonical sheet-qualified names, round-tripping through the read inventory |
 | Structured tables/ListObjects | ✅ | ✅ | ✅ | Columns, formulas, totals, table types, and styles |
@@ -288,7 +288,7 @@ conversion, fonts, and image conversion are optional.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Images | 🟡 | ✅ | 🟡 | Inline/floating picture and blip extraction; `DocWriter::insert_picture` writes inline PNG/JPEG pictures (OfficeArtWordDrawing in the Data stream) and `insert_floating_picture` writes floating ones (0x0008 anchor + PlcfSpa + fcDggInfo OfficeArtContent) |
-| Drawings and shapes | 🟡 | ✅ | 🟡 | OfficeArt/Escher shape extraction (Data stream + fcDggInfo drawing group) and textbox story reading; `DocWriter::insert_floating_shape` writes floating rectangles/rounded rectangles/ellipses with fill/line colors, `insert_floating_text_box` adds plain-text boxes (ccpTxbx story + PlcftxbxTxt + ClientTextbox) |
+| Drawings and shapes | 🟡 | ✅ | 🟡 | OfficeArt/Escher shape extraction (Data stream + fcDggInfo drawing group) and textbox story reading (main + header); `DocWriter::insert_floating_shape`/`insert_floating_text_box` write main-story shapes and text boxes, `insert_header_text_box` writes header-story text boxes (PlcfSpaHdr + ccpHdrTxbx + PlcfHdrtxbxTxt) |
 | Embedded OLE/package objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve embedded object storages; payloads remain inert |
 | MathType/MTEF equations | 🟡 | ✅ | ❌ | Equation Native extraction and conversion; no DOC equation authoring |
 | Summary/document properties | ✅ | ✅ | ✅ | OLE property-set reading and editing |
