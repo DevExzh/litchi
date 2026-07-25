@@ -121,6 +121,11 @@ pub struct MutableXlsbWorksheet {
     /// Original text for formula groups created through the text API. Binary
     /// groups intentionally have no entry and are never recompiled.
     formula_group_sources: BTreeMap<(u32, u32), String>,
+    /// Structured tables (ListObjects) hosted on this sheet.
+    tables: Vec<crate::xlsb::table::XlsbTable>,
+    /// Relationship IDs allocated for `tables` by the workbook writer, in
+    /// table order. Populated during `XlsbWorkbookWriter::save`.
+    pub(crate) table_rel_ids: Vec<String>,
 }
 
 pub(crate) struct ContextualFormulaRestore {
@@ -228,6 +233,8 @@ impl MutableXlsbWorksheet {
             conditional_formattings: Vec::new(),
             formula_groups: Vec::new(),
             formula_group_sources: BTreeMap::new(),
+            tables: Vec::new(),
+            table_rel_ids: Vec::new(),
         }
     }
 
@@ -954,6 +961,55 @@ impl MutableXlsbWorksheet {
     }
 
     /// Get all comments
+    /// Add a structured table (ListObject) hosted on this sheet.
+    ///
+    /// The table part is serialized and related from this worksheet when the
+    /// workbook is saved. The display name is required by Excel; the column
+    /// list, when present, must match the range width.
+    pub fn add_table(&mut self, table: crate::xlsb::table::XlsbTable) -> XlsbResult<()> {
+        const MAX_TABLES_PER_SHEET: usize = 4_096;
+        if self.tables.len() >= MAX_TABLES_PER_SHEET {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                "worksheet table count exceeds the safety limit".to_string(),
+            ));
+        }
+        if table
+            .display_name
+            .as_deref()
+            .is_none_or(str::is_empty)
+        {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                "structured table requires a display name".to_string(),
+            ));
+        }
+        let range = &table.range;
+        if range.first_row > range.last_row || range.first_column > range.last_column {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                "structured table range is inverted".to_string(),
+            ));
+        }
+        let width = u64::from(range.last_column) - u64::from(range.first_column) + 1;
+        if !table.columns.is_empty() && table.columns.len() as u64 != width {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "structured table declares {} columns for a range {width} wide",
+                table.columns.len()
+            )));
+        }
+        if self.tables.iter().any(|existing| existing.id == table.id) {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "duplicate structured table id {}",
+                table.id
+            )));
+        }
+        self.tables.push(table);
+        Ok(())
+    }
+
+    /// The structured tables hosted on this sheet.
+    pub fn tables(&self) -> &[crate::xlsb::table::XlsbTable] {
+        &self.tables
+    }
+
     pub fn comments(&self) -> &[Comment] {
         &self.comments
     }
@@ -1195,6 +1251,17 @@ impl MutableXlsbWorksheet {
                 writer,
                 &self.conditional_formattings,
             )?;
+        }
+
+        // Write table references (BrtBeginListParts / BrtListPart /
+        // BrtEndListParts) after all other sheet features.
+        if !self.tables.is_empty() {
+            if self.table_rel_ids.len() != self.tables.len() {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    "worksheet tables lack relationship IDs from the workbook writer".to_string(),
+                ));
+            }
+            crate::xlsb::table::write::write_list_parts(writer, &self.table_rel_ids)?;
         }
 
         // Write BrtEndSheet

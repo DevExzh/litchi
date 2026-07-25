@@ -783,6 +783,7 @@ impl XlsbWorkbookWriter {
             })
             .collect::<Vec<_>>();
         let formula_sheet_ranges = std::cell::RefCell::new(Vec::new());
+        let mut next_table_index = 1usize;
         for (i, worksheet) in self.worksheets.iter_mut().enumerate() {
             // Create the worksheet part with an empty blob first so we can attach
             // relationships (binary index + external hyperlinks) and obtain
@@ -846,6 +847,24 @@ impl XlsbWorkbookWriter {
                 ))
             };
 
+            // Structured tables: one part per table, related from the
+            // worksheet so the BrtListPart records can carry valid rIds.
+            let mut table_parts = Vec::new();
+            if !worksheet.tables().is_empty() {
+                let mut rel_ids = Vec::with_capacity(worksheet.tables().len());
+                for table in worksheet.tables() {
+                    let table_name = format!("tables/table{next_table_index}.bin");
+                    next_table_index += 1;
+                    rel_ids.push(sheet_part.relate_to(&format!("../{table_name}"), rel::TABLE));
+                    table_parts.push(BlobPart::new(
+                        PackURI::new(format!("/xl/{table_name}"))?,
+                        "application/vnd.ms-excel.table".to_string(),
+                        crate::xlsb::table::write::write_table_part(table)?,
+                    ));
+                }
+                worksheet.table_rel_ids = rel_ids;
+            }
+
             // Now serialize the worksheet with fully-populated relationship IDs
             // in the hyperlink records.
             let mut sheet_data = Vec::new();
@@ -876,6 +895,9 @@ impl XlsbWorkbookWriter {
             package.add_part(Box::new(sheet_part));
             package.add_part(Box::new(binary_index_part));
             if let Some(part) = comments_part {
+                package.add_part(Box::new(part));
+            }
+            for part in table_parts {
                 package.add_part(Box::new(part));
             }
         }
@@ -1006,6 +1028,114 @@ mod tests {
         let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
         assert_eq!(reader.calculation_properties(), &expected);
     }
+
+    #[test]
+    fn structured_tables_round_trip_through_save_and_read() {
+        use crate::xlsb::table::{
+            XlsbTable, XlsbTableColumn, XlsbTableFormula, XlsbTableRange, XlsbTableStyleInfo,
+            XlsbTableTotalsRowFunction, XlsbTableType,
+        };
+
+        let table = XlsbTable {
+            id: 3,
+            name: Some("SalesTable".to_string()),
+            display_name: Some("SalesTable".to_string()),
+            range: XlsbTableRange {
+                first_row: 0,
+                last_row: 2,
+                first_column: 0,
+                last_column: 1,
+            },
+            table_type: XlsbTableType::Range,
+            header_row_count: 1,
+            columns: vec![
+                XlsbTableColumn {
+                    id: 1,
+                    name: Some("Region".to_string()),
+                    ..XlsbTableColumn::default()
+                },
+                XlsbTableColumn {
+                    id: 2,
+                    name: Some("Amount".to_string()),
+                    totals_row_function: XlsbTableTotalsRowFunction::Sum,
+                    calculated_column_formula: Some(XlsbTableFormula {
+                        array: false,
+                        tokens: vec![0x1E, 0x02],
+                        extra: Vec::new(),
+                    }),
+                    ..XlsbTableColumn::default()
+                },
+            ],
+            style_info: Some(XlsbTableStyleInfo {
+                name: Some("TableStyleMedium2".to_string()),
+                show_first_column: false,
+                show_last_column: false,
+                show_row_stripes: true,
+                show_column_stripes: false,
+            }),
+            ..XlsbTable::default()
+        };
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut sheet = MutableXlsbWorksheet::new("Sheet1");
+        sheet.set_cell(0, 0, "Region");
+        sheet.set_cell(0, 1, "Amount");
+        sheet.set_cell(1, 0, "North");
+        sheet.set_cell(1, 1, 42.5);
+        sheet.add_table(table.clone()).unwrap();
+        // Validation: missing display name, inverted range, width mismatch,
+        // duplicate id.
+        assert!(
+            sheet
+                .add_table(XlsbTable {
+                    id: 9,
+                    range: table.range,
+                    ..XlsbTable::default()
+                })
+                .is_err()
+        );
+        assert!(
+            sheet
+                .add_table(XlsbTable {
+                    id: 9,
+                    display_name: Some("Bad".to_string()),
+                    range: XlsbTableRange {
+                        first_row: 5,
+                        last_row: 2,
+                        first_column: 0,
+                        last_column: 0,
+                    },
+                    ..XlsbTable::default()
+                })
+                .is_err()
+        );
+        assert!(
+            sheet
+                .add_table(XlsbTable {
+                    id: 9,
+                    display_name: Some("Bad".to_string()),
+                    range: table.range,
+                    columns: vec![XlsbTableColumn::default()],
+                    ..XlsbTable::default()
+                })
+                .is_err()
+        );
+        let mut duplicate = table.clone();
+        duplicate.display_name = Some("Other".to_string());
+        assert!(sheet.add_table(duplicate).is_err());
+        workbook.add_worksheet(sheet);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let tables = reader.structured_tables();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].0, 0);
+        assert_eq!(tables[0].1, table);
+        assert_eq!(reader.tables_on_sheet(0).len(), 1);
+        assert!(reader.tables_on_sheet(1).is_empty());
+    }
+
 
     #[test]
     fn comments_survive_package_roundtrip() {
