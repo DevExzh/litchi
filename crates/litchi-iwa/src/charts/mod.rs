@@ -14,6 +14,7 @@ use crate::{Error, IWorkPackage, Result};
 mod archive;
 pub(crate) mod axis;
 pub(crate) mod axis_bounds;
+pub(crate) mod axis_number_format;
 pub(crate) mod axis_scale;
 pub(crate) mod axis_steps;
 pub(crate) mod axis_style;
@@ -28,6 +29,7 @@ pub(crate) mod hidden_data;
 mod kind;
 pub mod metadata_extractor;
 pub(crate) mod non_style;
+pub(crate) mod number_format;
 pub(crate) mod options;
 pub(crate) mod pie_label_distance;
 pub(crate) mod pie_labels;
@@ -67,6 +69,9 @@ pub use donut_inner_radius::ChartDonutInnerRadius;
 pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
+pub use number_format::{
+    ChartDecimalPlaces, ChartFixedDecimalPlaces, ChartNegativeStyle, ChartNumberFormat,
+};
 pub use pie_label_distance::ChartPieLabelDistance;
 pub use pie_labels::ChartPieLabelVisibility;
 pub use pie_start_angle::ChartPieStartAngle;
