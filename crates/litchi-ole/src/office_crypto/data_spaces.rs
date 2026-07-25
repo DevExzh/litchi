@@ -19,6 +19,13 @@ use std::io::{Read, Seek};
 
 use litchi_cfb::OleFile;
 
+use super::property_integrity::{
+    DOCUMENT_SUMMARY_INFORMATION_STREAM, ENCRYPTED_DOCUMENT_SUMMARY_INFORMATION_HASH_STREAM,
+    ENCRYPTED_SUMMARY_INFORMATION_HASH_STREAM, EncryptedPropertyStreamInfo,
+    SUMMARY_INFORMATION_STREAM, checksum_matches, parse_encrypted_property_stream_info,
+};
+use super::sensitivity_labels::{SensitivityLabelList, parse_label_info};
+
 const HEADER_LENGTH: u32 = 8;
 const TRANSFORM_TYPE: u32 = 1;
 const EXTENSIBILITY_HEADER_LENGTH: u32 = 4;
@@ -185,6 +192,19 @@ pub struct DataSpaceGraph {
     pub irm: Option<IrmDataSpace>,
     /// Exact sensitivity-label XML bytes, retained inert when present.
     pub label_info: Option<Vec<u8>>,
+    /// Validated typed view of `label_info`.
+    pub sensitivity_labels: Option<SensitivityLabelList>,
+    /// Integrity metadata for the public SummaryInformation property stream.
+    pub summary_information_integrity: Option<PropertyStreamIntegrity>,
+    /// Integrity metadata for the public DocumentSummaryInformation property stream.
+    pub document_summary_information_integrity: Option<PropertyStreamIntegrity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PropertyStreamIntegrity {
+    pub info: EncryptedPropertyStreamInfo,
+    /// `None` means a future info-stream version that readers must ignore.
+    pub checksum_matches: Option<bool>,
 }
 
 pub fn parse_version_info(data: &[u8]) -> Result<DataSpaceVersionInfo, DataSpaceError> {
@@ -640,14 +660,50 @@ pub fn inspect_data_spaces<R: Read + Seek>(
 
     validate_graph(ole, &map, &definitions, &transforms)?;
     let irm = classify_irm(&map, &definitions, &transforms)?;
-    let label_info = if ole.exists(&[DATA_SPACES_STORAGE, "TransformInfo", "LabelInfo"]) {
-        let bytes = read_stream(ole, &[DATA_SPACES_STORAGE, "TransformInfo", "LabelInfo"])?;
-        let xml = std::str::from_utf8(&bytes).map_err(|_| invalid("LabelInfo is not UTF-8 XML"))?;
-        validate_inert_xml(xml, "LabelInfo")?;
-        Some(bytes)
-    } else {
-        None
-    };
+    let (label_info, sensitivity_labels) =
+        if ole.exists(&[DATA_SPACES_STORAGE, "TransformInfo", "LabelInfo"]) {
+            let bytes = read_stream(ole, &[DATA_SPACES_STORAGE, "TransformInfo", "LabelInfo"])?;
+            let labels = parse_label_info(&bytes)
+                .map_err(|error| invalid(format!("LabelInfo validation failed: {error}")))?;
+            (Some(bytes), Some(labels))
+        } else {
+            (None, None)
+        };
+    if sensitivity_labels.is_some()
+        && !irm.as_ref().is_some_and(|profile| {
+            transforms.iter().any(|transform| {
+                transform.name == profile.transform_name
+                    && transform
+                        .irm
+                        .as_ref()
+                        .is_some_and(|metadata| metadata.publishing_license.is_some())
+            })
+        })
+    {
+        return Err(invalid(
+            "LabelInfo requires an IRM transform with a publishing license",
+        ));
+    }
+    let summary_information_integrity = inspect_property_integrity(
+        ole,
+        ENCRYPTED_SUMMARY_INFORMATION_HASH_STREAM,
+        SUMMARY_INFORMATION_STREAM,
+    )?;
+    let document_summary_information_integrity = inspect_property_integrity(
+        ole,
+        ENCRYPTED_DOCUMENT_SUMMARY_INFORMATION_HASH_STREAM,
+        DOCUMENT_SUMMARY_INFORMATION_STREAM,
+    )?;
+    if (summary_information_integrity.is_some() || document_summary_information_integrity.is_some())
+        && irm.is_none()
+        && !transforms
+            .iter()
+            .any(|transform| transform.encryption.is_some())
+    {
+        return Err(invalid(
+            "encrypted property hash stream is present without an encryption or IRM transform",
+        ));
+    }
     Ok(Some(DataSpaceGraph {
         version,
         map,
@@ -655,6 +711,9 @@ pub fn inspect_data_spaces<R: Read + Seek>(
         transforms,
         irm,
         label_info,
+        sensitivity_labels,
+        summary_information_integrity,
+        document_summary_information_integrity,
     }))
 }
 
@@ -662,6 +721,28 @@ pub fn inspect_data_spaces<R: Read + Seek>(
 pub fn inspect_data_spaces_bytes(bytes: &[u8]) -> Result<Option<DataSpaceGraph>, DataSpaceError> {
     let mut ole = OleFile::open(std::io::Cursor::new(bytes)).map_err(ole_error)?;
     inspect_data_spaces(&mut ole)
+}
+
+fn inspect_property_integrity<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    info_stream: &str,
+    property_stream: &str,
+) -> Result<Option<PropertyStreamIntegrity>, DataSpaceError> {
+    if !ole.exists(&[info_stream]) {
+        return Ok(None);
+    }
+    if !ole.exists(&[property_stream]) {
+        return Err(invalid(format!(
+            "{info_stream} is present without {property_stream}"
+        )));
+    }
+    let info = parse_encrypted_property_stream_info(&read_stream(ole, &[info_stream])?)
+        .map_err(|error| invalid(format!("{info_stream} is malformed: {error}")))?;
+    let checksum_matches = checksum_matches(&info, &read_stream(ole, &[property_stream])?);
+    Ok(Some(PropertyStreamIntegrity {
+        info,
+        checksum_matches,
+    }))
 }
 
 fn validate_graph<R: Read + Seek>(
@@ -1475,6 +1556,29 @@ mod tests {
                 &write_version_info(&DataSpaceVersionInfo::default()).unwrap(),
             )
             .unwrap();
+        let label_info = format!(
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?><clbl:labelList xmlns:clbl=\"{}\"><clbl:label id=\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\" enabled=\"1\" method=\"Standard\" siteId=\"12345678-1234-5678-90ab-1234567890ab\" contentBits=\"8\" removed=\"0\"/></clbl:labelList>",
+            crate::office_crypto::sensitivity_labels::LABEL_INFO_NAMESPACE
+        );
+        writer
+            .create_stream(
+                &[DATA_SPACES_STORAGE, "TransformInfo", "LabelInfo"],
+                label_info.as_bytes(),
+            )
+            .unwrap();
+        let summary_information = b"public summary property set";
+        writer
+            .create_stream(&[SUMMARY_INFORMATION_STREAM], summary_information)
+            .unwrap();
+        writer
+            .create_stream(
+                &[ENCRYPTED_SUMMARY_INFORMATION_HASH_STREAM],
+                &crate::office_crypto::property_integrity::write_encrypted_property_stream_info(
+                    crate::office_crypto::property_integrity::mso_crc32(summary_information),
+                    &[],
+                ),
+            )
+            .unwrap();
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
 
@@ -1484,6 +1588,15 @@ mod tests {
         assert_eq!(irm.document_kind, IrmDocumentKind::Ooxml);
         assert_eq!(irm.protected_content_stream, "EncryptedPackage");
         assert_eq!(graph.transforms[0].end_user_licenses, [end_user_license]);
+        assert_eq!(graph.sensitivity_labels.unwrap().labels.len(), 1);
+        assert_eq!(
+            graph
+                .summary_information_integrity
+                .unwrap()
+                .checksum_matches,
+            Some(true)
+        );
+        assert!(graph.document_summary_information_integrity.is_none());
     }
 
     #[test]
