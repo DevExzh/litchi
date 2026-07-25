@@ -161,6 +161,8 @@ pub mod pivot;
 
 /// Table (ListObject) stream parsing (MS-XLSB 2.1.7.51)
 pub mod table;
+pub mod connections;
+pub(crate) mod walker;
 
 /// Chart sheet stream parsing (MS-XLSB 2.1.7.7)
 pub mod chartsheet;

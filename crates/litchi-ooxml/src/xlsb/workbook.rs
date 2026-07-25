@@ -60,6 +60,7 @@ pub struct XlsbWorkbook {
     structured_tables: Vec<(usize, crate::xlsb::table::XlsbTable)>,
     chart_sheets: Vec<(usize, crate::xlsb::chartsheet::XlsbChartSheet)>,
     sheet_drawings: Vec<crate::xlsb::drawing::XlsbSheetDrawing>,
+    connections: Option<crate::xlsb::connections::XlsbConnections>,
 }
 
 /// Chart sheet relationship types documented by MS-XLSB 2.1.7.7.
@@ -199,6 +200,16 @@ impl XlsbWorkbook {
             .iter()
             .find(|(id, _)| *id == cache_id)
             .map(|(_, definition)| definition)
+    }
+
+    /// The typed External Data Connections part, when the workbook declares
+    /// one (MS-XLSB 2.1.7.24).
+    ///
+    /// These are inert data snapshots: connection strings, commands, URLs,
+    /// file paths, and credential metadata are stored verbatim and are never
+    /// resolved, contacted, refreshed, or executed.
+    pub fn connections(&self) -> Option<&crate::xlsb::connections::XlsbConnections> {
+        self.connections.as_ref()
     }
 
     /// Typed structured-table (ListObject) definitions paired with their
@@ -476,6 +487,7 @@ impl XlsbWorkbook {
             structured_tables: Vec::new(),
             chart_sheets: Vec::new(),
             sheet_drawings: Vec::new(),
+            connections: None,
         };
 
         workbook.load_workbook_info()?;
@@ -507,6 +519,7 @@ impl XlsbWorkbook {
             structured_tables: Vec::new(),
             chart_sheets: Vec::new(),
             sheet_drawings: Vec::new(),
+            connections: None,
         };
 
         workbook.load_workbook_info()?;
@@ -857,6 +870,31 @@ impl XlsbWorkbook {
             pivot_cache_definitions.push((*cache_id, definition));
         }
 
+        // External Data Connections part (MS-XLSB 2.1.7.24): at most one per
+        // package, related from the workbook part.
+        let mut connections = None;
+        for relationship in workbook_part.rels().iter() {
+            if !relationship
+                .reltype()
+                .to_ascii_lowercase()
+                .ends_with("/connections")
+            {
+                continue;
+            }
+            if relationship.is_external() {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    "connections relationship is external".to_string(),
+                ));
+            }
+            if connections.is_some() {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                    "workbook declares multiple connections parts".to_string(),
+                ));
+            }
+            let part = self.package.get_part(&relationship.target_partname()?)?;
+            connections = Some(crate::xlsb::connections::parse_connections_part(part.blob())?);
+        }
+
         let mut tables = Vec::new();
         let mut pivot_views = Vec::new();
         let mut structured_tables = Vec::new();
@@ -1038,6 +1076,7 @@ impl XlsbWorkbook {
         self.is_1904 = info.is_1904;
         self.calculation_properties = info.calculation_properties.unwrap_or_default();
         self.pivot_cache_definitions = pivot_cache_definitions;
+        self.connections = connections;
         self.structured_tables = structured_tables;
         self.chart_sheets = chart_sheets;
         self.sheet_drawings = sheet_drawings;
@@ -2188,6 +2227,7 @@ mod tests {
             structured_tables: Vec::new(),
             chart_sheets: Vec::new(),
             sheet_drawings: Vec::new(),
+            connections: None,
         };
         workbook.load_external_book(&uri)
     }
@@ -2500,6 +2540,7 @@ mod tests {
             structured_tables: Vec::new(),
             chart_sheets: Vec::new(),
             sheet_drawings: Vec::new(),
+            connections: None,
         };
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
         let book = workbook.load_external_book(&uri).unwrap();

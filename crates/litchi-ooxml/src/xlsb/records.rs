@@ -225,6 +225,34 @@ pub mod record_types {
     pub const LIST14: u16 = 1111;
 
     // External connections and links
+    pub const BEGIN_EXT_CONNECTION: u16 = 201;
+    pub const END_EXT_CONNECTION: u16 = 202;
+    pub const BEGIN_EC_DB_PROPS: u16 = 203;
+    pub const END_EC_DB_PROPS: u16 = 204;
+    pub const BEGIN_EC_OLAP_PROPS: u16 = 205;
+    pub const END_EC_OLAP_PROPS: u16 = 206;
+    pub const BEGIN_EC_WEB_PROPS: u16 = 261;
+    pub const END_EC_WEB_PROPS: u16 = 262;
+    pub const BEGIN_EC_WP_TABLES: u16 = 263;
+    pub const END_EC_WP_TABLES: u16 = 264;
+    pub const BEGIN_EC_PARAMS: u16 = 265;
+    pub const END_EC_PARAMS: u16 = 266;
+    pub const BEGIN_EC_PARAM: u16 = 267;
+    pub const END_EC_PARAM: u16 = 268;
+    pub const BEGIN_EXT_CONNECTIONS: u16 = 429;
+    pub const END_EXT_CONNECTIONS: u16 = 430;
+    pub const BEGIN_EC_TXT_WIZ: u16 = 538;
+    pub const END_EC_TXT_WIZ: u16 = 539;
+    pub const BEGIN_EXT_CONN14: u16 = 1068;
+    pub const END_EXT_CONN14: u16 = 1069;
+    pub const BEGIN_EXT_CONN15: u16 = 2109;
+    pub const END_EXT_CONN15: u16 = 2110;
+    pub const BEGIN_EC_TXT_WIZ15: u16 = 2129;
+    pub const END_EC_TXT_WIZ15: u16 = 2130;
+    pub const BEGIN_DATA_FEED_PR15: u16 = 2113;
+    pub const END_DATA_FEED_PR15: u16 = 2114;
+    pub const BEGIN_DB_TABLES15: u16 = 2118;
+    pub const END_DB_TABLES15: u16 = 2119;
     pub const BEGIN_EXTERNALS: u16 = 0x0161;
     pub const END_EXTERNALS: u16 = 0x0162;
     pub const SUP_BOOK_SRC: u16 = 0x0163;
