@@ -14,6 +14,7 @@ use crate::{Error, IWorkPackage, Result};
 mod archive;
 pub(crate) mod axis;
 pub(crate) mod axis_bounds;
+pub(crate) mod axis_label_affixes;
 pub(crate) mod axis_number_format;
 pub(crate) mod axis_scale;
 pub(crate) mod axis_steps;
@@ -70,7 +71,8 @@ pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use number_format::{
-    ChartDecimalPlaces, ChartFixedDecimalPlaces, ChartNegativeStyle, ChartNumberFormat,
+    ChartDecimalPlaces, ChartFixedDecimalPlaces, ChartLabelAffixes, ChartNegativeStyle,
+    ChartNumberFormat,
 };
 pub use pie_label_distance::ChartPieLabelDistance;
 pub use pie_labels::ChartPieLabelVisibility;

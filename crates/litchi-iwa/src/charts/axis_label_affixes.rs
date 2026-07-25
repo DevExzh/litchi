@@ -1,8 +1,7 @@
-//! Lossless decimal-number-format CRUD for native chart axes.
+//! Lossless prefix and suffix CRUD for native chart-axis labels.
 //!
-//! iWork stores both legacy and current format payloads on the selected axis
-//! non-style object. The default is automatic decimal places, a minus sign,
-//! and no thousands separator.
+//! Pages, Numbers, and Keynote persist axis-label affixes inside both the
+//! legacy and current number formatter objects on an axis non-style archive.
 
 use prost::Message;
 
@@ -10,11 +9,8 @@ use crate::charts::axis::{
     GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD, axis_non_style_slot,
     generated_axis_non_style_extension,
 };
-use crate::charts::number_format::{
-    DualNumberFormatFields, clear_dual_number_format, patch_dual_number_format,
-    read_dual_number_format,
-};
-use crate::charts::{ChartAxis, ChartNumberFormat};
+use crate::charts::number_format::{DualNumberFormatFields, patch_dual_affixes, read_dual_affixes};
+use crate::charts::{ChartAxis, ChartLabelAffixes, ChartNumberFormat};
 use crate::protobuf::tsch;
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -26,14 +22,14 @@ const AXIS_NUMBER_FORMAT_FIELDS: DualNumberFormatFields = DualNumberFormatFields
 };
 const FORMAT_CONTEXT: &str = "chart axis-label";
 
-/// Read the decimal-number format for one native chart axis.
-pub(crate) fn chart_axis_number_format(
+/// Read the text placed before and after labels on one native chart axis.
+pub(crate) fn chart_axis_label_affixes(
     package: &IWorkPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
     axis: ChartAxis,
-) -> Result<ChartNumberFormat> {
+) -> Result<ChartLabelAffixes> {
     axis_non_style_slot(
         package,
         chart_archive_name,
@@ -41,17 +37,17 @@ pub(crate) fn chart_axis_number_format(
         drawable_label,
         axis,
     )?
-    .read(package, read_axis_number_format)
+    .read(package, read_axis_label_affixes)
 }
 
-/// Set or reset the decimal-number format for one native chart axis.
-pub(crate) fn set_chart_axis_number_format(
+/// Set or clear the text placed before and after labels on one chart axis.
+pub(crate) fn set_chart_axis_label_affixes(
     package: &mut IWorkPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
     axis: ChartAxis,
-    format: ChartNumberFormat,
+    affixes: &ChartLabelAffixes,
 ) -> Result<()> {
     let slot = axis_non_style_slot(
         package,
@@ -60,55 +56,43 @@ pub(crate) fn set_chart_axis_number_format(
         drawable_label,
         axis,
     )?;
-    if slot.read(package, read_axis_number_format)? == format {
+    if slot.read(package, read_axis_label_affixes)? == *affixes {
         return Ok(());
     }
     slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
-    slot.update(package, |data| patch_axis_number_format(data, format))?;
-    if slot.read(package, read_axis_number_format)? != format {
+    slot.update(package, |data| patch_axis_label_affixes(data, affixes))?;
+    if slot.read(package, read_axis_label_affixes)? != *affixes {
         return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} {}-axis number-format update failed validation",
+            "{drawable_label} chart {drawable_object_id} {}-axis label-affix update failed validation",
             axis.label()
         )));
     }
     Ok(())
 }
 
-pub(super) fn read_axis_number_format(data: &[u8]) -> Result<ChartNumberFormat> {
+fn read_axis_label_affixes(data: &[u8]) -> Result<ChartLabelAffixes> {
     let extension = generated_axis_non_style_extension(data)?;
     if let Some(extension) = extension {
         tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
     }
-    read_dual_number_format(
-        extension,
-        AXIS_NUMBER_FORMAT_FIELDS,
-        ChartNumberFormat::AXIS_NATIVE_DEFAULT,
-        FORMAT_CONTEXT,
-    )
+    read_dual_affixes(extension, AXIS_NUMBER_FORMAT_FIELDS, FORMAT_CONTEXT)
 }
 
-pub(super) fn patch_axis_number_format(
-    data: &[u8],
-    expected: ChartNumberFormat,
-) -> Result<Vec<u8>> {
+fn patch_axis_label_affixes(data: &[u8], expected: &ChartLabelAffixes) -> Result<Vec<u8>> {
     let existing_extension = generated_axis_non_style_extension(data)?;
-    if existing_extension.is_none() && expected == ChartNumberFormat::AXIS_NATIVE_DEFAULT {
+    if existing_extension.is_none() && expected.is_empty() {
         return Ok(data.to_vec());
     }
     let extension = existing_extension.unwrap_or_default();
     tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
-    let patched_extension = if expected == ChartNumberFormat::AXIS_NATIVE_DEFAULT {
-        clear_dual_number_format(extension, AXIS_NUMBER_FORMAT_FIELDS, FORMAT_CONTEXT)?
-    } else {
-        patch_dual_number_format(
-            extension,
-            AXIS_NUMBER_FORMAT_FIELDS,
-            expected,
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT,
-            FORMAT_CONTEXT,
-        )?
-    };
-    let Some(patched_extension) = patched_extension else {
+    let Some(patched_extension) = patch_dual_affixes(
+        extension,
+        AXIS_NUMBER_FORMAT_FIELDS,
+        expected,
+        ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+        FORMAT_CONTEXT,
+    )?
+    else {
         return Ok(data.to_vec());
     };
     let patched = patch_length_delimited_field(
@@ -117,9 +101,9 @@ pub(super) fn patch_axis_number_format(
         existing_extension.is_some(),
         Some(patched_extension.as_slice()),
     )?;
-    if read_axis_number_format(&patched)? != expected {
+    if read_axis_label_affixes(&patched)? != *expected {
         return Err(Error::InvalidFormat(
-            "chart axis-label number-format wire patch failed validation".to_owned(),
+            "chart axis-label affix wire patch failed validation".to_owned(),
         ));
     }
     Ok(patched)
@@ -135,21 +119,17 @@ mod tests {
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
 
-    fn custom_format() -> ChartNumberFormat {
-        ChartNumberFormat::new(
-            ChartDecimalPlaces::fixed(2).unwrap(),
-            ChartNegativeStyle::Parentheses,
-            true,
-        )
+    fn custom_affixes() -> ChartLabelAffixes {
+        ChartLabelAffixes::new("USD ", " net")
     }
 
     #[test]
-    fn app_authored_axis_number_format_round_trips_exactly() {
+    fn app_authored_axis_affixes_round_trip_through_both_formatters() {
         let original = axis_non_style_with_unknown_fields();
-        let customized = patch_axis_number_format(&original, custom_format()).unwrap();
+        let customized = patch_axis_label_affixes(&original, &custom_affixes()).unwrap();
         assert_eq!(
-            read_axis_number_format(&customized).unwrap(),
-            custom_format()
+            read_axis_label_affixes(&customized).unwrap(),
+            custom_affixes()
         );
         let extension = generated_axis_non_style_extension(&customized)
             .unwrap()
@@ -170,18 +150,40 @@ mod tests {
     }
 
     #[test]
-    fn reset_removes_only_axis_number_format_fields() {
+    fn clearing_axis_affixes_preserves_number_format_and_unknown_fields() {
         let original = axis_non_style_with_unknown_fields();
-        let customized = patch_axis_number_format(&original, custom_format()).unwrap();
-        let reset =
-            patch_axis_number_format(&customized, ChartNumberFormat::AXIS_NATIVE_DEFAULT).unwrap();
-        assert_eq!(reset, original);
+        let format = ChartNumberFormat::new(
+            ChartDecimalPlaces::fixed(2).unwrap(),
+            ChartNegativeStyle::Parentheses,
+            true,
+        );
+        let formatted =
+            super::super::axis_number_format::patch_axis_number_format(&original, format).unwrap();
+        let customized = patch_axis_label_affixes(&formatted, &custom_affixes()).unwrap();
+        let cleared = patch_axis_label_affixes(&customized, &ChartLabelAffixes::default()).unwrap();
+        assert_eq!(
+            read_axis_label_affixes(&cleared).unwrap(),
+            ChartLabelAffixes::default()
+        );
+        assert_eq!(
+            super::super::axis_number_format::read_axis_number_format(&cleared).unwrap(),
+            format
+        );
+        let extension = generated_axis_non_style_extension(&cleared)
+            .unwrap()
+            .unwrap();
+        assert!(
+            parse_wire_fields(extension)
+                .unwrap()
+                .iter()
+                .any(|field| field.number == UNKNOWN_GENERATED_FIELD)
+        );
     }
 
     #[test]
-    fn malformed_or_conflicting_axis_number_formats_are_rejected() {
+    fn malformed_or_conflicting_axis_affixes_are_rejected() {
         let original = axis_non_style_with_unknown_fields();
-        let customized = patch_axis_number_format(&original, custom_format()).unwrap();
+        let customized = patch_axis_label_affixes(&original, &custom_affixes()).unwrap();
         let extension = generated_axis_non_style_extension(&customized)
             .unwrap()
             .unwrap();
@@ -204,7 +206,7 @@ mod tests {
             Some(duplicate_extension.as_slice()),
         )
         .unwrap();
-        assert!(read_axis_number_format(&duplicate).is_err());
+        assert!(read_axis_label_affixes(&duplicate).is_err());
     }
 
     fn axis_non_style_with_unknown_fields() -> Vec<u8> {

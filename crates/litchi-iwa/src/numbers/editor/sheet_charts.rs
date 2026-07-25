@@ -3,6 +3,7 @@
 mod axis;
 mod axis_bounds;
 mod axis_gridlines;
+mod axis_label_affixes;
 mod axis_labels;
 mod axis_line;
 mod axis_minimum_label;

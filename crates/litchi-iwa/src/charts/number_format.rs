@@ -16,6 +16,8 @@ const FORMAT_TYPE_FIELD: u32 = 1;
 const DECIMAL_PLACES_FIELD: u32 = 2;
 const NEGATIVE_STYLE_FIELD: u32 = 4;
 const THOUSANDS_SEPARATOR_FIELD: u32 = 5;
+const PREFIX_FIELD: u32 = 10_000;
+const SUFFIX_FIELD: u32 = 10_001;
 
 pub(crate) const NATIVE_NUMBER_FORMAT_TYPE: u64 = 2;
 const NATIVE_DECIMAL_NUMBER_FORMAT: u64 = 256;
@@ -147,6 +149,38 @@ impl Default for ChartNumberFormat {
     }
 }
 
+/// Text placed immediately before and after native chart labels.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct ChartLabelAffixes {
+    prefix: Box<str>,
+    suffix: Box<str>,
+}
+
+impl ChartLabelAffixes {
+    /// Construct chart-label affixes.
+    pub fn new(prefix: impl Into<Box<str>>, suffix: impl Into<Box<str>>) -> Self {
+        Self {
+            prefix: prefix.into(),
+            suffix: suffix.into(),
+        }
+    }
+
+    /// Text placed before each label.
+    pub fn prefix(&self) -> &str {
+        &self.prefix
+    }
+
+    /// Text placed after each label.
+    pub fn suffix(&self) -> &str {
+        &self.suffix
+    }
+
+    /// Whether neither affix contains text.
+    pub fn is_empty(&self) -> bool {
+        self.prefix.is_empty() && self.suffix.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct DualNumberFormatFields {
     pub(crate) legacy: u32,
@@ -183,6 +217,37 @@ pub(crate) fn read_dual_number_format(
         (_, Some(current)) => Ok(current),
         (Some(legacy), None) => Ok(legacy),
         (None, None) => Ok(default),
+    }
+}
+
+pub(crate) fn read_dual_affixes(
+    extension: Option<&[u8]>,
+    fields: DualNumberFormatFields,
+    context: &str,
+) -> Result<ChartLabelAffixes> {
+    let Some(extension) = extension else {
+        return Ok(ChartLabelAffixes::default());
+    };
+    if let Some(format_type) = strict_optional_varint(extension, fields.format_type, context)?
+        && format_type != NATIVE_NUMBER_FORMAT_TYPE
+    {
+        return Err(Error::InvalidFormat(format!(
+            "{context} number-format type {format_type} is unsupported"
+        )));
+    }
+    let legacy = strict_optional_length_delimited(extension, fields.legacy, context)?
+        .map(|format| read_affixes(format, context))
+        .transpose()?;
+    let current = strict_optional_length_delimited(extension, fields.current, context)?
+        .map(|format| read_affixes(format, context))
+        .transpose()?;
+    match (legacy, current) {
+        (Some(legacy), Some(current)) if legacy != current => Err(Error::InvalidFormat(format!(
+            "legacy and current {context} number formats disagree on label affixes"
+        ))),
+        (_, Some(current)) => Ok(current),
+        (Some(legacy), None) => Ok(legacy),
+        (None, None) => Ok(ChartLabelAffixes::default()),
     }
 }
 
@@ -231,6 +296,80 @@ pub(crate) fn patch_dual_number_format(
     )?;
     let format_type_present =
         strict_optional_varint(&extension, fields.format_type, context)?.is_some();
+    patch_varint_field(
+        &extension,
+        fields.format_type,
+        format_type_present,
+        Some(NATIVE_NUMBER_FORMAT_TYPE),
+    )
+    .map(Some)
+}
+
+/// Patch label affixes in both native formatter representations.
+///
+/// `None` means the existing extension already represents `expected` and can
+/// be retained byte-for-byte.
+pub(crate) fn patch_dual_affixes(
+    extension: &[u8],
+    fields: DualNumberFormatFields,
+    expected: &ChartLabelAffixes,
+    default_format: ChartNumberFormat,
+    context: &str,
+) -> Result<Option<Vec<u8>>> {
+    let legacy = strict_optional_length_delimited(extension, fields.legacy, context)?;
+    let current = strict_optional_length_delimited(extension, fields.current, context)?;
+    let companion_type = strict_optional_varint(extension, fields.format_type, context)?;
+    if let Some(format_type) = companion_type
+        && format_type != NATIVE_NUMBER_FORMAT_TYPE
+    {
+        return Err(Error::InvalidFormat(format!(
+            "{context} number-format type {format_type} is unsupported"
+        )));
+    }
+    if legacy.is_none() && current.is_none() && expected.is_empty() {
+        return Ok(None);
+    }
+    let legacy_present = legacy.is_some();
+    let current_present = current.is_some();
+    let seed = current
+        .or(legacy)
+        .map_or_else(|| canonical_number_format(default_format), <[u8]>::to_vec);
+    let legacy_format = patch_affixes(
+        legacy.map_or_else(|| seed.clone(), <[u8]>::to_vec),
+        expected,
+        context,
+    )?;
+    let current_format = patch_affixes(
+        current.map_or_else(|| seed, <[u8]>::to_vec),
+        expected,
+        context,
+    )?;
+    if expected.is_empty()
+        && legacy_present
+        && current_present
+        && companion_type == Some(NATIVE_NUMBER_FORMAT_TYPE)
+    {
+        let canonical_default = canonical_number_format(default_format);
+        if legacy_format == canonical_default && current_format == canonical_default {
+            return clear_dual_number_format(extension, fields, context);
+        }
+    }
+    let extension = patch_length_delimited_field(
+        extension,
+        fields.legacy,
+        legacy_present,
+        Some(legacy_format.as_slice()),
+    )?;
+    let extension = patch_length_delimited_field(
+        &extension,
+        fields.current,
+        current_present,
+        Some(current_format.as_slice()),
+    )?;
+    if expected.is_empty() {
+        return Ok(Some(extension));
+    }
+    let format_type_present = companion_type.is_some();
     patch_varint_field(
         &extension,
         fields.format_type,
@@ -323,6 +462,14 @@ fn read_number_format(
     ))
 }
 
+fn read_affixes(data: &[u8], context: &str) -> Result<ChartLabelAffixes> {
+    tsk::FormatStructArchive::decode(data)?;
+    Ok(ChartLabelAffixes::new(
+        strict_optional_string(data, PREFIX_FIELD, context)?.unwrap_or_default(),
+        strict_optional_string(data, SUFFIX_FIELD, context)?.unwrap_or_default(),
+    ))
+}
+
 fn patch_number_format(
     mut format: Vec<u8>,
     expected: ChartNumberFormat,
@@ -350,6 +497,28 @@ fn patch_number_format(
         THOUSANDS_SEPARATOR_FIELD,
         u64::from(expected.thousands_separator()),
         context,
+    )
+}
+
+fn patch_affixes(
+    mut format: Vec<u8>,
+    expected: &ChartLabelAffixes,
+    context: &str,
+) -> Result<Vec<u8>> {
+    tsk::FormatStructArchive::decode(format.as_slice())?;
+    let prefix_present = strict_optional_string(&format, PREFIX_FIELD, context)?.is_some();
+    format = patch_length_delimited_field(
+        &format,
+        PREFIX_FIELD,
+        prefix_present,
+        (!expected.prefix.is_empty()).then_some(expected.prefix.as_bytes()),
+    )?;
+    let suffix_present = strict_optional_string(&format, SUFFIX_FIELD, context)?.is_some();
+    patch_length_delimited_field(
+        &format,
+        SUFFIX_FIELD,
+        suffix_present,
+        (!expected.suffix.is_empty()).then_some(expected.suffix.as_bytes()),
     )
 }
 
@@ -386,6 +555,24 @@ fn canonical_number_format(default: ChartNumberFormat) -> Vec<u8> {
     )
     .expect("writing to a Vec cannot fail");
     format
+}
+
+fn strict_optional_string(
+    data: &[u8],
+    field_number: u32,
+    context: &str,
+) -> Result<Option<Box<str>>> {
+    strict_optional_length_delimited(data, field_number, context)?
+        .map(|bytes| {
+            std::str::from_utf8(bytes)
+                .map(Box::<str>::from)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "{context} label-affix field {field_number} is not UTF-8: {error}"
+                    ))
+                })
+        })
+        .transpose()
 }
 
 fn strict_optional_length_delimited<'a>(
@@ -464,6 +651,10 @@ mod tests {
         )
     }
 
+    fn custom_affixes() -> ChartLabelAffixes {
+        ChartLabelAffixes::new("USD ", " net")
+    }
+
     #[test]
     fn fixed_decimal_places_match_the_native_inspector_range() {
         assert_eq!(
@@ -501,6 +692,86 @@ mod tests {
             strict_optional_varint(&patched, UNKNOWN_FIELD, "test axis").unwrap(),
             Some(73)
         );
+    }
+
+    #[test]
+    fn dual_affixes_round_trip_and_preserve_number_format_fields() {
+        let formatted = patch_dual_number_format(
+            &[],
+            FIELDS,
+            custom_format(),
+            ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+            "test axis",
+        )
+        .unwrap()
+        .unwrap();
+        let patched = patch_dual_affixes(
+            &formatted,
+            FIELDS,
+            &custom_affixes(),
+            ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+            "test axis",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            read_dual_affixes(Some(&patched), FIELDS, "test axis").unwrap(),
+            custom_affixes()
+        );
+        assert_eq!(
+            read_dual_number_format(
+                Some(&patched),
+                FIELDS,
+                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                "test axis"
+            )
+            .unwrap(),
+            custom_format()
+        );
+        let cleared = patch_dual_affixes(
+            &patched,
+            FIELDS,
+            &ChartLabelAffixes::default(),
+            ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+            "test axis",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            read_dual_affixes(Some(&cleared), FIELDS, "test axis").unwrap(),
+            ChartLabelAffixes::default()
+        );
+        assert_eq!(
+            read_dual_number_format(
+                Some(&cleared),
+                FIELDS,
+                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                "test axis"
+            )
+            .unwrap(),
+            custom_format()
+        );
+    }
+
+    #[test]
+    fn dual_affixes_reject_conflicts_and_non_utf8_text() {
+        let legacy = patch_affixes(
+            canonical_number_format(ChartNumberFormat::AXIS_NATIVE_DEFAULT),
+            &custom_affixes(),
+            "test axis",
+        )
+        .unwrap();
+        let current = canonical_number_format(ChartNumberFormat::AXIS_NATIVE_DEFAULT);
+        let mut conflicting = Vec::new();
+        append_length_delimited_field(&mut conflicting, FIELDS.legacy, &legacy).unwrap();
+        append_length_delimited_field(&mut conflicting, FIELDS.current, &current).unwrap();
+        assert!(read_dual_affixes(Some(&conflicting), FIELDS, "test axis").is_err());
+
+        let mut malformed_format = canonical_number_format(ChartNumberFormat::AXIS_NATIVE_DEFAULT);
+        append_length_delimited_field(&mut malformed_format, PREFIX_FIELD, &[0xff]).unwrap();
+        let mut malformed = Vec::new();
+        append_length_delimited_field(&mut malformed, FIELDS.current, &malformed_format).unwrap();
+        assert!(read_dual_affixes(Some(&malformed), FIELDS, "test axis").is_err());
     }
 
     #[test]
