@@ -330,7 +330,7 @@ conversion, fonts, and image conversion are optional.
 | Calculation, scenarios, and consolidation | ✅ | ✅ | ✅ | Typed settings and inert scenario/consolidation metadata |
 | Codepage handling | 🟡 | ✅ | 🟡 | Reader honors BIFF codepages; writer is centered on BIFF8/Windows-1252 |
 | Password encryption | ✅ | ✅ | ✅ | XOR and supported RC4/CryptoAPI profiles |
-| VBA project metadata | 🟡 | ✅ | 🟡 | Inert BIFF markers/code names plus bounded `_VBA_PROJECT_CUR` MS-OVBA parsing and deterministic cache-free project/module serialization: compressed `dir`, typed module metadata, `PROJECT`/`PROJECTwm`, `_VBA_PROJECT`, and codepage-aware module source; the shared builder can write nested CFB projects, while existing XLS editor integration remains limited to its module-free metadata scaffold; source is never compiled, interpreted, or executed |
+| VBA project metadata | ✅ | ✅ | ✅ | Inert BIFF markers/code names plus bounded `_VBA_PROJECT_CUR` MS-OVBA parsing and deterministic cache-free project/module serialization: compressed `dir`, typed module metadata, `PROJECT`/`PROJECTwm`, `_VBA_PROJECT`, and codepage-aware module source; the XLS writer authors structurally complete module-free or module-bearing projects, derives `ObNoMacros` from serialized module content, and commits builder validation atomically; source is never compiled, interpreted, or executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral CFB verification and signing |
 
 ## Excel binary OOXML workbooks (XLSB)

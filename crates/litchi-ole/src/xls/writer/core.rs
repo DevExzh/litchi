@@ -577,6 +577,7 @@ struct XlsFileSharing {
 #[derive(Debug, Clone)]
 pub(super) struct XlsVbaWriteMetadata {
     pub workbook_code_name: String,
+    pub project: crate::ovba::VbaProjectBinary,
 }
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct XlsCalculationSettings {
@@ -3315,11 +3316,46 @@ impl XlsWriter {
         Ok(())
     }
 
-    /// Enable a module-free VBA metadata scaffold without executable content.
+    /// Enable a complete module-free VBA project without executable content.
+    ///
+    /// The project is serialized as a bounded, cache-free MS-OVBA storage. Its
+    /// BIFF globals include `ObNoMacros` because it contains no modules.
     pub fn enable_empty_vba_project(&mut self, workbook_code_name: &str) -> XlsResult<()> {
+        crate::xls::vba::validate_code_name(workbook_code_name)?;
+        let project = crate::ovba::VbaProjectBuilder::new("VBAProject")
+            .build(&crate::ovba::VbaLimits::default())?;
+        self.vba_metadata = Some(XlsVbaWriteMetadata {
+            workbook_code_name: workbook_code_name.to_string(),
+            project,
+        });
+        Ok(())
+    }
+
+    /// Configure a complete inert VBA project from a bounded MS-OVBA builder.
+    ///
+    /// Module source is serialized but never compiled, interpreted, or run.
+    /// Validation and serialization finish before the writer state is changed.
+    pub fn set_vba_project(
+        &mut self,
+        workbook_code_name: &str,
+        project: &crate::ovba::VbaProjectBuilder,
+        limits: &crate::ovba::VbaLimits,
+    ) -> XlsResult<()> {
+        crate::xls::vba::validate_code_name(workbook_code_name)?;
+        let project = project.build(limits)?;
+        self.set_vba_project_binary(workbook_code_name, project)
+    }
+
+    /// Configure an already validated and serialized inert VBA project.
+    pub fn set_vba_project_binary(
+        &mut self,
+        workbook_code_name: &str,
+        project: crate::ovba::VbaProjectBinary,
+    ) -> XlsResult<()> {
         crate::xls::vba::validate_code_name(workbook_code_name)?;
         self.vba_metadata = Some(XlsVbaWriteMetadata {
             workbook_code_name: workbook_code_name.to_string(),
+            project,
         });
         Ok(())
     }
@@ -3338,7 +3374,7 @@ impl XlsWriter {
     ) -> XlsResult<()> {
         if self.vba_metadata.is_none() && code_name.is_some() {
             return Err(XlsError::InvalidData(
-                "worksheet VBA code names require an enabled empty VBA project".to_string(),
+                "worksheet VBA code names require an enabled VBA project".to_string(),
             ));
         }
         if let Some(value) = code_name {
@@ -3607,22 +3643,7 @@ impl XlsWriter {
 
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
-        ole_writer.create_stream(&["Workbook"], &streams.workbook)?;
-        if self.vba_metadata.is_some() {
-            ole_writer.create_storage(&["_VBA_PROJECT_CUR"])?;
-            ole_writer.create_storage(&["_VBA_PROJECT_CUR", "VBA"])?;
-            ole_writer.create_stream(&["_VBA_PROJECT_CUR", "VBA", "dir"], &[])?;
-        }
-
-        // Pivot cache storage: _SX_DB_CUR/XXXX
-        // Stream names use 4-digit uppercase hex per LO ScfTools::GetHexStr.
-        if !streams.pivot_caches.is_empty() {
-            ole_writer.create_storage(&["_SX_DB_CUR"])?;
-            for (id, data) in &streams.pivot_caches {
-                let name = format!("{:04X}", id);
-                ole_writer.create_stream(&["_SX_DB_CUR", &name], data)?;
-            }
-        }
+        self.populate_compound_document(&mut ole_writer, &streams)?;
 
         // Save to file
         ole_writer.save(path)?;
@@ -3648,14 +3669,29 @@ impl XlsWriter {
 
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
+        self.populate_compound_document(&mut ole_writer, &streams)?;
+
+        // Write to the provided writer
+        ole_writer.write_to(writer)?;
+
+        Ok(())
+    }
+
+    fn populate_compound_document(
+        &self,
+        ole_writer: &mut OleWriter,
+        streams: &stream::WorkbookStreams,
+    ) -> XlsResult<()> {
         ole_writer.create_stream(&["Workbook"], &streams.workbook)?;
-        if self.vba_metadata.is_some() {
+        if let Some(metadata) = &self.vba_metadata {
             ole_writer.create_storage(&["_VBA_PROJECT_CUR"])?;
-            ole_writer.create_storage(&["_VBA_PROJECT_CUR", "VBA"])?;
-            ole_writer.create_stream(&["_VBA_PROJECT_CUR", "VBA", "dir"], &[])?;
+            metadata
+                .project
+                .write_into(ole_writer, &["_VBA_PROJECT_CUR"])?;
         }
 
-        // Pivot cache storage: _SX_DB_CUR/XXXX
+        // Pivot cache storage: _SX_DB_CUR/XXXX. Stream names use four-digit
+        // uppercase hexadecimal identifiers, matching the legacy convention.
         if !streams.pivot_caches.is_empty() {
             ole_writer.create_storage(&["_SX_DB_CUR"])?;
             for (id, data) in &streams.pivot_caches {
@@ -3663,10 +3699,6 @@ impl XlsWriter {
                 ole_writer.create_stream(&["_SX_DB_CUR", &name], data)?;
             }
         }
-
-        // Write to the provided writer
-        ole_writer.write_to(writer)?;
-
         Ok(())
     }
 

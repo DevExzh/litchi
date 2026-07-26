@@ -380,6 +380,16 @@ pub struct VbaProjectBinary {
 }
 
 impl VbaProjectBinary {
+    /// Number of module streams serialized into the project.
+    pub fn module_count(&self) -> usize {
+        self.modules.len()
+    }
+
+    /// Whether the project contains no standard, class, or document modules.
+    pub fn is_module_free(&self) -> bool {
+        self.modules.is_empty()
+    }
+
     /// Write all project storages and streams into an existing CFB writer.
     pub fn write_into(
         &self,
@@ -752,6 +762,8 @@ mod tests {
     fn writes_complete_cache_free_project_and_reopens_every_module() {
         let limits = VbaLimits::default();
         let binary = sample_builder().build(&limits).unwrap();
+        assert_eq!(binary.module_count(), 3);
+        assert!(!binary.is_module_free());
         assert_eq!(
             binary.version_project_stream,
             [0xcc, 0x61, 0xff, 0xff, 0, 0, 0]

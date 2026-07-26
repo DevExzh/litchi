@@ -23,6 +23,8 @@ pub enum XlsError {
     Io(std::io::Error),
     /// CFB (Compound File Binary) error
     Cfb(litchi_cfb::OleError),
+    /// MS-OVBA project authoring or parsing error
+    Vba(litchi_cfb::ovba::VbaError),
     /// Invalid BIFF record
     InvalidRecord {
         /// Record type
@@ -81,6 +83,7 @@ impl fmt::Display for XlsError {
         match self {
             XlsError::Io(e) => write!(f, "I/O error: {}", e),
             XlsError::Cfb(e) => write!(f, "CFB error: {}", e),
+            XlsError::Vba(e) => write!(f, "VBA project error: {}", e),
             XlsError::InvalidRecord {
                 record_type,
                 message,
@@ -147,6 +150,7 @@ impl std::error::Error for XlsError {
         match self {
             XlsError::Io(e) => Some(e),
             XlsError::Cfb(e) => Some(e),
+            XlsError::Vba(e) => Some(e),
             _ => None,
         }
     }
@@ -161,6 +165,12 @@ impl From<std::io::Error> for XlsError {
 impl From<litchi_cfb::OleError> for XlsError {
     fn from(err: litchi_cfb::OleError) -> Self {
         XlsError::Cfb(err)
+    }
+}
+
+impl From<litchi_cfb::ovba::VbaError> for XlsError {
+    fn from(err: litchi_cfb::ovba::VbaError) -> Self {
+        XlsError::Vba(err)
     }
 }
 

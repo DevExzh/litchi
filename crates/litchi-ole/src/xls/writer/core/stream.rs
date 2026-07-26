@@ -178,7 +178,9 @@ pub(crate) fn generate_workbook_stream(
     biff::write_tab_id(&mut stream, sheet_count)?;
     if let Some(metadata) = vba_metadata {
         biff::write_ob_proj(&mut stream)?;
-        biff::write_ob_no_macros(&mut stream)?;
+        if metadata.project.is_module_free() {
+            biff::write_ob_no_macros(&mut stream)?;
+        }
         biff::write_code_name(&mut stream, &metadata.workbook_code_name)?;
     }
     biff::write_function_groups(&mut stream, function_groups)?;
