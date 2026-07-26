@@ -2,8 +2,9 @@
 
 use litchi_cfb::OleFile;
 pub use litchi_cfb::ovba::{
-    VbaDirectory, VbaError, VbaLimits, VbaModule, VbaModuleKind, VbaModuleMetadata, VbaProject,
-    VbaText, compress_container, decompress_container,
+    VbaDirectory, VbaError, VbaLimits, VbaModule, VbaModuleBuilder, VbaModuleKind,
+    VbaModuleMetadata, VbaPlatform, VbaProject, VbaProjectBinary, VbaProjectBuilder, VbaProjectId,
+    VbaProjectModuleKind, VbaText, compress_container, decompress_container,
 };
 use litchi_opc::{OpcPackage, PackURI};
 use std::io::Cursor;
@@ -70,6 +71,8 @@ mod tests {
         directory.extend_from_slice(&0u16.to_le_bytes());
         push_record(&mut directory, 0x000f, &0u16.to_le_bytes());
         push_record(&mut directory, 0x0013, &0xffffu16.to_le_bytes());
+        directory.extend_from_slice(&0x0010u16.to_le_bytes());
+        directory.extend_from_slice(&0u32.to_le_bytes());
 
         let mut writer = OleWriter::new();
         writer

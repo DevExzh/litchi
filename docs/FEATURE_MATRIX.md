@@ -135,7 +135,7 @@ conversion, fonts, and image conversion are optional.
 | Citations, bibliography, index, and TOA | 🟡 | ✅ | ✅ | Typed inert `CITATION` source-tag/multi-source and `BIBLIOGRAPHY` field discovery, Custom XML bibliography source-store/scalar-value metadata, and TOA/TA plus INDEX/XE metadata expose stored switches, cached results, and dirty/lock state; typed `CITATION` authoring writes caller-supplied tags, locale, volume, prefix/suffix, multi-source order, and optional cached text, while typed `BIBLIOGRAPHY` authoring writes caller-supplied display/filter locales, selected source-tag order, and optional cached text; bibliography styles remain opaque and no citation/table/index generation or refresh occurs; the bibliography source store supports typed source add/replace/remove with graph-preserving mutation |
 | IRM/Rights Management | 🟡 | ✅ | 🟡 | Shared MS-OFFCRYPTO DataSpaces inspection validates version/map/definition/transform graphs for OOXML and legacy binary IRM; typed codecs cover inert publishing licenses, cached end-user licenses, certificate chains, protected/viewer-content envelopes, sensitivity labels (including removed-label tombstones and lossless future extensions), EncryptedSIHash/EncryptedDSIHash property integrity verification, and legacy Custom XML promotion semantics. It never contacts rights services, evaluates licenses, or decrypts protected content |
 | RibbonX customization | 🟡 | ✅ | ✅ | Word, Excel, and PowerPoint package wrappers retain bounded package-level Custom UI XML parts in each documented relationship family; PowerPoint additionally exposes read-only presentation accessors. All paths validate root relationships and namespaces without executing callbacks, macros, commands, or linked content |
-| VBA projects/DOCM macros | 🟡 | 🟡 | ❌ | DOCM/DOTM relationship graphs plus bounded `vbaProject.bin` CFB/MS-OVBA parsing, deterministic compressed-container encoding, typed project/module metadata, and codepage-aware inert source extraction; supplemental data stays inert, VBA is never executed, and project/module authoring does not yet exist |
+| VBA projects/DOCM macros | 🟡 | 🟡 | ❌ | DOCM/DOTM relationship graphs plus bounded `vbaProject.bin` CFB/MS-OVBA parsing, deterministic cache-free project/module payload authoring, typed project/module metadata, and codepage-aware inert source extraction; authored payloads cover standard, class, and document modules, but package relationship insertion is not yet integrated; supplemental data stays inert and VBA is never executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
 
@@ -200,7 +200,7 @@ conversion, fonts, and image conversion are optional.
 | Workbook protection | 🟡 | ✅ | ✅ | Passive reader preserves structure/window/revision locks and legacy/strong verifier metadata; writer remains structure/window focused, with no password checking or policy enforcement |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
-| VBA projects/XLSM macros | 🟡 | 🟡 | ❌ | The MS-OFFMACRO2 relationship graph and bounded `vbaProject.bin` CFB/MS-OVBA project/module source are parsed inertly with the declared code page; the shared codec also provides deterministic compressed-container encoding, but VBA is never executed and project/module authoring does not yet exist |
+| VBA projects/XLSM macros | 🟡 | 🟡 | ❌ | The MS-OFFMACRO2 relationship graph and bounded `vbaProject.bin` CFB/MS-OVBA project/module source are parsed inertly with the declared code page; the shared codec writes deterministic cache-free CFB projects with standard, class, and document modules, but workbook relationship insertion is not yet integrated and VBA is never executed |
 
 ## PowerPoint presentations (PPTX)
 
@@ -236,7 +236,7 @@ conversion, fonts, and image conversion are optional.
 | Ink annotations | ✅ | ✅ | ✅ | Bounded inert InkML content-part inventory with slide/relationship/part identity and stored trace counts, plus validated inert InkML storage onto slides (`p:contentPart` + `customXml` relationship, dialect-preserving); no handwriting recognition, rendering, replay, or execution |
 | Laser pointer traces | ✅ | ✅ | ✅ | Bounded inert PowerPoint 2010 slide-show trace inventory with stored time offsets and coordinates, plus validated inert trace storage (new `p14:laserTraceLst` extension, existing/empty/missing `p:extLst` handled, dialect-preserving, read-back self-check); never replayed, rendered, interpolated, or executed |
 | Slide-show event records | ✅ | ✅ | ✅ | Bounded inert PowerPoint 2010 trigger/media event inventory with slide, event, target object, and stored timeline metadata, plus validated inert event storage (`p14:showEvtLst` via the shared extension patcher); events are never replayed or executed |
-| VBA projects/PPTM macros | 🟡 | 🟡 | ❌ | PPTM/PPSM/POTM relationship metadata plus bounded `vbaProject.bin` CFB/MS-OVBA project/module source parsing and deterministic compressed-container encoding; source is codepage-aware and inert, VBA is never executed, and project/module authoring does not yet exist |
+| VBA projects/PPTM macros | 🟡 | 🟡 | ❌ | PPTM/PPSM/POTM relationship metadata plus bounded `vbaProject.bin` CFB/MS-OVBA project/module source parsing and deterministic cache-free project/module payload authoring; source is codepage-aware and inert, presentation relationship insertion is not yet integrated, and VBA is never executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
 
@@ -297,7 +297,7 @@ conversion, fonts, and image conversion are optional.
 | Document protection settings | 🟡 | ✅ | ✅ | Typed settings/hashes; policy is not enforced |
 | Password encryption | ✅ | ✅ | ✅ | Supported DOC encryption profiles and encrypted writer output |
 | Macro-security metadata | ✅ | ✅ | ✅ | Passive DOP metadata only; macros are never executed |
-| VBA project/code modules | 🟡 | 🟡 | ❌ | Directory-only discovery plus bounded deterministic MS-OVBA compressed-container encoding/decoding, typed `dir` metadata, codepage-aware `PROJECT` text, and inert module-source extraction; source is never compiled, interpreted, or executed, and project/module authoring does not yet exist |
+| VBA project/code modules | 🟡 | 🟡 | 🟡 | Directory-only discovery plus bounded deterministic MS-OVBA compressed-container encoding/decoding, typed `dir` metadata, codepage-aware `PROJECT` text, inert module-source extraction, and cache-free project/module serialization into a CFB writer; existing DOC package integration remains read-only and source is never compiled, interpreted, or executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral CFB verification and signing |
 
 ## Excel binary workbooks (XLS)
@@ -330,7 +330,7 @@ conversion, fonts, and image conversion are optional.
 | Calculation, scenarios, and consolidation | ✅ | ✅ | ✅ | Typed settings and inert scenario/consolidation metadata |
 | Codepage handling | 🟡 | ✅ | 🟡 | Reader honors BIFF codepages; writer is centered on BIFF8/Windows-1252 |
 | Password encryption | ✅ | ✅ | ✅ | XOR and supported RC4/CryptoAPI profiles |
-| VBA project metadata | 🟡 | ✅ | 🟡 | Inert BIFF markers/code names plus bounded `_VBA_PROJECT_CUR` MS-OVBA parsing and deterministic compressed-container encoding: compressed `dir`, typed module metadata, `PROJECT` properties, and codepage-aware module source; source is never compiled, interpreted, or executed, and host-level writing is limited to a module-free metadata scaffold |
+| VBA project metadata | 🟡 | ✅ | 🟡 | Inert BIFF markers/code names plus bounded `_VBA_PROJECT_CUR` MS-OVBA parsing and deterministic cache-free project/module serialization: compressed `dir`, typed module metadata, `PROJECT`/`PROJECTwm`, `_VBA_PROJECT`, and codepage-aware module source; the shared builder can write nested CFB projects, while existing XLS editor integration remains limited to its module-free metadata scaffold; source is never compiled, interpreted, or executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral CFB verification and signing |
 
 ## Excel binary OOXML workbooks (XLSB)
@@ -356,7 +356,7 @@ conversion, fonts, and image conversion are optional.
 | Structured tables | ✅ | ✅ | ✅ | Typed inert ListObject model (MS-XLSB 2.1.7.51): identity, ranges, table types, header/totals metadata, DXF style ids, typed totals-row functions, inert calculated-column/totals formulas, and style-info flags; worksheet list parts are resolved eagerly at load; authoring serializes tables with validated display names/ranges/columns and per-sheet BrtListPart wiring |
 | External links and connections | ✅ | ✅ | ❌ | Typed inert external-workbook, DDE, and OLE link targets, sheet names, and declared name/item metadata, plus the MS-XLSB 2.1.7.24 External Data Connections part: DBType/CmdType enums, refresh and credential metadata, ODBC/OLE DB/OLAP/Web properties, typed parameters, and Web query tables; connection strings, commands, URLs, and credentials are stored verbatim and never resolved, contacted, refreshed, or executed |
 | Web extensions/Office Add-ins | 🟡 | ✅ | ✅ | Bounded `WEBEXTENSIONS` collection and `BrtWebExtension` payload codecs preserve exact FRT formula bytes, enforce one REFERENCE-class 3D cell/area range, validate workbook-resolved internal-sheet XTI indices and exact UTF-16 `appRef` values, cross-check MS-OWEXML bindings, and integrate with immutable worksheet reads and mutable worksheet emission; records remain inert and are never activated |
-| VBA project/code modules | 🟡 | 🟡 | ❌ | Inert MS-XLSB topology, bounded `vbaProject.bin` CFB/MS-OVBA project/module source parsing, deterministic compressed-container encoding, and declared legacy/Agile signature-part metadata; source is never executed, project/module authoring does not yet exist, and signature payloads remain opaque/unverified |
+| VBA project/code modules | 🟡 | 🟡 | ❌ | Inert MS-XLSB topology, bounded `vbaProject.bin` CFB/MS-OVBA project/module source parsing, deterministic cache-free project/module payload authoring, and declared legacy/Agile signature-part metadata; workbook relationship insertion is not yet integrated, source is never executed, and signature payloads remain opaque/unverified |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
 
@@ -678,9 +678,10 @@ They do not override the per-feature limits above.
 Macro-enabled OOXML variants (`.docm`, `.dotm`, `.xlsm`, `.xltm`, `.pptm`, `.ppsm`, and `.potm`)
 and macro-enabled XLSB workbooks validate their relationship graphs and expose bounded, typed,
 codepage-aware MS-OVBA project/module source through the shared CFB reader. VBA is never compiled,
-interpreted, or executed. The shared codec can deterministically encode bounded MS-OVBA compressed
-containers as a prerequisite for future project writing. Declared XLSB signature payloads remain
-opaque and unverified, and project/module authoring remains unsupported.
+interpreted, or executed. The shared builder deterministically writes bounded, cache-free CFB
+projects with spec-shaped `_VBA_PROJECT`, compressed `dir`, `PROJECT`, `PROJECTwm`, and standard,
+class, or document module streams. Host-package relationship insertion remains unsupported.
+Declared XLSB signature payloads remain opaque and unverified.
 
 ### OpenDocument
 

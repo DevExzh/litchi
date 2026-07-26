@@ -1,6 +1,6 @@
 //! Typed parsing of the compressed MS-OVBA `dir` stream.
 
-use super::{VbaError, VbaLimits, check_limit, decompress_container, invalid};
+use super::{VbaError, VbaLimits, check_limit, compress_container, decompress_container, invalid};
 use encoding_rs::Encoding;
 use litchi_core::encoding::codepage_to_encoding;
 
@@ -30,6 +30,7 @@ const MODULE_TERMINATOR_ID: u16 = 0x002b;
 const MODULE_COOKIE_ID: u16 = 0x002c;
 const MODULE_OFFSET_ID: u16 = 0x0031;
 const MODULE_NAME_UNICODE_ID: u16 = 0x0047;
+const DIR_TERMINATOR_ID: u16 = 0x0010;
 
 const STREAM_NAME_RESERVED: u16 = 0x0032;
 const PROJECT_DOC_STRING_RESERVED: u16 = 0x0040;
@@ -39,6 +40,278 @@ const MODULE_DOC_STRING_RESERVED: u16 = 0x0048;
 const FIXED_U32_SIZE: u32 = 4;
 const FIXED_U16_SIZE: u32 = 2;
 const DEFAULT_PROJECT_LCID: u32 = 0x0409;
+const WRITE_COOKIE: u16 = 0xffff;
+
+pub(crate) struct DirectoryWriteProject<'a> {
+    pub(crate) system_kind: u32,
+    pub(crate) code_page: u16,
+    pub(crate) name: &'a str,
+    pub(crate) description: &'a str,
+    pub(crate) help_context: u32,
+    pub(crate) version_major: u32,
+    pub(crate) version_minor: u16,
+    pub(crate) modules: &'a [DirectoryWriteModule<'a>],
+}
+
+pub(crate) struct DirectoryWriteModule<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) stream_name: &'a str,
+    pub(crate) description: &'a str,
+    pub(crate) help_context: u32,
+    pub(crate) kind: VbaModuleKind,
+    pub(crate) read_only: bool,
+    pub(crate) private: bool,
+}
+
+pub(crate) fn encode_directory(
+    project: &DirectoryWriteProject<'_>,
+    limits: &VbaLimits,
+) -> Result<Vec<u8>, VbaError> {
+    check_limit(
+        "VBA module count",
+        project.modules.len(),
+        limits.max_modules,
+    )?;
+    let module_count = u16::try_from(project.modules.len())
+        .map_err(|_| invalid("VBA module count exceeds the dir-stream field"))?;
+    let encoding = codepage_to_encoding(u32::from(project.code_page))
+        .ok_or(VbaError::UnsupportedCodePage(project.code_page))?;
+    let mut output = Vec::new();
+
+    push_record(
+        &mut output,
+        PROJECT_SYS_KIND_ID,
+        &project.system_kind.to_le_bytes(),
+    )?;
+    push_record(
+        &mut output,
+        PROJECT_LCID_ID,
+        &DEFAULT_PROJECT_LCID.to_le_bytes(),
+    )?;
+    push_record(
+        &mut output,
+        PROJECT_LCID_INVOKE_ID,
+        &DEFAULT_PROJECT_LCID.to_le_bytes(),
+    )?;
+    push_record(
+        &mut output,
+        PROJECT_CODEPAGE_ID,
+        &project.code_page.to_le_bytes(),
+    )?;
+
+    let project_name = encode_mbcs(project.name, encoding, "PROJECTNAME")?;
+    check_protocol_length("PROJECTNAME", project_name.len(), 128)?;
+    push_record(&mut output, PROJECT_NAME_ID, &project_name)?;
+    push_string_pair(
+        &mut output,
+        PROJECT_DOC_STRING_ID,
+        PROJECT_DOC_STRING_RESERVED,
+        project.description,
+        encoding,
+        limits,
+        2_000,
+        "PROJECTDOCSTRING",
+    )?;
+    push_mbcs_pair(
+        &mut output,
+        PROJECT_HELP_FILE_PATH_ID,
+        PROJECT_HELP_FILE_PATH_RESERVED,
+        "",
+        encoding,
+        limits,
+        260,
+        "PROJECTHELPFILEPATH",
+    )?;
+    push_record(
+        &mut output,
+        PROJECT_HELP_CONTEXT_ID,
+        &project.help_context.to_le_bytes(),
+    )?;
+    push_record(&mut output, PROJECT_LIB_FLAGS_ID, &0u32.to_le_bytes())?;
+    output.extend_from_slice(&PROJECT_VERSION_ID.to_le_bytes());
+    output.extend_from_slice(&FIXED_U32_SIZE.to_le_bytes());
+    output.extend_from_slice(&project.version_major.to_le_bytes());
+    output.extend_from_slice(&project.version_minor.to_le_bytes());
+    check_limit(
+        "decompressed VBA stream bytes",
+        output.len(),
+        limits.max_decompressed_stream_bytes,
+    )?;
+
+    push_record(&mut output, PROJECT_MODULES_ID, &module_count.to_le_bytes())?;
+    push_record(&mut output, PROJECT_COOKIE_ID, &WRITE_COOKIE.to_le_bytes())?;
+    for module in project.modules {
+        encode_module(&mut output, module, encoding, limits)?;
+        check_limit(
+            "decompressed VBA stream bytes",
+            output.len(),
+            limits.max_decompressed_stream_bytes,
+        )?;
+    }
+    output.extend_from_slice(&DIR_TERMINATOR_ID.to_le_bytes());
+    output.extend_from_slice(&0u32.to_le_bytes());
+
+    check_limit(
+        "decompressed VBA stream bytes",
+        output.len(),
+        limits.max_decompressed_stream_bytes,
+    )?;
+    compress_container(&output, limits)
+}
+
+fn encode_module(
+    output: &mut Vec<u8>,
+    module: &DirectoryWriteModule<'_>,
+    encoding: &'static Encoding,
+    limits: &VbaLimits,
+) -> Result<(), VbaError> {
+    let name = encode_mbcs(module.name, encoding, "MODULENAME")?;
+    push_record(output, MODULE_NAME_ID, &name)?;
+    let unicode_name = encode_utf16(module.name, "MODULENAMEUNICODE")?;
+    push_record(output, MODULE_NAME_UNICODE_ID, &unicode_name)?;
+    push_string_pair(
+        output,
+        MODULE_STREAM_NAME_ID,
+        STREAM_NAME_RESERVED,
+        module.stream_name,
+        encoding,
+        limits,
+        limits.max_string_bytes,
+        "MODULESTREAMNAME",
+    )?;
+    push_string_pair(
+        output,
+        MODULE_DOC_STRING_ID,
+        MODULE_DOC_STRING_RESERVED,
+        module.description,
+        encoding,
+        limits,
+        limits.max_string_bytes,
+        "MODULEDOCSTRING",
+    )?;
+    push_record(output, MODULE_OFFSET_ID, &0u32.to_le_bytes())?;
+    push_record(
+        output,
+        MODULE_HELP_CONTEXT_ID,
+        &module.help_context.to_le_bytes(),
+    )?;
+    push_record(output, MODULE_COOKIE_ID, &WRITE_COOKIE.to_le_bytes())?;
+    let type_id = match module.kind {
+        VbaModuleKind::Procedural => MODULE_PROCEDURAL_ID,
+        VbaModuleKind::DocumentClassOrDesigner => MODULE_OTHER_ID,
+    };
+    output.extend_from_slice(&type_id.to_le_bytes());
+    output.extend_from_slice(&0u32.to_le_bytes());
+    if module.read_only {
+        output.extend_from_slice(&MODULE_READ_ONLY_ID.to_le_bytes());
+        output.extend_from_slice(&0u32.to_le_bytes());
+    }
+    if module.private {
+        output.extend_from_slice(&MODULE_PRIVATE_ID.to_le_bytes());
+        output.extend_from_slice(&0u32.to_le_bytes());
+    }
+    output.extend_from_slice(&MODULE_TERMINATOR_ID.to_le_bytes());
+    output.extend_from_slice(&0u32.to_le_bytes());
+    Ok(())
+}
+
+fn push_record(output: &mut Vec<u8>, id: u16, value: &[u8]) -> Result<(), VbaError> {
+    let length =
+        u32::try_from(value.len()).map_err(|_| invalid("dir-stream record length exceeds u32"))?;
+    output.extend_from_slice(&id.to_le_bytes());
+    output.extend_from_slice(&length.to_le_bytes());
+    output.extend_from_slice(value);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn push_string_pair(
+    output: &mut Vec<u8>,
+    id: u16,
+    reserved: u16,
+    value: &str,
+    encoding: &'static Encoding,
+    limits: &VbaLimits,
+    protocol_maximum: usize,
+    field: &'static str,
+) -> Result<(), VbaError> {
+    let mbcs = encode_mbcs(value, encoding, field)?;
+    check_limit("VBA string bytes", mbcs.len(), limits.max_string_bytes)?;
+    check_protocol_length(field, mbcs.len(), protocol_maximum)?;
+    push_record(output, id, &mbcs)?;
+    output.extend_from_slice(&reserved.to_le_bytes());
+    let unicode = encode_utf16(value, field)?;
+    check_limit("VBA string bytes", unicode.len(), limits.max_string_bytes)?;
+    check_protocol_length(field, unicode.len(), protocol_maximum.saturating_mul(2))?;
+    push_length_prefixed(output, &unicode)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn push_mbcs_pair(
+    output: &mut Vec<u8>,
+    id: u16,
+    reserved: u16,
+    value: &str,
+    encoding: &'static Encoding,
+    limits: &VbaLimits,
+    protocol_maximum: usize,
+    field: &'static str,
+) -> Result<(), VbaError> {
+    let mbcs = encode_mbcs(value, encoding, field)?;
+    check_limit("VBA string bytes", mbcs.len(), limits.max_string_bytes)?;
+    check_protocol_length(field, mbcs.len(), protocol_maximum)?;
+    push_record(output, id, &mbcs)?;
+    output.extend_from_slice(&reserved.to_le_bytes());
+    push_length_prefixed(output, &mbcs)
+}
+
+fn push_length_prefixed(output: &mut Vec<u8>, value: &[u8]) -> Result<(), VbaError> {
+    let length =
+        u32::try_from(value.len()).map_err(|_| invalid("dir-stream string length exceeds u32"))?;
+    output.extend_from_slice(&length.to_le_bytes());
+    output.extend_from_slice(value);
+    Ok(())
+}
+
+fn check_protocol_length(
+    field: &'static str,
+    actual: usize,
+    maximum: usize,
+) -> Result<(), VbaError> {
+    if actual > maximum {
+        return Err(invalid(format!(
+            "{field} length {actual} exceeds {maximum}"
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn encode_mbcs(
+    value: &str,
+    encoding: &'static Encoding,
+    field: &'static str,
+) -> Result<Vec<u8>, VbaError> {
+    if value.contains('\0') {
+        return Err(invalid(format!("{field} contains a null character")));
+    }
+    let (encoded, _, had_errors) = encoding.encode(value);
+    if had_errors {
+        return Err(invalid(format!(
+            "{field} is not representable in the project code page"
+        )));
+    }
+    if encoded.contains(&0) {
+        return Err(invalid(format!("{field} encodes to a null byte")));
+    }
+    Ok(encoded.into_owned())
+}
+
+fn encode_utf16(value: &str, field: &'static str) -> Result<Vec<u8>, VbaError> {
+    if value.contains('\0') {
+        return Err(invalid(format!("{field} contains a null character")));
+    }
+    Ok(value.encode_utf16().flat_map(u16::to_le_bytes).collect())
+}
 
 /// Parsed metadata from an MS-OVBA `dir` stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -243,7 +516,15 @@ fn find_modules(
         }
         let mut reader = Reader::new(data, position + 16);
         match parse_modules(&mut reader, count, encoding, limits) {
-            Ok(modules) => return Ok(modules),
+            Ok(modules) => {
+                let terminator = reader
+                    .expect_id(DIR_TERMINATOR_ID)
+                    .and_then(|()| reader.expect_u32(0, "dir stream terminator reserved value"));
+                match terminator {
+                    Ok(()) => return Ok(modules),
+                    Err(error) => last_error = Some(error),
+                }
+            },
             Err(error) => last_error = Some(error),
         }
     }
@@ -601,6 +882,8 @@ mod tests {
         bytes.extend_from_slice(&0u32.to_le_bytes());
         bytes.extend_from_slice(&MODULE_TERMINATOR_ID.to_le_bytes());
         bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.extend_from_slice(&DIR_TERMINATOR_ID.to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
         literal_container(&bytes)
     }
 
@@ -629,5 +912,14 @@ mod tests {
             VbaDirectory::parse(&sample_dir(), &limits),
             Err(VbaError::LimitExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn rejects_missing_top_level_directory_terminator() {
+        let limits = VbaLimits::default();
+        let mut decompressed = decompress_container(&sample_dir(), &limits).unwrap();
+        decompressed.truncate(decompressed.len() - 6);
+        let malformed = compress_container(&decompressed, &limits).unwrap();
+        assert!(VbaDirectory::parse(&malformed, &limits).is_err());
     }
 }

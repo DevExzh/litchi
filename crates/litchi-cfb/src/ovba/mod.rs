@@ -3,10 +3,15 @@
 //! This module exposes source text and metadata for inspection. It does not
 //! compile, interpret, or execute VBA.
 
+mod authoring;
 mod compression;
 mod directory;
 mod project;
 
+pub use authoring::{
+    VbaModuleBuilder, VbaPlatform, VbaProjectBinary, VbaProjectBuilder, VbaProjectId,
+    VbaProjectModuleKind,
+};
 pub use compression::{compress_container, decompress_container};
 pub use directory::{VbaDirectory, VbaModuleKind, VbaModuleMetadata};
 pub use project::{VbaModule, VbaProject, VbaText};
