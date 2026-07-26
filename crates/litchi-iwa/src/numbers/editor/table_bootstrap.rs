@@ -38,12 +38,13 @@ struct TableObjectIds {
     style_list: u64,
     formula_list: u64,
     format_list: u64,
+    control_cell_spec_list: u64,
     uid_map: u64,
     stroke_sidecar: u64,
 }
 
 impl TableObjectIds {
-    const COUNT: usize = 11;
+    const COUNT: usize = 12;
 
     fn allocate(package: &IWorkPackage) -> Result<Self> {
         let mut next = next_object_identifier(package)?;
@@ -57,6 +58,7 @@ impl TableObjectIds {
             style_list: take_identifier(&mut next)?,
             formula_list: take_identifier(&mut next)?,
             format_list: take_identifier(&mut next)?,
+            control_cell_spec_list: take_identifier(&mut next)?,
             uid_map: take_identifier(&mut next)?,
             stroke_sidecar: take_identifier(&mut next)?,
         })
@@ -73,6 +75,7 @@ impl TableObjectIds {
             self.style_list,
             self.formula_list,
             self.format_list,
+            self.control_cell_spec_list,
             self.uid_map,
             self.stroke_sidecar,
         ]
@@ -393,6 +396,7 @@ fn table_objects(
             formula_table: reference(ids.formula_list),
             format_table_pre_bnc: reference(ids.format_list),
             format_table: Some(reference(ids.format_list)),
+            control_cell_spec_table: Some(reference(ids.control_cell_spec_list)),
             next_row_strip_id: 1,
             next_column_strip_id: 0,
             row_tile_tree: tst::TableRbTree {
@@ -466,6 +470,10 @@ fn table_objects(
         (ids.style_list, tst::table_data_list::ListType::Style),
         (ids.formula_list, tst::table_data_list::ListType::Formula),
         (ids.format_list, tst::table_data_list::ListType::Format),
+        (
+            ids.control_cell_spec_list,
+            tst::table_data_list::ListType::ControlCellSpec,
+        ),
     ] {
         objects.push(table_object(
             identifier,

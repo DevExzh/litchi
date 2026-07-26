@@ -19,6 +19,13 @@ pub use numeral_system::{
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
 };
 
+/// Native interactive Checkbox format for one table cell.
+///
+/// iWork stores no configurable options for this format. Applying it to an
+/// empty cell creates an unchecked Boolean value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TableCellCheckboxFormat;
+
 /// A fixed fractional-digit count accepted by the iWork cell inspector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TableCellFixedDecimalPlaces(u8);
@@ -464,6 +471,8 @@ pub enum TableCellDataFormat {
     DateTime(TableCellDateTimeFormat),
     /// Display a native Duration value with typed style and unit settings.
     Duration(TableCellDurationFormat),
+    /// Display and edit the value as a native Checkbox control.
+    Checkbox(TableCellCheckboxFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -493,6 +502,12 @@ impl From<TableCellScientificFormat> for TableCellDataFormat {
 impl From<TableCellFractionFormat> for TableCellDataFormat {
     fn from(value: TableCellFractionFormat) -> Self {
         Self::Fraction(value)
+    }
+}
+
+impl From<TableCellCheckboxFormat> for TableCellDataFormat {
+    fn from(value: TableCellCheckboxFormat) -> Self {
+        Self::Checkbox(value)
     }
 }
 

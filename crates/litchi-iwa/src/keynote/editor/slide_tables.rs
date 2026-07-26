@@ -61,6 +61,7 @@ pub use crate::table_cell_border::{
     TableCellBorderSide as KeynoteTableCellBorderSide, TableCellBorders as KeynoteTableCellBorders,
 };
 pub use crate::table_cell_data_format::{
+    TableCellCheckboxFormat as KeynoteTableCellCheckboxFormat,
     TableCellCurrencyFormat as KeynoteTableCellCurrencyFormat,
     TableCellDataFormat as KeynoteTableCellDataFormat,
     TableCellDateTimeFormat as KeynoteTableCellDateTimeFormat,
@@ -1047,6 +1048,72 @@ impl KeynoteEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Duration reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Checkbox format for one slide-table cell.
+    pub fn slide_table_cell_checkbox_format(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<KeynoteTableCellCheckboxFormat>> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_checkbox_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace an explicit native Checkbox format transactionally.
+    pub fn set_slide_table_cell_checkbox_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: KeynoteTableCellCheckboxFormat,
+    ) -> Result<()> {
+        self.set_slide_table_cell_data_format(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            format.into(),
+        )
+    }
+
+    /// Restore Automatic from an explicit Checkbox slide-table cell.
+    pub fn reset_slide_table_cell_checkbox_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_checkbox_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
+                != KeynoteTableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Keynote Checkbox reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;

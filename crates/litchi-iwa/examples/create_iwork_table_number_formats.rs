@@ -7,14 +7,14 @@ use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_data_format::{
-    TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle,
-    TableCellDateTimeFormat, TableCellDecimalPlaces, TableCellDurationFormat,
-    TableCellDurationStyle, TableCellDurationUnitRange, TableCellFixedDecimalPlaces,
-    TableCellFractionAccuracy, TableCellFractionFormat, TableCellNegativeNumberStyle,
-    TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces,
-    TableCellNumeralSystemFormat, TableCellNumeralSystemNegativeStyle,
-    TableCellNumeralSystemPlaces, TableCellPercentageFormat, TableCellScientificFormat,
-    TableCellThousandsSeparator,
+    TableCellCheckboxFormat, TableCellCurrencyCode, TableCellCurrencyFormat,
+    TableCellCurrencyStyle, TableCellDateTimeFormat, TableCellDecimalPlaces,
+    TableCellDurationFormat, TableCellDurationStyle, TableCellDurationUnitRange,
+    TableCellFixedDecimalPlaces, TableCellFractionAccuracy, TableCellFractionFormat,
+    TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellNumeralSystemBase,
+    TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
+    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
+    TableCellScientificFormat, TableCellThousandsSeparator,
 };
 
 const ROW: usize = 1;
@@ -26,6 +26,7 @@ const FRACTION_COLUMN: usize = 5;
 const NUMERAL_SYSTEM_COLUMN: usize = 6;
 const DATE_TIME_COLUMN: usize = 7;
 const DURATION_COLUMN: usize = 8;
+const CHECKBOX_COLUMN: usize = 9;
 const NUMBER_VALUE: f64 = -1_234.5;
 const PERCENTAGE_VALUE: f64 = -12.345;
 const CURRENCY_VALUE: f64 = -1_234.5;
@@ -106,7 +107,7 @@ const fn duration_format() -> TableCellDurationFormat {
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
-        .table_dimensions(3, 9)
+        .table_dimensions(3, 10)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(
@@ -180,6 +181,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CellValue::Duration(DURATION_VALUE),
     )?;
     editor.set_table_cell_duration_format(table_id, ROW, DURATION_COLUMN, duration_format())?;
+    editor.set_cell(table_id, ROW, CHECKBOX_COLUMN, CellValue::Boolean(true))?;
+    editor.set_table_cell_checkbox_format(
+        table_id,
+        ROW,
+        CHECKBOX_COLUMN,
+        TableCellCheckboxFormat,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -187,7 +195,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Created from scratch with native table-cell formats.\n")
-        .body_table("Number Formats", 3, 9)
+        .body_table("Number Formats", 3, 10)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(
@@ -261,6 +269,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CellValue::Duration(DURATION_VALUE),
     )?;
     editor.set_table_cell_duration_format(table_id, ROW, DURATION_COLUMN, duration_format())?;
+    editor.set_table_cell(table_id, ROW, CHECKBOX_COLUMN, CellValue::Boolean(true))?;
+    editor.set_table_cell_checkbox_format(
+        table_id,
+        ROW,
+        CHECKBOX_COLUMN,
+        TableCellCheckboxFormat,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -273,7 +288,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         0,
         "Number Formats",
         3,
-        9,
+        10,
         DrawablePoint { x: 320.0, y: 360.0 },
         DrawableSize {
             width: 1_280.0,
@@ -391,6 +406,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         DURATION_COLUMN,
         duration_format(),
+    )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        ROW,
+        CHECKBOX_COLUMN,
+        CellValue::Boolean(true),
+    )?;
+    editor.set_slide_table_cell_checkbox_format(
+        0,
+        table.model_object_id,
+        ROW,
+        CHECKBOX_COLUMN,
+        TableCellCheckboxFormat,
     )?;
     editor.save(output)?;
     Ok(())

@@ -2,14 +2,14 @@
 
 use crate::protobuf::tsk::FormatStructArchive;
 use crate::table_cell_data_format::{
-    TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDataFormat,
-    TableCellDateTimeFormat, TableCellDecimalPlaces, TableCellDurationFormat,
-    TableCellDurationStyle, TableCellDurationUnit, TableCellDurationUnitRange,
-    TableCellDurationUnits, TableCellFixedDecimalPlaces, TableCellFractionAccuracy,
-    TableCellFractionFormat, TableCellNegativeNumberStyle, TableCellNumberFormat,
-    TableCellNumeralSystemBase, TableCellNumeralSystemFormat, TableCellNumeralSystemNegativeStyle,
-    TableCellNumeralSystemPlaces, TableCellPercentageFormat, TableCellScientificFormat,
-    TableCellThousandsSeparator,
+    TableCellCheckboxFormat, TableCellCurrencyCode, TableCellCurrencyFormat,
+    TableCellCurrencyStyle, TableCellDataFormat, TableCellDateTimeFormat, TableCellDecimalPlaces,
+    TableCellDurationFormat, TableCellDurationStyle, TableCellDurationUnit,
+    TableCellDurationUnitRange, TableCellDurationUnits, TableCellFixedDecimalPlaces,
+    TableCellFractionAccuracy, TableCellFractionFormat, TableCellNegativeNumberStyle,
+    TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFormat,
+    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
+    TableCellScientificFormat, TableCellThousandsSeparator,
 };
 use crate::{Error, Result};
 
@@ -19,6 +19,7 @@ pub(super) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 pub(super) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 pub(super) const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
 pub(super) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
+pub(super) const NATIVE_CHECKBOX_FORMAT_TYPE: u32 = 263;
 pub(super) const NATIVE_DURATION_FORMAT_TYPE: u32 = 268;
 pub(super) const NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE: u32 = 269;
 pub(super) const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
@@ -33,6 +34,12 @@ const NATIVE_FRACTION_TENTHS: i32 = 10;
 const NATIVE_FRACTION_HUNDREDTHS: i32 = 100;
 
 pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<FormatStructArchive> {
+    if matches!(format, TableCellDataFormat::Checkbox(_)) {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_CHECKBOX_FORMAT_TYPE),
+            ..Default::default()
+        });
+    }
     if let TableCellDataFormat::Duration(format) = format {
         let range = format.units().range();
         return Ok(FormatStructArchive {
@@ -122,6 +129,7 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
         TableCellDataFormat::NumeralSystem(_) => unreachable!("handled above"),
         TableCellDataFormat::DateTime(_) => unreachable!("handled above"),
         TableCellDataFormat::Duration(_) => unreachable!("handled above"),
+        TableCellDataFormat::Checkbox(_) => unreachable!("handled above"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -149,6 +157,16 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
     let format_type = native.format_type.ok_or_else(|| {
         Error::InvalidFormat("Table cell has no native data-format type".to_owned())
     })?;
+    if format_type == NATIVE_CHECKBOX_FORMAT_TYPE {
+        let canonical =
+            data_format_to_native(&TableCellDataFormat::Checkbox(TableCellCheckboxFormat))?;
+        if native != &canonical {
+            return Err(Error::InvalidFormat(
+                "Checkbox cell format contains non-canonical options".to_owned(),
+            ));
+        }
+        return Ok(TableCellDataFormat::Checkbox(TableCellCheckboxFormat));
+    }
     if format_type == NATIVE_DURATION_FORMAT_TYPE {
         let style = duration_style_from_native(native.duration_style.ok_or_else(|| {
             Error::InvalidFormat("Duration cell format has no presentation style".to_owned())

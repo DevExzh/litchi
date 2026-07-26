@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             };
             println!(
-                "model={model_id} table_id={:?} name={:?} title=(visible={:?}, height={:?}, outlined={:?}) rows={} cols={} tile_size={:?} string_table={} formula_table={} formula_error_table={:?} rich_text_table={:?} conditional_table={:?} row_buckets={:?} column_headers={} next_strips=({}, {}) uid_map={:?} stroke_sidecar={:?} conditional_owner={:?}",
+                "model={model_id} table_id={:?} name={:?} title=(visible={:?}, height={:?}, outlined={:?}) rows={} cols={} tile_size={:?} string_table={} formula_table={} formula_error_table={:?} rich_text_table={:?} conditional_table={:?} control_cell_spec_table={:?} row_buckets={:?} column_headers={} next_strips=({}, {}) uid_map={:?} stroke_sidecar={:?} conditional_owner={:?}",
                 model.table_id,
                 model.table_name,
                 model.table_name_enabled,
@@ -90,6 +90,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 model
                     .base_data_store
                     .conditionalstyletable
+                    .as_ref()
+                    .map(|reference| reference.identifier),
+                model
+                    .base_data_store
+                    .control_cell_spec_table
                     .as_ref()
                     .map(|reference| reference.identifier),
                 model
@@ -361,6 +366,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 entry.refcount,
                                 entry.reference.map(|reference| reference.identifier),
                                 entry.string
+                            );
+                        }
+                    }
+                }
+            }
+            if let Some(control_table_id) = model
+                .base_data_store
+                .control_cell_spec_table
+                .as_ref()
+                .map(|reference| reference.identifier)
+                && let Some((archive_name, control_object)) = objects.get(&control_table_id)
+            {
+                println!(" control cell spec table archive={archive_name}");
+                for control_message in &control_object.messages {
+                    if let Ok(list) = tst::TableDataList::decode(control_message.data.as_slice()) {
+                        println!(
+                            "  list_type={} next={} segmented={} entries={}",
+                            list.list_type,
+                            list.next_list_id,
+                            list.segments.len(),
+                            list.entries.len()
+                        );
+                        for entry in list.entries {
+                            println!(
+                                "   control key={} refs={} spec={:?}",
+                                entry.key, entry.refcount, entry.cell_spec
                             );
                         }
                     }

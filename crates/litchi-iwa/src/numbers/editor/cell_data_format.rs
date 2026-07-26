@@ -3,18 +3,19 @@
 use super::*;
 use crate::numbers::bnc;
 use crate::protobuf::tsk::FormatStructArchive;
+use crate::table_cell_data_format::{
+    TableCellCheckboxFormat, TableCellCurrencyFormat, TableCellDataFormat, TableCellDateTimeFormat,
+    TableCellDurationFormat, TableCellFractionFormat, TableCellNumberFormat,
+    TableCellNumeralSystemFormat, TableCellPercentageFormat, TableCellScientificFormat,
+};
 #[cfg(test)]
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyStyle, TableCellDecimalPlaces,
     TableCellFixedDecimalPlaces, TableCellNegativeNumberStyle, TableCellThousandsSeparator,
 };
-use crate::table_cell_data_format::{
-    TableCellCurrencyFormat, TableCellDataFormat, TableCellDateTimeFormat, TableCellDurationFormat,
-    TableCellFractionFormat, TableCellNumberFormat, TableCellNumeralSystemFormat,
-    TableCellPercentageFormat, TableCellScientificFormat,
-};
 
 mod codec;
+mod control;
 use codec::*;
 
 pub(super) fn cell_data_format(
@@ -38,6 +39,14 @@ pub(super) fn cell_data_format(
     match format_reference(&cell)? {
         CellFormatReference::Automatic { .. } => Ok(TableCellDataFormat::Automatic),
         CellFormatReference::Explicit { identifier, .. } => {
+            if cell.cell_format_kind() == Some(bnc::CHECKBOX_CELL_FORMAT_KIND) {
+                control::validate_checkbox_spec(
+                    package,
+                    &location,
+                    cell.checkbox_control_value()
+                        .expect("validated Checkbox metadata"),
+                )?;
+            }
             let resolved = resolve_format_table(package, &location)?;
             let entry = required_format_entry(&resolved, identifier)?;
             entry
@@ -70,7 +79,8 @@ pub(super) fn cell_number_format(
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Number data format".to_owned(),
         )),
     }
@@ -91,7 +101,8 @@ pub(super) fn cell_currency_format(
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Currency data format".to_owned(),
         )),
     }
@@ -112,7 +123,8 @@ pub(super) fn reset_cell_currency_format(
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Cannot reset Currency format from a non-Currency cell".to_owned(),
         )),
     }
@@ -133,7 +145,8 @@ pub(super) fn cell_percentage_format(
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Percentage data format".to_owned(),
         )),
     }
@@ -154,7 +167,8 @@ pub(super) fn cell_scientific_format(
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Scientific data format".to_owned(),
         )),
     }
@@ -177,7 +191,8 @@ pub(super) fn reset_cell_scientific_format(
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Cannot reset Scientific format from a non-Scientific cell".to_owned(),
         )),
     }
@@ -198,7 +213,8 @@ pub(super) fn cell_fraction_format(
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Fraction data format".to_owned(),
         )),
     }
@@ -219,7 +235,8 @@ pub(super) fn reset_cell_fraction_format(
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Cannot reset Fraction format from a non-Fraction cell".to_owned(),
         )),
     }
@@ -240,7 +257,8 @@ pub(super) fn cell_numeral_system_format(
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Numeral System data format".to_owned(),
         )),
     }
@@ -263,7 +281,8 @@ pub(super) fn reset_cell_numeral_system_format(
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Cannot reset Numeral System format from a non-Numeral-System cell".to_owned(),
         )),
     }
@@ -284,7 +303,8 @@ pub(super) fn cell_date_time_format(
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Date & Time data format".to_owned(),
         )),
     }
@@ -305,7 +325,8 @@ pub(super) fn reset_cell_date_time_format(
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Cannot reset Date & Time format from a non-Date-Time cell".to_owned(),
         )),
     }
@@ -326,7 +347,8 @@ pub(super) fn cell_duration_format(
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::DateTime(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Duration data format".to_owned(),
         )),
     }
@@ -347,8 +369,39 @@ pub(super) fn reset_cell_duration_format(
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::DateTime(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Cannot reset Duration format from a non-Duration cell".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn cell_checkbox_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellCheckboxFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::Checkbox(format) => Ok(Some(format)),
+        _ => Err(Error::InvalidFormat(
+            "Table cell does not use the Checkbox data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_checkbox_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::Checkbox(_) => reset_cell_data_format(package, table_id, row, column),
+        _ => Err(Error::InvalidFormat(
+            "Cannot reset Checkbox format from a non-Checkbox cell".to_owned(),
         )),
     }
 }
@@ -392,10 +445,14 @@ pub(super) fn set_cell_data_format(
     let old_reference = format_reference(&cell)?;
     let old_identifier = old_reference.primary_identifier();
     let old_identifiers = old_reference.identifiers();
+    let old_control_identifier = (cell.cell_format_kind() == Some(bnc::CHECKBOX_CELL_FORMAT_KIND))
+        .then(|| cell.checkbox_control_value())
+        .flatten();
     let cell_format_kind = match format {
         TableCellDataFormat::Currency(_) => bnc::CellDataFormatKind::Currency,
         TableCellDataFormat::DateTime(_) => bnc::CellDataFormatKind::DateTime,
         TableCellDataFormat::Duration(_) => bnc::CellDataFormatKind::Duration,
+        TableCellDataFormat::Checkbox(_) => bnc::CellDataFormatKind::Checkbox,
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
@@ -404,6 +461,15 @@ pub(super) fn set_cell_data_format(
         TableCellDataFormat::Automatic => unreachable!("handled above"),
     };
     let native = data_format_to_native(format)?;
+    let new_control_identifier = if matches!(format, TableCellDataFormat::Checkbox(_)) {
+        Some(control::acquire_checkbox_spec(
+            package,
+            &location,
+            old_control_identifier,
+        )?)
+    } else {
+        None
+    };
     let resolved = resolve_format_table(package, &location)?;
     let old_entries = old_identifiers
         .into_iter()
@@ -448,7 +514,7 @@ pub(super) fn set_cell_data_format(
         append_format_entry(package, &resolved, native)?
     };
 
-    cell.set_data_format_identifier(new_identifier, cell_format_kind)?;
+    cell.set_data_format_identifier(new_identifier, cell_format_kind, new_control_identifier)?;
     let cell_count = storage::update_tile(
         package,
         &location.tile_archive,
@@ -477,6 +543,11 @@ pub(super) fn set_cell_data_format(
             )?;
         }
     }
+    if let Some(identifier) = old_control_identifier
+        && Some(identifier) != new_control_identifier
+    {
+        control::release_checkbox_spec(package, &location, identifier)?;
+    }
     Ok(())
 }
 
@@ -495,7 +566,8 @@ pub(super) fn reset_cell_number_format(
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Cannot reset Number format from a non-Number cell".to_owned(),
         )),
     }
@@ -518,7 +590,8 @@ pub(super) fn reset_cell_percentage_format(
         | TableCellDataFormat::Fraction(_)
         | TableCellDataFormat::NumeralSystem(_)
         | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Duration(_)
+        | TableCellDataFormat::Checkbox(_) => Err(Error::InvalidFormat(
             "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
         )),
     }
@@ -553,6 +626,9 @@ pub(super) fn reset_cell_data_format(
         .flatten()
         .map(|identifier| required_format_entry(&resolved, identifier))
         .collect::<Result<Vec<_>>>()?;
+    let old_control_identifier = (cell.cell_format_kind() == Some(bnc::CHECKBOX_CELL_FORMAT_KIND))
+        .then(|| cell.checkbox_control_value())
+        .flatten();
 
     cell.clear_explicit_format();
     let cell_count = storage::update_tile(
@@ -579,6 +655,9 @@ pub(super) fn reset_cell_data_format(
             old_entry,
             tst::table_data_list::ListType::Format,
         )?;
+    }
+    if let Some(identifier) = old_control_identifier {
+        control::release_checkbox_spec(package, &location, identifier)?;
     }
     Ok(true)
 }
@@ -622,6 +701,14 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
     let kind = cell.cell_format_kind();
     let identifier = cell.format_identifier();
     let secondary = cell.secondary_format_identifier();
+    match (kind, cell.checkbox_control_value()) {
+        (Some(bnc::CHECKBOX_CELL_FORMAT_KIND), Some(_)) | (_, None) => {},
+        _ => {
+            return Err(Error::InvalidFormat(
+                "Table cell contains inconsistent Checkbox control metadata".to_owned(),
+            ));
+        },
+    }
     match (explicit, kind, identifier) {
         (0, None, None) if secondary.is_none() => Ok(CellFormatReference::Automatic {
             identifier: None,
@@ -671,6 +758,14 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
             Ok(CellFormatReference::Explicit {
                 identifier,
                 secondary,
+            })
+        },
+        (bnc::EXPLICIT_CHECKBOX_FORMAT, Some(bnc::CHECKBOX_CELL_FORMAT_KIND), Some(identifier))
+            if secondary.is_none() =>
+        {
+            Ok(CellFormatReference::Explicit {
+                identifier,
+                secondary: None,
             })
         },
         _ => Err(Error::InvalidFormat(
@@ -1065,6 +1160,88 @@ mod tests {
         native = data_format_to_native(&duration.into()).unwrap();
         native.decimal_places = Some(2);
         assert!(data_format_from_native(&native).is_err());
+
+        let checkbox = TableCellDataFormat::Checkbox(TableCellCheckboxFormat);
+        let mut native = data_format_to_native(&checkbox).unwrap();
+        assert_eq!(native.format_type, Some(NATIVE_CHECKBOX_FORMAT_TYPE));
+        assert_eq!(data_format_from_native(&native).unwrap(), checkbox);
+        native.bool_true_string = Some("Yes".to_owned());
+        assert!(data_format_from_native(&native).is_err());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_reuses_and_resets_checkbox_formats() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Checkboxes")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Boolean(true))
+            .unwrap();
+        editor
+            .set_table_cell_checkbox_format(table_id, 1, 1, TableCellCheckboxFormat)
+            .unwrap();
+        editor
+            .set_table_cell_checkbox_format(table_id, 1, 2, TableCellCheckboxFormat)
+            .unwrap();
+
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 1);
+        assert_eq!(formats.entries[0].entry.refcount, 2);
+        let control_table_id = location
+            .descriptor
+            .model
+            .base_data_store
+            .control_cell_spec_table
+            .as_ref()
+            .unwrap()
+            .identifier;
+        let controls = storage::resolve_table_data_list(
+            editor.package(),
+            &location.object_locations,
+            control_table_id,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )
+        .unwrap();
+        assert_eq!(controls.entries.len(), 1);
+        assert_eq!(controls.entries[0].entry.refcount, 2);
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_checkbox_format(table_id, 1, 1).unwrap(),
+            Some(TableCellCheckboxFormat)
+        );
+        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            Some(&CellValue::Boolean(false))
+        );
+        assert!(
+            reopened
+                .reset_table_cell_checkbox_format(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened.table_cell_checkbox_format(table_id, 1, 2).unwrap(),
+            Some(TableCellCheckboxFormat)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_checkbox_format(table_id, 1, 2)
+                .unwrap()
+        );
+        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
+        let controls = storage::resolve_table_data_list(
+            reopened.package(),
+            &location.object_locations,
+            control_table_id,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )
+        .unwrap();
+        assert!(controls.entries.is_empty());
     }
 
     #[test]
