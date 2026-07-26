@@ -751,29 +751,30 @@ impl<'a> EscherRecord<'a> {
 
     /// Extract click and mouse-over actions from this shape's ClientData.
     pub fn extract_interactions(&self) -> Result<Vec<PowerPointInteraction>> {
+        self.extract_interactions_with_limits(crate::ppt::PowerPointInteractionLimits::default())
+    }
+
+    /// Extract shape actions with caller-supplied container and name limits.
+    pub fn extract_interactions_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointInteractionLimits,
+    ) -> Result<Vec<PowerPointInteraction>> {
         let Some(client_data) = (self.record_type == EscherRecordType::ClientData)
             .then_some(self)
             .or_else(|| self.find_child(EscherRecordType::ClientData))
         else {
             return Ok(Vec::new());
         };
-        let mut interactions = Vec::new();
-        for record in parse_ppt_record_sequence(&client_data.data, "shape ClientData")? {
-            if record.record_type != crate::consts::PptRecordType::InteractiveInfo {
-                continue;
-            }
-            let interaction = PowerPointInteraction::parse(&record)?;
-            if interactions
-                .iter()
-                .any(|existing: &PowerPointInteraction| existing.trigger == interaction.trigger)
-            {
-                return Err(PptError::Corrupted(
-                    "Shape contains duplicate interactive triggers".to_string(),
-                ));
-            }
-            interactions.push(interaction);
+        if client_data.version != 0x0f
+            || client_data.instance != 0
+            || client_data.record_type != EscherRecordType::ClientData
+            || usize::try_from(client_data.data_length).ok() != Some(client_data.data.len())
+        {
+            return Err(PptError::Corrupted(
+                "Invalid OfficeArt ClientData record header".to_string(),
+            ));
         }
-        Ok(interactions)
+        PowerPointInteraction::parse_client_data_payload(&client_data.data, limits)
     }
 
     /// Extract text content from this record.

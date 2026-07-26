@@ -200,6 +200,41 @@ impl<'data> EscherShape<'data> {
         self.placeholder
     }
 
+    /// Parse click and mouse-over actions from this shape's ClientData.
+    pub fn interactions(
+        &self,
+    ) -> crate::ppt::package::Result<Vec<crate::ppt::PowerPointInteraction>> {
+        self.interactions_with_limits(crate::ppt::PowerPointInteractionLimits::default())
+    }
+
+    /// Parse shape actions with caller-supplied record and name limits.
+    pub fn interactions_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointInteractionLimits,
+    ) -> crate::ppt::package::Result<Vec<crate::ppt::PowerPointInteraction>> {
+        let group_header = if self.is_group {
+            self.container
+                .find_child(EscherRecordType::SpContainer)
+                .map(EscherContainer::new)
+        } else {
+            None
+        };
+        let metadata_container = group_header.as_ref().unwrap_or(&self.container);
+        let Some(client_data) = metadata_container.find_child(EscherRecordType::ClientData) else {
+            return Ok(Vec::new());
+        };
+        if client_data.version != 0x0f
+            || client_data.instance != 0
+            || client_data.record_type_raw != 0xf011
+            || usize::try_from(client_data.length).ok() != Some(client_data.data.len())
+        {
+            return Err(crate::ppt::package::PptError::Corrupted(
+                "Invalid OfficeArt ClientData record header".to_string(),
+            ));
+        }
+        crate::ppt::PowerPointInteraction::parse_client_data_payload(client_data.data, limits)
+    }
+
     /// Parse the strict, context-validated PowerPoint `PlaceholderAtom`.
     pub fn placeholder_atom(
         &self,

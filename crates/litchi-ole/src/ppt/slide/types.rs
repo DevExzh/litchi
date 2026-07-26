@@ -109,6 +109,44 @@ impl<'doc> Slide<'doc> {
         Ok(self.shapes()?.len())
     }
 
+    /// Return every shape that has a click or mouse-over interaction.
+    pub fn shape_interactions(&self) -> Result<Vec<crate::ppt::PowerPointShapeInteractionEntry>> {
+        self.shape_interactions_with_limits(crate::ppt::PowerPointInteractionLimits::default())
+    }
+
+    /// Return shape interactions with caller-supplied record and name limits.
+    pub fn shape_interactions_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointInteractionLimits,
+    ) -> Result<Vec<crate::ppt::PowerPointShapeInteractionEntry>> {
+        let Some(ppdrawing) = self
+            .record
+            .find_child(crate::consts::PptRecordType::PPDrawing)
+        else {
+            return Ok(Vec::new());
+        };
+        let escher_shapes =
+            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let mut result = Vec::new();
+        let mut pending = escher_shapes.iter().rev().collect::<Vec<_>>();
+        while let Some(shape) = pending.pop() {
+            let interactions = shape.interactions_with_limits(limits)?;
+            if !interactions.is_empty() {
+                let shape_id = shape.shape_id().ok_or_else(|| {
+                    PptError::Corrupted(
+                        "Interactive OfficeArt shape has no shape identifier".to_string(),
+                    )
+                })?;
+                result.push(crate::ppt::PowerPointShapeInteractionEntry {
+                    shape_id,
+                    interactions,
+                });
+            }
+            pending.extend(shape.children().iter().rev());
+        }
+        Ok(result)
+    }
+
     /// Return every shape-scoped programmable-tag container on this slide.
     pub fn shape_programmable_tags(
         &self,

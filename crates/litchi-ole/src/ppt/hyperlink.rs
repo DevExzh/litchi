@@ -3,6 +3,7 @@
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 use crate::consts::PptRecordType;
+use std::borrow::Cow;
 
 /// Mouse event that triggers an interactive action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -152,23 +153,7 @@ impl PowerPointMacroNameAtom {
 
     /// Parse and retain exact UTF-16 bytes. A NULL code unit terminates the exposed text.
     pub fn parse_payload(data: &[u8], max_bytes: usize) -> Result<Self> {
-        if data.len() > max_bytes {
-            return corrupted("MacroNameAtom exceeds the configured size limit");
-        }
-        if data.len() % 2 != 0 {
-            return corrupted("MacroNameAtom length must be even");
-        }
-        let units = data
-            .chunks_exact(2)
-            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-            .collect::<Vec<_>>();
-        let visible = units
-            .iter()
-            .position(|unit| *unit == 0)
-            .unwrap_or(units.len());
-        let text = String::from_utf16(&units[..visible])
-            .map_err(|_| PptError::Corrupted("MacroNameAtom contains invalid UTF-16".into()))?;
-        validate_printable_text(&text)?;
+        let text = decode_macro_name(data, max_bytes)?;
         Ok(Self {
             text,
             raw_utf16: data.to_vec(),
@@ -205,6 +190,15 @@ pub struct PowerPointInteraction {
     pub unused: [u8; 3],
     /// Exact inert MacroNameAtom UTF-16 data, if present.
     pub macro_name_data: Option<Vec<u8>>,
+}
+
+/// Click and mouse-over actions attached to one slide shape.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PowerPointShapeInteractionEntry {
+    /// OfficeArt shape identifier.
+    pub shape_id: u32,
+    /// At most one action for each [`InteractionTrigger`].
+    pub interactions: Vec<PowerPointInteraction>,
 }
 
 impl PowerPointInteraction {
@@ -368,8 +362,28 @@ impl PowerPointInteraction {
         }
     }
 
-    /// Serialize the canonical headers and exact atom/name payloads.
+    /// Validate this interaction against explicit resource limits.
+    pub fn validate_with_limits(&self, limits: PowerPointInteractionLimits) -> Result<()> {
+        let macro_name = self.validated_macro_name_data(limits)?;
+        validate_serialized_interaction_size(
+            macro_name.as_ref().map(|data| data.len()),
+            limits.max_record_bytes,
+        )?;
+        Ok(())
+    }
+
+    /// Serialize canonical headers and exact atom/name payloads with default limits.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        self.to_bytes_with_limits(PowerPointInteractionLimits::default())
+    }
+
+    /// Serialize canonical headers and exact atom/name payloads with explicit limits.
+    pub fn to_bytes_with_limits(&self, limits: PowerPointInteractionLimits) -> Result<Vec<u8>> {
+        let macro_name = self.validated_macro_name_data(limits)?;
+        validate_serialized_interaction_size(
+            macro_name.as_ref().map(|data| data.len()),
+            limits.max_record_bytes,
+        )?;
         let atom_payload = self.atom().to_payload();
         let mut children = encode_record(
             0,
@@ -377,12 +391,12 @@ impl PowerPointInteraction {
             PptRecordType::InteractiveInfoAtom.as_u16(),
             &atom_payload,
         )?;
-        if let Some(name) = self.macro_name_atom()? {
+        if let Some(name) = macro_name {
             children.extend_from_slice(&encode_record(
                 0,
                 2,
                 PptRecordType::CString.as_u16(),
-                name.raw_utf16(),
+                &name,
             )?);
         }
         let instance = match self.trigger {
@@ -395,6 +409,30 @@ impl PowerPointInteraction {
             PptRecordType::InteractiveInfo.as_u16(),
             &children,
         )
+    }
+
+    fn validated_macro_name_data(
+        &self,
+        limits: PowerPointInteractionLimits,
+    ) -> Result<Option<Cow<'_, [u8]>>> {
+        match (&self.macro_name, &self.macro_name_data) {
+            (None, None) => Ok(None),
+            (Some(text), Some(data)) => {
+                let parsed = decode_macro_name(data, limits.max_macro_name_bytes)?;
+                if &parsed != text {
+                    return corrupted("MacroNameAtom text and exact data disagree");
+                }
+                Ok(Some(Cow::Borrowed(data)))
+            },
+            (Some(text), None) => {
+                let atom = PowerPointMacroNameAtom::new(text.clone())?;
+                if atom.raw_utf16().len() > limits.max_macro_name_bytes {
+                    return corrupted("MacroNameAtom exceeds the configured size limit");
+                }
+                Ok(Some(Cow::Owned(atom.raw_utf16)))
+            },
+            (None, Some(_)) => corrupted("MacroNameAtom exact data is present without text"),
+        }
     }
 
     /// Convert to the generic record model used by existing shape extraction.
@@ -414,6 +452,48 @@ impl PowerPointInteraction {
     ) -> Option<&'a PowerPointHyperlink> {
         hyperlinks.get(self.hyperlink_id)
     }
+
+    pub(crate) fn parse_client_data_payload(
+        data: &[u8],
+        limits: PowerPointInteractionLimits,
+    ) -> Result<Vec<Self>> {
+        let mut interactions = Vec::new();
+        for record in PptRecord::parse_sequence_strict(data, "shape ClientData")? {
+            if record.record_type != PptRecordType::InteractiveInfo {
+                continue;
+            }
+            let interaction = Self::parse_with_limits(&record, limits)?;
+            if interactions
+                .iter()
+                .any(|existing: &Self| existing.trigger == interaction.trigger)
+            {
+                return corrupted("Shape contains duplicate interactive triggers");
+            }
+            interactions.push(interaction);
+        }
+        Ok(interactions)
+    }
+}
+
+fn validate_serialized_interaction_size(
+    macro_name_bytes: Option<usize>,
+    max_record_bytes: usize,
+) -> Result<()> {
+    let macro_record_len = macro_name_bytes
+        .map(|size| {
+            8usize
+                .checked_add(size)
+                .ok_or_else(|| PptError::Corrupted("InteractiveInfo length overflows".into()))
+        })
+        .transpose()?
+        .unwrap_or(0);
+    let complete_len = 32usize
+        .checked_add(macro_record_len)
+        .ok_or_else(|| PptError::Corrupted("InteractiveInfo length overflows".into()))?;
+    if complete_len > max_record_bytes {
+        return corrupted("InteractiveInfo exceeds the configured record size limit");
+    }
+    Ok(())
 }
 
 fn action_value(value: InteractionAction) -> u8 {
@@ -511,6 +591,27 @@ fn validate_printable_text(value: &str) -> Result<()> {
         return corrupted("MacroNameAtom contains a forbidden control character");
     }
     Ok(())
+}
+
+fn decode_macro_name(data: &[u8], max_bytes: usize) -> Result<String> {
+    if data.len() > max_bytes {
+        return corrupted("MacroNameAtom exceeds the configured size limit");
+    }
+    if data.len() % 2 != 0 {
+        return corrupted("MacroNameAtom length must be even");
+    }
+    let units = data
+        .chunks_exact(2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .collect::<Vec<_>>();
+    let visible = units
+        .iter()
+        .position(|unit| *unit == 0)
+        .unwrap_or(units.len());
+    let text = String::from_utf16(&units[..visible])
+        .map_err(|_| PptError::Corrupted("MacroNameAtom contains invalid UTF-16".into()))?;
+    validate_printable_text(&text)?;
+    Ok(text)
 }
 
 fn encode_record(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Vec<u8>> {
@@ -691,6 +792,18 @@ mod interaction_protocol_tests {
         let mut trailing = bytes;
         trailing.push(0);
         assert!(PowerPointInteraction::parse_bytes(&trailing).is_err());
+
+        let value = PowerPointInteraction::new(
+            InteractionTrigger::Click,
+            InteractionAction::NoAction,
+            InteractionLinkTarget::Nil,
+        );
+        let limits = PowerPointInteractionLimits {
+            max_record_bytes: 31,
+            ..Default::default()
+        };
+        assert!(value.validate_with_limits(limits).is_err());
+        assert!(value.to_bytes_with_limits(limits).is_err());
     }
 }
 

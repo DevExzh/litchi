@@ -220,7 +220,7 @@ pub use html_publish::{
 pub use hyperlink::{
     InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
     PowerPointInteraction, PowerPointInteractionLimits, PowerPointInteractiveInfoAtom,
-    PowerPointMacroNameAtom,
+    PowerPointMacroNameAtom, PowerPointShapeInteractionEntry,
 };
 pub use hyperlink::{PowerPointHyperlink, PowerPointHyperlinkExtension, PowerPointHyperlinks};
 pub use kinsoku::{

@@ -8,6 +8,7 @@ use super::header_footer::{
     PowerPointHeaderFooterDisplayText, PowerPointHeaderFooterParent,
     PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
 };
+use super::hyperlink::PowerPointHyperlinks;
 use super::main_master::PowerPoint12MainMasterMetadata;
 use super::non_zoom_view::PowerPointOutlineSorterViewInformation;
 use super::ole_object::PowerPointOleObjectCollection;
@@ -312,6 +313,14 @@ impl Presentation {
         let sounds = self.embedded_sounds()?;
         media.validate_sound_collection(sounds.as_ref())?;
         Ok(Some(media))
+    }
+
+    /// Return the document's strictly validated hyperlink definitions.
+    ///
+    /// Targets remain inert: this method never opens a URL, path, presentation,
+    /// or named show.
+    pub fn hyperlinks(&self) -> Result<PowerPointHyperlinks> {
+        PowerPointHyperlinks::parse(&self.live_document_record()?)
     }
 
     /// Return inert embedded and linked OLE metadata without loading object storage.

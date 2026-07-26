@@ -898,6 +898,11 @@ pub struct UserShapeData {
     pub hyperlink_jump: u8,
     /// Hyperlink type (for InteractiveInfoAtom)
     pub hyperlink_type: u8,
+    /// Typed click and mouse-over interactions.
+    ///
+    /// These take precedence over the legacy single-hyperlink fields for the
+    /// corresponding trigger.
+    pub interactions: Vec<crate::ppt::PowerPointInteraction>,
     /// Picture BLIP index (for picture frames)
     pub picture_index: Option<u32>,
     /// Explicit custom/freeform geometry.
@@ -957,6 +962,7 @@ impl Default for UserShapeData {
             hyperlink_action: 4, // ACTION_HYPERLINK
             hyperlink_jump: 0,   // JUMP_NONE
             hyperlink_type: 8,   // LINK_Url
+            interactions: Vec::new(),
             picture_index: None,
             freeform_geometry: None,
             animation_info: None,
@@ -1195,31 +1201,64 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
     anchor.add_data(&y2.to_le_bytes()); // row1/bottom
     container.add_data(&anchor.build()?);
 
-    // ClientData with animation, placeholders, or hyperlinks
+    // ClientData grammar order: animation, click, mouse-over, placeholder,
+    // then round-trip records such as programmable tags.
     // MUST come BEFORE ClientTextbox per POI (addChildBefore(clientData, EscherTextboxRecord.RECORD_ID))
     let mut client_data = if let Some(ref animation_info) = shape.animation_info {
-        // Animation takes priority - write AnimationInfo to ClientData
         Some(build_client_data_with_animation(animation_info)?)
-    } else if let Some(placeholder_type) = shape.placeholder_type {
-        Some(build_client_data_with_placeholder(placeholder_type)?)
-    } else if let Some(hyperlink_id) = shape.hyperlink_id {
-        Some(build_client_data_with_hyperlink(
-            hyperlink_id,
-            shape.hyperlink_action,
-            shape.hyperlink_jump,
-            shape.hyperlink_type,
-        )?)
     } else {
         None
     };
+    let legacy_click = shape
+        .hyperlink_id
+        .map(|hyperlink_id| {
+            legacy_hyperlink_interaction(
+                hyperlink_id,
+                shape.hyperlink_action,
+                shape.hyperlink_jump,
+                shape.hyperlink_type,
+            )
+        })
+        .transpose()?;
+    for trigger in [
+        crate::ppt::InteractionTrigger::Click,
+        crate::ppt::InteractionTrigger::MouseOver,
+    ] {
+        let mut matching = shape
+            .interactions
+            .iter()
+            .filter(|interaction| interaction.trigger == trigger);
+        let interaction = matching.next();
+        if matching.next().is_some() {
+            return Err(std::io::Error::other(
+                "shape contains duplicate interactive triggers",
+            ));
+        }
+        let interaction = interaction.or_else(|| {
+            (trigger == crate::ppt::InteractionTrigger::Click)
+                .then_some(legacy_click.as_ref())
+                .flatten()
+        });
+        if let Some(interaction) = interaction {
+            let bytes = interaction
+                .to_bytes_with_limits(crate::ppt::PowerPointInteractionLimits::default())
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
+            append_client_data_payload(&mut client_data, &bytes)?;
+        }
+    }
+    if let Some(placeholder_type) = shape.placeholder_type {
+        let placeholder = build_client_data_with_placeholder(placeholder_type)?;
+        append_client_data_record_payload(&mut client_data, &placeholder)?;
+    }
     if let Some(runs) = &shape.smart_tag_runs
-        && let Some(programmable_tags) =
-            super::smart_tags::build_shape_programmable_tags(runs)
-                .map_err(|error| std::io::Error::other(error.to_string()))?
+        && let Some(programmable_tags) = super::smart_tags::build_shape_programmable_tags(runs)
+            .map_err(|error| std::io::Error::other(error.to_string()))?
     {
         append_client_data_payload(&mut client_data, &programmable_tags)?;
     }
     if let Some(client_data) = client_data {
+        crate::ppt::PowerPointClientData::parse(&client_data)
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
         container.add_data(&client_data);
     }
 
@@ -1235,6 +1274,58 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
     }
 
     container.build()
+}
+
+fn legacy_hyperlink_interaction(
+    hyperlink_id: u32,
+    action: u8,
+    jump: u8,
+    hyperlink_type: u8,
+) -> Result<crate::ppt::PowerPointInteraction, PptError> {
+    let mut atom_data = [0u8; 16];
+    atom_data[4..8].copy_from_slice(&hyperlink_id.to_le_bytes());
+    atom_data[8] = action;
+    atom_data[10] = jump;
+    atom_data[12] = hyperlink_type;
+    let atom = crate::ppt::PowerPointInteractiveInfoAtom::parse_payload(&atom_data)
+        .map_err(|error| std::io::Error::other(error.to_string()))?;
+    Ok(crate::ppt::PowerPointInteraction {
+        trigger: crate::ppt::InteractionTrigger::Click,
+        sound_id: atom.sound_id,
+        hyperlink_id: atom.hyperlink_id,
+        action: atom.action,
+        ole_verb: atom.ole_verb,
+        jump: atom.jump,
+        animated: atom.animated,
+        stop_sound: atom.stop_sound,
+        custom_show_return: atom.custom_show_return,
+        visited: atom.visited,
+        link_target: atom.link_target,
+        macro_name: None,
+        unused: atom.unused,
+        macro_name_data: None,
+    })
+}
+
+fn append_client_data_record_payload(
+    client_data: &mut Option<Vec<u8>>,
+    record: &[u8],
+) -> Result<(), PptError> {
+    let payload_len = record
+        .get(4..8)
+        .and_then(|bytes| bytes.try_into().ok())
+        .map(u32::from_le_bytes)
+        .and_then(|length| usize::try_from(length).ok())
+        .ok_or_else(|| std::io::Error::other("invalid ClientData record header"))?;
+    let expected_options = 0x000fu16.to_le_bytes();
+    let expected_type = record_type::CLIENT_DATA.to_le_bytes();
+    if record.len() != payload_len.saturating_add(8)
+        || record.get(0..2) != Some(expected_options.as_slice())
+        || record.get(2..4) != Some(expected_type.as_slice())
+    {
+        return Err(std::io::Error::other("invalid ClientData record"));
+    }
+    append_client_data_payload(client_data, &record[8..])
 }
 
 fn append_client_data_payload(
@@ -1253,7 +1344,11 @@ fn append_client_data_payload(
         .and_then(|bytes| bytes.try_into().ok())
         .map(u32::from_le_bytes)
         .ok_or_else(|| std::io::Error::other("invalid ClientData record header"))?;
-    if data.len() != usize::try_from(declared).unwrap_or(usize::MAX).saturating_add(8) {
+    if data.len()
+        != usize::try_from(declared)
+            .unwrap_or(usize::MAX)
+            .saturating_add(8)
+    {
         return Err(std::io::Error::other(
             "ClientData record length does not match its payload",
         ));
@@ -1271,50 +1366,23 @@ fn append_client_data_payload(
     Ok(())
 }
 
-/// Build ClientData record with InteractiveInfo for hyperlink
-/// Per POI HSLFShape.getClientData(): clientData.setOptions((short)15) => version=0xF, instance=0
+/// Build ClientData record with InteractiveInfo for a legacy hyperlink.
+#[cfg(test)]
 fn build_client_data_with_hyperlink(
     hyperlink_id: u32,
     action: u8,
     jump: u8,
     hyperlink_type: u8,
 ) -> Result<Vec<u8>, PptError> {
-    // Build InteractiveInfoAtom manually (16 bytes of data per POI)
-    // Offset 0-3: soundRef = 0
-    // Offset 4-7: hyperlinkID
-    // Offset 8: action
-    // Offset 9: oleVerb = 0
-    // Offset 10: jump
-    // Offset 11: flags = 0
-    // Offset 12: hyperlinkType
-    // Offset 13-15: reserved = 0
-    let mut atom_data = [0u8; 16];
-    atom_data[4..8].copy_from_slice(&hyperlink_id.to_le_bytes());
-    atom_data[8] = action;
-    atom_data[10] = jump;
-    atom_data[12] = hyperlink_type;
-
-    // InteractiveInfoAtom PPT record header (type 4083, 16 bytes data)
-    let mut info_atom = Vec::with_capacity(24);
-    info_atom.extend_from_slice(&[0x00, 0x00]); // version=0, instance=0
-    info_atom.extend_from_slice(&4083u16.to_le_bytes()); // RT_InteractiveInfoAtom
-    info_atom.extend_from_slice(&16u32.to_le_bytes()); // length
-    info_atom.extend_from_slice(&atom_data);
-
-    // InteractiveInfo container PPT record (type 4082)
-    let mut info_container = Vec::with_capacity(32);
-    info_container.extend_from_slice(&[0x0F, 0x00]); // version=F (container), instance=0
-    info_container.extend_from_slice(&4082u16.to_le_bytes()); // RT_InteractiveInfo
-    info_container.extend_from_slice(&(info_atom.len() as u32).to_le_bytes()); // length
-    info_container.extend_from_slice(&info_atom);
-
-    // ClientData Escher record (0xF011) wrapping InteractiveInfo PPT record
-    // POI uses options=15 (0x000F) => version=0xF, instance=0 (container version!)
-    let mut client_data =
-        EscherBuilder::new(header_version::CONTAINER, 0, record_type::CLIENT_DATA);
-    client_data.add_data(&info_container);
-
-    client_data.build()
+    let interaction = legacy_hyperlink_interaction(hyperlink_id, action, jump, hyperlink_type)?;
+    let mut client_data = None;
+    append_client_data_payload(
+        &mut client_data,
+        &interaction
+            .to_bytes()
+            .map_err(|error| std::io::Error::other(error.to_string()))?,
+    )?;
+    client_data.ok_or_else(|| std::io::Error::other("missing ClientData record"))
 }
 
 /// Build ClientData record with AnimationInfo.
@@ -2202,6 +2270,64 @@ mod tests {
         assert!(client_data.is_ok());
         let data = client_data.unwrap();
         assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn typed_interactions_coexist_in_client_data_grammar_order() {
+        let click = crate::ppt::PowerPointInteraction::new(
+            crate::ppt::InteractionTrigger::Click,
+            crate::ppt::InteractionAction::Macro,
+            crate::ppt::InteractionLinkTarget::Nil,
+        )
+        .with_macro_name("Run")
+        .unwrap();
+        let hover = crate::ppt::PowerPointInteraction::new(
+            crate::ppt::InteractionTrigger::MouseOver,
+            crate::ppt::InteractionAction::Ole,
+            crate::ppt::InteractionLinkTarget::Nil,
+        );
+        let shape = UserShapeData {
+            interactions: vec![click, hover],
+            animation_info: Some(crate::ppt::animation::AnimationInfo::new()),
+            placeholder_type: Some(6),
+            ..Default::default()
+        };
+
+        let bytes = create_user_shape_container(45, &shape).unwrap();
+        let root = EscherParser::new(&bytes)
+            .root_container()
+            .expect("shape container")
+            .unwrap();
+        let record = root
+            .find_child(EscherRecordType::ClientData)
+            .expect("ClientData");
+        let mut complete = Vec::with_capacity(8 + record.data.len());
+        let version_instance = u16::from(record.version) | (record.instance << 4);
+        complete.extend_from_slice(&version_instance.to_le_bytes());
+        complete.extend_from_slice(&record.record_type_raw.to_le_bytes());
+        complete.extend_from_slice(&record.length.to_le_bytes());
+        complete.extend_from_slice(record.data);
+
+        let client_data = crate::ppt::PowerPointClientData::parse(&complete).unwrap();
+        assert!(client_data.animation_info().is_some());
+        assert!(client_data.mouse_click_interactive_info().is_some());
+        assert!(client_data.mouse_over_interactive_info().is_some());
+        assert!(client_data.placeholder().is_some());
+    }
+
+    #[test]
+    fn duplicate_typed_interaction_triggers_are_rejected() {
+        let click = crate::ppt::PowerPointInteraction::new(
+            crate::ppt::InteractionTrigger::Click,
+            crate::ppt::InteractionAction::NoAction,
+            crate::ppt::InteractionLinkTarget::Nil,
+        );
+        let shape = UserShapeData {
+            interactions: vec![click.clone(), click],
+            ..Default::default()
+        };
+
+        assert!(create_user_shape_container(45, &shape).is_err());
     }
 
     #[test]

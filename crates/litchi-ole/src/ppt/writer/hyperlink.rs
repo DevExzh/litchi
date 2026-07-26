@@ -346,8 +346,10 @@ impl Hyperlink {
     /// Build InteractiveInfoAtom for this hyperlink
     pub fn build_interactive_info_atom(&self) -> InteractiveInfoAtom {
         match &self.target {
-            HyperlinkTarget::Url(_) | HyperlinkTarget::File(_) => {
-                InteractiveInfoAtom::url_link(self.id)
+            HyperlinkTarget::Url(_) => InteractiveInfoAtom::url_link(self.id),
+            HyperlinkTarget::File(_) => InteractiveInfoAtom {
+                hyperlink_type: 0x0A,
+                ..InteractiveInfoAtom::url_link(self.id)
             },
             HyperlinkTarget::Slide(_) => InteractiveInfoAtom::slide_link(self.id),
             HyperlinkTarget::NextSlide => InteractiveInfoAtom::next_slide(),
@@ -355,7 +357,11 @@ impl Hyperlink {
             HyperlinkTarget::FirstSlide => InteractiveInfoAtom::first_slide(),
             HyperlinkTarget::LastSlide => InteractiveInfoAtom::last_slide(),
             HyperlinkTarget::EndShow => InteractiveInfoAtom::end_show(),
-            HyperlinkTarget::CustomShow(_) => InteractiveInfoAtom::slide_link(self.id),
+            HyperlinkTarget::CustomShow(_) => InteractiveInfoAtom {
+                action: HyperlinkAction::CustomShow as u8,
+                hyperlink_type: 0x06,
+                ..InteractiveInfoAtom::slide_link(self.id)
+            },
         }
     }
 }
@@ -722,6 +728,19 @@ mod tests {
         let next = InteractiveInfoAtom::next_slide();
         assert_eq!(next.hyperlink_type, 0x00);
         assert_eq!(next.jump, JumpAction::NextSlide as u8);
+
+        let file = Hyperlink::file("report.xlsx").build_interactive_info_atom();
+        assert_eq!(file.hyperlink_type, 0x0A);
+
+        let custom_show = Hyperlink {
+            id: 7,
+            display_text: None,
+            target: HyperlinkTarget::CustomShow("Summary".to_string()),
+            target_frame: None,
+        }
+        .build_interactive_info_atom();
+        assert_eq!(custom_show.action, HyperlinkAction::CustomShow as u8);
+        assert_eq!(custom_show.hyperlink_type, 0x06);
     }
 
     #[test]

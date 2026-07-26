@@ -61,8 +61,8 @@ use super::shape_style::{
 };
 #[allow(unused_imports)]
 use super::shapes::ShapeKind;
-use super::smart_tags::{PowerPointSmartTagDefinition, PowerPointSmartTagIndex};
 use super::slide_timing::SlideTiming;
+use super::smart_tags::{PowerPointSmartTagDefinition, PowerPointSmartTagIndex};
 use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
 use super::table::{PositionedTable, Table};
 use super::text_format::{FontEntity, Paragraph, TextAlign};
@@ -325,6 +325,8 @@ pub struct ShapeProperties {
     pub freeform_geometry: Option<FreeformGeometry>,
     /// Hyperlink attached to shape
     pub hyperlink_id: Option<u32>,
+    /// Typed click and mouse-over actions attached to the shape.
+    pub interactions: Vec<crate::ppt::PowerPointInteraction>,
 }
 
 /// Represents a shape on a slide
@@ -398,6 +400,7 @@ impl Default for ShapeProperties {
             picture_index: None,
             freeform_geometry: None,
             hyperlink_id: None,
+            interactions: Vec::new(),
         }
     }
 }
@@ -632,6 +635,7 @@ fn convert_shape_to_escher(
         hyperlink_action: get_hyperlink_info(props.hyperlink_id, hyperlinks).0,
         hyperlink_jump: get_hyperlink_info(props.hyperlink_id, hyperlinks).1,
         hyperlink_type: get_hyperlink_info(props.hyperlink_id, hyperlinks).2,
+        interactions: props.interactions.clone(),
         picture_index: props.picture_index,
         freeform_geometry: props.freeform_geometry.clone(),
         animation_info: shape.animation_info.clone(),
@@ -653,31 +657,76 @@ fn shape_rotation_to_fixed(degrees: f32) -> Option<i32> {
 /// Get hyperlink interactive info values based on hyperlink target
 /// Returns (action, jump, hyperlink_type)
 fn get_hyperlink_info(hyperlink_id: Option<u32>, hyperlinks: &HyperlinkCollection) -> (u8, u8, u8) {
+    let Some(interaction) = hyperlink_id.and_then(|id| interaction_for_hyperlink(id, hyperlinks))
+    else {
+        return (4, 0, 8);
+    };
+    let payload = interaction.atom().to_payload();
+    (payload[8], payload[10], payload[12])
+}
+
+fn interaction_for_hyperlink(
+    hyperlink_id: u32,
+    hyperlinks: &HyperlinkCollection,
+) -> Option<crate::ppt::PowerPointInteraction> {
     use super::hyperlink::HyperlinkTarget;
-
-    // Defaults for URL links: ACTION_HYPERLINK=4, JUMP_NONE=0, LINK_Url=8
-    let Some(id) = hyperlink_id else {
-        return (4, 0, 8);
+    use crate::ppt::{
+        InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
+        PowerPointInteraction,
     };
 
-    let Some(hyperlink) = hyperlinks.get(id) else {
-        return (4, 0, 8);
+    let hyperlink = hyperlinks.get(hyperlink_id)?;
+    let (action, jump, target) = match &hyperlink.target {
+        HyperlinkTarget::Url(_) => (
+            InteractionAction::Hyperlink,
+            InteractionJump::None,
+            InteractionLinkTarget::Url,
+        ),
+        HyperlinkTarget::File(_) => (
+            InteractionAction::Hyperlink,
+            InteractionJump::None,
+            InteractionLinkTarget::OtherFile,
+        ),
+        HyperlinkTarget::Slide(_) => (
+            InteractionAction::Hyperlink,
+            InteractionJump::None,
+            InteractionLinkTarget::SlideNumber,
+        ),
+        HyperlinkTarget::NextSlide => (
+            InteractionAction::Jump,
+            InteractionJump::NextSlide,
+            InteractionLinkTarget::NextSlide,
+        ),
+        HyperlinkTarget::PrevSlide => (
+            InteractionAction::Jump,
+            InteractionJump::PreviousSlide,
+            InteractionLinkTarget::PreviousSlide,
+        ),
+        HyperlinkTarget::FirstSlide => (
+            InteractionAction::Jump,
+            InteractionJump::FirstSlide,
+            InteractionLinkTarget::FirstSlide,
+        ),
+        HyperlinkTarget::LastSlide => (
+            InteractionAction::Jump,
+            InteractionJump::LastSlide,
+            InteractionLinkTarget::LastSlide,
+        ),
+        HyperlinkTarget::EndShow => (
+            InteractionAction::Jump,
+            InteractionJump::EndShow,
+            InteractionLinkTarget::Nil,
+        ),
+        HyperlinkTarget::CustomShow(_) => (
+            InteractionAction::CustomShow,
+            InteractionJump::None,
+            InteractionLinkTarget::CustomShow,
+        ),
     };
-
-    // Per POI HSLFHyperlink:
-    // - URL/File links: action=ACTION_HYPERLINK(4), jump=JUMP_NONE(0), hyperlinkType=LINK_Url(8)
-    // - Slide number: action=ACTION_HYPERLINK(4), jump=JUMP_NONE(0), hyperlinkType=LINK_SlideNumber(7)
-    // - Next/Prev/First/Last: action=ACTION_JUMP(3), jump=varies, hyperlinkType=varies
-    match &hyperlink.target {
-        HyperlinkTarget::Url(_) | HyperlinkTarget::File(_) => (4, 0, 8), // ACTION_HYPERLINK, JUMP_NONE, LINK_Url
-        HyperlinkTarget::Slide(_) => (4, 0, 7), // ACTION_HYPERLINK, JUMP_NONE, LINK_SlideNumber
-        HyperlinkTarget::NextSlide => (3, 1, 0), // ACTION_JUMP, JUMP_NEXTSLIDE, LINK_NextSlide
-        HyperlinkTarget::PrevSlide => (3, 2, 1), // ACTION_JUMP, JUMP_PREVIOUSSLIDE, LINK_PreviousSlide
-        HyperlinkTarget::FirstSlide => (3, 3, 2), // ACTION_JUMP, JUMP_FIRSTSLIDE, LINK_FirstSlide
-        HyperlinkTarget::LastSlide => (3, 4, 3), // ACTION_JUMP, JUMP_LASTSLIDE, LINK_LastSlide
-        HyperlinkTarget::EndShow => (3, 6, 0xFF), // ACTION_JUMP, JUMP_ENDSHOW, LINK_NULL
-        HyperlinkTarget::CustomShow(_) => (7, 0, 6), // ACTION_CUSTOMSHOW, JUMP_NONE, LINK_CustomShow
-    }
+    let mut interaction = PowerPointInteraction::new(InteractionTrigger::Click, action, target);
+    interaction.hyperlink_id = hyperlink_id;
+    interaction.jump = jump;
+    Some(interaction)
 }
 
 /// PPT file writer
@@ -1820,7 +1869,7 @@ impl PptWriter {
 
     /// Add a hyperlink and return its ID
     ///
-    /// The returned ID can be used with `add_shape_hyperlink` to attach
+    /// The returned ID can be used with [`Self::set_last_shape_hyperlink`] to attach
     /// the hyperlink to a shape.
     pub fn add_hyperlink(&mut self, hyperlink: Hyperlink) -> u32 {
         self.hyperlinks.add(hyperlink)
@@ -1832,17 +1881,98 @@ impl PptWriter {
         slide: usize,
         hyperlink_id: u32,
     ) -> Result<(), PptWriteError> {
+        let interaction =
+            interaction_for_hyperlink(hyperlink_id, &self.hyperlinks).ok_or_else(|| {
+                PptWriteError::InvalidData(format!("Hyperlink {hyperlink_id} does not exist"))
+            })?;
+        self.set_last_shape_interaction(slide, interaction)
+    }
+
+    /// Add or replace one typed click or mouse-over action on the last shape.
+    ///
+    /// Validation is atomic. Hyperlink references must identify an existing
+    /// writer hyperlink, and a shape can carry at most one action per trigger.
+    pub fn set_last_shape_interaction(
+        &mut self,
+        slide: usize,
+        interaction: crate::ppt::PowerPointInteraction,
+    ) -> Result<(), PptWriteError> {
+        self.set_last_shape_interaction_with_limits(
+            slide,
+            interaction,
+            crate::ppt::PowerPointInteractionLimits::default(),
+        )
+    }
+
+    /// Add or replace one shape action with explicit record and name limits.
+    pub fn set_last_shape_interaction_with_limits(
+        &mut self,
+        slide: usize,
+        interaction: crate::ppt::PowerPointInteraction,
+        limits: crate::ppt::PowerPointInteractionLimits,
+    ) -> Result<(), PptWriteError> {
+        interaction
+            .validate_with_limits(limits)
+            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+        if interaction.hyperlink_id != 0 && self.hyperlinks.get(interaction.hyperlink_id).is_none()
+        {
+            return Err(PptWriteError::InvalidData(format!(
+                "Hyperlink {} does not exist",
+                interaction.hyperlink_id
+            )));
+        }
         let slide_data = self
             .slides
             .get_mut(slide)
             .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         if let Some(shape) = slide_data.shapes.last_mut() {
-            shape.properties.hyperlink_id = Some(hyperlink_id);
+            shape.properties.hyperlink_id = None;
+            if let Some(existing) = shape
+                .properties
+                .interactions
+                .iter_mut()
+                .find(|existing| existing.trigger == interaction.trigger)
+            {
+                *existing = interaction;
+            } else {
+                shape.properties.interactions.push(interaction);
+                shape.properties.interactions.sort_by_key(|interaction| {
+                    match interaction.trigger {
+                        crate::ppt::InteractionTrigger::Click => 0,
+                        crate::ppt::InteractionTrigger::MouseOver => 1,
+                    }
+                });
+            }
             Ok(())
         } else {
             Err(PptWriteError::InvalidData("No shapes on slide".to_string()))
         }
+    }
+
+    /// Remove one trigger from the last shape, returning whether it was present.
+    pub fn clear_last_shape_interaction(
+        &mut self,
+        slide: usize,
+        trigger: crate::ppt::InteractionTrigger,
+    ) -> Result<bool, PptWriteError> {
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+        let shape = slide_data
+            .shapes
+            .last_mut()
+            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+        if trigger == crate::ppt::InteractionTrigger::Click {
+            shape.properties.hyperlink_id = None;
+        }
+        let old_len = shape.properties.interactions.len();
+        shape
+            .properties
+            .interactions
+            .retain(|interaction| interaction.trigger != trigger);
+        Ok(shape.properties.interactions.len() != old_len)
     }
 
     /// Set the rotation of the last shape on a slide, in degrees.
@@ -3372,6 +3502,7 @@ mod tests {
             flip_h: true,
             flip_v: false,
             hyperlink_id: None,
+            interactions: Vec::new(),
             picture_index: None,
             freeform_geometry: None,
         };
@@ -3497,16 +3628,11 @@ mod tests {
             )
             .unwrap();
         let hyperlink = writer.add_hyperlink(Hyperlink::url("https://example.invalid/"));
-        writer
-            .set_last_shape_hyperlink(slide, hyperlink)
-            .unwrap();
+        writer.set_last_shape_hyperlink(slide, hyperlink).unwrap();
         let encoded_shape =
             convert_shape_to_escher(&writer.slides[slide].shapes[0], &writer.hyperlinks);
         assert_eq!(
-            encoded_shape
-                .paragraphs
-                .as_ref()
-                .unwrap()[0]
+            encoded_shape.paragraphs.as_ref().unwrap()[0]
                 .runs
                 .iter()
                 .map(|run| run.style.pp9_run_id)
@@ -3583,8 +3709,7 @@ mod tests {
                 100,
                 50,
                 vec![Paragraph::with_runs(vec![
-                    super::super::text_format::TextRun::new("invalid")
-                        .with_smart_tag(dangling),
+                    super::super::text_format::TextRun::new("invalid").with_smart_tag(dangling),
                 ])],
             )
             .unwrap();
