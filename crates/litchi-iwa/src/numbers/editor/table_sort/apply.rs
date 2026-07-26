@@ -9,7 +9,10 @@ use crate::numbers::bnc::{BncCell, CachedScalar, StoredValue};
 use crate::numbers::editor::stroke_layers::{
     reorder_rows as reorder_stroke_rows, validate_row_reorder as validate_stroke_row_reorder,
 };
-use crate::numbers::editor::table_topology::{category_grouping_is_enabled, filter_has_row_state};
+use crate::numbers::editor::table_topology::{
+    category_grouping_is_enabled, deprecated_category_grouping_is_enabled, filter_has_row_state,
+    table_has_spill_state,
+};
 use crate::table_hidden_axes::{
     TableHiddenAxes, positional_user_hidden_axes, restore_positional_user_hidden_axes,
 };
@@ -202,8 +205,7 @@ fn apply_attached_table_sort_range(
     }
 
     let locations = object_locations(package)?;
-    let positional_hidden_axes =
-        validate_sort_features(package, &locations, table_id, &descriptor.model)?;
+    let positional_hidden_axes = validate_sort_features(package, &locations, descriptor)?;
     let plan = plan_body_sort(
         package,
         &locations,
@@ -295,20 +297,31 @@ fn table_body_bounds(model: &TableModelArchive) -> Result<(usize, usize)> {
 fn validate_sort_features(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
-    table_id: u64,
-    model: &TableModelArchive,
+    descriptor: &TableDescriptor,
 ) -> Result<TableHiddenAxes> {
+    let model = &descriptor.model;
     if model.number_of_filtered_rows.unwrap_or(0) != 0
-        || model.conditional_style_formula_owner_id.is_some()
         || model.pivot_owner.is_some()
-        || model.spill_owner.is_some()
-        || model.category_owner_deprecated.is_some()
+        || deprecated_category_grouping_is_enabled(model.category_owner_deprecated.as_ref())
         || filter_has_row_state(package, locations, model.row_filter_set_pre_pivot.as_ref())?
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
+        || table_has_spill_state(package, descriptor.table_info_id)?
     {
         return Err(Error::ParseError(
-            "Cannot yet execute a Numbers sort on a filtered, grouped, conditional, pivot, or spill table"
+            "Cannot yet execute a Numbers sort on a filtered, grouped, pivot, or spill table"
                 .to_owned(),
+        ));
+    }
+    if let Some(table) = &model.base_data_store.conditionalstyletable
+        && table_data_list_has_entries(
+            package,
+            locations,
+            table.identifier,
+            tst::table_data_list::ListType::ConditionalStyle,
+        )?
+    {
+        return Err(Error::ParseError(
+            "Cannot yet execute a Numbers sort on a table with conditional styles".to_owned(),
         ));
     }
     if model.base_column_row_uids.is_none() {
@@ -316,7 +329,7 @@ fn validate_sort_features(
             "Cannot safely execute a Numbers sort without a stable row UID map".to_owned(),
         ));
     }
-    if !cell_merge::regions_in_package(package, table_id)?.is_empty() {
+    if !cell_merge::regions_in_package(package, descriptor.object_id)?.is_empty() {
         return Err(Error::ParseError(
             "Cannot yet execute a Numbers sort on a table with merged cells".to_owned(),
         ));
@@ -340,7 +353,7 @@ fn validate_sort_features(
         || model.number_of_hidden_columns.unwrap_or_default() != 0
         || model.number_of_user_hidden_columns.unwrap_or_default() != 0;
     if declares_hidden_storage {
-        positional_user_hidden_axes(package, table_id)
+        positional_user_hidden_axes(package, descriptor.object_id)
     } else {
         Ok(TableHiddenAxes::empty())
     }

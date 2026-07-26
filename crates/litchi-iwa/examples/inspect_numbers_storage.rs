@@ -5,6 +5,9 @@ use litchi_iwa::IWorkPackage;
 use litchi_iwa::protobuf::{tsd, tst};
 use prost::Message;
 
+const BNC_COMMENT_FLAG: u32 = 0x080000;
+const BNC_CONDITIONAL_STYLE_FLAG: u32 = 0x100000;
+
 #[allow(deprecated)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = env::args()
@@ -63,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             };
             println!(
-                "model={model_id} table_id={:?} name={:?} title=(visible={:?}, height={:?}, outlined={:?}) rows={} cols={} tile_size={:?} string_table={} formula_table={} formula_error_table={:?} rich_text_table={:?} row_buckets={:?} column_headers={} next_strips=({}, {}) uid_map={:?} stroke_sidecar={:?}",
+                "model={model_id} table_id={:?} name={:?} title=(visible={:?}, height={:?}, outlined={:?}) rows={} cols={} tile_size={:?} string_table={} formula_table={} formula_error_table={:?} rich_text_table={:?} conditional_table={:?} row_buckets={:?} column_headers={} next_strips=({}, {}) uid_map={:?} stroke_sidecar={:?} conditional_owner={:?}",
                 model.table_id,
                 model.table_name,
                 model.table_name_enabled,
@@ -86,6 +89,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map(|reference| reference.identifier),
                 model
                     .base_data_store
+                    .conditionalstyletable
+                    .as_ref()
+                    .map(|reference| reference.identifier),
+                model
+                    .base_data_store
                     .row_headers
                     .buckets
                     .iter()
@@ -101,7 +109,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 model
                     .stroke_sidecar
                     .as_ref()
-                    .map(|reference| reference.identifier)
+                    .map(|reference| reference.identifier),
+                model.conditional_style_formula_owner_id,
+            );
+            println!(
+                " topology filtered={:?} filter={:?} category_deprecated={:?} category={:?} pivot={:?} spill={:?}",
+                model.number_of_filtered_rows,
+                model
+                    .row_filter_set_pre_pivot
+                    .as_ref()
+                    .map(|reference| reference.identifier),
+                model.category_owner_deprecated,
+                model
+                    .category_owner
+                    .as_ref()
+                    .map(|reference| reference.identifier),
+                model.pivot_owner,
+                model.spill_owner,
             );
             for header_id in model
                 .base_data_store
@@ -412,7 +436,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         for (column, cell) in
                             split_cells(storage, offsets, row.has_wide_offsets.unwrap_or(false))?
                         {
-                            if let Some(comment_id) = bnc_u32_field(cell, 0x080000) {
+                            if let Some(conditional_style_id) =
+                                bnc_u32_field(cell, BNC_CONDITIONAL_STYLE_FLAG)
+                            {
+                                println!(
+                                    "   conditional cell=({}, {}) id={conditional_style_id}",
+                                    tile_ref.tileid * tile_size + row.tile_row_index,
+                                    column
+                                );
+                            }
+                            if let Some(comment_id) = bnc_u32_field(cell, BNC_COMMENT_FLAG) {
                                 println!(
                                     "   comment cell=({}, {}) id={comment_id}",
                                     tile_ref.tileid * tile_size + row.tile_row_index,
@@ -436,6 +469,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     for (object_id, (archive_name, object)) in &objects {
         for message in &object.messages {
+            if let Ok(conditional) =
+                tst::ConditionalStyleSetArchive::decode(message.data.as_slice())
+                && conditional.rule_count > 0
+                && (!conditional.rules_prepivot.is_empty()
+                    || conditional
+                        .rules
+                        .as_ref()
+                        .is_some_and(|rules| !rules.rule.is_empty()))
+            {
+                println!(
+                    "conditional_style={object_id} archive={archive_name} type={} declared={} prepivot={} rules={}",
+                    message.type_,
+                    conditional.rule_count,
+                    conditional.rules_prepivot.len(),
+                    conditional
+                        .rules
+                        .as_ref()
+                        .map_or(0, |rules| rules.rule.len())
+                );
+            }
             match message.type_ {
                 6370 => {
                     if let Ok(pivot) = tst::PivotOwnerArchive::decode(message.data.as_slice()) {

@@ -2,6 +2,8 @@
 
 use super::*;
 
+const FORMULA_OWNER_DEPENDENCIES_MESSAGE_TYPE: u32 = 4_008;
+
 pub(super) fn filter_has_row_state(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
@@ -88,4 +90,34 @@ pub(super) fn category_grouping_is_enabled(
         }
     }
     Ok(false)
+}
+
+pub(super) fn deprecated_category_grouping_is_enabled(
+    owner: Option<&tst::CategoryOwnerArchive>,
+) -> bool {
+    owner.is_some_and(|owner| owner.group_by.iter().any(|group| group.is_enabled))
+}
+
+pub(super) fn table_has_spill_state(package: &IWorkPackage, table_info_id: u64) -> Result<bool> {
+    let Some(component) = package.calculation_engine_entry_name()? else {
+        return Ok(false);
+    };
+    let archive = package.archive(component)?;
+    Ok(archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .any(|message| {
+            message.type_ == FORMULA_OWNER_DEPENDENCIES_MESSAGE_TYPE
+                && tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice()).is_ok_and(
+                    |owner| {
+                        owner
+                            .formula_owner
+                            .is_some_and(|reference| reference.identifier == table_info_id)
+                            && owner
+                                .spill_range_sizes
+                                .is_some_and(|spills| !spills.spills.is_empty())
+                    },
+                )
+        }))
 }

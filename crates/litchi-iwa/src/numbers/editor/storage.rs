@@ -98,19 +98,23 @@ pub(super) fn resolve_table_data_list(
                 reference.identifier
             ))
         })?;
-        let segment_messages = segment_object
+        let mut segment_messages = segment_object
             .messages
             .iter()
-            .filter(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE)
-            .collect::<Vec<_>>();
-        if segment_messages.len() != 1 {
+            .filter(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE);
+        let Some(segment_message) = segment_messages.next() else {
             return Err(Error::InvalidFormat(format!(
-                "Object {} has {} Numbers TableDataListSegment payloads",
-                reference.identifier,
-                segment_messages.len()
+                "Object {} has no Numbers TableDataListSegment payload",
+                reference.identifier
+            )));
+        };
+        if segment_messages.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Object {} has multiple Numbers TableDataListSegment payloads",
+                reference.identifier
             )));
         }
-        let segment = TableDataListSegment::decode(segment_messages[0].data.as_slice())?;
+        let segment = TableDataListSegment::decode(segment_message.data.as_slice())?;
         validate_table_data_list_segment(reference.identifier, list_type, &segment)?;
         let owner = TableDataListEntryOwner::Segment {
             object_id: reference.identifier,
@@ -206,19 +210,23 @@ pub(super) fn resolve_table_string_values(
                 reference.identifier
             ))
         })?;
-        let segment_messages = segment_object
+        let mut segment_messages = segment_object
             .messages
             .iter()
-            .filter(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE)
-            .collect::<Vec<_>>();
-        if segment_messages.len() != 1 {
+            .filter(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE);
+        let Some(segment_message) = segment_messages.next() else {
             return Err(Error::InvalidFormat(format!(
-                "Object {} has {} Numbers TableDataListSegment payloads",
-                reference.identifier,
-                segment_messages.len()
+                "Object {} has no Numbers TableDataListSegment payload",
+                reference.identifier
+            )));
+        };
+        if segment_messages.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Object {} has multiple Numbers TableDataListSegment payloads",
+                reference.identifier
             )));
         }
-        let segment = TableDataListSegment::decode(segment_messages[0].data.as_slice())?;
+        let segment = TableDataListSegment::decode(segment_message.data.as_slice())?;
         validate_table_data_list_segment(reference.identifier, list_type, &segment)?;
         for entry in segment.entries {
             let key = entry.key;
@@ -235,6 +243,83 @@ pub(super) fn resolve_table_string_values(
         }
     }
     Ok(values)
+}
+
+/// Return whether a typed table-data list contains any root or segmented entry.
+///
+/// This avoids cloning payloads when a caller only needs to distinguish an
+/// empty native allocation from storage that carries semantic content.
+pub(super) fn table_data_list_has_entries(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    table_id: u64,
+    list_type: tst::table_data_list::ListType,
+) -> Result<bool> {
+    let table_archive = locations.get(&table_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers table-data-list object {table_id} is missing"
+        ))
+    })?;
+    let archive = package.archive(table_archive)?;
+    let object = archive.object(table_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers table-data-list object {table_id} is missing"
+        ))
+    })?;
+    let message_index = table_data_list_message_index(object, list_type).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Object {table_id} has no Numbers {list_type:?} TableDataList payload"
+        ))
+    })?;
+    let list = TableDataList::decode(object.messages[message_index].data.as_slice())?;
+    if !list.entries.is_empty() {
+        return Ok(true);
+    }
+
+    let mut segment_ids = HashSet::with_capacity(list.segments.len());
+    for reference in list.segments {
+        if !segment_ids.insert(reference.identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {list_type:?} table {table_id} repeats segment object {}",
+                reference.identifier
+            )));
+        }
+        let segment_archive = locations.get(&reference.identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table-data-list segment object {} is missing",
+                reference.identifier
+            ))
+        })?;
+        let archive = package.archive(segment_archive)?;
+        let segment_object = archive.object(reference.identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table-data-list segment object {} is missing",
+                reference.identifier
+            ))
+        })?;
+        let mut segment_messages = segment_object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE);
+        let Some(segment_message) = segment_messages.next() else {
+            return Err(Error::InvalidFormat(format!(
+                "Object {} has no Numbers TableDataListSegment payload",
+                reference.identifier
+            )));
+        };
+        if segment_messages.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Object {} has multiple Numbers TableDataListSegment payloads",
+                reference.identifier
+            )));
+        }
+        let segment = TableDataListSegment::decode(segment_message.data.as_slice())?;
+        validate_table_data_list_segment(reference.identifier, list_type, &segment)?;
+        if !segment.entries.is_empty() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 pub(super) fn validate_table_data_list_segment(

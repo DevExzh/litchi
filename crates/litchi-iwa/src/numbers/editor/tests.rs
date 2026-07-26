@@ -6494,11 +6494,77 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
 }
 
 #[test]
+fn table_sort_distinguishes_empty_and_populated_conditional_style_storage() {
+    for (has_entries, should_sort) in [(false, true), (true, false)] {
+        let mut package = test_package();
+        add_test_app_native_topology_allocations(&mut package);
+        add_test_conditional_style_storage(&mut package, has_entries);
+        let mut editor = NumbersEditor::from_package(package).unwrap();
+        editor
+            .set_cells(
+                10,
+                [
+                    TableCellUpdate::new(0, 1, CellValue::Number(3.0)),
+                    TableCellUpdate::new(1, 1, CellValue::Number(1.0)),
+                    TableCellUpdate::new(2, 1, CellValue::Number(4.0)),
+                    TableCellUpdate::new(3, 1, CellValue::Number(2.0)),
+                ],
+            )
+            .unwrap();
+        editor
+            .set_table_sort_order(
+                10,
+                NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                    NumbersTableSortColumnIndex::new(1).unwrap(),
+                    NumbersTableSortDirection::Ascending,
+                )])
+                .unwrap(),
+            )
+            .unwrap();
+        let before = editor.to_bytes().unwrap();
+        if should_sort {
+            assert!(editor.apply_table_sort_order(10).unwrap());
+        } else {
+            assert!(editor.apply_table_sort_order(10).is_err());
+            assert_eq!(editor.to_bytes().unwrap(), before);
+        }
+    }
+}
+
+#[test]
 fn table_sort_execution_rejects_unsupported_state_transactionally() {
     let mut no_order = NumbersEditor::from_package(test_package()).unwrap();
     let before = no_order.to_bytes().unwrap();
     assert!(no_order.apply_table_sort_order(10).is_err());
     assert_eq!(no_order.to_bytes().unwrap(), before);
+
+    let mut spill_package = test_package_with_calculation_engine();
+    add_test_spill_dependency(&mut spill_package);
+    let mut spill_editor = NumbersEditor::from_package(spill_package).unwrap();
+    spill_editor
+        .set_cells(
+            10,
+            [
+                TableCellUpdate::new(0, 1, CellValue::Number(3.0)),
+                TableCellUpdate::new(1, 1, CellValue::Number(1.0)),
+                TableCellUpdate::new(2, 1, CellValue::Number(4.0)),
+                TableCellUpdate::new(3, 1, CellValue::Number(2.0)),
+            ],
+        )
+        .unwrap();
+    spill_editor
+        .set_table_sort_order(
+            10,
+            NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(1).unwrap(),
+                NumbersTableSortDirection::Ascending,
+            )])
+            .unwrap(),
+        )
+        .unwrap();
+    let before = spill_editor.to_bytes().unwrap();
+    assert!(spill_editor.apply_table_sort_order(10).is_err());
+    assert_eq!(spill_editor.to_bytes().unwrap(), before);
 
     let mut formula_editor =
         NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
@@ -8017,6 +8083,139 @@ fn test_stroke_layer(package: &IWorkPackage, identifier: u64) -> tst::StrokeLaye
         .iter()
         .find_map(|message| tst::StrokeLayerArchive::decode(message.data.as_slice()).ok())
         .unwrap()
+}
+
+fn add_test_conditional_style_storage(package: &mut IWorkPackage, has_entries: bool) {
+    const CONDITIONAL_STYLE_TABLE_ID: u64 = 90;
+    const CONDITIONAL_STYLE_SET_ID: u64 = 91;
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let model_object = archive.object_mut(10).unwrap();
+            let message = model_object.messages[0].clone();
+            let mut model = TableModelArchive::decode(message.data.as_slice())?;
+            model.conditional_style_formula_owner_id = Some(tsp::CfuuidArchive {
+                uuid_w0: Some(1),
+                uuid_w1: Some(2),
+                uuid_w2: Some(3),
+                uuid_w3: Some(4),
+                ..Default::default()
+            });
+            model.base_data_store.conditionalstyletable = Some(Reference {
+                identifier: CONDITIONAL_STYLE_TABLE_ID,
+                ..Default::default()
+            });
+            model_object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: model.encode_to_vec(),
+                },
+            )?;
+
+            let entries = has_entries
+                .then_some(tst::table_data_list::ListEntry {
+                    key: 1,
+                    refcount: 1,
+                    reference: Some(Reference {
+                        identifier: CONDITIONAL_STYLE_SET_ID,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+                .into_iter()
+                .collect();
+            archive.insert_object(ArchiveObject::new(
+                CONDITIONAL_STYLE_TABLE_ID,
+                vec![RawMessage {
+                    type_: 6_005,
+                    data: TableDataList {
+                        list_type: tst::table_data_list::ListType::ConditionalStyle as i32,
+                        next_list_id: if has_entries { 2 } else { 1 },
+                        entries,
+                        segments: Vec::new(),
+                        is_new_for_bnc: Some(true),
+                    }
+                    .encode_to_vec(),
+                }],
+            )?)?;
+            if has_entries {
+                archive.insert_object(ArchiveObject::new(
+                    CONDITIONAL_STYLE_SET_ID,
+                    vec![RawMessage {
+                        type_: 6_010,
+                        data: tst::ConditionalStyleSetArchive {
+                            rule_count: 1,
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    }],
+                )?)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+}
+
+fn add_test_app_native_topology_allocations(package: &mut IWorkPackage) {
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            let message = object.messages[0].clone();
+            let mut model = TableModelArchive::decode(message.data.as_slice())?;
+            model.category_owner_deprecated = Some(tst::CategoryOwnerArchive {
+                owner_uid: tsp::Uuid { lower: 1, upper: 2 },
+                group_by: vec![tst::GroupByArchive {
+                    group_by_uid: tsp::Uuid { lower: 3, upper: 4 },
+                    is_enabled: false,
+                    ..Default::default()
+                }],
+            });
+            model.spill_owner = Some(tsce::SpillOwnerArchive {
+                owner_uid: tsp::Uuid { lower: 5, upper: 6 },
+            });
+            object
+                .replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data: model.encode_to_vec(),
+                    },
+                )
+                .map(|_| ())
+        })
+        .unwrap();
+}
+
+fn add_test_spill_dependency(package: &mut IWorkPackage) {
+    package
+        .update_archive("Index/CalculationEngine.iwa", |archive| {
+            let object = archive.object_mut(101).unwrap();
+            let message = object.messages[0].clone();
+            let mut owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+            owner.spill_range_sizes = Some(tsce::CellSpillSizesArchive {
+                spills: vec![tsce::cell_spill_sizes_archive::SpillForCell {
+                    coordinate: tsce::CellCoordinateArchive {
+                        column: Some(1),
+                        row: Some(1),
+                        ..Default::default()
+                    },
+                    spill_size: tsce::ColumnRowSize {
+                        num_columns: Some(1),
+                        num_rows: Some(2),
+                    },
+                }],
+            });
+            object
+                .replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data: owner.encode_to_vec(),
+                    },
+                )
+                .map(|_| ())
+        })
+        .unwrap();
 }
 
 fn test_package() -> IWorkPackage {
