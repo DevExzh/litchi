@@ -243,8 +243,14 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         let mut current_mode = self.mode; // Current mode for this character
 
         // Get base character representation
-        let mut base_text = if (129..129 + NUM_TYPEFACE_SLOTS).contains(&typeface) {
-            let charset_index = typeface - 129;
+        let slot_base = TYPEFACE_SLOT_BASE as usize;
+        let mut base_text = if (slot_base..slot_base + NUM_TYPEFACE_SLOTS).contains(&typeface) {
+            // The `typeface` byte is `TYPEFACE_SLOT_BASE + slot`, and the
+            // attribute table is indexed by slot, so subtract the base rather
+            // than the first named slot: using 129 shifted every typeface onto
+            // the previous slot's attributes, giving TEXT the unused ZERO
+            // slot's math attribute and FUNCTION the TEXT slot's.
+            let charset_index = typeface - slot_base;
             let charset_atts = get_charset_attributes(charset_index);
 
             _math_attr = charset_atts.math_attr;
@@ -650,9 +656,13 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         &self,
         obj_list: &MtefObjectList,
     ) -> Result<(Vec<MathNode<'arena>>, Vec<MathNode<'arena>>), MtefError> {
-        // Parse LINE objects as index and base
-        let mut index = Vec::new();
+        // A root template's first LINE is the radicand and its second is the
+        // degree, matching every other template here (see
+        // `parse_subscript_subobjects`) and MathType's own ordering, which
+        // LibreOffice reproduces by holding part 0 aside and emitting
+        // `nroot {part 1} {part 0}` (starmath/source/mathtype.cxx, tmROOT).
         let mut base = Vec::new();
+        let mut index = Vec::new();
         let mut current = Some(obj_list);
 
         while let Some(obj) = current {
@@ -660,10 +670,10 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                 && let Some(line_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefLine>()
                 && let Some(line_nodes) = self.convert_line_to_nodes(line_obj)?
             {
-                if index.is_empty() {
-                    index = line_nodes;
-                } else {
+                if base.is_empty() {
                     base = line_nodes;
+                } else {
+                    index = line_nodes;
                 }
             }
             current = obj.next.as_deref();
@@ -931,18 +941,14 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                 }
             }
 
-            // Determine fence type based on matrix properties
-            // This is a simplified approach - in a full implementation,
-            // this might be determined by context or additional MTEF data
-            let fence_type = match (matrix_obj.rows, matrix_obj.cols) {
-                (1, _) => MatrixFence::None, // Row vector
-                (_, 1) => MatrixFence::None, // Column vector
-                _ => MatrixFence::Paren,     // General matrix with parentheses
-            };
-
+            // A MATRIX record stores dimensions, alignment, and partition
+            // information but no delimiters: in MathType a bracketed matrix is
+            // a matrix nested inside a separate fence template, which the
+            // enclosing conversion already produces. Reporting a fence here
+            // would invent brackets the document does not contain.
             Ok(MathNode::Matrix {
                 rows,
-                fence_type,
+                fence_type: MatrixFence::None,
                 properties: None,
             })
         } else {

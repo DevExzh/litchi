@@ -133,6 +133,11 @@ pub const EQUATION_INLINE: u8 = 1;
 // Typeface slots (character record `typeface` byte = 128 + slot)
 // ---------------------------------------------------------------------------
 
+/// Value added to a typeface slot number to form the record's `typeface` byte.
+///
+/// Slot 0 is the unused ZERO slot, so `TYPEFACE_TEXT` (slot 1) is 129.
+pub const TYPEFACE_SLOT_BASE: u8 = 128;
+
 /// Typeface slot for plain text runs
 pub const TYPEFACE_TEXT: u8 = 129;
 /// Typeface slot for recognised function names (`sin`, `log`, ...)
