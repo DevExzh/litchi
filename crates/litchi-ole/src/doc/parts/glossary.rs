@@ -4,7 +4,7 @@ use super::super::package::{DocError, Result};
 use super::super::paragraph::{Paragraph, Run};
 use super::chp_bin_table::ChpBinTable;
 use super::fib::FileInformationBlock;
-use super::fields::{Field, FieldStory, FieldText, FieldsTable, HyperlinkField};
+use super::fields::{Field, FieldStory, FieldText, FieldsTable, HyperlinkField, NonPlcfFields};
 use super::pap_bin_table::PapBinTable;
 use super::paragraph_extractor::ParagraphExtractor;
 use super::piece_table::PieceTable;
@@ -405,6 +405,19 @@ impl AttachedGlossary {
             .iter()
             .filter_map(FieldText::hyperlink_field)
             .collect())
+    }
+
+    /// Reconstruct the five field kinds excluded from `Plcfld` by MS-DOC.
+    ///
+    /// This scans each attached story once and returns typed, inert `TC`, `TA`,
+    /// `XE`, `RD`, and `PRIVATE` metadata. Unbalanced or unrecognized field
+    /// characters are ignored. Referenced documents are never opened and
+    /// conversion payloads are never interpreted.
+    pub fn non_plcf_fields(&self) -> NonPlcfFields {
+        NonPlcfFields::from_story_texts(FieldStory::ALL.into_iter().filter_map(|story| {
+            let (start, end) = story.range(&self.fib)?;
+            Some((story, self.text_extractor.text_at_range(start, end)))
+        }))
     }
 
     /// Extract formatted paragraphs from every stored glossary subdocument.

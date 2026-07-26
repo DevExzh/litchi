@@ -270,6 +270,103 @@ impl FieldType {
     pub const fn is_specified(self) -> bool {
         !matches!(self, Self::Unknown(_))
     }
+
+    /// Map a stored field-instruction keyword to its native `flt` type.
+    ///
+    /// Keywords are ASCII case-insensitive. The five text-only field kinds
+    /// excluded from `Plcfld` (`TC`, `TA`, `XE`, `RD`, and `PRIVATE`) return
+    /// `None`, as do unrecognized keywords.
+    pub fn from_keyword(keyword: &str) -> Option<Self> {
+        const TYPES: &[(&str, FieldType)] = &[
+            ("REF", FieldType::Ref),
+            ("FTNREF", FieldType::FootnoteRef),
+            ("SET", FieldType::Set),
+            ("IF", FieldType::If),
+            ("INDEX", FieldType::Index),
+            ("STYLEREF", FieldType::StyleRef),
+            ("SEQ", FieldType::Sequence),
+            ("TOC", FieldType::TableOfContents),
+            ("INFO", FieldType::Info),
+            ("TITLE", FieldType::Title),
+            ("SUBJECT", FieldType::Subject),
+            ("AUTHOR", FieldType::Author),
+            ("KEYWORDS", FieldType::Keywords),
+            ("COMMENTS", FieldType::Comments),
+            ("LASTSAVEDBY", FieldType::LastSavedBy),
+            ("CREATEDATE", FieldType::CreateDate),
+            ("SAVEDATE", FieldType::SaveDate),
+            ("PRINTDATE", FieldType::PrintDate),
+            ("REVNUM", FieldType::RevisionNumber),
+            ("EDITTIME", FieldType::EditTime),
+            ("NUMPAGES", FieldType::NumberOfPages),
+            ("NUMWORDS", FieldType::NumberOfWords),
+            ("NUMCHARS", FieldType::NumberOfCharacters),
+            ("FILENAME", FieldType::FileName),
+            ("TEMPLATE", FieldType::Template),
+            ("DATE", FieldType::Date),
+            ("TIME", FieldType::Time),
+            ("PAGE", FieldType::Page),
+            ("=", FieldType::Formula),
+            ("QUOTE", FieldType::Quote),
+            ("INCLUDE", FieldType::Include),
+            ("PAGEREF", FieldType::PageRef),
+            ("ASK", FieldType::Ask),
+            ("FILLIN", FieldType::FillIn),
+            ("DATA", FieldType::Data),
+            ("NEXT", FieldType::Next),
+            ("NEXTIF", FieldType::NextIf),
+            ("SKIPIF", FieldType::SkipIf),
+            ("MERGEREC", FieldType::MergeRecord),
+            ("DDE", FieldType::Dde),
+            ("DDEAUTO", FieldType::DdeAuto),
+            ("GLOSSARY", FieldType::Glossary),
+            ("PRINT", FieldType::Print),
+            ("EQ", FieldType::Equation),
+            ("GOTOBUTTON", FieldType::GoToButton),
+            ("MACROBUTTON", FieldType::MacroButton),
+            ("AUTONUMOUT", FieldType::AutoNumOutline),
+            ("AUTONUMLGL", FieldType::AutoNumLegal),
+            ("AUTONUM", FieldType::AutoNum),
+            ("IMPORT", FieldType::Import),
+            ("LINK", FieldType::Link),
+            ("SYMBOL", FieldType::Symbol),
+            ("EMBED", FieldType::EmbeddedObject),
+            ("MERGEFIELD", FieldType::MergeField),
+            ("USERNAME", FieldType::UserName),
+            ("USERINITIALS", FieldType::UserInitials),
+            ("USERADDRESS", FieldType::UserAddress),
+            ("BARCODE", FieldType::BarCode),
+            ("DOCVARIABLE", FieldType::DocumentVariable),
+            ("SECTION", FieldType::Section),
+            ("SECTIONPAGES", FieldType::SectionPages),
+            ("INCLUDEPICTURE", FieldType::IncludePicture),
+            ("INCLUDETEXT", FieldType::IncludeText),
+            ("FILESIZE", FieldType::FileSize),
+            ("FORMTEXT", FieldType::FormText),
+            ("FORMCHECKBOX", FieldType::FormCheckbox),
+            ("NOTEREF", FieldType::NoteRef),
+            ("TOA", FieldType::TableOfAuthorities),
+            ("MERGESEQ", FieldType::MergeSequence),
+            ("AUTOTEXT", FieldType::AutoText),
+            ("COMPARE", FieldType::Compare),
+            ("ADDIN", FieldType::AddIn),
+            ("FORMDROPDOWN", FieldType::FormDropdown),
+            ("ADVANCE", FieldType::Advance),
+            ("DOCPROPERTY", FieldType::DocumentProperty),
+            ("CONTROL", FieldType::Control),
+            ("HYPERLINK", FieldType::Hyperlink),
+            ("AUTOTEXTLIST", FieldType::AutoTextList),
+            ("LISTNUM", FieldType::ListNumber),
+            ("HTMLCONTROL", FieldType::HtmlControl),
+            ("BIDIOUTLINE", FieldType::BidiOutline),
+            ("ADDRESSBLOCK", FieldType::AddressBlock),
+            ("GREETINGLINE", FieldType::GreetingLine),
+            ("SHAPE", FieldType::Shape),
+        ];
+        TYPES.iter().find_map(|(name, field_type)| {
+            keyword.eq_ignore_ascii_case(name).then_some(*field_type)
+        })
+    }
 }
 
 impl From<u8> for FieldType {
@@ -1750,6 +1847,95 @@ impl PrivateField {
     /// hidden-text visibility.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
+    }
+}
+
+/// Typed fields whose marker characters MS-DOC excludes from every `Plcfld`.
+///
+/// MS-DOC §2.8.25 lists exactly five such field types: `TC`, `TA`, `XE`, `RD`,
+/// and `PRIVATE`. This collection reconstructs them from balanced field
+/// characters in stored story text. All values remain inert; no generated
+/// table, index, referenced document, conversion payload, or cached result is
+/// resolved, opened, interpreted, refreshed, or executed.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NonPlcfFields {
+    table_of_contents_entries: Vec<TableOfContentsEntryField>,
+    table_of_authorities_entries: Vec<TableOfAuthoritiesEntryField>,
+    index_entries: Vec<IndexEntryField>,
+    referenced_documents: Vec<ReferencedDocumentField>,
+    private_fields: Vec<PrivateField>,
+}
+
+impl NonPlcfFields {
+    pub(crate) fn from_story_texts<'a>(
+        stories: impl IntoIterator<Item = (FieldStory, &'a str)>,
+    ) -> Self {
+        let mut output = Self::default();
+        for (story, text) in stories {
+            for field in non_plcf_field_texts(story, text) {
+                if let Some(value) = TableOfContentsEntryField::from_non_plcf_field(&field) {
+                    output.table_of_contents_entries.push(value);
+                } else if let Some(value) =
+                    TableOfAuthoritiesEntryField::from_non_plcf_field(&field)
+                {
+                    output.table_of_authorities_entries.push(value);
+                } else if let Some(value) = IndexEntryField::from_non_plcf_field(&field) {
+                    output.index_entries.push(value);
+                } else if let Some(value) = ReferencedDocumentField::from_non_plcf_field(&field) {
+                    output.referenced_documents.push(value);
+                } else if let Some(value) = PrivateField::from_non_plcf_field(&field) {
+                    output.private_fields.push(value);
+                }
+            }
+        }
+        output
+    }
+
+    /// Return stored `TC` table-of-contents entries in story and source order.
+    pub fn table_of_contents_entries(&self) -> &[TableOfContentsEntryField] {
+        &self.table_of_contents_entries
+    }
+
+    /// Return stored `TA` table-of-authorities entries in story and source order.
+    pub fn table_of_authorities_entries(&self) -> &[TableOfAuthoritiesEntryField] {
+        &self.table_of_authorities_entries
+    }
+
+    /// Return stored `XE` index entries in story and source order.
+    pub fn index_entries(&self) -> &[IndexEntryField] {
+        &self.index_entries
+    }
+
+    /// Return stored `RD` referenced-document fields without opening them.
+    pub fn referenced_documents(&self) -> &[ReferencedDocumentField] {
+        &self.referenced_documents
+    }
+
+    /// Return stored opaque `PRIVATE` conversion-data fields.
+    pub fn private_fields(&self) -> &[PrivateField] {
+        &self.private_fields
+    }
+
+    /// Whether no recognized excluded field is present.
+    pub fn is_empty(&self) -> bool {
+        self.table_of_contents_entries.is_empty()
+            && self.table_of_authorities_entries.is_empty()
+            && self.index_entries.is_empty()
+            && self.referenced_documents.is_empty()
+            && self.private_fields.is_empty()
+    }
+
+    /// Total number of recognized excluded fields.
+    pub fn len(&self) -> usize {
+        [
+            self.table_of_contents_entries.len(),
+            self.table_of_authorities_entries.len(),
+            self.index_entries.len(),
+            self.referenced_documents.len(),
+            self.private_fields.len(),
+        ]
+        .into_iter()
+        .fold(0usize, usize::saturating_add)
     }
 }
 
@@ -8535,6 +8721,17 @@ mod tests {
         assert_eq!(FieldType::from(0x42), FieldType::SectionPages);
         assert_eq!(FieldType::from(0x45), FieldType::FileSize);
         assert_eq!(FieldType::from(0x04), FieldType::Unknown(0x04));
+        assert_eq!(
+            FieldType::from_keyword("hyperlink"),
+            Some(FieldType::Hyperlink)
+        );
+        assert_eq!(FieldType::from_keyword("="), Some(FieldType::Formula));
+        assert_eq!(
+            FieldType::from_keyword("FTNREF"),
+            Some(FieldType::FootnoteRef)
+        );
+        assert_eq!(FieldType::from_keyword("TC"), None);
+        assert_eq!(FieldType::from_keyword("future-field"), None);
     }
 
     #[test]
@@ -9641,6 +9838,34 @@ mod tests {
                 .iter()
                 .all(|field| PrivateField::from_non_plcf_field(field).is_none())
         );
+    }
+
+    #[test]
+    fn non_plcf_collection_classifies_all_five_excluded_types_once() {
+        let main = concat!(
+            "\u{0013}TC Contents\u{0015}",
+            "\u{0013}TA \\l Citation\u{0015}",
+            "\u{0013}XE Entry\u{0015}",
+            "\u{0013}RD appendix.doc \\f\u{0015}",
+            "\u{0013}PRIVATE opaque\u{0015}",
+            "\u{0013}TC missing-end",
+        );
+        let header = "\u{0013}UNKNOWN ignored\u{0015}";
+        let fields = NonPlcfFields::from_story_texts([
+            (FieldStory::Main, main),
+            (FieldStory::Header, header),
+        ]);
+
+        assert_eq!(fields.len(), 5);
+        assert!(!fields.is_empty());
+        assert_eq!(fields.table_of_contents_entries().len(), 1);
+        assert_eq!(fields.table_of_authorities_entries().len(), 1);
+        assert_eq!(fields.index_entries().len(), 1);
+        assert_eq!(fields.referenced_documents().len(), 1);
+        assert_eq!(fields.private_fields().len(), 1);
+        assert_eq!(fields.referenced_documents()[0].story(), FieldStory::Main);
+
+        assert!(NonPlcfFields::from_story_texts([(FieldStory::Main, "\u{0013}TC")]).is_empty());
     }
 
     #[test]

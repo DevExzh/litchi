@@ -6,6 +6,9 @@
 /// Core DOC writer implementation
 mod core;
 
+/// Strict field-table generation.
+mod fields;
+
 /// Comments writer input types
 pub mod bookmarks;
 pub mod comments;

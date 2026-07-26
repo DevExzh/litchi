@@ -1,7 +1,7 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_ole::doc::writer::{
-    DocDrawingShape, DocEncryptionProfile, DocPicture, DocShapeKind, FloatingPosition,
-    ParagraphFormatting,
+    CharacterFormatting, DocDrawingShape, DocEncryptionProfile, DocPicture, DocShapeKind,
+    FloatingPosition, ParagraphFormatting,
 };
 use litchi_ole::doc::{
     DocOpenOptions, DocWriter, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle,
@@ -123,6 +123,63 @@ fn glossary_with_hyperlink() -> DocWriter {
             vec![
                 GlossaryItem::try_new(
                     "website",
+                    GlossaryItemKind::NamedAutoText,
+                    None,
+                    0,
+                    item_end,
+                )
+                .unwrap(),
+            ],
+            vec![],
+            item_end,
+            item_end + 1,
+            item_end + 2,
+        )
+        .unwrap(),
+    );
+    writer
+}
+
+fn glossary_with_non_plcf_fields() -> DocWriter {
+    const INSTRUCTIONS: [&str; 5] = [
+        r#"TC "Illustration 1" \f i \l 4 \n"#,
+        r#"TA \l "Baldwin v. Alberti" \c 1 \s Baldwin"#,
+        r#"XE "Office Open XML:Syntax" \b \f Intro"#,
+        r#"RD "chapters/Chapter 1.doc" \f"#,
+        r#"PRIVATE "converter payload""#,
+    ];
+
+    let mut writer = DocWriter::new();
+    let marker_format = CharacterFormatting {
+        special: Some(true),
+        ..CharacterFormatting::default()
+    };
+    let instruction_format = CharacterFormatting {
+        field_vanish: Some(true),
+        ..CharacterFormatting::default()
+    };
+    let mut item_end = 0u32;
+    for instruction in INSTRUCTIONS {
+        writer
+            .add_paragraph_runs(
+                vec![
+                    ("\u{0013}".to_string(), marker_format.clone()),
+                    (instruction.to_string(), instruction_format.clone()),
+                    ("\u{0015}".to_string(), marker_format.clone()),
+                ],
+                ParagraphFormatting::default(),
+            )
+            .unwrap();
+        let paragraph_units = u32::try_from(instruction.encode_utf16().count() + 3).unwrap();
+        item_end = item_end.checked_add(paragraph_units).unwrap();
+    }
+    writer.add_paragraph("").unwrap();
+    writer.add_paragraph("").unwrap();
+    writer.set_glossary_metadata(
+        GlossaryMetadata::try_new(
+            vec![
+                GlossaryItem::try_new(
+                    "field-indexes",
                     GlossaryItemKind::NamedAutoText,
                     None,
                     0,
@@ -495,6 +552,41 @@ fn attached_glossary_exposes_typed_inert_fields() {
     assert_eq!(links.len(), 1);
     assert_eq!(links[0].external_target(), Some("https://example.com"));
     assert_eq!(links[0].cached_result(), Some("OpenAI"));
+}
+
+#[test]
+fn attached_glossary_reconstructs_all_fields_excluded_from_plcfld() {
+    let mut template = DocWriter::new();
+    template.add_paragraph("Template").unwrap();
+    template
+        .set_attached_glossary(glossary_with_non_plcf_fields())
+        .unwrap();
+
+    let mut output = Cursor::new(Vec::new());
+    template.write_to(&mut output).unwrap();
+    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let document = package.document().unwrap();
+    let attached = document.attached_glossary().unwrap().unwrap();
+
+    assert!(attached.fields_table().main_document_fields().is_empty());
+    let fields = attached.non_plcf_fields();
+    assert_eq!(fields.len(), 5);
+    assert!(!fields.is_empty());
+    assert_eq!(
+        fields.table_of_contents_entries()[0].entry(),
+        "Illustration 1"
+    );
+    assert_eq!(fields.table_of_authorities_entries().len(), 1);
+    assert_eq!(fields.index_entries()[0].entry(), "Office Open XML:Syntax");
+    assert_eq!(
+        fields.referenced_documents()[0].source(),
+        "chapters/Chapter 1.doc"
+    );
+    assert!(fields.referenced_documents()[0].uses_relative_path());
+    assert_eq!(
+        fields.private_fields()[0].opaque_instructions(),
+        r#""converter payload""#
+    );
 }
 
 #[test]

@@ -992,42 +992,6 @@ fn write_textbox_story_text(
     Ok((start_cps, *current_cp - story_start_cp))
 }
 
-fn build_plcffld(field_char_cps: &[(u32, u16)], text_length: u32) -> Vec<u8> {
-    let n = field_char_cps.len();
-    let mut plcffld = Vec::with_capacity((n + 1) * 4 + n * 2);
-    for (cp, _) in field_char_cps {
-        plcffld.extend_from_slice(&cp.to_le_bytes());
-    }
-    // The final CP is the PLCF terminal entry and does not describe a marker.
-    plcffld.extend_from_slice(&text_length.to_le_bytes());
-
-    let mut field_stack = Vec::new();
-    for (_, field_character) in field_char_cps {
-        let (fldch, flt_or_flags) = match *field_character {
-            0x13 => {
-                field_stack.push(false);
-                (0x13, 0x58) // fldBegin, flt = HYPERLINK (88)
-            },
-            0x14 => {
-                if let Some(has_separator) = field_stack.last_mut() {
-                    *has_separator = true;
-                }
-                (0x14, 0x00) // fldSep, ignored byte is zero for new output
-            },
-            0x15 => {
-                let has_separator = field_stack.pop().unwrap_or(false);
-                let is_nested = !field_stack.is_empty();
-                let flags = u8::from(has_separator) << 7 | u8::from(is_nested) << 6;
-                (0x15, flags)
-            },
-            _ => (0x00, 0x00),
-        };
-        plcffld.push(fldch);
-        plcffld.push(flt_or_flags);
-    }
-    plcffld
-}
-
 impl DocWriter {
     /// Create a new DOC writer
     pub fn new() -> Self {
@@ -2995,6 +2959,7 @@ impl DocWriter {
         {
             return Ok(None);
         }
+        let story_text_start = text_stream.len();
 
         // Build index->paragraph mapping for 12 slots per MS-DOC PlcfHdd / Apache POI:
         //   Slots 0-5:  footnote/endnote separator/continuation stories
@@ -3199,7 +3164,11 @@ impl DocWriter {
         let fields = if field_char_cps.is_empty() {
             Vec::new()
         } else {
-            build_plcffld(&field_char_cps, header_cp)
+            super::fields::build_plcffld(
+                &field_char_cps,
+                header_cp,
+                &text_stream[story_text_start..],
+            )?
         };
         Ok(Some(HeaderStoryData {
             plcfhdd,
@@ -4055,10 +4024,22 @@ impl DocWriter {
 
         // Write PlcfFldMom if there are field characters
         if !field_char_cps.is_empty() {
-            let plcffld = build_plcffld(&field_char_cps, text_length);
-            fib.set_plcffld_mom(table_offset, plcffld.len() as u32);
-            table_stream.extend_from_slice(&plcffld);
-            table_offset = table_stream.len() as u32;
+            let main_text_bytes = usize::try_from(text_length)
+                .ok()
+                .and_then(|value| value.checked_mul(2))
+                .and_then(|length| text_stream.get(..length))
+                .ok_or_else(|| {
+                    DocWriteError::InvalidData(
+                        "DOC main field story exceeds the text stream".to_string(),
+                    )
+                })?;
+            let plcffld =
+                super::fields::build_plcffld(&field_char_cps, text_length, main_text_bytes)?;
+            if !plcffld.is_empty() {
+                fib.set_plcffld_mom(table_offset, plcffld.len() as u32);
+                table_stream.extend_from_slice(&plcffld);
+                table_offset = table_stream.len() as u32;
+            }
         }
 
         // Write numbering tables if present
@@ -6866,30 +6847,6 @@ mod tests {
         ] {
             assert!(build_revision_papx_grpprl(&formatting, None).is_err());
         }
-    }
-
-    #[test]
-    fn plcffld_end_flags_match_their_field_structure() {
-        let top_level = build_plcffld(&[(21, 0x13), (56, 0x14), (61, 0x15)], 63);
-        assert_eq!(&top_level[16..], &[0x13, 0x58, 0x14, 0x00, 0x15, 0x80]);
-
-        let nested = build_plcffld(
-            &[
-                (1, 0x13),
-                (2, 0x13),
-                (3, 0x14),
-                (4, 0x15),
-                (5, 0x14),
-                (6, 0x15),
-            ],
-            7,
-        );
-        assert_eq!(
-            &nested[28..],
-            &[
-                0x13, 0x58, 0x13, 0x58, 0x14, 0x00, 0x15, 0xC0, 0x14, 0x00, 0x15, 0x80,
-            ]
-        );
     }
 
     #[test]
