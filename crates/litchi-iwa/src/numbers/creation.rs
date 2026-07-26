@@ -1106,14 +1106,33 @@ fn formatting_symbols() -> tsk::FormattingSymbolsArchive {
 }
 
 fn uid_map(rows: u32, columns: u32) -> tst::ColumnRowUidMapArchive {
+    let (sorted_column_uids, column_index_for_uid, column_uid_for_index) = uid_axis(columns);
+    let (sorted_row_uids, row_index_for_uid, row_uid_for_index) = uid_axis(rows);
     tst::ColumnRowUidMapArchive {
-        sorted_column_uids: (0..columns).map(|_| fresh_tsp_uuid()).collect(),
-        column_index_for_uid: (0..columns).collect(),
-        column_uid_for_index: (0..columns).collect(),
-        sorted_row_uids: (0..rows).map(|_| fresh_tsp_uuid()).collect(),
-        row_index_for_uid: (0..rows).collect(),
-        row_uid_for_index: (0..rows).collect(),
+        sorted_column_uids,
+        column_index_for_uid,
+        column_uid_for_index,
+        sorted_row_uids,
+        row_index_for_uid,
+        row_uid_for_index,
     }
+}
+
+fn uid_axis(length: u32) -> (Vec<tsp::Uuid>, Vec<u32>, Vec<u32>) {
+    let mut entries = (0..length)
+        .map(|physical_index| (fresh_tsp_uuid(), physical_index))
+        .collect::<Vec<_>>();
+    entries.sort_unstable_by_key(|(uid, _)| (uid.upper, uid.lower));
+    let mut sorted_uids = Vec::with_capacity(entries.len());
+    let mut index_for_uid = Vec::with_capacity(entries.len());
+    let mut uid_for_index = vec![0; entries.len()];
+    for (stable_index, (uid, physical_index)) in (0..length).zip(entries) {
+        sorted_uids.push(uid);
+        index_for_uid.push(physical_index);
+        uid_for_index[usize::try_from(physical_index)
+            .expect("u32 axis index must fit the platform usize")] = stable_index;
+    }
+    (sorted_uids, index_for_uid, uid_for_index)
 }
 
 fn fresh_tsp_uuid() -> tsp::Uuid {
@@ -1246,6 +1265,22 @@ mod tests {
         let reopened = NumbersEditor::from_bytes(&bytes).unwrap();
         assert_eq!(reopened.sheets().unwrap()[0].name, "Inventory");
         assert_eq!(reopened.tables().unwrap()[0].name, "Stock");
+    }
+
+    #[test]
+    fn generated_axis_uids_are_canonical_inverse_permutations() {
+        let (uids, index_for_uid, uid_for_index) = uid_axis(64);
+
+        assert!(
+            uids.windows(2)
+                .all(|pair| { (pair[0].upper, pair[0].lower) < (pair[1].upper, pair[1].lower) })
+        );
+        for (stable_index, physical_index) in index_for_uid.iter().copied().enumerate() {
+            assert_eq!(
+                uid_for_index[usize::try_from(physical_index).unwrap()],
+                u32::try_from(stable_index).unwrap()
+            );
+        }
     }
 
     #[test]
