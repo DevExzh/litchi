@@ -1,4 +1,4 @@
-//! Create Pages, Numbers, and Keynote files with native decimal cell formats.
+//! Create Pages, Numbers, and Keynote files with native numeric cell formats.
 
 use std::path::{Path, PathBuf};
 
@@ -8,8 +8,9 @@ use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDecimalPlaces,
-    TableCellFixedDecimalPlaces, TableCellNegativeNumberStyle, TableCellNumberFormat,
-    TableCellPercentageFormat, TableCellScientificFormat, TableCellThousandsSeparator,
+    TableCellFixedDecimalPlaces, TableCellFractionAccuracy, TableCellFractionFormat,
+    TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellPercentageFormat,
+    TableCellScientificFormat, TableCellThousandsSeparator,
 };
 
 const ROW: usize = 1;
@@ -17,10 +18,12 @@ const NUMBER_COLUMN: usize = 1;
 const PERCENTAGE_COLUMN: usize = 2;
 const CURRENCY_COLUMN: usize = 3;
 const SCIENTIFIC_COLUMN: usize = 4;
+const FRACTION_COLUMN: usize = 5;
 const NUMBER_VALUE: f64 = -1_234.5;
 const PERCENTAGE_VALUE: f64 = -12.345;
 const CURRENCY_VALUE: f64 = -1_234.5;
 const SCIENTIFIC_VALUE: f64 = -1_234.5;
+const FRACTION_VALUE: f64 = -12.375;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -67,10 +70,14 @@ fn scientific_format() -> Result<TableCellScientificFormat, litchi_iwa::Error> {
     ))
 }
 
+const fn fraction_format() -> TableCellFractionFormat {
+    TableCellFractionFormat::new(TableCellFractionAccuracy::Eighths)
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
-        .table_dimensions(3, 5)
+        .table_dimensions(3, 6)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(
@@ -111,6 +118,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         SCIENTIFIC_COLUMN,
         scientific_format()?,
     )?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        FRACTION_COLUMN,
+        CellValue::Number(FRACTION_VALUE),
+    )?;
+    editor.set_table_cell_fraction_format(table_id, ROW, FRACTION_COLUMN, fraction_format())?;
     editor.save(output)?;
     Ok(())
 }
@@ -118,7 +132,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Created from scratch with a native decimal table-cell format.\n")
-        .body_table("Number Formats", 3, 5)
+        .body_table("Number Formats", 3, 6)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(
@@ -159,6 +173,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         SCIENTIFIC_COLUMN,
         scientific_format()?,
     )?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        FRACTION_COLUMN,
+        CellValue::Number(FRACTION_VALUE),
+    )?;
+    editor.set_table_cell_fraction_format(table_id, ROW, FRACTION_COLUMN, fraction_format())?;
     editor.save(output)?;
     Ok(())
 }
@@ -171,7 +192,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         0,
         "Number Formats",
         3,
-        5,
+        6,
         DrawablePoint { x: 320.0, y: 360.0 },
         DrawableSize {
             width: 1_280.0,
@@ -233,6 +254,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         SCIENTIFIC_COLUMN,
         scientific_format()?,
+    )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        ROW,
+        FRACTION_COLUMN,
+        CellValue::Number(FRACTION_VALUE),
+    )?;
+    editor.set_slide_table_cell_fraction_format(
+        0,
+        table.model_object_id,
+        ROW,
+        FRACTION_COLUMN,
+        fraction_format(),
     )?;
     editor.save(output)?;
     Ok(())

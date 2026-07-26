@@ -3,9 +3,9 @@
 use crate::protobuf::tsk::FormatStructArchive;
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDataFormat,
-    TableCellDecimalPlaces, TableCellFixedDecimalPlaces, TableCellNegativeNumberStyle,
-    TableCellNumberFormat, TableCellPercentageFormat, TableCellScientificFormat,
-    TableCellThousandsSeparator,
+    TableCellDecimalPlaces, TableCellFixedDecimalPlaces, TableCellFractionAccuracy,
+    TableCellFractionFormat, TableCellNegativeNumberStyle, TableCellNumberFormat,
+    TableCellPercentageFormat, TableCellScientificFormat, TableCellThousandsSeparator,
 };
 use crate::{Error, Result};
 
@@ -13,9 +13,26 @@ pub(super) const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
 pub(super) const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
 pub(super) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 pub(super) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
+pub(super) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
 pub(super) const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
+const NATIVE_FRACTION_UP_TO_ONE_DIGIT: i32 = -1;
+const NATIVE_FRACTION_UP_TO_TWO_DIGITS: i32 = -2;
+const NATIVE_FRACTION_UP_TO_THREE_DIGITS: i32 = -3;
+const NATIVE_FRACTION_HALVES: i32 = 2;
+const NATIVE_FRACTION_QUARTERS: i32 = 4;
+const NATIVE_FRACTION_EIGHTHS: i32 = 8;
+const NATIVE_FRACTION_SIXTEENTHS: i32 = 16;
+const NATIVE_FRACTION_TENTHS: i32 = 10;
+const NATIVE_FRACTION_HUNDREDTHS: i32 = 100;
 
 pub(super) fn data_format_to_native(format: TableCellDataFormat) -> Result<FormatStructArchive> {
+    if let TableCellDataFormat::Fraction(format) = format {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_FRACTION_FORMAT_TYPE),
+            fraction_accuracy: Some(fraction_accuracy_to_native(format.accuracy())),
+            ..Default::default()
+        });
+    }
     let (
         format_type,
         decimal_places,
@@ -61,6 +78,7 @@ pub(super) fn data_format_to_native(format: TableCellDataFormat) -> Result<Forma
             None,
             None,
         ),
+        TableCellDataFormat::Fraction(_) => unreachable!("handled above"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -88,6 +106,24 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
     let format_type = native.format_type.ok_or_else(|| {
         Error::InvalidFormat("Table cell has no native data-format type".to_owned())
     })?;
+    if format_type == NATIVE_FRACTION_FORMAT_TYPE {
+        let accuracy = native.fraction_accuracy.ok_or_else(|| {
+            Error::InvalidFormat("Fraction cell format has no accuracy setting".to_owned())
+        })?;
+        if native.decimal_places.is_some()
+            || native.negative_style.is_some()
+            || native.show_thousands_separator.is_some()
+            || native.currency_code.is_some()
+            || native.use_accounting_style.is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "Fraction cell format contains non-canonical decimal options".to_owned(),
+            ));
+        }
+        return Ok(TableCellDataFormat::Fraction(TableCellFractionFormat::new(
+            fraction_accuracy_from_native(accuracy)?,
+        )));
+    }
     if !matches!(
         format_type,
         NATIVE_NUMBER_FORMAT_TYPE
@@ -98,6 +134,11 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
         return Err(Error::InvalidFormat(format!(
             "Table cell uses unsupported native data-format type {format_type}"
         )));
+    }
+    if native.fraction_accuracy.is_some() {
+        return Err(Error::InvalidFormat(
+            "Non-Fraction cell format contains a fraction-accuracy setting".to_owned(),
+        ));
     }
     let decimal_places = match native.decimal_places {
         Some(NATIVE_AUTOMATIC_DECIMAL_PLACES) => TableCellDecimalPlaces::Automatic,
@@ -183,4 +224,35 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
         },
         _ => unreachable!("validated native data-format type"),
     })
+}
+
+const fn fraction_accuracy_to_native(accuracy: TableCellFractionAccuracy) -> u32 {
+    match accuracy {
+        TableCellFractionAccuracy::UpToOneDigit => NATIVE_FRACTION_UP_TO_ONE_DIGIT as u32,
+        TableCellFractionAccuracy::UpToTwoDigits => NATIVE_FRACTION_UP_TO_TWO_DIGITS as u32,
+        TableCellFractionAccuracy::UpToThreeDigits => NATIVE_FRACTION_UP_TO_THREE_DIGITS as u32,
+        TableCellFractionAccuracy::Halves => NATIVE_FRACTION_HALVES as u32,
+        TableCellFractionAccuracy::Quarters => NATIVE_FRACTION_QUARTERS as u32,
+        TableCellFractionAccuracy::Eighths => NATIVE_FRACTION_EIGHTHS as u32,
+        TableCellFractionAccuracy::Sixteenths => NATIVE_FRACTION_SIXTEENTHS as u32,
+        TableCellFractionAccuracy::Tenths => NATIVE_FRACTION_TENTHS as u32,
+        TableCellFractionAccuracy::Hundredths => NATIVE_FRACTION_HUNDREDTHS as u32,
+    }
+}
+
+fn fraction_accuracy_from_native(value: u32) -> Result<TableCellFractionAccuracy> {
+    match value as i32 {
+        NATIVE_FRACTION_UP_TO_ONE_DIGIT => Ok(TableCellFractionAccuracy::UpToOneDigit),
+        NATIVE_FRACTION_UP_TO_TWO_DIGITS => Ok(TableCellFractionAccuracy::UpToTwoDigits),
+        NATIVE_FRACTION_UP_TO_THREE_DIGITS => Ok(TableCellFractionAccuracy::UpToThreeDigits),
+        NATIVE_FRACTION_HALVES => Ok(TableCellFractionAccuracy::Halves),
+        NATIVE_FRACTION_QUARTERS => Ok(TableCellFractionAccuracy::Quarters),
+        NATIVE_FRACTION_EIGHTHS => Ok(TableCellFractionAccuracy::Eighths),
+        NATIVE_FRACTION_SIXTEENTHS => Ok(TableCellFractionAccuracy::Sixteenths),
+        NATIVE_FRACTION_TENTHS => Ok(TableCellFractionAccuracy::Tenths),
+        NATIVE_FRACTION_HUNDREDTHS => Ok(TableCellFractionAccuracy::Hundredths),
+        _ => Err(Error::InvalidFormat(format!(
+            "Fraction cell format has invalid accuracy {value}"
+        ))),
+    }
 }

@@ -1,6 +1,8 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
-use crate::table_cell_data_format::{TableCellCurrencyCode, TableCellCurrencyStyle};
+use crate::table_cell_data_format::{
+    TableCellCurrencyCode, TableCellCurrencyStyle, TableCellFractionAccuracy,
+};
 
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
     (
@@ -319,6 +321,47 @@ fn source_built_table_roundtrips_scientific_format_crud() {
     assert!(
         reopened
             .reset_slide_table_cell_scientific_format(0, table.model_object_id, 1, 1)
+            .unwrap()
+    );
+    assert_eq!(
+        reopened
+            .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
+            .unwrap(),
+        KeynoteTableCellDataFormat::Automatic
+    );
+}
+
+#[test]
+fn source_built_table_roundtrips_fraction_format_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Fractions", 3, 3, position, size)
+        .unwrap();
+    let format = KeynoteTableCellFractionFormat::new(TableCellFractionAccuracy::Eighths);
+    editor
+        .set_slide_table_cell(
+            0,
+            table.model_object_id,
+            1,
+            1,
+            KeynoteTableCellValue::Number(-12.375),
+        )
+        .unwrap();
+    editor
+        .set_slide_table_cell_fraction_format(0, table.model_object_id, 1, 1, format)
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_cell_fraction_format(0, table.model_object_id, 1, 1)
+            .unwrap(),
+        Some(format)
+    );
+    assert!(
+        reopened
+            .reset_slide_table_cell_fraction_format(0, table.model_object_id, 1, 1)
             .unwrap()
     );
     assert_eq!(

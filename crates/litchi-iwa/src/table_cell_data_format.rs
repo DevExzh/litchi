@@ -211,6 +211,54 @@ impl Default for TableCellScientificFormat {
     }
 }
 
+/// Denominator strategy used by iWork's native Fraction cell format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TableCellFractionAccuracy {
+    /// Choose the closest fraction whose denominator has at most one digit.
+    UpToOneDigit,
+    /// Choose the closest fraction whose denominator has at most two digits.
+    UpToTwoDigits,
+    /// Choose the closest fraction whose denominator has at most three digits.
+    #[default]
+    UpToThreeDigits,
+    /// Always use a denominator of two.
+    Halves,
+    /// Always use a denominator of four.
+    Quarters,
+    /// Always use a denominator of eight.
+    Eighths,
+    /// Always use a denominator of sixteen.
+    Sixteenths,
+    /// Always use a denominator of ten.
+    Tenths,
+    /// Always use a denominator of one hundred.
+    Hundredths,
+}
+
+/// Explicit mixed-fraction display format for one native table cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TableCellFractionFormat {
+    accuracy: TableCellFractionAccuracy,
+}
+
+impl TableCellFractionFormat {
+    /// Construct a Fraction format with the requested denominator strategy.
+    pub const fn new(accuracy: TableCellFractionAccuracy) -> Self {
+        Self { accuracy }
+    }
+
+    /// Return the denominator strategy.
+    pub const fn accuracy(self) -> TableCellFractionAccuracy {
+        self.accuracy
+    }
+
+    /// Replace the denominator strategy.
+    pub const fn with_accuracy(mut self, accuracy: TableCellFractionAccuracy) -> Self {
+        self.accuracy = accuracy;
+        self
+    }
+}
+
 /// Three-letter ISO 4217-style currency code stored by native iWork.
 ///
 /// The compact inline representation avoids allocating for every formatted
@@ -395,6 +443,8 @@ pub enum TableCellDataFormat {
     Percentage(TableCellPercentageFormat),
     /// Display the value in scientific notation.
     Scientific(TableCellScientificFormat),
+    /// Display the value as a whole number and native fraction.
+    Fraction(TableCellFractionFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -418,6 +468,12 @@ impl From<TableCellCurrencyFormat> for TableCellDataFormat {
 impl From<TableCellScientificFormat> for TableCellDataFormat {
     fn from(value: TableCellScientificFormat) -> Self {
         Self::Scientific(value)
+    }
+}
+
+impl From<TableCellFractionFormat> for TableCellDataFormat {
+    fn from(value: TableCellFractionFormat) -> Self {
+        Self::Fraction(value)
     }
 }
 
@@ -482,6 +538,19 @@ mod tests {
         assert_eq!(
             TableCellDataFormat::from(format),
             TableCellDataFormat::Scientific(format)
+        );
+    }
+
+    #[test]
+    fn fraction_format_has_native_default_accuracy() {
+        let format = TableCellFractionFormat::default();
+        assert_eq!(
+            format.accuracy(),
+            TableCellFractionAccuracy::UpToThreeDigits
+        );
+        assert_eq!(
+            TableCellDataFormat::from(format),
+            TableCellDataFormat::Fraction(format)
         );
     }
 }
