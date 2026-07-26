@@ -160,13 +160,7 @@ const CONSOL_AUTO_PAGE: u16 = 1 << 0;
 /// stream are skipped without failing.
 pub fn parse_pivot_cache_definition(data: &[u8]) -> XlsbResult<PivotCacheDefinition> {
     let mut walker = RecordWalker::new(data);
-    let first = walker.required("BrtBeginPivotCacheDef")?;
-    if first.header.record_type != rt::BEGIN_PIVOT_CACHE_DEF {
-        return Err(XlsbError::UnexpectedRecord {
-            expected: rt::BEGIN_PIVOT_CACHE_DEF,
-            found: first.header.record_type,
-        });
-    }
+    let first = walker.required_begin(rt::BEGIN_PIVOT_CACHE_DEF, "BrtBeginPivotCacheDef")?;
     let mut definition = parse_definition_payload(&first.data)?;
     while let Some(record) = walker.next()? {
         match record.header.record_type {
@@ -216,7 +210,6 @@ impl PayloadCursor<'_> {
         })
     }
 }
-
 
 /// `BrtBeginPivotCacheDef` payload (MS-XLSB 2.4.168).
 fn parse_definition_payload(data: &[u8]) -> XlsbResult<PivotCacheDefinition> {

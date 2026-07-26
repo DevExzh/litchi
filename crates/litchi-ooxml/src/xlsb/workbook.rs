@@ -1,5 +1,6 @@
 //! Workbook implementation for XLSB files
 
+use crate::common::external_link_rels::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
 use crate::xlsb::XlsbCell;
 use crate::xlsb::calculation::CalculationProperties;
 use crate::xlsb::error::XlsbResult;
@@ -34,21 +35,6 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
 use std::io::{BufReader, Cursor, Read, Seek, Write};
 use std::sync::Arc;
-
-/// External-workbook relationship types documented by MS-XLSB.
-const EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES: &[&str] = &[
-    relationship_type::EXTERNAL_LINK_PATH,
-    relationship_type::STRICT_EXTERNAL_LINK_PATH,
-    "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath/xlStartup",
-    "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath/xlAlternateStartup",
-    "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath/xlLibrary",
-    "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath/xlPathMissing",
-    "http://schemas.microsoft.com/office/2019/04/relationships/externalLinkLongPath",
-    "http://schemas.microsoft.com/office/2019/04/relationships/xlExternalLinkLongPath/xlStartup",
-    "http://schemas.microsoft.com/office/2019/04/relationships/xlExternalLinkLongPath/xlAlternateStartup",
-    "http://schemas.microsoft.com/office/2009/04/relationships/xlExternalLinkLongPath/xlPathMissing",
-    "http://schemas.microsoft.com/office/2009/04/relationships/xlExternalLinkLongPath/xlLibrary",
-];
 
 /// OLE data-source relationship types documented by MS-XLSB and MS-OI29500.
 const OLE_DATA_SOURCE_RELATIONSHIP_TYPES: &[&str] = &[
@@ -391,9 +377,7 @@ impl XlsbWorkbook {
             XlsbDrawingObject, XlsbEmbeddedChart, XlsbEmbeddedImage, XlsbSheetDrawing,
         };
         let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|error| {
-            crate::xlsb::error::XlsbError::Encoding(format!(
-                "Drawings part is not UTF-8: {error}"
-            ))
+            crate::xlsb::error::XlsbError::Encoding(format!("Drawings part is not UTF-8: {error}"))
         })?;
         let shapes = crate::xlsx::shapes::parse_drawing_shapes(drawing_xml)?.unwrap_or_default();
         let drawing = crate::xlsb::drawing::parse_drawing_part(drawing_part.blob())?;
@@ -435,12 +419,9 @@ impl XlsbWorkbook {
                     else {
                         continue;
                     };
-                    if images.len()
-                        >= crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES
-                    {
+                    if images.len() >= crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES {
                         return Err(crate::xlsb::error::XlsbError::InvalidLength {
-                            expected:
-                                crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES,
+                            expected: crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES,
                             found: images.len() + 1,
                         });
                     }
@@ -459,8 +440,8 @@ impl XlsbWorkbook {
                             > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES
                         {
                             return Err(crate::xlsb::error::XlsbError::InvalidLength {
-                                expected: crate::xlsb::drawing_image::
-                                    MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
+                                expected:
+                                    crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
                                 found: image_bytes,
                             });
                         }

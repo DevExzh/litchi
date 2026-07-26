@@ -84,13 +84,7 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> XlsbResu
         legacy_drawing_header_footer_rel_id: None,
     };
     let mut walker = RecordWalker::new(data);
-    let first = walker.required("BrtBeginSheet")?;
-    if first.header.record_type != rt::BEGIN_SHEET {
-        return Err(XlsbError::UnexpectedRecord {
-            expected: rt::BEGIN_SHEET,
-            found: first.header.record_type,
-        });
-    }
+    walker.required_begin(rt::BEGIN_SHEET, "BrtBeginSheet")?;
     let mut seen_cs_prop = false;
     // Strong protection parsed from `BrtCsProtectionIso`, pending the classic
     // `BrtCsProtection` record that MS-XLSB 2.4.346 requires immediately after.
@@ -367,4 +361,3 @@ fn set_rel_id(data: &[u8], context: &'static str, slot: &mut Option<String>) -> 
     *slot = Some(rel_id);
     Ok(())
 }
-

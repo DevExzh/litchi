@@ -85,13 +85,7 @@ const PARAM_DATA_BOOLEAN: u32 = 4;
 pub fn parse_connections_part(data: &[u8]) -> XlsbResult<XlsbConnections> {
     const CONTEXT: &str = "ExternalDataConnections";
     let mut walker = RecordWalker::new(data);
-    let begin = walker.required(CONTEXT)?;
-    if begin.header.record_type != rt::BEGIN_EXT_CONNECTIONS {
-        return Err(XlsbError::UnexpectedRecord {
-            expected: rt::BEGIN_EXT_CONNECTIONS,
-            found: begin.header.record_type,
-        });
-    }
+    let begin = walker.required_begin(rt::BEGIN_EXT_CONNECTIONS, CONTEXT)?;
     PayloadCursor::new(&begin.data, "BrtBeginExtConnections").finish()?;
 
     let mut connections = XlsbConnections::default();
@@ -364,7 +358,11 @@ fn parse_param(data: &[u8]) -> XlsbResult<XlsbConnectionParameter> {
     };
     let name = cursor.read_wide_string()?;
     let prompt = cursor.read_wide_string()?;
-    let prompt = if prompt.is_empty() { None } else { Some(prompt) };
+    let prompt = if prompt.is_empty() {
+        None
+    } else {
+        Some(prompt)
+    };
     let value = match pbt {
         PBT_VALUE => match data_type {
             Some(PARAM_DATA_DOUBLE) => Some(XlsbParameterValue::Number(cursor.read_f64()?)),
@@ -380,7 +378,10 @@ fn parse_param(data: &[u8]) -> XlsbResult<XlsbConnectionParameter> {
                 Some(XlsbParameterValue::Boolean(boolean != 0))
             },
             Some(other) => {
-                return Err(malformed(CONTEXT, format!("unknown parameter dataType {other:#x}")));
+                return Err(malformed(
+                    CONTEXT,
+                    format!("unknown parameter dataType {other:#x}"),
+                ));
             },
             None => return Err(malformed(CONTEXT, "value parameter lacks a dataType")),
         },

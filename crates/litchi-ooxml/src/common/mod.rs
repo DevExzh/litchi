@@ -1,5 +1,6 @@
 //! Common OOXML functionality shared across formats.
 
+pub(crate) mod external_link_rels;
 pub mod mce;
 pub mod properties;
 pub(crate) mod xml;

@@ -1,5 +1,8 @@
 //! Read-only SpreadsheetML external-workbook link metadata and cached values.
 
+use crate::common::external_link_rels::{
+    EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES, is_external_workbook_relationship,
+};
 use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::{is_spreadsheetml_name, relationship_attribute_value};
@@ -19,13 +22,18 @@ const MAX_CACHED_CELLS: usize = 1_000_000;
 const MAX_LINK_ITEMS: usize = 65_536;
 const MAX_CACHE_TEXT_BYTES: usize = 64 * 1024 * 1024;
 const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
-const TRANSITIONAL_SML: &str =
-    "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const TRANSITIONAL_SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 const TRANSITIONAL_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 const MAX_EXTERNAL_TARGET_BYTES: usize = 32 * 1024;
+/// Highest column index addressable by a SpreadsheetML cell reference (`XFD`).
+const MAX_CELL_COLUMN: u32 = 16_384;
+/// Highest row index addressable by a SpreadsheetML cell reference.
+const MAX_CELL_ROW: u32 = 1_048_576;
+/// Longest column prefix a valid reference can carry (`XFD` is three letters).
+const MAX_COLUMN_LETTERS: usize = 3;
 
 /// Namespace conformance used when authoring an external-link part.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -204,10 +212,7 @@ impl ExternalLinkKind {
     }
 
     /// Serialize this link without dereferencing or executing any target metadata.
-    pub fn to_xml_with_conformance(
-        &self,
-        conformance: ExternalLinkConformance,
-    ) -> Result<Vec<u8>> {
+    pub fn to_xml_with_conformance(&self, conformance: ExternalLinkConformance) -> Result<Vec<u8>> {
         let has_x14 = matches!(self, Self::Ole(link) if link.items.iter().any(|item| item.source == ExternalOleItemSource::Office2010));
         let mut xml = format!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><externalLink xmlns="{}""#,
@@ -243,11 +248,7 @@ pub(crate) fn build_external_link_part(
     part_uri: PackURI,
     kind: &ExternalLinkKind,
 ) -> Result<BlobPart> {
-    build_external_link_part_with_conformance(
-        part_uri,
-        kind,
-        ExternalLinkConformance::Transitional,
-    )
+    build_external_link_part_with_conformance(part_uri, kind, ExternalLinkConformance::Transitional)
 }
 
 pub(crate) fn build_external_link_part_with_conformance(
@@ -265,7 +266,7 @@ pub(crate) fn build_external_link_part_with_conformance(
         ExternalLinkKind::Workbook(link) => add_external_target_relationship(
             &mut part,
             &link.target,
-            &[rt::EXTERNAL_LINK_PATH, rt::STRICT_EXTERNAL_LINK_PATH],
+            EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES,
             "external workbook",
         )?,
         ExternalLinkKind::Ole(link) => add_external_target_relationship(
@@ -341,11 +342,9 @@ fn validate_external_target(
     if target.target().len() > MAX_EXTERNAL_TARGET_BYTES {
         return Err(limit(&format!("{description} target URI")));
     }
-    if target
-        .target()
-        .chars()
-        .any(|character| character.is_control() || character == '\u{fffe}' || character == '\u{ffff}')
-    {
+    if target.target().chars().any(|character| {
+        character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
+    }) {
         return Err(invalid(format!(
             "{description} target URI contains an invalid character"
         )));
@@ -353,9 +352,7 @@ fn validate_external_target(
     if target.relationship_id().len() > 1024
         || target.relationship_id().chars().any(char::is_control)
     {
-        return Err(invalid(format!(
-            "{description} relationship ID is invalid"
-        )));
+        return Err(invalid(format!("{description} relationship ID is invalid")));
     }
     if !allowed_types.contains(&target.relationship_type()) {
         return Err(invalid(format!(
@@ -369,7 +366,7 @@ fn validate_external_target(
 fn write_external_workbook(xml: &mut String, link: &ExternalWorkbookLink) -> Result<()> {
     validate_external_target(
         &link.target,
-        &[rt::EXTERNAL_LINK_PATH, rt::STRICT_EXTERNAL_LINK_PATH],
+        EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES,
         "external workbook",
     )?;
     xml.push_str("<externalBook");
@@ -1293,10 +1290,7 @@ pub(crate) fn load_external_link(
             if !relationship.is_external() {
                 return Err(invalid("externalBook target relationship must be external"));
             }
-            if !matches!(
-                relationship.reltype(),
-                rt::EXTERNAL_LINK_PATH | rt::STRICT_EXTERNAL_LINK_PATH
-            ) {
+            if !is_external_workbook_relationship(relationship.reltype()) {
                 return Err(invalid(format!(
                     "externalBook target has invalid relationship type '{}'",
                     relationship.reltype()
@@ -1571,32 +1565,35 @@ fn parse_cell_type(value: Option<&str>) -> Result<ExternalCellType> {
     }
 }
 
+/// Validate an `A1`-style cached cell reference.
+///
+/// Accepts the full SpreadsheetML address space, so multi-letter columns
+/// (`AA1` through `XFD1048576`) are valid. The column prefix is bounded to
+/// [`MAX_COLUMN_LETTERS`] so a long letter run cannot drive the accumulator.
 fn validate_cell_reference(value: &str) -> Result<()> {
+    let malformed = || invalid(format!("invalid external cached cell reference '{value}'"));
+
     let mut column = 0u32;
     let mut split = 0usize;
     for byte in value.bytes() {
-        if byte.is_ascii_alphabetic() && split == 0 {
-            column = column
-                .checked_mul(26)
-                .and_then(|n| n.checked_add(u32::from(byte.to_ascii_uppercase() - b'A' + 1)))
-                .ok_or_else(|| invalid("external cell column overflow"))?;
-        } else {
+        if !byte.is_ascii_alphabetic() {
             break;
         }
+        if split == MAX_COLUMN_LETTERS {
+            return Err(malformed());
+        }
+        column = column
+            .checked_mul(26)
+            .and_then(|n| n.checked_add(u32::from(byte.to_ascii_uppercase() - b'A' + 1)))
+            .ok_or_else(|| invalid("external cell column overflow"))?;
         split += 1;
     }
-    if split == 0 || split == value.len() || column > 16_384 {
-        return Err(invalid(format!(
-            "invalid external cached cell reference '{value}'"
-        )));
+    if split == 0 || split == value.len() || column > MAX_CELL_COLUMN {
+        return Err(malformed());
     }
-    let row = value[split..]
-        .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid external cached cell reference '{value}'")))?;
-    if row == 0 || row > 1_048_576 {
-        return Err(invalid(format!(
-            "invalid external cached cell reference '{value}'"
-        )));
+    let row = value[split..].parse::<u32>().map_err(|_| malformed())?;
+    if row == 0 || row > MAX_CELL_ROW {
+        return Err(malformed());
     }
     Ok(())
 }

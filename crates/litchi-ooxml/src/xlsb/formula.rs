@@ -32,7 +32,11 @@ use litchi_core::binary;
 /// Maximum size of an XLSB cell formula token stream.
 ///
 /// [MS-XLSB] 2.5.98.4 requires `cce` to be greater than zero and less than
-/// 16,385 bytes.
+/// 16,385 bytes. The upper bound is enforced; the lower bound is not, because
+/// Excel itself writes `cce == 0` for cells whose token stream is empty. Such
+/// a formula carries no tokens and evaluates to nothing, and treating it as
+/// fatal would reject the entire workbook over a single cell, so an empty
+/// token stream is preserved verbatim on both read and write instead.
 pub const MAX_CELL_FORMULA_BYTES: usize = 16_384;
 
 /// One entry from the workbook's `BrtExternSheet.rgXti` array.
@@ -1175,9 +1179,9 @@ impl CellParsedFormula {
         }
 
         let cce = binary::read_u32_le_at(data, 0)? as usize;
-        if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
+        if cce > MAX_CELL_FORMULA_BYTES {
             return Err(XlsbError::InvalidFormula(format!(
-                "cell formula token length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
+                "cell formula token length {cce} exceeds {MAX_CELL_FORMULA_BYTES}"
             )));
         }
         let cb_offset = 4usize.checked_add(cce).ok_or_else(|| {
@@ -1215,9 +1219,9 @@ impl CellParsedFormula {
 
     /// Serialize this formula with its two length prefixes.
     pub fn to_bytes(&self) -> XlsbResult<Vec<u8>> {
-        if self.rgce.is_empty() || self.rgce.len() > MAX_CELL_FORMULA_BYTES {
+        if self.rgce.len() > MAX_CELL_FORMULA_BYTES {
             return Err(XlsbError::InvalidFormula(format!(
-                "cell formula token length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
+                "cell formula token length {} exceeds {MAX_CELL_FORMULA_BYTES}",
                 self.rgce.len()
             )));
         }
@@ -5750,13 +5754,19 @@ mod tests {
     }
 
     #[test]
-    fn cell_parsed_formula_rejects_zero_and_oversized_token_streams() {
-        let zero = [0_u8; 8];
-        assert!(matches!(
-            CellParsedFormula::parse(&zero),
-            Err(XlsbError::InvalidFormula(_))
-        ));
+    fn cell_parsed_formula_accepts_the_empty_token_streams_excel_writes() {
+        // `cce == 0`, `cb == 0`: no tokens and no ancillary data.
+        let empty = [0_u8; 8];
+        let (formula, consumed) = CellParsedFormula::parse(&empty).unwrap();
+        assert!(formula.rgce.is_empty());
+        assert!(formula.rgcb.is_empty());
+        assert_eq!(consumed, empty.len());
+        // The empty stream must survive a write so reading cannot lose it.
+        assert_eq!(formula.to_bytes().unwrap(), empty);
+    }
 
+    #[test]
+    fn cell_parsed_formula_rejects_oversized_token_streams() {
         let mut oversized = Vec::new();
         oversized.extend_from_slice(&((MAX_CELL_FORMULA_BYTES as u32) + 1).to_le_bytes());
         oversized.extend_from_slice(&[0; 4]);

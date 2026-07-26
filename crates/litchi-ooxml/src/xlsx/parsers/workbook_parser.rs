@@ -498,11 +498,13 @@ impl WorkbookInfo {
             defined_name.local_sheet_id,
             defined_name.name.to_ascii_lowercase(),
         );
+        // Producers other than Excel repeat a name within one scope, most
+        // often the built-in `_xlnm.*` print and filter names. Excel resolves
+        // such a workbook to a single definition rather than refusing to open
+        // it, so the first definition wins and later repeats in the same scope
+        // are dropped. Distinct scopes remain independent.
         if !self.defined_name_keys.insert(key) {
-            return Err(invalid(format!(
-                "duplicate workbook defined name '{}' in the same scope",
-                defined_name.name
-            )));
+            return Ok(());
         }
         self.defined_names.push(defined_name);
         Ok(())
@@ -561,11 +563,12 @@ fn parse_sheet_element(
     if sheet_id == 0 {
         return Err(invalid("workbook sheet ID must be positive"));
     }
-    if let Some(state) = unqualified_attribute_value(element, b"state", decoder)?
-        && !matches!(state.as_str(), "visible" | "hidden" | "veryHidden")
-    {
-        return Err(invalid(format!("invalid workbook sheet state '{state}'")));
-    }
+    // `sheet/@state` is read but not retained here, so an unrecognised value
+    // is ignored rather than failing the workbook. Producers other than Excel
+    // emit values outside `ST_SheetState` (LibreOffice writes `state="show"`),
+    // and the schema default `visible` is the correct reading for anything
+    // that is not `hidden` or `veryHidden`. Callers that need the retained
+    // state use the sheet-visibility accessors on `Workbook`.
 
     Ok(WorksheetInfo {
         name,
@@ -799,9 +802,6 @@ mod tests {
                 r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="x" localSheetId="1">x</definedName></definedNames></workbook>"#
             ),
             format!(
-                r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="Same">1</definedName><definedName name="same">2</definedName></definedNames></workbook>"#
-            ),
-            format!(
                 r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames/><definedNames/></workbook>"#
             ),
             format!(
@@ -828,6 +828,46 @@ mod tests {
             "1".repeat(MAX_DEFINED_NAME_FORMULA_BYTES + 1)
         );
         assert!(parse_workbook_details(&oversized_formula).is_err());
+    }
+
+    /// Producers other than Excel repeat a defined name within one scope.
+    /// The first definition wins instead of the workbook being rejected.
+    #[test]
+    fn keeps_the_first_of_duplicate_defined_names_in_the_same_scope() {
+        let sheets = r#"<sheets><sheet name="One" sheetId="1" r:id="r1"/></sheets>"#;
+        // Name matching is case-insensitive, so `Same` and `same` collide.
+        let xml = format!(
+            r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="Same">1</definedName><definedName name="same">2</definedName></definedNames></workbook>"#
+        );
+        let parsed = parse_workbook_details(&xml).unwrap();
+        assert_eq!(parsed.defined_names.len(), 1);
+        assert_eq!(parsed.defined_names[0].name, "Same");
+        assert_eq!(parsed.defined_names[0].reference, "1");
+    }
+
+    /// The same name in two different sheet scopes is not a duplicate.
+    #[test]
+    fn keeps_same_defined_name_in_distinct_scopes() {
+        let sheets = r#"<sheets><sheet name="One" sheetId="1" r:id="r1"/></sheets>"#;
+        let xml = format!(
+            r#"<workbook xmlns="{S}" xmlns:r="{R}">{sheets}<definedNames><definedName name="x">1</definedName><definedName name="x" localSheetId="0">2</definedName></definedNames></workbook>"#
+        );
+        let parsed = parse_workbook_details(&xml).unwrap();
+        assert_eq!(parsed.defined_names.len(), 2);
+    }
+
+    /// `sheet/@state` values outside `ST_SheetState` must not fail the
+    /// workbook; LibreOffice writes `state="show"` (tdf#118668).
+    #[test]
+    fn tolerates_unrecognised_sheet_state_values() {
+        for state in ["show", "", "VISIBLE", "bogus"] {
+            let xml = format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><sheets><sheet name="One" sheetId="1" state="{state}" r:id="r1"/></sheets></workbook>"#
+            );
+            let parsed = parse_workbook_details(&xml).unwrap_or_else(|e| panic!("{state}: {e}"));
+            assert_eq!(parsed.sheets.len(), 1, "{state}");
+            assert_eq!(parsed.sheets[0].name, "One", "{state}");
+        }
     }
 
     #[test]

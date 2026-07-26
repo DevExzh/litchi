@@ -9,6 +9,10 @@
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types as rt, wide_str_with_len};
 
+/// Maximum number of leading future-record wrapper blocks skipped while
+/// looking for the record that opens a part stream.
+const MAX_LEADING_WRAPPER_BLOCKS: usize = 16;
+
 /// `BrtBeginPRule` / `BrtEndPRule` (MS-XLSB 2.4.186): unmodelled pivot rule.
 const BEGIN_PRULE: u16 = 247;
 const END_PRULE: u16 = 248;
@@ -47,6 +51,41 @@ impl<'a> RecordWalker<'a> {
             .ok_or_else(|| XlsbError::UnexpectedEndOfStream(context.to_string()))
     }
 
+    /// Read the record that opens a part stream, requiring it to be
+    /// `begin_type`.
+    ///
+    /// Excel may prefix a part with future-record wrapper blocks
+    /// (`BrtACBegin`/`BrtACEnd` and `BrtFRTBegin`/`BrtFRTEnd`) that carry
+    /// application content a given reader version does not model. MS-XLSB
+    /// requires readers to skip wrapper blocks they do not understand, so any
+    /// leading balanced wrappers are consumed before the expected begin record
+    /// is matched. At most [`MAX_LEADING_WRAPPER_BLOCKS`] are skipped so a
+    /// crafted stream cannot loop unboundedly.
+    pub(crate) fn required_begin(
+        &mut self,
+        begin_type: u16,
+        context: &'static str,
+    ) -> XlsbResult<XlsbRecord> {
+        for _ in 0..MAX_LEADING_WRAPPER_BLOCKS {
+            let record = self.required(context)?;
+            let record_type = record.header.record_type;
+            if record_type == begin_type {
+                return Ok(record);
+            }
+            if !matches!(record_type, rt::AC_BEGIN | rt::FRT_BEGIN) {
+                return Err(XlsbError::UnexpectedRecord {
+                    expected: begin_type,
+                    found: record_type,
+                });
+            }
+            self.skip_unhandled(record_type, context)?;
+        }
+        Err(XlsbError::UnexpectedRecord {
+            expected: begin_type,
+            found: rt::AC_BEGIN,
+        })
+    }
+
     /// Consume records up to and including `end_type`, tolerating nested
     /// collections of the same record pair.
     pub(crate) fn skip_collection(
@@ -71,7 +110,11 @@ impl<'a> RecordWalker<'a> {
 
     /// Skip a record the parser does not handle: a balanced collection when
     /// the type is a known begin record, a single record otherwise.
-    pub(crate) fn skip_unhandled(&mut self, record_type: u16, context: &'static str) -> XlsbResult<()> {
+    pub(crate) fn skip_unhandled(
+        &mut self,
+        record_type: u16,
+        context: &'static str,
+    ) -> XlsbResult<()> {
         if let Some(end_type) = paired_end(record_type) {
             self.skip_collection(record_type, end_type, context)?;
         }

@@ -87,7 +87,7 @@ struct SharedStringParser {
     rich_text: HashMap<usize, Vec<RichTextRun>>,
     pending_string: Option<PendingString>,
     pending_run: Option<PendingRun>,
-    expected_count: Option<u32>,
+    /// `sst/@uniqueCount`, used only to size the string table up front.
     expected_unique_count: Option<u32>,
 }
 
@@ -98,7 +98,6 @@ impl SharedStringParser {
             rich_text: HashMap::new(),
             pending_string: None,
             pending_run: None,
-            expected_count: None,
             expected_unique_count: None,
         }
     }
@@ -191,21 +190,21 @@ impl SharedStringParser {
             }
         }
 
-        parser.validate_counts()?;
         Ok(SharedStrings {
             strings: parser.strings,
             rich_text: parser.rich_text,
         })
     }
 
+    /// Read the advisory `count` and `uniqueCount` hints on the `sst` root.
+    ///
+    /// ECMA-376 declares both as optional, and Excel writes tables whose hints
+    /// disagree with the `si` children actually present. The parsed items are
+    /// authoritative, so a missing, unparseable, or contradictory hint is
+    /// ignored rather than failing the workbook; `uniqueCount` only ever sizes
+    /// the initial allocation, itself capped at `MAX_PREALLOCATED_STRINGS`.
     fn parse_root_attributes(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        self.expected_count = optional_u32(element, b"count", decoder, "shared-string count")?;
-        self.expected_unique_count = optional_u32(
-            element,
-            b"uniqueCount",
-            decoder,
-            "shared-string unique count",
-        )?;
+        self.expected_unique_count = optional_advisory_u32(element, b"uniqueCount", decoder)?;
         if let Some(expected) = self.expected_unique_count {
             let capacity = usize::try_from(expected)
                 .unwrap_or(usize::MAX)
@@ -481,26 +480,6 @@ impl SharedStringParser {
         }
         Ok(())
     }
-
-    fn validate_counts(&self) -> Result<()> {
-        let actual = u32::try_from(self.strings.len())
-            .map_err(|_| invalid("shared-string count exceeds u32"))?;
-        if let Some(expected) = self.expected_unique_count
-            && expected != actual
-        {
-            return Err(invalid(format!(
-                "shared-string uniqueCount declares {expected}, parsed {actual}"
-            )));
-        }
-        if let Some(expected) = self.expected_count
-            && expected < actual
-        {
-            return Err(invalid(format!(
-                "shared-string count declares {expected}, below {actual} unique strings"
-            )));
-        }
-        Ok(())
-    }
 }
 
 impl SharedStrings {
@@ -567,19 +546,17 @@ fn required_string(
         .ok_or_else(|| invalid(format!("missing {description} attribute")))
 }
 
-fn optional_u32(
+/// Read an optional attribute that is only a hint, ignoring unusable values.
+///
+/// Returns `None` when the attribute is absent or does not parse as a `u32`,
+/// so a malformed hint never fails the surrounding parse.
+fn optional_advisory_u32(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: Decoder,
-    description: &str,
 ) -> Result<Option<u32>> {
-    unqualified_attribute_value(element, name, decoder)?
-        .map(|value| {
-            value
-                .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
-        })
-        .transpose()
+    Ok(unqualified_attribute_value(element, name, decoder)?
+        .and_then(|value| value.parse::<u32>().ok()))
 }
 
 fn boolean_property(element: &BytesStart<'_>, decoder: Decoder, description: &str) -> Result<bool> {
@@ -727,8 +704,6 @@ mod tests {
     #[test]
     fn rejects_bad_counts_structure_and_run_properties() {
         for xml in [
-            format!(r#"<sst xmlns="{S}" uniqueCount="2"><si><t>one</t></si></sst>"#),
-            format!(r#"<sst xmlns="{S}" count="0"><si><t>one</t></si></sst>"#),
             format!(r#"<sst xmlns="{S}"><si><t>one</t><r><t>two</t></r></si></sst>"#),
             format!(r#"<sst xmlns="{S}"><si><r><rPr><sz val="NaN"/></rPr><t>x</t></r></si></sst>"#),
             format!(r#"<sst xmlns="{S}"><si><r><rPr><b/><b/></rPr><t>x</t></r></si></sst>"#),
@@ -737,5 +712,32 @@ mod tests {
         ] {
             assert!(SharedStrings::parse(&xml).is_err(), "accepted {xml}");
         }
+    }
+
+    /// `sst/@count` and `sst/@uniqueCount` are optional hints, and Excel emits
+    /// tables whose hints disagree with the `si` children present. The parsed
+    /// items stay authoritative instead of the workbook being rejected.
+    #[test]
+    fn treats_contradictory_and_malformed_count_hints_as_advisory() {
+        for xml in [
+            // uniqueCount too high, too low, and count below the item total.
+            format!(r#"<sst xmlns="{S}" uniqueCount="2"><si><t>one</t></si></sst>"#),
+            format!(r#"<sst xmlns="{S}" uniqueCount="0"><si><t>one</t></si></sst>"#),
+            format!(r#"<sst xmlns="{S}" count="0"><si><t>one</t></si></sst>"#),
+            // Non-numeric and negative hints are ignored rather than fatal.
+            format!(r#"<sst xmlns="{S}" uniqueCount="NaN"><si><t>one</t></si></sst>"#),
+            format!(r#"<sst xmlns="{S}" count="-1"><si><t>one</t></si></sst>"#),
+        ] {
+            let parsed = SharedStrings::parse(&xml).unwrap_or_else(|e| panic!("{xml}: {e}"));
+            assert_eq!(parsed.strings(), ["one"], "{xml}");
+        }
+    }
+
+    /// An absurd `uniqueCount` must not drive the initial allocation.
+    #[test]
+    fn oversized_unique_count_hint_does_not_preallocate() {
+        let xml = format!(r#"<sst xmlns="{S}" uniqueCount="4294967295"><si><t>one</t></si></sst>"#);
+        let parsed = SharedStrings::parse(&xml).unwrap();
+        assert_eq!(parsed.strings(), ["one"]);
     }
 }

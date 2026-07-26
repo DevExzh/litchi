@@ -53,13 +53,7 @@ const FRT_BLANK_LEN: usize = 4;
 /// failing.
 pub fn parse_table_part(data: &[u8]) -> XlsbResult<XlsbTable> {
     let mut walker = RecordWalker::new(data);
-    let first = walker.required("BrtBeginList")?;
-    if first.header.record_type != rt::BEGIN_LIST {
-        return Err(XlsbError::UnexpectedRecord {
-            expected: rt::BEGIN_LIST,
-            found: first.header.record_type,
-        });
-    }
+    let first = walker.required_begin(rt::BEGIN_LIST, "BrtBeginList")?;
     let mut table = parse_list_payload(&first.data)?;
     while let Some(record) = walker.next()? {
         match record.header.record_type {
@@ -129,7 +123,6 @@ fn parse_list_parts(
         "BrtEndListParts".to_string(),
     ))
 }
-
 
 /// `BrtBeginList` payload (MS-XLSB 2.4.100).
 fn parse_list_payload(data: &[u8]) -> XlsbResult<XlsbTable> {
