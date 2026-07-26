@@ -6,7 +6,7 @@
 
 use crate::common::mce::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::{NsReader, XmlVersion};
@@ -36,6 +36,8 @@ const MAX_OUTPUT_XML: usize = 32 * 1024 * 1024;
 const MAX_BINARY: usize = 64 * 1024 * 1024;
 const MAX_TOTAL_BINARY: usize = 256 * 1024 * 1024;
 const MAX_CONTROLS: usize = 65_535;
+const MAX_SHAPE_ID: u32 = 67_098_623;
+const MAX_CONTROL_NAME_CHARS: usize = 32;
 const MAX_PROPERTIES: usize = 65_536;
 const MAX_STRING: usize = 1024 * 1024;
 const MAX_DEPTH: usize = 256;
@@ -137,11 +139,20 @@ pub struct OpaqueActiveXBinary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpaqueActiveXPreviewImage {
+    pub relationship_id: String,
+    pub part_uri: PackURI,
+    pub content_type: String,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadedActiveXControl {
     pub control: WorksheetControl,
     pub descriptor_uri: PackURI,
     pub descriptor: ActiveXDescriptor,
     pub binaries: Vec<OpaqueActiveXBinary>,
+    pub preview: Option<OpaqueActiveXPreviewImage>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -192,8 +203,10 @@ impl WorksheetControls {
                 ],
             )?;
             let shape_id = req_u32(node, "", "shapeId")?;
-            if shape_id == 0 || !shape_ids.insert(shape_id) {
-                return Err(invalid("control shapeId must be nonzero and unique"));
+            if !(1..=MAX_SHAPE_ID).contains(&shape_id) || !shape_ids.insert(shape_id) {
+                return Err(invalid(
+                    "control shapeId must be unique and within Office's supported range",
+                ));
             }
             let relationship_id =
                 relationship_attr(node, "id")?.ok_or_else(|| invalid("control is missing r:id"))?;
@@ -201,6 +214,9 @@ impl WorksheetControls {
             let name = attr(node, "", "name")?;
             if let Some(name) = name.as_ref() {
                 bounded(name, "control name")?;
+                if name.chars().count() > MAX_CONTROL_NAME_CHARS {
+                    return Err(invalid("control name exceeds Office's 32-character limit"));
+                }
                 if !names.insert(name.clone()) {
                     return Err(invalid("duplicate control name"));
                 }
@@ -248,6 +264,45 @@ impl WorksheetControls {
         }
         Ok(out.into_bytes())
     }
+}
+
+/// Replaces the direct worksheet `controls` child while preserving unrelated bytes.
+///
+/// An empty value removes the collection. Controls selected only through an MCE
+/// `AlternateContent` branch are rejected because rewriting that branch would not
+/// be byte-preserving.
+pub fn replace_worksheet_controls_xml(xml: &[u8], controls: &WorksheetControls) -> Result<Vec<u8>> {
+    let parsed = WorksheetControls::parse(xml)?;
+    if !controls.controls.is_empty() {
+        validate_controls(controls)?;
+    }
+    let location = worksheet_controls_span(xml)?;
+    if !parsed.controls.is_empty() && location.span.is_none() {
+        return Err(invalid(
+            "MCE-selected controls cannot be mutated as a direct worksheet child",
+        ));
+    }
+    let fragment = if controls.controls.is_empty() {
+        Vec::new()
+    } else {
+        controls_fragment(controls, location.strict)?
+    };
+    let (start, end) = location
+        .span
+        .unwrap_or((location.insertion, location.insertion));
+    let size = xml
+        .len()
+        .checked_sub(end - start)
+        .and_then(|n| n.checked_add(fragment.len()))
+        .ok_or_else(|| limit("updated worksheet XML bytes"))?;
+    if size > MAX_OUTPUT_XML {
+        return Err(limit("updated worksheet XML bytes"));
+    }
+    let mut out = Vec::with_capacity(size);
+    out.extend_from_slice(&xml[..start]);
+    out.extend_from_slice(&fragment);
+    out.extend_from_slice(&xml[end..]);
+    Ok(out)
 }
 
 impl ActiveXDescriptor {
@@ -358,7 +413,7 @@ pub fn load_from_worksheet(
     let mut loaded = Vec::with_capacity(parsed.controls.len());
     let mut total_binary = 0usize;
     for control in parsed.controls {
-        if let Some(id) = control
+        let preview = if let Some(id) = control
             .properties
             .as_ref()
             .and_then(|p| p.preview_relationship_id.as_deref())
@@ -379,7 +434,24 @@ pub fn load_from_worksheet(
                     got: part.content_type().into(),
                 });
             }
-        }
+            if part.blob().len() > MAX_BINARY {
+                return Err(limit("ActiveX preview image bytes"));
+            }
+            total_binary = total_binary
+                .checked_add(part.blob().len())
+                .ok_or_else(|| limit("aggregate ActiveX resource bytes"))?;
+            if total_binary > MAX_TOTAL_BINARY {
+                return Err(limit("aggregate ActiveX resource bytes"));
+            }
+            Some(OpaqueActiveXPreviewImage {
+                relationship_id: id.to_string(),
+                part_uri: rel.target_partname()?,
+                content_type: part.content_type().to_string(),
+                bytes: part.blob().to_vec(),
+            })
+        } else {
+            None
+        };
         let rel = worksheet
             .rels()
             .get(&control.relationship_id)
@@ -446,9 +518,556 @@ pub fn load_from_worksheet(
             descriptor_uri,
             descriptor,
             binaries,
+            preview,
         });
     }
     Ok(ActiveXControlSet { controls: loaded })
+}
+
+/// Stores a complete, inert ActiveX graph on a worksheet that has no controls.
+pub fn store_on_worksheet(
+    package: &mut OpcPackage,
+    worksheet_uri: &PackURI,
+    value: &ActiveXControlSet,
+) -> Result<()> {
+    let prepared = prepare_graph(package, worksheet_uri, value, true)?;
+    install_graph(package, worksheet_uri, prepared)
+}
+
+/// Atomically replaces the complete inert ActiveX graph of a worksheet.
+///
+/// An empty set removes the graph. An in-memory package snapshot is used only
+/// for rollback; ActiveX payloads are still copied and never interpreted.
+pub fn replace_on_worksheet(
+    package: &mut OpcPackage,
+    worksheet_uri: &PackURI,
+    value: &ActiveXControlSet,
+) -> Result<()> {
+    if value.controls.is_empty() {
+        remove_from_worksheet(package, worksheet_uri)?;
+        return Ok(());
+    }
+    validate_control_set(value)?;
+    let snapshot = litchi_opc::PackageWriter::to_bytes(package)?;
+    let result = (|| {
+        remove_from_worksheet(package, worksheet_uri)?;
+        store_on_worksheet(package, worksheet_uri, value)
+    })();
+    if let Err(error) = result {
+        *package = OpcPackage::from_bytes(&snapshot)?;
+        return Err(error);
+    }
+    Ok(())
+}
+
+/// Removes the complete ActiveX graph from a worksheet.
+///
+/// Shared descriptor, binary, or preview parts are retained while any other
+/// internal relationship still targets them.
+pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_uri: &PackURI) -> Result<bool> {
+    let loaded = load_from_worksheet(package, worksheet_uri)?;
+    if loaded.controls.is_empty() {
+        return Ok(false);
+    }
+    let worksheet_xml = package.get_part(worksheet_uri)?.blob().to_vec();
+    let updated = replace_worksheet_controls_xml(&worksheet_xml, &WorksheetControls::default())?;
+    let control_ids: Vec<String> = loaded
+        .controls
+        .iter()
+        .map(|item| item.control.relationship_id.clone())
+        .collect();
+    let preview_ids: Vec<String> = loaded
+        .controls
+        .iter()
+        .filter_map(|item| item.preview.as_ref().map(|p| p.relationship_id.clone()))
+        .collect();
+    let remaining_ids = relationship_ids_in_xml(&updated)?;
+    package.clear_digital_signatures().map_err(|error| {
+        OoxmlError::Other(format!(
+            "failed to clear signatures before removing ActiveX controls: {error}"
+        ))
+    })?;
+    {
+        let worksheet = package.get_part_mut(worksheet_uri)?;
+        for id in &control_ids {
+            worksheet.rels_mut().remove(id);
+        }
+        for id in &preview_ids {
+            if !remaining_ids.contains(id) {
+                worksheet.rels_mut().remove(id);
+            }
+        }
+        worksheet.set_blob(updated);
+    }
+
+    let mut binary_candidates = Vec::new();
+    for item in &loaded.controls {
+        if !part_has_inbound_relationship(package, &item.descriptor_uri)? {
+            package.remove_part(&item.descriptor_uri);
+            binary_candidates.extend(item.binaries.iter().map(|b| b.part_uri.clone()));
+        }
+    }
+    for uri in binary_candidates {
+        if !part_has_inbound_relationship(package, &uri)? {
+            package.remove_part(&uri);
+        }
+    }
+    for preview in loaded
+        .controls
+        .iter()
+        .filter_map(|item| item.preview.as_ref())
+    {
+        if !part_has_inbound_relationship(package, &preview.part_uri)? {
+            package.remove_part(&preview.part_uri);
+        }
+    }
+    Ok(true)
+}
+
+struct PreparedGraph {
+    worksheet_xml: Vec<u8>,
+    strict: bool,
+    descriptors: Vec<PreparedDescriptor>,
+    resources: Vec<(PackURI, String, Vec<u8>)>,
+    worksheet_relationships: Vec<(String, PackURI, bool)>,
+}
+
+struct PreparedDescriptor {
+    uri: PackURI,
+    xml: Vec<u8>,
+    relationships: Vec<(String, PackURI)>,
+}
+
+fn prepare_graph(
+    package: &OpcPackage,
+    worksheet_uri: &PackURI,
+    value: &ActiveXControlSet,
+    require_empty: bool,
+) -> Result<PreparedGraph> {
+    validate_control_set(value)?;
+    let worksheet = package.get_part(worksheet_uri)?;
+    if worksheet.content_type() != WORKSHEET_CONTENT_TYPE {
+        return Err(OoxmlError::InvalidContentType {
+            expected: WORKSHEET_CONTENT_TYPE.into(),
+            got: worksheet.content_type().into(),
+        });
+    }
+    let existing = WorksheetControls::parse(worksheet.blob())?;
+    if require_empty
+        && (!existing.controls.is_empty()
+            || worksheet
+                .rels()
+                .iter()
+                .any(|rel| matches!(rel.reltype(), CONTROL_REL | CONTROL_REL_STRICT)))
+    {
+        return Err(invalid("worksheet already has an ActiveX control graph"));
+    }
+    let controls = WorksheetControls {
+        controls: value
+            .controls
+            .iter()
+            .map(|item| item.control.clone())
+            .collect(),
+    };
+    let worksheet_xml = replace_worksheet_controls_xml(worksheet.blob(), &controls)?;
+    let strict = worksheet_controls_span(worksheet.blob())?.strict;
+
+    let mut occupied_ids: HashSet<String> = worksheet
+        .rels()
+        .iter()
+        .map(|r| r.r_id().to_string())
+        .collect();
+    let mut part_uris = HashSet::new();
+    let mut descriptors = Vec::with_capacity(value.controls.len());
+    let mut resources = Vec::new();
+    let mut worksheet_relationships = Vec::new();
+    for item in &value.controls {
+        validate_rel_id(&item.control.relationship_id)?;
+        if !occupied_ids.insert(item.control.relationship_id.clone()) {
+            return Err(relerr("duplicate or occupied worksheet relationship ID"));
+        }
+        validate_part_location(&item.descriptor_uri, "/xl/activeX/", "ActiveX descriptor")?;
+        reserve_new_part(package, &mut part_uris, &item.descriptor_uri)?;
+        let descriptor_xml = item.descriptor.to_xml()?;
+        let mut expected_ids = HashSet::new();
+        collect_binary_ids_descriptor(&item.descriptor, &mut expected_ids)?;
+        let actual_ids: HashSet<String> = item
+            .binaries
+            .iter()
+            .map(|binary| binary.relationship_id.clone())
+            .collect();
+        if expected_ids != actual_ids || actual_ids.len() != item.binaries.len() {
+            return Err(relerr(
+                "descriptor relationship IDs must exactly match supplied binaries",
+            ));
+        }
+        let mut descriptor_rels = Vec::with_capacity(item.binaries.len());
+        for binary in &item.binaries {
+            validate_rel_id(&binary.relationship_id)?;
+            validate_part_location(&binary.part_uri, "/xl/activeX/", "ActiveX binary")?;
+            if binary.bytes.len() > MAX_BINARY {
+                return Err(limit("ActiveX binary bytes"));
+            }
+            reserve_new_part(package, &mut part_uris, &binary.part_uri)?;
+            descriptor_rels.push((binary.relationship_id.clone(), binary.part_uri.clone()));
+            resources.push((
+                binary.part_uri.clone(),
+                BINARY_CONTENT_TYPE.into(),
+                binary.bytes.clone(),
+            ));
+        }
+        worksheet_relationships.push((
+            item.control.relationship_id.clone(),
+            item.descriptor_uri.clone(),
+            false,
+        ));
+        match (&item.control.properties, &item.preview) {
+            (Some(properties), Some(preview)) => {
+                if properties.preview_relationship_id.as_deref()
+                    != Some(preview.relationship_id.as_str())
+                {
+                    return Err(relerr(
+                        "control preview relationship ID does not match supplied preview",
+                    ));
+                }
+                validate_rel_id(&preview.relationship_id)?;
+                if !occupied_ids.insert(preview.relationship_id.clone()) {
+                    return Err(relerr("duplicate or occupied worksheet relationship ID"));
+                }
+                validate_part_location(&preview.part_uri, "/xl/media/", "ActiveX preview")?;
+                if !preview.content_type.starts_with("image/") {
+                    return Err(invalid("ActiveX preview content type must be image/*"));
+                }
+                if preview.bytes.len() > MAX_BINARY {
+                    return Err(limit("ActiveX preview image bytes"));
+                }
+                reserve_new_part(package, &mut part_uris, &preview.part_uri)?;
+                worksheet_relationships.push((
+                    preview.relationship_id.clone(),
+                    preview.part_uri.clone(),
+                    true,
+                ));
+                resources.push((
+                    preview.part_uri.clone(),
+                    preview.content_type.clone(),
+                    preview.bytes.clone(),
+                ));
+            },
+            (Some(properties), None) if properties.preview_relationship_id.is_some() => {
+                return Err(relerr("control references a preview that was not supplied"));
+            },
+            (_, Some(_)) => return Err(relerr("supplied preview is not referenced by controlPr")),
+            _ => {},
+        }
+        descriptors.push(PreparedDescriptor {
+            uri: item.descriptor_uri.clone(),
+            xml: descriptor_xml,
+            relationships: descriptor_rels,
+        });
+    }
+    Ok(PreparedGraph {
+        worksheet_xml,
+        strict,
+        descriptors,
+        resources,
+        worksheet_relationships,
+    })
+}
+
+fn install_graph(
+    package: &mut OpcPackage,
+    worksheet_uri: &PackURI,
+    prepared: PreparedGraph,
+) -> Result<()> {
+    package.clear_digital_signatures().map_err(|error| {
+        OoxmlError::Other(format!(
+            "failed to clear signatures before storing ActiveX controls: {error}"
+        ))
+    })?;
+    for (uri, content_type, bytes) in prepared.resources {
+        package.try_add_part(Box::new(BlobPart::new(uri, content_type, bytes)))?;
+    }
+    for descriptor in prepared.descriptors {
+        let mut part = BlobPart::new(
+            descriptor.uri.clone(),
+            DESCRIPTOR_CONTENT_TYPE.into(),
+            descriptor.xml,
+        );
+        for (id, target) in descriptor.relationships {
+            part.rels_mut().try_add_relationship(
+                BINARY_REL.into(),
+                target.relative_ref(descriptor.uri.base_uri()),
+                id,
+                TargetMode::Internal,
+            )?;
+        }
+        package.try_add_part(Box::new(part))?;
+    }
+    let worksheet = package.get_part_mut(worksheet_uri)?;
+    for (id, target, preview) in prepared.worksheet_relationships {
+        worksheet.rels_mut().try_add_relationship(
+            if preview {
+                if prepared.strict {
+                    IMAGE_REL_STRICT
+                } else {
+                    IMAGE_REL
+                }
+            } else if prepared.strict {
+                CONTROL_REL_STRICT
+            } else {
+                CONTROL_REL
+            }
+            .into(),
+            target.relative_ref(worksheet_uri.base_uri()),
+            id,
+            TargetMode::Internal,
+        )?;
+    }
+    worksheet.set_blob(prepared.worksheet_xml);
+    Ok(())
+}
+
+fn controls_fragment(value: &WorksheetControls, strict: bool) -> Result<Vec<u8>> {
+    validate_controls(value)?;
+    let rel = if strict { REL_STRICT } else { REL };
+    let xdr = if strict { XDR_STRICT } else { XDR };
+    let mut out = String::with_capacity(256 + value.controls.len() * 256);
+    out.push_str("<controls xmlns:r=\"");
+    out.push_str(rel);
+    out.push_str("\" xmlns:xdr=\"");
+    out.push_str(xdr);
+    out.push_str("\">");
+    for control in &value.controls {
+        write_control(&mut out, control);
+    }
+    out.push_str("</controls>");
+    if out.len() > MAX_OUTPUT_XML {
+        return Err(limit("controls XML bytes"));
+    }
+    Ok(out.into_bytes())
+}
+
+struct WorksheetControlsLocation {
+    strict: bool,
+    span: Option<(usize, usize)>,
+    insertion: usize,
+}
+
+fn worksheet_controls_span(xml: &[u8]) -> Result<WorksheetControlsLocation> {
+    if xml.len() > MAX_XML {
+        return Err(limit("worksheet XML bytes"));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut strict = false;
+    let mut root = false;
+    let mut controls_start = None;
+    let mut controls_span = None;
+    let mut insertion = None;
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("worksheet XML offset overflow"))?;
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) => {
+                let namespace = resolved_ns(&resolved)?;
+                if depth == 0 {
+                    if element.local_name().as_ref() != b"worksheet"
+                        || !matches!(namespace.as_str(), SML | SML_STRICT)
+                    {
+                        return Err(invalid("expected SpreadsheetML worksheet root"));
+                    }
+                    strict = namespace == SML_STRICT;
+                    root = true;
+                } else if depth == 1 && namespace == if strict { SML_STRICT } else { SML } {
+                    match element.local_name().as_ref() {
+                        b"controls" if controls_start.replace(start).is_some() => {
+                            return Err(invalid("worksheet has multiple direct controls"));
+                        },
+                        b"controls" => {},
+                        b"webPublishItems" | b"tableParts" | b"extLst" => {
+                            insertion.get_or_insert(start);
+                        },
+                        _ => {},
+                    }
+                }
+                depth += 1;
+                if depth > MAX_DEPTH {
+                    return Err(limit("worksheet XML depth"));
+                }
+            },
+            Event::Empty(element) => {
+                let namespace = resolved_ns(&resolved)?;
+                if depth == 1 && namespace == if strict { SML_STRICT } else { SML } {
+                    if element.local_name().as_ref() == b"controls" {
+                        return Err(invalid("empty controls collection is not valid"));
+                    }
+                    if matches!(
+                        element.local_name().as_ref(),
+                        b"webPublishItems" | b"tableParts" | b"extLst"
+                    ) {
+                        insertion.get_or_insert(start);
+                    }
+                }
+            },
+            Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid("unexpected worksheet closing element"));
+                }
+                if depth == 2 && element.local_name().as_ref() == b"controls" {
+                    let start = controls_start
+                        .take()
+                        .ok_or_else(|| invalid("mismatched controls closing element"))?;
+                    let end = usize::try_from(reader.buffer_position())
+                        .map_err(|_| invalid("worksheet XML offset overflow"))?;
+                    controls_span = Some((start, end));
+                }
+                if depth == 1 && element.local_name().as_ref() == b"worksheet" {
+                    insertion.get_or_insert(start);
+                }
+                depth -= 1;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTDs and processing instructions are rejected"));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if !root || depth != 0 || controls_start.is_some() {
+        return Err(invalid("invalid worksheet XML"));
+    }
+    Ok(WorksheetControlsLocation {
+        strict,
+        span: controls_span,
+        insertion: insertion.ok_or_else(|| invalid("missing worksheet closing element"))?,
+    })
+}
+
+fn validate_control_set(value: &ActiveXControlSet) -> Result<()> {
+    if value.controls.is_empty() || value.controls.len() > MAX_CONTROLS {
+        return Err(invalid("ActiveX control set requires 1..65535 controls"));
+    }
+    validate_controls(&WorksheetControls {
+        controls: value
+            .controls
+            .iter()
+            .map(|item| item.control.clone())
+            .collect(),
+    })?;
+    let mut total = 0usize;
+    for item in &value.controls {
+        validate_descriptor(&item.descriptor)?;
+        for binary in &item.binaries {
+            total = total
+                .checked_add(binary.bytes.len())
+                .ok_or_else(|| limit("aggregate ActiveX resource bytes"))?;
+        }
+        if let Some(preview) = item.preview.as_ref() {
+            total = total
+                .checked_add(preview.bytes.len())
+                .ok_or_else(|| limit("aggregate ActiveX resource bytes"))?;
+        }
+    }
+    if total > MAX_TOTAL_BINARY {
+        return Err(limit("aggregate ActiveX resource bytes"));
+    }
+    Ok(())
+}
+
+fn reserve_new_part(
+    package: &OpcPackage,
+    reserved: &mut HashSet<PackURI>,
+    uri: &PackURI,
+) -> Result<()> {
+    if reserved.iter().any(|other| other.is_equivalent_to(uri)) {
+        return Err(invalid("ActiveX graph contains conflicting part names"));
+    }
+    package.validate_new_part_name(uri)?;
+    reserved.insert(uri.clone());
+    Ok(())
+}
+
+fn validate_part_location(uri: &PackURI, prefix: &str, kind: &str) -> Result<()> {
+    let Some(filename) = uri.as_str().strip_prefix(prefix) else {
+        return Err(invalid(format!("{kind} must be stored below {prefix}")));
+    };
+    if filename.is_empty() || filename.contains('/') {
+        return Err(invalid(format!(
+            "{kind} must be a direct child of {prefix}"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_rel_id(value: &str) -> Result<()> {
+    let mut bytes = value.bytes();
+    if !matches!(bytes.next(), Some(b'A'..=b'Z' | b'a'..=b'z' | b'_'))
+        || !bytes.all(|b| matches!(b, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'.' | b'-'))
+    {
+        return Err(relerr("relationship ID must be an XML NCName"));
+    }
+    bounded(value, "relationship ID")
+}
+
+fn relationship_ids_in_xml(xml: &[u8]) -> Result<HashSet<String>> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut buffer = Vec::new();
+    let mut ids = HashSet::new();
+    loop {
+        let resolver = reader.resolver().clone();
+        let (_, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                for attribute in element.attributes().with_checks(true) {
+                    let attribute =
+                        attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    let (namespace, _) = resolver.resolve_attribute(attribute.key);
+                    if matches!(namespace, ResolveResult::Bound(Namespace(value)) if matches!(value, b"http://schemas.openxmlformats.org/officeDocument/2006/relationships" | b"http://purl.oclc.org/ooxml/officeDocument/relationships"))
+                    {
+                        ids.insert(
+                            attribute
+                                .decoded_and_normalized_value(
+                                    XmlVersion::Explicit1_0,
+                                    reader.decoder(),
+                                )
+                                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                                .into_owned(),
+                        );
+                    }
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTDs and processing instructions are rejected"));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    Ok(ids)
+}
+
+fn part_has_inbound_relationship(package: &OpcPackage, target: &PackURI) -> Result<bool> {
+    for relationship in package.rels().iter() {
+        if !relationship.is_external() && relationship.target_partname()? == *target {
+            return Ok(true);
+        }
+    }
+    for part in package.iter_parts() {
+        for relationship in part.rels().iter() {
+            if !relationship.is_external() && relationship.target_partname()? == *target {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 #[derive(Debug, Clone)]
@@ -857,13 +1476,18 @@ fn validate_controls(value: &WorksheetControls) -> Result<()> {
     let mut ids = HashSet::new();
     let mut names = HashSet::new();
     for c in &value.controls {
-        if c.shape_id == 0 || !ids.insert(c.shape_id) {
-            return Err(invalid("control shapeId must be nonzero and unique"));
+        if !(1..=MAX_SHAPE_ID).contains(&c.shape_id) || !ids.insert(c.shape_id) {
+            return Err(invalid(
+                "control shapeId must be unique and within Office's supported range",
+            ));
         }
         nonempty(&c.relationship_id, "control relationship ID")?;
         bounded(&c.relationship_id, "control relationship ID")?;
         if let Some(n) = c.name.as_ref() {
             bounded(n, "control name")?;
+            if n.chars().count() > MAX_CONTROL_NAME_CHARS {
+                return Err(invalid("control name exceeds Office's 32-character limit"));
+            }
             if !names.insert(n) {
                 return Err(invalid("duplicate control name"));
             }
@@ -1247,7 +1871,7 @@ fn limit(value: impl Into<String>) -> OoxmlError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_opc::{BlobPart, Part};
+    use litchi_opc::{BlobPart, PackageWriter, Part};
 
     const WS: &str = "/xl/worksheets/sheet1.xml";
     fn fixture(bytes: &[u8]) -> ActiveXControlSet {
@@ -1290,10 +1914,14 @@ mod tests {
     #[test]
     fn poi_property_bag_header_and_footer() {
         for bytes in [
-            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/45540_form_Header.xlsx")
-                .as_slice(),
-            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/45540_form_Footer.xlsx")
-                .as_slice(),
+            include_bytes!(
+                "../../../../test-data/poi/test-data/spreadsheet/45540_form_Header.xlsx"
+            )
+            .as_slice(),
+            include_bytes!(
+                "../../../../test-data/poi/test-data/spreadsheet/45540_form_Footer.xlsx"
+            )
+            .as_slice(),
         ] {
             let set = fixture(bytes);
             assert_eq!(set.controls.len(), 40);
@@ -1469,6 +2097,173 @@ mod tests {
             }
             .to_xml()
             .is_err()
+        );
+    }
+
+    fn blank_package() -> OpcPackage {
+        let xml = format!(
+            r#"<worksheet xmlns="{SML}" xmlns:r="{REL}"><sheetData><row r="1"/></sheetData><oleObjects/><tableParts count="0"/><extLst/></worksheet>"#
+        );
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new(WS).unwrap(),
+            WORKSHEET_CONTENT_TYPE.into(),
+            xml.into_bytes(),
+        )));
+        package
+    }
+
+    fn binary_control(descriptor_uri: &str, binary_uri: &str) -> ActiveXControlSet {
+        ActiveXControlSet {
+            controls: vec![LoadedActiveXControl {
+                control: WorksheetControl {
+                    shape_id: 42,
+                    relationship_id: "rIdControl".into(),
+                    name: Some("Generated control".into()),
+                    properties: Some(ControlProperties {
+                        anchor: ObjectAnchor {
+                            from: Marker {
+                                column: 1,
+                                column_offset: 2,
+                                row: 3,
+                                row_offset: 4,
+                            },
+                            to: Marker {
+                                column: 5,
+                                column_offset: 6,
+                                row: 7,
+                                row_offset: 8,
+                            },
+                            move_with_cells: Some(true),
+                            size_with_cells: Some(false),
+                        },
+                        locked: Some(true),
+                        default_size: None,
+                        print: Some(false),
+                        disabled: None,
+                        recalc_always: None,
+                        ui_object: None,
+                        auto_fill: None,
+                        auto_line: None,
+                        auto_picture: None,
+                        macro_name: Some("inert_callback_name".into()),
+                        alternate_text: Some("generated".into()),
+                        preview_relationship_id: Some("rIdPreview".into()),
+                    }),
+                },
+                descriptor_uri: PackURI::new(descriptor_uri).unwrap(),
+                descriptor: ActiveXDescriptor {
+                    class_id: "{00000000-0000-0000-0000-000000000000}".into(),
+                    license: None,
+                    persistence: Persistence::StreamInit,
+                    relationship_id: Some("rIdBinary".into()),
+                    properties: Vec::new(),
+                },
+                binaries: vec![OpaqueActiveXBinary {
+                    relationship_id: "rIdBinary".into(),
+                    part_uri: PackURI::new(binary_uri).unwrap(),
+                    bytes: vec![0, 1, 2, 0xff],
+                }],
+                preview: Some(OpaqueActiveXPreviewImage {
+                    relationship_id: "rIdPreview".into(),
+                    part_uri: PackURI::new("/xl/media/generated.png").unwrap(),
+                    content_type: "image/png".into(),
+                    bytes: vec![0x89, b'P', b'N', b'G'],
+                }),
+            }],
+        }
+    }
+
+    #[test]
+    fn generated_graph_store_reload_and_remove_preserves_unrelated_xml() {
+        let mut package = blank_package();
+        let worksheet_uri = PackURI::new(WS).unwrap();
+        let original = package.get_part(&worksheet_uri).unwrap().blob().to_vec();
+        let expected = binary_control("/xl/activeX/generated.xml", "/xl/activeX/generated.bin");
+        store_on_worksheet(&mut package, &worksheet_uri, &expected).unwrap();
+        let xml = std::str::from_utf8(package.get_part(&worksheet_uri).unwrap().blob()).unwrap();
+        assert!(xml.contains("<sheetData><row r=\"1\"/></sheetData><oleObjects/><controls"));
+        assert!(xml.contains("</controls><tableParts count=\"0\"/><extLst/>"));
+
+        let bytes = PackageWriter::to_bytes(&package).unwrap();
+        let reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        assert_eq!(
+            load_from_worksheet(&reopened, &worksheet_uri).unwrap(),
+            expected
+        );
+
+        assert!(remove_from_worksheet(&mut package, &worksheet_uri).unwrap());
+        assert_eq!(package.get_part(&worksheet_uri).unwrap().blob(), original);
+        assert!(
+            package
+                .get_part(&PackURI::new("/xl/activeX/generated.xml").unwrap())
+                .is_err()
+        );
+        assert!(!remove_from_worksheet(&mut package, &worksheet_uri).unwrap());
+    }
+
+    #[test]
+    fn generated_replace_rolls_back_on_conflicting_part_name() {
+        let mut package = blank_package();
+        let worksheet_uri = PackURI::new(WS).unwrap();
+        let first = binary_control("/xl/activeX/first.xml", "/xl/activeX/first.bin");
+        store_on_worksheet(&mut package, &worksheet_uri, &first).unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/activeX/occupied.bin").unwrap(),
+            "application/octet-stream".into(),
+            vec![9],
+        )));
+        let before_xml = package.get_part(&worksheet_uri).unwrap().blob().to_vec();
+        let before_parts = package.part_count();
+        let replacement = binary_control("/xl/activeX/second.xml", "/xl/activeX/occupied.bin");
+        assert!(replace_on_worksheet(&mut package, &worksheet_uri, &replacement).is_err());
+        assert_eq!(package.part_count(), before_parts);
+        assert_eq!(package.get_part(&worksheet_uri).unwrap().blob(), before_xml);
+        assert_eq!(
+            load_from_worksheet(&package, &worksheet_uri).unwrap(),
+            first
+        );
+    }
+
+    #[test]
+    fn generated_remove_retains_shared_preview_and_rejects_limits() {
+        let mut package = blank_package();
+        let worksheet_uri = PackURI::new(WS).unwrap();
+        let value = binary_control("/xl/activeX/a.xml", "/xl/activeX/a.bin");
+        store_on_worksheet(&mut package, &worksheet_uri, &value).unwrap();
+        package
+            .get_part_mut(&worksheet_uri)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                IMAGE_REL.into(),
+                "../media/generated.png".into(),
+                "rIdShared".into(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        remove_from_worksheet(&mut package, &worksheet_uri).unwrap();
+        assert!(
+            package
+                .get_part(&PackURI::new("/xl/media/generated.png").unwrap())
+                .is_ok()
+        );
+
+        let mut invalid = value;
+        invalid.controls[0].control.shape_id = MAX_SHAPE_ID + 1;
+        assert!(store_on_worksheet(&mut blank_package(), &worksheet_uri, &invalid).is_err());
+        invalid.controls[0].control.shape_id = 1;
+        invalid.controls[0].control.name = Some("x".repeat(MAX_CONTROL_NAME_CHARS + 1));
+        assert!(store_on_worksheet(&mut blank_package(), &worksheet_uri, &invalid).is_err());
+    }
+
+    #[test]
+    fn direct_xml_mutation_refuses_mce_selected_collection() {
+        let xml = format!(
+            r#"<worksheet xmlns="{SML}" xmlns:r="{REL}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="{X14}"><mc:AlternateContent><mc:Choice Requires="x14"><controls><control shapeId="1" r:id="rId1"/></controls></mc:Choice></mc:AlternateContent></worksheet>"#
+        );
+        assert!(
+            replace_worksheet_controls_xml(xml.as_bytes(), &WorksheetControls::default()).is_err()
         );
     }
 }

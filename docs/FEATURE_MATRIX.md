@@ -183,7 +183,7 @@ conversion, fonts, and image conversion are optional.
 | External workbook, DDE, and OLE links | ✅ | ✅ | ✅ | Typed inert links, cached sheet data, names, and targets; never refreshed automatically |
 | Connections and query tables | ✅ | ✅ | ✅ | Typed package CRUD; external queries are never executed |
 | OLE objects | ✅ | ✅ | ✅ | Worksheet object metadata, anchors, payload resources, and package graph |
-| ActiveX controls | 🟡 | ✅ | ❌ | Typed control/property discovery; no worksheet control authoring graph |
+| ActiveX controls | 🟢 | ✅ | ✅ | Typed worksheet/descriptor parsing plus inert, atomic graph store/replace/remove; opaque persistence and preview bytes are never activated |
 | Web extensions/Office Add-ins | 🟡 | ✅ | 🟡 | Shared package-level task-pane create/replace/remove, bounded web-extension parsing/serialization, inert embedded/external snapshot-resource CRUD, typed CT_Blip compression/effect trees, self-contained mixed-content `extLst` preservation at every MS-OWEXML site, and typed worksheet `x15:webExtensions` range bindings exposed through worksheet/workbook read and transactional mutation APIs with MS-OWEXML `appRef` cross-validation; add-ins and links are never activated or fetched |
 | XML maps | 🟡 | ✅ | ✅ | Typed inert MapInfo/schema/data-binding package CRUD with strict/transitional relationships; mappings, schema locations, and bound files are never resolved or executed |
 | Volatile dependencies | 🟡 | ✅ | ✅ | Typed inert workbook-scoped RTD/OLAP dependency package CRUD; never contacts servers/connections or evaluates formulas |

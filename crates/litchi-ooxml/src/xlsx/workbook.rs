@@ -13,6 +13,12 @@ use crate::web_extensions::{
     OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
     remove_web_extension_task_panes, store_web_extension_task_panes,
 };
+use crate::xlsx::active_x::{
+    ActiveXControlSet, load_from_worksheet as load_worksheet_active_x,
+    remove_from_worksheet as remove_worksheet_active_x,
+    replace_on_worksheet as replace_worksheet_active_x,
+    store_on_worksheet as store_worksheet_active_x,
+};
 use crate::xlsx::calculation_chain::{
     CalculationChain, CalculationChainConformance, load_calculation_chain,
     remove_calculation_chain, store_calculation_chain,
@@ -71,6 +77,37 @@ use std::collections::{HashMap, HashSet};
 
 use super::parsers::workbook_parser;
 use super::worksheet::{Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksheetIterator};
+
+fn next_active_x_relationship_id(
+    occupied: &mut HashSet<String>,
+    control_index: usize,
+    preview: bool,
+) -> String {
+    let kind = if preview { "Preview" } else { "Control" };
+    let mut suffix = 0usize;
+    loop {
+        let id = format!("_litchiActiveX{kind}{control_index}_{suffix}");
+        if occupied.insert(id.clone()) {
+            return id;
+        }
+        suffix += 1;
+    }
+}
+
+fn next_active_x_part_uri(
+    package: &OpcPackage,
+    directory: &str,
+    stem: &str,
+    extension: &str,
+) -> SheetResult<PackURI> {
+    for suffix in 0..=100_000usize {
+        let uri = PackURI::new(format!("{directory}/{stem}_{suffix}.{extension}"))?;
+        if package.validate_new_part_name(&uri).is_ok() {
+            return Ok(uri);
+        }
+    }
+    Err("Unable to allocate an ActiveX part name".into())
+}
 
 /// Concrete implementation of a Workbook for Excel files.
 #[derive(Debug)]
@@ -726,6 +763,56 @@ impl Workbook {
             .ok_or("Worksheet index out of bounds")?;
         let uri = self.worksheet_part_uri(info)?;
         remove_worksheet_named_sheet_views(&mut self.package, &uri).map_err(Into::into)
+    }
+
+    /// Load one worksheet's ActiveX descriptors and opaque persistence bytes.
+    ///
+    /// No control, callback, or embedded binary is instantiated or executed.
+    pub fn worksheet_active_x_controls(&self, index: usize) -> SheetResult<ActiveXControlSet> {
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        load_worksheet_active_x(&self.package, &uri).map_err(Into::into)
+    }
+
+    /// Store a complete inert ActiveX graph on a worksheet without controls.
+    pub fn store_worksheet_active_x_controls(
+        &mut self,
+        index: usize,
+        value: &ActiveXControlSet,
+    ) -> SheetResult<()> {
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        store_worksheet_active_x(&mut self.package, &uri, value).map_err(Into::into)
+    }
+
+    /// Atomically replace one worksheet's complete inert ActiveX graph.
+    pub fn replace_worksheet_active_x_controls(
+        &mut self,
+        index: usize,
+        value: &ActiveXControlSet,
+    ) -> SheetResult<()> {
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        replace_worksheet_active_x(&mut self.package, &uri, value).map_err(Into::into)
+    }
+
+    /// Remove one worksheet's ActiveX graph without activating its payloads.
+    pub fn remove_worksheet_active_x_controls(&mut self, index: usize) -> SheetResult<bool> {
+        let info = self
+            .worksheets
+            .get(index)
+            .ok_or("Worksheet index out of bounds")?;
+        let uri = self.worksheet_part_uri(info)?;
+        remove_worksheet_active_x(&mut self.package, &uri).map_err(Into::into)
     }
 
     /// Return passive `workbookProtection` metadata from the current `workbook.xml` part.
@@ -1900,6 +1987,23 @@ impl Workbook {
                 // collections. Detach inert companion parts first so old targets
                 // do not become orphaned, then restore them after materialization.
                 let named_sheet_views = self.detach_named_sheet_views_before_materialization()?;
+                let active_x_controls = (0..self.worksheets.len())
+                    .map(|index| {
+                        let info = self
+                            .worksheets
+                            .get(index)
+                            .ok_or("Worksheet index out of bounds")?;
+                        let uri = self.worksheet_part_uri(info)?;
+                        let controls = load_worksheet_active_x(&self.package, &uri)?;
+                        Ok((!controls.controls.is_empty()).then_some((uri, controls)))
+                    })
+                    .collect::<SheetResult<Vec<_>>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
+                for (uri, _) in &active_x_controls {
+                    remove_worksheet_active_x(&mut self.package, uri)?;
+                }
                 let volatile_dependencies = load_volatile_dependencies(&self.package)?;
                 let xml_maps = load_xml_maps(&self.package)?;
                 if self.calculation_chain.is_some() {
@@ -1916,6 +2020,54 @@ impl Workbook {
                 self.restore_volatile_dependencies_after_materialization(&volatile_dependencies)?;
                 self.restore_xml_maps_after_materialization(&xml_maps)?;
                 self.restore_named_sheet_views_after_materialization(&named_sheet_views)?;
+                for (worksheet_index, (uri, mut controls)) in
+                    active_x_controls.into_iter().enumerate()
+                {
+                    let mut occupied = self
+                        .package
+                        .get_part(&uri)?
+                        .rels()
+                        .iter()
+                        .map(|relationship| relationship.r_id().to_string())
+                        .collect::<HashSet<_>>();
+                    for (control_index, item) in controls.controls.iter_mut().enumerate() {
+                        item.descriptor_uri = next_active_x_part_uri(
+                            &self.package,
+                            "/xl/activeX",
+                            &format!("litchiControl{worksheet_index}_{control_index}"),
+                            "xml",
+                        )?;
+                        for (binary_index, binary) in item.binaries.iter_mut().enumerate() {
+                            binary.part_uri = next_active_x_part_uri(
+                                &self.package,
+                                "/xl/activeX",
+                                &format!(
+                                    "litchiControl{worksheet_index}_{control_index}Binary{binary_index}"
+                                ),
+                                "bin",
+                            )?;
+                        }
+                        item.control.relationship_id =
+                            next_active_x_relationship_id(&mut occupied, control_index, false);
+                        if let Some(preview) = item.preview.as_mut() {
+                            preview.part_uri = next_active_x_part_uri(
+                                &self.package,
+                                "/xl/media",
+                                &format!(
+                                    "litchiControl{worksheet_index}_{control_index}Preview"
+                                ),
+                                "img",
+                            )?;
+                            let id =
+                                next_active_x_relationship_id(&mut occupied, control_index, true);
+                            preview.relationship_id = id.clone();
+                            if let Some(properties) = item.control.properties.as_mut() {
+                                properties.preview_relationship_id = Some(id);
+                            }
+                        }
+                    }
+                    store_worksheet_active_x(&mut self.package, &uri, &controls)?;
+                }
                 self.restore_worksheet_web_extension_bindings_after_materialization(
                     &mutable_data,
                     &worksheet_web_extension_bindings,
@@ -3785,6 +3937,10 @@ fn validate_threaded_comment_people<'a>(
 mod tests {
     use super::{Workbook, validate_threaded_comment_people};
     use crate::charts::{ChartExtensionList, ChartShapeProperties, plot_area::TypeGroup};
+    use crate::xlsx::active_x::{
+        ActiveXControlSet, ActiveXDescriptor, ActiveXProperty, LoadedActiveXControl, Persistence,
+        WorksheetControl,
+    };
     use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
@@ -4716,6 +4872,51 @@ mod tests {
         let bindings = reopened.worksheet_web_extension_bindings(0).unwrap();
         assert_eq!(bindings.len(), 2);
         assert_eq!(bindings[1].application_reference(), "sales-point");
+    }
+
+    #[test]
+    fn preserves_inert_active_x_graph_during_materialization() {
+        let mut workbook = Workbook::create().unwrap();
+        let value = ActiveXControlSet {
+            controls: vec![LoadedActiveXControl {
+                control: WorksheetControl {
+                    shape_id: 17,
+                    relationship_id: "rIdGeneratedControl".into(),
+                    name: Some("Generated".into()),
+                    properties: None,
+                },
+                descriptor_uri: PackURI::new("/xl/activeX/generated.xml").unwrap(),
+                descriptor: ActiveXDescriptor {
+                    class_id: "{00000000-0000-0000-0000-000000000000}".into(),
+                    license: None,
+                    persistence: Persistence::PropertyBag,
+                    relationship_id: None,
+                    properties: vec![ActiveXProperty {
+                        name: "Caption".into(),
+                        value: Some("inert".into()),
+                        object: None,
+                    }],
+                },
+                binaries: Vec::new(),
+                preview: None,
+            }],
+        };
+        workbook
+            .store_worksheet_active_x_controls(0, &value)
+            .unwrap();
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "materialized");
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("active-x-preserved.xlsx");
+        workbook.save(&path).unwrap();
+        let reopened = Workbook::open(&path).unwrap();
+        let loaded = reopened.worksheet_active_x_controls(0).unwrap();
+        assert_eq!(loaded.controls.len(), 1);
+        assert_eq!(loaded.controls[0].control.shape_id, 17);
+        assert_eq!(loaded.controls[0].descriptor, value.controls[0].descriptor);
     }
 
     fn package_with_custom_workbook_parts() -> OpcPackage {
