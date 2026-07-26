@@ -8,6 +8,7 @@ use crate::xls::defined_names::{
 use crate::xls::encryption::prepare_workbook_stream;
 use crate::xls::error::{XlsError, XlsResult};
 use crate::xls::formula::{FormulaContext, ptg_exp_anchor, render_formula, render_shared_formula};
+use crate::xls::leniency::{XlsLeniency, XlsToleranceLog, XlsToleranceReport};
 use crate::xls::number_format::{XlsDateSystem, XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::xls::records::{
     BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, FormulaValue,
@@ -161,6 +162,26 @@ pub struct XlsWorkbook<R: Read + Seek> {
     pivot_caches: Vec<crate::xls::PivotCache>,
     /// SXStreamID values in global PivotCache ordinal order.
     pivot_cache_stream_ids: Vec<u16>,
+    /// Formatting defects repaired while opening; always empty in strict mode.
+    tolerance: XlsToleranceReport,
+}
+
+/// Out-parameters filled while scanning the workbook globals substream.
+///
+/// The globals pass produces several independent collections that the caller
+/// consumes afterwards; bundling them keeps the scan a single-responsibility
+/// function instead of a long positional parameter list.
+struct WorkbookGlobalsSink<'a> {
+    /// `BoundSheet8` entries in stream order.
+    bound_sheets: &'a mut Vec<BoundSheetRecord>,
+    /// Shared-string table contents.
+    strings: &'a mut Vec<String>,
+    /// Rich-text and phonetic properties parallel to `strings`.
+    string_properties: &'a mut Vec<Option<Box<SharedStringProperties>>>,
+    /// `Lbl` records and their trailing optional records.
+    defined_name_slots: &'a mut Vec<DefinedNameSlot>,
+    /// Formatting-defect policy and the repairs it recorded.
+    tolerance: &'a mut XlsToleranceLog,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -168,6 +189,15 @@ pub struct XlsWorkbook<R: Read + Seek> {
 pub struct XlsOpenOptions<'a> {
     /// Password used for BIFF8 password-to-open encryption.
     pub password: Option<&'a str>,
+    /// How non-structural formatting defects are treated.
+    ///
+    /// Defaults to [`XlsLeniency::Strict`], which rejects any deviation from
+    /// MS-XLS. Set [`XlsLeniency::TolerateFormattingDefects`] to open the
+    /// widespread real-world workbooks whose cosmetic formatting metadata is
+    /// self-contradictory; everything repaired is then enumerable through
+    /// [`XlsWorkbook::tolerance_report`]. Structural defects — record framing,
+    /// stream grammar, and encryption — remain hard errors either way.
+    pub leniency: XlsLeniency,
 }
 
 impl<R: Read + Seek> XlsWorkbook<R> {
@@ -208,9 +238,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_string_index: Ok(None),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             function_groups: None,
+            tolerance: XlsToleranceReport::default(),
         };
 
-        workbook.parse_workbook(options.password)?;
+        workbook.parse_workbook(&options)?;
         Ok(workbook)
     }
 
@@ -259,20 +290,34 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_string_index: Ok(None),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             function_groups: None,
+            tolerance: XlsToleranceReport::default(),
         };
 
-        workbook.parse_workbook(options.password)?;
+        workbook.parse_workbook(&options)?;
         Ok(workbook)
     }
 
+    /// Formatting defects repaired while opening this workbook.
+    ///
+    /// Always clean under [`XlsLeniency::Strict`], because a strict open either
+    /// rejects the defect or never encounters one. Under
+    /// [`XlsLeniency::TolerateFormattingDefects`] every repair the reader made
+    /// is enumerable here; see [`crate::xls::XlsFormattingDefect`] for the
+    /// closed set of defects that can appear and the substitute value each one
+    /// produced.
+    pub fn tolerance_report(&self) -> &XlsToleranceReport {
+        &self.tolerance
+    }
+
     /// Parse the workbook stream
-    fn parse_workbook(&mut self, password: Option<&str>) -> XlsResult<()> {
+    fn parse_workbook(&mut self, options: &XlsOpenOptions<'_>) -> XlsResult<()> {
         // Find and read the Workbook stream
         let workbook_data = self
             .ole_file
             .open_stream(&["Workbook"])
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
-        let workbook_data = prepare_workbook_stream(workbook_data, password)?;
+        let workbook_data = prepare_workbook_stream(workbook_data, options.password)?;
+        let mut tolerance = XlsToleranceLog::new(options.leniency);
 
         let mut record_iter = RecordIter::new(std::io::Cursor::new(&workbook_data))?;
         let mut encoding = XlsEncoding::from_codepage(1252)?; // Default codepage
@@ -285,11 +330,15 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.parse_workbook_globals(
             &mut record_iter,
             &mut encoding,
-            &mut bound_sheets,
-            &mut strings,
-            &mut string_properties,
-            &mut defined_name_slots,
+            WorkbookGlobalsSink {
+                bound_sheets: &mut bound_sheets,
+                strings: &mut strings,
+                string_properties: &mut string_properties,
+                defined_name_slots: &mut defined_name_slots,
+                tolerance: &mut tolerance,
+            },
         )?;
+        self.tolerance = tolerance.into_report();
 
         // Use Arc for zero-copy sharing across worksheets
         self.shared_strings = Some(Arc::new(strings));
@@ -419,11 +468,15 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         &mut self,
         record_iter: &mut RecordIter<Reader>,
         encoding: &mut XlsEncoding,
-        bound_sheets: &mut Vec<BoundSheetRecord>,
-        strings: &mut Vec<String>,
-        string_properties: &mut Vec<Option<Box<SharedStringProperties>>>,
-        defined_name_slots: &mut Vec<DefinedNameSlot>,
+        sink: WorkbookGlobalsSink<'_>,
     ) -> XlsResult<()> {
+        let WorkbookGlobalsSink {
+            bound_sheets,
+            strings,
+            string_properties,
+            defined_name_slots,
+            tolerance,
+        } = sink;
         // Collect all records first for easier processing
         let mut records = Vec::new();
         for record_result in record_iter.by_ref() {
@@ -435,7 +488,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             }
         }
 
-        self.formatting = Arc::new(XlsFormatting::parse_globals(&records)?);
+        self.formatting = Arc::new(XlsFormatting::parse_globals(&records, tolerance)?);
         self.is_1904_date_system = self.formatting.date_system() == XlsDateSystem::Excel1904;
 
         let mut palette_seen = false;
@@ -485,12 +538,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             external_link_collector.feed_record(record.header.record_type, &record.data)?;
 
             match record.header.record_type {
-                0x0031 => {
+                crate::xls::font::FONT_RECORD_TYPE => {
                     let index = crate::xls::font::logical_font_index(self.fonts.len())?;
-                    self.fonts.push(crate::xls::font::XlsFont::parse_record(
-                        index,
-                        &record.data,
-                    )?);
+                    self.fonts
+                        .push(crate::xls::font::XlsFont::parse_record(
+                            index,
+                            &record.data,
+                            tolerance,
+                        )?);
                 },
                 0x0092 => {
                     self.palette = crate::xls::palette::XlsPalette::parse_unique_record(
@@ -1470,6 +1525,7 @@ mod defined_name_tests {
             file,
             XlsOpenOptions {
                 password: Some("abc"),
+                ..XlsOpenOptions::default()
             },
         )
         .unwrap();

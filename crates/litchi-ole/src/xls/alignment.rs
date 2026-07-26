@@ -1,6 +1,7 @@
 //! BIFF8 XF cell and style alignment metadata.
 
 use super::error::{XlsError, XlsResult};
+use super::leniency::{XlsFormattingDefect, XlsToleranceLog};
 
 /// Horizontal alignment of cell text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -103,10 +104,19 @@ impl XlsCellAlignment {
         self.reading_order
     }
 
+    /// Parse the three XF alignment bytes under an explicit leniency policy.
+    ///
+    /// `xf_index` locates the owning XF record in the recorded report. The only
+    /// tolerated defect is `fJustLast` without distributed horizontal
+    /// alignment, which is cleared; invalid vertical alignment, rotation,
+    /// reading order, and reserved bits stay hard errors because each of those
+    /// would otherwise silently invent a layout the file never specified.
     pub(crate) fn parse(
         alignment_options: u8,
         rotation: u8,
         indentation_options: u8,
+        xf_index: u16,
+        tolerance: &mut XlsToleranceLog,
     ) -> XlsResult<Self> {
         let horizontal = match alignment_options & 0x07 {
             0 => XlsHorizontalAlignment::General,
@@ -128,11 +138,15 @@ impl XlsCellAlignment {
             4 => XlsVerticalAlignment::Distributed,
             value => return Err(invalid(format!("XF vertical alignment {value} is invalid"))),
         };
-        let justify_last_line = alignment_options & 0x80 != 0;
+        let mut justify_last_line = alignment_options & 0x80 != 0;
         if justify_last_line && horizontal != XlsHorizontalAlignment::Distributed {
-            return Err(invalid(
-                "XF justify-last-line requires distributed horizontal alignment",
-            ));
+            tolerance.tolerate(
+                XlsFormattingDefect::AlignmentJustifyLastLine,
+                u32::from(xf_index),
+                u32::from(alignment_options & 0x07),
+                || invalid("XF justify-last-line requires distributed horizontal alignment"),
+            )?;
+            justify_last_line = false;
         }
 
         let rotation = match rotation {
@@ -173,6 +187,22 @@ fn invalid(message: impl Into<String>) -> XlsError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xls::leniency::XlsLeniency;
+
+    /// Strict-mode shim for the three-byte alignment payload.
+    fn parse(
+        alignment_options: u8,
+        rotation: u8,
+        indentation_options: u8,
+    ) -> XlsResult<XlsCellAlignment> {
+        XlsCellAlignment::parse(
+            alignment_options,
+            rotation,
+            indentation_options,
+            0,
+            &mut XlsToleranceLog::new(XlsLeniency::Strict),
+        )
+    }
 
     #[test]
     fn parses_every_horizontal_and_vertical_alignment() {
@@ -187,7 +217,7 @@ mod tests {
             XlsHorizontalAlignment::Distributed,
         ];
         for (value, expected) in horizontal.into_iter().enumerate() {
-            let parsed = XlsCellAlignment::parse(value as u8 | 0x20, 0, 0).unwrap();
+            let parsed = parse(value as u8 | 0x20, 0, 0).unwrap();
             assert_eq!(parsed.horizontal(), expected);
             assert_eq!(parsed.vertical(), XlsVerticalAlignment::Bottom);
         }
@@ -200,33 +230,29 @@ mod tests {
             XlsVerticalAlignment::Distributed,
         ];
         for (value, expected) in vertical.into_iter().enumerate() {
-            let parsed = XlsCellAlignment::parse((value as u8) << 4, 0, 0).unwrap();
+            let parsed = parse((value as u8) << 4, 0, 0).unwrap();
             assert_eq!(parsed.vertical(), expected);
         }
     }
 
     #[test]
     fn parses_flags_indent_and_reading_orders() {
-        let parsed = XlsCellAlignment::parse(0x80 | 0x08 | 0x07, 0, 0x10 | 0x0f).unwrap();
+        let parsed = parse(0x80 | 0x08 | 0x07, 0, 0x10 | 0x0f).unwrap();
         assert!(parsed.wraps_text());
         assert!(parsed.justifies_last_line());
         assert_eq!(parsed.indent(), 15);
         assert!(parsed.shrinks_to_fit());
 
         assert_eq!(
-            XlsCellAlignment::parse(0x20, 0, 0).unwrap().reading_order(),
+            parse(0x20, 0, 0).unwrap().reading_order(),
             XlsReadingOrder::Context
         );
         assert_eq!(
-            XlsCellAlignment::parse(0x20, 0, 0x40)
-                .unwrap()
-                .reading_order(),
+            parse(0x20, 0, 0x40).unwrap().reading_order(),
             XlsReadingOrder::LeftToRight
         );
         assert_eq!(
-            XlsCellAlignment::parse(0x20, 0, 0x80)
-                .unwrap()
-                .reading_order(),
+            parse(0x20, 0, 0x80).unwrap().reading_order(),
             XlsReadingOrder::RightToLeft
         );
     }
@@ -241,22 +267,83 @@ mod tests {
             (180, XlsTextRotation::Clockwise(90)),
             (255, XlsTextRotation::Vertical),
         ] {
-            assert_eq!(
-                XlsCellAlignment::parse(0x20, value, 0).unwrap().rotation(),
-                expected
-            );
+            assert_eq!(parse(0x20, value, 0).unwrap().rotation(), expected);
         }
     }
 
     #[test]
     fn rejects_invalid_enum_and_reserved_values() {
         for value in 5..=7 {
-            assert!(XlsCellAlignment::parse(value << 4, 0, 0).is_err());
+            assert!(parse(value << 4, 0, 0).is_err());
         }
-        assert!(XlsCellAlignment::parse(0x80, 0, 0).is_err());
-        assert!(XlsCellAlignment::parse(0x20, 181, 0).is_err());
-        assert!(XlsCellAlignment::parse(0x20, 254, 0).is_err());
-        assert!(XlsCellAlignment::parse(0x20, 0, 0x20).is_err());
-        assert!(XlsCellAlignment::parse(0x20, 0, 0xc0).is_err());
+        assert!(parse(0x80, 0, 0).is_err());
+        assert!(parse(0x20, 181, 0).is_err());
+        assert!(parse(0x20, 254, 0).is_err());
+        assert!(parse(0x20, 0, 0x20).is_err());
+        assert!(parse(0x20, 0, 0xc0).is_err());
+    }
+
+    #[test]
+    fn a_lenient_policy_clears_justify_last_line_without_distributed_alignment() {
+        // fJustLast set with alcH = Left (1), which MS-XLS forbids.
+        const NON_DISTRIBUTED_JUST_LAST: u8 = 0x80 | 0x20 | 0x01;
+        const XF_INDEX: u16 = 42;
+
+        let mut tolerance = XlsToleranceLog::new(XlsLeniency::TolerateFormattingDefects);
+        let parsed =
+            XlsCellAlignment::parse(NON_DISTRIBUTED_JUST_LAST, 0, 0, XF_INDEX, &mut tolerance)
+                .expect("a lenient policy repairs the flag");
+        assert!(!parsed.justifies_last_line());
+        assert_eq!(parsed.horizontal(), XlsHorizontalAlignment::Left);
+
+        let report = tolerance.into_report();
+        assert_eq!(
+            report.count(XlsFormattingDefect::AlignmentJustifyLastLine),
+            1
+        );
+        let entry = report.defects()[0];
+        assert_eq!(entry.ordinal(), u32::from(XF_INDEX));
+        assert_eq!(
+            entry.observed(),
+            u32::from(XlsHorizontalAlignment::Left as u8)
+        );
+    }
+
+    #[test]
+    fn a_lenient_policy_still_rejects_every_other_alignment_defect() {
+        // Only the justify-last-line contradiction is cosmetic; an unknown
+        // vertical alignment, rotation, or reading order would otherwise make
+        // the reader invent a layout the file never specified.
+        let mut tolerance = XlsToleranceLog::new(XlsLeniency::TolerateFormattingDefects);
+        for (alignment_options, rotation, indentation_options) in [
+            (0x50u8, 0u8, 0u8),
+            (0x20, 181, 0),
+            (0x20, 0, 0x20),
+            (0x20, 0, 0xc0),
+        ] {
+            assert!(
+                XlsCellAlignment::parse(
+                    alignment_options,
+                    rotation,
+                    indentation_options,
+                    0,
+                    &mut tolerance,
+                )
+                .is_err()
+            );
+        }
+        assert!(tolerance.into_report().is_clean());
+    }
+
+    #[test]
+    fn justify_last_line_survives_when_the_file_is_conforming() {
+        const DISTRIBUTED_JUST_LAST: u8 = 0x80 | 0x20 | 0x07;
+        for leniency in [XlsLeniency::Strict, XlsLeniency::TolerateFormattingDefects] {
+            let mut tolerance = XlsToleranceLog::new(leniency);
+            let parsed = XlsCellAlignment::parse(DISTRIBUTED_JUST_LAST, 0, 0, 0, &mut tolerance)
+                .expect("distributed alignment permits fJustLast");
+            assert!(parsed.justifies_last_line());
+            assert!(tolerance.into_report().is_clean());
+        }
     }
 }

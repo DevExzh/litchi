@@ -90,6 +90,10 @@ mod font;
 
 /// BIFF8 XF cell and style alignment metadata.
 mod alignment;
+
+/// Opt-in tolerance for non-structural formatting defects.
+mod leniency;
+
 /// BIFF8 XF border and fill metadata.
 mod border_fill;
 
@@ -216,6 +220,7 @@ pub use formula_errors::{
 };
 pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
 pub use layout::{XlsColumnLayout, XlsRowLayout};
+pub use leniency::{XlsFormattingDefect, XlsLeniency, XlsToleranceReport, XlsToleratedDefect};
 pub use list_object::{
     XlsCachedDiskHeader, XlsExternalTableField, XlsExternalTableMetadata, XlsExternalTableVersion,
     XlsListColumnId, XlsListObject, XlsListObjectColumn, XlsListObjectFeatureVersion,

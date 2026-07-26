@@ -978,7 +978,10 @@ mod tests {
         let open = |password| {
             XlsWorkbook::new_with_options(
                 std::fs::File::open(&path).unwrap(),
-                XlsOpenOptions { password },
+                XlsOpenOptions {
+                    password,
+                    ..XlsOpenOptions::default()
+                },
             )
         };
         assert!(matches!(open(None), Err(XlsError::PasswordRequired)));
@@ -1081,6 +1084,7 @@ mod tests {
             file,
             XlsOpenOptions {
                 password: Some("abc"),
+                ..XlsOpenOptions::default()
             },
         )
         .unwrap();
@@ -1098,6 +1102,7 @@ mod tests {
                 wrong_password_file,
                 XlsOpenOptions {
                     password: Some("wrong"),
+                    ..XlsOpenOptions::default()
                 },
             ),
             Err(XlsError::InvalidPassword)
@@ -1107,6 +1112,7 @@ mod tests {
             file,
             XlsOpenOptions {
                 password: Some("password"),
+                ..XlsOpenOptions::default()
             },
         )
         .unwrap();

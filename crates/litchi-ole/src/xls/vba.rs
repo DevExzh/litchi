@@ -5,9 +5,12 @@
 
 use super::{XlsError, XlsResult};
 
+/// MS-XLS 2.4.185 `ObProj` record type (record enumeration value 211).
 pub(crate) const OB_PROJ_RECORD_TYPE: u16 = 0x00D3;
+/// MS-XLS 2.4.51 `CodeName` record type (record enumeration value 442).
 pub(crate) const CODE_NAME_RECORD_TYPE: u16 = 0x01BA;
-pub(crate) const OB_NO_MACROS_RECORD_TYPE: u16 = 0x01BF;
+/// MS-XLS 2.4.184 `ObNoMacros` record type (record enumeration value 445).
+pub(crate) const OB_NO_MACROS_RECORD_TYPE: u16 = 0x01BD;
 const DIMENSIONS_RECORD_TYPE: u16 = 0x0200;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -477,6 +480,19 @@ mod tests {
                 .is_err()
         );
     }
+    /// MS-XLS 2.3.1 assigns `ObProj` 211, `CodeName` 442, and `ObNoMacros` 445.
+    ///
+    /// These are pinned because a wrong `ObNoMacros` id silently makes the
+    /// marker unobservable: real workbooks emit 0x01BD, so a reader matching
+    /// any other value reports every macro-free workbook as macro-bearing.
+    #[test]
+    fn vba_marker_record_ids_match_the_spec_enumeration() {
+        assert_eq!(OB_PROJ_RECORD_TYPE, 211);
+        assert_eq!(CODE_NAME_RECORD_TYPE, 442);
+        assert_eq!(OB_NO_MACROS_RECORD_TYPE, 445);
+        assert_eq!(OB_NO_MACROS_RECORD_TYPE, 0x01BD);
+    }
+
     #[test]
     fn no_macros_marker_is_inert() {
         let mut globals = WorkbookVbaCollector::new();

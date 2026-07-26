@@ -75,6 +75,7 @@ fn reads_poi_xor_encrypted_style_xf_reserved_bit() {
         File::open(poi_fixture("xor-encryption-abc.xls")).unwrap(),
         XlsOpenOptions {
             password: Some("abc"),
+            ..XlsOpenOptions::default()
         },
     )
     .unwrap();

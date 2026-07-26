@@ -1,9 +1,16 @@
 //! BIFF8 workbook font table support.
 
+use super::leniency::{XlsFormattingDefect, XlsToleranceLog};
 use super::{XlsColor, XlsError, XlsPalette, XlsResult};
 
+/// MS-XLS 2.4.122 `Font` record type.
+pub(crate) const FONT_RECORD_TYPE: u16 = 0x0031;
 const FONT_FIXED_LENGTH: usize = 14;
 const MAX_FONT_NAME_LENGTH: usize = 31;
+/// Smallest `Font.cch` MS-XLS permits; zero is the tolerated defect.
+const MIN_FONT_NAME_LENGTH: usize = 1;
+/// Largest `Font.bFamily` value defined by MS-XLS 2.4.122.
+const MAX_FONT_FAMILY: u8 = 5;
 
 /// Vertical positioning applied to a font.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -147,7 +154,18 @@ impl XlsFont {
         self.charset
     }
 
-    pub(crate) fn parse_record(index: u16, data: &[u8]) -> XlsResult<Self> {
+    /// Parse a `Font` record under an explicit leniency policy.
+    ///
+    /// Under [`super::XlsLeniency::TolerateFormattingDefects`] an out-of-range
+    /// `bFamily` degrades to [`XlsFontFamily::NotApplicable`] and a zero `cch`
+    /// yields an empty name; both are recorded in `tolerance`. Every other
+    /// deviation — including a payload whose length disagrees with `cch` — stays
+    /// a hard error, because that is a framing defect rather than a cosmetic one.
+    pub(crate) fn parse_record(
+        index: u16,
+        data: &[u8],
+        tolerance: &mut XlsToleranceLog,
+    ) -> XlsResult<Self> {
         validate_font_index(index)?;
         if data.len() < FONT_FIXED_LENGTH + 2 {
             return Err(invalid(format!(
@@ -198,7 +216,19 @@ impl XlsFont {
             3 => XlsFontFamily::Modern,
             4 => XlsFontFamily::Script,
             5 => XlsFontFamily::Decorative,
-            value => return Err(invalid(format!("Font family {value} is invalid"))),
+            value => {
+                tolerance.tolerate(
+                    XlsFormattingDefect::FontFamily,
+                    u32::from(index),
+                    u32::from(value),
+                    || {
+                        invalid(format!(
+                            "Font family {value} is invalid; expected 0..={MAX_FONT_FAMILY}"
+                        ))
+                    },
+                )?;
+                XlsFontFamily::NotApplicable
+            },
         };
         let charset = match data[12] {
             0x00 => XlsFontCharset::Ansi,
@@ -228,9 +258,18 @@ impl XlsFont {
         };
 
         let character_count = usize::from(data[14]);
-        if !(1..=MAX_FONT_NAME_LENGTH).contains(&character_count) {
+        if character_count == 0 {
+            // A nameless font is cosmetic: the record still carries every
+            // metric, and a renderer substitutes its own default face exactly
+            // as it would for a name it does not have installed.
+            tolerance.tolerate(XlsFormattingDefect::FontNameEmpty, u32::from(index), 0, || {
+                invalid(format!(
+                    "Font name has 0 characters; expected {MIN_FONT_NAME_LENGTH}..={MAX_FONT_NAME_LENGTH}"
+                ))
+            })?;
+        } else if character_count > MAX_FONT_NAME_LENGTH {
             return Err(invalid(format!(
-                "Font name has {character_count} characters; expected 1..={MAX_FONT_NAME_LENGTH}"
+                "Font name has {character_count} characters; expected {MIN_FONT_NAME_LENGTH}..={MAX_FONT_NAME_LENGTH}"
             )));
         }
         let string_flags = data[15];
@@ -336,6 +375,13 @@ fn invalid(message: impl Into<String>) -> XlsError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xls::leniency::XlsLeniency;
+
+    /// Strict-mode shim: these tests exercise the default reject-everything
+    /// policy, which the production reader threads through a tolerance log.
+    fn parse_record(index: u16, data: &[u8]) -> XlsResult<XlsFont> {
+        XlsFont::parse_record(index, data, &mut XlsToleranceLog::new(XlsLeniency::Strict))
+    }
 
     fn font_record(weight: u16, italic: bool, color_index: u16, name: &str) -> Vec<u8> {
         let mut data = Vec::new();
@@ -361,7 +407,7 @@ mod tests {
             .into_iter()
             .enumerate()
             .map(|(physical, (weight, italic))| {
-                XlsFont::parse_record(
+                parse_record(
                     logical_font_index(physical).unwrap(),
                     &font_record(weight, italic, 0x7fff, "Arial"),
                 )
@@ -372,13 +418,13 @@ mod tests {
 
     #[test]
     fn parses_normative_normal_and_bold_blue_fonts() {
-        let normal = XlsFont::parse_record(0, &font_record(400, false, 0x7fff, "Arial")).unwrap();
+        let normal = parse_record(0, &font_record(400, false, 0x7fff, "Arial")).unwrap();
         assert_eq!(normal.name(), "Arial");
         assert_eq!(normal.height_twips(), 200);
         assert!(!normal.is_bold());
         assert!(!normal.is_italic());
 
-        let bold = XlsFont::parse_record(5, &font_record(700, false, 0x000c, "Arial")).unwrap();
+        let bold = parse_record(5, &font_record(700, false, 0x000c, "Arial")).unwrap();
         assert!(bold.is_bold());
         assert_eq!(bold.color_index(), 0x000c);
     }
@@ -394,7 +440,7 @@ mod tests {
         data[13] = 0xff;
         data[15] |= 0xfe;
 
-        let font = XlsFont::parse_record(5, &data).unwrap();
+        let font = parse_record(5, &data).unwrap();
         assert_eq!(font.name(), "ＭＳ ゴシック");
         assert!(font.is_bold());
         assert!(font.is_italic());
@@ -416,7 +462,7 @@ mod tests {
         data[2..4].copy_from_slice(&0xff05u16.to_le_bytes());
         data[13] = 0xff;
         data[15] = 0xff;
-        XlsFont::parse_record(0, &data).unwrap();
+        parse_record(0, &data).unwrap();
     }
 
     #[test]
@@ -424,7 +470,7 @@ mod tests {
         assert_eq!(logical_font_index(0).unwrap(), 0);
         assert_eq!(logical_font_index(3).unwrap(), 3);
         assert_eq!(logical_font_index(4).unwrap(), 5);
-        assert!(XlsFont::parse_record(4, &font_record(400, false, 0x7fff, "Arial")).is_err());
+        assert!(parse_record(4, &font_record(400, false, 0x7fff, "Arial")).is_err());
     }
 
     #[test]
@@ -448,13 +494,13 @@ mod tests {
         ] {
             let mut data = font_record(400, false, 0x7fff, "Arial");
             data[offset..offset + 2].copy_from_slice(&bytes);
-            assert!(XlsFont::parse_record(0, &data).is_err());
+            assert!(parse_record(0, &data).is_err());
         }
 
         for (offset, value) in [(10, 3), (11, 6), (12, 3), (12, 0xde)] {
             let mut data = font_record(400, false, 0x7fff, "Arial");
             data[offset] = value;
-            assert!(XlsFont::parse_record(0, &data).is_err());
+            assert!(parse_record(0, &data).is_err());
         }
     }
 
@@ -462,17 +508,17 @@ mod tests {
     fn rejects_invalid_name_lengths_and_truncation() {
         let mut empty_name = font_record(400, false, 0x7fff, "A");
         empty_name[14] = 0;
-        assert!(XlsFont::parse_record(0, &empty_name).is_err());
+        assert!(parse_record(0, &empty_name).is_err());
 
         let mut long_name = font_record(400, false, 0x7fff, "Arial");
         long_name[14] = 32;
-        assert!(XlsFont::parse_record(0, &long_name).is_err());
+        assert!(parse_record(0, &long_name).is_err());
 
         let mut truncated = font_record(400, false, 0x7fff, "Arial");
         truncated.pop();
-        assert!(XlsFont::parse_record(0, &truncated).is_err());
+        assert!(parse_record(0, &truncated).is_err());
 
-        assert!(XlsFont::parse_record(0, &font_record(400, false, 0x7fff, "A\0B")).is_err());
+        assert!(parse_record(0, &font_record(400, false, 0x7fff, "A\0B")).is_err());
     }
 
     #[test]
@@ -482,7 +528,7 @@ mod tests {
         compressed.truncate(16);
         compressed.extend_from_slice(b"Arial");
 
-        let font = XlsFont::parse_record(0, &compressed).unwrap();
+        let font = parse_record(0, &compressed).unwrap();
         assert_eq!(font.name(), "Arial");
     }
 }

@@ -790,7 +790,14 @@ mod tests {
         let mut record = Vec::new();
         write_font(&mut record, &font).unwrap();
 
-        let parsed = crate::xls::font::XlsFont::parse_record(0, &record[4..]).unwrap();
+        let parsed = crate::xls::font::XlsFont::parse_record(
+            0,
+            &record[4..],
+            &mut crate::xls::leniency::XlsToleranceLog::new(
+                crate::xls::leniency::XlsLeniency::Strict,
+            ),
+        )
+        .unwrap();
         assert_eq!(parsed.name(), font.name);
         assert_eq!(parsed.height_twips(), font.height);
         assert!(parsed.is_bold());

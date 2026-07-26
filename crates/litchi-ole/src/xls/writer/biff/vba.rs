@@ -1,20 +1,27 @@
 use crate::xls::XlsResult;
-use crate::xls::vba::validate_code_name;
+use crate::xls::vba::{
+    CODE_NAME_RECORD_TYPE, OB_NO_MACROS_RECORD_TYPE, OB_PROJ_RECORD_TYPE, validate_code_name,
+};
 use crate::xls::writer::biff::write_record_header;
 use std::io::Write;
 
+/// Payload length of the two zero-length VBA marker records.
+const MARKER_RECORD_LEN: u16 = 0;
+/// `cch` plus the option byte that precede a `CodeName` string's characters.
+const CODE_NAME_HEADER_LEN: u16 = 3;
+
 pub(crate) fn write_ob_proj<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, 0x00D3, 0)
+    write_record_header(writer, OB_PROJ_RECORD_TYPE, MARKER_RECORD_LEN)
 }
 pub(crate) fn write_ob_no_macros<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, 0x01BF, 0)
+    write_record_header(writer, OB_NO_MACROS_RECORD_TYPE, MARKER_RECORD_LEN)
 }
 pub(crate) fn write_code_name<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
     validate_code_name(value)?;
     let count = value.encode_utf16().count() as u16;
     let wide = !value.chars().all(|character| u32::from(character) <= 0xFF);
-    let data_len = 3 + count * if wide { 2 } else { 1 };
-    write_record_header(writer, 0x01BA, data_len)?;
+    let data_len = CODE_NAME_HEADER_LEN + count * if wide { 2 } else { 1 };
+    write_record_header(writer, CODE_NAME_RECORD_TYPE, data_len)?;
     writer.write_all(&count.to_le_bytes())?;
     writer.write_all(&[u8::from(wide)])?;
     if wide {

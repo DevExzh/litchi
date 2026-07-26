@@ -1,12 +1,16 @@
 use std::collections::HashMap;
 
 use super::error::{XlsError, XlsResult};
+use super::leniency::{XlsFormattingDefect, XlsToleranceLog};
 use super::records::Record;
 
 const DATE1904_RECORD: u16 = 0x0022;
-const FORMAT_RECORD: u16 = 0x041e;
-const XF_RECORD: u16 = 0x00e0;
-const XFCRC_RECORD: u16 = 0x087c;
+/// MS-XLS 2.4.126 `Format` record type.
+pub(crate) const FORMAT_RECORD: u16 = 0x041e;
+/// MS-XLS 2.4.353 `XF` record type.
+pub(crate) const XF_RECORD: u16 = 0x00e0;
+/// MS-XLS 2.4.354 `XFCRC` record type.
+pub(crate) const XFCRC_RECORD: u16 = 0x087c;
 const MAX_DXF_RECORDS: usize = 65_536;
 const MAX_FORMAT_RECORDS: usize = 218;
 const MIN_XF_RECORDS: usize = 16;
@@ -375,7 +379,14 @@ impl XlsFormatting {
         }
     }
 
-    pub(crate) fn parse_globals(records: &[Record]) -> XlsResult<Self> {
+    /// Parse the formatting records of the workbook globals under `tolerance`.
+    ///
+    /// See [`XlsFormattingDefect`] for the exhaustive list of defects a lenient
+    /// policy repairs here; every other validation is unchanged.
+    pub(crate) fn parse_globals(
+        records: &[Record],
+        tolerance: &mut XlsToleranceLog,
+    ) -> XlsResult<Self> {
         let mut date_system = None;
         let mut number_formats = Vec::new();
         let mut extended_formats = Vec::new();
@@ -395,7 +406,10 @@ impl XlsFormatting {
                     if number_formats.len() == MAX_FORMAT_RECORDS {
                         return Err(invalid(FORMAT_RECORD, "more than 218 Format records"));
                     }
-                    let format = parse_number_format(&record.data)?;
+                    let ordinal = u32::try_from(number_formats.len()).map_err(|_| {
+                        invalid(FORMAT_RECORD, "Format record ordinal does not fit in u32")
+                    })?;
+                    let format = parse_number_format(&record.data, ordinal, tolerance)?;
                     if format_by_id.contains_key(&format.id) {
                         return Err(invalid(
                             FORMAT_RECORD,
@@ -412,7 +426,7 @@ impl XlsFormatting {
                     let index = u16::try_from(extended_formats.len()).map_err(|_| {
                         invalid(XF_RECORD, "XF index does not fit in the BIFF index field")
                     })?;
-                    extended_formats.push(parse_xf(&record.data, index)?);
+                    extended_formats.push(parse_xf(&record.data, index, tolerance)?);
                 },
                 XFCRC_RECORD => {
                     if xfcrc.is_some() {
@@ -453,14 +467,22 @@ impl XlsFormatting {
             ));
         }
         if let Some(count) = xfcrc {
-            if count as usize != extended_formats.len() {
-                return Err(invalid(
-                    XFCRC_RECORD,
-                    format!(
-                        "XFCRC declares {count} XF records but {} were parsed",
-                        extended_formats.len()
-                    ),
-                ));
+            let parsed = extended_formats.len();
+            if count as usize != parsed {
+                // XFCRC is a redundant integrity summary over the XF table.
+                // The XF records themselves remain individually well-formed, so
+                // a disagreeing cxfs costs no cell data.
+                tolerance.tolerate(
+                    XlsFormattingDefect::ExtendedFormatCountMismatch,
+                    u32::try_from(parsed).unwrap_or(u32::MAX),
+                    u32::from(count),
+                    || {
+                        invalid(
+                            XFCRC_RECORD,
+                            format!("XFCRC declares {count} XF records but {parsed} were parsed"),
+                        )
+                    },
+                )?;
             }
         }
 
@@ -565,7 +587,16 @@ fn parse_date_system(data: &[u8]) -> XlsResult<XlsDateSystem> {
     }
 }
 
-fn parse_number_format(data: &[u8]) -> XlsResult<XlsNumberFormat> {
+/// Smallest number of UTF-16 code units MS-XLS 2.4.126 permits in a format code.
+const MIN_FORMAT_CODE_UNITS: usize = 1;
+/// Largest number of UTF-16 code units MS-XLS 2.4.126 permits in a format code.
+const MAX_FORMAT_CODE_UNITS: usize = 255;
+
+fn parse_number_format(
+    data: &[u8],
+    ordinal: u32,
+    tolerance: &mut XlsToleranceLog,
+) -> XlsResult<XlsNumberFormat> {
     if data.len() < 5 {
         return Err(invalid(FORMAT_RECORD, "truncated Format record"));
     }
@@ -576,12 +607,17 @@ fn parse_number_format(data: &[u8]) -> XlsResult<XlsNumberFormat> {
             format!("number format identifier {id} is outside the permitted ranges"),
         ));
     }
-    let code = parse_xl_unicode_string(&data[2..])?;
+    let (code, truncated) = parse_xl_unicode_string(&data[2..], ordinal, tolerance)?;
     let count = code.encode_utf16().count();
-    if !(1..=255).contains(&count) {
+    // A truncated code was already recorded as `FormatStringOverrun`; its
+    // surviving length is a consequence of the repair, not a separate defect.
+    if !truncated && !(MIN_FORMAT_CODE_UNITS..=MAX_FORMAT_CODE_UNITS).contains(&count) {
         return Err(invalid(
             FORMAT_RECORD,
-            format!("format string has {count} UTF-16 code units; expected 1 through 255"),
+            format!(
+                "format string has {count} UTF-16 code units; expected \
+                 {MIN_FORMAT_CODE_UNITS} through {MAX_FORMAT_CODE_UNITS}"
+            ),
         ));
     }
     Ok(XlsNumberFormat {
@@ -602,7 +638,18 @@ const XL_UNICODE_STRING_HEADER_LEN: usize = 3;
 /// Offset of the option byte within an XLUnicodeString.
 const XL_UNICODE_STRING_FLAGS_OFFSET: usize = 2;
 
-fn parse_xl_unicode_string(data: &[u8]) -> XlsResult<String> {
+/// Decode a `Format` record's `XLUnicodeString`.
+///
+/// Returns the decoded code and whether the payload was shorter than `cch`
+/// declared. A short payload is only reachable when `tolerance` permits
+/// [`XlsFormattingDefect::FormatStringOverrun`]; a *longer* payload stays a hard
+/// error, because trailing bytes mean the record framing is wrong rather than
+/// merely the count.
+fn parse_xl_unicode_string(
+    data: &[u8],
+    ordinal: u32,
+    tolerance: &mut XlsToleranceLog,
+) -> XlsResult<(String, bool)> {
     if data.len() < XL_UNICODE_STRING_HEADER_LEN {
         return Err(invalid(FORMAT_RECORD, "truncated XLUnicodeString header"));
     }
@@ -618,31 +665,51 @@ fn parse_xl_unicode_string(data: &[u8]) -> XlsResult<String> {
     } else {
         COMPRESSED_CHAR_BYTES
     };
-    let char_bytes = cch
+    let declared_bytes = cch
         .checked_mul(char_width)
         .ok_or_else(|| invalid(FORMAT_RECORD, "format string length overflow"))?;
+    let available = data.len() - XL_UNICODE_STRING_HEADER_LEN;
+    let truncated = declared_bytes > available;
+    let char_bytes = if truncated {
+        tolerance.tolerate(
+            XlsFormattingDefect::FormatStringOverrun,
+            ordinal,
+            u32::try_from(cch).unwrap_or(u32::MAX),
+            || invalid(FORMAT_RECORD, "truncated format string characters"),
+        )?;
+        // Keep only whole characters so a stray odd byte cannot split a
+        // UTF-16 code unit.
+        available - (available % char_width)
+    } else {
+        declared_bytes
+    };
     let chars = data
         .get(XL_UNICODE_STRING_HEADER_LEN..XL_UNICODE_STRING_HEADER_LEN + char_bytes)
         .ok_or_else(|| invalid(FORMAT_RECORD, "truncated format string characters"))?;
-    if XL_UNICODE_STRING_HEADER_LEN + char_bytes != data.len() {
+    if !truncated && XL_UNICODE_STRING_HEADER_LEN + char_bytes != data.len() {
         return Err(invalid(
             FORMAT_RECORD,
             "XLUnicodeString has trailing bytes after its characters",
         ));
     }
-    if char_width == COMPRESSED_CHAR_BYTES {
-        Ok(chars.iter().map(|byte| char::from(*byte)).collect())
+    let code = if char_width == COMPRESSED_CHAR_BYTES {
+        chars.iter().map(|byte| char::from(*byte)).collect()
     } else {
         let units = chars
-            .chunks_exact(2)
+            .chunks_exact(UTF16_CHAR_BYTES)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]));
         char::decode_utf16(units)
             .collect::<Result<String, _>>()
-            .map_err(|_| invalid(FORMAT_RECORD, "format string contains invalid UTF-16"))
-    }
+            .map_err(|_| invalid(FORMAT_RECORD, "format string contains invalid UTF-16"))?
+    };
+    Ok((code, truncated))
 }
 
-fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
+fn parse_xf(
+    data: &[u8],
+    index: u16,
+    tolerance: &mut XlsToleranceLog,
+) -> XlsResult<XlsExtendedFormat> {
     if data.len() != 20 {
         return Err(invalid(
             XF_RECORD,
@@ -685,7 +752,9 @@ fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
     let quote_prefix = !style && prefix;
     let has_xf_extension = !style && border2 & (1 << 25) != 0;
     let pivot_button = !style && area & (1 << 14) != 0;
-    let alignment = crate::xls::alignment::XlsCellAlignment::parse(data[6], data[7], data[8])?;
+    let alignment = crate::xls::alignment::XlsCellAlignment::parse(
+        data[6], data[7], data[8], index, tolerance,
+    )?;
     let (borders, fill) = crate::xls::border_fill::parse_xf_border_fill(data, style)?;
 
     Ok(XlsExtendedFormat {
@@ -789,9 +858,38 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
     }
 }
 
+/// Strict-mode shim used by both test modules: the production reader threads a
+/// tolerance log, but these tests exercise the default reject-everything policy.
+#[cfg(test)]
+fn parse_globals_strict(records: &[Record]) -> XlsResult<XlsFormatting> {
+    XlsFormatting::parse_globals(
+        records,
+        &mut XlsToleranceLog::new(crate::xls::leniency::XlsLeniency::Strict),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Strict-mode shim: the production reader threads a tolerance log, but
+    /// these tests exercise the default (reject-everything) policy.
+    fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
+        super::parse_xf(
+            data,
+            index,
+            &mut XlsToleranceLog::new(crate::xls::leniency::XlsLeniency::Strict),
+        )
+    }
+
+    /// Strict-mode shim for [`super::parse_number_format`].
+    fn parse_number_format(data: &[u8]) -> XlsResult<XlsNumberFormat> {
+        super::parse_number_format(
+            data,
+            0,
+            &mut XlsToleranceLog::new(crate::xls::leniency::XlsLeniency::Strict),
+        )
+    }
 
     fn semantic_xf(style: bool, parent: u16, application_bits: u8) -> [u8; 20] {
         let mut data = [0; 20];
@@ -935,6 +1033,73 @@ mod tests {
         assert!(parse_number_format(&data).is_err());
     }
 
+    /// Build a `Format` payload whose `cch` claims `declared` characters while
+    /// only `present` characters follow.
+    fn overlong_format_record(declared: u16, present: &str) -> Vec<u8> {
+        let mut data = vec![164, 0];
+        data.extend_from_slice(&declared.to_le_bytes());
+        data.push(XL_UNICODE_STRING_HIGH_BYTE);
+        for unit in present.encode_utf16() {
+            data.extend_from_slice(&unit.to_le_bytes());
+        }
+        data
+    }
+
+    #[test]
+    fn a_lenient_policy_truncates_a_format_string_that_overstates_its_payload() {
+        const DECLARED: u16 = 40;
+        const ORDINAL: u32 = 3;
+        let data = overlong_format_record(DECLARED, "0.00");
+
+        let mut tolerance =
+            XlsToleranceLog::new(crate::xls::leniency::XlsLeniency::TolerateFormattingDefects);
+        let format = super::parse_number_format(&data, ORDINAL, &mut tolerance)
+            .expect("a lenient policy decodes the characters that are present");
+        assert_eq!(format.code(), "0.00");
+
+        let report = tolerance.into_report();
+        assert_eq!(report.count(XlsFormattingDefect::FormatStringOverrun), 1);
+        assert_eq!(report.defects()[0].ordinal(), ORDINAL);
+        assert_eq!(report.defects()[0].observed(), u32::from(DECLARED));
+        assert_eq!(report.defects()[0].record_type(), FORMAT_RECORD);
+    }
+
+    #[test]
+    fn a_truncated_format_string_drops_a_split_utf16_code_unit() {
+        // One trailing byte cannot form a UTF-16 code unit; the repair must
+        // discard it rather than decode half a character.
+        let mut data = overlong_format_record(40, "0.00");
+        data.push(0x30);
+
+        let mut tolerance =
+            XlsToleranceLog::new(crate::xls::leniency::XlsLeniency::TolerateFormattingDefects);
+        let format = super::parse_number_format(&data, 0, &mut tolerance)
+            .expect("a lenient policy keeps only whole characters");
+        assert_eq!(format.code(), "0.00");
+        assert_eq!(
+            tolerance
+                .into_report()
+                .count(XlsFormattingDefect::FormatStringOverrun),
+            1
+        );
+    }
+
+    #[test]
+    fn a_lenient_policy_still_rejects_trailing_bytes_and_a_bad_format_identifier() {
+        let mut tolerance =
+            XlsToleranceLog::new(crate::xls::leniency::XlsLeniency::TolerateFormattingDefects);
+        // Trailing bytes past a satisfied `cch` are a framing defect.
+        let mut trailing = overlong_format_record(4, "0.00");
+        trailing.push(0);
+        trailing.push(0);
+        assert!(super::parse_number_format(&trailing, 0, &mut tolerance).is_err());
+        // An identifier outside the permitted ranges is not a formatting defect.
+        let mut bad_id = overlong_format_record(4, "0.00");
+        bad_id[0..2].copy_from_slice(&0u16.to_le_bytes());
+        assert!(super::parse_number_format(&bad_id, 0, &mut tolerance).is_err());
+        assert!(tolerance.into_report().is_clean());
+    }
+
     #[test]
     fn rejects_invalid_date_xf_and_crc_shapes() {
         assert!(parse_date_system(&[2, 0]).is_err());
@@ -960,7 +1125,7 @@ mod tests {
         records.push(xf(false, 0, 14));
         records.push(xf(false, 0, 164));
         records.push(xf(false, 0, 165));
-        let formatting = XlsFormatting::parse_globals(&records).unwrap();
+        let formatting = parse_globals_strict(&records).unwrap();
 
         let builtin = CellRecord::Number {
             row: 0,
@@ -1132,8 +1297,7 @@ mod real_world_tolerance_tests {
         let mut records = vec![format_record(164, "yyyy-mm-dd")];
         records.extend(minimal_xf_records());
 
-        let formatting =
-            XlsFormatting::parse_globals(&records).expect("a missing Date1904 is not fatal");
+        let formatting = parse_globals_strict(&records).expect("a missing Date1904 is not fatal");
         assert_eq!(formatting.date_system(), XlsDateSystem::Excel1900);
     }
 
@@ -1144,7 +1308,7 @@ mod real_world_tolerance_tests {
         records.push(format_record(164, "yyyy-mm-dd"));
         records.extend(minimal_xf_records());
 
-        let formatting = XlsFormatting::parse_globals(&records).expect("explicit Date1904 parses");
+        let formatting = parse_globals_strict(&records).expect("explicit Date1904 parses");
         assert_eq!(formatting.date_system(), XlsDateSystem::Excel1904);
     }
 
@@ -1168,7 +1332,7 @@ mod real_world_tolerance_tests {
             ];
             records.extend(minimal_xf_records());
 
-            let formatting = XlsFormatting::parse_globals(&records)
+            let formatting = parse_globals_strict(&records)
                 .unwrap_or_else(|error| panic!("reserved bits {reserved:#04x} rejected: {error}"));
             assert_eq!(
                 formatting.number_format(164).map(XlsNumberFormat::code),
@@ -1192,6 +1356,34 @@ mod real_world_tolerance_tests {
         ];
         records.extend(minimal_xf_records());
 
-        assert!(XlsFormatting::parse_globals(&records).is_err());
+        assert!(parse_globals_strict(&records).is_err());
+    }
+
+    #[test]
+    fn a_lenient_policy_repairs_an_xfcrc_count_disagreement_only() {
+        let mut records = vec![format_record(164, "yyyy-mm-dd")];
+        records.extend(minimal_xf_records());
+        let mut crc = [0u8; 20];
+        crc[0..2].copy_from_slice(&XFCRC_RECORD.to_le_bytes());
+        crc[16..20].copy_from_slice(&99u32.to_le_bytes());
+        crc[14..16].copy_from_slice(&(MIN_XF_RECORDS as u16 + 1).to_le_bytes());
+        records.push(record(XFCRC_RECORD, crc.to_vec()));
+
+        assert!(parse_globals_strict(&records).is_err());
+
+        let mut tolerance =
+            XlsToleranceLog::new(crate::xls::leniency::XlsLeniency::TolerateFormattingDefects);
+        let formatting = XlsFormatting::parse_globals(&records, &mut tolerance)
+            .expect("a lenient policy trusts the XF records that were parsed");
+        assert_eq!(formatting.extended_formats().len(), MIN_XF_RECORDS);
+
+        let report = tolerance.into_report();
+        assert_eq!(
+            report.count(XlsFormattingDefect::ExtendedFormatCountMismatch),
+            1
+        );
+        let entry = report.defects()[0];
+        assert_eq!(entry.ordinal(), MIN_XF_RECORDS as u32);
+        assert_eq!(entry.observed(), MIN_XF_RECORDS as u32 + 1);
     }
 }
