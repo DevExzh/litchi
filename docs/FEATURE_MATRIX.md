@@ -330,6 +330,7 @@ conversion, fonts, and image conversion are optional.
 | Protection | ✅ | ✅ | ✅ | Sheet, object, scenario, workbook, and password records |
 | Calculation, scenarios, and consolidation | ✅ | ✅ | ✅ | Typed settings and inert scenario/consolidation metadata |
 | Codepage handling | 🟡 | ✅ | 🟡 | Reader honors BIFF codepages; writer is centered on BIFF8/Windows-1252 |
+| Reader leniency | ✅ | ✅ | N/A | `XlsOpenOptions::leniency` defaults to strict; `TolerateFormattingDefects` repairs out-of-range font family, empty font name, justify-last-line without distributed alignment, an XFCRC count disagreeing with the parsed XF records, and a FORMAT string overrunning its payload, each recorded in a bounded `XlsToleranceReport`; structural and encryption defects stay fatal in both modes |
 | Password encryption | ✅ | ✅ | ✅ | XOR and supported RC4/CryptoAPI profiles |
 | VBA project metadata | ✅ | ✅ | ✅ | Inert BIFF markers/code names plus bounded `_VBA_PROJECT_CUR` MS-OVBA parsing and deterministic cache-free project/module serialization: compressed `dir`, typed module metadata, `PROJECT`/`PROJECTwm`, `_VBA_PROJECT`, and codepage-aware module source; the XLS writer authors structurally complete module-free or module-bearing projects, derives `ObNoMacros` from serialized module content, and commits builder validation atomically; source is never compiled, interpreted, or executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral CFB verification and signing |
@@ -416,7 +417,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Open/create/save | ✅ | ✅ | ✅ | Document and template packages, paths, readers, and bytes |
-| Text, paragraphs, spans, and headings | ✅ | ✅ | ✅ | Rich text extraction and mutation |
+| Text, paragraphs, spans, and headings | ✅ | ✅ | ✅ | Rich text extraction and mutation, including paragraphs nested inside anchored frames, text boxes, custom shapes, inline annotations, and framed tables; note bodies, ruby text, and tracked changes remain excluded from block extraction |
 | Tables | ✅ | ✅ | ✅ | Nested tables, properties, rows, and cells |
 | Lists and outline styles | ✅ | ✅ | ✅ | Ordered/unordered lists, labels, outline levels, alignment, and typed outline-style inspection/mutation; no label regeneration |
 | Sections | ✅ | ✅ | ✅ | Add, wrap, unwrap, replace, remove, and protected/linked metadata |
@@ -449,7 +450,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Cell value types | ✅ | ✅ | ✅ | String, number, boolean, date/time, duration, percentage, currency, and error-like values |
 | Formula strings and references | ✅ | ✅ | ✅ | OpenFormula text and cached values |
 | Formula evaluation | 🟡 | ✅ | N/A | Immutable ODS snapshots implement the shared workbook trait; common OpenFormula A1 references and semicolon arguments are normalized for the evaluator, while unsupported grammar remains an explicit formula error |
-| Repeated and merged cells/rows | ✅ | ✅ | ✅ | Semantic expansion and deterministic serialization |
+| Repeated and merged cells/rows | ✅ | ✅ | ✅ | Semantic expansion and deterministic serialization; the full-width/full-height blank padding every ODF producer emits is deferred rather than materialized, so interior runs still expand where real content follows and trailing runs are dropped up to a bounded number of authored empty rows |
 | Styles and full cell formatting | ✅ | ✅ | ✅ | Text, alignment, borders, backgrounds, number/data styles, protection styles, and read-only named fill-image/gradient/hatch/marker/opacity/stroke-dash inspection; no link following, style-use resolution, or rendering |
 | Conditional cell styles | ✅ | ✅ | ✅ | ODF style-map conditions and ordered mutation; not the full Excel rule family |
 | Content validation | ✅ | ✅ | ✅ | Conditions, prompts, error messages, events, definitions, and cell bindings |
