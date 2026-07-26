@@ -12,6 +12,9 @@ pub const DEFAULT_TAB_WIDTH_TWIPS: u32 = 720;
 /// Largest default tab width representable by an RTF numeric parameter.
 pub const MAX_DEFAULT_TAB_WIDTH_TWIPS: u32 = i32::MAX as u32;
 
+/// First non-control ASCII code point; anything below it is escaped in body text.
+const ASCII_CONTROL_LIMIT: u32 = 0x20;
+
 /// Controls how a writer resolves document `deftab` metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DefaultTabWidthPolicy {
@@ -7122,8 +7125,19 @@ impl<W: Write> RtfWriter<W> {
                 '\\' => self.write_str("\\\\")?,
                 '{' => self.write_str("\\{")?,
                 '}' => self.write_str("\\}")?,
-                '\n' => self.write_control_word("par", None)?,
-                '\t' => self.write_control_word("tab", None)?,
+                // The trailing space delimits the control word. Without it the
+                // following character is absorbed into the word itself (`\partwo`)
+                // or misread as its numeric parameter (`\par2`), silently
+                // destroying the text that follows the break. RTF always consumes
+                // a single delimiting space, so it never reappears as content.
+                '\n' => self.write_str("\\par ")?,
+                '\t' => self.write_str("\\tab ")?,
+                // Readers discard raw carriage returns and other bare control
+                // bytes as line-ending noise, so emit them as hex escapes to keep
+                // them part of the document text.
+                c if (c as u32) < ASCII_CONTROL_LIMIT => {
+                    write!(self.writer, "\\'{:02x}", c as u32)?;
+                },
                 c if c.is_ascii() => {
                     write!(self.writer, "{}", c)?;
                 },

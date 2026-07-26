@@ -131,3 +131,48 @@ fn libreoffice_fixture_exposes_its_explicit_default_tab_width() {
     let doc = RtfDocument::parse_bytes(&bytes).unwrap();
     assert_eq!(doc.default_tab_width_twips(), Some(720));
 }
+
+#[test]
+fn identical_repeated_declarations_are_idempotent() {
+    // LibreOffice restates `\deftab` once per paragraph-properties reset, so an
+    // identical redeclaration carries no new information and must not discard
+    // the document.
+    let doc = RtfDocument::parse(r"{\rtf1\ansi\deftab720\deftab720\deftab720 body}")
+        .expect("repeated identical deftab rejected");
+    assert_eq!(doc.default_tab_width_twips(), Some(720));
+    assert_eq!(doc.text().trim(), "body");
+}
+
+#[test]
+fn conflicting_repeated_declarations_are_still_rejected() {
+    let Err(error) = RtfDocument::parse(r"{\rtf1\ansi\deftab720\deftab480 body}") else {
+        panic!("conflicting deftab accepted");
+    };
+    assert!(
+        error.to_string().contains("conflicting RTF deftab"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn libreoffice_fixtures_with_repeated_deftab_keep_their_text() {
+    // Both fixtures are genuine LibreOffice output that repeats `\deftab`; each
+    // was previously rejected outright, losing all of its body text.
+    for (fixture, expected_twips, expected_text) in [
+        ("repeated-deftab.rtf", 420u32, "standard"),
+        ("repeated-deftab-cjk.rtf", 840u32, "のをする。"),
+    ] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/rtf")
+            .join(fixture);
+        let bytes = std::fs::read(&path)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+        let doc = RtfDocument::parse_bytes(&bytes)
+            .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
+        assert_eq!(doc.default_tab_width_twips(), Some(expected_twips));
+        assert!(
+            doc.text().contains(expected_text),
+            "{fixture} lost its body text"
+        );
+    }
+}

@@ -255,6 +255,15 @@ const MAX_SHAPES: usize = 65_536;
 const MAX_SHAPE_GROUPS: usize = 16_384;
 const MAX_SHAPES_PER_GROUP: usize = 65_536;
 const MAX_GROUPS_PER_GROUP: usize = 16_384;
+/// Hard ceiling on how deeply RTF groups (`{` ... `}`) may nest.
+///
+/// Group parsing is recursive, so an unbounded nesting depth lets a hostile or
+/// merely corrupt file exhaust the call stack and abort the process rather than
+/// surface a recoverable error. The deepest nesting observed anywhere in the
+/// real-world compatibility corpus is 15 levels, so this leaves ample room for
+/// genuine documents while keeping the worst-case stack cost comfortably inside
+/// a default 2 MiB thread stack even in unoptimised builds.
+const MAX_GROUP_NESTING_DEPTH: usize = 32;
 const MAX_SHAPE_GROUP_DEPTH: usize = 64;
 const MAX_STORY_GROUP_DEPTH: usize = 64;
 const MAX_SHAPE_PROPERTIES: usize = 65_536;
@@ -2140,111 +2149,18 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a group (content between braces).
-    fn parse_group(&mut self) -> RtfResult<()> {
-        self.expect_token(Token::OpenBrace)?;
-
-        if self.states.len() == 2 {
-            self.root_section_format_run = false;
-        }
-        let starts_visible_section_format = self
-            .states
-            .last()
-            .is_some_and(|state| state.destination == Destination::DocumentBody)
-            && matches!(
-                self.tokens.get(self.pos),
-                Some(Token::Control(ControlWord::SectionDefault))
-            );
-
-        // Push new state (inherit from parent)
-        if let Some(current) = self.states.last() {
-            self.states.push(current.clone());
-        } else {
-            self.states.push(State::default());
-        }
-        if starts_visible_section_format {
-            self.current_state_mut()?.visible_section_format = true;
-        }
-
-        let nested_destination = match (self.tokens.get(self.pos), self.tokens.get(self.pos + 1)) {
-            (Some(Token::Control(ControlWord::NestedTableProperties(param))), _) => {
-                Some((true, *param, 1))
-            },
-            (Some(Token::Control(ControlWord::NoNestedTables(param))), _) => {
-                Some((false, *param, 1))
-            },
-            (
-                Some(Token::Control(ControlWord::IgnorableDestination)),
-                Some(Token::Control(ControlWord::NestedTableProperties(param))),
-            ) => Some((true, *param, 2)),
-            (
-                Some(Token::Control(ControlWord::IgnorableDestination)),
-                Some(Token::Control(ControlWord::NoNestedTables(param))),
-            ) => Some((false, *param, 2)),
-            _ => None,
-        };
-        if let Some((properties, param, consumed)) = nested_destination {
-            require_parameterless(
-                param,
-                if properties {
-                    "nesttableprops"
-                } else {
-                    "nonesttables"
-                },
-            )?;
-            self.pos += consumed;
-            if properties {
-                self.current_state_mut()?.destination = Destination::NestedTableProperties;
-                self.parse_content()?;
-            } else {
-                self.current_state_mut()?.destination = Destination::Other;
-                self.skip_until_close_brace()?;
-            }
-            self.states.pop();
-            return Ok(());
-        }
-
-        if self.current_state()?.revision_type.is_some()
-            && matches!(
-                self.tokens.get(self.pos),
-                Some(Token::Control(
-                    ControlWord::IgnorableDestination
-                        | ControlWord::UserProperties
-                        | ControlWord::IndexEntry
-                        | ControlWord::TableOfContentsEntry
-                        | ControlWord::TableOfContentsEntryNoPage
-                        | ControlWord::FontTable
-                        | ControlWord::ColorTable
-                        | ControlWord::StyleSheet
-                        | ControlWord::ListTable
-                        | ControlWord::ListOverrideTable
-                        | ControlWord::RevisionTable
-                        | ControlWord::Info
-                        | ControlWord::Shape(_)
-                        | ControlWord::ShapeGroup(_)
-                        | ControlWord::Picture
-                        | ControlWord::Object
-                        | ControlWord::Result
-                        | ControlWord::Field
-                        | ControlWord::Header
-                        | ControlWord::HeaderFirst
-                        | ControlWord::HeaderLeft
-                        | ControlWord::HeaderRight
-                        | ControlWord::Footer
-                        | ControlWord::FooterFirst
-                        | ControlWord::FooterLeft
-                        | ControlWord::FooterRight
-                        | ControlWord::Footnote
-                        | ControlWord::Endnote
-                ))
-            )
-        {
-            return Err(RtfError::MalformedDocument(
-                "RTF revision text cannot contain active or external destinations".to_string(),
-            ));
-        }
-
-        // Check if this is a special group (header, destination, etc.)
+    /// Dispatch the destination-specific handling that a group may open with.
+    ///
+    /// Returns `true` when the group was fully consumed by a specialised
+    /// destination parser and the caller must not fall through to generic
+    /// content parsing.
+    ///
+    /// This is deliberately kept out of [`Parser::parse_group`] and marked
+    /// `#[inline(never)]`: the dispatch table is very large, so leaving it inline
+    /// would put its correspondingly large stack frame on the recursive
+    /// group-nesting path and blow the stack after only a handful of levels.
+    #[inline(never)]
+    fn dispatch_group_destination(&mut self) -> RtfResult<bool> {
         if self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
                 Token::Control(
@@ -2257,17 +2173,17 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::GeneratedListText) => {
                     self.parse_generated_list_marker(crate::GeneratedListMarkerKind::Modern)?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::LegacyGeneratedListText) => {
                     self.parse_generated_list_marker(crate::GeneratedListMarkerKind::Legacy)?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::LegacyParagraphNumbering(_)) => {
                     self.parse_legacy_paragraph_numbering()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::LegacyDrawingObject) => {
                     return Err(RtfError::MalformedDocument(
@@ -2285,7 +2201,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::UnicodeAlternate) => {
                     self.parse_unicode_alternate_group()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::FontTable) => {
                     let valid_scope = self.states.len() == 3
@@ -2309,7 +2225,7 @@ impl<'a> Parser<'a> {
                     self.parse_font_table()?;
                     self.skip_until_close_brace()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::ColorTable) => {
                     // Mark this as color table destination
@@ -2319,7 +2235,7 @@ impl<'a> Parser<'a> {
                     self.parse_color_table()?;
                     self.skip_until_close_brace()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::UserProperties) => {
                     return Err(RtfError::MalformedDocument(
@@ -2338,7 +2254,7 @@ impl<'a> Parser<'a> {
                 ) => {
                     self.parse_navigation_entry_destination()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::IgnorableDestination) => {
                     if matches!(
@@ -2349,7 +2265,7 @@ impl<'a> Parser<'a> {
                     ) {
                         self.parse_bookmark_destination()?;
                         self.states.pop();
-                        return Ok(());
+                        return Ok(true);
                     }
                     match self.tokens.get(self.pos + 1) {
                         Some(Token::Control(ControlWord::FileTable)) => {
@@ -2360,21 +2276,21 @@ impl<'a> Parser<'a> {
                             }
                             self.file_table = Some(self.parse_file_table()?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::DefaultCharacterProperties(_))) => {
                             self.parse_default_formatting_destination(
                                 crate::DefaultFormattingDestination::Character,
                             )?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::DefaultParagraphProperties(_))) => {
                             self.parse_default_formatting_destination(
                                 crate::DefaultFormattingDestination::Paragraph,
                             )?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::BlipUid)) => {
                             return Err(RtfError::MalformedDocument(
@@ -2478,7 +2394,7 @@ impl<'a> Parser<'a> {
                                 ));
                             }
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(
                             control @ (ControlWord::FootnoteSeparator
@@ -2509,7 +2425,7 @@ impl<'a> Parser<'a> {
                             let separator = self.parse_note_separator_destination(kind)?;
                             self.note_separators.add(separator)?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(
                             ControlWord::HideReviewMarkup(_)
@@ -2639,7 +2555,7 @@ impl<'a> Parser<'a> {
                             self.window_caption =
                                 Some(self.parse_window_caption_destination(true)?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::XslTransform)) => {
                             if self.states.len() != 3 || self.section_note_options_closed {
@@ -2655,7 +2571,7 @@ impl<'a> Parser<'a> {
                             }
                             self.xsl_transform = Some(self.parse_xsl_transform_destination()?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::StyleListFilter(parameter))) => {
                             if self.states.len() != 3 || self.section_note_options_closed {
@@ -2672,7 +2588,7 @@ impl<'a> Parser<'a> {
                             self.style_list_filter =
                                 Some(self.parse_style_list_filter_destination(*parameter)?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(
                             control @ (ControlWord::WriteReservation(_)
@@ -2708,7 +2624,7 @@ impl<'a> Parser<'a> {
                                 _ => unreachable!(),
                             }
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::UnicodeAlternateDestination)) => {
                             return Err(RtfError::MalformedDocument(
@@ -2719,19 +2635,19 @@ impl<'a> Parser<'a> {
                             self.pos += 1;
                             self.parse_list_table()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::ListOverrideTable)) => {
                             self.pos += 1;
                             self.parse_list_override_table()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::RevisionTable)) => {
                             self.pos += 1;
                             self.parse_revision_table()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::FormField | ControlWord::DataField)) => {
                             return Err(RtfError::MalformedDocument(
@@ -2746,25 +2662,25 @@ impl<'a> Parser<'a> {
                             }
                             self.generator = Some(self.parse_generator_destination()?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::RevisionSaveTable)) => {
                             self.pos += 1;
                             self.parse_revision_save_table()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::XmlNamespaceTable)) => {
                             self.pos += 1;
                             self.parse_xml_namespace_table()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::ProtectionUserTable)) => {
                             self.pos += 1;
                             self.parse_protection_user_table()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(
                             control @ (ControlWord::NextFile | ControlWord::DocumentTemplate),
@@ -2802,7 +2718,7 @@ impl<'a> Parser<'a> {
                             }
                             self.external_references.validate()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(
                             control @ (ControlWord::DocumentViewKind(_)
@@ -2828,7 +2744,7 @@ impl<'a> Parser<'a> {
                             self.pos += 1;
                             self.apply_document_view_control(&control)?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::ThemeData)) => {
                             if self.saw_theme_data {
@@ -2842,7 +2758,7 @@ impl<'a> Parser<'a> {
                                 crate::theme::MAX_THEME_DATA_BYTES,
                             )?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::ColorSchemeMapping)) => {
                             if self.saw_color_scheme_mapping {
@@ -2856,7 +2772,7 @@ impl<'a> Parser<'a> {
                                 crate::theme::MAX_COLOR_SCHEME_MAPPING_BYTES,
                             )?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::LatentStyles)) => {
                             if self.latent_styles.is_some() {
@@ -2866,12 +2782,12 @@ impl<'a> Parser<'a> {
                             }
                             self.latent_styles = Some(self.parse_latent_styles()?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::LegacySectionNumberingLevel(_))) => {
                             self.parse_legacy_section_numbering_level()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::ParagraphGroupTable)) => {
                             if self.paragraph_group_table.is_some() {
@@ -2881,7 +2797,7 @@ impl<'a> Parser<'a> {
                             }
                             self.paragraph_group_table = Some(self.parse_paragraph_group_table()?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::DataStore)) => {
                             if self.saw_data_store {
@@ -2892,7 +2808,7 @@ impl<'a> Parser<'a> {
                             self.saw_data_store = true;
                             self.data_store = Some(self.parse_data_store_destination()?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::MailMerge)) => {
                             if self.mail_merge.is_some() {
@@ -2902,7 +2818,7 @@ impl<'a> Parser<'a> {
                             }
                             self.mail_merge = Some(self.parse_mail_merge_destination()?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::MathProperties)) => {
                             if self.math_properties.is_some() {
@@ -2913,17 +2829,17 @@ impl<'a> Parser<'a> {
                             }
                             self.math_properties = Some(self.parse_math_properties_destination()?);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::UserProperties)) => {
                             self.parse_user_properties_destination()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::AnnotationAuthor)) => {
                             if self.pending_annotation_author_seen {
@@ -2935,7 +2851,7 @@ impl<'a> Parser<'a> {
                                 self.parse_ignorable_text_destination()?;
                             self.pending_annotation_author_seen = true;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::AnnotationInitials)) => {
                             if self.pending_annotation_initials_seen {
@@ -2947,22 +2863,22 @@ impl<'a> Parser<'a> {
                                 self.parse_ignorable_text_destination()?;
                             self.pending_annotation_initials_seen = true;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::AnnotationRangeStart)) => {
                             self.parse_annotation_range_marker(true)?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::AnnotationRangeEnd)) => {
                             self.parse_annotation_range_marker(false)?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::Annotation)) => {
                             self.parse_annotation_destination()?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::Shape(_))) => {
                             return Err(RtfError::MalformedDocument(
@@ -2986,7 +2902,7 @@ impl<'a> Parser<'a> {
                                 true,
                             )?;
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::NonShapePicture(_))) => {
                             return Err(RtfError::MalformedDocument(
@@ -3014,7 +2930,7 @@ impl<'a> Parser<'a> {
                             self.background_shape_index = Some(self.shapes.len());
                             self.shapes.push(shape);
                             self.states.pop();
-                            return Ok(());
+                            return Ok(true);
                         },
                         _ => {},
                     }
@@ -3024,7 +2940,7 @@ impl<'a> Parser<'a> {
                     }
                     self.skip_until_close_brace()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::StyleSheet) => {
                     // Parse style definitions without adding their names to body text.
@@ -3033,22 +2949,22 @@ impl<'a> Parser<'a> {
                     }
                     self.parse_stylesheet()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::ListTable) => {
                     self.parse_list_table()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::ListOverrideTable) => {
                     self.parse_list_override_table()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::RevisionTable) => {
                     self.parse_revision_table()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::FormField | ControlWord::DataField) => {
                     return Err(RtfError::MalformedDocument(
@@ -3074,7 +2990,7 @@ impl<'a> Parser<'a> {
                     }
                     self.window_caption = Some(self.parse_window_caption_destination(false)?);
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::XslTransform) => {
                     return Err(RtfError::MalformedDocument(
@@ -3151,7 +3067,7 @@ impl<'a> Parser<'a> {
                     }
                     self.math_properties = Some(self.parse_math_properties_destination()?);
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::Info) => {
                     // Parse document metadata without adding it to body text.
@@ -3160,7 +3076,7 @@ impl<'a> Parser<'a> {
                     }
                     self.parse_info()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::Shape(parameter)) => {
                     require_parameterless(*parameter, "shp")?;
@@ -3282,7 +3198,7 @@ impl<'a> Parser<'a> {
                         },
                     }
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::NonShapePicture(parameter)) => {
                     require_parameterless(*parameter, "nonshppict")?;
@@ -3291,7 +3207,7 @@ impl<'a> Parser<'a> {
                         false,
                     )?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::ShapePicture(_)) => {
                     return Err(RtfError::MalformedDocument(
@@ -3430,7 +3346,7 @@ impl<'a> Parser<'a> {
                         },
                     }
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::Picture) => {
                     // Mark as picture destination and extract
@@ -3440,7 +3356,7 @@ impl<'a> Parser<'a> {
                     self.parse_picture()?;
                     self.skip_until_close_brace()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::PictureProperties(_)) => {
                     return Err(RtfError::MalformedDocument(
@@ -3480,7 +3396,7 @@ impl<'a> Parser<'a> {
                         crate::BodyStoryEvent::Object(index),
                     ));
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::InvalidObjectDestinationParameter) => {
                     return Err(RtfError::MalformedDocument(
@@ -3495,7 +3411,7 @@ impl<'a> Parser<'a> {
                     }
                     self.skip_until_close_brace()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::InvalidObjectResultDestinationParameter) => {
                     return Err(RtfError::MalformedDocument(
@@ -3507,7 +3423,7 @@ impl<'a> Parser<'a> {
                     self.parse_field()?;
                     self.skip_until_close_brace()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::Header) => {
                     self.pos += 1;
@@ -3517,7 +3433,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_type = Some(super::section::HeaderFooterType::Header);
                     self.parse_header_footer_content()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::HeaderFirst) => {
                     self.pos += 1;
@@ -3527,7 +3443,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_type = Some(super::section::HeaderFooterType::HeaderFirst);
                     self.parse_header_footer_content()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::HeaderLeft) => {
                     self.pos += 1;
@@ -3537,7 +3453,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_type = Some(super::section::HeaderFooterType::HeaderLeft);
                     self.parse_header_footer_content()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::HeaderRight) => {
                     self.pos += 1;
@@ -3547,7 +3463,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_type = Some(super::section::HeaderFooterType::HeaderRight);
                     self.parse_header_footer_content()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::Footer) => {
                     self.pos += 1;
@@ -3557,7 +3473,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_type = Some(super::section::HeaderFooterType::Footer);
                     self.parse_header_footer_content()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::FooterFirst) => {
                     self.pos += 1;
@@ -3567,7 +3483,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_type = Some(super::section::HeaderFooterType::FooterFirst);
                     self.parse_header_footer_content()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::FooterLeft) => {
                     self.pos += 1;
@@ -3577,7 +3493,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_type = Some(super::section::HeaderFooterType::FooterLeft);
                     self.parse_header_footer_content()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::FooterRight) => {
                     self.pos += 1;
@@ -3587,7 +3503,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_type = Some(super::section::HeaderFooterType::FooterRight);
                     self.parse_header_footer_content()?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(ControlWord::Footnote) => {
                     self.pos += 1;
@@ -3596,7 +3512,7 @@ impl<'a> Parser<'a> {
                     }
                     self.parse_note(true)?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 Token::Control(
                     ControlWord::FootnoteSeparator
@@ -3617,10 +3533,131 @@ impl<'a> Parser<'a> {
                     }
                     self.parse_note(false)?;
                     self.states.pop();
-                    return Ok(());
+                    return Ok(true);
                 },
                 _ => {},
             }
+        }
+
+        Ok(false)
+    }
+
+    /// Parse a group (content between braces).
+    fn parse_group(&mut self) -> RtfResult<()> {
+        self.expect_token(Token::OpenBrace)?;
+
+        // Group parsing recurses, so refuse pathological nesting before it can
+        // exhaust the call stack. Reporting a typed error keeps a hostile file
+        // recoverable instead of aborting the process.
+        if self.states.len() >= MAX_GROUP_NESTING_DEPTH {
+            return Err(RtfError::MalformedDocument(
+                "RTF group nesting depth exceeds the safety limit".to_string(),
+            ));
+        }
+
+        if self.states.len() == 2 {
+            self.root_section_format_run = false;
+        }
+        let starts_visible_section_format = self
+            .states
+            .last()
+            .is_some_and(|state| state.destination == Destination::DocumentBody)
+            && matches!(
+                self.tokens.get(self.pos),
+                Some(Token::Control(ControlWord::SectionDefault))
+            );
+
+        // Push new state (inherit from parent)
+        if let Some(current) = self.states.last() {
+            self.states.push(current.clone());
+        } else {
+            self.states.push(State::default());
+        }
+        if starts_visible_section_format {
+            self.current_state_mut()?.visible_section_format = true;
+        }
+
+        let nested_destination = match (self.tokens.get(self.pos), self.tokens.get(self.pos + 1)) {
+            (Some(Token::Control(ControlWord::NestedTableProperties(param))), _) => {
+                Some((true, *param, 1))
+            },
+            (Some(Token::Control(ControlWord::NoNestedTables(param))), _) => {
+                Some((false, *param, 1))
+            },
+            (
+                Some(Token::Control(ControlWord::IgnorableDestination)),
+                Some(Token::Control(ControlWord::NestedTableProperties(param))),
+            ) => Some((true, *param, 2)),
+            (
+                Some(Token::Control(ControlWord::IgnorableDestination)),
+                Some(Token::Control(ControlWord::NoNestedTables(param))),
+            ) => Some((false, *param, 2)),
+            _ => None,
+        };
+        if let Some((properties, param, consumed)) = nested_destination {
+            require_parameterless(
+                param,
+                if properties {
+                    "nesttableprops"
+                } else {
+                    "nonesttables"
+                },
+            )?;
+            self.pos += consumed;
+            if properties {
+                self.current_state_mut()?.destination = Destination::NestedTableProperties;
+                self.parse_content()?;
+            } else {
+                self.current_state_mut()?.destination = Destination::Other;
+                self.skip_until_close_brace()?;
+            }
+            self.states.pop();
+            return Ok(());
+        }
+
+        if self.current_state()?.revision_type.is_some()
+            && matches!(
+                self.tokens.get(self.pos),
+                Some(Token::Control(
+                    ControlWord::IgnorableDestination
+                        | ControlWord::UserProperties
+                        | ControlWord::IndexEntry
+                        | ControlWord::TableOfContentsEntry
+                        | ControlWord::TableOfContentsEntryNoPage
+                        | ControlWord::FontTable
+                        | ControlWord::ColorTable
+                        | ControlWord::StyleSheet
+                        | ControlWord::ListTable
+                        | ControlWord::ListOverrideTable
+                        | ControlWord::RevisionTable
+                        | ControlWord::Info
+                        | ControlWord::Shape(_)
+                        | ControlWord::ShapeGroup(_)
+                        | ControlWord::Picture
+                        | ControlWord::Object
+                        | ControlWord::Result
+                        | ControlWord::Field
+                        | ControlWord::Header
+                        | ControlWord::HeaderFirst
+                        | ControlWord::HeaderLeft
+                        | ControlWord::HeaderRight
+                        | ControlWord::Footer
+                        | ControlWord::FooterFirst
+                        | ControlWord::FooterLeft
+                        | ControlWord::FooterRight
+                        | ControlWord::Footnote
+                        | ControlWord::Endnote
+                ))
+            )
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision text cannot contain active or external destinations".to_string(),
+            ));
+        }
+
+        // Check if this is a special group (header, destination, etc.)
+        if self.dispatch_group_destination()? {
+            return Ok(());
         }
 
         // Parse group content. A scoped revision marker without any inert text
@@ -4799,6 +4836,184 @@ impl<'a> Parser<'a> {
         Ok(output)
     }
 
+    /// Handle a control word encountered while parsing generic group content.
+    ///
+    /// Split out of [`Parser::parse_content`] and marked `#[inline(never)]` for
+    /// the same reason as [`Parser::dispatch_group_destination`]: the dispatch
+    /// table is large, and leaving it inline would charge its stack frame to
+    /// every level of group nesting on the recursive path.
+    #[inline(never)]
+    fn dispatch_content_control(
+        &mut self,
+        control: &ControlWord<'a>,
+        text_buffer: &mut SmallVec<[u8; 256]>,
+    ) -> RtfResult<()> {
+        match control {
+            ControlWord::Par | ControlWord::Line => {
+                let structural_table_boundary =
+                    self.finalize_table_before_non_table_body_content(true)?;
+                self.pos += 1;
+                // Paragraph break - flush current text
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                if !structural_table_boundary {
+                    text_buffer.push(b'\n');
+                }
+                let state = self.current_state_mut()?;
+                state.paragraph_content_started = false;
+                state.paragraph_numbering_declared = false;
+            },
+            ControlWord::Page(param) => {
+                require_parameterless(*param, "page")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_body_page_break()?;
+                self.pos += 1;
+            },
+            ControlWord::Section => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.pos += 1;
+                self.apply_control_word(control)?;
+            },
+            ControlWord::LegacyParagraphNumbering(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF pn control must be the first control in its own destination group"
+                        .to_string(),
+                ));
+            },
+            ControlWord::Tab => {
+                self.finalize_table_before_non_table_body_content(true)?;
+                self.pos += 1;
+                text_buffer.push(b'\t');
+            },
+            ControlWord::Unicode(code) => {
+                self.finalize_table_before_non_table_body_content(true)?;
+                // Handle Unicode character with potential fallback
+                if self
+                    .states
+                    .last()
+                    .is_some_and(|state| state.destination == Destination::DocumentBody)
+                {
+                    self.section_note_options_closed = true;
+                    self.root_section_format_run = false;
+                }
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.parse_unicode_sequence(*code)?;
+            },
+            ControlWord::Ansi
+            | ControlWord::AnsiCodePage(_)
+            | ControlWord::Mac
+            | ControlWord::Pc
+            | ControlWord::Pca => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.pos += 1;
+                self.apply_control_word(control)?;
+            },
+            ControlWord::NonBreakingSpace
+            | ControlWord::OptionalHyphen
+            | ControlWord::NonBreakingHyphen => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                let text = control_symbol_text(control).ok_or_else(|| {
+                    RtfError::MalformedDocument("missing RTF control-symbol text".to_string())
+                })?;
+                self.pos += 1;
+                self.append_semantic_text(text)?;
+            },
+            ControlWord::AnnotationMark => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                if self.pending_annotation_mark {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate pending RTF annotation marker".to_string(),
+                    ));
+                }
+                self.pending_annotation_mark = true;
+                self.pos += 1;
+            },
+            ControlWord::Revised(_)
+            | ControlWord::Deleted(_)
+            | ControlWord::RevisionAuthor(_)
+            | ControlWord::DeletedRevisionAuthor(_)
+            | ControlWord::RevisionDate(_)
+            | ControlWord::DeletedRevisionDate(_) => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                let starting = match control {
+                    ControlWord::Revised(true) => Some(super::annotation::RevisionType::Insertion),
+                    ControlWord::Deleted(true) => Some(super::annotation::RevisionType::Deletion),
+                    _ => None,
+                };
+                if matches!(control, ControlWord::Revised(false))
+                    && let Some(id) = self.current_state()?.revision_event_id
+                {
+                    self.record_revision_end(id)?;
+                }
+                let in_table = self.current_state()?.in_table
+                    || self.current_state()?.table_nesting_level >= 2;
+                let event_id = starting.map(|kind| {
+                    let id = self.revision_event_indices.len();
+                    self.revision_event_indices.push(None);
+                    if !in_table {
+                        self.body_story_events.push(match kind {
+                            super::annotation::RevisionType::Insertion => {
+                                ParsedBodyStoryEvent::RevisionStart(id)
+                            },
+                            super::annotation::RevisionType::Deletion => {
+                                ParsedBodyStoryEvent::RevisionDeletion(id)
+                            },
+                            _ => unreachable!(),
+                        });
+                    }
+                    id
+                });
+                self.pos += 1;
+                self.apply_control_word(control)?;
+                if let Some(id) = event_id {
+                    self.current_state_mut()?.revision_event_id = Some(id);
+                }
+            },
+            ControlWord::FormProtection(_)
+            | ControlWord::AnnotationProtection(_)
+            | ControlWord::RevisionProtection(_)
+            | ControlWord::ReadOnlyProtection(_)
+            | ControlWord::AllProtection(_)
+            | ControlWord::EnforceProtection(_)
+            | ControlWord::ProtectionLevel(_) => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.pos += 1;
+                self.apply_control_word(control)?;
+            },
+            ControlWord::ColorBackground(_) => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.pos += 1;
+                self.apply_control_word(control)?;
+            },
+            _ => {
+                self.pos += 1;
+                // Apply formatting changes
+                self.apply_control_word(control)?;
+            },
+        }
+
+        Ok(())
+    }
+
     /// Parse group content (text and control words).
     fn parse_content(&mut self) -> RtfResult<()> {
         let mut text_buffer = SmallVec::<[u8; 256]>::new();
@@ -4822,171 +5037,7 @@ impl<'a> Parser<'a> {
                     self.parse_group()?;
                 },
                 Token::Control(control) => {
-                    match control {
-                        ControlWord::Par | ControlWord::Line => {
-                            let structural_table_boundary =
-                                self.finalize_table_before_non_table_body_content(true)?;
-                            self.pos += 1;
-                            // Paragraph break - flush current text
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            if !structural_table_boundary {
-                                text_buffer.push(b'\n');
-                            }
-                            let state = self.current_state_mut()?;
-                            state.paragraph_content_started = false;
-                            state.paragraph_numbering_declared = false;
-                        },
-                        ControlWord::Page(param) => {
-                            require_parameterless(*param, "page")?;
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            self.record_body_page_break()?;
-                            self.pos += 1;
-                        },
-                        ControlWord::Section => {
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            self.pos += 1;
-                            self.apply_control_word(control)?;
-                        },
-                        ControlWord::LegacyParagraphNumbering(_) => {
-                            return Err(RtfError::MalformedDocument("RTF pn control must be the first control in its own destination group".to_string()));
-                        },
-                        ControlWord::Tab => {
-                            self.finalize_table_before_non_table_body_content(true)?;
-                            self.pos += 1;
-                            text_buffer.push(b'\t');
-                        },
-                        ControlWord::Unicode(code) => {
-                            self.finalize_table_before_non_table_body_content(true)?;
-                            // Handle Unicode character with potential fallback
-                            if self
-                                .states
-                                .last()
-                                .is_some_and(|state| state.destination == Destination::DocumentBody)
-                            {
-                                self.section_note_options_closed = true;
-                                self.root_section_format_run = false;
-                            }
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            self.parse_unicode_sequence(*code)?;
-                        },
-                        ControlWord::Ansi
-                        | ControlWord::AnsiCodePage(_)
-                        | ControlWord::Mac
-                        | ControlWord::Pc
-                        | ControlWord::Pca => {
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            self.pos += 1;
-                            self.apply_control_word(control)?;
-                        },
-                        ControlWord::NonBreakingSpace
-                        | ControlWord::OptionalHyphen
-                        | ControlWord::NonBreakingHyphen => {
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            let text = control_symbol_text(control).ok_or_else(|| {
-                                RtfError::MalformedDocument(
-                                    "missing RTF control-symbol text".to_string(),
-                                )
-                            })?;
-                            self.pos += 1;
-                            self.append_semantic_text(text)?;
-                        },
-                        ControlWord::AnnotationMark => {
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            if self.pending_annotation_mark {
-                                return Err(RtfError::MalformedDocument(
-                                    "duplicate pending RTF annotation marker".to_string(),
-                                ));
-                            }
-                            self.pending_annotation_mark = true;
-                            self.pos += 1;
-                        },
-                        ControlWord::Revised(_)
-                        | ControlWord::Deleted(_)
-                        | ControlWord::RevisionAuthor(_)
-                        | ControlWord::DeletedRevisionAuthor(_)
-                        | ControlWord::RevisionDate(_)
-                        | ControlWord::DeletedRevisionDate(_) => {
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            let starting = match control {
-                                ControlWord::Revised(true) => {
-                                    Some(super::annotation::RevisionType::Insertion)
-                                },
-                                ControlWord::Deleted(true) => {
-                                    Some(super::annotation::RevisionType::Deletion)
-                                },
-                                _ => None,
-                            };
-                            if matches!(control, ControlWord::Revised(false))
-                                && let Some(id) = self.current_state()?.revision_event_id
-                            {
-                                self.record_revision_end(id)?;
-                            }
-                            let in_table = self.current_state()?.in_table
-                                || self.current_state()?.table_nesting_level >= 2;
-                            let event_id = starting.map(|kind| {
-                                let id = self.revision_event_indices.len();
-                                self.revision_event_indices.push(None);
-                                if !in_table {
-                                    self.body_story_events.push(match kind {
-                                        super::annotation::RevisionType::Insertion => {
-                                            ParsedBodyStoryEvent::RevisionStart(id)
-                                        },
-                                        super::annotation::RevisionType::Deletion => {
-                                            ParsedBodyStoryEvent::RevisionDeletion(id)
-                                        },
-                                        _ => unreachable!(),
-                                    });
-                                }
-                                id
-                            });
-                            self.pos += 1;
-                            self.apply_control_word(control)?;
-                            if let Some(id) = event_id {
-                                self.current_state_mut()?.revision_event_id = Some(id);
-                            }
-                        },
-                        ControlWord::FormProtection(_)
-                        | ControlWord::AnnotationProtection(_)
-                        | ControlWord::RevisionProtection(_)
-                        | ControlWord::ReadOnlyProtection(_)
-                        | ControlWord::AllProtection(_)
-                        | ControlWord::EnforceProtection(_)
-                        | ControlWord::ProtectionLevel(_) => {
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            self.pos += 1;
-                            self.apply_control_word(control)?;
-                        },
-                        ControlWord::ColorBackground(_) => {
-                            if !text_buffer.is_empty() {
-                                self.flush_text_buffer(&mut text_buffer)?;
-                            }
-                            self.pos += 1;
-                            self.apply_control_word(control)?;
-                        },
-                        _ => {
-                            self.pos += 1;
-                            // Apply formatting changes
-                            self.apply_control_word(control)?;
-                        },
-                    }
+                    self.dispatch_content_control(control, &mut text_buffer)?;
                 },
                 Token::Text(text) => {
                     self.pos += 1;
@@ -5415,11 +5466,6 @@ impl<'a> Parser<'a> {
                     "RTF deftab must precede visible text at document root".to_string(),
                 ));
             }
-            if self.default_tab_width_twips.is_some() {
-                return Err(RtfError::MalformedDocument(
-                    "duplicate RTF deftab document property".to_string(),
-                ));
-            }
             let value = parameter.ok_or_else(|| {
                 RtfError::MalformedDocument(
                     "RTF deftab requires a nonnegative numeric parameter".to_string(),
@@ -5430,6 +5476,17 @@ impl<'a> Parser<'a> {
                     "RTF deftab requires a nonnegative numeric parameter".to_string(),
                 )
             })?;
+            // Real producers (LibreOffice in particular) restate `\deftab` once
+            // per paragraph-properties reset, so an identical redeclaration is
+            // idempotent rather than malformed. Only a genuinely conflicting
+            // value is ambiguous, and that is still rejected.
+            if let Some(existing) = self.default_tab_width_twips
+                && existing != value
+            {
+                return Err(RtfError::MalformedDocument(
+                    "conflicting RTF deftab document property".to_string(),
+                ));
+            }
             self.default_tab_width_twips = Some(value);
             return Ok(());
         }

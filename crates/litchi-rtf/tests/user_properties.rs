@@ -1,5 +1,7 @@
 use litchi_rtf::{RtfDocument, RtfWriter, UserPropertyType, UserPropertyValue};
 
+// The fixture value 3.1400 exercises lexical round-tripping; it is not the constant PI.
+#[allow(clippy::approx_constant)]
 #[test]
 fn parses_all_typed_values_in_normative_order() {
     let document = RtfDocument::parse(concat!(
