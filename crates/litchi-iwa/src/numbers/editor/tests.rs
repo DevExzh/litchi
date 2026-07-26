@@ -3457,6 +3457,79 @@ fn table_cell_fill_crud_round_trips_and_reuses_private_style() {
 }
 
 #[test]
+fn table_cell_layout_composes_with_fill_and_resets_independently() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_name("Layout")
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let original_layout = editor.table_cell_layout(table_id, 1, 1).unwrap();
+    let original_object_count = storage::object_locations(editor.package()).unwrap().len();
+    let fill = crate::shapes::ShapeFill::Solid(
+        crate::shapes::RgbaColor::new(0.8, 0.2, 0.1, 1.0, crate::shapes::RgbColorSpace::Srgb)
+            .unwrap(),
+    );
+    editor.set_table_cell_fill(table_id, 1, 1, &fill).unwrap();
+    let styled_object_count = storage::object_locations(editor.package()).unwrap().len();
+    assert_eq!(styled_object_count, original_object_count + 1);
+
+    let layout = crate::table_cell_layout::TableCellLayout::default()
+        .with_text_wrap(crate::table_cell_layout::TableCellTextWrap::Wrapped)
+        .with_vertical_alignment(crate::table_cell_layout::TableCellVerticalAlignment::Middle)
+        .with_insets(crate::table_cell_layout::TableCellInsets::new(
+            crate::table_cell_layout::TableCellInset::from_points(1.0).unwrap(),
+            crate::table_cell_layout::TableCellInset::from_points(2.0).unwrap(),
+            crate::table_cell_layout::TableCellInset::from_points(3.0).unwrap(),
+            crate::table_cell_layout::TableCellInset::from_points(4.0).unwrap(),
+        ));
+    editor
+        .set_table_cell_layout(table_id, 1, 1, layout)
+        .unwrap();
+    assert_eq!(
+        storage::object_locations(editor.package()).unwrap().len(),
+        styled_object_count
+    );
+
+    let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.table_cell_layout(table_id, 1, 1).unwrap(), layout);
+    assert_eq!(reopened.table_cell_fill(table_id, 1, 1).unwrap(), fill);
+    assert!(reopened.reset_table_cell_layout(table_id, 1, 1).unwrap());
+    assert_eq!(
+        reopened.table_cell_layout(table_id, 1, 1).unwrap(),
+        original_layout
+    );
+    assert_eq!(reopened.table_cell_fill(table_id, 1, 1).unwrap(), fill);
+    assert!(!reopened.reset_table_cell_layout(table_id, 1, 1).unwrap());
+    assert!(reopened.reset_table_cell_fill(table_id, 1, 1).unwrap());
+    assert_eq!(
+        storage::object_locations(reopened.package()).unwrap().len(),
+        original_object_count
+    );
+}
+
+#[test]
+fn table_cell_layout_rejects_invalid_coordinates_transactionally() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(2, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_table_cell_layout(
+                table_id,
+                2,
+                0,
+                crate::table_cell_layout::TableCellLayout::default(),
+            )
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn table_cell_border_rejects_invalid_coordinates_transactionally() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
     let before = editor.to_bytes().unwrap();

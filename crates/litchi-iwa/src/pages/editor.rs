@@ -3925,12 +3925,14 @@ pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
     PagesCellValue, PagesTable, PagesTableAxisIndex, PagesTableCellComment,
-    PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo, PagesTableCellRegion,
-    PagesTableCellUpdate, PagesTableColumnDeletion, PagesTableColumnInsertion, PagesTableDimension,
-    PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
-    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
-    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableHiddenAxes, PagesTableInfo,
-    PagesTablePoints, PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
+    PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo, PagesTableCellInset,
+    PagesTableCellInsets, PagesTableCellLayout, PagesTableCellRegion, PagesTableCellTextWrap,
+    PagesTableCellUpdate, PagesTableCellVerticalAlignment, PagesTableColumnDeletion,
+    PagesTableColumnInsertion, PagesTableDimension, PagesTableDimensionSize,
+    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
+    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
+    PagesTableHeaderSettings, PagesTableHiddenAxes, PagesTableInfo, PagesTablePoints,
+    PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
     PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
     PagesTableSortScope, PagesTableTitleSettings,
 };

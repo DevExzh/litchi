@@ -1959,6 +1959,51 @@ impl NumbersEditor {
         self.set_cell(table_id, row, column, CellValue::Empty)
     }
 
+    /// Read the effective text layout for one zero-based table cell.
+    pub fn table_cell_layout(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<crate::table_cell_layout::TableCellLayout> {
+        cell_layout::cell_layout(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace local text-layout overrides for one table cell.
+    pub fn set_table_cell_layout(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        layout: crate::table_cell_layout::TableCellLayout,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_layout::set_cell_layout(&mut staged, table_id, row, column, layout)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_layout(table_id, row, column)? != layout {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell layout failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local text-layout overrides and restore inherited cell values.
+    pub fn reset_table_cell_layout(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_layout::reset_cell_layout(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective fill for one zero-based table cell.
     pub fn table_cell_fill(
         &self,
@@ -2967,6 +3012,34 @@ pub(crate) fn table_cell_fill_in_package(
     cell_fill::cell_fill(package, table_id, row, column)
 }
 
+pub(crate) fn table_cell_layout_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<crate::table_cell_layout::TableCellLayout> {
+    cell_layout::cell_layout(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_layout_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    layout: crate::table_cell_layout::TableCellLayout,
+) -> Result<()> {
+    cell_layout::set_cell_layout(package, table_id, row, column, layout)
+}
+
+pub(crate) fn reset_table_cell_layout_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_layout::reset_cell_layout(package, table_id, row, column)
+}
+
 pub(crate) fn set_table_cell_fill_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -3286,7 +3359,9 @@ pub(crate) fn create_empty_table_graph_in_package(
 }
 
 mod cell_fill;
+mod cell_layout;
 mod cell_merge;
+mod cell_style;
 mod column_insert;
 mod date_time_fields;
 mod drawable_order;

@@ -100,6 +100,46 @@ fn source_built_table_roundtrips_cell_fill_crud() {
 }
 
 #[test]
+fn source_built_table_roundtrips_cell_layout_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Layout", 3, 3, position, size)
+        .unwrap();
+    let inherited = editor
+        .slide_table_cell_layout(0, table.model_object_id, 1, 1)
+        .unwrap();
+    let layout = KeynoteTableCellLayout::default()
+        .with_text_wrap(KeynoteTableCellTextWrap::Wrapped)
+        .with_vertical_alignment(KeynoteTableCellVerticalAlignment::Middle)
+        .with_insets(KeynoteTableCellInsets::uniform(
+            KeynoteTableCellInset::from_points(7.0).unwrap(),
+        ));
+    editor
+        .set_slide_table_cell_layout(0, table.model_object_id, 1, 1, layout)
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_cell_layout(0, table.model_object_id, 1, 1)
+            .unwrap(),
+        layout
+    );
+    assert!(
+        reopened
+            .reset_slide_table_cell_layout(0, table.model_object_id, 1, 1)
+            .unwrap()
+    );
+    assert_eq!(
+        reopened
+            .slide_table_cell_layout(0, table.model_object_id, 1, 1)
+            .unwrap(),
+        inherited
+    );
+}
+
+#[test]
 fn source_built_table_roundtrips_full_crud() {
     let editor = KeynoteDocumentBuilder::new().build().unwrap();
     assert!(editor.slide_tables(0).unwrap().is_empty());

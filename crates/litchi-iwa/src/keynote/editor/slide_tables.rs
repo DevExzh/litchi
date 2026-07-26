@@ -60,6 +60,11 @@ pub type KeynoteTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 pub use crate::table_cell_border::{
     TableCellBorderSide as KeynoteTableCellBorderSide, TableCellBorders as KeynoteTableCellBorders,
 };
+pub use crate::table_cell_layout::{
+    TableCellInset as KeynoteTableCellInset, TableCellInsets as KeynoteTableCellInsets,
+    TableCellLayout as KeynoteTableCellLayout, TableCellTextWrap as KeynoteTableCellTextWrap,
+    TableCellVerticalAlignment as KeynoteTableCellVerticalAlignment,
+};
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
 /// Lossless header/footer configuration shared by native iWork tables.
@@ -434,6 +439,76 @@ impl KeynoteEditor {
             column,
             KeynoteTableCellValue::Empty,
         )
+    }
+
+    /// Read the effective text layout for one reachable slide-table cell.
+    pub fn slide_table_cell_layout(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellLayout> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_layout_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace local text-layout overrides for one slide-table cell.
+    pub fn set_slide_table_cell_layout(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        layout: KeynoteTableCellLayout,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_layout_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            layout,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_layout(slide_index, model_object_id, row, column)? != layout {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell layout failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local text-layout overrides and restore inherited cell values.
+    pub fn reset_slide_table_cell_layout(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_layout_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
     }
 
     /// Read the effective fill for one reachable slide-table cell.

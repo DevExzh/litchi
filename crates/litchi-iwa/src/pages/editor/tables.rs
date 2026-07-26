@@ -62,6 +62,11 @@ pub type PagesTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 pub use crate::table_cell_border::{
     TableCellBorderSide as PagesTableCellBorderSide, TableCellBorders as PagesTableCellBorders,
 };
+pub use crate::table_cell_layout::{
+    TableCellInset as PagesTableCellInset, TableCellInsets as PagesTableCellInsets,
+    TableCellLayout as PagesTableCellLayout, TableCellTextWrap as PagesTableCellTextWrap,
+    TableCellVerticalAlignment as PagesTableCellVerticalAlignment,
+};
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -226,6 +231,73 @@ impl PagesEditor {
         column: usize,
     ) -> Result<()> {
         self.set_table_cell(model_object_id, row, column, PagesCellValue::Empty)
+    }
+
+    /// Read the effective text layout for one body-table cell.
+    pub fn table_cell_layout(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellLayout> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_layout_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace local text-layout overrides for one body-table cell.
+    pub fn set_table_cell_layout(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        layout: PagesTableCellLayout,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_layout_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            layout,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_layout(model_object_id, row, column)? != layout {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell layout failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local text-layout overrides and restore inherited cell values.
+    pub fn reset_table_cell_layout(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_layout_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
     }
 
     /// Read the effective fill for one body-table cell.
@@ -1138,6 +1210,33 @@ mod tests {
         assert_eq!(reopened.table_cell_fill(model_id, 1, 1).unwrap(), fill);
         assert!(reopened.reset_table_cell_fill(model_id, 1, 1).unwrap());
         assert_eq!(reopened.table_cell_fill(model_id, 1, 1).unwrap(), inherited);
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_cell_layout_crud() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Layout", 3, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let inherited = editor.table_cell_layout(model_id, 1, 1).unwrap();
+        let layout = PagesTableCellLayout::default()
+            .with_text_wrap(PagesTableCellTextWrap::Wrapped)
+            .with_vertical_alignment(PagesTableCellVerticalAlignment::Bottom)
+            .with_insets(PagesTableCellInsets::uniform(
+                PagesTableCellInset::from_points(5.0).unwrap(),
+            ));
+        editor
+            .set_table_cell_layout(model_id, 1, 1, layout)
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.table_cell_layout(model_id, 1, 1).unwrap(), layout);
+        assert!(reopened.reset_table_cell_layout(model_id, 1, 1).unwrap());
+        assert_eq!(
+            reopened.table_cell_layout(model_id, 1, 1).unwrap(),
+            inherited
+        );
     }
 
     #[test]
