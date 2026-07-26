@@ -3,11 +3,11 @@
 use crate::protobuf::tsk::FormatStructArchive;
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDataFormat,
-    TableCellDecimalPlaces, TableCellFixedDecimalPlaces, TableCellFractionAccuracy,
-    TableCellFractionFormat, TableCellNegativeNumberStyle, TableCellNumberFormat,
-    TableCellNumeralSystemBase, TableCellNumeralSystemFormat, TableCellNumeralSystemNegativeStyle,
-    TableCellNumeralSystemPlaces, TableCellPercentageFormat, TableCellScientificFormat,
-    TableCellThousandsSeparator,
+    TableCellDateTimeFormat, TableCellDecimalPlaces, TableCellFixedDecimalPlaces,
+    TableCellFractionAccuracy, TableCellFractionFormat, TableCellNegativeNumberStyle,
+    TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFormat,
+    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
+    TableCellScientificFormat, TableCellThousandsSeparator,
 };
 use crate::{Error, Result};
 
@@ -15,6 +15,7 @@ pub(super) const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
 pub(super) const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
 pub(super) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 pub(super) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
+pub(super) const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
 pub(super) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
 pub(super) const NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE: u32 = 269;
 pub(super) const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
@@ -28,7 +29,14 @@ const NATIVE_FRACTION_SIXTEENTHS: i32 = 16;
 const NATIVE_FRACTION_TENTHS: i32 = 10;
 const NATIVE_FRACTION_HUNDREDTHS: i32 = 100;
 
-pub(super) fn data_format_to_native(format: TableCellDataFormat) -> Result<FormatStructArchive> {
+pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<FormatStructArchive> {
+    if let TableCellDataFormat::DateTime(format) = format {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_DATE_TIME_FORMAT_TYPE),
+            date_time_format: Some(format.pattern().to_owned()),
+            ..Default::default()
+        });
+    }
     if let TableCellDataFormat::NumeralSystem(format) = format {
         return Ok(FormatStructArchive {
             format_type: Some(NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE),
@@ -98,6 +106,7 @@ pub(super) fn data_format_to_native(format: TableCellDataFormat) -> Result<Forma
         ),
         TableCellDataFormat::Fraction(_) => unreachable!("handled above"),
         TableCellDataFormat::NumeralSystem(_) => unreachable!("handled above"),
+        TableCellDataFormat::DateTime(_) => unreachable!("handled above"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -125,6 +134,28 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
     let format_type = native.format_type.ok_or_else(|| {
         Error::InvalidFormat("Table cell has no native data-format type".to_owned())
     })?;
+    if format_type == NATIVE_DATE_TIME_FORMAT_TYPE {
+        if native.decimal_places.is_some()
+            || native.negative_style.is_some()
+            || native.show_thousands_separator.is_some()
+            || native.currency_code.is_some()
+            || native.use_accounting_style.is_some()
+            || native.fraction_accuracy.is_some()
+            || native.base.is_some()
+            || native.base_places.is_some()
+            || native.base_use_minus_sign.is_some()
+            || native.suppress_date_format.is_some()
+            || native.suppress_time_format.is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "Date & Time cell format contains non-canonical options".to_owned(),
+            ));
+        }
+        let pattern = native.date_time_format.as_deref().ok_or_else(|| {
+            Error::InvalidFormat("Date & Time cell format has no ICU pattern".to_owned())
+        })?;
+        return TableCellDateTimeFormat::new(pattern).map(TableCellDataFormat::DateTime);
+    }
     if format_type == NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE {
         if native.decimal_places.is_some()
             || native.negative_style.is_some()
@@ -132,6 +163,9 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
             || native.currency_code.is_some()
             || native.use_accounting_style.is_some()
             || native.fraction_accuracy.is_some()
+            || native.date_time_format.is_some()
+            || native.suppress_date_format.is_some()
+            || native.suppress_time_format.is_some()
         {
             return Err(Error::InvalidFormat(
                 "Numeral System cell format contains non-canonical numeric options".to_owned(),
@@ -184,6 +218,9 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
             || native.base.is_some()
             || native.base_places.is_some()
             || native.base_use_minus_sign.is_some()
+            || native.date_time_format.is_some()
+            || native.suppress_date_format.is_some()
+            || native.suppress_time_format.is_some()
         {
             return Err(Error::InvalidFormat(
                 "Fraction cell format contains non-canonical decimal options".to_owned(),
@@ -213,6 +250,14 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
     {
         return Err(Error::InvalidFormat(
             "Non-Numeral-System cell format contains numeral-system options".to_owned(),
+        ));
+    }
+    if native.date_time_format.is_some()
+        || native.suppress_date_format.is_some()
+        || native.suppress_time_format.is_some()
+    {
+        return Err(Error::InvalidFormat(
+            "Non-Date-Time cell format contains Date & Time options".to_owned(),
         ));
     }
     let decimal_places = match native.decimal_places {

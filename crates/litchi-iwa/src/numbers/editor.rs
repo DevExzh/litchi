@@ -1978,7 +1978,7 @@ impl NumbersEditor {
         format: crate::table_cell_data_format::TableCellDataFormat,
     ) -> Result<()> {
         let mut staged = self.package.clone();
-        cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, format)?;
+        cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, &format)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         if verified.table_cell_data_format(table_id, row, column)? != format {
             return Err(Error::InvalidFormat(
@@ -2265,6 +2265,53 @@ impl NumbersEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Numbers numeral-system reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Date & Time format for one table cell.
+    ///
+    /// `None` means the Date value uses iWork's automatic data format.
+    pub fn table_cell_date_time_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<crate::table_cell_data_format::TableCellDateTimeFormat>> {
+        cell_data_format::cell_date_time_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit Date & Time format transactionally.
+    pub fn set_table_cell_date_time_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: crate::table_cell_data_format::TableCellDateTimeFormat,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Date & Time cell.
+    pub fn reset_table_cell_date_time_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_date_time_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Date & Time reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;
@@ -3394,7 +3441,7 @@ pub(crate) fn set_table_cell_data_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    format: crate::table_cell_data_format::TableCellDataFormat,
+    format: &crate::table_cell_data_format::TableCellDataFormat,
 ) -> Result<()> {
     cell_data_format::set_cell_data_format(package, table_id, row, column, format)
 }
@@ -3469,6 +3516,24 @@ pub(crate) fn reset_table_cell_numeral_system_format_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_data_format::reset_cell_numeral_system_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_date_time_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<crate::table_cell_data_format::TableCellDateTimeFormat>> {
+    cell_data_format::cell_date_time_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_date_time_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_date_time_format(package, table_id, row, column)
 }
 
 pub(crate) fn set_table_cell_layout_in_package(

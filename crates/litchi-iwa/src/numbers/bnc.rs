@@ -32,17 +32,21 @@ pub(crate) const COMMENT_FLAG: u32 = 0x080000;
 const CELL_FORMAT_KIND_FLAG: u32 = 0x001000;
 const CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x002000;
 const CURRENCY_FORMAT_IDENTIFIER_FLAG: u32 = 0x004000;
+const DATE_TIME_FORMAT_IDENTIFIER_FLAG: u32 = 0x008000;
 const EXPLICIT_FORMAT_FLAGS_START: usize = 6;
 const EXPLICIT_FORMAT_FLAGS_END: usize = 8;
 pub(crate) const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
 pub(crate) const EXPLICIT_CURRENCY_FORMAT: u16 = 0x0803;
+pub(crate) const EXPLICIT_DATE_TIME_FORMAT: u16 = 0x0008;
 pub(crate) const DECIMAL_CELL_FORMAT_KIND: u32 = 1;
 pub(crate) const CURRENCY_CELL_FORMAT_KIND: u32 = 2;
+pub(crate) const DATE_TIME_CELL_FORMAT_KIND: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DecimalCellFormatKind {
+pub(crate) enum CellDataFormatKind {
     NumberOrPercentage,
     Currency,
+    DateTime,
 }
 
 const VALUE_FLAGS: u32 = DECIMAL_FLAG
@@ -200,10 +204,10 @@ impl BncCell {
                 "Numbers cells cannot store a non-finite numeric value".to_string(),
             ));
         }
-        let cell_type = if self.cell_format_kind() == Some(CURRENCY_CELL_FORMAT_KIND) {
-            CELL_TYPE_ALTERNATE_NUMBER
-        } else {
-            CELL_TYPE_NUMBER
+        let cell_type = match self.cell_format_kind() {
+            Some(CURRENCY_CELL_FORMAT_KIND) => CELL_TYPE_ALTERNATE_NUMBER,
+            Some(DATE_TIME_CELL_FORMAT_KIND) => CELL_TYPE_RICH_TEXT_OR_NUMBER,
+            _ => CELL_TYPE_NUMBER,
         };
         self.replace_value(cell_type, DECIMAL_FLAG, decimal128_le(value)?.to_vec());
         Ok(())
@@ -352,6 +356,7 @@ impl BncCell {
     pub(crate) fn format_identifier(&self) -> Option<u32> {
         match self.cell_format_kind() {
             Some(CURRENCY_CELL_FORMAT_KIND) => self.u32_field(CURRENCY_FORMAT_IDENTIFIER_FLAG),
+            Some(DATE_TIME_CELL_FORMAT_KIND) => self.u32_field(DATE_TIME_FORMAT_IDENTIFIER_FLAG),
             _ => self.u32_field(CELL_FORMAT_IDENTIFIER_FLAG),
         }
     }
@@ -364,33 +369,46 @@ impl BncCell {
         }
     }
 
-    pub(crate) fn set_data_format_identifier(
-        &mut self,
-        identifier: u32,
-        kind: DecimalCellFormatKind,
-    ) {
+    pub(crate) fn set_data_format_identifier(&mut self, identifier: u32, kind: CellDataFormatKind) {
         let (explicit_flags, format_kind) = match kind {
-            DecimalCellFormatKind::NumberOrPercentage => {
+            CellDataFormatKind::NumberOrPercentage => {
                 if self.prefix[1] == CELL_TYPE_ALTERNATE_NUMBER {
                     self.prefix[1] = CELL_TYPE_NUMBER;
                 }
                 self.fields.remove(&CURRENCY_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&DATE_TIME_FORMAT_IDENTIFIER_FLAG);
                 self.fields.insert(
                     CELL_FORMAT_IDENTIFIER_FLAG,
                     identifier.to_le_bytes().to_vec(),
                 );
                 (EXPLICIT_DECIMAL_FORMAT, DECIMAL_CELL_FORMAT_KIND)
             },
-            DecimalCellFormatKind::Currency => {
+            CellDataFormatKind::Currency => {
                 if self.prefix[1] == CELL_TYPE_NUMBER {
                     self.prefix[1] = CELL_TYPE_ALTERNATE_NUMBER;
                 }
                 self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&DATE_TIME_FORMAT_IDENTIFIER_FLAG);
                 self.fields.insert(
                     CURRENCY_FORMAT_IDENTIFIER_FLAG,
                     identifier.to_le_bytes().to_vec(),
                 );
                 (EXPLICIT_CURRENCY_FORMAT, CURRENCY_CELL_FORMAT_KIND)
+            },
+            CellDataFormatKind::DateTime => {
+                if matches!(
+                    self.prefix[1],
+                    CELL_TYPE_NUMBER | CELL_TYPE_ALTERNATE_NUMBER
+                ) {
+                    self.prefix[1] = CELL_TYPE_RICH_TEXT_OR_NUMBER;
+                }
+                self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&CURRENCY_FORMAT_IDENTIFIER_FLAG);
+                self.fields.insert(
+                    DATE_TIME_FORMAT_IDENTIFIER_FLAG,
+                    identifier.to_le_bytes().to_vec(),
+                );
+                (EXPLICIT_DATE_TIME_FORMAT, DATE_TIME_CELL_FORMAT_KIND)
             },
         };
         self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
@@ -404,7 +422,11 @@ impl BncCell {
         self.fields.remove(&CELL_FORMAT_KIND_FLAG);
         self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
         self.fields.remove(&CURRENCY_FORMAT_IDENTIFIER_FLAG);
-        if self.prefix[1] == CELL_TYPE_ALTERNATE_NUMBER {
+        self.fields.remove(&DATE_TIME_FORMAT_IDENTIFIER_FLAG);
+        let is_plain_numeric_rich_text_cell = self.prefix[1] == CELL_TYPE_RICH_TEXT_OR_NUMBER
+            && !self.fields.contains_key(&RICH_TEXT_FLAG)
+            && (self.fields.contains_key(&DECIMAL_FLAG) || self.fields.contains_key(&NUMBER_FLAG));
+        if self.prefix[1] == CELL_TYPE_ALTERNATE_NUMBER || is_plain_numeric_rich_text_cell {
             self.prefix[1] = CELL_TYPE_NUMBER;
         }
     }
@@ -654,7 +676,7 @@ mod tests {
         let mut cell = BncCell::minimal();
         cell.set_number(1_234.5).unwrap();
         cell.set_style_identifier(Some(7));
-        cell.set_data_format_identifier(2, DecimalCellFormatKind::NumberOrPercentage);
+        cell.set_data_format_identifier(2, CellDataFormatKind::NumberOrPercentage);
 
         assert_eq!(cell.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
         assert_eq!(cell.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
@@ -677,7 +699,7 @@ mod tests {
     fn currency_formats_use_native_alternate_number_metadata() {
         let mut cell = BncCell::minimal();
         cell.set_number(-12.345).unwrap();
-        cell.set_data_format_identifier(4, DecimalCellFormatKind::Currency);
+        cell.set_data_format_identifier(4, CellDataFormatKind::Currency);
 
         assert_eq!(cell.explicit_format_flags(), EXPLICIT_CURRENCY_FORMAT);
         assert_eq!(cell.cell_format_kind(), Some(CURRENCY_CELL_FORMAT_KIND));
@@ -701,6 +723,36 @@ mod tests {
         assert_eq!(cell.cell_format_kind(), None);
         assert_eq!(cell.format_identifier(), None);
         assert_eq!(cell.stored_value(), StoredValue::Number);
+    }
+
+    #[test]
+    fn date_time_formats_use_native_date_metadata() {
+        let mut cell = BncCell::minimal();
+        cell.set_date(789_332_889.0).unwrap();
+        cell.set_data_format_identifier(7, CellDataFormatKind::DateTime);
+
+        assert_eq!(cell.explicit_format_flags(), EXPLICIT_DATE_TIME_FORMAT);
+        assert_eq!(cell.cell_format_kind(), Some(DATE_TIME_CELL_FORMAT_KIND));
+        assert_eq!(cell.format_identifier(), Some(7));
+        assert_eq!(cell.stored_value(), StoredValue::Date);
+        assert_eq!(
+            cell.encode(),
+            hex("050500000000080004900000000080cc2186c7410300000007000000")
+        );
+
+        let mut number = BncCell::minimal();
+        number.set_number(-1_234.5).unwrap();
+        number.set_data_format_identifier(7, CellDataFormatKind::DateTime);
+        assert_eq!(number.stored_value(), StoredValue::Number);
+        assert_eq!(number.prefix[1], CELL_TYPE_RICH_TEXT_OR_NUMBER);
+        number.clear_explicit_format();
+        assert_eq!(number.prefix[1], CELL_TYPE_NUMBER);
+        assert_eq!(number.stored_value(), StoredValue::Number);
+
+        cell.clear_explicit_format();
+        assert_eq!(cell.stored_value(), StoredValue::Date);
+        assert_eq!(cell.explicit_format_flags(), 0);
+        assert_eq!(cell.format_identifier(), None);
     }
 
     fn hex(value: &str) -> Vec<u8> {

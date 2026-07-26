@@ -7,12 +7,13 @@ use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_data_format::{
-    TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDecimalPlaces,
-    TableCellFixedDecimalPlaces, TableCellFractionAccuracy, TableCellFractionFormat,
-    TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellNumeralSystemBase,
-    TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
-    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
-    TableCellScientificFormat, TableCellThousandsSeparator,
+    TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle,
+    TableCellDateTimeFormat, TableCellDecimalPlaces, TableCellFixedDecimalPlaces,
+    TableCellFractionAccuracy, TableCellFractionFormat, TableCellNegativeNumberStyle,
+    TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces,
+    TableCellNumeralSystemFormat, TableCellNumeralSystemNegativeStyle,
+    TableCellNumeralSystemPlaces, TableCellPercentageFormat, TableCellScientificFormat,
+    TableCellThousandsSeparator,
 };
 
 const ROW: usize = 1;
@@ -22,12 +23,14 @@ const CURRENCY_COLUMN: usize = 3;
 const SCIENTIFIC_COLUMN: usize = 4;
 const FRACTION_COLUMN: usize = 5;
 const NUMERAL_SYSTEM_COLUMN: usize = 6;
+const DATE_TIME_COLUMN: usize = 7;
 const NUMBER_VALUE: f64 = -1_234.5;
 const PERCENTAGE_VALUE: f64 = -12.345;
 const CURRENCY_VALUE: f64 = -1_234.5;
 const SCIENTIFIC_VALUE: f64 = -1_234.5;
 const FRACTION_VALUE: f64 = -12.375;
 const NUMERAL_SYSTEM_VALUE: f64 = -1_234.5;
+const DATE_TIME_VALUE: f64 = 789_332_889.0;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -86,10 +89,14 @@ fn numeral_system_format() -> Result<TableCellNumeralSystemFormat, litchi_iwa::E
     )
 }
 
+fn date_time_format() -> TableCellDateTimeFormat {
+    TableCellDateTimeFormat::iso_date_time_24_hour_with_seconds()
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
-        .table_dimensions(3, 7)
+        .table_dimensions(3, 8)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(
@@ -149,6 +156,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         NUMERAL_SYSTEM_COLUMN,
         numeral_system_format()?,
     )?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        DATE_TIME_COLUMN,
+        CellValue::Date(DATE_TIME_VALUE),
+    )?;
+    editor.set_table_cell_date_time_format(table_id, ROW, DATE_TIME_COLUMN, date_time_format())?;
     editor.save(output)?;
     Ok(())
 }
@@ -156,7 +170,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Created from scratch with a native decimal table-cell format.\n")
-        .body_table("Number Formats", 3, 7)
+        .body_table("Number Formats", 3, 8)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(
@@ -216,6 +230,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         NUMERAL_SYSTEM_COLUMN,
         numeral_system_format()?,
     )?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        DATE_TIME_COLUMN,
+        CellValue::Date(DATE_TIME_VALUE),
+    )?;
+    editor.set_table_cell_date_time_format(table_id, ROW, DATE_TIME_COLUMN, date_time_format())?;
     editor.save(output)?;
     Ok(())
 }
@@ -228,7 +249,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         0,
         "Number Formats",
         3,
-        7,
+        8,
         DrawablePoint { x: 320.0, y: 360.0 },
         DrawableSize {
             width: 1_280.0,
@@ -318,6 +339,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         NUMERAL_SYSTEM_COLUMN,
         numeral_system_format()?,
+    )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        ROW,
+        DATE_TIME_COLUMN,
+        CellValue::Date(DATE_TIME_VALUE),
+    )?;
+    editor.set_slide_table_cell_date_time_format(
+        0,
+        table.model_object_id,
+        ROW,
+        DATE_TIME_COLUMN,
+        date_time_format(),
     )?;
     editor.save(output)?;
     Ok(())

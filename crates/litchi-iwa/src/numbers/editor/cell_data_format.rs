@@ -9,8 +9,9 @@ use crate::table_cell_data_format::{
     TableCellFixedDecimalPlaces, TableCellNegativeNumberStyle, TableCellThousandsSeparator,
 };
 use crate::table_cell_data_format::{
-    TableCellCurrencyFormat, TableCellDataFormat, TableCellFractionFormat, TableCellNumberFormat,
-    TableCellNumeralSystemFormat, TableCellPercentageFormat, TableCellScientificFormat,
+    TableCellCurrencyFormat, TableCellDataFormat, TableCellDateTimeFormat, TableCellFractionFormat,
+    TableCellNumberFormat, TableCellNumeralSystemFormat, TableCellPercentageFormat,
+    TableCellScientificFormat,
 };
 
 mod codec;
@@ -67,7 +68,8 @@ pub(super) fn cell_number_format(
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Number data format".to_owned(),
         )),
     }
@@ -86,7 +88,8 @@ pub(super) fn cell_currency_format(
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Currency data format".to_owned(),
         )),
     }
@@ -105,7 +108,8 @@ pub(super) fn reset_cell_currency_format(
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Cannot reset Currency format from a non-Currency cell".to_owned(),
         )),
     }
@@ -124,7 +128,8 @@ pub(super) fn cell_percentage_format(
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Percentage data format".to_owned(),
         )),
     }
@@ -143,7 +148,8 @@ pub(super) fn cell_scientific_format(
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Scientific data format".to_owned(),
         )),
     }
@@ -164,7 +170,8 @@ pub(super) fn reset_cell_scientific_format(
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Cannot reset Scientific format from a non-Scientific cell".to_owned(),
         )),
     }
@@ -183,7 +190,8 @@ pub(super) fn cell_fraction_format(
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Fraction data format".to_owned(),
         )),
     }
@@ -202,7 +210,8 @@ pub(super) fn reset_cell_fraction_format(
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Cannot reset Fraction format from a non-Fraction cell".to_owned(),
         )),
     }
@@ -221,7 +230,8 @@ pub(super) fn cell_numeral_system_format(
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Numeral System data format".to_owned(),
         )),
     }
@@ -242,8 +252,49 @@ pub(super) fn reset_cell_numeral_system_format(
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Cannot reset Numeral System format from a non-Numeral-System cell".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn cell_date_time_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellDateTimeFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::DateTime(format) => Ok(Some(format)),
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Percentage(_)
+        | TableCellDataFormat::Scientific(_)
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+            "Table cell does not use the Date & Time data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_date_time_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::DateTime(_) => reset_cell_data_format(package, table_id, row, column),
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Percentage(_)
+        | TableCellDataFormat::Scientific(_)
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+            "Cannot reset Date & Time format from a non-Date-Time cell".to_owned(),
         )),
     }
 }
@@ -255,7 +306,7 @@ pub(super) fn set_cell_number_format(
     column: usize,
     format: TableCellNumberFormat,
 ) -> Result<()> {
-    set_cell_data_format(package, table_id, row, column, format.into())
+    set_cell_data_format(package, table_id, row, column, &format.into())
 }
 
 pub(super) fn set_cell_data_format(
@@ -263,9 +314,9 @@ pub(super) fn set_cell_data_format(
     table_id: u64,
     row: usize,
     column: usize,
-    format: TableCellDataFormat,
+    format: &TableCellDataFormat,
 ) -> Result<()> {
-    if format == TableCellDataFormat::Automatic {
+    if format == &TableCellDataFormat::Automatic {
         reset_cell_data_format(package, table_id, row, column)?;
         return Ok(());
     }
@@ -288,12 +339,13 @@ pub(super) fn set_cell_data_format(
     let old_identifier = old_reference.primary_identifier();
     let old_identifiers = old_reference.identifiers();
     let cell_format_kind = match format {
-        TableCellDataFormat::Currency(_) => bnc::DecimalCellFormatKind::Currency,
+        TableCellDataFormat::Currency(_) => bnc::CellDataFormatKind::Currency,
+        TableCellDataFormat::DateTime(_) => bnc::CellDataFormatKind::DateTime,
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => bnc::DecimalCellFormatKind::NumberOrPercentage,
+        | TableCellDataFormat::NumeralSystem(_) => bnc::CellDataFormatKind::NumberOrPercentage,
         TableCellDataFormat::Automatic => unreachable!("handled above"),
     };
     let native = data_format_to_native(format)?;
@@ -386,7 +438,8 @@ pub(super) fn reset_cell_number_format(
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Cannot reset Number format from a non-Number cell".to_owned(),
         )),
     }
@@ -407,7 +460,8 @@ pub(super) fn reset_cell_percentage_format(
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Scientific(_)
         | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::NumeralSystem(_)
+        | TableCellDataFormat::DateTime(_) => Err(Error::InvalidFormat(
             "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
         )),
     }
@@ -542,6 +596,14 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
                 secondary,
             })
         },
+        (
+            bnc::EXPLICIT_DATE_TIME_FORMAT,
+            Some(bnc::DATE_TIME_CELL_FORMAT_KIND),
+            Some(identifier),
+        ) if secondary.is_none() => Ok(CellFormatReference::Explicit {
+            identifier,
+            secondary: None,
+        }),
         _ => Err(Error::InvalidFormat(
             "Table cell contains inconsistent data-format metadata".to_owned(),
         )),
@@ -738,7 +800,7 @@ fn append_format_entry(
 
 #[cfg(test)]
 fn number_format_to_native(format: TableCellNumberFormat) -> FormatStructArchive {
-    data_format_to_native(format.into()).expect("number format is explicit")
+    data_format_to_native(&format.into()).expect("number format is explicit")
 }
 
 #[cfg(test)]
@@ -785,7 +847,7 @@ mod tests {
             TableCellNegativeNumberStyle::RedParentheses,
             TableCellThousandsSeparator::Hidden,
         );
-        let native = data_format_to_native(percentage.into()).unwrap();
+        let native = data_format_to_native(&percentage.into()).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_PERCENTAGE_FORMAT_TYPE));
         assert_eq!(
             data_format_from_native(&native).unwrap(),
@@ -799,7 +861,7 @@ mod tests {
             TableCellThousandsSeparator::Shown,
             TableCellCurrencyStyle::Accounting,
         );
-        let mut native = data_format_to_native(currency.into()).unwrap();
+        let mut native = data_format_to_native(&currency.into()).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_CURRENCY_FORMAT_TYPE));
         assert_eq!(native.currency_code.as_deref(), Some("EUR"));
         assert_eq!(native.use_accounting_style, Some(true));
@@ -810,13 +872,13 @@ mod tests {
 
         native.currency_code = Some("euro".to_owned());
         assert!(data_format_from_native(&native).is_err());
-        native = data_format_to_native(currency.into()).unwrap();
+        native = data_format_to_native(&currency.into()).unwrap();
         native.use_accounting_style = None;
         assert!(data_format_from_native(&native).is_err());
 
         let scientific =
             TableCellScientificFormat::new(TableCellFixedDecimalPlaces::new(5).unwrap());
-        let mut native = data_format_to_native(scientific.into()).unwrap();
+        let mut native = data_format_to_native(&scientific.into()).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_SCIENTIFIC_FORMAT_TYPE));
         assert_eq!(native.decimal_places, Some(5));
         assert_eq!(
@@ -825,10 +887,10 @@ mod tests {
         );
         native.negative_style = Some(2);
         assert!(data_format_from_native(&native).is_err());
-        native = data_format_to_native(scientific.into()).unwrap();
+        native = data_format_to_native(&scientific.into()).unwrap();
         native.decimal_places = Some(NATIVE_AUTOMATIC_DECIMAL_PLACES);
         assert!(data_format_from_native(&native).is_err());
-        native = data_format_to_native(scientific.into()).unwrap();
+        native = data_format_to_native(&scientific.into()).unwrap();
         native.fraction_accuracy = Some(8);
         assert!(data_format_from_native(&native).is_err());
 
@@ -845,7 +907,7 @@ mod tests {
         ];
         for (accuracy, native_accuracy) in accuracies {
             let fraction = TableCellFractionFormat::new(accuracy);
-            let native = data_format_to_native(fraction.into()).unwrap();
+            let native = data_format_to_native(&fraction.into()).unwrap();
             assert_eq!(native.format_type, Some(NATIVE_FRACTION_FORMAT_TYPE));
             assert_eq!(native.fraction_accuracy, Some(native_accuracy));
             assert_eq!(
@@ -853,10 +915,11 @@ mod tests {
                 TableCellDataFormat::Fraction(fraction)
             );
         }
-        let mut invalid = data_format_to_native(TableCellFractionFormat::default().into()).unwrap();
+        let mut invalid =
+            data_format_to_native(&TableCellFractionFormat::default().into()).unwrap();
         invalid.fraction_accuracy = Some(3);
         assert!(data_format_from_native(&invalid).is_err());
-        invalid = data_format_to_native(TableCellFractionFormat::default().into()).unwrap();
+        invalid = data_format_to_native(&TableCellFractionFormat::default().into()).unwrap();
         invalid.decimal_places = Some(2);
         assert!(data_format_from_native(&invalid).is_err());
 
@@ -866,7 +929,7 @@ mod tests {
             TableCellNumeralSystemNegativeStyle::TwosComplement,
         )
         .unwrap();
-        let mut native = data_format_to_native(numeral_system.into()).unwrap();
+        let mut native = data_format_to_native(&numeral_system.into()).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE));
         assert_eq!(native.base, Some(16));
         assert_eq!(native.base_places, Some(8));
@@ -877,15 +940,92 @@ mod tests {
         );
         native.base = Some(37);
         assert!(data_format_from_native(&native).is_err());
-        native = data_format_to_native(numeral_system.into()).unwrap();
+        native = data_format_to_native(&numeral_system.into()).unwrap();
         native.base_places = Some(33);
         assert!(data_format_from_native(&native).is_err());
-        native = data_format_to_native(numeral_system.into()).unwrap();
+        native = data_format_to_native(&numeral_system.into()).unwrap();
         native.base = Some(10);
         assert!(data_format_from_native(&native).is_err());
-        native = data_format_to_native(numeral_system.into()).unwrap();
+        native = data_format_to_native(&numeral_system.into()).unwrap();
         native.decimal_places = Some(2);
         assert!(data_format_from_native(&native).is_err());
+
+        let date_time = TableCellDateTimeFormat::iso_date_time_24_hour_with_seconds();
+        let mut native =
+            data_format_to_native(&TableCellDataFormat::DateTime(date_time.clone())).unwrap();
+        assert_eq!(native.format_type, Some(NATIVE_DATE_TIME_FORMAT_TYPE));
+        assert_eq!(
+            native.date_time_format.as_deref(),
+            Some("yyyy-MM-dd H:mm:ss")
+        );
+        assert_eq!(
+            data_format_from_native(&native).unwrap(),
+            TableCellDataFormat::DateTime(date_time.clone())
+        );
+        native.date_time_format = None;
+        assert!(data_format_from_native(&native).is_err());
+        native = data_format_to_native(&TableCellDataFormat::DateTime(date_time.clone())).unwrap();
+        native.suppress_time_format = Some(false);
+        assert!(data_format_from_native(&native).is_err());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_reuses_and_resets_date_time_formats() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Dates")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let date_time = TableCellDateTimeFormat::iso_date_time_24_hour_with_seconds();
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Date(789_332_889.0))
+            .unwrap();
+        editor
+            .set_cell(table_id, 1, 2, CellValue::Date(789_332_889.0))
+            .unwrap();
+        editor
+            .set_table_cell_date_time_format(table_id, 1, 1, date_time.clone())
+            .unwrap();
+        editor
+            .set_table_cell_date_time_format(table_id, 1, 2, date_time.clone())
+            .unwrap();
+
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 1);
+        assert_eq!(formats.entries[0].entry.refcount, 2);
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .table_cell_date_time_format(table_id, 1, 1)
+                .unwrap(),
+            Some(date_time.clone())
+        );
+        assert!(
+            reopened
+                .reset_table_cell_date_time_format(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .table_cell_date_time_format(table_id, 1, 2)
+                .unwrap(),
+            Some(date_time)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_date_time_format(table_id, 1, 2)
+                .unwrap()
+        );
+        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
+        assert!(
+            resolve_format_table(reopened.package(), &location)
+                .unwrap()
+                .entries
+                .is_empty()
+        );
     }
 
     #[test]

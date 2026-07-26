@@ -63,6 +63,7 @@ pub use crate::table_cell_border::{
 pub use crate::table_cell_data_format::{
     TableCellCurrencyFormat as KeynoteTableCellCurrencyFormat,
     TableCellDataFormat as KeynoteTableCellDataFormat,
+    TableCellDateTimeFormat as KeynoteTableCellDateTimeFormat,
     TableCellFractionFormat as KeynoteTableCellFractionFormat,
     TableCellNumeralSystemFormat as KeynoteTableCellNumeralSystemFormat,
     TableCellPercentageFormat as KeynoteTableCellPercentageFormat,
@@ -489,7 +490,7 @@ impl KeynoteEditor {
             model_object_id,
             row,
             column,
-            format,
+            &format,
         )?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         require_table_model(&verified, slide_index, model_object_id)?;
@@ -909,6 +910,72 @@ impl KeynoteEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Keynote numeral-system reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Date & Time format for one slide-table cell.
+    pub fn slide_table_cell_date_time_format(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<KeynoteTableCellDateTimeFormat>> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_date_time_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace an explicit Date & Time format transactionally.
+    pub fn set_slide_table_cell_date_time_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: KeynoteTableCellDateTimeFormat,
+    ) -> Result<()> {
+        self.set_slide_table_cell_data_format(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            format.into(),
+        )
+    }
+
+    /// Restore Automatic from an explicit Date & Time slide-table cell.
+    pub fn reset_slide_table_cell_date_time_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_date_time_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
+                != KeynoteTableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Keynote Date & Time reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;

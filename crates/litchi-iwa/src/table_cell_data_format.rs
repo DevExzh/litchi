@@ -6,7 +6,9 @@ use std::str::FromStr;
 
 const MAXIMUM_DECIMAL_PLACES: u8 = 30;
 
+mod date_time;
 mod numeral_system;
+pub use date_time::TableCellDateTimeFormat;
 pub use numeral_system::{
     TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
@@ -436,7 +438,7 @@ impl TableCellCurrencyFormat {
 }
 
 /// Data format stored explicitly on one native iWork table cell.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum TableCellDataFormat {
     /// Let iWork infer the format from the cell value.
     #[default]
@@ -453,6 +455,8 @@ pub enum TableCellDataFormat {
     Fraction(TableCellFractionFormat),
     /// Display the rounded integer in a positional numeral system.
     NumeralSystem(TableCellNumeralSystemFormat),
+    /// Display a native Date value with an ICU-style pattern.
+    DateTime(TableCellDateTimeFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -600,6 +604,21 @@ mod tests {
         assert_eq!(
             TableCellNumeralSystemFormat::default().negative_style(),
             TableCellNumeralSystemNegativeStyle::MinusSign
+        );
+    }
+
+    #[test]
+    fn date_time_patterns_are_owned_strict_and_ergonomic() {
+        assert!(TableCellDateTimeFormat::new("").is_err());
+        assert!(TableCellDateTimeFormat::new("yyyy\0MM").is_err());
+        assert_eq!(
+            TableCellDateTimeFormat::iso_date_time_24_hour_with_seconds().pattern(),
+            "yyyy-MM-dd H:mm:ss"
+        );
+        let custom = TableCellDateTimeFormat::new("EEEE, MMMM d, y").unwrap();
+        assert_eq!(
+            TableCellDataFormat::from(custom.clone()),
+            TableCellDataFormat::DateTime(custom)
         );
     }
 }
