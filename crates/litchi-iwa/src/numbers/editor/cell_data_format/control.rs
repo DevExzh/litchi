@@ -1,7 +1,10 @@
 //! Native control-cell-spec table lifecycle for interactive data formats.
 
 use super::*;
-use crate::table_cell_data_format::{TableCellSliderRange, TableCellStepperRange};
+use crate::table_cell_data_format::{
+    TableCellPopUpMenuFormat, TableCellPopUpMenuInitialSelection, TableCellSliderRange,
+    TableCellStepperRange,
+};
 
 const DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
 const CHECKBOX_INTERACTION_TYPE: u32 = 8;
@@ -11,13 +14,15 @@ const STAR_RATING_MAXIMUM: f64 = 5.0;
 const STAR_RATING_INCREMENT: f64 = 1.0;
 const SLIDER_INTERACTION_TYPE: u32 = 5;
 const STEPPER_INTERACTION_TYPE: u32 = 4;
+const POP_UP_MENU_INTERACTION_TYPE: u32 = 7;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum ControlCellSpecKind {
     Checkbox,
     StarRating,
     Slider(TableCellSliderRange),
     Stepper(TableCellStepperRange),
+    PopUpMenu(TableCellPopUpMenuFormat),
 }
 
 pub(super) fn acquire_spec(
@@ -26,7 +31,7 @@ pub(super) fn acquire_spec(
     current_identifier: Option<u32>,
     kind: ControlCellSpecKind,
 ) -> Result<u32> {
-    let expected = cell_spec(kind);
+    let expected = cell_spec(&kind);
     let table_id = ensure_control_table(package, location)?;
     let locations = storage::object_locations(package)?;
     let resolved = storage::resolve_table_data_list(
@@ -102,6 +107,121 @@ pub(super) fn acquire_spec(
     Ok(key)
 }
 
+pub(super) fn acquire_pop_up_menu_spec(
+    package: &mut IWorkPackage,
+    location: &model::CellLocation,
+    current_identifier: Option<u32>,
+    format: &TableCellPopUpMenuFormat,
+) -> Result<u32> {
+    let table_id = ensure_control_table(package, location)?;
+    let locations = storage::object_locations(package)?;
+    let resolved = storage::resolve_table_data_list(
+        package,
+        &locations,
+        table_id,
+        tst::table_data_list::ListType::ControlCellSpec,
+    )?;
+    let mut reusable_model_identifier = None;
+    for entry in &resolved.entries {
+        let Some(spec) = entry.entry.cell_spec.as_ref() else {
+            continue;
+        };
+        if spec.interaction_type != POP_UP_MENU_INTERACTION_TYPE {
+            continue;
+        }
+        if entry.entry.refcount == 0 {
+            return Err(Error::InvalidFormat(
+                "Numbers control-cell-spec table contains a zero-reference entry".to_owned(),
+            ));
+        }
+        let Some(reference) = spec.chooser_control_popup_model.as_ref() else {
+            continue;
+        };
+        let existing = pop_up_menu::read_model(
+            package,
+            &locations,
+            reference.identifier,
+            spec.chooser_control_start_w_first == Some(true),
+        )?;
+        if existing.items() == format.items() {
+            reusable_model_identifier = Some(reference.identifier);
+        }
+        if &existing == format {
+            if current_identifier != Some(entry.entry.key) {
+                storage::increment_table_data_list_entry(
+                    package,
+                    &locations,
+                    &resolved,
+                    entry,
+                    tst::table_data_list::ListType::ControlCellSpec,
+                )?;
+            }
+            return Ok(entry.entry.key);
+        }
+    }
+
+    let model_identifier = reusable_model_identifier.map_or_else(
+        || pop_up_menu::create_model(package, &resolved.table_archive, format),
+        Ok,
+    )?;
+    let spec = tst::CellSpecArchive {
+        interaction_type: POP_UP_MENU_INTERACTION_TYPE,
+        chooser_control_popup_model: Some(tsp::Reference {
+            identifier: model_identifier,
+            ..Default::default()
+        }),
+        chooser_control_start_w_first: Some(matches!(
+            format.initial_selection(),
+            TableCellPopUpMenuInitialSelection::FirstItem
+        )),
+        ..Default::default()
+    };
+    let key = storage::next_table_data_list_key(&resolved.list, &resolved.entries)?;
+    package.update_archive(&resolved.table_archive, |archive| {
+        let object = archive.object_mut(table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers control-cell-spec table object {table_id} is missing"
+            ))
+        })?;
+        let index = storage::table_data_list_message_index(
+            object,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Object {table_id} has no Numbers control-cell-spec list payload"
+            ))
+        })?;
+        let previous = TableDataList::decode(object.messages[index].data.as_slice())?;
+        let mut current = previous.clone();
+        current.next_list_id = key.checked_add(1).ok_or_else(|| {
+            Error::ParseError("Numbers control-cell-spec identifier overflow".to_owned())
+        })?;
+        current.entries.push(tst::table_data_list::ListEntry {
+            key,
+            refcount: 1,
+            cell_spec: Some(spec),
+            ..Default::default()
+        });
+        let data = storage::rewrite_table_data_list_wire(
+            object.messages[index].data.as_slice(),
+            &previous,
+            &current,
+        )?;
+        let message_type = object.messages[index].type_;
+        object.replace_message(
+            index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+        )?;
+        storage::add_message_object_reference(object, index, model_identifier, model_identifier);
+        Ok(())
+    })?;
+    Ok(key)
+}
+
 pub(super) fn read_spec(
     package: &IWorkPackage,
     location: &model::CellLocation,
@@ -142,6 +262,35 @@ pub(super) fn read_spec(
             "Interactive control spec {identifier} has no payload"
         ))
     })?;
+    if spec.interaction_type == POP_UP_MENU_INTERACTION_TYPE {
+        let reference = spec.chooser_control_popup_model.as_ref().ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Interactive control spec {identifier} has no Pop-Up Menu model"
+            ))
+        })?;
+        let format = pop_up_menu::read_model(
+            package,
+            &location.object_locations,
+            reference.identifier,
+            spec.chooser_control_start_w_first == Some(true),
+        )?;
+        let mut expected = spec.clone();
+        expected.chooser_control_popup_model = None;
+        let mut canonical = tst::CellSpecArchive {
+            interaction_type: POP_UP_MENU_INTERACTION_TYPE,
+            chooser_control_start_w_first: spec.chooser_control_start_w_first,
+            ..Default::default()
+        };
+        if !matches!(canonical.chooser_control_start_w_first, Some(true | false)) {
+            canonical.chooser_control_start_w_first = Some(true);
+        }
+        if expected != canonical {
+            return Err(Error::InvalidFormat(format!(
+                "Interactive control spec {identifier} has non-canonical Pop-Up Menu options"
+            )));
+        }
+        return Ok(ControlCellSpecKind::PopUpMenu(format));
+    }
     parse_cell_spec(spec).map_err(|error| {
         Error::InvalidFormat(format!(
             "Interactive control spec {identifier} is invalid: {error}"
@@ -179,13 +328,22 @@ pub(super) fn release_spec(
                 "Interactive cell references missing control spec {identifier}"
             ))
         })?;
-    storage::decrement_table_data_list_entry(
+    let popup_model = entry
+        .entry
+        .cell_spec
+        .as_ref()
+        .and_then(|spec| spec.chooser_control_popup_model.as_ref())
+        .map(|reference| reference.identifier);
+    let removed = storage::decrement_table_data_list_entry(
         package,
         &location.object_locations,
         &resolved,
         entry,
         tst::table_data_list::ListType::ControlCellSpec,
     )?;
+    if removed && let Some(identifier) = popup_model {
+        pop_up_menu::remove_model_if_unreferenced(package, &location.object_locations, identifier)?;
+    }
     Ok(())
 }
 
@@ -282,7 +440,7 @@ fn ensure_control_table(package: &mut IWorkPackage, location: &model::CellLocati
     Ok(identifier)
 }
 
-fn cell_spec(kind: ControlCellSpecKind) -> tst::CellSpecArchive {
+fn cell_spec(kind: &ControlCellSpecKind) -> tst::CellSpecArchive {
     match kind {
         ControlCellSpecKind::Checkbox => tst::CellSpecArchive {
             interaction_type: CHECKBOX_INTERACTION_TYPE,
@@ -309,15 +467,19 @@ fn cell_spec(kind: ControlCellSpecKind) -> tst::CellSpecArchive {
             range_control_inc: Some(range.increment()),
             ..Default::default()
         },
+        ControlCellSpecKind::PopUpMenu(_) => {
+            unreachable!("Pop-Up Menu specs require a model reference")
+        },
     }
 }
 
-const fn control_label(kind: ControlCellSpecKind) -> &'static str {
+const fn control_label(kind: &ControlCellSpecKind) -> &'static str {
     match kind {
         ControlCellSpecKind::Checkbox => "Checkbox",
         ControlCellSpecKind::StarRating => "Star Rating",
         ControlCellSpecKind::Slider(_) => "Slider",
         ControlCellSpecKind::Stepper(_) => "Stepper",
+        ControlCellSpecKind::PopUpMenu(_) => "Pop-Up Menu",
     }
 }
 
@@ -359,10 +521,10 @@ fn parse_cell_spec(
         },
         value => return Err(format!("unsupported interaction type {value}")),
     };
-    if spec != &cell_spec(kind) {
+    if spec != &cell_spec(&kind) {
         return Err(format!(
             "{} contains non-canonical options",
-            control_label(kind)
+            control_label(&kind)
         ));
     }
     Ok(kind)

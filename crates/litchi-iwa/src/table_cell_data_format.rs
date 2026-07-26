@@ -10,6 +10,7 @@ mod date_time;
 mod duration;
 mod numeral_system;
 mod numeric_control;
+mod pop_up_menu;
 mod slider;
 mod stepper;
 pub use date_time::TableCellDateTimeFormat;
@@ -22,6 +23,9 @@ pub use numeral_system::{
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
 };
 pub use numeric_control::TableCellNumericControlDisplayFormat;
+pub use pop_up_menu::{
+    TableCellPopUpMenuFormat, TableCellPopUpMenuInitialSelection, TableCellPopUpMenuItem,
+};
 pub use slider::{TableCellSliderDisplayFormat, TableCellSliderFormat, TableCellSliderRange};
 pub use stepper::{TableCellStepperDisplayFormat, TableCellStepperFormat, TableCellStepperRange};
 
@@ -492,6 +496,8 @@ pub enum TableCellDataFormat {
     Slider(TableCellSliderFormat),
     /// Display and edit the numeric value with native increment and decrement buttons.
     Stepper(TableCellStepperFormat),
+    /// Display and edit a text value with a native Pop-Up Menu control.
+    PopUpMenu(TableCellPopUpMenuFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -545,6 +551,12 @@ impl From<TableCellSliderFormat> for TableCellDataFormat {
 impl From<TableCellStepperFormat> for TableCellDataFormat {
     fn from(value: TableCellStepperFormat) -> Self {
         Self::Stepper(value)
+    }
+}
+
+impl From<TableCellPopUpMenuFormat> for TableCellDataFormat {
+    fn from(value: TableCellPopUpMenuFormat) -> Self {
+        Self::PopUpMenu(value)
     }
 }
 

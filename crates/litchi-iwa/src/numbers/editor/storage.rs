@@ -938,6 +938,13 @@ pub(super) fn entry_object_references(entry: &tst::table_data_list::ListEntry) -
     .into_iter()
     .flatten()
     .map(|reference| reference.identifier)
+    .chain(
+        entry
+            .cell_spec
+            .as_ref()
+            .and_then(|spec| spec.chooser_control_popup_model.as_ref())
+            .map(|reference| reference.identifier),
+    )
     .collect()
 }
 

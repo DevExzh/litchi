@@ -7,8 +7,8 @@ use crate::table_cell_data_format::{
     TableCellCheckboxFormat, TableCellCurrencyFormat, TableCellDataFormat, TableCellDateTimeFormat,
     TableCellDurationFormat, TableCellFractionFormat, TableCellNumberFormat,
     TableCellNumeralSystemFormat, TableCellNumericControlDisplayFormat, TableCellPercentageFormat,
-    TableCellScientificFormat, TableCellSliderFormat, TableCellStarRatingFormat,
-    TableCellStepperFormat,
+    TableCellPopUpMenuFormat, TableCellPopUpMenuInitialSelection, TableCellScientificFormat,
+    TableCellSliderFormat, TableCellStarRatingFormat, TableCellStepperFormat,
 };
 #[cfg(test)]
 use crate::table_cell_data_format::{
@@ -19,6 +19,7 @@ use crate::table_cell_data_format::{
 
 mod codec;
 mod control;
+mod pop_up_menu;
 use codec::*;
 
 pub(super) fn cell_data_format(
@@ -62,6 +63,7 @@ pub(super) fn cell_data_format(
                             | TableCellDataFormat::StarRating(_)
                             | TableCellDataFormat::Slider(_)
                             | TableCellDataFormat::Stepper(_)
+                            | TableCellDataFormat::PopUpMenu(_)
                     ) {
                         return Err(Error::InvalidFormat(
                             "Interactive cell format has no control-cell-spec reference".to_owned(),
@@ -133,6 +135,15 @@ pub(super) fn cell_data_format(
                         display_format,
                     )))
                 },
+                Some(control::ControlCellSpecKind::PopUpMenu(format)) => {
+                    validate_text_format(native)?;
+                    if cell.cell_format_kind() != Some(bnc::TEXT_CELL_FORMAT_KIND) {
+                        return Err(Error::InvalidFormat(
+                            "Pop-Up Menu control uses inconsistent BNC format metadata".to_owned(),
+                        ));
+                    }
+                    Ok(TableCellDataFormat::PopUpMenu(format))
+                },
             }
         },
     }
@@ -157,7 +168,8 @@ pub(super) fn cell_number_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Number data format".to_owned(),
         )),
     }
@@ -182,7 +194,8 @@ pub(super) fn cell_currency_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Currency data format".to_owned(),
         )),
     }
@@ -207,7 +220,8 @@ pub(super) fn reset_cell_currency_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Currency format from a non-Currency cell".to_owned(),
         )),
     }
@@ -232,7 +246,8 @@ pub(super) fn cell_percentage_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Percentage data format".to_owned(),
         )),
     }
@@ -257,7 +272,8 @@ pub(super) fn cell_scientific_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Scientific data format".to_owned(),
         )),
     }
@@ -284,7 +300,8 @@ pub(super) fn reset_cell_scientific_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Scientific format from a non-Scientific cell".to_owned(),
         )),
     }
@@ -309,7 +326,8 @@ pub(super) fn cell_fraction_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Fraction data format".to_owned(),
         )),
     }
@@ -334,7 +352,8 @@ pub(super) fn reset_cell_fraction_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Fraction format from a non-Fraction cell".to_owned(),
         )),
     }
@@ -359,7 +378,8 @@ pub(super) fn cell_numeral_system_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Numeral System data format".to_owned(),
         )),
     }
@@ -386,7 +406,8 @@ pub(super) fn reset_cell_numeral_system_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Numeral System format from a non-Numeral-System cell".to_owned(),
         )),
     }
@@ -411,7 +432,8 @@ pub(super) fn cell_date_time_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Date & Time data format".to_owned(),
         )),
     }
@@ -436,7 +458,8 @@ pub(super) fn reset_cell_date_time_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Date & Time format from a non-Date-Time cell".to_owned(),
         )),
     }
@@ -461,7 +484,8 @@ pub(super) fn cell_duration_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Duration data format".to_owned(),
         )),
     }
@@ -486,7 +510,8 @@ pub(super) fn reset_cell_duration_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Duration format from a non-Duration cell".to_owned(),
         )),
     }
@@ -614,6 +639,36 @@ pub(super) fn reset_cell_stepper_format(
     }
 }
 
+pub(super) fn cell_pop_up_menu_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellPopUpMenuFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::PopUpMenu(format) => Ok(Some(format)),
+        _ => Err(Error::InvalidFormat(
+            "Table cell does not use the Pop-Up Menu data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_pop_up_menu_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::PopUpMenu(_) => reset_cell_data_format(package, table_id, row, column),
+        _ => Err(Error::InvalidFormat(
+            "Cannot reset Pop-Up Menu format from a non-Pop-Up-Menu cell".to_owned(),
+        )),
+    }
+}
+
 pub(super) fn set_cell_number_format(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -672,6 +727,7 @@ pub(super) fn set_cell_data_format(
             },
             _ => bnc::CellDataFormatKind::NumericControlNumberOrPercentage,
         },
+        TableCellDataFormat::PopUpMenu(_) => bnc::CellDataFormatKind::PopUpMenu,
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
@@ -704,6 +760,12 @@ pub(super) fn set_cell_data_format(
             &location,
             old_control_identifier,
             control::ControlCellSpecKind::Stepper(format.range()),
+        )?),
+        TableCellDataFormat::PopUpMenu(format) => Some(control::acquire_pop_up_menu_spec(
+            package,
+            &location,
+            old_control_identifier,
+            format,
         )?),
         _ => None,
     };
@@ -762,6 +824,28 @@ pub(super) fn set_cell_data_format(
     {
         cell.set_plain_number(format.range().native_initial_value())?;
     }
+    if let TableCellDataFormat::PopUpMenu(format) = format
+        && matches!(
+            format.initial_selection(),
+            TableCellPopUpMenuInitialSelection::FirstItem
+        )
+        && matches!(cell.stored_value(), StoredValue::Empty)
+    {
+        let identifier = storage::update_string_table(
+            package,
+            &location.object_locations,
+            location
+                .descriptor
+                .model
+                .base_data_store
+                .string_table
+                .identifier,
+            None,
+            Some(format.items()[0].as_str()),
+        )?
+        .expect("new text produces a string-table identifier");
+        cell.set_string(identifier);
+    }
     cell.set_data_format_identifier(new_identifier, cell_format_kind, new_control_identifier)?;
     let cell_count = storage::update_tile(
         package,
@@ -818,7 +902,8 @@ pub(super) fn reset_cell_number_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Number format from a non-Number cell".to_owned(),
         )),
     }
@@ -845,7 +930,8 @@ pub(super) fn reset_cell_percentage_format(
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
         )),
     }
@@ -955,6 +1041,7 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
     let secondary = cell.secondary_format_identifier();
     match (kind, cell.control_cell_spec_identifier()) {
         (Some(bnc::CHECKBOX_CELL_FORMAT_KIND), Some(_))
+        | (Some(bnc::TEXT_CELL_FORMAT_KIND), Some(_))
         | (Some(bnc::DECIMAL_CELL_FORMAT_KIND), _)
         | (Some(bnc::CURRENCY_CELL_FORMAT_KIND), _)
         | (_, None) => {},
@@ -1016,6 +1103,14 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
             })
         },
         (bnc::EXPLICIT_CHECKBOX_FORMAT, Some(bnc::CHECKBOX_CELL_FORMAT_KIND), Some(identifier))
+            if secondary.is_none() =>
+        {
+            Ok(CellFormatReference::Explicit {
+                identifier,
+                secondary: None,
+            })
+        },
+        (bnc::EXPLICIT_TEXT_FORMAT, Some(bnc::TEXT_CELL_FORMAT_KIND), Some(identifier))
             if secondary.is_none() =>
         {
             Ok(CellFormatReference::Explicit {
@@ -1813,6 +1908,127 @@ mod tests {
         let controls = storage::resolve_table_data_list(
             reopened.package(),
             &location.object_locations,
+            control_table_id,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )
+        .unwrap();
+        assert!(controls.entries.is_empty());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_reuses_and_cleans_up_pop_up_menus() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Menus")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let priority = TableCellPopUpMenuFormat::try_new(["Low", "Medium", "High"]).unwrap();
+        editor
+            .set_table_cell_pop_up_menu_format(table_id, 1, 1, priority.clone())
+            .unwrap();
+        editor
+            .set_table_cell_pop_up_menu_format(table_id, 1, 2, priority.clone())
+            .unwrap();
+
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 1);
+        assert_eq!(formats.entries[0].entry.refcount, 2);
+        assert_eq!(
+            formats.entries[0].entry.format,
+            Some(text_format_to_native())
+        );
+        let control_table_id = location
+            .descriptor
+            .model
+            .base_data_store
+            .control_cell_spec_table
+            .as_ref()
+            .unwrap()
+            .identifier;
+        let controls = storage::resolve_table_data_list(
+            editor.package(),
+            &location.object_locations,
+            control_table_id,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )
+        .unwrap();
+        assert_eq!(controls.entries.len(), 1);
+        assert_eq!(controls.entries[0].entry.refcount, 2);
+        let first_model_id = controls.entries[0]
+            .entry
+            .cell_spec
+            .as_ref()
+            .unwrap()
+            .chooser_control_popup_model
+            .as_ref()
+            .unwrap()
+            .identifier;
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .table_cell_pop_up_menu_format(table_id, 1, 1)
+                .unwrap(),
+            Some(priority.clone())
+        );
+        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            Some(&CellValue::Text("Low".to_owned()))
+        );
+
+        let blank_priority = TableCellPopUpMenuFormat::try_new(["Low", "Medium", "High"])
+            .unwrap()
+            .with_initial_selection(TableCellPopUpMenuInitialSelection::Blank);
+        reopened
+            .set_table_cell_pop_up_menu_format(table_id, 1, 1, blank_priority.clone())
+            .unwrap();
+        assert_eq!(
+            reopened
+                .table_cell_pop_up_menu_format(table_id, 1, 1)
+                .unwrap(),
+            Some(blank_priority)
+        );
+        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 1).unwrap();
+        let controls = storage::resolve_table_data_list(
+            reopened.package(),
+            &location.object_locations,
+            control_table_id,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )
+        .unwrap();
+        assert_eq!(controls.entries.len(), 2);
+        assert!(controls.entries.iter().all(|entry| {
+            entry
+                .entry
+                .cell_spec
+                .as_ref()
+                .and_then(|spec| spec.chooser_control_popup_model.as_ref())
+                .is_some_and(|reference| reference.identifier == first_model_id)
+        }));
+        assert!(
+            reopened
+                .reset_table_cell_pop_up_menu_format(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .table_cell_pop_up_menu_format(table_id, 1, 2)
+                .unwrap(),
+            Some(priority)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_pop_up_menu_format(table_id, 1, 2)
+                .unwrap()
+        );
+        let locations = storage::object_locations(reopened.package()).unwrap();
+        assert!(!locations.contains_key(&first_model_id));
+        let controls = storage::resolve_table_data_list(
+            reopened.package(),
+            &locations,
             control_table_id,
             tst::table_data_list::ListType::ControlCellSpec,
         )

@@ -675,6 +675,45 @@ fn source_built_table_roundtrips_stepper_format_crud() {
 }
 
 #[test]
+fn source_built_table_roundtrips_pop_up_menu_format_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Menus", 3, 3, position, size)
+        .unwrap();
+    let format = KeynoteTableCellPopUpMenuFormat::try_new(["Draft", "Published"]).unwrap();
+    editor
+        .set_slide_table_cell_pop_up_menu_format(0, table.model_object_id, 1, 1, format.clone())
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_cell_pop_up_menu_format(0, table.model_object_id, 1, 1)
+            .unwrap(),
+        Some(format)
+    );
+    assert_eq!(
+        reopened
+            .slide_table(0, table.model_object_id)
+            .unwrap()
+            .get_cell(1, 1),
+        Some(&KeynoteTableCellValue::Text("Draft".to_owned()))
+    );
+    assert!(
+        reopened
+            .reset_slide_table_cell_pop_up_menu_format(0, table.model_object_id, 1, 1)
+            .unwrap()
+    );
+    assert_eq!(
+        reopened
+            .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
+            .unwrap(),
+        KeynoteTableCellDataFormat::Automatic
+    );
+}
+
+#[test]
 fn source_built_table_roundtrips_full_crud() {
     let editor = KeynoteDocumentBuilder::new().build().unwrap();
     assert!(editor.slide_tables(0).unwrap().is_empty());

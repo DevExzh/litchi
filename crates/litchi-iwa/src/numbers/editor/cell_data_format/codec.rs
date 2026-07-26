@@ -18,6 +18,7 @@ pub(super) const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
 pub(super) const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
 pub(super) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 pub(super) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
+pub(super) const NATIVE_TEXT_FORMAT_TYPE: u32 = 260;
 pub(super) const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
 pub(super) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
 pub(super) const NATIVE_CHECKBOX_FORMAT_TYPE: u32 = 263;
@@ -36,6 +37,9 @@ const NATIVE_FRACTION_TENTHS: i32 = 10;
 const NATIVE_FRACTION_HUNDREDTHS: i32 = 100;
 
 pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<FormatStructArchive> {
+    if matches!(format, TableCellDataFormat::PopUpMenu(_)) {
+        return Ok(text_format_to_native());
+    }
     if let TableCellDataFormat::Slider(format) = format {
         return numeric_control_display_to_native(format.display_format());
     }
@@ -147,6 +151,7 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
         TableCellDataFormat::StarRating(_) => unreachable!("handled above"),
         TableCellDataFormat::Slider(_) => unreachable!("handled above"),
         TableCellDataFormat::Stepper(_) => unreachable!("handled above"),
+        TableCellDataFormat::PopUpMenu(_) => unreachable!("handled above"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -168,6 +173,22 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
         use_accounting_style: accounting_style,
         ..Default::default()
     })
+}
+
+pub(super) fn text_format_to_native() -> FormatStructArchive {
+    FormatStructArchive {
+        format_type: Some(NATIVE_TEXT_FORMAT_TYPE),
+        ..Default::default()
+    }
+}
+
+pub(super) fn validate_text_format(native: &FormatStructArchive) -> Result<()> {
+    if native != &text_format_to_native() {
+        return Err(Error::InvalidFormat(
+            "Pop-Up Menu references a non-canonical Text format".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn numeric_control_display_to_native(
