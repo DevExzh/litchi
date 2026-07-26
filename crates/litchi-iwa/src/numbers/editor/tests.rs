@@ -3420,6 +3420,43 @@ fn table_cell_border_crud_allocates_sparse_layers_and_round_trips() {
 }
 
 #[test]
+fn table_cell_fill_crud_round_trips_and_reuses_private_style() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .sheet_name("Fill")
+        .table_name("Colors")
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let original = editor.table_cell_fill(table_id, 1, 1).unwrap();
+    let red = crate::shapes::ShapeFill::Solid(
+        crate::shapes::RgbaColor::new(0.85, 0.1, 0.2, 1.0, crate::shapes::RgbColorSpace::Srgb)
+            .unwrap(),
+    );
+    let blue = crate::shapes::ShapeFill::Solid(
+        crate::shapes::RgbaColor::new(0.1, 0.25, 0.9, 1.0, crate::shapes::RgbColorSpace::Srgb)
+            .unwrap(),
+    );
+
+    editor.set_table_cell_fill(table_id, 1, 1, &red).unwrap();
+    assert_eq!(editor.table_cell_fill(table_id, 1, 1).unwrap(), red);
+    assert_eq!(editor.table_cell_fill(table_id, 1, 2).unwrap(), original);
+    let after_first = storage::object_locations(editor.package()).unwrap().len();
+
+    editor.set_table_cell_fill(table_id, 1, 1, &blue).unwrap();
+    assert_eq!(
+        storage::object_locations(editor.package()).unwrap().len(),
+        after_first
+    );
+    assert_eq!(editor.table_cell_fill(table_id, 1, 1).unwrap(), blue);
+
+    let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert!(reopened.reset_table_cell_fill(table_id, 1, 1).unwrap());
+    assert_eq!(reopened.table_cell_fill(table_id, 1, 1).unwrap(), original);
+    assert!(!reopened.reset_table_cell_fill(table_id, 1, 1).unwrap());
+}
+
+#[test]
 fn table_cell_border_rejects_invalid_coordinates_transactionally() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
     let before = editor.to_bytes().unwrap();

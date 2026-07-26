@@ -25,6 +25,7 @@ pub(crate) const NUMBER_FLAG: u32 = 0x000002;
 pub(crate) const DATE_FLAG: u32 = 0x000004;
 pub(crate) const STRING_FLAG: u32 = 0x000008;
 pub(crate) const RICH_TEXT_FLAG: u32 = 0x000010;
+pub(crate) const STYLE_FLAG: u32 = 0x000020;
 pub(crate) const FORMULA_FLAG: u32 = 0x000200;
 pub(crate) const FORMULA_ERROR_FLAG: u32 = 0x000800;
 pub(crate) const COMMENT_FLAG: u32 = 0x080000;
@@ -314,6 +315,19 @@ impl BncCell {
 
     pub(crate) fn comment_identifier(&self) -> Option<u32> {
         self.u32_field(COMMENT_FLAG)
+    }
+
+    pub(crate) fn style_identifier(&self) -> Option<u32> {
+        self.u32_field(STYLE_FLAG)
+    }
+
+    pub(crate) fn set_style_identifier(&mut self, identifier: Option<u32>) {
+        if let Some(identifier) = identifier {
+            self.fields
+                .insert(STYLE_FLAG, identifier.to_le_bytes().to_vec());
+        } else {
+            self.fields.remove(&STYLE_FLAG);
+        }
     }
 
     pub(crate) fn set_comment_identifier(&mut self, identifier: Option<u32>) {

@@ -436,6 +436,76 @@ impl KeynoteEditor {
         )
     }
 
+    /// Read the effective fill for one reachable slide-table cell.
+    pub fn slide_table_cell_fill(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<crate::shapes::ShapeFill> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_fill_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace one local slide-table cell fill.
+    pub fn set_slide_table_cell_fill(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        fill: &crate::shapes::ShapeFill,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_fill_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            fill,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if &verified.slide_table_cell_fill(slide_index, model_object_id, row, column)? != fill {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell fill failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct fill override and restore the inherited table style.
+    pub fn reset_slide_table_cell_fill(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_fill_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective explicit borders for one reachable slide-table cell.
     pub fn slide_table_cell_borders(
         &self,

@@ -228,6 +228,73 @@ impl PagesEditor {
         self.set_table_cell(model_object_id, row, column, PagesCellValue::Empty)
     }
 
+    /// Read the effective fill for one body-table cell.
+    pub fn table_cell_fill(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<crate::shapes::ShapeFill> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_fill_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace one local body-table cell fill.
+    pub fn set_table_cell_fill(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        fill: &crate::shapes::ShapeFill,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_fill_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            fill,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if &verified.table_cell_fill(model_object_id, row, column)? != fill {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell fill failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct fill override and restore the inherited table style.
+    pub fn reset_table_cell_fill(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_fill_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective explicit borders for one body-table cell.
     pub fn table_cell_borders(
         &self,
@@ -1051,6 +1118,26 @@ mod tests {
             reopened.table_cell_borders(model_id, 1, 1).unwrap().right,
             None
         );
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_cell_fill_crud() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Fills", 3, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let inherited = editor.table_cell_fill(model_id, 1, 1).unwrap();
+        let fill = crate::shapes::ShapeFill::Solid(
+            crate::shapes::RgbaColor::new(0.2, 0.75, 0.35, 1.0, crate::shapes::RgbColorSpace::Srgb)
+                .unwrap(),
+        );
+        editor.set_table_cell_fill(model_id, 1, 1, &fill).unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.table_cell_fill(model_id, 1, 1).unwrap(), fill);
+        assert!(reopened.reset_table_cell_fill(model_id, 1, 1).unwrap());
+        assert_eq!(reopened.table_cell_fill(model_id, 1, 1).unwrap(), inherited);
     }
 
     #[test]

@@ -1959,6 +1959,51 @@ impl NumbersEditor {
         self.set_cell(table_id, row, column, CellValue::Empty)
     }
 
+    /// Read the effective fill for one zero-based table cell.
+    pub fn table_cell_fill(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<crate::shapes::ShapeFill> {
+        cell_fill::cell_fill(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a local table-cell fill transactionally.
+    pub fn set_table_cell_fill(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        fill: &crate::shapes::ShapeFill,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_fill::set_cell_fill(&mut staged, table_id, row, column, fill)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if &verified.table_cell_fill(table_id, row, column)? != fill {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell fill failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct fill override and restore the inherited table style.
+    pub fn reset_table_cell_fill(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_fill::reset_cell_fill(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective explicit borders for one zero-based table cell.
     pub fn table_cell_borders(
         &self,
@@ -2913,6 +2958,34 @@ pub(crate) fn table_cell_borders_in_package(
     stroke_layers::cell_borders(package, table_id, row, column)
 }
 
+pub(crate) fn table_cell_fill_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<crate::shapes::ShapeFill> {
+    cell_fill::cell_fill(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_fill_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    fill: &crate::shapes::ShapeFill,
+) -> Result<()> {
+    cell_fill::set_cell_fill(package, table_id, row, column, fill)
+}
+
+pub(crate) fn reset_table_cell_fill_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_fill::reset_cell_fill(package, table_id, row, column)
+}
+
 pub(crate) fn set_table_cell_border_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -3212,6 +3285,7 @@ pub(crate) fn create_empty_table_graph_in_package(
     Ok((graph.info_object_id, graph.model_object_id))
 }
 
+mod cell_fill;
 mod cell_merge;
 mod column_insert;
 mod date_time_fields;
