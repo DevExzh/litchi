@@ -293,7 +293,9 @@ pub use views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
 };
 pub use workbook::Workbook;
-pub use workbook_protection::{WorkbookProtectionMetadata, parse_workbook_protection};
+pub use workbook_protection::{
+    WorkbookProtectionMetadata, parse_workbook_protection, write_workbook_protection,
+};
 pub use vba_project::VbaProject;
 pub use worksheet::{
     AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule, Hyperlink,

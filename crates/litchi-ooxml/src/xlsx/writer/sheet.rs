@@ -2284,7 +2284,7 @@ impl MutableWorksheet {
         if let Some(password) = password {
             protection
                 .set_verifier(Some(ProtectionPasswordVerifier::Legacy(
-                    u16::from_str_radix(&Self::hash_password(password), 16).unwrap(),
+                    Self::hash_password(password),
                 )))
                 .expect("legacy verifier is valid");
         }
@@ -2307,7 +2307,7 @@ impl MutableWorksheet {
         if let Some(password) = password {
             permissions
                 .set_verifier(Some(ProtectionPasswordVerifier::Legacy(
-                    u16::from_str_radix(&Self::hash_password(password), 16).unwrap(),
+                    Self::hash_password(password),
                 )))
                 .expect("legacy verifier is valid");
         }
@@ -2351,7 +2351,7 @@ impl MutableWorksheet {
     ///
     /// Note: This is NOT a secure hash! Excel uses a very weak password protection.
     /// For production use, consider using stronger protection methods at the file system level.
-    pub(crate) fn hash_password(password: &str) -> String {
+    pub(crate) fn hash_password(password: &str) -> u16 {
         let mut hash: u16 = 0;
 
         for ch in password.chars().rev() {
@@ -2363,7 +2363,7 @@ impl MutableWorksheet {
         hash ^= password.len() as u16;
         hash ^= 0xCE4B;
 
-        format!("{:04X}", hash)
+        hash
     }
 
     // ===== Row/Column Grouping =====

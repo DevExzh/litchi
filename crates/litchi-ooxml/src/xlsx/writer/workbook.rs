@@ -11,6 +11,9 @@ use std::fmt::Write as FmtWrite;
 use super::sheet::{MutableWorksheet, NamedRange};
 use super::strings::MutableSharedStrings;
 use super::styles::StylesBuilder;
+pub use crate::xlsx::workbook_protection::WorkbookProtectionMetadata as WorkbookProtection;
+use crate::xlsx::workbook_protection::write_workbook_protection;
+use crate::xlsx::ProtectionPasswordVerifier;
 
 /// Type alias for cell position to style index mapping.
 type CellStyleMap = HashMap<(u32, u32), usize>;
@@ -333,17 +336,6 @@ fn escape_sheet_name(name: &str) -> String {
         }
     }
     escaped
-}
-
-/// Workbook protection configuration.
-#[derive(Debug, Clone)]
-pub struct WorkbookProtection {
-    /// Password hash (optional)
-    pub password_hash: Option<String>,
-    /// Lock structure (prevent adding/deleting sheets)
-    pub lock_structure: bool,
-    /// Lock windows (prevent resizing/moving workbook window)
-    pub lock_windows: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -747,18 +739,7 @@ impl MutableWorkbookData {
 
         // Write workbook protection if configured (must come after workbookPr per OOXML spec)
         if let Some(ref protection) = self.protection {
-            xml.push_str("<workbookProtection");
-            if let Some(ref hash) = protection.password_hash {
-                write!(xml, r#" workbookPassword="{}""#, hash)
-                    .map_err(|e| format!("XML write error: {}", e))?;
-            }
-            if protection.lock_structure {
-                xml.push_str(r#" lockStructure="1""#);
-            }
-            if protection.lock_windows {
-                xml.push_str(r#" lockWindows="1""#);
-            }
-            xml.push_str("/>");
+            xml.push_str(&write_workbook_protection(protection).map_err(|error| error.to_string())?);
         }
 
         // Add bookViews (required by Excel)
@@ -1002,13 +983,24 @@ impl MutableWorkbookData {
     ) {
         use super::sheet::MutableWorksheet;
 
-        let password_hash = password.map(MutableWorksheet::hash_password);
+        let mut protection = WorkbookProtection::new();
+        protection.set_workbook_verifier(
+            password.map(|value| {
+                ProtectionPasswordVerifier::Legacy(MutableWorksheet::hash_password(value))
+            }),
+        );
+        protection.set_structure_locked(lock_structure);
+        protection.set_windows_locked(lock_windows);
+        self.protection = Some(protection);
+        self.modified = true;
+    }
 
-        self.protection = Some(WorkbookProtection {
-            password_hash,
-            lock_structure,
-            lock_windows,
-        });
+    /// Replace the complete typed workbook-protection configuration.
+    ///
+    /// This accepts caller-supplied legacy or strong verifier metadata for both
+    /// workbook and revision locks. It never derives or checks a password.
+    pub fn set_workbook_protection(&mut self, protection: WorkbookProtection) {
+        self.protection = Some(protection);
         self.modified = true;
     }
 
@@ -1810,25 +1802,21 @@ mod tests {
         let mut wb = MutableWorkbookData::new();
         assert!(!wb.is_protected());
 
-        wb.protection = Some(WorkbookProtection {
-            password_hash: None,
-            lock_structure: true,
-            lock_windows: false,
-        });
+        let mut protection = WorkbookProtection::new();
+        protection.set_structure_locked(true);
+        wb.protection = Some(protection);
 
         assert!(wb.is_protected());
-        assert!(wb.protection.as_ref().unwrap().lock_structure);
-        assert!(!wb.protection.as_ref().unwrap().lock_windows);
+        assert!(wb.protection.as_ref().unwrap().structure_locked());
+        assert!(!wb.protection.as_ref().unwrap().windows_locked());
     }
 
     #[test]
     fn test_remove_protection_direct() {
         let mut wb = MutableWorkbookData::new();
-        wb.protection = Some(WorkbookProtection {
-            password_hash: None,
-            lock_structure: true,
-            lock_windows: false,
-        });
+        let mut protection = WorkbookProtection::new();
+        protection.set_structure_locked(true);
+        wb.protection = Some(protection);
         assert!(wb.is_protected());
 
         wb.protection = None;
@@ -1864,18 +1852,28 @@ mod tests {
     #[test]
     fn test_generate_workbook_xml_with_protection() {
         let mut wb = MutableWorkbookData::new();
-        wb.protection = Some(WorkbookProtection {
-            password_hash: Some("ABCD1234".to_string()),
-            lock_structure: true,
-            lock_windows: true,
-        });
+        let mut protection = WorkbookProtection::new();
+        protection.set_workbook_verifier(Some(ProtectionPasswordVerifier::Legacy(0xABCD)));
+        protection.set_revisions_verifier(Some(ProtectionPasswordVerifier::Strong(
+            crate::xlsx::StrongProtectionPasswordVerifier::new(
+                "SHA-512",
+                vec![1, 2],
+                vec![3, 4],
+                100_000,
+            )
+            .unwrap(),
+        )));
+        protection.set_structure_locked(true);
+        protection.set_windows_locked(true);
+        protection.set_revision_locked(true);
+        wb.set_workbook_protection(protection);
 
         let xml = wb
             .generate_workbook_xml_with_external_rels(&["rId1".to_string()], &[], &[])
             .unwrap();
 
         assert!(xml.contains(
-            r#"<workbookProtection workbookPassword="ABCD1234" lockStructure="1" lockWindows="1"/>"#
+            r#"<workbookProtection workbookPassword="ABCD" revisionsAlgorithmName="SHA-512" revisionsHashValue="AQI=" revisionsSaltValue="AwQ=" revisionsSpinCount="100000" lockStructure="1" lockWindows="1" lockRevision="1"/>"#
         ));
     }
 

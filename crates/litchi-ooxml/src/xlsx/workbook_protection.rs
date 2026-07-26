@@ -1,11 +1,12 @@
-//! Passive `workbookProtection` metadata for SpreadsheetML workbooks.
+//! Typed `workbookProtection` metadata and XML codec for SpreadsheetML workbooks.
 //!
 //! The OOXML `workbookProtection` element carries advisory structure, window,
 //! and revision locks along with optional legacy or strong password verifier
-//! metadata. This module preserves that metadata but never accepts, derives,
-//! or validates a password, and it never enforces an editing policy.
+//! metadata. This module preserves and serializes that metadata but never
+//! accepts or validates a password, and it never enforces an editing policy.
 
 use std::collections::HashSet;
+use std::fmt::Write as _;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -40,9 +41,19 @@ pub struct WorkbookProtectionMetadata {
 }
 
 impl WorkbookProtectionMetadata {
+    /// Create empty workbook-protection metadata.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Return the optional workbook password verifier metadata.
     pub fn workbook_verifier(&self) -> Option<&ProtectionPasswordVerifier> {
         self.workbook_verifier.as_ref()
+    }
+
+    /// Set the workbook password verifier metadata.
+    pub fn set_workbook_verifier(&mut self, verifier: Option<ProtectionPasswordVerifier>) {
+        self.workbook_verifier = verifier;
     }
 
     /// Return the optional revision password verifier metadata.
@@ -50,9 +61,19 @@ impl WorkbookProtectionMetadata {
         self.revisions_verifier.as_ref()
     }
 
+    /// Set the revision password verifier metadata.
+    pub fn set_revisions_verifier(&mut self, verifier: Option<ProtectionPasswordVerifier>) {
+        self.revisions_verifier = verifier;
+    }
+
     /// Whether workbook structure changes are requested to be locked.
     pub fn structure_locked(&self) -> bool {
         self.lock_structure
+    }
+
+    /// Request or clear the workbook-structure lock.
+    pub fn set_structure_locked(&mut self, locked: bool) {
+        self.lock_structure = locked;
     }
 
     /// Whether workbook-window changes are requested to be locked.
@@ -60,9 +81,19 @@ impl WorkbookProtectionMetadata {
         self.lock_windows
     }
 
+    /// Request or clear the workbook-window lock.
+    pub fn set_windows_locked(&mut self, locked: bool) {
+        self.lock_windows = locked;
+    }
+
     /// Whether workbook revision changes are requested to be locked.
     pub fn revision_locked(&self) -> bool {
         self.lock_revision
+    }
+
+    /// Request or clear the workbook revision-history lock.
+    pub fn set_revision_locked(&mut self, locked: bool) {
+        self.lock_revision = locked;
     }
 }
 
@@ -82,6 +113,91 @@ pub fn parse_workbook_protection(xml: &[u8]) -> Result<Option<WorkbookProtection
     }
     let selected = process_ooxml(xml)?;
     parse_selected(selected.as_ref())
+}
+
+/// Serialize one typed SpreadsheetML `workbookProtection` element.
+///
+/// The returned element uses canonical uppercase hexadecimal legacy verifiers
+/// and canonical base64 for strong verifier byte strings. Passwords are never
+/// accepted or derived by this codec.
+pub fn write_workbook_protection(value: &WorkbookProtectionMetadata) -> Result<String> {
+    let mut xml = String::with_capacity(256);
+    xml.push_str("<workbookProtection");
+    write_verifier(&mut xml, "workbook", value.workbook_verifier.as_ref())?;
+    write_verifier(&mut xml, "revisions", value.revisions_verifier.as_ref())?;
+    write_true(&mut xml, "lockStructure", value.lock_structure)?;
+    write_true(&mut xml, "lockWindows", value.lock_windows)?;
+    write_true(&mut xml, "lockRevision", value.lock_revision)?;
+    xml.push_str("/>");
+    Ok(xml)
+}
+
+fn write_verifier(
+    xml: &mut String,
+    prefix: &str,
+    verifier: Option<&ProtectionPasswordVerifier>,
+) -> Result<()> {
+    match verifier {
+        None => {},
+        Some(ProtectionPasswordVerifier::Legacy(value)) => {
+            let attribute = if prefix == "workbook" {
+                "workbookPassword"
+            } else {
+                "revisionsPassword"
+            };
+            write!(xml, " {attribute}=\"{value:04X}\"").map_err(xml_error)?;
+        },
+        Some(ProtectionPasswordVerifier::Strong(value)) => {
+            write_xml_attribute(
+                xml,
+                &format!("{prefix}AlgorithmName"),
+                value.algorithm_name(),
+            )?;
+            write_xml_attribute(
+                xml,
+                &format!("{prefix}HashValue"),
+                &BASE64.encode(value.hash_value()),
+            )?;
+            write_xml_attribute(
+                xml,
+                &format!("{prefix}SaltValue"),
+                &BASE64.encode(value.salt_value()),
+            )?;
+            write!(xml, " {prefix}SpinCount=\"{}\"", value.spin_count()).map_err(xml_error)?;
+        },
+    }
+    Ok(())
+}
+
+fn write_true(xml: &mut String, name: &str, value: bool) -> Result<()> {
+    if value {
+        write!(xml, " {name}=\"1\"").map_err(xml_error)?;
+    }
+    Ok(())
+}
+
+fn write_xml_attribute(xml: &mut String, name: &str, value: &str) -> Result<()> {
+    if value.chars().any(|character| {
+        let code = character as u32;
+        !matches!(code, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+    }) {
+        return Err(invalid(format!(
+            "workbook protection {name} contains an invalid XML character"
+        )));
+    }
+    write!(xml, " {name}=\"").map_err(xml_error)?;
+    for character in value.chars() {
+        match character {
+            '&' => xml.push_str("&amp;"),
+            '<' => xml.push_str("&lt;"),
+            '>' => xml.push_str("&gt;"),
+            '"' => xml.push_str("&quot;"),
+            '\'' => xml.push_str("&apos;"),
+            _ => xml.push(character),
+        }
+    }
+    xml.push('"');
+    Ok(())
 }
 
 fn parse_selected(xml: &[u8]) -> Result<Option<WorkbookProtectionMetadata>> {
@@ -414,6 +530,45 @@ mod tests {
             r#"<workbookProtection revisionsAlgorithmName="SHA-512" revisionsHashValue="AQI=" revisionsSaltValue="AwQ="/>"#,
         );
         assert!(parse_workbook_protection(incomplete.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn writes_and_reparses_all_typed_protection_attributes() {
+        let mut metadata = WorkbookProtectionMetadata::new();
+        metadata.set_workbook_verifier(Some(ProtectionPasswordVerifier::Strong(
+            StrongProtectionPasswordVerifier::new("SHA-512", vec![1, 2, 3], vec![4, 5, 6], 100_000)
+                .unwrap(),
+        )));
+        metadata.set_revisions_verifier(Some(ProtectionPasswordVerifier::Legacy(0x00AF)));
+        metadata.set_structure_locked(true);
+        metadata.set_windows_locked(true);
+        metadata.set_revision_locked(true);
+
+        let element = write_workbook_protection(&metadata).unwrap();
+        assert_eq!(
+            element,
+            r#"<workbookProtection workbookAlgorithmName="SHA-512" workbookHashValue="AQID" workbookSaltValue="BAUG" workbookSpinCount="100000" revisionsPassword="00AF" lockStructure="1" lockWindows="1" lockRevision="1"/>"#
+        );
+
+        let parsed = parse_workbook_protection(workbook(&element).as_bytes())
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed, metadata);
+    }
+
+    #[test]
+    fn writer_escapes_future_algorithm_names_without_weakening_validation() {
+        let mut metadata = WorkbookProtectionMetadata::new();
+        metadata.set_revisions_verifier(Some(ProtectionPasswordVerifier::Strong(
+            StrongProtectionPasswordVerifier::new("future&hash", vec![1], vec![2], 0).unwrap(),
+        )));
+
+        let element = write_workbook_protection(&metadata).unwrap();
+        assert!(element.contains(r#"revisionsAlgorithmName="future&amp;hash""#));
+        let parsed = parse_workbook_protection(workbook(&element).as_bytes())
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed, metadata);
     }
 
     #[test]

@@ -3725,6 +3725,22 @@ impl Workbook {
         );
     }
 
+    /// Replace the complete typed workbook-protection configuration.
+    ///
+    /// This supports workbook and revision locks with either legacy 16-bit
+    /// verifiers or caller-supplied strong verifier metadata. Verifiers remain
+    /// advisory and inert: this crate does not validate passwords or enforce
+    /// an editing policy.
+    pub fn set_workbook_protection(&mut self, protection: WorkbookProtectionMetadata) {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+        self.mutable_data
+            .as_mut()
+            .unwrap()
+            .set_workbook_protection(protection);
+    }
+
     /// Unprotect the workbook.
     pub fn unprotect_workbook(&mut self) {
         if let Some(data) = self.mutable_data.as_mut() {
@@ -3935,7 +3951,7 @@ fn validate_threaded_comment_people<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{Workbook, validate_threaded_comment_people};
+    use super::{Workbook, WorkbookProtectionMetadata, validate_threaded_comment_people};
     use crate::charts::{ChartExtensionList, ChartShapeProperties, plot_area::TypeGroup};
     use crate::xlsx::active_x::{
         ActiveXControlSet, ActiveXDescriptor, ActiveXProperty, LoadedActiveXControl, Persistence,
@@ -3948,8 +3964,8 @@ mod tests {
     use crate::xlsx::{
         ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
         ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
-        ChartUserShapesRelationshipTarget, Mention, Person, PersonList, Table, TableColumn,
-        ThreadedComment, WorksheetChart,
+        ChartUserShapesRelationshipTarget, Mention, Person, PersonList, ProtectionPasswordVerifier,
+        StrongProtectionPasswordVerifier, Table, TableColumn, ThreadedComment, WorksheetChart,
     };
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -3961,6 +3977,36 @@ mod tests {
     <definedName name="_xlnm.Print_Titles" localSheetId="0">Sales!$1:$2,Sales!$A:$B</definedName>
   </definedNames>
 </workbook>"#;
+
+    #[test]
+    fn saves_and_reloads_complete_typed_workbook_protection() {
+        let mut protection = WorkbookProtectionMetadata::new();
+        protection.set_workbook_verifier(Some(ProtectionPasswordVerifier::Strong(
+            StrongProtectionPasswordVerifier::new(
+                "SHA-512",
+                vec![1, 2, 3],
+                vec![4, 5, 6],
+                100_000,
+            )
+            .unwrap(),
+        )));
+        protection.set_revisions_verifier(Some(ProtectionPasswordVerifier::Legacy(0x00AF)));
+        protection.set_structure_locked(true);
+        protection.set_windows_locked(true);
+        protection.set_revision_locked(true);
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("workbook-protection.xlsx");
+        let mut workbook = Workbook::create().unwrap();
+        workbook.set_workbook_protection(protection.clone());
+        workbook.save(&path).unwrap();
+
+        let reopened = Workbook::open(path).unwrap();
+        assert_eq!(
+            reopened.workbook_protection_metadata().unwrap(),
+            Some(protection)
+        );
+    }
 
     #[test]
     fn saves_and_reloads_worksheet_tables_and_drawings() {

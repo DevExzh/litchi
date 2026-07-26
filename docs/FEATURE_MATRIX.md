@@ -197,7 +197,7 @@ conversion, fonts, and image conversion are optional.
 | Headers and footers | ✅ | ✅ | ✅ | Odd/even/first sections and formatting codes |
 | Page breaks and printer settings | ✅ | ✅ | ✅ | Horizontal/vertical breaks and printer-resource graphs |
 | Sheet protection/protected ranges | ✅ | ✅ | ✅ | Legacy and strong hashes plus protected-range metadata |
-| Workbook protection | 🟡 | ✅ | ✅ | Passive reader preserves structure/window/revision locks and legacy/strong verifier metadata; writer remains structure/window focused, with no password checking or policy enforcement |
+| Workbook protection | ✅ | ✅ | ✅ | Typed structure/window/revision locks and legacy/strong verifier metadata round-trip through complete `workbookProtection` parsing and authoring; password verifiers remain advisory and the library does not enforce editing policy |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
 | VBA projects/XLSM macros | 🟡 | 🟡 | 🟡 | The MS-OFFMACRO2 relationship graph and bounded `vbaProject.bin` CFB/MS-OVBA project/module source are parsed inertly with the declared code page; package mutation attaches either validated existing payloads or deterministic cache-free authored projects, transitions XLSX/XLTX content types, preserves the graph across workbook materialization, and supports complete removal; VBA is never executed |
