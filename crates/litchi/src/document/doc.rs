@@ -97,16 +97,6 @@ fn rtf_metadata(document: &litchi_rtf::RtfDocument<'_>) -> litchi_core::Metadata
 pub struct Document {
     /// The underlying format-specific implementation
     pub(super) inner: DocumentImpl,
-    /// DOCX package storage that must outlive the Document reference.
-    ///
-    /// This field is prefixed with `_` because it's not directly accessed,
-    /// but it MUST be kept to maintain memory safety. The `inner` DocumentImpl::Docx
-    /// variant holds a reference with extended lifetime to data owned by this Box.
-    /// Dropping this would invalidate those references (use-after-free).
-    ///
-    /// Only used for DOCX files; None for DOC files.
-    #[cfg(feature = "ooxml")]
-    pub(super) _package: Option<Box<ooxml::docx::Package>>,
 }
 
 impl Document {
@@ -195,8 +185,6 @@ impl Document {
 
                 Ok(Self {
                     inner: DocumentImpl::Doc(doc, metadata),
-                    #[cfg(feature = "ooxml")]
-                    _package: None,
                 })
             },
             #[cfg(feature = "rtf")]
@@ -210,8 +198,6 @@ impl Document {
 
                 Ok(Self {
                     inner: DocumentImpl::Rtf(doc),
-                    #[cfg(feature = "ooxml")]
-                    _package: None,
                 })
             },
             #[cfg(feature = "ooxml")]
@@ -221,22 +207,15 @@ impl Document {
                     ooxml::docx::Package::from_opc_package(opc_package).map_err(Error::from)?,
                 );
 
-                // SAFETY: Same lifetime extension as in `open()`
-                let doc_ref = unsafe {
-                    let pkg_ptr = &*package as *const ooxml::docx::Package;
-                    let doc = (*pkg_ptr).document().map_err(Error::from)?;
-                    std::mem::transmute::<ooxml::docx::Document<'_>, ooxml::docx::Document<'static>>(
-                        doc,
-                    )
-                };
+                // Validate the read view before retaining the owned package.
+                package.document().map_err(Error::from)?;
 
                 // Extract metadata from OOXML core properties
                 let metadata = crate::ooxml::metadata::extract_metadata(package.opc_package())
                     .unwrap_or_else(|_| litchi_core::Metadata::default());
 
                 Ok(Self {
-                    inner: DocumentImpl::Docx(Box::new(doc_ref), metadata),
-                    _package: Some(package),
+                    inner: DocumentImpl::Docx(package, metadata),
                 })
             },
             #[cfg(feature = "iwa")]
@@ -247,8 +226,6 @@ impl Document {
 
                 Ok(Self {
                     inner: DocumentImpl::Pages(doc),
-                    #[cfg(feature = "ooxml")]
-                    _package: None,
                 })
             },
             #[cfg(feature = "odf")]
@@ -259,8 +236,6 @@ impl Document {
 
                 Ok(Self {
                     inner: DocumentImpl::Odt(doc),
-                    #[cfg(feature = "ooxml")]
-                    _package: None,
                 })
             },
             // Handle mismatched formats
@@ -290,7 +265,10 @@ impl Document {
             #[cfg(feature = "ole")]
             DocumentImpl::Doc(doc, _) => doc.text().map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            DocumentImpl::Docx(doc, _) => doc.text().map_err(Error::from),
+            DocumentImpl::Docx(package, _) => package
+                .document()
+                .and_then(|document| document.text())
+                .map_err(Error::from),
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Pages: {}", e))
@@ -321,7 +299,10 @@ impl Document {
             #[cfg(feature = "ole")]
             DocumentImpl::Doc(doc, _) => doc.paragraph_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            DocumentImpl::Docx(doc, _) => doc.paragraph_count().map_err(Error::from),
+            DocumentImpl::Docx(package, _) => package
+                .document()
+                .and_then(|document| document.paragraph_count())
+                .map_err(Error::from),
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(doc) => {
                 // Pages documents are organized by sections
@@ -360,8 +341,11 @@ impl Document {
                 Ok(paras.into_iter().map(Paragraph::Doc).collect())
             },
             #[cfg(feature = "ooxml")]
-            DocumentImpl::Docx(doc, _) => {
-                let paras = doc.paragraphs().map_err(Error::from)?;
+            DocumentImpl::Docx(package, _) => {
+                let paras = package
+                    .document()
+                    .and_then(|document| document.paragraphs())
+                    .map_err(Error::from)?;
                 Ok(paras.into_iter().map(Paragraph::Docx).collect())
             },
             #[cfg(feature = "iwa")]
@@ -435,8 +419,11 @@ impl Document {
                 Ok(tables.into_iter().map(Table::Doc).collect())
             },
             #[cfg(feature = "ooxml")]
-            DocumentImpl::Docx(doc, _) => {
-                let tables = doc.tables().map_err(Error::from)?;
+            DocumentImpl::Docx(package, _) => {
+                let tables = package
+                    .document()
+                    .and_then(|document| document.tables())
+                    .map_err(Error::from)?;
                 Ok(tables
                     .into_iter()
                     .map(|t| Table::Docx(Box::new(t)))
@@ -533,10 +520,13 @@ impl Document {
                     .collect())
             },
             #[cfg(feature = "ooxml")]
-            DocumentImpl::Docx(doc, _) => {
+            DocumentImpl::Docx(package, _) => {
                 use super::DocumentElement;
                 use litchi_ooxml::docx::DocxElement;
-                let raw = doc.elements().map_err(Error::from)?;
+                let raw = package
+                    .document()
+                    .and_then(|document| document.elements())
+                    .map_err(Error::from)?;
                 Ok(raw
                     .into_iter()
                     .map(|el| match el {
@@ -764,6 +754,30 @@ mod tests {
             "Failed to load DOCX from bytes: {:?}",
             doc.err()
         );
+    }
+
+    #[test]
+    #[cfg(feature = "ooxml")]
+    fn owned_docx_facade_survives_moves_and_repeated_reads() {
+        fn move_document(document: Document) -> Document {
+            document
+        }
+
+        let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
+        let document = move_document(Document::open(path).expect("Failed to open DOCX"));
+        let text = document.text().expect("Failed to extract text");
+
+        assert!(!text.is_empty());
+        assert_eq!(document.text().unwrap(), text);
+        assert_eq!(
+            document.paragraph_count().unwrap(),
+            document.paragraphs().unwrap().len()
+        );
+        assert!(!document.elements().unwrap().is_empty());
+        document.tables().expect("Failed to extract tables");
+        document.metadata().expect("Failed to extract metadata");
+
+        drop(document);
     }
 
     #[test]

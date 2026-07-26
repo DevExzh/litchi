@@ -41,7 +41,7 @@ conversion, fonts, and image conversion are optional.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Smart format detection | ✅ | ✅ | N/A | Detects the listed Office, ODF, RTF, and iWork families from content, not only extensions |
-| Unified document facade | 🟡 | ✅ | ❌ | Common text/metadata access for DOC, DOCX, RTF, Pages, and ODT, including bounded RTF `\info` text, counts, identifiers, producer versions, hyperlink bases, and timezone-unspecified timestamps without false UTC conversion; authoring remains format-specific |
+| Unified document facade | 🟡 | ✅ | ❌ | Common text/metadata access for DOC, DOCX, RTF, Pages, and ODT; DOCX ownership is fully safe and uses method-scoped borrowed views over the retained package, while RTF metadata includes bounded `\info` text, counts, identifiers, producer versions, hyperlink bases, and timezone-unspecified timestamps without false UTC conversion; authoring remains format-specific |
 | Unified presentation facade | 🟡 | ✅ | ❌ | Common access for PPT, PPTX, Keynote, and ODP; authoring remains format-specific |
 | Unified workbook facade | ✅ | ✅ | ❌ | Common sheet names/count, text, and metadata for XLS, XLSX, XLSB, ODS, and Numbers |
 | Workbook trait API | 🟡 | ✅ | ❌ | Implemented by XLS, XLSX, XLSB, text workbooks, and immutable ODS evaluation snapshots; Numbers uses the unified facade |

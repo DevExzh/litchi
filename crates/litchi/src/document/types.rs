@@ -23,7 +23,7 @@ pub(super) enum DocumentImpl {
     Doc(ole::doc::Document, litchi_core::Metadata),
     /// Modern .docx format
     #[cfg(feature = "ooxml")]
-    Docx(Box<ooxml::docx::Document<'static>>, litchi_core::Metadata),
+    Docx(Box<ooxml::docx::Package>, litchi_core::Metadata),
     /// Apple Pages format
     #[cfg(feature = "iwa")]
     Pages(crate::iwa::pages::PagesDocument),

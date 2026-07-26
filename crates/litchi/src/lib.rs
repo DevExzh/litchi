@@ -162,6 +162,8 @@
 //! Most users should use the high-level API and only access low-level modules
 //! when format-specific features are needed.
 
+#![forbid(unsafe_code)]
+
 /// Common types, traits, and utilities shared across formats.
 ///
 /// Re-export of the `litchi-core` crate under the historical `common` path.
