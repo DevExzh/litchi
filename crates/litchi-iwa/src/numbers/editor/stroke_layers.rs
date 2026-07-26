@@ -201,6 +201,251 @@ pub(super) fn delete(
     )
 }
 
+/// Validate every explicit border layer before a table row permutation.
+pub(super) fn validate_row_reorder(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    sidecar_id: u64,
+    rows: u32,
+    columns: u32,
+    body_start: usize,
+    destinations_by_source: &[usize],
+) -> Result<()> {
+    planned_row_reorder(
+        package,
+        locations,
+        sidecar_id,
+        TableDimensions { rows, columns },
+        body_start,
+        destinations_by_source,
+    )
+    .map(drop)
+}
+
+/// Keep explicit cell borders attached to their cells during a row permutation.
+pub(super) fn reorder_rows(
+    package: &mut IWorkPackage,
+    locations: &HashMap<u64, String>,
+    sidecar_id: u64,
+    rows: u32,
+    columns: u32,
+    body_start: usize,
+    destinations_by_source: &[usize],
+) -> Result<()> {
+    let updates = planned_row_reorder(
+        package,
+        locations,
+        sidecar_id,
+        TableDimensions { rows, columns },
+        body_start,
+        destinations_by_source,
+    )?;
+    apply_layer_updates(package, &updates)
+}
+
+fn planned_row_reorder(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    sidecar_id: u64,
+    dimensions: TableDimensions,
+    body_start: usize,
+    destinations_by_source: &[usize],
+) -> Result<Vec<LayerUpdate>> {
+    let sidecar_archive = locations.get(&sidecar_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers stroke sidecar {sidecar_id} is missing"))
+    })?;
+    let archive = package.archive(sidecar_archive)?;
+    let object = archive.object(sidecar_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers stroke sidecar {sidecar_id} is missing"))
+    })?;
+    let message_index = unique_message_index(
+        object,
+        STROKE_SIDECAR_MESSAGE_TYPE,
+        |data| tst::StrokeSidecarArchive::decode(data).is_ok(),
+        "stroke sidecar",
+    )?;
+    let sidecar =
+        tst::StrokeSidecarArchive::decode(object.messages[message_index].data.as_slice())?;
+    validate_sidecar_dimensions(&sidecar, dimensions)?;
+
+    let mut updates = Vec::new();
+    let mut seen_layers = HashSet::new();
+    for side in LayerSide::ALL {
+        for reference in side.references(&sidecar) {
+            if !seen_layers.insert(reference.identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers stroke sidecar {sidecar_id} references layer {} more than once",
+                    reference.identifier
+                )));
+            }
+            if let Some(update) = plan_reordered_layer(
+                package,
+                locations,
+                reference.identifier,
+                side,
+                dimensions,
+                body_start,
+                destinations_by_source,
+            )? {
+                updates.push(update);
+            }
+        }
+    }
+    Ok(updates)
+}
+
+fn plan_reordered_layer(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    identifier: u64,
+    side: LayerSide,
+    dimensions: TableDimensions,
+    body_start: usize,
+    destinations_by_source: &[usize],
+) -> Result<Option<LayerUpdate>> {
+    let archive_name = locations.get(&identifier).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers stroke layer {identifier} is missing"))
+    })?;
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(identifier).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers stroke layer {identifier} is missing"))
+    })?;
+    let message_index = unique_message_index(
+        object,
+        STROKE_LAYER_MESSAGE_TYPE,
+        |data| tst::StrokeLayerArchive::decode(data).is_ok(),
+        "stroke layer",
+    )?;
+    let previous = tst::StrokeLayerArchive::decode(object.messages[message_index].data.as_slice())?;
+    let fixed_length = axis_length(side.fixed_axis(), dimensions);
+    let traversal_length = axis_length(opposite_axis(side.fixed_axis()), dimensions);
+    let layer_index = previous.row_column_index.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers stroke layer {identifier} has no row/column index"
+        ))
+    })?;
+    if layer_index >= fixed_length {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers stroke layer {identifier} index {layer_index} exceeds its axis length {fixed_length}"
+        )));
+    }
+    for run in &previous.stroke_runs {
+        validated_run_range(run, traversal_length)?;
+    }
+
+    let (current, run_sources) = if side.fixed_axis() == StrokeAxis::Row {
+        let mut current = previous.clone();
+        current.row_column_index = Some(relocated_row(
+            layer_index,
+            body_start,
+            destinations_by_source,
+        )?);
+        (current, (0..previous.stroke_runs.len()).collect())
+    } else {
+        let (runs, run_sources) = reorder_runs(
+            &previous.stroke_runs,
+            dimensions.rows,
+            body_start,
+            destinations_by_source,
+        )?;
+        let mut current = previous.clone();
+        current.stroke_runs = runs;
+        (current, run_sources)
+    };
+
+    Ok((current != previous).then_some(LayerUpdate {
+        identifier,
+        archive_name: archive_name.clone(),
+        message_index,
+        previous,
+        current,
+        run_sources,
+    }))
+}
+
+fn reorder_runs(
+    runs: &[tst::stroke_layer_archive::StrokeRunArchive],
+    rows: u32,
+    body_start: usize,
+    destinations_by_source: &[usize],
+) -> Result<(Vec<tst::stroke_layer_archive::StrokeRunArchive>, Vec<usize>)> {
+    let mut reordered = Vec::with_capacity(runs.len());
+    let mut sources = Vec::with_capacity(runs.len());
+    for (source, run) in runs.iter().enumerate() {
+        let (start, end) = validated_run_range(run, rows)?;
+        let mut destinations = (start..end)
+            .map(|row| relocated_row(row, body_start, destinations_by_source))
+            .collect::<Result<Vec<_>>>()?;
+        destinations.sort_unstable();
+        let Some(&first) = destinations.first() else {
+            continue;
+        };
+        let mut range_start = first;
+        let mut previous = first;
+        for destination in destinations.into_iter().skip(1) {
+            if previous.checked_add(1) == Some(destination) {
+                previous = destination;
+                continue;
+            }
+            push_reordered_run(
+                &mut reordered,
+                &mut sources,
+                run,
+                source,
+                range_start,
+                previous,
+            )?;
+            range_start = destination;
+            previous = destination;
+        }
+        push_reordered_run(
+            &mut reordered,
+            &mut sources,
+            run,
+            source,
+            range_start,
+            previous,
+        )?;
+    }
+
+    Ok((reordered, sources))
+}
+
+fn push_reordered_run(
+    runs: &mut Vec<tst::stroke_layer_archive::StrokeRunArchive>,
+    sources: &mut Vec<usize>,
+    template: &tst::stroke_layer_archive::StrokeRunArchive,
+    source: usize,
+    start: u32,
+    end: u32,
+) -> Result<()> {
+    let mut run = template.clone();
+    run.origin = Some(checked_i32(start)?);
+    run.length = Some(
+        end.checked_sub(start)
+            .and_then(|length| length.checked_add(1))
+            .ok_or_else(|| Error::ParseError("Numbers stroke run length overflow".to_owned()))?,
+    );
+    runs.push(run);
+    sources.push(source);
+    Ok(())
+}
+
+fn relocated_row(row: u32, body_start: usize, destinations_by_source: &[usize]) -> Result<u32> {
+    let row = usize::try_from(row)
+        .map_err(|_| Error::ParseError("Numbers stroke row exceeds usize".to_owned()))?;
+    let Some(source_offset) = row.checked_sub(body_start) else {
+        return u32::try_from(row)
+            .map_err(|_| Error::ParseError("Numbers stroke row exceeds u32".to_owned()));
+    };
+    let Some(destination) = destinations_by_source.get(source_offset) else {
+        return u32::try_from(row)
+            .map_err(|_| Error::ParseError("Numbers stroke row exceeds u32".to_owned()));
+    };
+    u32::try_from(*destination)
+        .map_err(|_| Error::ParseError("Numbers stroke row destination exceeds u32".to_owned()))
+}
+
 fn mutate(
     package: &mut IWorkPackage,
     locations: &HashMap<u64, String>,
@@ -254,43 +499,7 @@ fn mutate(
         *side.references_mut(&mut current) = references;
     }
 
-    for update in &updates {
-        package.update_archive(&update.archive_name, |archive| {
-            let object = archive.object_mut(update.identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers stroke layer {} is missing",
-                    update.identifier
-                ))
-            })?;
-            let original = object.messages.get(update.message_index).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers stroke layer {} payload is missing",
-                    update.identifier
-                ))
-            })?;
-            let decoded = tst::StrokeLayerArchive::decode(original.data.as_slice())?;
-            if decoded != update.previous {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers stroke layer {} changed before mutation",
-                    update.identifier
-                )));
-            }
-            let data = rewrite_stroke_layer_wire(
-                original.data.as_slice(),
-                &update.previous,
-                &update.current,
-                &update.run_sources,
-            )?;
-            object.replace_message(
-                update.message_index,
-                RawMessage {
-                    type_: original.type_,
-                    data,
-                },
-            )?;
-            Ok(())
-        })?;
-    }
+    apply_layer_updates(package, &updates)?;
 
     package.update_archive(sidecar_archive, |archive| {
         let object = archive.object_mut(sidecar_id).ok_or_else(|| {
@@ -331,6 +540,47 @@ fn mutate(
         });
         Ok(())
     })
+}
+
+fn apply_layer_updates(package: &mut IWorkPackage, updates: &[LayerUpdate]) -> Result<()> {
+    for update in updates {
+        package.update_archive(&update.archive_name, |archive| {
+            let object = archive.object_mut(update.identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers stroke layer {} is missing",
+                    update.identifier
+                ))
+            })?;
+            let original = object.messages.get(update.message_index).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers stroke layer {} payload is missing",
+                    update.identifier
+                ))
+            })?;
+            let decoded = tst::StrokeLayerArchive::decode(original.data.as_slice())?;
+            if decoded != update.previous {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers stroke layer {} changed before mutation",
+                    update.identifier
+                )));
+            }
+            let data = rewrite_stroke_layer_wire(
+                original.data.as_slice(),
+                &update.previous,
+                &update.current,
+                &update.run_sources,
+            )?;
+            object.replace_message(
+                update.message_index,
+                RawMessage {
+                    type_: original.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })?;
+    }
+    Ok(())
 }
 
 fn plan_layer(

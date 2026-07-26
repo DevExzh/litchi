@@ -6,6 +6,9 @@ use std::collections::{HashMap, HashSet};
 use prost::Message;
 
 use crate::numbers::bnc::{BncCell, CachedScalar, StoredValue};
+use crate::numbers::editor::stroke_layers::{
+    reorder_rows as reorder_stroke_rows, validate_row_reorder as validate_stroke_row_reorder,
+};
 use crate::numbers::editor::table_topology::{category_grouping_is_enabled, filter_has_row_state};
 use crate::table_hidden_axes::{
     TableHiddenAxes, positional_user_hidden_axes, restore_positional_user_hidden_axes,
@@ -15,10 +18,7 @@ use super::*;
 
 mod storage;
 
-use storage::{
-    reorder_body_row_headers, reorder_body_table_tile_rows, reorder_row_uids,
-    validate_sort_stroke_sidecar,
-};
+use storage::{reorder_body_row_headers, reorder_body_table_tile_rows, reorder_row_uids};
 
 #[derive(Debug)]
 pub(super) struct BodySortPlan {
@@ -216,6 +216,17 @@ fn apply_attached_table_sort_range(
         return Ok(false);
     }
     let destinations_by_source = plan.destinations_by_source()?;
+    if let Some(sidecar) = &descriptor.model.stroke_sidecar {
+        validate_stroke_row_reorder(
+            package,
+            &locations,
+            sidecar.identifier,
+            descriptor.model.number_of_rows,
+            descriptor.model.number_of_columns,
+            row_start,
+            &destinations_by_source,
+        )?;
+    }
     reorder_body_table_tile_rows(
         package,
         &locations,
@@ -230,6 +241,17 @@ fn apply_attached_table_sort_range(
         row_start,
         &destinations_by_source,
     )?;
+    if let Some(sidecar) = &descriptor.model.stroke_sidecar {
+        reorder_stroke_rows(
+            package,
+            &locations,
+            sidecar.identifier,
+            descriptor.model.number_of_rows,
+            descriptor.model.number_of_columns,
+            row_start,
+            &destinations_by_source,
+        )?;
+    }
     let row_uids = descriptor
         .model
         .base_column_row_uids
@@ -299,7 +321,17 @@ fn validate_sort_features(
             "Cannot yet execute a Numbers sort on a table with merged cells".to_owned(),
         ));
     }
-    validate_sort_stroke_sidecar(package, locations, model)?;
+    if let Some(sidecar) = &model.stroke_sidecar {
+        validate_stroke_row_reorder(
+            package,
+            locations,
+            sidecar.identifier,
+            model.number_of_rows,
+            model.number_of_columns,
+            0,
+            &[],
+        )?;
+    }
     let declares_hidden_storage = model.hidden_states_owner.is_some()
         || model.hidden_state_formula_owner_for_rows.is_some()
         || model.hidden_state_formula_owner_for_columns.is_some()

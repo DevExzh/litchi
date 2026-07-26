@@ -380,10 +380,10 @@ impl NumbersEditor {
     /// key in the body must be a complete plain Text, finite Number, Boolean,
     /// Date, or Duration column of one consistent type. Cell comment threads
     /// move with their rows. It rejects formula and error body cells, merged
-    /// cells, filters, grouping, pivots, spill state, conditional styles, and
-    /// explicit border layers. User-hidden row and column positions remain
-    /// fixed, matching native iWork sorting.
+    /// cells, filters, grouping, pivots, spill state, and conditional styles
     /// transactionally rather than risking a semantically partial rewrite.
+    /// Explicit cell borders and comment threads move with their rows, while
+    /// user-hidden row and column positions remain fixed to match native iWork.
     ///
     /// Returns `true` when one or more body rows were physically reordered,
     /// and `false` when the body was already in the requested stable order.

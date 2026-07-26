@@ -6384,17 +6384,59 @@ fn table_sort_moves_rows_across_tile_boundaries() {
 }
 
 #[test]
-fn table_sort_execution_rejects_unsupported_state_transactionally() {
+fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
     let mut package = test_package();
-    add_test_stroke_layer(&mut package, 88, TestStrokeLayerSide::Top, 0, &[(0, 4)]);
+    add_test_stroke_layer(&mut package, 88, TestStrokeLayerSide::Top, 1, &[(0, 4)]);
+    add_test_stroke_layer(
+        &mut package,
+        89,
+        TestStrokeLayerSide::Left,
+        1,
+        &[(0, 2), (2, 2)],
+    );
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            for identifier in [88, 89] {
+                let object = archive.object_mut(identifier).unwrap();
+                let message = object.messages[0].clone();
+                let mut data = crate::wire::transform_length_delimited_fields_at_path(
+                    &message.data,
+                    &[2],
+                    |run| {
+                        let mut run = run.to_vec();
+                        append_unknown_varint(&mut run, 98, 980);
+                        Ok(run)
+                    },
+                )?;
+                append_unknown_varint(&mut data, 99, 990);
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor
+        .set_table_header_settings(
+            10,
+            NumbersTableHeaderSettings {
+                header_rows: Some(NumbersTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
     editor
         .set_cells(
             10,
             [
-                TableCellUpdate::new(0, 1, CellValue::Number(3.0)),
-                TableCellUpdate::new(1, 1, CellValue::Number(1.0)),
-                TableCellUpdate::new(2, 1, CellValue::Number(4.0)),
+                TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::Number(3.0)),
+                TableCellUpdate::new(2, 1, CellValue::Number(1.0)),
                 TableCellUpdate::new(3, 1, CellValue::Number(2.0)),
             ],
         )
@@ -6409,10 +6451,50 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
             .unwrap(),
         )
         .unwrap();
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.apply_table_sort_order(10).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(editor.apply_table_sort_order(10).unwrap());
 
+    let top = test_stroke_layer(editor.package(), 88);
+    assert_eq!(top.row_column_index, Some(3));
+    assert_eq!(
+        top.stroke_runs
+            .iter()
+            .map(|run| (run.origin, run.length))
+            .collect::<Vec<_>>(),
+        [(Some(0), Some(4))]
+    );
+    let left = test_stroke_layer(editor.package(), 89);
+    assert_eq!(left.row_column_index, Some(1));
+    assert_eq!(
+        left.stroke_runs
+            .iter()
+            .map(|run| (run.origin, run.length))
+            .collect::<Vec<_>>(),
+        [(Some(0), Some(1)), (Some(3), Some(1)), (Some(1), Some(2)),]
+    );
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    for identifier in [88, 89] {
+        let data = archive.object(identifier).unwrap().messages[0]
+            .data
+            .as_slice();
+        assert!(
+            crate::wire::parse_wire_fields(data)
+                .unwrap()
+                .iter()
+                .any(|field| field.number == 99)
+        );
+        for run in crate::wire::repeated_length_delimited_payloads(data, 2).unwrap() {
+            assert!(
+                crate::wire::parse_wire_fields(run)
+                    .unwrap()
+                    .iter()
+                    .any(|field| field.number == 98)
+            );
+        }
+    }
+}
+
+#[test]
+fn table_sort_execution_rejects_unsupported_state_transactionally() {
     let mut no_order = NumbersEditor::from_package(test_package()).unwrap();
     let before = no_order.to_bytes().unwrap();
     assert!(no_order.apply_table_sort_order(10).is_err());

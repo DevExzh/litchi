@@ -354,50 +354,6 @@ pub(super) fn reorder_row_uids(
     })
 }
 
-pub(super) fn validate_sort_stroke_sidecar(
-    package: &IWorkPackage,
-    locations: &HashMap<u64, String>,
-    model: &TableModelArchive,
-) -> Result<()> {
-    let Some(reference) = &model.stroke_sidecar else {
-        return Ok(());
-    };
-    let archive_name = locations.get(&reference.identifier).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Numbers stroke sidecar {} is missing",
-            reference.identifier
-        ))
-    })?;
-    let archive = package.archive(archive_name)?;
-    let object = archive.object(reference.identifier).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Numbers stroke sidecar {} is missing",
-            reference.identifier
-        ))
-    })?;
-    let sidecar = unique_stroke_sidecar(object, reference.identifier)?;
-    let rows = model.number_of_rows;
-    let columns = model.number_of_columns;
-    if sidecar.row_count.is_some_and(|count| count != rows)
-        || sidecar.column_count.is_some_and(|count| count != columns)
-    {
-        return Err(Error::InvalidFormat(format!(
-            "Numbers stroke sidecar dimensions {:?}x{:?} do not match table {rows}x{columns}",
-            sidecar.row_count, sidecar.column_count
-        )));
-    }
-    if !sidecar.left_column_stroke_layers.is_empty()
-        || !sidecar.right_column_stroke_layers.is_empty()
-        || !sidecar.top_row_stroke_layers.is_empty()
-        || !sidecar.bottom_row_stroke_layers.is_empty()
-    {
-        return Err(Error::ParseError(
-            "Cannot yet execute a Numbers sort on a table with explicit border layers".to_owned(),
-        ));
-    }
-    Ok(())
-}
-
 fn relocated_row(
     source: usize,
     body_start: usize,
@@ -530,26 +486,6 @@ fn unique_uid_map_message_index(object: &ArchiveObject, identifier: u64) -> Resu
         ))),
         _ => Err(Error::InvalidFormat(format!(
             "Object {identifier} has multiple Numbers UID map payloads"
-        ))),
-    }
-}
-
-fn unique_stroke_sidecar(
-    object: &ArchiveObject,
-    identifier: u64,
-) -> Result<tst::StrokeSidecarArchive> {
-    let sidecars = object
-        .messages
-        .iter()
-        .filter_map(|message| tst::StrokeSidecarArchive::decode(message.data.as_slice()).ok())
-        .collect::<Vec<_>>();
-    match sidecars.as_slice() {
-        [sidecar] => Ok(sidecar.clone()),
-        [] => Err(Error::InvalidFormat(format!(
-            "Object {identifier} has no Numbers stroke sidecar payload"
-        ))),
-        _ => Err(Error::InvalidFormat(format!(
-            "Object {identifier} has multiple Numbers stroke sidecar payloads"
         ))),
     }
 }
