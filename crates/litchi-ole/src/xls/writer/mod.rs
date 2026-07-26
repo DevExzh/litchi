@@ -22,6 +22,7 @@ pub mod view;
 pub mod row_blocks;
 
 // Re-export public types
+pub use crate::xls::XlsEncryptionProfile;
 pub use crate::xls::{
     XlsAutoFilter12Criterion, XlsAutoFilter12Icon, XlsAutoFilter12IconSet, XlsAutoFilter12Operator,
     XlsAutoFilter12Value, XlsExternalTableField, XlsExternalTableMetadata, XlsExternalTableVersion,
@@ -37,7 +38,6 @@ pub use crate::xls::{
     XlsConsolidationRange, XlsConsolidationSource,
 };
 pub use crate::xls::{XlsDefinedNameFutureRecords, XlsNameFnGrp12, XlsNamePublish};
-pub use crate::xls::XlsEncryptionProfile;
 pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
     PivotCacheValue, XlsAddInFunctionOptions, XlsCalculationSettings, XlsCellValue,
@@ -50,11 +50,11 @@ pub use core::{
     XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
     XlsDataValidationType, XlsDdeOrOleItemOptions, XlsDdeOrOleLinkOptions, XlsDefinedName,
     XlsDefinedNameRecordOptions, XlsExternalCacheRowOptions, XlsExternalDefinedNameOptions,
-    XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsFunctionGroupOptions,
+    XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsFunctionGroupOptions, XlsGroupRect,
     XlsPageSetupOptions, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
-    XlsPivotTableConfig, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine,
-    XlsShapeText, XlsShapeTextRun, XlsShapeWrite, XlsWorkbookEnvironmentOptions,
-    XlsWorkbookWindowOptions, XlsWorksheetLayoutOptions, XlsWriter,
+    XlsPivotTableConfig, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild,
+    XlsShapeGroupWrite, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeTextRun, XlsShapeWrite,
+    XlsWorkbookEnvironmentOptions, XlsWorkbookWindowOptions, XlsWorksheetLayoutOptions, XlsWriter,
 };
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,

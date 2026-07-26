@@ -32,16 +32,16 @@
 use super::super::error::{XlsError, XlsResult};
 use super::biff::AutoFilterConditionWrite;
 use super::formatting::{CellStyle, ExtendedFormat, FormattingManager};
+use crate::xls::XlsEncryptionProfile;
+use crate::xls::encryption::{
+    XlsWriterEncryption, encrypt_workbook_for_write, validate_writer_encryption,
+};
 use crate::xls::page_setup::{
     XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
 };
 use crate::xls::{
     XlsDifferentialFormat, XlsListObject, XlsTableStyle, XlsTableStyles, XlsXfProperty,
 };
-use crate::xls::encryption::{
-    XlsWriterEncryption, encrypt_workbook_for_write, validate_writer_encryption,
-};
-use crate::xls::XlsEncryptionProfile;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
 use zeroize::Zeroizing;
@@ -51,6 +51,7 @@ mod conditional_format;
 mod data_validation;
 mod named_range;
 mod shape;
+mod shape_group;
 mod stream;
 mod worksheet;
 
@@ -72,6 +73,7 @@ pub use self::shape::{
     XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText,
     XlsShapeTextRun, XlsShapeWrite,
 };
+pub use self::shape_group::{XlsGroupRect, XlsShapeGroupChild, XlsShapeGroupWrite};
 use self::worksheet::{
     AutoFilterColumnDef, AutoFilterRange, MergedRange, PivotCellXfRole, SortConfig, WritableCell,
     WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
@@ -193,7 +195,9 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
     if config.source_first_row > config.source_last_row
         || config.source_first_col > config.source_last_col
     {
-        return Err(XlsError::InvalidData("PivotTable source range is reversed".to_string()));
+        return Err(XlsError::InvalidData(
+            "PivotTable source range is reversed".to_string(),
+        ));
     }
     u16::try_from(config.fields.len()).map_err(|_| {
         XlsError::InvalidData("PivotTable field count exceeds BIFF8 capacity".to_string())
@@ -210,24 +214,38 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
         if let Some(crate::xls::PivotCacheGrouping::Discrete(grouping)) = &field.grouping {
             let base = usize::from(grouping.base_field_index);
             if base >= config.fields.len() || base == field_index {
-                return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} has invalid base field {base}")));
+                return Err(XlsError::InvalidData(format!(
+                    "PivotCache grouping field {field_index} has invalid base field {base}"
+                )));
             }
             if group_children[base].replace(field_index).is_some() {
-                return Err(XlsError::InvalidData(format!("PivotCache base field {base} has multiple grouping children")));
+                return Err(XlsError::InvalidData(format!(
+                    "PivotCache base field {base} has multiple grouping children"
+                )));
             }
             let mut cursor = base;
             let mut seen = vec![false; config.fields.len()];
-            while let Some(crate::xls::PivotCacheGrouping::Discrete(parent)) = &config.fields[cursor].grouping {
-                if seen[cursor] { return Err(XlsError::InvalidData("PivotCache grouping chain contains a cycle".to_string())); }
+            while let Some(crate::xls::PivotCacheGrouping::Discrete(parent)) =
+                &config.fields[cursor].grouping
+            {
+                if seen[cursor] {
+                    return Err(XlsError::InvalidData(
+                        "PivotCache grouping chain contains a cycle".to_string(),
+                    ));
+                }
                 seen[cursor] = true;
                 cursor = usize::from(parent.base_field_index);
-                if cursor >= config.fields.len() { break; }
+                if cursor >= config.fields.len() {
+                    break;
+                }
             }
         }
     }
     for (field_index, field) in config.fields.iter().enumerate() {
         u16::try_from(field.cache_items.len()).map_err(|_| {
-            XlsError::InvalidData(format!("PivotCache field {field_index} has too many shared items"))
+            XlsError::InvalidData(format!(
+                "PivotCache field {field_index} has too many shared items"
+            ))
         })?;
         if field.is_numeric && !field.cache_items.is_empty() && field.grouping.is_none() {
             return Err(XlsError::InvalidData(format!(
@@ -237,7 +255,10 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
         for (item_index, item) in field.cache_items.iter().enumerate() {
             item.validate()?;
             if matches!(item, crate::xls::PivotCacheItem::Number(_))
-                && !matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Numeric(_)))
+                && !matches!(
+                    field.grouping,
+                    Some(crate::xls::PivotCacheGrouping::Numeric(_))
+                )
             {
                 return Err(XlsError::InvalidData(format!(
                     "non-numeric PivotCache field {field_index} cannot contain numeric shared item {item_index}"
@@ -252,51 +273,97 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
         if let Some(grouping) = &field.grouping {
             let group_items = grouping.group_items();
             if group_items.is_empty() || group_items.len() > usize::from(u16::MAX) {
-                return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} has invalid group-item count")));
+                return Err(XlsError::InvalidData(format!(
+                    "PivotCache grouping field {field_index} has invalid group-item count"
+                )));
             }
             for (index, item) in group_items.iter().enumerate() {
                 item.validate()?;
                 if group_items[..index].contains(item) {
-                    return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} has duplicate group item {index}")));
+                    return Err(XlsError::InvalidData(format!(
+                        "PivotCache grouping field {field_index} has duplicate group item {index}"
+                    )));
                 }
             }
             match grouping {
                 crate::xls::PivotCacheGrouping::Numeric(value) => {
-                    if !value.start.is_finite() || !value.end.is_finite() || !value.step.is_finite()
-                        || value.start >= value.end || value.step <= 0.0
-                    { return Err(XlsError::InvalidData(format!("PivotCache numeric grouping field {field_index} has invalid bounds or step"))); }
-                    if field.cache_items.iter().any(|item| !matches!(item, crate::xls::PivotCacheItem::Number(_))) {
-                        return Err(XlsError::InvalidData(format!("PivotCache numeric grouping field {field_index} has nonnumeric original items")));
+                    if !value.start.is_finite()
+                        || !value.end.is_finite()
+                        || !value.step.is_finite()
+                        || value.start >= value.end
+                        || value.step <= 0.0
+                    {
+                        return Err(XlsError::InvalidData(format!(
+                            "PivotCache numeric grouping field {field_index} has invalid bounds or step"
+                        )));
+                    }
+                    if field
+                        .cache_items
+                        .iter()
+                        .any(|item| !matches!(item, crate::xls::PivotCacheItem::Number(_)))
+                    {
+                        return Err(XlsError::InvalidData(format!(
+                            "PivotCache numeric grouping field {field_index} has nonnumeric original items"
+                        )));
                     }
                 },
                 crate::xls::PivotCacheGrouping::Date(value) => {
                     if value.start >= value.end || value.step == 0 || value.step > i16::MAX as u16 {
-                        return Err(XlsError::InvalidData(format!("PivotCache date grouping field {field_index} has invalid bounds or step")));
+                        return Err(XlsError::InvalidData(format!(
+                            "PivotCache date grouping field {field_index} has invalid bounds or step"
+                        )));
                     }
-                    if field.cache_items.iter().any(|item| !matches!(item, crate::xls::PivotCacheItem::DateTime(_) | crate::xls::PivotCacheItem::Empty)) {
-                        return Err(XlsError::InvalidData(format!("PivotCache date grouping field {field_index} has invalid original items")));
+                    if field.cache_items.iter().any(|item| {
+                        !matches!(
+                            item,
+                            crate::xls::PivotCacheItem::DateTime(_)
+                                | crate::xls::PivotCacheItem::Empty
+                        )
+                    }) {
+                        return Err(XlsError::InvalidData(format!(
+                            "PivotCache date grouping field {field_index} has invalid original items"
+                        )));
                     }
                 },
                 crate::xls::PivotCacheGrouping::Discrete(value) => {
                     if !field.cache_items.is_empty() || field.is_numeric {
-                        return Err(XlsError::InvalidData(format!("discrete PivotCache grouping field {field_index} must be derived")));
+                        return Err(XlsError::InvalidData(format!(
+                            "discrete PivotCache grouping field {field_index} must be derived"
+                        )));
                     }
-                    let base_items = config.fields[usize::from(value.base_field_index)].cache_items.len();
+                    let base_items = config.fields[usize::from(value.base_field_index)]
+                        .cache_items
+                        .len();
                     if value.item_to_group.len() != base_items {
-                        return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} mapping is not exhaustive")));
+                        return Err(XlsError::InvalidData(format!(
+                            "PivotCache grouping field {field_index} mapping is not exhaustive"
+                        )));
                     }
                     let mut used = vec![false; value.group_items.len()];
                     for mapped in &value.item_to_group {
                         let mapped = usize::from(*mapped);
-                        if mapped >= used.len() { return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} mapping index is out of range"))); }
+                        if mapped >= used.len() {
+                            return Err(XlsError::InvalidData(format!(
+                                "PivotCache grouping field {field_index} mapping index is out of range"
+                            )));
+                        }
                         used[mapped] = true;
                     }
-                    if used.iter().any(|used| !used) { return Err(XlsError::InvalidData(format!("PivotCache grouping field {field_index} contains an unused group item"))); }
+                    if used.iter().any(|used| !used) {
+                        return Err(XlsError::InvalidData(format!(
+                            "PivotCache grouping field {field_index} contains an unused group item"
+                        )));
+                    }
                 },
             }
         }
         for item in &field.items {
-            let visible_count = field.grouping.as_ref().map_or(field.cache_items.len(), |grouping| grouping.group_items().len());
+            let visible_count = field
+                .grouping
+                .as_ref()
+                .map_or(field.cache_items.len(), |grouping| {
+                    grouping.group_items().len()
+                });
             if item.item_type == 0 && usize::from(item.cache_index) >= visible_count {
                 return Err(XlsError::InvalidData(format!(
                     "PivotTable field {field_index} SXVI cache index {} is out of range",
@@ -306,22 +373,45 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
         }
     }
     for (row_index, row) in config.source_data.iter().enumerate() {
-        let source_field_count = config.fields.iter().filter(|field| !matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_)))).count();
+        let source_field_count = config
+            .fields
+            .iter()
+            .filter(|field| {
+                !matches!(
+                    field.grouping,
+                    Some(crate::xls::PivotCacheGrouping::Discrete(_))
+                )
+            })
+            .count();
         if row.len() != source_field_count {
             return Err(XlsError::InvalidData(format!(
                 "PivotCache row {row_index} has {} values for {} fields",
-                row.len(), source_field_count
+                row.len(),
+                source_field_count
             )));
         }
         let mut row_values = row.iter();
         for (field_index, field) in config.fields.iter().enumerate() {
-            if matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_))) { continue; }
+            if matches!(
+                field.grouping,
+                Some(crate::xls::PivotCacheGrouping::Discrete(_))
+            ) {
+                continue;
+            }
             let value = row_values.next().unwrap();
             if field.is_numeric && field.grouping.is_none() {
                 match value {
                     PivotCacheValue::Number(number) if number.is_finite() => {},
-                    PivotCacheValue::Number(_) => return Err(XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} is non-finite"))),
-                    _ => return Err(XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} does not match numeric field type"))),
+                    PivotCacheValue::Number(_) => {
+                        return Err(XlsError::InvalidData(format!(
+                            "PivotCache row {row_index} field {field_index} is non-finite"
+                        )));
+                    },
+                    _ => {
+                        return Err(XlsError::InvalidData(format!(
+                            "PivotCache row {row_index} field {field_index} does not match numeric field type"
+                        )));
+                    },
                 }
                 continue;
             }
@@ -342,7 +432,9 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                 },
             };
             if index >= field.cache_items.len() {
-                return Err(XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} shared index {index} is out of range")));
+                return Err(XlsError::InvalidData(format!(
+                    "PivotCache row {row_index} field {field_index} shared index {index} is out of range"
+                )));
             }
         }
     }
@@ -1742,6 +1834,7 @@ impl XlsWriter {
             .shapes
             .iter()
             .filter_map(|shape| shape.object_id)
+            .chain(worksheet.shape_groups.iter().flat_map(group_object_ids))
             .collect::<std::collections::HashSet<_>>();
         let object_count = pivot_ids
             .union(&shape_ids)
@@ -1800,6 +1893,88 @@ impl XlsWriter {
         let count = worksheet.shapes.len();
         worksheet.shapes.clear();
         Ok(count)
+    }
+
+    /// Add a validated shape group and return the group's worksheet OBJ identifier.
+    ///
+    /// The group consumes one object ID for itself plus one per child; assigned
+    /// child identifiers are stored back into the group before it is retained.
+    pub fn add_shape_group(
+        &mut self,
+        sheet: usize,
+        mut group: XlsShapeGroupWrite,
+    ) -> XlsResult<u16> {
+        group.validate()?;
+        let worksheet = self
+            .worksheets
+            .get(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        let pivot_ids = worksheet
+            .pivot_tables
+            .iter()
+            .flat_map(|table| table.page_entries.iter().map(|entry| entry.2))
+            .filter(|id| *id != 0 && *id != u16::MAX)
+            .collect::<std::collections::HashSet<_>>();
+        let shape_ids = worksheet
+            .shapes
+            .iter()
+            .filter_map(|shape| shape.object_id)
+            .chain(worksheet.shape_groups.iter().flat_map(group_object_ids))
+            .collect::<std::collections::HashSet<_>>();
+        let object_count = pivot_ids
+            .union(&shape_ids)
+            .count()
+            .checked_add(worksheet.comments.len())
+            .and_then(|count| count.checked_add(group.object_count()))
+            .ok_or_else(|| XlsError::InvalidData("worksheet shape count overflows".to_string()))?;
+        if object_count > 1022 {
+            return Err(XlsError::InvalidData(
+                "a worksheet cannot contain more than 1022 drawing objects".to_string(),
+            ));
+        }
+        let mut reserved = pivot_ids;
+        reserved.extend(shape_ids);
+        for requested in group_object_ids(&group) {
+            if reserved.contains(&requested) {
+                return Err(XlsError::InvalidData(
+                    "shape object ID collides with another worksheet object".to_string(),
+                ));
+            }
+        }
+        let group_id = assign_object_id(&mut reserved, group.object_id)?;
+        group.object_id = Some(group_id);
+        for child in &mut group.children {
+            child.object_id = Some(assign_object_id(&mut reserved, child.object_id)?);
+        }
+        self.worksheets
+            .get_mut(sheet)
+            .unwrap()
+            .shape_groups
+            .push(group);
+        Ok(group_id)
+    }
+
+    /// Remove a shape group by the group's assigned OBJ identifier.
+    pub fn remove_shape_group(
+        &mut self,
+        sheet: usize,
+        object_id: u16,
+    ) -> XlsResult<XlsShapeGroupWrite> {
+        if object_id == 0 || object_id == u16::MAX {
+            return Err(XlsError::InvalidData(
+                "shape object ID 0 and 65535 are reserved".to_string(),
+            ));
+        }
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        let index = worksheet
+            .shape_groups
+            .iter()
+            .position(|group| group.object_id == Some(object_id))
+            .ok_or_else(|| XlsError::InvalidData("shape object ID was not found".to_string()))?;
+        Ok(worksheet.shape_groups.remove(index))
     }
 
     pub fn set_auto_filter(
@@ -3781,6 +3956,31 @@ impl Default for XlsWriter {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Iterate every OBJ identifier requested or assigned inside a shape group.
+fn group_object_ids(group: &XlsShapeGroupWrite) -> impl Iterator<Item = u16> + '_ {
+    group
+        .object_id
+        .into_iter()
+        .chain(group.children.iter().filter_map(|child| child.object_id))
+}
+
+/// Reserve the requested OBJ identifier or the first free canonical one.
+fn assign_object_id(
+    reserved: &mut std::collections::HashSet<u16>,
+    requested: Option<u16>,
+) -> XlsResult<u16> {
+    let object_id = match requested {
+        Some(object_id) => object_id,
+        None => (1..u16::MAX)
+            .find(|candidate| !reserved.contains(candidate))
+            .ok_or_else(|| {
+                XlsError::InvalidData("worksheet object IDs are exhausted".to_string())
+            })?,
+    };
+    reserved.insert(object_id);
+    Ok(object_id)
 }
 
 /// Implementation notes for BIFF record generation:

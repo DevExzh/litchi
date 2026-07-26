@@ -23,6 +23,7 @@ mod cells;
 mod comment;
 mod conditional_format;
 mod drawing;
+mod drawing_group;
 mod list_object;
 mod modern_globals;
 mod named_range;
@@ -37,8 +38,9 @@ mod worksheet;
 
 pub(crate) use cells::write_formula;
 pub(crate) use comment::CommentConfig;
-pub(crate) use drawing::{PrimitiveShapeConfig, write_worksheet_drawing};
 pub(crate) use conditional_format::Cf12Config;
+pub(crate) use drawing::{PrimitiveShapeConfig, write_worksheet_drawing};
+pub(crate) use drawing_group::GroupShapeConfig;
 pub(crate) use list_object::write_list_objects;
 
 pub(crate) use modern_globals::{

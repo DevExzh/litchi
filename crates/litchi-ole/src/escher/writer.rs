@@ -66,6 +66,7 @@ pub mod record_type {
     pub const CLIENT_ANCHOR: u16 = 0xF010;
     pub const CLIENT_DATA: u16 = 0xF011;
     pub const CLIENT_TEXTBOX: u16 = 0xF00D;
+    pub const CHILD_ANCHOR: u16 = 0xF00F;
     pub const SPLIT_MENU_COLORS: u16 = 0xF11E;
 }
 
@@ -328,7 +329,7 @@ pub fn write_child_anchor<W: Write>(
     right: i32,
     bottom: i32,
 ) -> io::Result<()> {
-    write_record_header(writer, 0x00, 0, 0xF00F, 16)?;
+    write_record_header(writer, 0x00, 0, record_type::CHILD_ANCHOR, 16)?;
     writer.write_all(&left.to_le_bytes())?;
     writer.write_all(&top.to_le_bytes())?;
     writer.write_all(&right.to_le_bytes())?;

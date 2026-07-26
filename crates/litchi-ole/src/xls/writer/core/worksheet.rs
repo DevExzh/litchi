@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::comment::WritableComment;
 use super::shape::XlsShapeWrite;
+use super::shape_group::XlsShapeGroupWrite;
 use super::{
     XlsCellValue, XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormatGroup,
     XlsConditionalFormatRange, XlsConditionalFormatRule, XlsDataValidation,
@@ -114,6 +115,7 @@ pub(super) struct WritableWorksheet {
     pub hyperlinks: Vec<XlsHyperlink>,
     pub comments: Vec<WritableComment>,
     pub shapes: Vec<XlsShapeWrite>,
+    pub shape_groups: Vec<XlsShapeGroupWrite>,
     /// Per-column AutoFilter conditions.
     pub auto_filter_columns: Vec<AutoFilterColumnDef>,
     /// Sort configuration.
@@ -180,6 +182,7 @@ impl WritableWorksheet {
             hyperlinks: Vec::new(),
             comments: Vec::new(),
             shapes: Vec::new(),
+            shape_groups: Vec::new(),
             auto_filter_columns: Vec::new(),
             sort_config: None,
             sort_data: None,

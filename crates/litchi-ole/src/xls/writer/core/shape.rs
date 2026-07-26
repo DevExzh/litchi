@@ -217,28 +217,43 @@ impl XlsShapeWrite {
 
     pub(crate) fn validate(&self) -> XlsResult<()> {
         self.anchor.validate()?;
-        if matches!(self.object_id, Some(0 | u16::MAX)) {
-            return Err(XlsError::InvalidData(
-                "shape object ID 0 and 65535 are reserved".to_string(),
-            ));
-        }
-        if let XlsShapeLine::Solid { width_emu, .. } = self.line
-            && !(1..=20_116_800).contains(&width_emu)
-        {
-            return Err(XlsError::InvalidData(
-                "shape line width must be 1..=20116800 EMU".to_string(),
-            ));
-        }
-        if self.kind == XlsShapeKind::Line
-            && (self.fill != XlsShapeFill::None || self.text.is_some())
-        {
-            return Err(XlsError::InvalidData(
-                "line primitives do not support fill or text".to_string(),
-            ));
-        }
-        if let Some(text) = &self.text {
-            text.validate()?;
-        }
-        Ok(())
+        validate_shape_style(
+            self.kind,
+            self.object_id,
+            self.fill,
+            self.line,
+            self.text.as_ref(),
+        )
     }
+}
+
+/// Validate the primitive style fields shared by top-level and grouped shapes.
+pub(crate) fn validate_shape_style(
+    kind: XlsShapeKind,
+    object_id: Option<u16>,
+    fill: XlsShapeFill,
+    line: XlsShapeLine,
+    text: Option<&XlsShapeText>,
+) -> XlsResult<()> {
+    if matches!(object_id, Some(0 | u16::MAX)) {
+        return Err(XlsError::InvalidData(
+            "shape object ID 0 and 65535 are reserved".to_string(),
+        ));
+    }
+    if let XlsShapeLine::Solid { width_emu, .. } = line
+        && !(1..=20_116_800).contains(&width_emu)
+    {
+        return Err(XlsError::InvalidData(
+            "shape line width must be 1..=20116800 EMU".to_string(),
+        ));
+    }
+    if kind == XlsShapeKind::Line && (fill != XlsShapeFill::None || text.is_some()) {
+        return Err(XlsError::InvalidData(
+            "line primitives do not support fill or text".to_string(),
+        ));
+    }
+    if let Some(text) = text {
+        text.validate()?;
+    }
+    Ok(())
 }

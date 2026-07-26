@@ -379,8 +379,22 @@ pub(crate) fn generate_workbook_stream(
 
             // Build source rows: split each PivotCacheValue row into
             // string_indices (for SXDBB) and numeric_values (for SXNUM).
-            let num_string_fields = pt.fields.iter().filter(|f| !f.cache_items.is_empty() && !matches!(f.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_)))).count();
-            let num_numeric_fields = pt.fields.iter().filter(|f| f.is_numeric && f.cache_items.is_empty() && f.grouping.is_none()).count();
+            let num_string_fields = pt
+                .fields
+                .iter()
+                .filter(|f| {
+                    !f.cache_items.is_empty()
+                        && !matches!(
+                            f.grouping,
+                            Some(crate::xls::PivotCacheGrouping::Discrete(_))
+                        )
+                })
+                .count();
+            let num_numeric_fields = pt
+                .fields
+                .iter()
+                .filter(|f| f.is_numeric && f.cache_items.is_empty() && f.grouping.is_none())
+                .count();
             let mut row_item_indices: Vec<Vec<u16>> = Vec::with_capacity(pt.source_data.len());
             let mut row_numeric_values: Vec<Vec<f64>> = Vec::with_capacity(pt.source_data.len());
             for row in &pt.source_data {
@@ -388,17 +402,34 @@ pub(crate) fn generate_workbook_stream(
                 let mut nv = Vec::with_capacity(num_numeric_fields);
                 let mut values = row.iter();
                 for field in &pt.fields {
-                    if matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_))) { continue; }
+                    if matches!(
+                        field.grouping,
+                        Some(crate::xls::PivotCacheGrouping::Discrete(_))
+                    ) {
+                        continue;
+                    }
                     let val = values.next().unwrap();
-                    let is_num = field.is_numeric && field.cache_items.is_empty() && field.grouping.is_none();
+                    let is_num = field.is_numeric
+                        && field.cache_items.is_empty()
+                        && field.grouping.is_none();
                     match val {
-                        super::PivotCacheValue::StringIndex(idx) if !is_num => si.push(u16::from(*idx)),
+                        super::PivotCacheValue::StringIndex(idx) if !is_num => {
+                            si.push(u16::from(*idx))
+                        },
                         super::PivotCacheValue::SharedItemIndex(idx) if !is_num => si.push(*idx),
                         super::PivotCacheValue::Number(v) if is_num => nv.push(*v),
                         value if !is_num => {
-                            let item = match value { super::PivotCacheValue::Number(number) => Some(crate::xls::PivotCacheItem::Number(*number)), _ => value.shared_item() };
+                            let item = match value {
+                                super::PivotCacheValue::Number(number) => {
+                                    Some(crate::xls::PivotCacheItem::Number(*number))
+                                },
+                                _ => value.shared_item(),
+                            };
                             if let Some(item) = item
-                                && let Some(index) = field.cache_items.iter().position(|candidate| candidate == &item)
+                                && let Some(index) = field
+                                    .cache_items
+                                    .iter()
+                                    .position(|candidate| candidate == &item)
                             {
                                 si.push(index as u16);
                             }
@@ -439,7 +470,15 @@ pub(crate) fn generate_workbook_stream(
             .flat_map(|table| table.page_entries.iter().map(|entry| entry.2))
             .filter(|id| *id != 0 && *id != u16::MAX)
             .collect::<HashSet<_>>();
-        let object_count = pivot_ids.len() + worksheet.shapes.len() + worksheet.comments.len();
+        let group_object_count = worksheet
+            .shape_groups
+            .iter()
+            .map(|group| 1 + group.children.len())
+            .sum::<usize>();
+        let object_count = pivot_ids.len()
+            + worksheet.shapes.len()
+            + group_object_count
+            + worksheet.comments.len();
         if object_count > 1022 {
             return Err(XlsError::InvalidData(
                 "a worksheet cannot contain more than 1022 drawing objects".to_string(),
@@ -882,6 +921,37 @@ pub(crate) fn generate_workbook_stream(
                 }
                 primitive_configs.push(biff::PrimitiveShapeConfig { shape, object_id });
             }
+            let mut group_configs = Vec::with_capacity(worksheet.shape_groups.len());
+            for group in &worksheet.shape_groups {
+                let object_id = group.object_id.ok_or_else(|| {
+                    XlsError::InvalidData(
+                        "writable shape group has no assigned object ID".to_string(),
+                    )
+                })?;
+                if object_id == 0 || object_id == u16::MAX || !reserved.insert(object_id) {
+                    return Err(XlsError::InvalidData(
+                        "shape object ID is reserved or duplicated on the worksheet".to_string(),
+                    ));
+                }
+                let mut child_object_ids = Vec::with_capacity(group.children.len());
+                for child in &group.children {
+                    let child_id = child.object_id.ok_or_else(|| {
+                        XlsError::InvalidData("grouped shape has no assigned object ID".to_string())
+                    })?;
+                    if child_id == 0 || child_id == u16::MAX || !reserved.insert(child_id) {
+                        return Err(XlsError::InvalidData(
+                            "shape object ID is reserved or duplicated on the worksheet"
+                                .to_string(),
+                        ));
+                    }
+                    child_object_ids.push(child_id);
+                }
+                group_configs.push(biff::GroupShapeConfig {
+                    group,
+                    object_id,
+                    child_object_ids,
+                });
+            }
             let mut next_object_id = 1u16;
             let mut configs = Vec::with_capacity(worksheet.comments.len());
             let mut guids = HashSet::new();
@@ -928,6 +998,7 @@ pub(crate) fn generate_workbook_stream(
                 drawing_id,
                 &pivot_object_ids,
                 &primitive_configs,
+                &group_configs,
                 &configs,
             )?;
         }
