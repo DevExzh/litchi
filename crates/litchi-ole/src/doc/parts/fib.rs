@@ -22,6 +22,10 @@ const TABLE_POINTER_SIZE: usize = 8;
 /// Word 8 and newer use the counted `FibRgFcLcb` representation.
 const COUNTED_TABLE_POINTER_NFIB: u16 = 0x0069;
 
+/// `nFib` of the first Word 97 binary format, the earliest release MS-DOC
+/// describes. Anything lower is a Word 6.0/95 file with a different layout.
+pub const WORD_97_NFIB: u16 = 0x00C1;
+
 /// File Information Block.
 ///
 /// The FIB is the primary metadata structure in a DOC file.
@@ -145,7 +149,9 @@ impl FileInformationBlock {
             0x0021 => "Word 1.0",
             0x0045 => "Word 2.0",
             0x0065 => "Word 6.0",
-            0x0067 => "Word 95 (7.0)",
+            // LibreOffice treats every nFib through 104 as Word 95 or earlier
+            // (sw/source/filter/ww8/ww8scan.cxx), and both 103 and 104 occur.
+            0x0067 | 0x0068 => "Word 95 (7.0)",
             0x00C1 => "Word 97",
             0x00D9 => "Word 2000",
             0x0101 => "Word 2002/2003",

@@ -12,7 +12,7 @@ use super::parts::associated_strings::DocumentAssociatedStrings;
 use super::parts::bookmarks::BookmarksTable;
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
-use super::parts::fib::FileInformationBlock;
+use super::parts::fib::{FileInformationBlock, WORD_97_NFIB};
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
     BarcodeField, BidiOutlineField, CompareField, DdeField, DocumentContextField,
@@ -202,10 +202,21 @@ impl Document {
             "0Table"
         };
 
-        // Read the table stream
-        let mut table_stream = ole
-            .open_stream(&[table_stream_name])
-            .map_err(|_| DocError::StreamNotFound(table_stream_name.to_string()))?;
+        // Read the table stream. MS-DOC 2.1 requires one of `0Table`/`1Table`
+        // to be present, so a file without it is either damaged or predates the
+        // format: Word 6.0 and Word 95 keep those structures inside
+        // `WordDocument`. Naming the version is far more actionable for the
+        // caller than reporting a missing stream.
+        let mut table_stream = ole.open_stream(&[table_stream_name]).map_err(|_| {
+            if fib.version() < WORD_97_NFIB {
+                DocError::UnsupportedVersion {
+                    nfib: fib.version(),
+                    name: fib.version_name(),
+                }
+            } else {
+                DocError::StreamNotFound(table_stream_name.to_string())
+            }
+        })?;
 
         // Read the Data stream (optional - contains embedded pictures and objects)
         // According to Apache POI, pictures are stored in Data stream, not WordDocument stream
@@ -2796,5 +2807,29 @@ mod tests {
         let img = Image::new(u32::MAX);
         let err = doc.image_data(&img).expect_err("expected invalid offset");
         assert!(matches!(err, ImageError::InvalidPicOffset(_)));
+    }
+
+    /// Word 6.0 and Word 95 keep the structures MS-DOC places in a table
+    /// stream inside `WordDocument`, so they have no `0Table`/`1Table`. The
+    /// reader used to report a bare "Stream not found: 0Table", which told the
+    /// caller nothing; it must name the format generation instead. Apache POI
+    /// reaches the same diagnosis at the same point.
+    #[test]
+    fn word_6_documents_report_their_version_not_a_missing_stream() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/doc/word6-no-table-stream.doc");
+        let mut package = crate::doc::Package::open(&path).expect("the CFB container opens");
+
+        match package.document() {
+            Err(crate::doc::DocError::UnsupportedVersion { nfib, name }) => {
+                assert!(
+                    nfib < crate::doc::parts::fib::WORD_97_NFIB,
+                    "expected a pre-Word-97 nFib, got {nfib:#06x}"
+                );
+                assert!(name.contains("Word 6"), "unexpected version name: {name}");
+            },
+            Err(other) => panic!("expected an UnsupportedVersion error, got {other:?}"),
+            Ok(_) => panic!("expected a Word 6.0 document to be rejected"),
+        }
     }
 }

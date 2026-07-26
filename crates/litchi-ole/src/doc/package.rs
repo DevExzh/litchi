@@ -49,6 +49,17 @@ pub enum DocError {
     UnsupportedEncryption(DocEncryptionKind),
     /// The clear encryption header is malformed.
     MalformedEncryptionHeader(String),
+    /// The file predates the Word 97 binary format this reader implements.
+    ///
+    /// Word 6.0 and Word 95 documents keep the structures that MS-DOC places
+    /// in a table stream inside `WordDocument` instead, so they cannot be read
+    /// as MS-DOC no matter how tolerant the parser is.
+    UnsupportedVersion {
+        /// The `nFib` value found in the FIB.
+        nfib: u16,
+        /// Human-readable name of the originating Word release.
+        name: &'static str,
+    },
 }
 
 impl From<io::Error> for DocError {
@@ -79,6 +90,10 @@ impl std::fmt::Display for DocError {
             DocError::MalformedEncryptionHeader(s) => {
                 write!(f, "malformed DOC encryption header: {s}")
             },
+            DocError::UnsupportedVersion { nfib, name } => write!(
+                f,
+                "{name} documents (nFib {nfib:#06x}) predate the Word 97 binary format and are not supported"
+            ),
         }
     }
 }
@@ -338,6 +353,9 @@ impl From<DocError> for litchi_core::Error {
                 litchi_core::Error::InvalidFormat(format!("unsupported DOC encryption: {kind:?}"))
             },
             DocError::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
+            DocError::UnsupportedVersion { nfib, name } => litchi_core::Error::InvalidFormat(
+                format!("{name} documents (nFib {nfib:#06x}) are not supported"),
+            ),
         }
     }
 }
