@@ -275,6 +275,13 @@ pub mod record_types {
     pub const EXTERN_CELL_ERROR: u16 = 0x0172;
     pub const EXTERN_CELL_STRING: u16 = 0x0173;
     pub const SUP_NAME_START: u16 = 0x0241;
+    pub const SUP_NAME_VALUE_START: u16 = 0x0242;
+    pub const SUP_NAME_VALUE_END: u16 = 0x0243;
+    pub const SUP_NAME_NUM: u16 = 0x0244;
+    pub const SUP_NAME_ERROR: u16 = 0x0245;
+    pub const SUP_NAME_STRING: u16 = 0x0246;
+    pub const SUP_NAME_NIL: u16 = 0x0247;
+    pub const SUP_NAME_BOOL: u16 = 0x0248;
     pub const SUP_NAME_FORMULA: u16 = 0x0249;
     pub const SUP_NAME_BITS: u16 = 0x024A;
     pub const SUP_NAME_END: u16 = 0x024B;

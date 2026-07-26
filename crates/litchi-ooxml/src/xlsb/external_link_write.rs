@@ -5,7 +5,13 @@
 //! instantiated, evaluated, or executed.
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
-use crate::xlsb::formula::{XlsbExternalLink, XlsbExternalLinkKind};
+use crate::xlsb::external_link::{
+    DATA_ITEM_REQUIRED_TRAILING_FLAG, DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE,
+    DDE_ITEM_SUPPORTS_OLE, EXTERNAL_NAME_BUILT_IN, EXTERNAL_REFERENCE_DDE, EXTERNAL_REFERENCE_OLE,
+    EXTERNAL_REFERENCE_WORKBOOK, OLE_ITEM_DISPLAY_AS_ICON, OLE_ITEM_REQUIRED_CLASS_FLAG,
+    XlsbDdeItem, XlsbExternalCachedValue, XlsbExternalDefinedName, XlsbExternalLink,
+    XlsbExternalLinkKind, XlsbExternalValueMatrix, XlsbOleItem,
+};
 use crate::xlsb::records::record_types;
 use crate::xlsb::writer::RecordWriter;
 use litchi_opc::PackURI;
@@ -14,11 +20,7 @@ use litchi_opc::part::{BlobPart, Part};
 
 const EXTERNAL_LINK_CONTENT_TYPE: &str = "application/vnd.ms-excel.externalLink";
 const MAX_EXTERNAL_LINK_PART_BYTES: usize = 32 * 1024 * 1024;
-const EXTERNAL_REFERENCE_WORKBOOK: u16 = 0;
-const EXTERNAL_REFERENCE_DDE: u16 = 1;
-const EXTERNAL_REFERENCE_OLE: u16 = 2;
 const NULL_WIDE_STRING_LENGTH: u32 = u32::MAX;
-const EMPTY_EXTERNAL_NAME_BITS: [u8; 7] = [0; 7];
 
 pub(crate) fn author_external_link_part(
     link: &XlsbExternalLink,
@@ -107,20 +109,123 @@ fn write_external_link_stream(
         writer.write_record(record_types::SUP_TABS, &tabs)?;
     }
 
-    for name in link.declared_names() {
-        let mut name_payload = Vec::with_capacity(4 + name.len() * 2);
-        RecordWriter::new(&mut name_payload).write_wide_string(name)?;
-        writer.write_record(record_types::SUP_NAME_START, &name_payload)?;
-        if link.is_workbook() {
-            // cb=0 means the external name is undefined. We do not invent a
-            // formula absent one in the public typed model.
-            writer.write_record(record_types::SUP_NAME_FORMULA, &0u32.to_le_bytes())?;
-        }
-        writer.write_record(record_types::SUP_NAME_BITS, &EMPTY_EXTERNAL_NAME_BITS)?;
-        writer.write_record(record_types::SUP_NAME_END, &[])?;
+    for entry in link.defined_names() {
+        write_defined_name(&mut writer, entry)?;
+    }
+    for item in link.dde_items() {
+        write_dde_item(&mut writer, item)?;
+    }
+    for item in link.ole_items() {
+        write_ole_item(&mut writer, item)?;
     }
     writer.write_record(record_types::END_SUP_BOOK, &[])?;
     Ok(bytes)
+}
+
+fn write_entry_start<W: std::io::Write>(
+    writer: &mut RecordWriter<W>,
+    name: &str,
+) -> XlsbResult<()> {
+    let mut name_payload = Vec::with_capacity(4 + name.len() * 2);
+    RecordWriter::new(&mut name_payload).write_wide_string(name)?;
+    writer.write_record(record_types::SUP_NAME_START, &name_payload)?;
+    Ok(())
+}
+
+fn write_defined_name<W: std::io::Write>(
+    writer: &mut RecordWriter<W>,
+    entry: &XlsbExternalDefinedName,
+) -> XlsbResult<()> {
+    write_entry_start(writer, entry.name())?;
+    let formula = entry.formula().map_or(&[][..], |formula| formula.tokens());
+    let mut formula_payload = Vec::with_capacity(4 + formula.len());
+    formula_payload.extend_from_slice(
+        &u32::try_from(formula.len())
+            .map_err(|_| XlsbError::InvalidFormula("external formula size overflow".to_string()))?
+            .to_le_bytes(),
+    );
+    formula_payload.extend_from_slice(formula);
+    writer.write_record(record_types::SUP_NAME_FORMULA, &formula_payload)?;
+
+    let mut bits = [0u8; 7];
+    bits[0] = u8::from(entry.is_built_in()) * EXTERNAL_NAME_BUILT_IN;
+    let scope = entry
+        .scope_sheet_index()
+        .map_or(0u32, |index| u32::from(index) + 1);
+    bits[2..6].copy_from_slice(&scope.to_le_bytes());
+    writer.write_record(record_types::SUP_NAME_BITS, &bits)?;
+    writer.write_record(record_types::SUP_NAME_END, &[])?;
+    Ok(())
+}
+
+fn write_dde_item<W: std::io::Write>(
+    writer: &mut RecordWriter<W>,
+    item: &XlsbDdeItem,
+) -> XlsbResult<()> {
+    write_entry_start(writer, item.name())?;
+    let mut bits = [0u8; 7];
+    bits[0] = (u8::from(item.wants_advise()) * DATA_ITEM_WANT_ADVISE)
+        | (u8::from(item.wants_picture()) * DATA_ITEM_WANT_PICTURE)
+        | (u8::from(item.supports_ole()) * DDE_ITEM_SUPPORTS_OLE);
+    bits[6] = DATA_ITEM_REQUIRED_TRAILING_FLAG;
+    writer.write_record(record_types::SUP_NAME_BITS, &bits)?;
+    if let Some(values) = item.cached_values() {
+        write_cached_values(writer, values)?;
+    }
+    writer.write_record(record_types::SUP_NAME_END, &[])?;
+    Ok(())
+}
+
+fn write_ole_item<W: std::io::Write>(
+    writer: &mut RecordWriter<W>,
+    item: &XlsbOleItem,
+) -> XlsbResult<()> {
+    write_entry_start(writer, item.name())?;
+    let mut bits = [0u8; 7];
+    bits[0] = (u8::from(item.wants_advise()) * DATA_ITEM_WANT_ADVISE)
+        | (u8::from(item.wants_picture()) * DATA_ITEM_WANT_PICTURE)
+        | OLE_ITEM_REQUIRED_CLASS_FLAG
+        | (u8::from(item.displays_as_icon()) * OLE_ITEM_DISPLAY_AS_ICON);
+    bits[6] = DATA_ITEM_REQUIRED_TRAILING_FLAG;
+    writer.write_record(record_types::SUP_NAME_BITS, &bits)?;
+    if let Some(values) = item.cached_values() {
+        write_cached_values(writer, values)?;
+    }
+    writer.write_record(record_types::SUP_NAME_END, &[])?;
+    Ok(())
+}
+
+fn write_cached_values<W: std::io::Write>(
+    writer: &mut RecordWriter<W>,
+    values: &XlsbExternalValueMatrix,
+) -> XlsbResult<()> {
+    let mut dimensions = Vec::with_capacity(8);
+    dimensions.extend_from_slice(&values.rows().to_le_bytes());
+    dimensions.extend_from_slice(&values.columns().to_le_bytes());
+    writer.write_record(record_types::SUP_NAME_VALUE_START, &dimensions)?;
+    for value in values.values() {
+        match value {
+            XlsbExternalCachedValue::Empty => {
+                writer.write_record(record_types::SUP_NAME_NIL, &[])?;
+            },
+            XlsbExternalCachedValue::Number(number) => {
+                writer.write_record(record_types::SUP_NAME_NUM, &number.to_le_bytes())?;
+            },
+            XlsbExternalCachedValue::Boolean(value) => {
+                writer.write_record(record_types::SUP_NAME_BOOL, &[u8::from(*value)])?;
+            },
+            XlsbExternalCachedValue::Error(error) => {
+                writer.write_record(record_types::SUP_NAME_ERROR, &[error.code()])?;
+            },
+            XlsbExternalCachedValue::String(value) => {
+                let mut payload = Vec::with_capacity(4 + value.len() * 2);
+                RecordWriter::new(&mut payload).write_wide_string(value)?;
+                writer.write_record(record_types::SUP_NAME_STRING, &payload)?;
+            },
+        }
+    }
+    writer.write_record(record_types::SUP_NAME_VALUE_END, &[])?;
+    Ok(())
 }
 
 fn required_relationship_id<'a>(

@@ -3,10 +3,18 @@
 use crate::xlsb::XlsbCell;
 use crate::xlsb::calculation::CalculationProperties;
 use crate::xlsb::error::XlsbResult;
+use crate::xlsb::external_link::{
+    DATA_ITEM_REQUIRED_TRAILING_FLAG, DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE,
+    DDE_ITEM_RESERVED_MASK, DDE_ITEM_SUPPORTS_OLE, EXTERNAL_NAME_BUILT_IN,
+    EXTERNAL_NAME_RESERVED_MASK, EXTERNAL_REFERENCE_DDE, EXTERNAL_REFERENCE_OLE,
+    EXTERNAL_REFERENCE_WORKBOOK, MAX_XLSB_EXTERNAL_CACHED_VALUES, OLE_ITEM_DISPLAY_AS_ICON,
+    OLE_ITEM_REQUIRED_CLASS_FLAG, OLE_ITEM_RESERVED_MASK, XlsbDdeItem, XlsbExternalCachedValue,
+    XlsbExternalDefinedName, XlsbExternalEntries, XlsbExternalErrorValue, XlsbExternalLink,
+    XlsbExternalLinkKind, XlsbExternalNameFormula, XlsbExternalValueMatrix, XlsbOleItem,
+};
 use crate::xlsb::formula::{
     FormulaExternalBook, FormulaExternalSheet, FormulaPivotViewDefinition,
-    FormulaResolutionContext, FormulaSupportingLink, FormulaTableDefinition, XlsbExternalLink,
-    XlsbExternalLinkKind, excel_name_eq,
+    FormulaResolutionContext, FormulaSupportingLink, FormulaTableDefinition, excel_name_eq,
 };
 use crate::xlsb::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
 use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
@@ -192,9 +200,34 @@ impl XlsbWorkbook {
         &self.formula_context.defined_names
     }
 
+    /// Number of stored external-workbook, DDE, and OLE links.
+    pub fn external_link_count(&self) -> usize {
+        self.formula_context.external_books.len()
+    }
+
+    /// Borrow one stored external link without cloning its cached values.
+    pub fn external_link(&self, index: usize) -> Option<&XlsbExternalLink> {
+        self.formula_context
+            .external_books
+            .get(index)
+            .map(FormulaExternalBook::metadata_ref)
+    }
+
+    /// Iterate stored external links without cloning their cached values.
+    pub fn external_link_iter(
+        &self,
+    ) -> impl ExactSizeIterator<Item = &XlsbExternalLink> + DoubleEndedIterator {
+        self.formula_context
+            .external_books
+            .iter()
+            .map(FormulaExternalBook::metadata_ref)
+    }
+
     /// Return stored external-workbook, DDE, and OLE link metadata.
     ///
-    /// The returned values are data-only snapshots in workbook link order.
+    /// The returned values are cloned data-only snapshots in workbook link
+    /// order. Use [`Self::external_link_iter`] for zero-copy access to large
+    /// cached matrices.
     /// Litchi never follows, opens, contacts, refreshes, evaluates, or
     /// executes any external-link target.
     pub fn external_links(&self) -> Vec<XlsbExternalLink> {
@@ -1636,11 +1669,19 @@ impl XlsbWorkbook {
         let mut target_key = String::new();
         let mut target_detail = String::new();
         let mut sheet_names = Vec::new();
-        let mut defined_names = Vec::new();
+        let mut workbook_entries = Vec::new();
+        let mut dde_entries = Vec::new();
+        let mut ole_entries = Vec::new();
         let mut saw_sup_tabs = false;
         // 0 = outside a name, 1 = expect formula, 2 = expect bits,
-        // 3 = expect end (or optional DDE/OLE cached values).
+        // 3 = expect end/value start, 4 = inside a cached matrix.
         let mut sup_name_state = 0u8;
+        let mut current_name = None;
+        let mut current_formula = None;
+        let mut current_bits = None;
+        let mut current_cache = None;
+        let mut cache_dimensions = None;
+        let mut cache_values = Vec::new();
         let mut saw_end = false;
 
         for record in &mut iter {
@@ -1666,7 +1707,7 @@ impl XlsbWorkbook {
                     let (first, consumed) =
                         crate::xlsb::records::wide_str_with_len(&record.data[2..])?;
                     let mut offset = 2 + consumed;
-                    let (second, consumed) = if kind == 0 {
+                    let (second, consumed) = if kind == EXTERNAL_REFERENCE_WORKBOOK {
                         Self::parse_nullable_wide_string(&record.data[offset..])?
                     } else {
                         let (value, consumed) =
@@ -1674,12 +1715,15 @@ impl XlsbWorkbook {
                         (Some(value), consumed)
                     };
                     offset += consumed;
-                    if offset != record.data.len() || kind > 2 || first.is_empty() {
+                    if offset != record.data.len()
+                        || kind > EXTERNAL_REFERENCE_OLE
+                        || first.is_empty()
+                    {
                         return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                             "invalid BrtBeginSupBook payload".to_string(),
                         ));
                     }
-                    if kind == 0 && second.is_some() {
+                    if kind == EXTERNAL_REFERENCE_WORKBOOK && second.is_some() {
                         return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                             "external workbook BrtBeginSupBook string2 is not NULL".to_string(),
                         ));
@@ -1689,7 +1733,10 @@ impl XlsbWorkbook {
                     target_detail = second.unwrap_or_default();
                 },
                 record_types::SUP_TABS => {
-                    if link_type != Some(0) || saw_sup_tabs || sup_name_state != 0 {
+                    if link_type != Some(EXTERNAL_REFERENCE_WORKBOOK)
+                        || saw_sup_tabs
+                        || sup_name_state != 0
+                    {
                         return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                             "unexpected BrtSupTabs".to_string(),
                         ));
@@ -1703,7 +1750,8 @@ impl XlsbWorkbook {
                             "BrtSupNameStart precedes BrtBeginSupBook".to_string(),
                         )
                     })?;
-                    if sup_name_state != 0 || (kind == 0 && !saw_sup_tabs) {
+                    if sup_name_state != 0 || (kind == EXTERNAL_REFERENCE_WORKBOOK && !saw_sup_tabs)
+                    {
                         return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                             "unexpected BrtSupNameStart".to_string(),
                         ));
@@ -1714,16 +1762,20 @@ impl XlsbWorkbook {
                             "BrtSupNameStart has trailing bytes".to_string(),
                         ));
                     }
-                    if kind == 0 {
+                    if kind == EXTERNAL_REFERENCE_WORKBOOK {
                         validate_defined_name(&name)?;
                         sup_name_state = 1;
                     } else {
+                        validate_defined_name(&name)?;
                         sup_name_state = 2;
                     }
-                    defined_names.push(name);
+                    current_name = Some(name);
                 },
                 record_types::SUP_NAME_FORMULA => {
-                    if link_type != Some(0) || sup_name_state != 1 || record.data.len() < 4 {
+                    if link_type != Some(EXTERNAL_REFERENCE_WORKBOOK)
+                        || sup_name_state != 1
+                        || record.data.len() < 4
+                    {
                         return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                             "unexpected BrtSupNameFmla".to_string(),
                         ));
@@ -1745,6 +1797,13 @@ impl XlsbWorkbook {
                             found: record.data.len(),
                         });
                     }
+                    current_formula = if formula_len == 0 {
+                        None
+                    } else {
+                        Some(XlsbExternalNameFormula::from_tokens(
+                            record.data[4..].to_vec(),
+                        )?)
+                    };
                     sup_name_state = 2;
                 },
                 record_types::SUP_NAME_BITS => {
@@ -1753,6 +1812,89 @@ impl XlsbWorkbook {
                             "unexpected BrtSupNameBits".to_string(),
                         ));
                     }
+                    let mut bits = [0u8; 7];
+                    bits.copy_from_slice(&record.data);
+                    Self::validate_external_name_bits(
+                        link_type.expect("external link kind is present"),
+                        &bits,
+                    )?;
+                    current_bits = Some(bits);
+                    sup_name_state = 3;
+                },
+                record_types::SUP_NAME_VALUE_START => {
+                    if !matches!(
+                        link_type,
+                        Some(EXTERNAL_REFERENCE_DDE | EXTERNAL_REFERENCE_OLE)
+                    ) || sup_name_state != 3
+                        || record.data.len() != 8
+                        || current_cache.is_some()
+                    {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "unexpected BrtSupNameValueStart".to_string(),
+                        ));
+                    }
+                    let rows = binary::read_u32_le_at(&record.data, 0)?;
+                    let columns = binary::read_u32_le_at(&record.data, 4)?;
+                    let count = usize::try_from(rows)
+                        .ok()
+                        .and_then(|rows| {
+                            usize::try_from(columns)
+                                .ok()
+                                .and_then(|columns| rows.checked_mul(columns))
+                        })
+                        .ok_or_else(|| {
+                            crate::xlsb::error::XlsbError::InvalidFormula(
+                                "external cached-value dimensions overflow".to_string(),
+                            )
+                        })?;
+                    if count > MAX_XLSB_EXTERNAL_CACHED_VALUES {
+                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                            expected: MAX_XLSB_EXTERNAL_CACHED_VALUES,
+                            found: count,
+                        });
+                    }
+                    cache_values.clear();
+                    cache_values.reserve(count);
+                    cache_dimensions = Some((rows, columns, count));
+                    sup_name_state = 4;
+                },
+                record_types::SUP_NAME_NIL
+                | record_types::SUP_NAME_NUM
+                | record_types::SUP_NAME_BOOL
+                | record_types::SUP_NAME_ERROR
+                | record_types::SUP_NAME_STRING => {
+                    let Some((_, _, count)) = cache_dimensions else {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "cached external value occurs outside its matrix".to_string(),
+                        ));
+                    };
+                    if sup_name_state != 4 || cache_values.len() >= count {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "too many or misplaced cached external values".to_string(),
+                        ));
+                    }
+                    cache_values.push(Self::parse_external_cached_value(
+                        record.header.record_type,
+                        &record.data,
+                    )?);
+                },
+                record_types::SUP_NAME_VALUE_END => {
+                    let Some((rows, columns, count)) = cache_dimensions.take() else {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "unexpected BrtSupNameValueEnd".to_string(),
+                        ));
+                    };
+                    if sup_name_state != 4 || !record.data.is_empty() || cache_values.len() != count
+                    {
+                        return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                            "invalid cached external value matrix".to_string(),
+                        ));
+                    }
+                    current_cache = Some(XlsbExternalValueMatrix::new(
+                        rows,
+                        columns,
+                        std::mem::take(&mut cache_values),
+                    )?);
                     sup_name_state = 3;
                 },
                 record_types::SUP_NAME_END => {
@@ -1760,6 +1902,58 @@ impl XlsbWorkbook {
                         return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                             "invalid BrtSupNameEnd".to_string(),
                         ));
+                    }
+                    let kind = link_type.expect("external link kind is present");
+                    let name = current_name.take().ok_or_else(|| {
+                        crate::xlsb::error::XlsbError::InvalidFormula(
+                            "external name block has no name".to_string(),
+                        )
+                    })?;
+                    let bits = current_bits.take().ok_or_else(|| {
+                        crate::xlsb::error::XlsbError::InvalidFormula(
+                            "external name block has no properties".to_string(),
+                        )
+                    })?;
+                    match kind {
+                        EXTERNAL_REFERENCE_WORKBOOK => {
+                            let scope = binary::read_u32_le_at(&bits, 2)?;
+                            let mut entry = XlsbExternalDefinedName::new(name)?
+                                .with_built_in(bits[0] & EXTERNAL_NAME_BUILT_IN != 0);
+                            if scope != 0 {
+                                entry = entry.with_sheet_scope(u16::try_from(scope - 1).map_err(
+                                    |_| {
+                                        crate::xlsb::error::XlsbError::InvalidFormula(
+                                            "external defined-name scope overflow".to_string(),
+                                        )
+                                    },
+                                )?);
+                            }
+                            if let Some(formula) = current_formula.take() {
+                                entry = entry.with_formula(formula);
+                            }
+                            workbook_entries.push(entry);
+                        },
+                        EXTERNAL_REFERENCE_DDE => {
+                            let mut item = XlsbDdeItem::new(name)?
+                                .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
+                                .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
+                                .with_ole_support(bits[0] & DDE_ITEM_SUPPORTS_OLE != 0);
+                            if let Some(cache) = current_cache.take() {
+                                item = item.with_cached_values(cache);
+                            }
+                            dde_entries.push(item);
+                        },
+                        EXTERNAL_REFERENCE_OLE => {
+                            let mut item = XlsbOleItem::new(name)?
+                                .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
+                                .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
+                                .with_icon(bits[0] & OLE_ITEM_DISPLAY_AS_ICON != 0);
+                            if let Some(cache) = current_cache.take() {
+                                item = item.with_cached_values(cache);
+                            }
+                            ole_entries.push(item);
+                        },
+                        _ => unreachable!("external link kind was validated above"),
                     }
                     sup_name_state = 0;
                 },
@@ -1778,9 +1972,11 @@ impl XlsbWorkbook {
                     saw_end = true;
                 },
                 _ => {
-                    if link_type == Some(0) && sup_name_state != 0 {
+                    if sup_name_state == 4
+                        || (link_type == Some(EXTERNAL_REFERENCE_WORKBOOK) && sup_name_state != 0)
+                    {
                         return Err(crate::xlsb::error::XlsbError::InvalidFormula(
-                            "unexpected record inside an external defined name".to_string(),
+                            "unexpected record inside an external name or cache".to_string(),
                         ));
                     }
                 },
@@ -1796,27 +1992,21 @@ impl XlsbWorkbook {
                 "external link has no BrtEndSupBook".to_string(),
             ));
         }
-        if kind == 0 && !saw_sup_tabs {
+        if kind == EXTERNAL_REFERENCE_WORKBOOK && !saw_sup_tabs {
             return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                 "external workbook link has no BrtSupTabs".to_string(),
             ));
         }
-        let (link_kind, source, detail, target) = match kind {
-            1 => {
+        let (link_kind, source, detail) = match kind {
+            EXTERNAL_REFERENCE_DDE => {
                 if !part.rels().is_empty() {
                     return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                         "DDE external link must not contain relationships".to_string(),
                     ));
                 }
-                let target = format!("{target_key}:{target_detail}");
-                (
-                    XlsbExternalLinkKind::Dde,
-                    target_key,
-                    Some(target_detail),
-                    target,
-                )
+                (XlsbExternalLinkKind::Dde, target_key, Some(target_detail))
             },
-            0 | 2 => {
+            EXTERNAL_REFERENCE_WORKBOOK | EXTERNAL_REFERENCE_OLE => {
                 if part.rels().len() != 1 {
                     return Err(crate::xlsb::error::XlsbError::InvalidFormula(
                         "external workbook/OLE link must have exactly one data-source relationship"
@@ -1833,13 +2023,13 @@ impl XlsbWorkbook {
                         "external data relationship {target_key:?} is internal"
                     )));
                 }
-                let allowed_relationship_types = if kind == 0 {
+                let allowed_relationship_types = if kind == EXTERNAL_REFERENCE_WORKBOOK {
                     EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES
                 } else {
                     OLE_DATA_SOURCE_RELATIONSHIP_TYPES
                 };
                 if !allowed_relationship_types.contains(&relationship.reltype()) {
-                    let source_kind = if kind == 0 {
+                    let source_kind = if kind == EXTERNAL_REFERENCE_WORKBOOK {
                         "external workbook"
                     } else {
                         "OLE data source"
@@ -1850,25 +2040,95 @@ impl XlsbWorkbook {
                     )));
                 }
                 let target = relationship.target_ref().to_string();
-                let link_kind = if kind == 0 {
+                let link_kind = if kind == EXTERNAL_REFERENCE_WORKBOOK {
                     XlsbExternalLinkKind::Workbook
                 } else {
                     XlsbExternalLinkKind::Ole
                 };
-                let detail = if kind == 2 { Some(target_detail) } else { None };
-                (link_kind, target.clone(), detail, target)
+                let detail = if kind == EXTERNAL_REFERENCE_OLE {
+                    Some(target_detail)
+                } else {
+                    None
+                };
+                (link_kind, target, detail)
             },
             _ => unreachable!("external link kind was validated above"),
         };
-        Ok(FormulaExternalBook {
+        let entries = match kind {
+            EXTERNAL_REFERENCE_WORKBOOK => XlsbExternalEntries::Workbook(workbook_entries),
+            EXTERNAL_REFERENCE_DDE => XlsbExternalEntries::Dde(dde_entries),
+            EXTERNAL_REFERENCE_OLE => XlsbExternalEntries::Ole(ole_entries),
+            _ => unreachable!("external link kind was validated above"),
+        };
+        let metadata = XlsbExternalLink {
             kind: link_kind,
             source,
             detail,
-            target,
-            sheet_names: sheet_names.into(),
-            defined_names: defined_names.into(),
-            is_workbook: kind == 0,
-        })
+            sheet_names,
+            entries,
+        };
+        metadata.validate()?;
+        Ok(FormulaExternalBook { metadata })
+    }
+
+    fn validate_external_name_bits(kind: u16, bits: &[u8; 7]) -> XlsbResult<()> {
+        let reserved_word = &bits[2..6];
+        let valid = match kind {
+            EXTERNAL_REFERENCE_WORKBOOK => {
+                bits[0] & EXTERNAL_NAME_RESERVED_MASK == 0
+                    && bits[6] & DATA_ITEM_REQUIRED_TRAILING_FLAG == 0
+            },
+            EXTERNAL_REFERENCE_DDE => {
+                bits[0] & DDE_ITEM_RESERVED_MASK == 0
+                    && reserved_word == [0, 0, 0, 0]
+                    && bits[6] & DATA_ITEM_REQUIRED_TRAILING_FLAG != 0
+            },
+            EXTERNAL_REFERENCE_OLE => {
+                bits[0] & OLE_ITEM_RESERVED_MASK == 0
+                    && bits[0] & OLE_ITEM_REQUIRED_CLASS_FLAG != 0
+                    && reserved_word == [0, 0, 0, 0]
+                    && bits[6] & DATA_ITEM_REQUIRED_TRAILING_FLAG != 0
+            },
+            _ => false,
+        };
+        if !valid {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "invalid BrtSupNameBits properties for external-link kind {kind}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn parse_external_cached_value(
+        record_type: u16,
+        data: &[u8],
+    ) -> XlsbResult<XlsbExternalCachedValue> {
+        match record_type {
+            record_types::SUP_NAME_NIL if data.is_empty() => Ok(XlsbExternalCachedValue::Empty),
+            record_types::SUP_NAME_NUM if data.len() == 8 => {
+                let number = f64::from_le_bytes(data.try_into().expect("length was checked"));
+                crate::xlsb::external_link::validate_external_number(number)?;
+                Ok(XlsbExternalCachedValue::Number(number))
+            },
+            record_types::SUP_NAME_BOOL if data.len() == 1 && data[0] <= 1 => {
+                Ok(XlsbExternalCachedValue::Boolean(data[0] != 0))
+            },
+            record_types::SUP_NAME_ERROR if data.len() == 1 => Ok(XlsbExternalCachedValue::Error(
+                XlsbExternalErrorValue::from_code(data[0])?,
+            )),
+            record_types::SUP_NAME_STRING => {
+                let (value, consumed) = crate::xlsb::records::wide_str_with_len(data)?;
+                if consumed != data.len() {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        "BrtSupNameSt has trailing bytes".to_string(),
+                    ));
+                }
+                Ok(XlsbExternalCachedValue::String(value))
+            },
+            _ => Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "invalid cached external value record 0x{record_type:04X}"
+            ))),
+        }
     }
 
     fn parse_external_sheet_names(data: &[u8]) -> XlsbResult<Vec<String>> {
@@ -2435,10 +2695,15 @@ mod tests {
         let mut begin = kind.to_le_bytes().to_vec();
         begin.extend_from_slice(&wide_string(source));
         begin.extend_from_slice(&wide_string(detail));
+        let mut bits = vec![0; 7];
+        if kind == 2 {
+            bits[0] = 1 << 4;
+        }
+        bits[6] = 1;
         vec![
             (record_types::BEGIN_SUP_BOOK, begin),
             (record_types::SUP_NAME_START, wide_string(item_name)),
-            (record_types::SUP_NAME_BITS, vec![0; 7]),
+            (record_types::SUP_NAME_BITS, bits),
             (record_types::SUP_NAME_END, Vec::new()),
             (record_types::END_SUP_BOOK, Vec::new()),
         ]
@@ -2712,18 +2977,18 @@ mod tests {
         };
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
         let book = workbook.load_external_book(&uri).unwrap();
-        assert!(book.is_workbook);
-        assert_eq!(book.target, "ab");
-        assert_eq!(&*book.sheet_names, &["ab"]);
+        assert!(book.metadata.is_workbook());
+        assert_eq!(book.metadata.source(), "ab");
+        assert_eq!(book.metadata.sheet_names(), &["ab"]);
     }
 
     #[test]
     fn parses_external_workbook_sheet_and_name_metadata() {
         let book = parse_external_link(&external_workbook_records()).unwrap();
-        assert!(book.is_workbook);
-        assert_eq!(book.target, "Book.xlsx");
-        assert_eq!(&*book.sheet_names, &["Data Sheet"]);
-        assert_eq!(&*book.defined_names, &["Rate"]);
+        assert!(book.metadata.is_workbook());
+        assert_eq!(book.metadata.source(), "Book.xlsx");
+        assert_eq!(book.metadata.sheet_names(), &["Data Sheet"]);
+        assert_eq!(book.metadata().defined_names()[0].name(), "Rate");
 
         let link = book.metadata();
         assert_eq!(link.kind(), XlsbExternalLinkKind::Workbook);
@@ -2732,12 +2997,12 @@ mod tests {
         assert_eq!(link.dde_topic(), None);
         assert_eq!(link.ole_program_id(), None);
         assert_eq!(link.sheet_names(), &["Data Sheet".to_string()]);
-        assert_eq!(link.declared_names(), &["Rate".to_string()]);
+        assert_eq!(link.defined_names()[0].name(), "Rate");
     }
 
     #[test]
     fn exposes_inert_dde_and_ole_link_metadata() {
-        let dde_records = external_data_source_records(1, "Excel", "System", "Rates Item");
+        let dde_records = external_data_source_records(1, "Excel", "System", "RatesItem");
         let dde = parse_external_link_with_relationship_type(&dde_records, None)
             .unwrap()
             .metadata();
@@ -2747,9 +3012,9 @@ mod tests {
         assert_eq!(dde.dde_topic(), Some("System"));
         assert_eq!(dde.ole_program_id(), None);
         assert!(dde.sheet_names().is_empty());
-        assert_eq!(dde.declared_names(), &["Rates Item".to_string()]);
+        assert_eq!(dde.dde_items()[0].name(), "RatesItem");
 
-        let ole_records = external_data_source_records(2, "rIdPath", "Acme.Server", "Report Item");
+        let ole_records = external_data_source_records(2, "rIdPath", "Acme.Server", "ReportItem");
         let ole = parse_external_link_with_relationship_type(
             &ole_records,
             Some(relationship_type::OLE_OBJECT),
@@ -2762,7 +3027,43 @@ mod tests {
         assert_eq!(ole.dde_topic(), None);
         assert_eq!(ole.ole_program_id(), Some("Acme.Server"));
         assert!(ole.sheet_names().is_empty());
-        assert_eq!(ole.declared_names(), &["Report Item".to_string()]);
+        assert_eq!(ole.ole_items()[0].name(), "ReportItem");
+    }
+
+    #[test]
+    fn rejects_invalid_external_item_flags_and_cache_framing() {
+        let mut invalid_dde = external_data_source_records(1, "Excel", "System", "StatusItem");
+        invalid_dde
+            .iter_mut()
+            .find(|(record_type, _)| *record_type == record_types::SUP_NAME_BITS)
+            .unwrap()
+            .1[6] = 0;
+        assert!(matches!(
+            parse_external_link_with_relationship_type(&invalid_dde, None),
+            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+        ));
+
+        let mut truncated_cache =
+            external_data_source_records(2, "rIdPath", "Acme.Server", "ReportItem");
+        let end = truncated_cache.len() - 2;
+        truncated_cache.splice(
+            end..end,
+            [
+                (
+                    record_types::SUP_NAME_VALUE_START,
+                    [1u32.to_le_bytes(), 2u32.to_le_bytes()].concat(),
+                ),
+                (record_types::SUP_NAME_NUM, 1.0f64.to_le_bytes().to_vec()),
+                (record_types::SUP_NAME_VALUE_END, Vec::new()),
+            ],
+        );
+        assert!(matches!(
+            parse_external_link_with_relationship_type(
+                &truncated_cache,
+                Some(relationship_type::OLE_OBJECT),
+            ),
+            Err(crate::xlsb::error::XlsbError::InvalidFormula(_))
+        ));
     }
 
     #[test]
@@ -2847,7 +3148,7 @@ mod tests {
         assert_eq!(link.kind(), XlsbExternalLinkKind::Workbook);
         assert_eq!(link.source(), "Book.xlsx");
         assert_eq!(link.sheet_names(), &["Data Sheet".to_string()]);
-        assert_eq!(link.declared_names(), &["Rate".to_string()]);
+        assert_eq!(link.defined_names()[0].name(), "Rate");
 
         let reference = FormulaParser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0])
             .parse()

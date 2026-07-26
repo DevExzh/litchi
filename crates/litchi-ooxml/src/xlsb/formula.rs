@@ -25,6 +25,7 @@
 mod function_table;
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
+pub use crate::xlsb::external_link::{XlsbExternalLink, XlsbExternalLinkKind};
 use function_table::BUILTIN_FUNCTIONS;
 use litchi_core::binary;
 
@@ -311,240 +312,19 @@ impl FormulaTableDefinition {
     }
 }
 
-/// Stored kind of an XLSB External Link part.
-///
-/// The kind describes metadata already present in the package; it does not
-/// cause its source to be opened, contacted, refreshed, or executed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsbExternalLinkKind {
-    /// A link to another workbook.
-    Workbook,
-    /// A link to a Dynamic Data Exchange server and topic.
-    Dde,
-    /// A link to an OLE data source.
-    Ole,
-}
-
-/// Typed, inert metadata from one XLSB External Link part.
-///
-/// The source, topic, program ID, worksheet names, and declared names are
-/// stored package metadata. Reading this value never follows a relationship,
-/// opens a workbook, contacts a DDE server, initializes an OLE object,
-/// refreshes data, evaluates formulas, or executes code.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsbExternalLink {
-    kind: XlsbExternalLinkKind,
-    source: String,
-    detail: Option<String>,
-    sheet_names: Vec<String>,
-    declared_names: Vec<String>,
-}
-
-impl XlsbExternalLink {
-    const MAX_COLLECTION_ITEMS: usize = 65_535;
-    const MAX_WIDE_STRING_UNITS: usize = 32_767;
-
-    /// Create inert metadata for an external workbook link.
-    ///
-    /// `source` is stored as an external relationship target and is never
-    /// opened or fetched. Declared names are emitted as undefined external
-    /// names unless a future richer API supplies formula/cache records.
-    pub fn workbook(
-        source: impl Into<String>,
-        sheet_names: Vec<String>,
-        declared_names: Vec<String>,
-    ) -> XlsbResult<Self> {
-        let link = Self {
-            kind: XlsbExternalLinkKind::Workbook,
-            source: source.into(),
-            detail: None,
-            sheet_names,
-            declared_names,
-        };
-        link.validate()?;
-        Ok(link)
-    }
-
-    /// Create inert metadata for a DDE server/topic link.
-    ///
-    /// No process is started and no DDE request is sent. Data-item names are
-    /// emitted without cached values.
-    pub fn dde(
-        server: impl Into<String>,
-        topic: impl Into<String>,
-        item_names: Vec<String>,
-    ) -> XlsbResult<Self> {
-        let link = Self {
-            kind: XlsbExternalLinkKind::Dde,
-            source: server.into(),
-            detail: Some(topic.into()),
-            sheet_names: Vec::new(),
-            declared_names: item_names,
-        };
-        link.validate()?;
-        Ok(link)
-    }
-
-    /// Create inert metadata for an OLE data-source link.
-    ///
-    /// `source` is retained as an external relationship target. The object is
-    /// never instantiated and item names are emitted without cached values.
-    pub fn ole(
-        source: impl Into<String>,
-        program_id: impl Into<String>,
-        item_names: Vec<String>,
-    ) -> XlsbResult<Self> {
-        let link = Self {
-            kind: XlsbExternalLinkKind::Ole,
-            source: source.into(),
-            detail: Some(program_id.into()),
-            sheet_names: Vec::new(),
-            declared_names: item_names,
-        };
-        link.validate()?;
-        Ok(link)
-    }
-
-    /// Return the stored external-link kind.
-    pub const fn kind(&self) -> XlsbExternalLinkKind {
-        self.kind
-    }
-
-    /// Return the stored source identifier.
-    ///
-    /// This is the external relationship target for workbook and OLE links,
-    /// and the DDE server name for DDE links. It is never resolved or opened.
-    pub fn source(&self) -> &str {
-        &self.source
-    }
-
-    /// Return the stored DDE topic when this is a DDE link.
-    pub fn dde_topic(&self) -> Option<&str> {
-        match self.kind {
-            XlsbExternalLinkKind::Dde => self.detail.as_deref(),
-            XlsbExternalLinkKind::Workbook | XlsbExternalLinkKind::Ole => None,
-        }
-    }
-
-    /// Return the stored OLE program ID when this is an OLE link.
-    pub fn ole_program_id(&self) -> Option<&str> {
-        match self.kind {
-            XlsbExternalLinkKind::Ole => self.detail.as_deref(),
-            XlsbExternalLinkKind::Workbook | XlsbExternalLinkKind::Dde => None,
-        }
-    }
-
-    /// Return cached worksheet names for a workbook link.
-    ///
-    /// DDE and OLE links return an empty slice.
-    pub fn sheet_names(&self) -> &[String] {
-        &self.sheet_names
-    }
-
-    /// Return stored names declared by this link.
-    ///
-    /// For workbook links, these are external defined names. For DDE and OLE
-    /// links, these are data-item names. They are metadata only and are never
-    /// evaluated or requested from the source.
-    pub fn declared_names(&self) -> &[String] {
-        &self.declared_names
-    }
-
-    /// Return whether this link stores metadata for another workbook.
-    pub const fn is_workbook(&self) -> bool {
-        matches!(self.kind, XlsbExternalLinkKind::Workbook)
-    }
-
-    pub(crate) fn validate(&self) -> XlsbResult<()> {
-        validate_external_link_string(&self.source, "external-link source")?;
-        match self.kind {
-            XlsbExternalLinkKind::Workbook => {
-                if self.detail.is_some() {
-                    return Err(XlsbError::InvalidFormula(
-                        "external workbook link cannot have DDE/OLE detail".to_string(),
-                    ));
-                }
-            },
-            XlsbExternalLinkKind::Dde | XlsbExternalLinkKind::Ole => {
-                validate_external_link_string(
-                    self.detail.as_deref().unwrap_or_default(),
-                    match self.kind {
-                        XlsbExternalLinkKind::Dde => "DDE topic",
-                        XlsbExternalLinkKind::Ole => "OLE program ID",
-                        XlsbExternalLinkKind::Workbook => unreachable!(),
-                    },
-                )?;
-                if !self.sheet_names.is_empty() {
-                    return Err(XlsbError::InvalidFormula(
-                        "DDE/OLE links cannot declare workbook sheet names".to_string(),
-                    ));
-                }
-            },
-        }
-        if self.sheet_names.len() > Self::MAX_COLLECTION_ITEMS
-            || self.declared_names.len() > Self::MAX_COLLECTION_ITEMS
-        {
-            return Err(XlsbError::InvalidFormula(
-                "external-link collection exceeds 65,535 items".to_string(),
-            ));
-        }
-        for (index, sheet_name) in self.sheet_names.iter().enumerate() {
-            validate_external_link_string(sheet_name, "external sheet name")?;
-            if self.sheet_names[..index]
-                .iter()
-                .any(|existing| excel_name_eq(existing, sheet_name))
-            {
-                return Err(XlsbError::InvalidFormula(format!(
-                    "duplicate external sheet name {sheet_name:?}"
-                )));
-            }
-        }
-        for (index, name) in self.declared_names.iter().enumerate() {
-            crate::xlsb::named_ranges::validate_defined_name(name)?;
-            if self.declared_names[..index]
-                .iter()
-                .any(|existing| excel_name_eq(existing, name))
-            {
-                return Err(XlsbError::InvalidFormula(format!(
-                    "duplicate external declared name {name:?}"
-                )));
-            }
-        }
-        Ok(())
-    }
-}
-
-fn validate_external_link_string(value: &str, context: &str) -> XlsbResult<()> {
-    let units = value.encode_utf16().count();
-    if units == 0 || units > XlsbExternalLink::MAX_WIDE_STRING_UNITS || value.contains('\0') {
-        return Err(XlsbError::InvalidFormula(format!(
-            "{context} is empty, too long, or contains NUL"
-        )));
-    }
-    Ok(())
-}
-
 /// Formula-resolution metadata from one XLSB External Link part.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FormulaExternalBook {
-    pub(crate) kind: XlsbExternalLinkKind,
-    pub(crate) source: String,
-    pub(crate) detail: Option<String>,
-    pub(crate) target: String,
-    pub(crate) sheet_names: std::sync::Arc<[String]>,
-    pub(crate) defined_names: std::sync::Arc<[String]>,
-    pub(crate) is_workbook: bool,
+    pub(crate) metadata: XlsbExternalLink,
 }
 
 impl FormulaExternalBook {
     pub(crate) fn metadata(&self) -> XlsbExternalLink {
-        XlsbExternalLink {
-            kind: self.kind,
-            source: self.source.clone(),
-            detail: self.detail.clone(),
-            sheet_names: self.sheet_names.to_vec(),
-            declared_names: self.defined_names.to_vec(),
-        }
+        self.metadata.clone()
+    }
+
+    pub(crate) fn metadata_ref(&self) -> &XlsbExternalLink {
+        &self.metadata
     }
 }
 
@@ -902,7 +682,7 @@ impl FormulaResolutionContext {
                 "Xti index {xti_index} refers to missing external book {book_index}"
             ))
         })?;
-        if !book.is_workbook {
+        if !book.metadata.is_workbook() {
             return Err(XlsbError::UnsupportedFeature(format!(
                 "Xti index {xti_index} refers to a DDE or OLE data source"
             )));
@@ -917,18 +697,22 @@ impl FormulaResolutionContext {
             .map_err(|_| XlsbError::InvalidFormula("external sheet index overflow".to_string()))?;
         let last_index = usize::try_from(xti.last_sheet)
             .map_err(|_| XlsbError::InvalidFormula("external sheet index overflow".to_string()))?;
-        let first = book.sheet_names.get(first_index).ok_or_else(|| {
-            XlsbError::InvalidFormula(format!(
-                "external sheet {} exceeds {} cached names",
-                xti.first_sheet,
-                book.sheet_names.len()
-            ))
-        })?;
-        let last = book.sheet_names.get(last_index).ok_or_else(|| {
+        let first = book
+            .metadata
+            .sheet_names()
+            .get(first_index)
+            .ok_or_else(|| {
+                XlsbError::InvalidFormula(format!(
+                    "external sheet {} exceeds {} cached names",
+                    xti.first_sheet,
+                    book.metadata.sheet_names().len()
+                ))
+            })?;
+        let last = book.metadata.sheet_names().get(last_index).ok_or_else(|| {
             XlsbError::InvalidFormula(format!(
                 "external sheet {} exceeds {} cached names",
                 xti.last_sheet,
-                book.sheet_names.len()
+                book.metadata.sheet_names().len()
             ))
         })?;
         let sheets = if first_index == last_index {
@@ -936,7 +720,10 @@ impl FormulaResolutionContext {
         } else {
             format!("{first}:{last}")
         };
-        Ok(format_formula_prefix(&format!("[{}]{sheets}", book.target)))
+        Ok(format_formula_prefix(&format!(
+            "[{}]{sheets}",
+            book.metadata.source()
+        )))
     }
 
     fn resolve_external_name(&self, xti_index: u16, name_index: u32) -> XlsbResult<String> {
@@ -976,22 +763,24 @@ impl FormulaResolutionContext {
             .ok_or_else(|| {
                 XlsbError::InvalidFormula(format!("missing external book {book_index}"))
             })?;
-        if !book.is_workbook {
+        if !book.metadata.is_workbook() {
             return Err(XlsbError::UnsupportedFeature(
                 "PtgNameX refers to a DDE or OLE data source".to_string(),
             ));
         }
         let index = usize::try_from(name_index - 1)
             .map_err(|_| XlsbError::InvalidFormula("external name index overflow".to_string()))?;
-        let name = book.defined_names.get(index).ok_or_else(|| {
+        let names = book.metadata.defined_names();
+        let name = names.get(index).ok_or_else(|| {
             XlsbError::InvalidFormula(format!(
                 "external name index {name_index} exceeds {} names",
-                book.defined_names.len()
+                names.len()
             ))
         })?;
         Ok(format!(
-            "{}!{name}",
-            format_formula_prefix(&format!("[{}]", book.target))
+            "{}!{}",
+            format_formula_prefix(&format!("[{}]", book.metadata.source())),
+            name.name()
         ))
     }
 }
@@ -4285,10 +4074,11 @@ impl<'a> FormulaCompiler<'a> {
             let Ok(sheet_index) = usize::try_from(xti.first_sheet) else {
                 continue;
             };
-            if !book.is_workbook
-                || !excel_name_eq(&book.target, target)
+            if !book.metadata.is_workbook()
+                || !excel_name_eq(book.metadata.source(), target)
                 || !book
-                    .sheet_names
+                    .metadata
+                    .sheet_names()
                     .get(sheet_index)
                     .is_some_and(|candidate| excel_name_eq(candidate, sheet))
             {
@@ -5628,13 +5418,12 @@ mod tests {
             }]
             .into(),
             external_books: vec![FormulaExternalBook {
-                kind: XlsbExternalLinkKind::Workbook,
-                source: "Book.xlsx".to_string(),
-                detail: None,
-                target: "Book.xlsx".to_string(),
-                sheet_names: vec!["Data Sheet".to_string()].into(),
-                defined_names: vec!["Rate".to_string()].into(),
-                is_workbook: true,
+                metadata: XlsbExternalLink::workbook(
+                    "Book.xlsx",
+                    vec!["Data Sheet".to_string()],
+                    vec!["Rate".to_string()],
+                )
+                .unwrap(),
             }]
             .into(),
             defined_names: Vec::new().into(),
@@ -6093,13 +5882,12 @@ mod tests {
             }]
             .into(),
             external_books: vec![FormulaExternalBook {
-                kind: XlsbExternalLinkKind::Workbook,
-                source: "Book.xlsx".to_string(),
-                detail: None,
-                target: "Book.xlsx".to_string(),
-                sheet_names: vec!["Data Sheet".to_string()].into(),
-                defined_names: Vec::new().into(),
-                is_workbook: true,
+                metadata: XlsbExternalLink::workbook(
+                    "Book.xlsx",
+                    vec!["Data Sheet".to_string()],
+                    Vec::new(),
+                )
+                .unwrap(),
             }]
             .into(),
             defined_names: Vec::new().into(),
@@ -6245,13 +6033,12 @@ mod structured_reference_compiler_tests {
             },
         ];
         let external_books = vec![FormulaExternalBook {
-            kind: XlsbExternalLinkKind::Workbook,
-            source: "Book.xlsx".to_string(),
-            detail: None,
-            target: "Book.xlsx".to_string(),
-            sheet_names: vec!["Data Sheet".to_string()].into(),
-            defined_names: Vec::new().into(),
-            is_workbook: true,
+            metadata: XlsbExternalLink::workbook(
+                "Book.xlsx",
+                vec!["Data Sheet".to_string()],
+                Vec::new(),
+            )
+            .unwrap(),
         }];
         let sheet_ranges = std::cell::RefCell::new(Vec::new());
         let compile_context = FormulaCompilationContext {

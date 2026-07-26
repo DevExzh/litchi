@@ -162,6 +162,8 @@ pub mod pivot;
 
 /// Lossless PivotTable definition parts (MS-XLSB 2.1.7.40)
 pub mod pivot_view;
+/// Typed, inert External Link data (MS-XLSB 2.1.7.25)
+pub mod external_link;
 mod external_link_write;
 
 /// Table (ListObject) stream parsing (MS-XLSB 2.1.7.51)
@@ -197,7 +199,14 @@ pub use drawing::{
 };
 pub use drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
 pub use error::{XlsbError, XlsbResult};
-pub use formula::{XlsbExternalLink, XlsbExternalLinkKind};
+pub use external_link::{
+    MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,
+    MAX_XLSB_EXTERNAL_CACHED_VALUES, XlsbDdeItem, XlsbExternalAreaReference,
+    XlsbExternalCachedValue, XlsbExternalCellLocation, XlsbExternalCellReference,
+    XlsbExternalDefinedName, XlsbExternalErrorValue, XlsbExternalLink, XlsbExternalLinkKind,
+    XlsbExternalNameFormula, XlsbExternalNameFormulaKind, XlsbExternalSheetRange,
+    XlsbExternalValueMatrix, XlsbOleItem,
+};
 pub use pivot::{
     CalculatedItem, CalculatedMember, CalculatedMemberExt14, PivotCacheConsolidationPage,
     PivotCacheConsolidationSet, PivotCacheConsolidationSource, PivotCacheDateTime,
