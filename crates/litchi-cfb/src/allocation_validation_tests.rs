@@ -1,6 +1,9 @@
 use std::io::Cursor;
 
-use crate::consts::{DIRENTRY_SIZE, SECTOR_SHIFT_OFFSET, SECTOR_SHIFT_V3, SECTOR_SIZE_V3};
+use crate::consts::{
+    DIRENTRY_SIZE, FREESECT, HEADER_DIFAT_ENTRIES, HEADER_DIFAT_OFFSET, NUM_FAT_SECTORS_OFFSET,
+    SECTOR_SHIFT_OFFSET, SECTOR_SHIFT_V3, SECTOR_SIZE_V3,
+};
 use crate::{OleFile, writer::OleWriter};
 
 fn sample_file() -> Vec<u8> {
@@ -183,4 +186,46 @@ fn still_rejects_sectors_that_start_past_the_end_of_the_file() {
         OleFile::open(Cursor::new(truncated.to_vec())).is_err(),
         "a header-only file has no sectors to read"
     );
+}
+
+/// MS-CFB 2.2 describes the header DIFAT only as holding "the first 109 FAT
+/// sector locations" and never constrains the entries past the declared FAT
+/// sector count. Writers leave zeroes or stale values there, so the tail must
+/// not be validated — the count field already says where the list ends.
+#[test]
+fn ignores_the_unused_tail_of_the_header_difat() {
+    let mut bytes = sample_file();
+    let used = read_u32(&bytes, NUM_FAT_SECTORS_OFFSET) as usize;
+    assert!(
+        used < HEADER_DIFAT_ENTRIES,
+        "sample must leave part of the header DIFAT unused"
+    );
+
+    // Dirty every unused entry with values a writer might plausibly leave.
+    for (index, value) in
+        (used..HEADER_DIFAT_ENTRIES).zip([0u32, 1, 0xDEAD_BEEF].into_iter().cycle())
+    {
+        write_u32(&mut bytes, HEADER_DIFAT_OFFSET + index * 4, value);
+    }
+
+    let file = OleFile::open(Cursor::new(bytes)).expect("a dirty DIFAT tail is not fatal");
+    let entries = file.list_streams();
+    assert!(
+        entries
+            .iter()
+            .any(|path| path.iter().any(|part| part == "Data")),
+        "expected the stream to remain reachable, got {entries:?}"
+    );
+}
+
+/// The used part of the list is still validated: an entry inside the declared
+/// count that terminates the list early remains an error.
+#[test]
+fn still_rejects_a_header_difat_list_shorter_than_its_count() {
+    let mut bytes = sample_file();
+    let used = read_u32(&bytes, NUM_FAT_SECTORS_OFFSET) as usize;
+    assert!(used > 0, "sample must declare at least one FAT sector");
+
+    write_u32(&mut bytes, HEADER_DIFAT_OFFSET + (used - 1) * 4, FREESECT);
+    assert!(OleFile::open(Cursor::new(bytes)).is_err());
 }

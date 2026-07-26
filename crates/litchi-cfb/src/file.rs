@@ -423,9 +423,9 @@ impl<R: Read + Seek> OleFile<R> {
         // First 109 FAT sector indexes are in header at offset 0x4C
         let mut fat_sectors = Vec::with_capacity(expected_fat_sectors);
         let mut difat_sectors = Vec::with_capacity(num_difat_sectors as usize);
-        let header_fat_count = 109.min(expected_fat_sectors);
+        let header_fat_count = HEADER_DIFAT_ENTRIES.min(expected_fat_sectors);
         for i in 0..header_fat_count {
-            let offset = 0x4C + i * 4;
+            let offset = HEADER_DIFAT_OFFSET + i * 4;
             let sector = U32::<LE>::read_from_bytes(&header[offset..offset + 4])
                 .map(|v| v.get())
                 .unwrap_or(0);
@@ -437,17 +437,12 @@ impl<R: Read + Seek> OleFile<R> {
             self.claim_sector(sector, PhysicalSectorRole::Fat)?;
             fat_sectors.push(sector);
         }
-        for i in header_fat_count..109 {
-            let offset = 0x4C + i * 4;
-            let sector = U32::<LE>::read_from_bytes(&header[offset..offset + 4])
-                .map(|v| v.get())
-                .unwrap_or(0);
-            if sector != FREESECT {
-                return Err(OleError::CorruptedFile(
-                    "Unused header DIFAT entries must be FREESECT".to_string(),
-                ));
-            }
-        }
+        // Entries past the declared FAT sector count are not part of the FAT
+        // sector list. MS-CFB 2.2 describes the header DIFAT only as holding
+        // "the first 109 FAT sector locations" and never constrains the unused
+        // tail, so writers leave zeroes or stale values there. The count field
+        // already says where the list ends, and the FAT chain validation below
+        // catches a count that disagrees with the file, so the tail is ignored.
 
         let mut difat_sector = first_difat_sector;
         let entries_per_sector = (self.sector_size / 4) - 1;

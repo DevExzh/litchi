@@ -10,6 +10,15 @@ pub const DIRENTRY_SIZE: usize = 128;
 /// Default sector size for version 3 (512 bytes)
 pub const SECTOR_SIZE_V3: usize = 512;
 
+/// Header offset of the Number of FAT Sectors field (MS-CFB 2.2)
+pub const NUM_FAT_SECTORS_OFFSET: usize = 0x2C;
+
+/// Header offset of the DIFAT array (MS-CFB 2.2)
+pub const HEADER_DIFAT_OFFSET: usize = 0x4C;
+
+/// FAT sector locations the header DIFAT array can hold (MS-CFB 2.2)
+pub const HEADER_DIFAT_ENTRIES: usize = 109;
+
 /// Header offset of the Sector Shift field (MS-CFB 2.2)
 pub const SECTOR_SHIFT_OFFSET: usize = 0x1E;
 
