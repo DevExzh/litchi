@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use super::super::leniency::{DocLeniency, DocStylesheetDefect, DocToleranceReport};
 use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
 use super::tap::TableProperties;
@@ -168,14 +169,35 @@ impl StyleDefinition {
 /// Parsed Word stylesheet with null style slots retained.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StyleSheet {
+    /// Non-structural defects repaired during a lenient parse.
+    tolerance: DocToleranceReport,
     header: StyleSheetHeader,
     styles: Vec<Option<StyleDefinition>>,
     stshi_tail: Vec<u8>,
 }
 
 impl StyleSheet {
+    /// Non-structural defects a lenient parse repaired.
+    ///
+    /// Always empty after a [`DocLeniency::Strict`] parse.
+    #[inline]
+    pub fn tolerance_report(&self) -> &DocToleranceReport {
+        &self.tolerance
+    }
+
     /// Parse the mandatory Word 97+ stylesheet at FIB pointer index 1.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
+        Self::parse_with_leniency(fib, table_stream, DocLeniency::Strict)
+    }
+
+    /// Parse the stylesheet, optionally repairing non-structural defects.
+    ///
+    /// Under [`DocLeniency::Strict`] this behaves exactly like [`Self::parse`].
+    pub fn parse_with_leniency(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        leniency: DocLeniency,
+    ) -> Result<Self> {
         let (stream_offset, length) = fib
             .get_table_pointer(STSH_POINTER_INDEX)
             .filter(|(_, length)| *length != 0)
@@ -190,7 +212,7 @@ impl StyleSheet {
         let data = table_stream
             .get(start..end)
             .ok_or_else(|| corrupted("stylesheet extends beyond the table stream"))?;
-        Self::parse_data(data, start)
+        Self::parse_data(data, start, leniency)
     }
 
     /// General stylesheet information.
@@ -430,7 +452,11 @@ impl StyleSheet {
         }
     }
 
-    pub(crate) fn parse_data(data: &[u8], stream_offset: usize) -> Result<Self> {
+    pub(crate) fn parse_data(
+        data: &[u8],
+        stream_offset: usize,
+        leniency: DocLeniency,
+    ) -> Result<Self> {
         let cb_stshi = usize::from(read_u16(data, 0, "cbStshi")?);
         if cb_stshi < STSHIF_SIZE {
             return Err(corrupted("cbStshi is shorter than Stshif"));
@@ -511,10 +537,12 @@ impl StyleSheet {
             return Err(corrupted("stylesheet has trailing bytes"));
         }
 
-        validate_styles(&styles)?;
+        let mut tolerance = DocToleranceReport::default();
+        validate_styles(&styles, leniency, &mut tolerance)?;
         Ok(Self {
             header,
             styles,
+            tolerance,
             stshi_tail: stshi[STSHIF_SIZE..].to_vec(),
         })
     }
@@ -942,7 +970,11 @@ pub(crate) fn validate_table_style_sprms(
     Ok(())
 }
 
-fn validate_styles(styles: &[Option<StyleDefinition>]) -> Result<()> {
+fn validate_styles(
+    styles: &[Option<StyleDefinition>],
+    leniency: DocLeniency,
+    tolerance: &mut DocToleranceReport,
+) -> Result<()> {
     for required_empty in [13usize, 14] {
         if styles.get(required_empty).is_some_and(Option::is_some) {
             return Err(corrupted("reserved fixed-index style is not empty"));
@@ -971,7 +1003,14 @@ fn validate_styles(styles: &[Option<StyleDefinition>]) -> Result<()> {
     for style in styles.iter().flatten() {
         for name in std::iter::once(&style.name).chain(style.aliases.iter()) {
             if !names.insert(name.as_str()) {
-                return Err(corrupted("style names and aliases must be unique"));
+                // MS-DOC 2.9 requires uniqueness, but the name only labels the
+                // style: every stored reference resolves by index, so a
+                // duplicate cannot make a lookup ambiguous. Rejecting costs the
+                // caller the whole document.
+                if !leniency.tolerates_stylesheet_defects() {
+                    return Err(corrupted("style names and aliases must be unique"));
+                }
+                tolerance.record(DocStylesheetDefect::DuplicateStyleName, style.index);
             }
         }
         if let Some(base) = style.base_style {
@@ -1031,7 +1070,7 @@ mod tests {
     use super::*;
 
     fn parse(data: &[u8]) -> Result<StyleSheet> {
-        StyleSheet::parse_data(data, 0)
+        StyleSheet::parse_data(data, 0, DocLeniency::Strict)
     }
 
     fn std_record(

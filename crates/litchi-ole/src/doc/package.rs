@@ -10,6 +10,10 @@ use std::path::Path;
 pub struct DocOpenOptions<'a> {
     /// Password used for password-to-open encryption.
     pub password: Option<&'a str>,
+    /// How non-structural stylesheet defects are treated.
+    ///
+    /// Defaults to [`DocLeniency::Strict`], which is the historical behaviour.
+    pub leniency: super::leniency::DocLeniency,
 }
 
 /// Password-to-open encryption schemes identified in a DOC file.
@@ -401,6 +405,7 @@ mod tests {
         assert!(matches!(
             package.document_with_options(DocOpenOptions {
                 password: Some("wrong"),
+                ..Default::default()
             }),
             Err(DocError::InvalidPassword)
         ));
@@ -409,6 +414,7 @@ mod tests {
         let document = package
             .document_with_options(DocOpenOptions {
                 password: Some("tika"),
+                ..Default::default()
             })
             .unwrap();
         assert!(!document.text().unwrap().trim().is_empty());
@@ -428,6 +434,7 @@ mod tests {
         assert!(matches!(
             package.document_with_options(DocOpenOptions {
                 password: Some("wrong"),
+                ..Default::default()
             }),
             Err(DocError::InvalidPassword)
         ));
@@ -436,6 +443,7 @@ mod tests {
         let document = package
             .document_with_options(DocOpenOptions {
                 password: Some("password"),
+                ..Default::default()
             })
             .unwrap();
         assert!(!document.text().unwrap().trim().is_empty());

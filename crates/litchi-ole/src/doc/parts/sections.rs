@@ -1215,6 +1215,7 @@ mod tests {
             let document = package
                 .document_with_options(DocOpenOptions {
                     password: Some(password),
+                    ..Default::default()
                 })
                 .unwrap();
             assert!(!document.sections().is_empty());

@@ -293,7 +293,7 @@ impl Document {
         // Word 97+ files are required to carry a stylesheet. Older Word files use
         // a different FIB and stylesheet representation that is not interpreted here.
         let mut stylesheet = (fib.version() >= 0x00C1)
-            .then(|| StyleSheet::parse(&fib, &table_stream))
+            .then(|| StyleSheet::parse_with_leniency(&fib, &table_stream, options.leniency))
             .transpose()?;
         if let Some(stylesheet) = &mut stylesheet {
             stylesheet.resolve_revision_authors(&revision_authors)?;

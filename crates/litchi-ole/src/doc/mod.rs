@@ -57,6 +57,7 @@ pub mod footnote;
 pub mod header_footer;
 pub mod hyperlink;
 pub mod image;
+pub mod leniency;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
@@ -81,6 +82,9 @@ pub use header_footer::HeaderFooter;
 pub use parts::headers::HeaderFooterType;
 pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
+pub use leniency::{
+    DocLeniency, DocStylesheetDefect, DocToleranceReport, DocToleratedDefect,
+};
 pub use package::{DocEncryptionKind, DocError, DocOpenOptions, Package};
 pub use equation::{DocMtefEquationWriteOptions, EQUATION_3_CLSID, MtefEquation};
 pub use paragraph::{Paragraph, Run};
