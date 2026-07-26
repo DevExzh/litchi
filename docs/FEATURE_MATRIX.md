@@ -41,7 +41,7 @@ conversion, fonts, and image conversion are optional.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Smart format detection | ✅ | ✅ | N/A | Detects the listed Office, ODF, RTF, and iWork families from content, not only extensions |
-| Unified document facade | 🟡 | ✅ | ❌ | Common text/metadata access for DOC, DOCX, RTF, Pages, and ODT; authoring remains format-specific |
+| Unified document facade | 🟡 | ✅ | ❌ | Common text/metadata access for DOC, DOCX, RTF, Pages, and ODT, including bounded RTF `\info` text, counts, identifiers, producer versions, hyperlink bases, and timezone-unspecified timestamps without false UTC conversion; authoring remains format-specific |
 | Unified presentation facade | 🟡 | ✅ | ❌ | Common access for PPT, PPTX, Keynote, and ODP; authoring remains format-specific |
 | Unified workbook facade | ✅ | ✅ | ❌ | Common sheet names/count, text, and metadata for XLS, XLSX, XLSB, ODS, and Numbers |
 | Workbook trait API | 🟡 | ✅ | ❌ | Implemented by XLS, XLSX, XLSB, text workbooks, and immutable ODS evaluation snapshots; Numbers uses the unified facade |
@@ -564,7 +564,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | XML namespaces and XSL transform metadata | ✅ | ✅ | ✅ | Namespace table, transform location/usage, and XML policies; no transform execution |
 | Document protection and write reservations | ✅ | ✅ | ✅ | Protection controls, users, hashes, reservations, and save preferences; no policy enforcement |
 | Document/view/print/compatibility policies | ✅ | ✅ | ✅ | Typed RTF 1.9.1 settings across layout, rendering, privacy, revision, save, style, and compatibility groups |
-| Document info and generator/origin metadata | ✅ | ✅ | ✅ | Title/author/timestamps, generator, origin, caption, and revision-save metadata |
+| Document info and generator/origin metadata | ✅ | ✅ | ✅ | Title/author/timestamps, generator, origin, caption, and revision-save metadata, with standard `\info` values bridged into the unified metadata facade |
 | Compressed RTF | ✅ | ✅ | ✅ | LZFu compression/decompression |
 | Digital signatures | N/A | N/A | N/A | RTF does not define package signatures |
 | File encryption | N/A | N/A | N/A | RTF does not define a standard encrypted-file wrapper |

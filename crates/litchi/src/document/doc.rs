@@ -12,6 +12,62 @@ use crate::ooxml;
 
 use std::path::Path;
 
+#[cfg(feature = "rtf")]
+fn rtf_timestamp_to_naive(
+    timestamp: Option<litchi_rtf::RtfTimestamp>,
+) -> Option<chrono::NaiveDateTime> {
+    let timestamp = timestamp?;
+    let year = timestamp.year?;
+    let month = u32::try_from(timestamp.month?).ok()?;
+    let day = u32::try_from(timestamp.day?).ok()?;
+    let hour = u32::try_from(timestamp.hour.unwrap_or(0)).ok()?;
+    let minute = u32::try_from(timestamp.minute.unwrap_or(0)).ok()?;
+    let second = u32::try_from(timestamp.second.unwrap_or(0)).ok()?;
+    chrono::NaiveDate::from_ymd_opt(year, month, day)?.and_hms_opt(hour, minute, second)
+}
+
+#[cfg(feature = "rtf")]
+fn rtf_metadata(document: &litchi_rtf::RtfDocument<'_>) -> litchi_core::Metadata {
+    let info = document.info();
+    let text = |value: Option<&str>| value.map(str::to_owned);
+    litchi_core::Metadata {
+        title: text(info.title.as_deref()),
+        subject: text(info.subject.as_deref()),
+        author: text(info.author.as_deref()),
+        keywords: text(info.keywords.as_deref()),
+        description: text(info.document_comment.as_deref().or(info.comment.as_deref())),
+        identifier: info.id.map(|value| value.to_string()),
+        language: None,
+        template: None,
+        last_modified_by: text(info.operator.as_deref()),
+        revision: info.version.map(|value| value.to_string()),
+        created: None,
+        created_local: rtf_timestamp_to_naive(info.creation_timestamp),
+        modified: None,
+        modified_local: rtf_timestamp_to_naive(info.revision_timestamp),
+        page_count: info.pages,
+        word_count: info.words,
+        character_count: info.characters,
+        character_count_with_spaces: info.characters_with_spaces,
+        editing_time_minutes: info.editing_time,
+        application: document
+            .generator()
+            .map(|generator| generator.value.to_string()),
+        category: text(info.category.as_deref()),
+        company: text(info.company.as_deref()),
+        manager: text(info.manager.as_deref()),
+        content_status: None,
+        content_type: None,
+        version: info.revision.map(|value| value.to_string()),
+        last_printed_time: None,
+        last_printed_local: rtf_timestamp_to_naive(info.print_timestamp),
+        last_backup_local: rtf_timestamp_to_naive(info.backup_timestamp),
+        hyperlink_base: text(info.hyperlink_base.as_deref()),
+        security: None,
+        codepage: None,
+    }
+}
+
 /// A Word document.
 ///
 /// This is the main entry point for working with Word documents.
@@ -609,7 +665,9 @@ impl Document {
     ///
     /// Extracts metadata from the document such as title, author, creation date, etc.
     /// For OLE (.doc) files, this reads from SummaryInformation and DocumentSummaryInformation streams.
-    /// For OOXML (.docx) files, this reads from core properties (currently not implemented).
+    /// For OOXML (.docx) files, this reads from core properties. RTF values
+    /// come from the `\info` destination; its timezone-less timestamps are
+    /// exposed through the corresponding `*_local` fields.
     ///
     /// # Examples
     ///
@@ -653,11 +711,7 @@ impl Document {
                 Ok(metadata)
             },
             #[cfg(feature = "rtf")]
-            DocumentImpl::Rtf(_doc) => {
-                // RTF doesn't have standard metadata in the same way
-                // Metadata would need to be parsed from \info group
-                Ok(litchi_core::Metadata::default())
-            },
+            DocumentImpl::Rtf(doc) => Ok(rtf_metadata(doc)),
             #[cfg(feature = "odf")]
             DocumentImpl::Odt(doc) => doc
                 .metadata()
@@ -736,6 +790,71 @@ mod tests {
             "Failed to load RTF from bytes: {:?}",
             doc.err()
         );
+    }
+
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn unified_rtf_metadata_preserves_info_without_inventing_timezones() {
+        let source = concat!(
+            r"{\rtf1\ansi{\*\generator Litchi 1.0;}{\info",
+            r"{\title Unified title}{\subject Subject}{\author Ada}",
+            r"{\operator Grace}{\keywords one,two}{\comment fallback comment}",
+            r"{\doccomm Primary description}{\manager Lin}{\company ACME}",
+            r"{\category Draft}{\hlinkbase https://example.test/base/}",
+            r"{\creatim\yr2026\mo7\dy15\hr12\min34\sec56}",
+            r"{\revtim\yr2026\mo7\dy16\hr9\min8}",
+            r"{\printim\yr0\mo0\dy0\hr0\min0}",
+            r"{\buptim\yr2026\mo7\dy17}",
+            r"\version7\vern191\edmins42\nofpages3\nofwords9\nofchars44",
+            r"\nofcharsws50\id77}Body}",
+        );
+        let document = Document::from_bytes(source.as_bytes().to_vec()).unwrap();
+        let metadata = document.metadata().unwrap();
+
+        assert_eq!(metadata.title.as_deref(), Some("Unified title"));
+        assert_eq!(metadata.subject.as_deref(), Some("Subject"));
+        assert_eq!(metadata.author.as_deref(), Some("Ada"));
+        assert_eq!(metadata.last_modified_by.as_deref(), Some("Grace"));
+        assert_eq!(metadata.description.as_deref(), Some("Primary description"));
+        assert_eq!(metadata.manager.as_deref(), Some("Lin"));
+        assert_eq!(metadata.company.as_deref(), Some("ACME"));
+        assert_eq!(metadata.category.as_deref(), Some("Draft"));
+        assert_eq!(
+            metadata.hyperlink_base.as_deref(),
+            Some("https://example.test/base/")
+        );
+        assert_eq!(metadata.revision.as_deref(), Some("7"));
+        assert_eq!(metadata.version.as_deref(), Some("191"));
+        assert_eq!(metadata.editing_time_minutes, Some(42));
+        assert_eq!(metadata.page_count, Some(3));
+        assert_eq!(metadata.word_count, Some(9));
+        assert_eq!(metadata.character_count, Some(44));
+        assert_eq!(metadata.character_count_with_spaces, Some(50));
+        assert_eq!(metadata.identifier.as_deref(), Some("77"));
+        assert_eq!(metadata.application.as_deref(), Some("Litchi 1.0"));
+        assert_eq!(
+            metadata.created_local,
+            chrono::NaiveDate::from_ymd_opt(2026, 7, 15)
+                .unwrap()
+                .and_hms_opt(12, 34, 56)
+        );
+        assert_eq!(
+            metadata.modified_local,
+            chrono::NaiveDate::from_ymd_opt(2026, 7, 16)
+                .unwrap()
+                .and_hms_opt(9, 8, 0)
+        );
+        assert_eq!(
+            metadata.last_backup_local,
+            chrono::NaiveDate::from_ymd_opt(2026, 7, 17)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+        );
+        assert_eq!(metadata.created, None);
+        assert_eq!(metadata.modified, None);
+        assert_eq!(metadata.last_printed_time, None);
+        assert_eq!(metadata.last_printed_local, None);
+        assert!(metadata.has_data());
     }
 
     #[test]

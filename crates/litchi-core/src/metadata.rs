@@ -7,7 +7,7 @@
 //! YAML front-matter serialization (which depends on `serde_saphyr`, a
 //! workspace dep not present in `litchi-core`) live in the umbrella crate
 //! at `src/metadata_ext.rs`.
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Unified document metadata structure.
@@ -46,12 +46,21 @@ pub struct Metadata {
     /// Revision number
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revision: Option<String>,
-    /// Creation date (Unix timestamp)
+    /// Creation date with an explicit UTC interpretation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<DateTime<Utc>>,
-    /// Last modification date (Unix timestamp)
+    /// Creation date when the source format stores no timezone.
+    ///
+    /// This is kept separate from [`Self::created`] so callers do not
+    /// accidentally interpret a producer-local timestamp as UTC.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_local: Option<NaiveDateTime>,
+    /// Last modification date with an explicit UTC interpretation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modified: Option<DateTime<Utc>>,
+    /// Last modification date when the source format stores no timezone.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modified_local: Option<NaiveDateTime>,
     /// Number of pages
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page_count: Option<u32>,
@@ -61,6 +70,12 @@ pub struct Metadata {
     /// Number of characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub character_count: Option<u32>,
+    /// Number of characters including spaces
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub character_count_with_spaces: Option<u32>,
+    /// Total editing duration in minutes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub editing_time_minutes: Option<u32>,
     /// Application that created the document
     #[serde(skip_serializing_if = "Option::is_none")]
     pub application: Option<String>,
@@ -85,6 +100,18 @@ pub struct Metadata {
     /// Last printed time
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_printed_time: Option<DateTime<Utc>>,
+    /// Last printed time when the source format stores no timezone.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_printed_local: Option<NaiveDateTime>,
+    /// Last backup time when the source format stores no timezone.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_backup_local: Option<NaiveDateTime>,
+    /// Base URI used to resolve relative hyperlinks.
+    ///
+    /// This value is metadata only. Consumers decide whether and how to
+    /// resolve it; the library does not follow the URI.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hyperlink_base: Option<String>,
     /// Security level
     #[serde(skip_serializing_if = "Option::is_none")]
     pub security: Option<u32>,
@@ -109,10 +136,14 @@ impl Metadata {
             || self.last_modified_by.is_some()
             || self.revision.is_some()
             || self.created.is_some()
+            || self.created_local.is_some()
             || self.modified.is_some()
+            || self.modified_local.is_some()
             || self.page_count.is_some()
             || self.word_count.is_some()
             || self.character_count.is_some()
+            || self.character_count_with_spaces.is_some()
+            || self.editing_time_minutes.is_some()
             || self.application.is_some()
             || self.category.is_some()
             || self.company.is_some()
@@ -121,6 +152,9 @@ impl Metadata {
             || self.content_type.is_some()
             || self.version.is_some()
             || self.last_printed_time.is_some()
+            || self.last_printed_local.is_some()
+            || self.last_backup_local.is_some()
+            || self.hyperlink_base.is_some()
             || self.security.is_some()
             || self.codepage.is_some()
     }
@@ -140,5 +174,12 @@ mod tests {
             ..Default::default()
         };
         assert!(metadata_with_title.has_data());
+
+        let metadata_with_unzoned_time = Metadata {
+            created_local: chrono::NaiveDate::from_ymd_opt(2026, 7, 26)
+                .and_then(|date| date.and_hms_opt(12, 0, 0)),
+            ..Default::default()
+        };
+        assert!(metadata_with_unzoned_time.has_data());
     }
 }
