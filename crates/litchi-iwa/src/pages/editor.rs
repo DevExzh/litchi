@@ -3924,13 +3924,13 @@ pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
 pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
-    PagesCellValue, PagesTable, PagesTableCellComment, PagesTableCellCommentInfo,
-    PagesTableCellCommentReplyInfo, PagesTableCellRegion, PagesTableCellUpdate,
-    PagesTableColumnDeletion, PagesTableColumnInsertion, PagesTableDimension,
+    PagesCellValue, PagesTable, PagesTableAxisIndex, PagesTableCellComment,
+    PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo, PagesTableCellRegion,
+    PagesTableCellUpdate, PagesTableColumnDeletion, PagesTableColumnInsertion, PagesTableDimension,
     PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
     PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
-    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
-    PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
+    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableHiddenAxes, PagesTableInfo,
+    PagesTablePoints, PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
     PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
     PagesTableSortScope, PagesTableTitleSettings,
 };

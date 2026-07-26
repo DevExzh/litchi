@@ -14,6 +14,7 @@ mod appearance;
 mod comments;
 mod formula;
 mod graph;
+mod hidden_axes;
 mod lock;
 mod sort;
 mod storage;
@@ -29,6 +30,7 @@ pub use formula::{
     KeynoteTableFormulaExpression,
 };
 use graph::{require_table_model, slide_table_graph, table_template};
+pub use hidden_axes::{KeynoteTableAxisIndex, KeynoteTableHiddenAxes};
 pub use sort::{
     KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
     KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,

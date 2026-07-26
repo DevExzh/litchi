@@ -6222,6 +6222,78 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
 }
 
 #[test]
+fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
+    use crate::table_hidden_axes::{TableAxisIndex, TableHiddenAxes};
+
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(5, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    editor
+        .set_table_header_settings(
+            table_id,
+            NumbersTableHeaderSettings {
+                header_rows: Some(NumbersTableHeaderCount::ONE),
+                footer_rows: Some(NumbersTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    editor
+        .set_cells(
+            table_id,
+            [
+                TableCellUpdate::new(0, 0, CellValue::Text("Region".to_owned())),
+                TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
+                TableCellUpdate::new(1, 0, CellValue::Text("North".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::Number(120.0)),
+                TableCellUpdate::new(2, 0, CellValue::Text("South".to_owned())),
+                TableCellUpdate::new(2, 1, CellValue::Number(98.0)),
+                TableCellUpdate::new(3, 0, CellValue::Text("Central".to_owned())),
+                TableCellUpdate::new(3, 1, CellValue::Number(105.0)),
+                TableCellUpdate::new(4, 0, CellValue::Text("Total".to_owned())),
+                TableCellUpdate::new(4, 1, CellValue::Number(323.0)),
+            ],
+        )
+        .unwrap();
+    let hidden = TableHiddenAxes::new([TableAxisIndex::row(2)]).unwrap();
+    editor.set_table_hidden_axes(table_id, &hidden).unwrap();
+    editor
+        .set_table_sort_order(
+            table_id,
+            NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(1).unwrap(),
+                NumbersTableSortDirection::Descending,
+            )])
+            .unwrap(),
+        )
+        .unwrap();
+
+    assert!(editor.apply_table_sort_order(table_id).unwrap());
+    assert_eq!(editor.table_hidden_axes(table_id).unwrap(), hidden);
+    let table = &NumbersDocument::from_bytes(&editor.to_bytes().unwrap())
+        .unwrap()
+        .sheets()
+        .unwrap()[0]
+        .tables[0];
+    assert_eq!(
+        table.get_cell(1, 0),
+        Some(&CellValue::Text("North".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(2, 0),
+        Some(&CellValue::Text("Central".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(3, 0),
+        Some(&CellValue::Text("South".to_owned()))
+    );
+    let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.table_hidden_axes(table_id).unwrap(), hidden);
+}
+
+#[test]
 fn table_sort_moves_rows_across_tile_boundaries() {
     let mut package = test_package();
     package

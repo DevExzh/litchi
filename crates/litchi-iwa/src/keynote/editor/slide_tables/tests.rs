@@ -322,6 +322,10 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .unwrap()
         .unwrap()
         .storage_object_id;
+    let hidden = KeynoteTableHiddenAxes::new([KeynoteTableAxisIndex::row(2)]).unwrap();
+    editor
+        .set_slide_table_hidden_axes(0, model_id, &hidden)
+        .unwrap();
     let order = KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
         KeynoteTableSortColumnIndex::new(0).unwrap(),
         KeynoteTableSortDirection::Ascending,
@@ -384,6 +388,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .storage_object_id,
         reply_id
     );
+    assert_eq!(editor.slide_table_hidden_axes(0, model_id).unwrap(), hidden);
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -404,6 +409,10 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .unwrap()[0]
             .storage_object_id,
         reply_id
+    );
+    assert_eq!(
+        reopened.slide_table_hidden_axes(0, model_id).unwrap(),
+        hidden
     );
     let unchanged = reopened.to_bytes().unwrap();
     reopened
@@ -485,6 +494,10 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .unwrap()[0]
             .storage_object_id,
         reply_id
+    );
+    assert_eq!(
+        reopened.slide_table_hidden_axes(0, model_id).unwrap(),
+        hidden
     );
 
     reopened.clear_slide_table_sort_order(0, model_id).unwrap();

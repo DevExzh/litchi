@@ -1,4 +1,4 @@
-//! Typed hidden-row and hidden-column state for native Numbers tables.
+//! Typed hidden-row and hidden-column state shared by native iWork tables.
 
 use std::collections::{HashMap, HashSet};
 
@@ -105,6 +105,96 @@ pub(crate) fn table_hidden_axes(
 ) -> Result<TableHiddenAxes> {
     let graph = table_hidden_graph(package, model_object_id)?;
     hidden_axes_from_graph(&graph)
+}
+
+/// Snapshot user-hidden axes when no filtered or pivot-hidden state is active.
+///
+/// Row sorting uses this stricter view because native iWork keeps user-hidden
+/// positions fixed while row payloads and stable row UIDs move.
+pub(crate) fn positional_user_hidden_axes(
+    package: &IWorkPackage,
+    model_object_id: u64,
+) -> Result<TableHiddenAxes> {
+    let graph = table_hidden_graph(package, model_object_id)?;
+    let axes = hidden_axes_from_graph(&graph)?;
+    let Some(owner) = &graph.model.hidden_states_owner else {
+        return Ok(axes);
+    };
+    if owner.hidden_states.len() != 1 {
+        return Err(Error::ParseError(
+            "Cannot reorder an iWork table with multiple stored hidden-state views".to_owned(),
+        ));
+    }
+    let active_uuid = graph.info.hidden_states_uuid.as_ref().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork table info {} has no active hidden-state UUID",
+            graph.info_object_id
+        ))
+    })?;
+    let active = unique_active_state(owner, active_uuid)?;
+    if [
+        &active.row_hidden_state_extent,
+        &active.column_hidden_state_extent,
+    ]
+    .into_iter()
+    .flat_map(|extent| &extent.base_hidden_states)
+    .any(|state| state.filtered == Some(true) || state.pivot_hidden == Some(true))
+    {
+        return Err(Error::ParseError(
+            "Cannot reorder an iWork table with filtered or pivot-hidden axes".to_owned(),
+        ));
+    }
+    Ok(axes)
+}
+
+/// Restore positional user-hidden axes after a caller has reordered row UIDs.
+///
+/// The caller must provide transactionality. This performs no package clone,
+/// which keeps the shared table-sort executor to one outer staging copy.
+pub(crate) fn restore_positional_user_hidden_axes(
+    package: &mut IWorkPackage,
+    model_object_id: u64,
+    expected: &TableHiddenAxes,
+) -> Result<()> {
+    if table_hidden_axes(package, model_object_id)? == *expected {
+        return Ok(());
+    }
+    let graph = table_hidden_graph(package, model_object_id)?;
+    let mut owner = graph.model.hidden_states_owner.clone().ok_or_else(|| {
+        Error::InvalidFormat("iWork table hidden-state owner is absent".to_owned())
+    })?;
+    let active_uuid = graph.info.hidden_states_uuid.as_ref().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork table info {} has no active hidden-state UUID",
+            graph.info_object_id
+        ))
+    })?;
+    let active = unique_active_state_mut(&mut owner, active_uuid)?;
+    update_extent(
+        &mut active.row_hidden_state_extent,
+        &graph.row_uids,
+        expected.iter().filter_map(|axis| match axis {
+            TableAxisIndex::Row(index) => Some(index),
+            TableAxisIndex::Column(_) => None,
+        }),
+        "row",
+    )?;
+    update_extent(
+        &mut active.column_hidden_state_extent,
+        &graph.column_uids,
+        expected.iter().filter_map(|axis| match axis {
+            TableAxisIndex::Column(index) => Some(index),
+            TableAxisIndex::Row(_) => None,
+        }),
+        "column",
+    )?;
+    patch_model(package, &graph, &owner, active_uuid, None)?;
+    if table_hidden_axes(package, model_object_id)? != *expected {
+        return Err(Error::InvalidFormat(
+            "iWork positional hidden axes failed row-reorder validation".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn set_table_hidden_axes(

@@ -7,6 +7,9 @@ use prost::Message;
 
 use crate::numbers::bnc::{BncCell, CachedScalar, StoredValue};
 use crate::numbers::editor::table_topology::{category_grouping_is_enabled, filter_has_row_state};
+use crate::table_hidden_axes::{
+    TableHiddenAxes, positional_user_hidden_axes, restore_positional_user_hidden_axes,
+};
 
 use super::*;
 
@@ -199,7 +202,8 @@ fn apply_attached_table_sort_range(
     }
 
     let locations = object_locations(package)?;
-    validate_sort_features(package, &locations, table_id, &descriptor.model)?;
+    let positional_hidden_axes =
+        validate_sort_features(package, &locations, table_id, &descriptor.model)?;
     let plan = plan_body_sort(
         package,
         &locations,
@@ -243,6 +247,9 @@ fn apply_attached_table_sort_range(
         row_start,
         &destinations_by_source,
     )?;
+    if !positional_hidden_axes.is_empty() {
+        restore_positional_user_hidden_axes(package, table_id, &positional_hidden_axes)?;
+    }
     Ok(true)
 }
 
@@ -268,12 +275,8 @@ fn validate_sort_features(
     locations: &HashMap<u64, String>,
     table_id: u64,
     model: &TableModelArchive,
-) -> Result<()> {
-    if model.number_of_hidden_rows.unwrap_or(0) != 0
-        || model.number_of_user_hidden_rows.unwrap_or(0) != 0
-        || model.number_of_filtered_rows.unwrap_or(0) != 0
-        || model.hidden_state_formula_owner_for_rows.is_some()
-        || model.hidden_states_owner.is_some()
+) -> Result<TableHiddenAxes> {
+    if model.number_of_filtered_rows.unwrap_or(0) != 0
         || model.conditional_style_formula_owner_id.is_some()
         || model.pivot_owner.is_some()
         || model.spill_owner.is_some()
@@ -282,7 +285,7 @@ fn validate_sort_features(
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(
-            "Cannot yet execute a Numbers sort on a hidden, filtered, grouped, conditional, pivot, or spill table"
+            "Cannot yet execute a Numbers sort on a filtered, grouped, conditional, pivot, or spill table"
                 .to_owned(),
         ));
     }
@@ -296,7 +299,19 @@ fn validate_sort_features(
             "Cannot yet execute a Numbers sort on a table with merged cells".to_owned(),
         ));
     }
-    validate_sort_stroke_sidecar(package, locations, model)
+    validate_sort_stroke_sidecar(package, locations, model)?;
+    let declares_hidden_storage = model.hidden_states_owner.is_some()
+        || model.hidden_state_formula_owner_for_rows.is_some()
+        || model.hidden_state_formula_owner_for_columns.is_some()
+        || model.number_of_hidden_rows.unwrap_or_default() != 0
+        || model.number_of_user_hidden_rows.unwrap_or_default() != 0
+        || model.number_of_hidden_columns.unwrap_or_default() != 0
+        || model.number_of_user_hidden_columns.unwrap_or_default() != 0;
+    if declares_hidden_storage {
+        positional_user_hidden_axes(package, table_id)
+    } else {
+        Ok(TableHiddenAxes::empty())
+    }
 }
 
 fn plan_body_sort(

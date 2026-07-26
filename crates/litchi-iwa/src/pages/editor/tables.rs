@@ -3,6 +3,7 @@
 mod appearance;
 mod comments;
 mod formula;
+mod hidden_axes;
 mod layout;
 mod lock;
 mod sort;
@@ -16,6 +17,7 @@ pub use formula::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression,
 };
+pub use hidden_axes::{PagesTableAxisIndex, PagesTableHiddenAxes};
 pub use layout::{
     PagesTableDimension, PagesTableDimensionSize, PagesTableHeaderCount, PagesTableHeaderSettings,
     PagesTablePoints,
@@ -1146,6 +1148,8 @@ mod tests {
             .unwrap()
             .unwrap()
             .storage_object_id;
+        let hidden = PagesTableHiddenAxes::new([PagesTableAxisIndex::row(2)]).unwrap();
+        editor.set_table_hidden_axes(model_id, &hidden).unwrap();
         let order = PagesTableSortOrder::new([PagesTableSortRule::new(
             PagesTableSortColumnIndex::new(0).unwrap(),
             PagesTableSortDirection::Ascending,
@@ -1200,6 +1204,7 @@ mod tests {
             editor.table_cell_comment_replies(model_id, 4, 1).unwrap()[0].storage_object_id,
             reply_id
         );
+        assert_eq!(editor.table_hidden_axes(model_id).unwrap(), hidden);
 
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1218,6 +1223,7 @@ mod tests {
             reopened.table_cell_comment_replies(model_id, 4, 1).unwrap()[0].storage_object_id,
             reply_id
         );
+        assert_eq!(reopened.table_hidden_axes(model_id).unwrap(), hidden);
         let unchanged = reopened.to_bytes().unwrap();
         reopened.set_table_sort_order(model_id, order).unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), unchanged);
@@ -1289,6 +1295,7 @@ mod tests {
             reopened.table_cell_comment_replies(model_id, 2, 1).unwrap()[0].storage_object_id,
             reply_id
         );
+        assert_eq!(reopened.table_hidden_axes(model_id).unwrap(), hidden);
 
         reopened.clear_table_sort_order(model_id).unwrap();
         assert_eq!(reopened.table_sort_order(model_id).unwrap(), None);

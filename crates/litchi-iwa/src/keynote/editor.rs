@@ -4466,15 +4466,16 @@ pub use slide_movies::{
 };
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use slide_tables::{
-    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellComment, KeynoteTableCellCommentInfo,
-    KeynoteTableCellCommentReplyInfo, KeynoteTableCellRegion, KeynoteTableCellUpdate,
-    KeynoteTableCellValue, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
-    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
-    KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
-    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTablePoints, KeynoteTableRowDeletion,
-    KeynoteTableRowInsertion, KeynoteTableSortColumnIndex, KeynoteTableSortDirection,
-    KeynoteTableSortOrder, KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
+    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableAxisIndex, KeynoteTableCellComment,
+    KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo, KeynoteTableCellRegion,
+    KeynoteTableCellUpdate, KeynoteTableCellValue, KeynoteTableColumnDeletion,
+    KeynoteTableColumnInsertion, KeynoteTableDimension, KeynoteTableDimensionSize,
+    KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
+    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
+    KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
+    KeynoteTableHiddenAxes, KeynoteTablePoints, KeynoteTableRowDeletion, KeynoteTableRowInsertion,
+    KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
+    KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
     KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
