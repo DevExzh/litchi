@@ -1,7 +1,7 @@
-mod conv;
+pub(crate) mod conv;
 mod matrix;
-mod operators;
-mod parse;
+pub(crate) mod operators;
+pub(crate) mod parse;
 mod symbols;
 mod templates;
 mod utils;

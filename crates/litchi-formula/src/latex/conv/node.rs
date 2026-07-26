@@ -20,7 +20,7 @@ use crate::latex::utils::{
 use std::fmt::Write;
 
 /// Convert predefined symbol to LaTeX
-fn predefined_symbol_to_latex(symbol: PredefinedSymbol) -> &'static str {
+pub(crate) fn predefined_symbol_to_latex(symbol: PredefinedSymbol) -> &'static str {
     match symbol {
         PredefinedSymbol::Alpha => "\\alpha",
         PredefinedSymbol::Beta => "\\beta",
@@ -79,7 +79,7 @@ fn predefined_symbol_to_latex(symbol: PredefinedSymbol) -> &'static str {
 }
 
 /// Convert function name to LaTeX
-fn function_name_to_latex(function: FunctionName) -> &'static str {
+pub(crate) fn function_name_to_latex(function: FunctionName) -> &'static str {
     match function {
         FunctionName::Sin => "\\sin",
         FunctionName::Cos => "\\cos",
@@ -126,6 +126,26 @@ impl LatexConverter {
     pub fn convert_node(&mut self, node: &MathNode) -> Result<(), LatexError> {
         convert_node_internal(self, node)
     }
+}
+
+/// Write the argument a function applies to, if it has one
+///
+/// A function read out of a format that only records the name — MTEF sets one
+/// in its function typeface — has no argument, and `\sin{}` would render an
+/// empty group after it. The braces are only needed to bind an argument.
+fn convert_function_argument(
+    converter: &mut LatexConverter,
+    argument: &[MathNode],
+) -> Result<(), LatexError> {
+    if argument.is_empty() {
+        return Ok(());
+    }
+    converter.buffer.push('{');
+    for node in argument {
+        convert_node_internal(converter, node)?;
+    }
+    converter.buffer.push('}');
+    Ok(())
 }
 
 /// Internal node conversion function
@@ -413,19 +433,11 @@ fn convert_node_internal(
                 write!(&mut converter.buffer, "\\operatorname{{{}}}", name)
                     .map_err(|e| LatexError::FormatError(e.to_string()))?;
             }
-            converter.buffer.push('{');
-            for n in argument.iter() {
-                convert_node_internal(converter, n)?;
-            }
-            converter.buffer.push('}');
+            convert_function_argument(converter, argument)?;
         },
         MathNode::PredefinedFunction { function, argument } => {
             converter.buffer.push_str(function_name_to_latex(*function));
-            converter.buffer.push('{');
-            for n in argument.iter() {
-                convert_node_internal(converter, n)?;
-            }
-            converter.buffer.push('}');
+            convert_function_argument(converter, argument)?;
         },
         MathNode::Matrix {
             rows,

@@ -11,6 +11,7 @@
 
 use super::charset::*;
 use super::objects::*;
+use super::semantic;
 use crate::ast::{Fence, LargeOperator, LineStyle, MathNode, MatrixFence};
 use crate::mtef::MtefError;
 use crate::mtef::constants::*;
@@ -46,7 +47,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                     if let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>() {
                         // Special handling based on rtf2latex2e Eqn_TranslateObjects logic
                         match char_obj.typeface {
-                            130 => {
+                            TYPEFACE_FUNCTION => {
                                 // Function typeface - auto-recognize functions.
                                 // A run that spells no name (for example a
                                 // symbol set in the function font) is not an
@@ -64,7 +65,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                                 }
                                 nodes.push(self.convert_char_to_node(char_obj)?);
                             },
-                            129 if self.mode != crate::mtef::constants::EQN_MODE_TEXT => {
+                            TYPEFACE_TEXT if self.mode != EQN_MODE_TEXT => {
                                 // Text in math mode
                                 let (node, skip_count) = self.convert_text_run_to_node(current)?;
                                 nodes.push(node);
@@ -136,25 +137,36 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         Ok(nodes)
     }
 
+    /// Convert one character record into the node its glyph stands for
+    ///
+    /// The spelling resolved from the typeface tables is LaTeX, so a symbol,
+    /// relation or function name is recognised and lowered to the matching AST
+    /// variant. Anything the tables do not name — a letter, a digit, an
+    /// unknown command — keeps the spelling as text, as it always did.
     fn convert_char_to_node(&self, char_obj: &MtefChar) -> Result<MathNode<'arena>, MtefError> {
-        let text = self.convert_char_to_text(char_obj).map_err(|e| {
+        let spelling = self.convert_char_to_text(char_obj).map_err(|e| {
             MtefError::ParseError(format!(
                 "Failed to convert character (typeface={}, char={}): {}",
                 char_obj.typeface, char_obj.character, e
             ))
         })?;
-        Ok(MathNode::Text(text))
+
+        // An embellished character has been folded into a LaTeX template such
+        // as `\dot{x}`, which no single node represents.
+        if char_obj.embellishment_list.is_some() {
+            return Ok(MathNode::Text(spelling));
+        }
+
+        Ok(semantic::node_for_spelling(&spelling).unwrap_or(MathNode::Text(spelling)))
     }
 
-    /// Convert a function sequence to a MathNode (handles typeface 130 functions)
+    /// Convert a function sequence to a MathNode (handles the function typeface)
     /// Returns `None` when the run spells no function name, leaving the caller
     /// to convert the character normally.
     fn convert_function_to_node(
         &self,
         start_obj: Option<&MtefObjectList>,
     ) -> Result<Option<(MathNode<'arena>, usize)>, MtefError> {
-        use crate::mtef::binary::charset::lookup_function;
-
         let mut function_name = String::new();
         let mut current = start_obj;
         let mut skip_count = 0;
@@ -163,7 +175,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         while let Some(obj) = current {
             if let MtefRecordType::Char = obj.tag
                 && let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>()
-                && char_obj.typeface == 130
+                && char_obj.typeface == TYPEFACE_FUNCTION
                 && (char_obj.character as u8).is_ascii_alphabetic()
                 && let Some(ch) = char::from_u32(char_obj.character as u32)
             {
@@ -179,15 +191,12 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             return Ok(None);
         }
 
-        // Look up the function in the table
-        let latex_text = if let Some(func) = lookup_function(&function_name) {
-            Cow::Borrowed(func.trim_end()) // Remove trailing space
-        } else {
-            // Fallback: wrap in \mathrm{}
-            Cow::Owned(format!("\\mathrm{{{}}}", function_name))
-        };
-
-        Ok(Some((MathNode::Text(latex_text), skip_count)))
+        // The typeface already declares the run to be a function name, so an
+        // unrecognised name stays a function rather than degrading to text.
+        Ok(Some((
+            semantic::node_for_function(&function_name),
+            skip_count,
+        )))
     }
 
     /// Convert a text run to a MathNode (handles typeface 129 text in math)
@@ -204,7 +213,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             match obj.tag {
                 MtefRecordType::Char => {
                     if let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>()
-                        && char_obj.typeface == 129
+                        && char_obj.typeface == TYPEFACE_TEXT
                         && let Some(ch) = char::from_u32(char_obj.character as u32)
                     {
                         text_run.push(ch);
@@ -274,11 +283,11 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                 },
                 MA_TEXT | MA_MATH => {
                     // For special case: mode depends on variation (like spaces)
-                    if typeface == 152 && _math_attr == MA_TEXT {
+                    if typeface == usize::from(TYPEFACE_SPACE) && _math_attr == MA_TEXT {
                         let old_mode = current_mode;
                         current_mode = EQN_MODE_TEXT;
                         Some(old_mode)
-                    } else if typeface == 152 && _math_attr == MA_MATH {
+                    } else if typeface == usize::from(TYPEFACE_SPACE) && _math_attr == MA_MATH {
                         let old_mode = current_mode;
                         current_mode = if self.inline != 0 {
                             EQN_MODE_INLINE
@@ -296,7 +305,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             // Try character lookup first using PHF map
             let lookup_result = if charset_atts.do_lookup {
                 // Special handling for typefaces with mode-dependent lookups
-                let lookup_math_attr = if typeface == 152 {
+                let lookup_math_attr = if typeface == usize::from(TYPEFACE_SPACE) {
                     // Space characters have different meanings in math vs text
                     _math_attr
                 } else {
@@ -383,7 +392,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             }
 
             // Special handling for certain typefaces (like bold)
-            if typeface == 135 {
+            if typeface == usize::from(TYPEFACE_VECTOR) {
                 // Bold typeface - matches rtf2latex2e logic
                 return Ok(Cow::Owned(format!("\\mathbf{{{}}}", ch)));
             }

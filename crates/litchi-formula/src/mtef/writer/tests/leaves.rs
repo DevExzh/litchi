@@ -1,4 +1,4 @@
-use super::{number, roundtrip_text, text};
+use super::{number, roundtrip, roundtrip_text, text};
 use crate::ast::{MathNode, Operator, PredefinedSymbol, SpaceType, Symbol};
 use crate::mtef::writer::{MtefWriteError, MtefWriter};
 use std::borrow::Cow;
@@ -19,7 +19,11 @@ fn operators_round_trip_through_the_symbol_typeface() {
         MathNode::Operator(Operator::Plus),
         MathNode::Operator(Operator::LessThanOrEqual),
     ];
-    assert_eq!(roundtrip_text(&nodes), "=+\\leq ");
+    // The reader now recovers the operators themselves, not their spellings.
+    roundtrip(&nodes, |recovered| {
+        assert_eq!(recovered, &nodes[..], "operators must survive as operators");
+    });
+    assert_eq!(roundtrip_text(&nodes), "=+\\leq");
 }
 
 #[test]
@@ -28,7 +32,14 @@ fn predefined_symbols_round_trip() {
         MathNode::PredefinedSymbol(PredefinedSymbol::Alpha),
         MathNode::PredefinedSymbol(PredefinedSymbol::OmegaCap),
     ];
-    assert_eq!(roundtrip_text(&nodes), "\\alpha \\Omega ");
+    roundtrip(&nodes, |recovered| {
+        assert_eq!(
+            recovered,
+            &nodes[..],
+            "Greek letters must survive as predefined symbols"
+        );
+    });
+    assert_eq!(roundtrip_text(&nodes), "\\alpha\\Omega");
 }
 
 #[test]
@@ -38,7 +49,15 @@ fn unicode_symbols_round_trip() {
         unicode: Some('∞'),
         variant: None,
     });
-    assert_eq!(roundtrip_text(&[symbol]), "\\infty ");
+    // `∞` names a predefined symbol, so it comes back as one rather than as
+    // the raw `\\infty ` spelling the charset table holds.
+    roundtrip(std::slice::from_ref(&symbol), |recovered| {
+        assert_eq!(
+            recovered,
+            &[MathNode::PredefinedSymbol(PredefinedSymbol::Infinity)][..]
+        );
+    });
+    assert_eq!(roundtrip_text(&[symbol]), "\\infty");
 }
 
 #[test]
@@ -57,7 +76,10 @@ fn spaces_round_trip_as_spacing_commands() {
         MathNode::Space(SpaceType::Thin),
         MathNode::Space(SpaceType::Quad),
     ];
-    assert_eq!(roundtrip_text(&nodes), "\\,\\quad ");
+    roundtrip(&nodes, |recovered| {
+        assert_eq!(recovered, &nodes[..], "spacing must survive as spaces");
+    });
+    assert_eq!(roundtrip_text(&nodes), "\\,\\quad");
 }
 
 #[test]

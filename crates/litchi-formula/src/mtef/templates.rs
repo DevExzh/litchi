@@ -552,6 +552,46 @@ const MTEF_TEMPLATES: &[TemplateDef] = &[
     },
 ];
 
+/// Append the LaTeX spelling of a leaf node to `out`
+///
+/// Template substitution is textual, so a leaf has to be spelled back out.
+/// Every variant the MTEF reader produces for a single character is covered;
+/// anything with structure becomes `?`, as it always did.
+pub(super) fn push_leaf_text(node: &MathNode<'_>, out: &mut String) {
+    use crate::latex::conv::node::{function_name_to_latex, predefined_symbol_to_latex};
+    use crate::latex::operators::{large_operator_to_latex, operator_to_latex, space_to_latex};
+
+    match node {
+        MathNode::Text(text) => out.push_str(text),
+        MathNode::Number(number) => out.push_str(number),
+        MathNode::Symbol(symbol) => match symbol.unicode {
+            Some(unicode) => out.push(unicode),
+            None => out.push_str(&symbol.name),
+        },
+        MathNode::Operator(operator) => out.push_str(operator_to_latex(*operator)),
+        MathNode::PredefinedSymbol(symbol) => out.push_str(predefined_symbol_to_latex(*symbol)),
+        MathNode::Space(space) => out.push_str(space_to_latex(*space)),
+        // Only a recognised name is a control word; anything else has to be
+        // wrapped, exactly as the LaTeX converter does, so that a name like
+        // `foo` does not become the undefined command `\foo`.
+        MathNode::Function { name, .. } => {
+            if crate::latex::operators::is_standard_function(name) {
+                out.push('\\');
+                out.push_str(name);
+            } else {
+                out.push_str("\\operatorname{");
+                out.push_str(name);
+                out.push('}');
+            }
+        },
+        MathNode::PredefinedFunction { function, .. } => {
+            out.push_str(function_name_to_latex(*function))
+        },
+        MathNode::LargeOp { operator, .. } => out.push_str(large_operator_to_latex(*operator)),
+        _ => out.push('?'), // Placeholder for complex nodes
+    }
+}
+
 impl TemplateParser {
     /// Find template by selector and variation
     pub fn find_template(selector: u8, variation: u16) -> Option<&'static TemplateDef> {
@@ -586,23 +626,9 @@ impl TemplateParser {
 
                     // Substitute the argument
                     if arg_index < args.len() {
-                        // Convert argument nodes to text for simple substitution
-                        let mut arg_text = String::new();
                         for node in &args[arg_index] {
-                            match node {
-                                MathNode::Text(text) => arg_text.push_str(text),
-                                MathNode::Number(num) => arg_text.push_str(num),
-                                MathNode::Symbol(sym) => {
-                                    if let Some(unicode) = sym.unicode {
-                                        arg_text.push(unicode);
-                                    } else {
-                                        arg_text.push_str(&sym.name);
-                                    }
-                                },
-                                _ => arg_text.push('?'), // Placeholder for complex nodes
-                            }
+                            push_leaf_text(node, &mut result);
                         }
-                        result.push_str(&arg_text);
                     }
                 } else {
                     result.push('#');

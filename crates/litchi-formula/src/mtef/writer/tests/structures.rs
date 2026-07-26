@@ -442,7 +442,13 @@ fn unknown_function_names_keep_their_letters() {
         name: Cow::Borrowed("foo"),
         argument: vec![],
     };
-    assert_eq!(roundtrip_text(&[node]), "\\mathrm{foo}");
+    // The function typeface declares the run to be a function name, so an
+    // unrecognised one stays a function rather than degrading to text. It must
+    // not be spelled as the undefined command `\foo`.
+    roundtrip(std::slice::from_ref(&node), |recovered| {
+        assert_eq!(recovered, &[node.clone()][..]);
+    });
+    assert_eq!(roundtrip_text(&[node]), "\\operatorname{foo}");
 }
 
 #[test]

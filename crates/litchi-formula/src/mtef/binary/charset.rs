@@ -273,49 +273,6 @@ pub const EMBELLISHMENT_TEMPLATES: &[&str] = &[
     "{%1} ,%1 ",                     // 37 - embU_L1ARROW
 ];
 
-/// Function name lookup table (based on rtf2latex2e Profile_FUNCTIONS)
-static FUNCTION_LOOKUP_TABLE: phf::Map<&'static str, &'static str> = phf::phf_map! {
-    "Pr" => "\\Pr ",
-    "arccos" => "\\arccos ",
-    "arcsin" => "\\arcsin ",
-    "arctan" => "\\arctan ",
-    "arg" => "\\arg ",
-    "cos" => "\\cos ",
-    "cosh" => "\\cosh ",
-    "cot" => "\\cot ",
-    "coth" => "\\coth ",
-    "csc" => "\\csc ",
-    "deg" => "\\deg ",
-    "det" => "\\det ",
-    "dim" => "\\dim ",
-    "exp" => "\\exp ",
-    "gcd" => "\\gcd ",
-    "hom" => "\\hom ",
-    "inf" => "\\inf ",
-    "ker" => "\\ker ",
-    "lim" => "\\lim ",
-    "liminf" => "\\liminf ",
-    "limsup" => "\\limsup ",
-    "ln" => "\\ln ",
-    "log" => "\\log ",
-    "max" => "\\max ",
-    "min" => "\\min ",
-    "sec" => "\\sec ",
-    "sin" => "\\sin ",
-    "sinh" => "\\sinh ",
-    "sup" => "\\sup ",
-    "tan" => "\\tan ",
-    "tanh" => "\\tanh ",
-    "mod" => "\\mathop{\\rm mod} ",
-    "glb" => "\\mathop{\\rm glb} ",
-    "lub" => "\\mathop{\\rm lub} ",
-    "int" => "\\mathop{\\rm int} ",
-    "Im" => "\\mathop{\\rm Im} ",
-    "Re" => "\\mathop{\\rm Re} ",
-    "var" => "\\mathop{\\rm var} ",
-    "cov" => "\\mathop{\\rm cov} ",
-};
-
 /// Perfect Hash Function map for character lookup (compile-time generated)
 static CHAR_LOOKUP_TABLE: phf::Map<&'static str, &'static str> = phf::phf_map! {
     "130.91" => "\\lbrack ",
@@ -667,11 +624,6 @@ pub fn lookup_character(typeface: usize, character: u16, math_attr: i32) -> Opti
     }
 
     None
-}
-
-/// Lookup a function name in the function mapping table
-pub fn lookup_function(function_name: &str) -> Option<&'static str> {
-    FUNCTION_LOOKUP_TABLE.get(function_name).copied()
 }
 
 /// Get embellishment template for a given embellishment type

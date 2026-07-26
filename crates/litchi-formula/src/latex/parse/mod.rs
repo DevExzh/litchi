@@ -9,7 +9,7 @@
 // original string, so a parse allocates only the node tree itself.
 
 mod atoms;
-mod commands;
+pub(crate) mod commands;
 mod environments;
 mod error;
 mod fences;

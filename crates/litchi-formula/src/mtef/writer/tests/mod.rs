@@ -16,6 +16,7 @@ use super::{MtefWriteOptions, MtefWriter};
 use crate::ast::{Formula, MathNode};
 use crate::mtef::MtefParser;
 use crate::mtef::constants::*;
+use crate::mtef::templates::push_leaf_text;
 use std::borrow::Cow;
 
 // ---------------------------------------------------------------------------
@@ -62,10 +63,18 @@ fn flatten_text(nodes: &[MathNode<'_>]) -> String {
     let mut out = String::new();
     for node in nodes {
         match node {
-            MathNode::Text(text) => out.push_str(text),
-            MathNode::Number(number) => out.push_str(number),
             MathNode::Row(content) => out.push_str(&flatten_text(content)),
             MathNode::Run { content, .. } => out.push_str(&flatten_text(content)),
+            // The reader lowers a character to the node its glyph names, so a
+            // leaf has to be spelled back out to be compared as text.
+            MathNode::Text(_)
+            | MathNode::Number(_)
+            | MathNode::Operator(_)
+            | MathNode::Symbol(_)
+            | MathNode::PredefinedSymbol(_)
+            | MathNode::Space(_)
+            | MathNode::Function { .. }
+            | MathNode::PredefinedFunction { .. } => push_leaf_text(node, &mut out),
             other => out.push_str(&format!("<{}>", node_kind(other))),
         }
     }
