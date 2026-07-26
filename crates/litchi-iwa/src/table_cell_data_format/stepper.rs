@@ -5,15 +5,15 @@ const NATIVE_DEFAULT_MINIMUM: f64 = 1.0;
 const NATIVE_DEFAULT_MAXIMUM: f64 = 100.0;
 const NATIVE_DEFAULT_INCREMENT: f64 = 1.0;
 
-/// Numeric presentation nested inside an interactive Slider format.
-pub type TableCellSliderDisplayFormat = TableCellNumericControlDisplayFormat;
+/// Numeric presentation nested inside an interactive Stepper format.
+pub type TableCellStepperDisplayFormat = TableCellNumericControlDisplayFormat;
 
-/// Finite numeric range used by an interactive Slider table cell.
+/// Finite numeric range used by an interactive Stepper table cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TableCellSliderRange(NumericControlRange);
+pub struct TableCellStepperRange(NumericControlRange);
 
-impl TableCellSliderRange {
-    /// The range created by iWork when Slider is applied to an empty cell.
+impl TableCellStepperRange {
+    /// The range created by iWork when Stepper is applied to an empty cell.
     pub const NATIVE_DEFAULT: Self = Self(NumericControlRange::new_unchecked(
         NATIVE_DEFAULT_MINIMUM,
         NATIVE_DEFAULT_MAXIMUM,
@@ -40,29 +40,29 @@ impl TableCellSliderRange {
         self.0.increment()
     }
 
-    pub(crate) fn native_initial_value(self) -> f64 {
-        self.0.midpoint_grid_value()
+    pub(crate) const fn native_initial_value(self) -> f64 {
+        self.minimum()
     }
 }
 
-impl Default for TableCellSliderRange {
+impl Default for TableCellStepperRange {
     fn default() -> Self {
         Self::NATIVE_DEFAULT
     }
 }
 
-/// Native interactive Slider format for one table cell.
+/// Native interactive Stepper format for one table cell.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct TableCellSliderFormat {
-    range: TableCellSliderRange,
-    display_format: TableCellSliderDisplayFormat,
+pub struct TableCellStepperFormat {
+    range: TableCellStepperRange,
+    display_format: TableCellStepperDisplayFormat,
 }
 
-impl TableCellSliderFormat {
-    /// Construct a Slider from a validated range and numeric presentation.
+impl TableCellStepperFormat {
+    /// Construct a Stepper from a validated range and numeric presentation.
     pub const fn new(
-        range: TableCellSliderRange,
-        display_format: TableCellSliderDisplayFormat,
+        range: TableCellStepperRange,
+        display_format: TableCellStepperDisplayFormat,
     ) -> Self {
         Self {
             range,
@@ -71,23 +71,23 @@ impl TableCellSliderFormat {
     }
 
     /// Return the interactive range.
-    pub const fn range(&self) -> TableCellSliderRange {
+    pub const fn range(&self) -> TableCellStepperRange {
         self.range
     }
 
     /// Borrow the nested numeric presentation.
-    pub const fn display_format(&self) -> &TableCellSliderDisplayFormat {
+    pub const fn display_format(&self) -> &TableCellStepperDisplayFormat {
         &self.display_format
     }
 
     /// Replace the interactive range.
-    pub fn with_range(mut self, range: TableCellSliderRange) -> Self {
+    pub fn with_range(mut self, range: TableCellStepperRange) -> Self {
         self.range = range;
         self
     }
 
     /// Replace the nested numeric presentation.
-    pub fn with_display_format(mut self, display_format: TableCellSliderDisplayFormat) -> Self {
+    pub fn with_display_format(mut self, display_format: TableCellStepperDisplayFormat) -> Self {
         self.display_format = display_format;
         self
     }
@@ -96,24 +96,24 @@ impl TableCellSliderFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::table_cell_data_format::TableCellScientificFormat;
+    use crate::table_cell_data_format::TableCellFractionFormat;
 
     #[test]
-    fn native_default_uses_the_midpoint_grid_value() {
+    fn native_default_starts_at_the_minimum() {
         assert_eq!(
-            TableCellSliderRange::NATIVE_DEFAULT.native_initial_value(),
-            50.0
+            TableCellStepperRange::NATIVE_DEFAULT.native_initial_value(),
+            1.0
         );
     }
 
     #[test]
     fn display_formats_compose_without_losing_strong_types() {
-        let range = TableCellSliderRange::new(0.0, 10.0, 0.25).unwrap();
-        let format = TableCellSliderFormat::new(range, TableCellScientificFormat::default().into());
+        let range = TableCellStepperRange::new(-10.0, 30.0, 0.5).unwrap();
+        let format = TableCellStepperFormat::new(range, TableCellFractionFormat::default().into());
         assert_eq!(format.range(), range);
         assert!(matches!(
             format.display_format(),
-            TableCellSliderDisplayFormat::Scientific(_)
+            TableCellStepperDisplayFormat::Fraction(_)
         ));
     }
 }

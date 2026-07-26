@@ -6,14 +6,15 @@ use crate::protobuf::tsk::FormatStructArchive;
 use crate::table_cell_data_format::{
     TableCellCheckboxFormat, TableCellCurrencyFormat, TableCellDataFormat, TableCellDateTimeFormat,
     TableCellDurationFormat, TableCellFractionFormat, TableCellNumberFormat,
-    TableCellNumeralSystemFormat, TableCellPercentageFormat, TableCellScientificFormat,
-    TableCellSliderDisplayFormat, TableCellSliderFormat, TableCellStarRatingFormat,
+    TableCellNumeralSystemFormat, TableCellNumericControlDisplayFormat, TableCellPercentageFormat,
+    TableCellScientificFormat, TableCellSliderFormat, TableCellStarRatingFormat,
+    TableCellStepperFormat,
 };
 #[cfg(test)]
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyStyle, TableCellDecimalPlaces,
     TableCellFixedDecimalPlaces, TableCellNegativeNumberStyle, TableCellSliderRange,
-    TableCellThousandsSeparator,
+    TableCellStepperRange, TableCellThousandsSeparator,
 };
 
 mod codec;
@@ -60,6 +61,7 @@ pub(super) fn cell_data_format(
                         TableCellDataFormat::Checkbox(_)
                             | TableCellDataFormat::StarRating(_)
                             | TableCellDataFormat::Slider(_)
+                            | TableCellDataFormat::Stepper(_)
                     ) {
                         return Err(Error::InvalidFormat(
                             "Interactive cell format has no control-cell-spec reference".to_owned(),
@@ -96,9 +98,11 @@ pub(super) fn cell_data_format(
                     Ok(format)
                 },
                 Some(control::ControlCellSpecKind::Slider(range)) => {
-                    let display_format = slider_display_from_native(native)?;
+                    let display_format = numeric_control_display_from_native(native)?;
                     let expected_kind = match display_format {
-                        TableCellSliderDisplayFormat::Currency(_) => bnc::CURRENCY_CELL_FORMAT_KIND,
+                        TableCellNumericControlDisplayFormat::Currency(_) => {
+                            bnc::CURRENCY_CELL_FORMAT_KIND
+                        },
                         _ => bnc::DECIMAL_CELL_FORMAT_KIND,
                     };
                     if cell.cell_format_kind() != Some(expected_kind) {
@@ -107,6 +111,24 @@ pub(super) fn cell_data_format(
                         ));
                     }
                     Ok(TableCellDataFormat::Slider(TableCellSliderFormat::new(
+                        range,
+                        display_format,
+                    )))
+                },
+                Some(control::ControlCellSpecKind::Stepper(range)) => {
+                    let display_format = numeric_control_display_from_native(native)?;
+                    let expected_kind = match display_format {
+                        TableCellNumericControlDisplayFormat::Currency(_) => {
+                            bnc::CURRENCY_CELL_FORMAT_KIND
+                        },
+                        _ => bnc::DECIMAL_CELL_FORMAT_KIND,
+                    };
+                    if cell.cell_format_kind() != Some(expected_kind) {
+                        return Err(Error::InvalidFormat(
+                            "Stepper control uses inconsistent BNC format metadata".to_owned(),
+                        ));
+                    }
+                    Ok(TableCellDataFormat::Stepper(TableCellStepperFormat::new(
                         range,
                         display_format,
                     )))
@@ -134,7 +156,8 @@ pub(super) fn cell_number_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Number data format".to_owned(),
         )),
     }
@@ -158,7 +181,8 @@ pub(super) fn cell_currency_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Currency data format".to_owned(),
         )),
     }
@@ -182,7 +206,8 @@ pub(super) fn reset_cell_currency_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Cannot reset Currency format from a non-Currency cell".to_owned(),
         )),
     }
@@ -206,7 +231,8 @@ pub(super) fn cell_percentage_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Percentage data format".to_owned(),
         )),
     }
@@ -230,7 +256,8 @@ pub(super) fn cell_scientific_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Scientific data format".to_owned(),
         )),
     }
@@ -256,7 +283,8 @@ pub(super) fn reset_cell_scientific_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Cannot reset Scientific format from a non-Scientific cell".to_owned(),
         )),
     }
@@ -280,7 +308,8 @@ pub(super) fn cell_fraction_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Fraction data format".to_owned(),
         )),
     }
@@ -304,7 +333,8 @@ pub(super) fn reset_cell_fraction_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Cannot reset Fraction format from a non-Fraction cell".to_owned(),
         )),
     }
@@ -328,7 +358,8 @@ pub(super) fn cell_numeral_system_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Numeral System data format".to_owned(),
         )),
     }
@@ -354,7 +385,8 @@ pub(super) fn reset_cell_numeral_system_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Cannot reset Numeral System format from a non-Numeral-System cell".to_owned(),
         )),
     }
@@ -378,7 +410,8 @@ pub(super) fn cell_date_time_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Date & Time data format".to_owned(),
         )),
     }
@@ -402,7 +435,8 @@ pub(super) fn reset_cell_date_time_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Cannot reset Date & Time format from a non-Date-Time cell".to_owned(),
         )),
     }
@@ -426,7 +460,8 @@ pub(super) fn cell_duration_format(
         | TableCellDataFormat::DateTime(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Duration data format".to_owned(),
         )),
     }
@@ -450,7 +485,8 @@ pub(super) fn reset_cell_duration_format(
         | TableCellDataFormat::DateTime(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Cannot reset Duration format from a non-Duration cell".to_owned(),
         )),
     }
@@ -548,6 +584,36 @@ pub(super) fn reset_cell_slider_format(
     }
 }
 
+pub(super) fn cell_stepper_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellStepperFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::Stepper(format) => Ok(Some(format)),
+        _ => Err(Error::InvalidFormat(
+            "Table cell does not use the Stepper data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_stepper_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::Stepper(_) => reset_cell_data_format(package, table_id, row, column),
+        _ => Err(Error::InvalidFormat(
+            "Cannot reset Stepper format from a non-Stepper cell".to_owned(),
+        )),
+    }
+}
+
 pub(super) fn set_cell_number_format(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -595,8 +661,16 @@ pub(super) fn set_cell_data_format(
         TableCellDataFormat::Checkbox(_) => bnc::CellDataFormatKind::Checkbox,
         TableCellDataFormat::StarRating(_) => bnc::CellDataFormatKind::StarRating,
         TableCellDataFormat::Slider(format) => match format.display_format() {
-            TableCellSliderDisplayFormat::Currency(_) => bnc::CellDataFormatKind::SliderCurrency,
-            _ => bnc::CellDataFormatKind::SliderNumberOrPercentage,
+            TableCellNumericControlDisplayFormat::Currency(_) => {
+                bnc::CellDataFormatKind::NumericControlCurrency
+            },
+            _ => bnc::CellDataFormatKind::NumericControlNumberOrPercentage,
+        },
+        TableCellDataFormat::Stepper(format) => match format.display_format() {
+            TableCellNumericControlDisplayFormat::Currency(_) => {
+                bnc::CellDataFormatKind::NumericControlCurrency
+            },
+            _ => bnc::CellDataFormatKind::NumericControlNumberOrPercentage,
         },
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Percentage(_)
@@ -624,6 +698,12 @@ pub(super) fn set_cell_data_format(
             &location,
             old_control_identifier,
             control::ControlCellSpecKind::Slider(format.range()),
+        )?),
+        TableCellDataFormat::Stepper(format) => Some(control::acquire_spec(
+            package,
+            &location,
+            old_control_identifier,
+            control::ControlCellSpecKind::Stepper(format.range()),
         )?),
         _ => None,
     };
@@ -673,6 +753,11 @@ pub(super) fn set_cell_data_format(
     };
 
     if let TableCellDataFormat::Slider(format) = format
+        && cell.cached_scalar()?.is_none()
+    {
+        cell.set_plain_number(format.range().native_initial_value())?;
+    }
+    if let TableCellDataFormat::Stepper(format) = format
         && cell.cached_scalar()?.is_none()
     {
         cell.set_plain_number(format.range().native_initial_value())?;
@@ -732,7 +817,8 @@ pub(super) fn reset_cell_number_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Cannot reset Number format from a non-Number cell".to_owned(),
         )),
     }
@@ -758,7 +844,8 @@ pub(super) fn reset_cell_percentage_format(
         | TableCellDataFormat::Duration(_)
         | TableCellDataFormat::Checkbox(_)
         | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Slider(_)
+        | TableCellDataFormat::Stepper(_) => Err(Error::InvalidFormat(
             "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
         )),
     }
@@ -1343,21 +1430,26 @@ mod tests {
         native.control_maximum = Some(5.0);
         assert!(data_format_from_native(&native).is_err());
 
-        let slider_displays = [
-            TableCellSliderDisplayFormat::Number(TableCellNumberFormat::default()),
-            TableCellSliderDisplayFormat::Currency(TableCellCurrencyFormat::default()),
-            TableCellSliderDisplayFormat::Percentage(TableCellPercentageFormat::default()),
-            TableCellSliderDisplayFormat::Fraction(TableCellFractionFormat::default()),
-            TableCellSliderDisplayFormat::Scientific(TableCellScientificFormat::default()),
-            TableCellSliderDisplayFormat::NumeralSystem(TableCellNumeralSystemFormat::default()),
+        let numeric_control_displays = [
+            TableCellNumericControlDisplayFormat::Number(TableCellNumberFormat::default()),
+            TableCellNumericControlDisplayFormat::Currency(TableCellCurrencyFormat::default()),
+            TableCellNumericControlDisplayFormat::Percentage(TableCellPercentageFormat::default()),
+            TableCellNumericControlDisplayFormat::Fraction(TableCellFractionFormat::default()),
+            TableCellNumericControlDisplayFormat::Scientific(TableCellScientificFormat::default()),
+            TableCellNumericControlDisplayFormat::NumeralSystem(
+                TableCellNumeralSystemFormat::default(),
+            ),
         ];
-        for display in slider_displays {
-            let native = slider_display_to_native(&display).unwrap();
-            assert_eq!(slider_display_from_native(&native).unwrap(), display);
+        for display in numeric_control_displays {
+            let native = numeric_control_display_to_native(&display).unwrap();
+            assert_eq!(
+                numeric_control_display_from_native(&native).unwrap(),
+                display
+            );
         }
-        let invalid_slider_native =
+        let invalid_numeric_control_native =
             data_format_to_native(&TableCellDataFormat::DateTime(date_time)).unwrap();
-        assert!(slider_display_from_native(&invalid_slider_native).is_err());
+        assert!(numeric_control_display_from_native(&invalid_numeric_control_native).is_err());
     }
 
     #[test]
@@ -1613,6 +1705,108 @@ mod tests {
         assert!(
             reopened
                 .reset_table_cell_slider_format(table_id, 1, 2)
+                .unwrap()
+        );
+        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
+        let controls = storage::resolve_table_data_list(
+            reopened.package(),
+            &location.object_locations,
+            control_table_id,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )
+        .unwrap();
+        assert!(controls.entries.is_empty());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_reuses_and_resets_stepper_formats() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Steppers")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let range = TableCellStepperRange::new(-10.0, 30.0, 0.5).unwrap();
+        let number_display = TableCellNumberFormat::new(
+            TableCellDecimalPlaces::fixed(2).unwrap(),
+            TableCellNegativeNumberStyle::MinusSign,
+            TableCellThousandsSeparator::Hidden,
+        );
+        let number_stepper = TableCellStepperFormat::new(range, number_display.into());
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Number(25.0))
+            .unwrap();
+        editor
+            .set_table_cell_stepper_format(table_id, 1, 1, number_stepper.clone())
+            .unwrap();
+        editor
+            .set_table_cell_stepper_format(table_id, 1, 2, number_stepper.clone())
+            .unwrap();
+
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 1);
+        assert_eq!(formats.entries[0].entry.refcount, 2);
+        let control_table_id = location
+            .descriptor
+            .model
+            .base_data_store
+            .control_cell_spec_table
+            .as_ref()
+            .unwrap()
+            .identifier;
+        let controls = storage::resolve_table_data_list(
+            editor.package(),
+            &location.object_locations,
+            control_table_id,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )
+        .unwrap();
+        assert_eq!(controls.entries.len(), 1);
+        assert_eq!(controls.entries[0].entry.refcount, 2);
+        assert_eq!(
+            controls.entries[0].entry.cell_spec,
+            Some(tst::CellSpecArchive {
+                interaction_type: 4,
+                range_control_min: Some(-10.0),
+                range_control_max: Some(30.0),
+                range_control_inc: Some(0.5),
+                ..Default::default()
+            })
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_stepper_format(table_id, 1, 1).unwrap(),
+            Some(number_stepper.clone())
+        );
+        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            Some(&CellValue::Number(-10.0))
+        );
+
+        let currency_stepper =
+            TableCellStepperFormat::new(range, TableCellCurrencyFormat::default().into());
+        reopened
+            .set_table_cell_stepper_format(table_id, 1, 1, currency_stepper.clone())
+            .unwrap();
+        assert_eq!(
+            reopened.table_cell_stepper_format(table_id, 1, 1).unwrap(),
+            Some(currency_stepper)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_stepper_format(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened.table_cell_stepper_format(table_id, 1, 2).unwrap(),
+            Some(number_stepper)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_stepper_format(table_id, 1, 2)
                 .unwrap()
         );
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();

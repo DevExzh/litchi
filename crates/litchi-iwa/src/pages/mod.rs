@@ -53,6 +53,7 @@ pub use editor::{
     PagesTableCellNumberFormat, PagesTableCellNumeralSystemFormat, PagesTableCellPercentageFormat,
     PagesTableCellRegion, PagesTableCellScientificFormat, PagesTableCellSliderDisplayFormat,
     PagesTableCellSliderFormat, PagesTableCellSliderRange, PagesTableCellStarRatingFormat,
+    PagesTableCellStepperDisplayFormat, PagesTableCellStepperFormat, PagesTableCellStepperRange,
     PagesTableCellTextWrap, PagesTableCellThousandsSeparator, PagesTableCellUpdate,
     PagesTableCellVerticalAlignment, PagesTableColumnDeletion, PagesTableColumnInsertion,
     PagesTableDimension, PagesTableDimensionSize, PagesTableFormulaAxisReference,

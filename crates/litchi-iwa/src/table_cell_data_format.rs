@@ -9,7 +9,9 @@ const MAXIMUM_DECIMAL_PLACES: u8 = 30;
 mod date_time;
 mod duration;
 mod numeral_system;
+mod numeric_control;
 mod slider;
+mod stepper;
 pub use date_time::TableCellDateTimeFormat;
 pub use duration::{
     TableCellDurationFormat, TableCellDurationStyle, TableCellDurationUnit,
@@ -19,7 +21,9 @@ pub use numeral_system::{
     TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
 };
+pub use numeric_control::TableCellNumericControlDisplayFormat;
 pub use slider::{TableCellSliderDisplayFormat, TableCellSliderFormat, TableCellSliderRange};
+pub use stepper::{TableCellStepperDisplayFormat, TableCellStepperFormat, TableCellStepperRange};
 
 /// Native interactive Checkbox format for one table cell.
 ///
@@ -486,6 +490,8 @@ pub enum TableCellDataFormat {
     StarRating(TableCellStarRatingFormat),
     /// Display and edit the numeric value with a native Slider control.
     Slider(TableCellSliderFormat),
+    /// Display and edit the numeric value with native increment and decrement buttons.
+    Stepper(TableCellStepperFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -533,6 +539,12 @@ impl From<TableCellStarRatingFormat> for TableCellDataFormat {
 impl From<TableCellSliderFormat> for TableCellDataFormat {
     fn from(value: TableCellSliderFormat) -> Self {
         Self::Slider(value)
+    }
+}
+
+impl From<TableCellStepperFormat> for TableCellDataFormat {
+    fn from(value: TableCellStepperFormat) -> Self {
+        Self::Stepper(value)
     }
 }
 

@@ -1,7 +1,7 @@
 //! Native control-cell-spec table lifecycle for interactive data formats.
 
 use super::*;
-use crate::table_cell_data_format::TableCellSliderRange;
+use crate::table_cell_data_format::{TableCellSliderRange, TableCellStepperRange};
 
 const DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
 const CHECKBOX_INTERACTION_TYPE: u32 = 8;
@@ -10,12 +10,14 @@ const STAR_RATING_MINIMUM: f64 = 0.0;
 const STAR_RATING_MAXIMUM: f64 = 5.0;
 const STAR_RATING_INCREMENT: f64 = 1.0;
 const SLIDER_INTERACTION_TYPE: u32 = 5;
+const STEPPER_INTERACTION_TYPE: u32 = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ControlCellSpecKind {
     Checkbox,
     StarRating,
     Slider(TableCellSliderRange),
+    Stepper(TableCellStepperRange),
 }
 
 pub(super) fn acquire_spec(
@@ -300,6 +302,13 @@ fn cell_spec(kind: ControlCellSpecKind) -> tst::CellSpecArchive {
             range_control_inc: Some(range.increment()),
             ..Default::default()
         },
+        ControlCellSpecKind::Stepper(range) => tst::CellSpecArchive {
+            interaction_type: STEPPER_INTERACTION_TYPE,
+            range_control_min: Some(range.minimum()),
+            range_control_max: Some(range.maximum()),
+            range_control_inc: Some(range.increment()),
+            ..Default::default()
+        },
     }
 }
 
@@ -308,6 +317,7 @@ const fn control_label(kind: ControlCellSpecKind) -> &'static str {
         ControlCellSpecKind::Checkbox => "Checkbox",
         ControlCellSpecKind::StarRating => "Star Rating",
         ControlCellSpecKind::Slider(_) => "Slider",
+        ControlCellSpecKind::Stepper(_) => "Stepper",
     }
 }
 
@@ -329,6 +339,21 @@ fn parse_cell_spec(
                 .ok_or_else(|| "Slider has no increment".to_owned())?;
             ControlCellSpecKind::Slider(
                 TableCellSliderRange::new(minimum, maximum, increment)
+                    .map_err(|error| error.to_string())?,
+            )
+        },
+        STEPPER_INTERACTION_TYPE => {
+            let minimum = spec
+                .range_control_min
+                .ok_or_else(|| "Stepper has no minimum".to_owned())?;
+            let maximum = spec
+                .range_control_max
+                .ok_or_else(|| "Stepper has no maximum".to_owned())?;
+            let increment = spec
+                .range_control_inc
+                .ok_or_else(|| "Stepper has no increment".to_owned())?;
+            ControlCellSpecKind::Stepper(
+                TableCellStepperRange::new(minimum, maximum, increment)
                     .map_err(|error| error.to_string())?,
             )
         },

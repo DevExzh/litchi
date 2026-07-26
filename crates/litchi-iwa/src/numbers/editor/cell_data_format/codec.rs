@@ -8,9 +8,9 @@ use crate::table_cell_data_format::{
     TableCellDurationUnitRange, TableCellDurationUnits, TableCellFixedDecimalPlaces,
     TableCellFractionAccuracy, TableCellFractionFormat, TableCellNegativeNumberStyle,
     TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFormat,
-    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
-    TableCellScientificFormat, TableCellSliderDisplayFormat, TableCellStarRatingFormat,
-    TableCellThousandsSeparator,
+    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
+    TableCellNumericControlDisplayFormat, TableCellPercentageFormat, TableCellScientificFormat,
+    TableCellStarRatingFormat, TableCellThousandsSeparator,
 };
 use crate::{Error, Result};
 
@@ -37,7 +37,10 @@ const NATIVE_FRACTION_HUNDREDTHS: i32 = 100;
 
 pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<FormatStructArchive> {
     if let TableCellDataFormat::Slider(format) = format {
-        return slider_display_to_native(format.display_format());
+        return numeric_control_display_to_native(format.display_format());
+    }
+    if let TableCellDataFormat::Stepper(format) = format {
+        return numeric_control_display_to_native(format.display_format());
     }
     if matches!(format, TableCellDataFormat::Checkbox(_)) {
         return Ok(FormatStructArchive {
@@ -143,6 +146,7 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
         TableCellDataFormat::Checkbox(_) => unreachable!("handled above"),
         TableCellDataFormat::StarRating(_) => unreachable!("handled above"),
         TableCellDataFormat::Slider(_) => unreachable!("handled above"),
+        TableCellDataFormat::Stepper(_) => unreachable!("handled above"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -166,44 +170,56 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
     })
 }
 
-pub(super) fn slider_display_to_native(
-    display: &TableCellSliderDisplayFormat,
+pub(super) fn numeric_control_display_to_native(
+    display: &TableCellNumericControlDisplayFormat,
 ) -> Result<FormatStructArchive> {
     let format = match display {
-        TableCellSliderDisplayFormat::Number(format) => TableCellDataFormat::Number(*format),
-        TableCellSliderDisplayFormat::Currency(format) => TableCellDataFormat::Currency(*format),
-        TableCellSliderDisplayFormat::Percentage(format) => {
+        TableCellNumericControlDisplayFormat::Number(format) => {
+            TableCellDataFormat::Number(*format)
+        },
+        TableCellNumericControlDisplayFormat::Currency(format) => {
+            TableCellDataFormat::Currency(*format)
+        },
+        TableCellNumericControlDisplayFormat::Percentage(format) => {
             TableCellDataFormat::Percentage(*format)
         },
-        TableCellSliderDisplayFormat::Fraction(format) => TableCellDataFormat::Fraction(*format),
-        TableCellSliderDisplayFormat::Scientific(format) => {
+        TableCellNumericControlDisplayFormat::Fraction(format) => {
+            TableCellDataFormat::Fraction(*format)
+        },
+        TableCellNumericControlDisplayFormat::Scientific(format) => {
             TableCellDataFormat::Scientific(*format)
         },
-        TableCellSliderDisplayFormat::NumeralSystem(format) => {
+        TableCellNumericControlDisplayFormat::NumeralSystem(format) => {
             TableCellDataFormat::NumeralSystem(*format)
         },
     };
     data_format_to_native(&format)
 }
 
-pub(super) fn slider_display_from_native(
+pub(super) fn numeric_control_display_from_native(
     native: &FormatStructArchive,
-) -> Result<TableCellSliderDisplayFormat> {
+) -> Result<TableCellNumericControlDisplayFormat> {
     match data_format_from_native(native)? {
-        TableCellDataFormat::Number(format) => Ok(TableCellSliderDisplayFormat::Number(format)),
-        TableCellDataFormat::Currency(format) => Ok(TableCellSliderDisplayFormat::Currency(format)),
-        TableCellDataFormat::Percentage(format) => {
-            Ok(TableCellSliderDisplayFormat::Percentage(format))
+        TableCellDataFormat::Number(format) => {
+            Ok(TableCellNumericControlDisplayFormat::Number(format))
         },
-        TableCellDataFormat::Fraction(format) => Ok(TableCellSliderDisplayFormat::Fraction(format)),
+        TableCellDataFormat::Currency(format) => {
+            Ok(TableCellNumericControlDisplayFormat::Currency(format))
+        },
+        TableCellDataFormat::Percentage(format) => {
+            Ok(TableCellNumericControlDisplayFormat::Percentage(format))
+        },
+        TableCellDataFormat::Fraction(format) => {
+            Ok(TableCellNumericControlDisplayFormat::Fraction(format))
+        },
         TableCellDataFormat::Scientific(format) => {
-            Ok(TableCellSliderDisplayFormat::Scientific(format))
+            Ok(TableCellNumericControlDisplayFormat::Scientific(format))
         },
         TableCellDataFormat::NumeralSystem(format) => {
-            Ok(TableCellSliderDisplayFormat::NumeralSystem(format))
+            Ok(TableCellNumericControlDisplayFormat::NumeralSystem(format))
         },
         _ => Err(Error::InvalidFormat(
-            "Slider uses a non-numeric display format".to_owned(),
+            "Interactive numeric control uses a non-numeric display format".to_owned(),
         )),
     }
 }

@@ -59,8 +59,8 @@ pub(crate) enum CellDataFormatKind {
     Duration,
     Checkbox,
     StarRating,
-    SliderNumberOrPercentage,
-    SliderCurrency,
+    NumericControlNumberOrPercentage,
+    NumericControlCurrency,
 }
 
 const VALUE_FLAGS: u32 = DECIMAL_FLAG
@@ -417,8 +417,8 @@ impl BncCell {
             (
                 CellDataFormatKind::Checkbox
                 | CellDataFormatKind::StarRating
-                | CellDataFormatKind::SliderNumberOrPercentage
-                | CellDataFormatKind::SliderCurrency,
+                | CellDataFormatKind::NumericControlNumberOrPercentage
+                | CellDataFormatKind::NumericControlCurrency,
                 Some(_),
             )
             | (
@@ -431,8 +431,8 @@ impl BncCell {
             (
                 CellDataFormatKind::Checkbox
                 | CellDataFormatKind::StarRating
-                | CellDataFormatKind::SliderNumberOrPercentage
-                | CellDataFormatKind::SliderCurrency,
+                | CellDataFormatKind::NumericControlNumberOrPercentage
+                | CellDataFormatKind::NumericControlCurrency,
                 None,
             ) => {
                 return Err(Error::InvalidFormat(
@@ -450,14 +450,14 @@ impl BncCell {
             kind,
             CellDataFormatKind::Checkbox
                 | CellDataFormatKind::StarRating
-                | CellDataFormatKind::SliderNumberOrPercentage
-                | CellDataFormatKind::SliderCurrency
+                | CellDataFormatKind::NumericControlNumberOrPercentage
+                | CellDataFormatKind::NumericControlCurrency
         ) {
             self.fields.remove(&CONTROL_CELL_SPEC_FLAG);
         }
         let (explicit_flags, format_kind) = match kind {
             CellDataFormatKind::NumberOrPercentage
-            | CellDataFormatKind::SliderNumberOrPercentage => {
+            | CellDataFormatKind::NumericControlNumberOrPercentage => {
                 if self.prefix[1] == CELL_TYPE_ALTERNATE_NUMBER {
                     self.prefix[1] = CELL_TYPE_NUMBER;
                 }
@@ -471,7 +471,7 @@ impl BncCell {
                 );
                 (EXPLICIT_DECIMAL_FORMAT, DECIMAL_CELL_FORMAT_KIND)
             },
-            CellDataFormatKind::Currency | CellDataFormatKind::SliderCurrency => {
+            CellDataFormatKind::Currency | CellDataFormatKind::NumericControlCurrency => {
                 if self.prefix[1] == CELL_TYPE_NUMBER {
                     self.prefix[1] = CELL_TYPE_ALTERNATE_NUMBER;
                 }
@@ -581,7 +581,8 @@ impl BncCell {
             (CellDataFormatKind::Checkbox, None) => self.set_boolean(false),
             (CellDataFormatKind::StarRating, None) => self.set_number(0.0)?,
             (
-                CellDataFormatKind::SliderNumberOrPercentage | CellDataFormatKind::SliderCurrency,
+                CellDataFormatKind::NumericControlNumberOrPercentage
+                | CellDataFormatKind::NumericControlCurrency,
                 Some(CachedScalar::Boolean(value)),
             ) => self.replace_value(
                 CELL_TYPE_NUMBER,
@@ -589,7 +590,8 @@ impl BncCell {
                 decimal128_le(if value { 1.0 } else { 0.0 })?.to_vec(),
             ),
             (
-                CellDataFormatKind::SliderNumberOrPercentage | CellDataFormatKind::SliderCurrency,
+                CellDataFormatKind::NumericControlNumberOrPercentage
+                | CellDataFormatKind::NumericControlCurrency,
                 Some(CachedScalar::Date(value)),
             ) => self.replace_value(
                 CELL_TYPE_NUMBER,
@@ -603,8 +605,8 @@ impl BncCell {
                 CellDataFormatKind::NumberOrPercentage
                 | CellDataFormatKind::Currency
                 | CellDataFormatKind::DateTime
-                | CellDataFormatKind::SliderNumberOrPercentage
-                | CellDataFormatKind::SliderCurrency,
+                | CellDataFormatKind::NumericControlNumberOrPercentage
+                | CellDataFormatKind::NumericControlCurrency,
                 Some(CachedScalar::Duration(seconds)),
             ) => {
                 self.replace_value(
@@ -1142,7 +1144,11 @@ mod tests {
         let mut empty = BncCell::minimal();
         empty.set_plain_number(10.0).unwrap();
         empty
-            .set_data_format_identifier(12, CellDataFormatKind::SliderNumberOrPercentage, Some(4))
+            .set_data_format_identifier(
+                12,
+                CellDataFormatKind::NumericControlNumberOrPercentage,
+                Some(4),
+            )
             .unwrap();
         assert_eq!(
             empty.cached_scalar().unwrap(),
@@ -1150,7 +1156,7 @@ mod tests {
         );
         assert_eq!(empty.control_cell_spec_identifier(), Some(4));
         empty
-            .set_data_format_identifier(11, CellDataFormatKind::SliderCurrency, Some(4))
+            .set_data_format_identifier(11, CellDataFormatKind::NumericControlCurrency, Some(4))
             .unwrap();
         assert_eq!(empty.cell_format_kind(), Some(CURRENCY_CELL_FORMAT_KIND));
         assert_eq!(empty.format_identifier(), Some(11));
