@@ -70,6 +70,8 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml";
     pub const WML_DOCUMENT_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+    pub const WML_TEMPLATE_MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml";
     /// MS-OFFMACRO2 macro-enabled Word document main-part content type.
     pub const WML_DOCUMENT_MACRO_MAIN: &str =
         "application/vnd.ms-word.document.macroEnabled.main+xml";
@@ -135,6 +137,10 @@ pub mod content_type {
     // PresentationML content types
     pub const PML_PRESENTATION_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+    pub const PML_SLIDESHOW_MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml";
+    pub const PML_TEMPLATE_MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml";
     pub const PML_PRES_MACRO_MAIN: &str =
         "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml";
     /// MS-OFFMACRO2 macro-enabled PowerPoint slideshow main-part content type.

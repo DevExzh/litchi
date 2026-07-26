@@ -37,7 +37,10 @@ use crate::xlsx::sheet_protection::{
     parse_worksheet_protection, replace_worksheet_protection,
     validate_worksheet_protection_metadata,
 };
-use crate::xlsx::vba_project::{VbaProject, discover_vba_project};
+use crate::xlsx::vba_project::{
+    VbaProject, discover_vba_project, remove_vba_project as remove_workbook_vba_project,
+    store_vba_project as store_workbook_vba_project,
+};
 use crate::xlsx::volatile_dependencies::{
     VolatileDependencies, VolatileDependenciesConformance,
     load_from_package_with_conformance as load_volatile_dependencies,
@@ -295,6 +298,31 @@ impl Workbook {
     pub fn vba_project(&self) -> crate::error::Result<Option<VbaProject>> {
         let workbook = self.package.get_part(&self.workbook_uri)?;
         discover_vba_project(&self.package, workbook)
+    }
+
+    /// Attach a cache-free, inert MS-OVBA project and convert this package to XLSM/XLTM.
+    pub fn set_vba_project(
+        &mut self,
+        project: &crate::vba::VbaProjectBinary,
+    ) -> crate::error::Result<VbaProject> {
+        let payload = project
+            .to_cfb_bytes()
+            .map_err(|error| crate::error::OoxmlError::InvalidFormat(error.to_string()))?;
+        self.set_vba_project_bytes(payload, &crate::vba::VbaLimits::default())
+    }
+
+    /// Attach an existing, validated `vbaProject.bin` payload without executing it.
+    pub fn set_vba_project_bytes(
+        &mut self,
+        payload: Vec<u8>,
+        limits: &crate::vba::VbaLimits,
+    ) -> crate::error::Result<VbaProject> {
+        store_workbook_vba_project(&mut self.package, &self.workbook_uri, payload, limits)
+    }
+
+    /// Remove the VBA project graph and convert XLSM/XLTM content types back to XLSX/XLTX.
+    pub fn remove_vba_project(&mut self) -> crate::error::Result<bool> {
+        remove_workbook_vba_project(&mut self.package, &self.workbook_uri)
     }
 
     /// Load persisted Office Add-in task-pane metadata without activating add-ins.
@@ -2166,9 +2194,28 @@ impl Workbook {
 
         validate_workbook_tables(data)?;
 
-        let preserved_external_relationships = {
+        let (
+            preserved_main_content_type,
+            preserved_vba_target,
+            preserved_external_relationships,
+        ) = {
             let workbook_part = self.package.get_part(&self.workbook_uri)?;
-            self.external_links
+            discover_vba_project(&self.package, workbook_part)?;
+            let mut vba_projects = workbook_part
+                .rels()
+                .iter()
+                .filter(|relationship| relationship.reltype() == rt::VBA_PROJECT);
+            let preserved_vba_target = match vba_projects.next() {
+                Some(relationship) if relationship.is_external() => {
+                    return Err("workbook VBA Project relationship cannot be external".into());
+                },
+                Some(relationship) => Some(relationship.target_ref().to_string()),
+                None => None,
+            };
+            if vba_projects.next().is_some() {
+                return Err("workbook has multiple VBA Project relationships".into());
+            }
+            let external_relationships = self.external_links
                 .iter()
                 .map(|link| {
                     let relationship =
@@ -2188,7 +2235,12 @@ impl Workbook {
                         relationship.is_external(),
                     ))
                 })
-                .collect::<SheetResult<Vec<_>>>()?
+                .collect::<SheetResult<Vec<_>>>()?;
+            (
+                workbook_part.content_type().to_string(),
+                preserved_vba_target,
+                external_relationships,
+            )
         };
 
         let workbook_uri = PackURI::new("/xl/workbook.xml")?;
@@ -2196,7 +2248,7 @@ impl Workbook {
         // Create temporary workbook part to manage relationships
         let mut temp_wb_part = BlobPart::new(
             workbook_uri.clone(),
-            ct::SML_SHEET_MAIN.to_string(),
+            preserved_main_content_type,
             Vec::new(),
         );
         for (relationship_type, target, relationship_id, external) in
@@ -2208,6 +2260,9 @@ impl Workbook {
                 relationship_id,
                 external,
             );
+        }
+        if let Some(target) = preserved_vba_target {
+            temp_wb_part.relate_to(&target, rt::VBA_PROJECT);
         }
 
         // Build styles from all worksheets FIRST

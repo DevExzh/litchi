@@ -244,12 +244,18 @@ impl OpcPackage {
     /// Try to add a part without replacing an existing or ambiguous part name.
     pub fn try_add_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
         let partname = part.partname().clone();
+        self.validate_new_part_name(&partname)?;
+        self.parts.insert(partname, part);
+        Ok(())
+    }
+
+    /// Validate that a new part name would not replace or conflict with an existing part.
+    pub fn validate_new_part_name(&self, partname: &PackURI) -> Result<()> {
         for existing in self.parts.keys() {
-            if let Some(conflict) = existing.conflict_with(&partname) {
-                return Err(part_name_conflict_error(existing, &partname, conflict));
+            if let Some(conflict) = existing.conflict_with(partname) {
+                return Err(part_name_conflict_error(existing, partname, conflict));
             }
         }
-        self.parts.insert(partname, part);
         Ok(())
     }
 

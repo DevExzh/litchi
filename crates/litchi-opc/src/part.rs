@@ -24,6 +24,21 @@ pub trait Part: Send + Sync {
     /// Get the content type of this part.
     fn content_type(&self) -> &str;
 
+    /// Replace the content type of this part.
+    ///
+    /// Callers are responsible for selecting a content type permitted by the
+    /// owning package format. The package writer will emit the updated value
+    /// into `[Content_Types].xml`.
+    fn set_content_type(&mut self, content_type: String) -> Result<()> {
+        Err(OpcError::InvalidContentType {
+            value: content_type,
+            reason: format!(
+                "part '{}' does not support changing its content type",
+                self.partname().as_str()
+            ),
+        })
+    }
+
     /// Get the binary content of this part.
     /// Returns a reference to the blob data for efficient access.
     fn blob(&self) -> &[u8];
@@ -130,6 +145,11 @@ impl Part for BlobPart {
 
     fn content_type(&self) -> &str {
         &self.content_type
+    }
+
+    fn set_content_type(&mut self, content_type: String) -> Result<()> {
+        self.content_type = content_type;
+        Ok(())
     }
 
     fn blob(&self) -> &[u8] {
@@ -321,6 +341,11 @@ impl Part for XmlPart {
         &self.content_type
     }
 
+    fn set_content_type(&mut self, content_type: String) -> Result<()> {
+        self.content_type = content_type;
+        Ok(())
+    }
+
     fn blob(&self) -> &[u8] {
         &self.xml_bytes
     }
@@ -391,10 +416,12 @@ mod tests {
     fn test_blob_part() {
         let partname = PackURI::new("/word/media/image1.png").unwrap();
         let content = vec![0x89, 0x50, 0x4E, 0x47]; // PNG header
-        let part = BlobPart::new(partname, "image/png".to_string(), content.clone());
+        let mut part = BlobPart::new(partname, "image/png".to_string(), content.clone());
 
         assert_eq!(part.content_type(), "image/png");
         assert_eq!(part.blob(), content.as_slice());
+        part.set_content_type("image/webp".to_string()).unwrap();
+        assert_eq!(part.content_type(), "image/webp");
     }
 
     #[test]
@@ -405,6 +432,9 @@ mod tests {
 
         let text = part.extract_text("text").unwrap();
         assert_eq!(text, Some("Hello".to_string()));
+        part.set_content_type("application/example+xml".to_string())
+            .unwrap();
+        assert_eq!(part.content_type(), "application/example+xml");
     }
 
     #[test]

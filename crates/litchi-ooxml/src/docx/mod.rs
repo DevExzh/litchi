@@ -196,7 +196,9 @@ pub use textbox::{
 };
 pub use theme::Theme;
 pub use variables::DocumentVariables;
-pub use vba_project::VbaProject;
+pub use vba_project::{
+    VbaDocumentEvent, VbaMacroDescriptor, VbaProject, VbaSupplementalData,
+};
 pub use web_settings::{
     Frame, FrameLayout, FrameScrollbarVisibility, Frameset, FramesetChild, FramesetColor,
     FramesetSplitBar, HtmlDiv, HtmlDivBorder, HtmlDivBorders, TargetScreenSize, ThemeColor,

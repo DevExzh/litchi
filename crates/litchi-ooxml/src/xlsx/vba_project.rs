@@ -4,6 +4,9 @@
 //! does not inspect, parse, decompress, or execute VBA project bytes.
 
 use crate::error::{OoxmlError, Result};
+use crate::vba_package::{
+    VbaPackageHost, remove_vba_project_graph, store_vba_project_graph, validate_vba_project_payload,
+};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
 
@@ -108,9 +111,28 @@ pub(crate) fn discover_vba_project(
     }))
 }
 
+pub(crate) fn store_vba_project(
+    package: &mut OpcPackage,
+    source: &PackURI,
+    payload: Vec<u8>,
+    limits: &crate::vba::VbaLimits,
+) -> Result<VbaProject> {
+    validate_vba_project_payload(&payload, limits)?;
+    store_vba_project_graph(package, source, VbaPackageHost::Excel, payload, None)?;
+    let source = package.get_part(source)?;
+    discover_vba_project(package, source)?.ok_or_else(|| {
+        OoxmlError::InvalidFormat("stored Excel VBA project was not discoverable".to_string())
+    })
+}
+
+pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
+    remove_vba_project_graph(package, source, VbaPackageHost::Excel)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::vba::{VbaLimits, VbaModuleBuilder, VbaProjectBuilder};
     use crate::xlsx::Workbook;
     use litchi_opc::part::BlobPart;
 
@@ -163,5 +185,145 @@ mod tests {
         let workbook = Workbook::create().unwrap();
 
         assert!(workbook.vba_project().unwrap().is_none());
+    }
+
+    fn authored_project() -> crate::vba::VbaProjectBinary {
+        VbaProjectBuilder::new("ExcelProject")
+            .with_module(VbaModuleBuilder::standard(
+                "Module1",
+                "Public Sub Hello()\r\nEnd Sub\r\n",
+            ))
+            .build(&VbaLimits::default())
+            .unwrap()
+    }
+
+    #[test]
+    fn stores_preserves_replaces_and_removes_authored_project() {
+        let file = tempfile::NamedTempFile::with_suffix(".xlsm").unwrap();
+        let mut workbook = Workbook::create().unwrap();
+        let project = authored_project();
+
+        let metadata = workbook.set_vba_project(&project).unwrap();
+        assert_eq!(metadata.project_part_name().as_str(), "/xl/vbaProject.bin");
+        assert_eq!(
+            workbook
+                .opc_package()
+                .main_document_part()
+                .unwrap()
+                .content_type(),
+            content_type::SML_SHEET_MACRO_MAIN
+        );
+        workbook
+            .worksheet_mut(0)
+            .unwrap()
+            .set_cell_value(1, 1, "materialize");
+        workbook.save(file.path()).unwrap();
+
+        let mut reopened = Workbook::open(file.path()).unwrap();
+        let metadata = reopened.vba_project().unwrap().unwrap();
+        let parsed = metadata
+            .read_project(reopened.opc_package(), &VbaLimits::default())
+            .unwrap();
+        assert_eq!(parsed.name(), "ExcelProject");
+        assert_eq!(parsed.modules().len(), 1);
+
+        reopened.set_vba_project(&project).unwrap();
+        assert!(reopened.remove_vba_project().unwrap());
+        assert!(reopened.vba_project().unwrap().is_none());
+        assert_eq!(
+            reopened
+                .opc_package()
+                .main_document_part()
+                .unwrap()
+                .content_type(),
+            content_type::SML_SHEET_MAIN
+        );
+        assert!(
+            reopened
+                .opc_package()
+                .get_part(&PackURI::new("/xl/vbaProject.bin").unwrap())
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_project_before_mutating_workbook() {
+        let mut workbook = Workbook::create().unwrap();
+        assert!(
+            workbook
+                .set_vba_project_bytes(vec![0; 64], &VbaLimits::default())
+                .is_err()
+        );
+        assert!(workbook.vba_project().unwrap().is_none());
+        assert_eq!(
+            workbook
+                .opc_package()
+                .main_document_part()
+                .unwrap()
+                .content_type(),
+            content_type::SML_SHEET_MAIN
+        );
+    }
+
+    #[test]
+    fn conflicting_canonical_part_name_is_rejected_atomically() {
+        let mut workbook = Workbook::create().unwrap();
+        let occupied = PackURI::new("/xl/VBAPROJECT.bin").unwrap();
+        workbook.opc_package_mut().add_part(Box::new(BlobPart::new(
+            occupied.clone(),
+            "application/octet-stream".to_string(),
+            b"keep me".to_vec(),
+        )));
+
+        assert!(workbook.set_vba_project(&authored_project()).is_err());
+        assert_eq!(
+            workbook.opc_package().get_part(&occupied).unwrap().blob(),
+            b"keep me"
+        );
+        assert!(workbook.vba_project().unwrap().is_none());
+        assert_eq!(
+            workbook
+                .opc_package()
+                .main_document_part()
+                .unwrap()
+                .content_type(),
+            content_type::SML_SHEET_MAIN
+        );
+    }
+
+    #[test]
+    fn template_kind_survives_attach_and_remove() {
+        let mut workbook = Workbook::create().unwrap();
+        let source = workbook
+            .opc_package()
+            .main_document_part()
+            .unwrap()
+            .partname()
+            .clone();
+        workbook
+            .opc_package_mut()
+            .get_part_mut(&source)
+            .unwrap()
+            .set_content_type(content_type::SML_TEMPLATE_MAIN.to_string())
+            .unwrap();
+
+        workbook.set_vba_project(&authored_project()).unwrap();
+        assert_eq!(
+            workbook
+                .opc_package()
+                .get_part(&source)
+                .unwrap()
+                .content_type(),
+            content_type::SML_TEMPLATE_MACRO_MAIN
+        );
+        workbook.remove_vba_project().unwrap();
+        assert_eq!(
+            workbook
+                .opc_package()
+                .get_part(&source)
+                .unwrap()
+                .content_type(),
+            content_type::SML_TEMPLATE_MAIN
+        );
     }
 }

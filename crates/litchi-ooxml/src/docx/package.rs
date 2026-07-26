@@ -31,7 +31,11 @@ use crate::docx::settings::{
     validate_attached_template_target,
 };
 use crate::docx::variables::DocumentVariables;
-use crate::docx::vba_project::{VbaProject, discover_vba_project};
+use crate::docx::vba_project::{
+    VbaProject, VbaSupplementalData, discover_vba_project,
+    remove_vba_project as remove_vba_project_graph_from_document,
+    store_vba_project as store_vba_project_in_document,
+};
 use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
 use crate::ribbonx::{
@@ -55,15 +59,19 @@ use std::path::Path;
 fn validate_document_main_content_type(content_type: &str) -> Result<()> {
     if matches!(
         content_type,
-        ct::WML_DOCUMENT_MAIN | ct::WML_DOCUMENT_MACRO_MAIN | ct::WML_TEMPLATE_MACRO_MAIN
+        ct::WML_DOCUMENT_MAIN
+            | ct::WML_TEMPLATE_MAIN
+            | ct::WML_DOCUMENT_MACRO_MAIN
+            | ct::WML_TEMPLATE_MACRO_MAIN
     ) {
         return Ok(());
     }
 
     Err(OoxmlError::InvalidContentType {
         expected: format!(
-            "{}, {}, or {}",
+            "{}, {}, {}, or {}",
             ct::WML_DOCUMENT_MAIN,
+            ct::WML_TEMPLATE_MAIN,
             ct::WML_DOCUMENT_MACRO_MAIN,
             ct::WML_TEMPLATE_MACRO_MAIN,
         ),
@@ -630,6 +638,53 @@ impl Package {
     pub fn vba_project(&self) -> Result<Option<VbaProject>> {
         let document = self.opc.main_document_part()?;
         discover_vba_project(&self.opc, document)
+    }
+
+    /// Attach a cache-free, inert MS-OVBA project with empty Word supplemental data.
+    pub fn set_vba_project(
+        &mut self,
+        project: &crate::vba::VbaProjectBinary,
+    ) -> Result<VbaProject> {
+        self.set_vba_project_with_supplemental_data(project, &VbaSupplementalData::new())
+    }
+
+    /// Attach a cache-free project and typed Word document-event/macro metadata.
+    pub fn set_vba_project_with_supplemental_data(
+        &mut self,
+        project: &crate::vba::VbaProjectBinary,
+        supplemental_data: &VbaSupplementalData,
+    ) -> Result<VbaProject> {
+        let payload = project
+            .to_cfb_bytes()
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?;
+        self.set_vba_project_bytes(
+            payload,
+            supplemental_data,
+            &crate::vba::VbaLimits::default(),
+        )
+    }
+
+    /// Attach an existing, validated `vbaProject.bin` and typed Word supplemental data.
+    pub fn set_vba_project_bytes(
+        &mut self,
+        payload: Vec<u8>,
+        supplemental_data: &VbaSupplementalData,
+        limits: &crate::vba::VbaLimits,
+    ) -> Result<VbaProject> {
+        let source = self.opc.main_document_part()?.partname().clone();
+        store_vba_project_in_document(
+            &mut self.opc,
+            &source,
+            payload,
+            supplemental_data,
+            limits,
+        )
+    }
+
+    /// Remove the VBA project and supplemental-data graph and restore DOCX/DOTX type.
+    pub fn remove_vba_project(&mut self) -> Result<bool> {
+        let source = self.opc.main_document_part()?.partname().clone();
+        remove_vba_project_graph_from_document(&mut self.opc, &source)
     }
 
     /// Load persisted Office Add-in task-pane metadata without activating add-ins.

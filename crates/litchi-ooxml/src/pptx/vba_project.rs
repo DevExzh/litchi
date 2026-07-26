@@ -4,6 +4,9 @@
 //! does not inspect, parse, decompress, or execute VBA project bytes.
 
 use crate::error::{OoxmlError, Result};
+use crate::vba_package::{
+    VbaPackageHost, remove_vba_project_graph, store_vba_project_graph, validate_vba_project_payload,
+};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
 
@@ -108,10 +111,29 @@ pub(crate) fn discover_vba_project(
     }))
 }
 
+pub(crate) fn store_vba_project(
+    package: &mut OpcPackage,
+    source: &PackURI,
+    payload: Vec<u8>,
+    limits: &crate::vba::VbaLimits,
+) -> Result<VbaProject> {
+    validate_vba_project_payload(&payload, limits)?;
+    store_vba_project_graph(package, source, VbaPackageHost::PowerPoint, payload, None)?;
+    let source = package.get_part(source)?;
+    discover_vba_project(package, source)?.ok_or_else(|| {
+        OoxmlError::InvalidFormat("stored PowerPoint VBA project was not discoverable".to_string())
+    })
+}
+
+pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
+    remove_vba_project_graph(package, source, VbaPackageHost::PowerPoint)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::pptx::Package;
+    use crate::vba::{VbaLimits, VbaModuleBuilder, VbaProjectBuilder};
     use litchi_opc::part::BlobPart;
 
     fn package_with_vba_project(
@@ -185,6 +207,110 @@ mod tests {
 
             assert_eq!(project.project_part_name().as_str(), "/ppt/vbaProject.bin");
             assert!(package.presentation().is_ok());
+        }
+    }
+
+    fn authored_project() -> crate::vba::VbaProjectBinary {
+        VbaProjectBuilder::new("PowerPointProject")
+            .with_module(VbaModuleBuilder::standard(
+                "Module1",
+                "Public Sub Hello()\r\nEnd Sub\r\n",
+            ))
+            .build(&VbaLimits::default())
+            .unwrap()
+    }
+
+    #[test]
+    fn stores_and_preserves_project_across_presentation_materialization() {
+        let file = tempfile::NamedTempFile::with_suffix(".pptm").unwrap();
+        let mut package = Package::new().unwrap();
+        let project = authored_project();
+        package.set_vba_project(&project).unwrap();
+        package.presentation_mut().unwrap().add_slide().unwrap();
+        package.save(file.path()).unwrap();
+
+        let mut reopened = Package::open(file.path()).unwrap();
+        let metadata = reopened.vba_project().unwrap().unwrap();
+        let parsed = metadata
+            .read_project(reopened.opc_package(), &VbaLimits::default())
+            .unwrap();
+        assert_eq!(parsed.name(), "PowerPointProject");
+        assert_eq!(
+            reopened
+                .opc_package()
+                .main_document_part()
+                .unwrap()
+                .content_type(),
+            content_type::PML_PRES_MACRO_MAIN
+        );
+
+        assert!(reopened.remove_vba_project().unwrap());
+        assert!(reopened.vba_project().unwrap().is_none());
+        assert_eq!(
+            reopened
+                .opc_package()
+                .main_document_part()
+                .unwrap()
+                .content_type(),
+            content_type::PML_PRESENTATION_MAIN
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_project_before_mutating_presentation() {
+        let mut package = Package::new().unwrap();
+        assert!(
+            package
+                .set_vba_project_bytes(vec![0; 64], &VbaLimits::default())
+                .is_err()
+        );
+        assert!(package.vba_project().unwrap().is_none());
+    }
+
+    #[test]
+    fn slideshow_and_template_kinds_survive_attach_and_remove() {
+        for (plain, macro_enabled) in [
+            (
+                content_type::PML_SLIDESHOW_MAIN,
+                content_type::PML_SLIDESHOW_MACRO_MAIN,
+            ),
+            (
+                content_type::PML_TEMPLATE_MAIN,
+                content_type::PML_TEMPLATE_MACRO_MAIN,
+            ),
+        ] {
+            let mut package = Package::new().unwrap();
+            let source = package
+                .opc_package()
+                .main_document_part()
+                .unwrap()
+                .partname()
+                .clone();
+            package
+                .opc_package_mut()
+                .get_part_mut(&source)
+                .unwrap()
+                .set_content_type(plain.to_string())
+                .unwrap();
+
+            package.set_vba_project(&authored_project()).unwrap();
+            assert_eq!(
+                package
+                    .opc_package()
+                    .get_part(&source)
+                    .unwrap()
+                    .content_type(),
+                macro_enabled
+            );
+            package.remove_vba_project().unwrap();
+            assert_eq!(
+                package
+                    .opc_package()
+                    .get_part(&source)
+                    .unwrap()
+                    .content_type(),
+                plain
+            );
         }
     }
 }

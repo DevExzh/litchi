@@ -4,7 +4,10 @@ use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
 use crate::pptx::presentation::{PptxChart, PptxTagList, Presentation};
 use crate::pptx::show_events::PptxSlideShowEvent;
-use crate::pptx::vba_project::{VbaProject, discover_vba_project};
+use crate::pptx::vba_project::{
+    VbaProject, discover_vba_project, remove_vba_project as remove_presentation_vba_project,
+    store_vba_project as store_presentation_vba_project,
+};
 use crate::pptx::writer::MutablePresentation;
 use crate::ribbonx::{
     RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
@@ -40,6 +43,8 @@ fn validate_presentation_main_content_type(content_type: &str) -> Result<()> {
     if matches!(
         content_type,
         ct::PML_PRESENTATION_MAIN
+            | ct::PML_SLIDESHOW_MAIN
+            | ct::PML_TEMPLATE_MAIN
             | ct::PML_PRES_MACRO_MAIN
             | ct::PML_SLIDESHOW_MACRO_MAIN
             | ct::PML_TEMPLATE_MACRO_MAIN
@@ -49,8 +54,10 @@ fn validate_presentation_main_content_type(content_type: &str) -> Result<()> {
 
     Err(OoxmlError::InvalidContentType {
         expected: format!(
-            "{}, {}, {}, or {}",
+            "{}, {}, {}, {}, {}, or {}",
             ct::PML_PRESENTATION_MAIN,
+            ct::PML_SLIDESHOW_MAIN,
+            ct::PML_TEMPLATE_MAIN,
             ct::PML_PRES_MACRO_MAIN,
             ct::PML_SLIDESHOW_MACRO_MAIN,
             ct::PML_TEMPLATE_MACRO_MAIN,
@@ -728,6 +735,33 @@ impl Package {
     pub fn vba_project(&self) -> Result<Option<VbaProject>> {
         let presentation = self.opc.main_document_part()?;
         discover_vba_project(&self.opc, presentation)
+    }
+
+    /// Attach a cache-free, inert MS-OVBA project and convert this package to PPTM/PPSM/POTM.
+    pub fn set_vba_project(
+        &mut self,
+        project: &crate::vba::VbaProjectBinary,
+    ) -> Result<VbaProject> {
+        let payload = project
+            .to_cfb_bytes()
+            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?;
+        self.set_vba_project_bytes(payload, &crate::vba::VbaLimits::default())
+    }
+
+    /// Attach an existing, validated `vbaProject.bin` payload without executing it.
+    pub fn set_vba_project_bytes(
+        &mut self,
+        payload: Vec<u8>,
+        limits: &crate::vba::VbaLimits,
+    ) -> Result<VbaProject> {
+        let source = self.opc.main_document_part()?.partname().clone();
+        store_presentation_vba_project(&mut self.opc, &source, payload, limits)
+    }
+
+    /// Remove the VBA project graph and restore the corresponding non-macro main type.
+    pub fn remove_vba_project(&mut self) -> Result<bool> {
+        let source = self.opc.main_document_part()?.partname().clone();
+        remove_presentation_vba_project(&mut self.opc, &source)
     }
 
     /// Load persisted Office Add-in task-pane metadata without activating add-ins.
@@ -1453,10 +1487,34 @@ impl Package {
         let pres_uri = PackURI::new("/ppt/presentation.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("presentation URI: {}", e)))?;
 
+        let (presentation_content_type, vba_project_target) = {
+            let existing = self.opc.get_part(&pres_uri)?;
+            discover_vba_project(&self.opc, existing)?;
+            let mut projects = existing
+                .rels()
+                .iter()
+                .filter(|relationship| relationship.reltype() == rt::VBA_PROJECT);
+            let target = match projects.next() {
+                Some(relationship) if relationship.is_external() => {
+                    return Err(OoxmlError::InvalidFormat(
+                        "presentation VBA Project relationship cannot be external".to_string(),
+                    ));
+                },
+                Some(relationship) => Some(relationship.target_ref().to_string()),
+                None => None,
+            };
+            if projects.next().is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "presentation has multiple VBA Project relationships".to_string(),
+                ));
+            }
+            (existing.content_type().to_string(), target)
+        };
+
         // Create a temporary presentation part to manage relationships
         let mut temp_pres_part = BlobPart::new(
             pres_uri.clone(),
-            ct::PML_PRESENTATION_MAIN.to_string(),
+            presentation_content_type,
             Vec::new(),
         );
 
@@ -1469,6 +1527,9 @@ impl Package {
         temp_pres_part.relate_to("viewProps.xml", rt::VIEW_PROPS);
         temp_pres_part.relate_to("presProps.xml", rt::PRES_PROPS);
         temp_pres_part.relate_to("theme/theme1.xml", rt::THEME);
+        if let Some(target) = vba_project_target {
+            temp_pres_part.relate_to(&target, rt::VBA_PROJECT);
+        }
 
         // Add relationship to notesMaster (required when we have notesSlides)
         let notes_master_rel_id =
