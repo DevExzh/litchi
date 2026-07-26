@@ -25,6 +25,8 @@ use quick_xml::reader::NsReader;
 use crate::common::xml::{decode_xml_reference, is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::relationship_attribute_value;
+use crate::xlsx::shape_geometry::XlsxCustomGeometry;
+use crate::xlsx::shape_geometry::parse::{CustomGeometryBuilder, GeometryElement};
 use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::worksheet::WorksheetInfo;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -848,6 +850,8 @@ pub struct XlsxShape {
     pub is_text_box: bool,
     /// Preset geometry (`a:prstGeom@prst`), when declared.
     pub preset: Option<XlsxShapePreset>,
+    /// Custom geometry (`a:custGeom`), when declared.
+    pub custom_geometry: Option<XlsxCustomGeometry>,
     /// Rich-text story (`xdr:txBody`), when present.
     pub text_body: Option<XlsxShapeTextBody>,
 }
@@ -1020,6 +1024,7 @@ enum Context {
     To,
     Marker(MarkerTarget, MarkerField),
     Object,
+    CustomGeometry(GeometryElement),
     TextBody,
     BodyProperties,
     Paragraph,
@@ -1113,6 +1118,8 @@ struct ObjectBuilder {
     non_visual: XlsxShapeNonVisual,
     is_text_box: bool,
     preset: Option<XlsxShapePreset>,
+    custom_geometry: Option<XlsxCustomGeometry>,
+    geometry_builder: Option<CustomGeometryBuilder>,
     start: Option<XlsxShapeConnectionEnd>,
     end: Option<XlsxShapeConnectionEnd>,
     transform: XlsxGroupTransform,
@@ -1129,6 +1136,8 @@ impl ObjectBuilder {
             non_visual: XlsxShapeNonVisual::default(),
             is_text_box: false,
             preset: None,
+            custom_geometry: None,
+            geometry_builder: None,
             start: None,
             end: None,
             transform: XlsxGroupTransform::default(),
@@ -1153,6 +1162,7 @@ impl ObjectBuilder {
                 non_visual: self.non_visual,
                 is_text_box: self.is_text_box,
                 preset: self.preset,
+                custom_geometry: self.custom_geometry,
                 text_body,
             })),
             BuilderKind::Connection => Some(XlsxDrawingObject::ConnectionShape(
@@ -1461,6 +1471,11 @@ impl Parser {
                 }
                 return Ok(Context::Other);
             },
+            Context::CustomGeometry(geometry_parent)
+                if is_drawingml_name(namespace, name, local) =>
+            {
+                return self.open_geometry_child(geometry_parent, local, element, decoder);
+            },
             // Objects nest only inside groups.
             Context::Object if xdr && self.builders.last().is_some_and(|b| b.kind == BuilderKind::Group) => {
                 match local {
@@ -1531,6 +1546,9 @@ impl Parser {
                     if let Some(preset) = unqualified_attribute_value(element, b"prst", decoder)? {
                         self.builder_mut()?.preset = Some(XlsxShapePreset::from_token(&preset));
                     }
+                },
+                b"custGeom" if builder_kind == Some(BuilderKind::Shape) => {
+                    return self.open_custom_geometry();
                 },
                 b"spLocks" | b"cxnSpLocks" | b"grpSpLocks"
                     if any_truthy_attribute(element, decoder)? =>
@@ -1609,6 +1627,51 @@ impl Parser {
             }
         }
         Ok(Context::Other)
+    }
+
+    /// Open the `a:custGeom` element of the current shape.
+    fn open_custom_geometry(&mut self) -> Result<Context> {
+        let builder = self.builder_mut()?;
+        if builder.custom_geometry.is_some() || builder.geometry_builder.is_some() {
+            return Err(invalid("drawing shape contains duplicate custom geometries"));
+        }
+        builder.geometry_builder = Some(CustomGeometryBuilder::new());
+        Ok(Context::CustomGeometry(GeometryElement::CustomGeometry))
+    }
+
+    /// Route one DrawingML child of the custom geometry subtree into the
+    /// geometry builder; unknown children are skipped inertly.
+    fn open_geometry_child(
+        &mut self,
+        parent: GeometryElement,
+        local: &[u8],
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> Result<Context> {
+        let builder = self.builder_mut()?;
+        let Some(geometry) = builder.geometry_builder.as_mut() else {
+            return Ok(Context::Other);
+        };
+        Ok(match geometry.open(parent, local, element, decoder)? {
+            Some(child) => Context::CustomGeometry(child),
+            None => Context::Other,
+        })
+    }
+
+    /// Close one custom geometry element; the `a:custGeom` close finalizes
+    /// the builder into the shape.
+    fn finish_geometry(&mut self, element: GeometryElement) -> Result<()> {
+        let builder = self.builder_mut()?;
+        if element == GeometryElement::CustomGeometry {
+            if let Some(geometry) = builder.geometry_builder.take() {
+                builder.custom_geometry = Some(geometry.finish()?);
+            }
+            return Ok(());
+        }
+        if let Some(geometry) = builder.geometry_builder.as_mut() {
+            geometry.close(element)?;
+        }
+        Ok(())
     }
 
     fn apply_group_transform(
@@ -1725,6 +1788,7 @@ impl Parser {
             Context::Marker(target, field) => self.finish_marker(target, field),
             Context::Anchor => self.finish_anchor(),
             Context::Object => self.close_object(),
+            Context::CustomGeometry(element) => self.finish_geometry(element),
             Context::Run => {
                 if let Some(builder) = self.builders.last_mut()
                     && let (Some(run), Some(paragraph)) = (

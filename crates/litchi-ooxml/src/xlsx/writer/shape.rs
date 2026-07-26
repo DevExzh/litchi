@@ -24,6 +24,8 @@ use std::fmt::Write as _;
 
 use litchi_core::xml::escape::escape_xml;
 
+use crate::xlsx::shape_geometry::write::write_custom_geometry;
+use crate::xlsx::shape_geometry::{XlsxCustomGeometry, validate_custom_geometry};
 use crate::xlsx::shapes::{
     XlsxCellMarker, XlsxEmuExtent, XlsxEmuOffset, XlsxEditAs, XlsxGroupTransform, XlsxShapeAnchor,
     XlsxShapeBodyProperties, XlsxShapeParagraph, XlsxShapePreset, XlsxShapeRun, XlsxTextAutofit,
@@ -69,8 +71,12 @@ pub struct XlsxShapeSpec {
     pub is_text_box: bool,
     /// How the shape is anchored on the worksheet grid.
     pub anchor: XlsxShapeAnchor,
-    /// Preset geometry (`a:prstGeom@prst`).
+    /// Preset geometry (`a:prstGeom@prst`), used when no custom geometry is
+    /// set.
     pub preset: XlsxShapePreset,
+    /// Custom geometry (`a:custGeom`), written instead of the preset when
+    /// set.
+    pub custom_geometry: Option<XlsxCustomGeometry>,
     /// Text-body properties (`a:bodyPr`).
     pub body_properties: XlsxShapeBodyProperties,
     /// The text story as paragraphs with runs.
@@ -117,8 +123,27 @@ impl XlsxShapeSpec {
             is_text_box: false,
             anchor,
             preset,
+            custom_geometry: None,
             body_properties: XlsxShapeBodyProperties::default(),
             paragraphs,
+        }
+    }
+
+    /// A shape drawn with a custom DrawingML geometry (`a:custGeom`) instead
+    /// of a preset.
+    ///
+    /// `text` is split into paragraphs on `\n` as in [`XlsxShapeSpec::shape`].
+    /// The `preset` field keeps its default and is not serialized while the
+    /// custom geometry is set.
+    pub fn custom(
+        name: impl Into<String>,
+        anchor: XlsxShapeAnchor,
+        geometry: XlsxCustomGeometry,
+        text: &str,
+    ) -> Self {
+        Self {
+            custom_geometry: Some(geometry),
+            ..Self::shape(name, anchor, XlsxShapePreset::Rectangle, text)
         }
     }
 
@@ -153,6 +178,9 @@ impl XlsxShapeSpec {
             return Err("shape text column count is outside DrawingML bounds".to_string());
         }
         validate_preset(&self.preset)?;
+        if let Some(geometry) = &self.custom_geometry {
+            validate_custom_geometry(geometry)?;
+        }
         validate_anchor(&self.anchor)
     }
 }
@@ -800,11 +828,16 @@ fn write_shape_xml(xml: &mut String, spec: &XlsxShapeSpec, id: u32) {
     }
     xml.push_str("</xdr:nvSpPr><xdr:spPr>");
     xml.push_str(r#"<a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm>"#);
-    let _ = write!(
-        xml,
-        r#"<a:prstGeom prst="{}"><a:avLst/></a:prstGeom>"#,
-        escape_xml(spec.preset.as_str())
-    );
+    match &spec.custom_geometry {
+        Some(geometry) => write_custom_geometry(xml, geometry),
+        None => {
+            let _ = write!(
+                xml,
+                r#"<a:prstGeom prst="{}"><a:avLst/></a:prstGeom>"#,
+                escape_xml(spec.preset.as_str())
+            );
+        },
+    }
     xml.push_str("</xdr:spPr><xdr:txBody>");
     write_body_properties(xml, &spec.body_properties);
     xml.push_str("<a:lstStyle/>");

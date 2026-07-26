@@ -64,6 +64,7 @@ pub mod sheet_format;
 pub mod sheet_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
+pub mod shape_geometry;
 pub mod shapes;
 pub mod slicer_cache;
 pub mod slicers;
@@ -251,6 +252,12 @@ pub use sheet_view::{
     WorksheetPaneState, WorksheetPivotArea, WorksheetPivotSelection, WorksheetRangeReference,
     WorksheetViewCollection, WorksheetViewDefinition, WorksheetViewExtension, WorksheetViewPane,
     WorksheetViewSelection, WorksheetViewSqref, WorksheetViewType, parse_worksheet_views,
+};
+pub use shape_geometry::{
+    XlsxAdjustHandle, XlsxAdjustValue, XlsxConnectionSite, XlsxCustomGeometry,
+    XlsxGeometryFormula, XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint,
+    XlsxGeometryRectangle, XlsxPathCommand, XlsxPathFillMode, XlsxPolarAdjustHandle,
+    XlsxXyAdjustHandle,
 };
 pub use shapes::{
     XlsxAnchoredObject, XlsxCellMarker, XlsxClientData, XlsxConnectionShape, XlsxDrawingObject,
