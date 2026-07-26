@@ -6,10 +6,11 @@ use crate::protobuf::tsk::FormatStructArchive;
 #[cfg(test)]
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyStyle, TableCellDecimalPlaces,
-    TableCellNegativeNumberStyle, TableCellThousandsSeparator,
+    TableCellFixedDecimalPlaces, TableCellNegativeNumberStyle, TableCellThousandsSeparator,
 };
 use crate::table_cell_data_format::{
     TableCellCurrencyFormat, TableCellDataFormat, TableCellNumberFormat, TableCellPercentageFormat,
+    TableCellScientificFormat,
 };
 
 mod codec;
@@ -62,9 +63,11 @@ pub(super) fn cell_number_format(
     match cell_data_format(package, table_id, row, column)? {
         TableCellDataFormat::Automatic => Ok(None),
         TableCellDataFormat::Number(format) => Ok(Some(format)),
-        TableCellDataFormat::Currency(_) | TableCellDataFormat::Percentage(_) => Err(
-            Error::InvalidFormat("Table cell does not use the Number data format".to_owned()),
-        ),
+        TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Percentage(_)
+        | TableCellDataFormat::Scientific(_) => Err(Error::InvalidFormat(
+            "Table cell does not use the Number data format".to_owned(),
+        )),
     }
 }
 
@@ -77,9 +80,11 @@ pub(super) fn cell_currency_format(
     match cell_data_format(package, table_id, row, column)? {
         TableCellDataFormat::Automatic => Ok(None),
         TableCellDataFormat::Currency(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_) | TableCellDataFormat::Percentage(_) => Err(
-            Error::InvalidFormat("Table cell does not use the Currency data format".to_owned()),
-        ),
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Percentage(_)
+        | TableCellDataFormat::Scientific(_) => Err(Error::InvalidFormat(
+            "Table cell does not use the Currency data format".to_owned(),
+        )),
     }
 }
 
@@ -92,11 +97,11 @@ pub(super) fn reset_cell_currency_format(
     match cell_data_format(package, table_id, row, column)? {
         TableCellDataFormat::Automatic => Ok(false),
         TableCellDataFormat::Currency(_) => reset_cell_data_format(package, table_id, row, column),
-        TableCellDataFormat::Number(_) | TableCellDataFormat::Percentage(_) => {
-            Err(Error::InvalidFormat(
-                "Cannot reset Currency format from a non-Currency cell".to_owned(),
-            ))
-        },
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Percentage(_)
+        | TableCellDataFormat::Scientific(_) => Err(Error::InvalidFormat(
+            "Cannot reset Currency format from a non-Currency cell".to_owned(),
+        )),
     }
 }
 
@@ -109,9 +114,47 @@ pub(super) fn cell_percentage_format(
     match cell_data_format(package, table_id, row, column)? {
         TableCellDataFormat::Automatic => Ok(None),
         TableCellDataFormat::Percentage(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_) | TableCellDataFormat::Currency(_) => Err(
-            Error::InvalidFormat("Table cell does not use the Percentage data format".to_owned()),
-        ),
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Scientific(_) => Err(Error::InvalidFormat(
+            "Table cell does not use the Percentage data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn cell_scientific_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellScientificFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::Scientific(format) => Ok(Some(format)),
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Percentage(_) => Err(Error::InvalidFormat(
+            "Table cell does not use the Scientific data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_scientific_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::Scientific(_) => {
+            reset_cell_data_format(package, table_id, row, column)
+        },
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Percentage(_) => Err(Error::InvalidFormat(
+            "Cannot reset Scientific format from a non-Scientific cell".to_owned(),
+        )),
     }
 }
 
@@ -156,9 +199,9 @@ pub(super) fn set_cell_data_format(
     let old_identifiers = old_reference.identifiers();
     let cell_format_kind = match format {
         TableCellDataFormat::Currency(_) => bnc::DecimalCellFormatKind::Currency,
-        TableCellDataFormat::Number(_) | TableCellDataFormat::Percentage(_) => {
-            bnc::DecimalCellFormatKind::NumberOrPercentage
-        },
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Percentage(_)
+        | TableCellDataFormat::Scientific(_) => bnc::DecimalCellFormatKind::NumberOrPercentage,
         TableCellDataFormat::Automatic => unreachable!("handled above"),
     };
     let native = data_format_to_native(format)?;
@@ -247,9 +290,11 @@ pub(super) fn reset_cell_number_format(
     match cell_data_format(package, table_id, row, column)? {
         TableCellDataFormat::Automatic => Ok(false),
         TableCellDataFormat::Number(_) => reset_cell_data_format(package, table_id, row, column),
-        TableCellDataFormat::Currency(_) | TableCellDataFormat::Percentage(_) => Err(
-            Error::InvalidFormat("Cannot reset Number format from a non-Number cell".to_owned()),
-        ),
+        TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Percentage(_)
+        | TableCellDataFormat::Scientific(_) => Err(Error::InvalidFormat(
+            "Cannot reset Number format from a non-Number cell".to_owned(),
+        )),
     }
 }
 
@@ -264,11 +309,11 @@ pub(super) fn reset_cell_percentage_format(
         TableCellDataFormat::Percentage(_) => {
             reset_cell_data_format(package, table_id, row, column)
         },
-        TableCellDataFormat::Number(_) | TableCellDataFormat::Currency(_) => {
-            Err(Error::InvalidFormat(
-                "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
-            ))
-        },
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Scientific(_) => Err(Error::InvalidFormat(
+            "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
+        )),
     }
 }
 
@@ -667,6 +712,78 @@ mod tests {
         native = data_format_to_native(currency.into()).unwrap();
         native.use_accounting_style = None;
         assert!(data_format_from_native(&native).is_err());
+
+        let scientific =
+            TableCellScientificFormat::new(TableCellFixedDecimalPlaces::new(5).unwrap());
+        let mut native = data_format_to_native(scientific.into()).unwrap();
+        assert_eq!(native.format_type, Some(NATIVE_SCIENTIFIC_FORMAT_TYPE));
+        assert_eq!(native.decimal_places, Some(5));
+        assert_eq!(
+            data_format_from_native(&native).unwrap(),
+            TableCellDataFormat::Scientific(scientific)
+        );
+        native.negative_style = Some(2);
+        assert!(data_format_from_native(&native).is_err());
+        native = data_format_to_native(scientific.into()).unwrap();
+        native.decimal_places = Some(NATIVE_AUTOMATIC_DECIMAL_PLACES);
+        assert!(data_format_from_native(&native).is_err());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_reuses_and_resets_scientific_formats() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Scientific")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let scientific =
+            TableCellScientificFormat::new(TableCellFixedDecimalPlaces::new(5).unwrap());
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Number(-1_234.5))
+            .unwrap();
+        editor
+            .set_table_cell_scientific_format(table_id, 1, 1, scientific)
+            .unwrap();
+        editor
+            .set_table_cell_scientific_format(table_id, 1, 2, scientific)
+            .unwrap();
+
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 1);
+        assert_eq!(formats.entries[0].entry.refcount, 2);
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .table_cell_scientific_format(table_id, 1, 1)
+                .unwrap(),
+            Some(scientific)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_scientific_format(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .table_cell_scientific_format(table_id, 1, 2)
+                .unwrap(),
+            Some(scientific)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_scientific_format(table_id, 1, 2)
+                .unwrap()
+        );
+        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
+        assert!(
+            resolve_format_table(reopened.package(), &location)
+                .unwrap()
+                .entries
+                .is_empty()
+        );
     }
 
     #[test]

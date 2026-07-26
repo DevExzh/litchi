@@ -13,6 +13,8 @@ pub struct TableCellFixedDecimalPlaces(u8);
 impl TableCellFixedDecimalPlaces {
     /// Render no fractional digits.
     pub const ZERO: Self = Self(0);
+    /// Render two fractional digits.
+    pub const TWO: Self = Self(2);
     /// Largest fixed precision accepted by the native inspector.
     pub const MAXIMUM: Self = Self(MAXIMUM_DECIMAL_PLACES);
 
@@ -175,6 +177,39 @@ decimal_format!(
     TableCellPercentageFormat,
     "Explicit percentage display format for one native table cell."
 );
+
+/// Explicit scientific-notation display format for one native table cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TableCellScientificFormat {
+    decimal_places: TableCellFixedDecimalPlaces,
+}
+
+impl TableCellScientificFormat {
+    /// Construct a scientific format with a fixed fractional-digit count.
+    pub const fn new(decimal_places: TableCellFixedDecimalPlaces) -> Self {
+        Self { decimal_places }
+    }
+
+    /// Return the fixed number of digits rendered after the decimal point.
+    pub const fn decimal_places(self) -> TableCellFixedDecimalPlaces {
+        self.decimal_places
+    }
+
+    /// Replace the fixed fractional-digit count.
+    pub const fn with_decimal_places(
+        mut self,
+        decimal_places: TableCellFixedDecimalPlaces,
+    ) -> Self {
+        self.decimal_places = decimal_places;
+        self
+    }
+}
+
+impl Default for TableCellScientificFormat {
+    fn default() -> Self {
+        Self::new(TableCellFixedDecimalPlaces::TWO)
+    }
+}
 
 /// Three-letter ISO 4217-style currency code stored by native iWork.
 ///
@@ -358,6 +393,8 @@ pub enum TableCellDataFormat {
     Currency(TableCellCurrencyFormat),
     /// Multiply the displayed value by one hundred and append a percent sign.
     Percentage(TableCellPercentageFormat),
+    /// Display the value in scientific notation.
+    Scientific(TableCellScientificFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -375,6 +412,12 @@ impl From<TableCellPercentageFormat> for TableCellDataFormat {
 impl From<TableCellCurrencyFormat> for TableCellDataFormat {
     fn from(value: TableCellCurrencyFormat) -> Self {
         Self::Currency(value)
+    }
+}
+
+impl From<TableCellScientificFormat> for TableCellDataFormat {
+    fn from(value: TableCellScientificFormat) -> Self {
+        Self::Scientific(value)
     }
 }
 
@@ -429,6 +472,16 @@ mod tests {
         assert_eq!(
             TableCellDataFormat::from(currency),
             TableCellDataFormat::Currency(currency)
+        );
+    }
+
+    #[test]
+    fn scientific_format_has_native_default_precision() {
+        let format = TableCellScientificFormat::default();
+        assert_eq!(format.decimal_places(), TableCellFixedDecimalPlaces::TWO);
+        assert_eq!(
+            TableCellDataFormat::from(format),
+            TableCellDataFormat::Scientific(format)
         );
     }
 }

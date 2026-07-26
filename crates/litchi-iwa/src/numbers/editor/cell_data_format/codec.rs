@@ -4,14 +4,16 @@ use crate::protobuf::tsk::FormatStructArchive;
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDataFormat,
     TableCellDecimalPlaces, TableCellFixedDecimalPlaces, TableCellNegativeNumberStyle,
-    TableCellNumberFormat, TableCellPercentageFormat, TableCellThousandsSeparator,
+    TableCellNumberFormat, TableCellPercentageFormat, TableCellScientificFormat,
+    TableCellThousandsSeparator,
 };
 use crate::{Error, Result};
 
 pub(super) const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
 pub(super) const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
 pub(super) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
-const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
+pub(super) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
+pub(super) const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
 
 pub(super) fn data_format_to_native(format: TableCellDataFormat) -> Result<FormatStructArchive> {
     let (
@@ -51,6 +53,14 @@ pub(super) fn data_format_to_native(format: TableCellDataFormat) -> Result<Forma
             None,
             None,
         ),
+        TableCellDataFormat::Scientific(format) => (
+            NATIVE_SCIENTIFIC_FORMAT_TYPE,
+            TableCellDecimalPlaces::Fixed(format.decimal_places()),
+            TableCellNegativeNumberStyle::MinusSign,
+            TableCellThousandsSeparator::Hidden,
+            None,
+            None,
+        ),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -80,7 +90,10 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
     })?;
     if !matches!(
         format_type,
-        NATIVE_NUMBER_FORMAT_TYPE | NATIVE_CURRENCY_FORMAT_TYPE | NATIVE_PERCENTAGE_FORMAT_TYPE
+        NATIVE_NUMBER_FORMAT_TYPE
+            | NATIVE_CURRENCY_FORMAT_TYPE
+            | NATIVE_PERCENTAGE_FORMAT_TYPE
+            | NATIVE_SCIENTIFIC_FORMAT_TYPE
     ) {
         return Err(Error::InvalidFormat(format!(
             "Table cell uses unsupported native data-format type {format_type}"
@@ -153,6 +166,21 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
         NATIVE_PERCENTAGE_FORMAT_TYPE => TableCellDataFormat::Percentage(
             TableCellPercentageFormat::new(decimal_places, negative_style, thousands_separator),
         ),
+        NATIVE_SCIENTIFIC_FORMAT_TYPE => {
+            if negative_style != TableCellNegativeNumberStyle::MinusSign
+                || thousands_separator != TableCellThousandsSeparator::Hidden
+            {
+                return Err(Error::InvalidFormat(
+                    "Scientific cell format contains non-canonical decimal options".to_owned(),
+                ));
+            }
+            let TableCellDecimalPlaces::Fixed(decimal_places) = decimal_places else {
+                return Err(Error::InvalidFormat(
+                    "Scientific cell format cannot use automatic decimal places".to_owned(),
+                ));
+            };
+            TableCellDataFormat::Scientific(TableCellScientificFormat::new(decimal_places))
+        },
         _ => unreachable!("validated native data-format type"),
     })
 }
