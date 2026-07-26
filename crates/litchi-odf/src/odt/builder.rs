@@ -925,13 +925,12 @@ impl DocumentBuilder {
         Ok(self)
     }
 
-    /// Wrap one UTF-8 text-node range in a selected paragraph with ruby.
+    /// Wrap one UTF-8 text range in a selected paragraph with ruby.
     ///
-    /// The range follows `wrap_ruby_annotation_xml`: it must be non-empty,
-    /// fit inside one text/CDATA/entity node, and equal the annotation's
-    /// plain-text base. The builder emits queued ruby mutations in call order
-    /// without splitting surrounding inline markup or evaluating any active
-    /// document content.
+    /// The range follows `wrap_ruby_annotation_xml`: a plain base may span
+    /// adjacent character data under one parent, while an XML base may span
+    /// balanced legal inline elements. The builder emits queued ruby mutations
+    /// in call order without splitting ancestors or evaluating active content.
     pub fn wrap_ruby_annotation(
         &mut self,
         paragraph_index: usize,
@@ -2151,6 +2150,31 @@ mod tests {
         assert_eq!(
             document.ruby_annotations().unwrap().annotations,
             vec![annotation]
+        );
+
+        let structured_base = crate::RubyBase::from_xml_fragment(
+            r#"<text:span text:style-name="Em">漢</text:span><text:span text:style-name="Strong">字</text:span>"#,
+        )
+        .unwrap();
+        let structured =
+            crate::RubyAnnotation::new(None, structured_base, "かんじ", None).unwrap();
+        let mut builder = DocumentBuilder::new();
+        builder
+            .add_rich_paragraph(vec![
+                ("A", None),
+                ("漢", Some("Em")),
+                ("字", Some("Strong")),
+                ("Z", None),
+            ])
+            .unwrap();
+        builder
+            .wrap_ruby_annotation(0, 1..1 + "漢字".len(), &structured)
+            .unwrap();
+
+        let document = crate::odt::Document::from_bytes(builder.build().unwrap()).unwrap();
+        assert_eq!(
+            document.ruby_annotations().unwrap().annotations,
+            vec![structured]
         );
     }
 

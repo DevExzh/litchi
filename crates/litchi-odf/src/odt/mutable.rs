@@ -263,13 +263,14 @@ impl MutableDocument {
         Ok(())
     }
 
-    /// Wrap one UTF-8 text-node range in a selected paragraph with ruby.
+    /// Wrap one UTF-8 text range in a selected paragraph with ruby.
     ///
     /// The range uses the structural coordinate space accepted by
-    /// `wrap_ruby_annotation_xml`: it must be non-empty, wholly within one
-    /// text/CDATA/entity node, and equal the annotation's plain-text base.
-    /// Existing inline markup is never split. Ruby insertion is inert and
-    /// does not execute scripts, macros, links, or external content.
+    /// `wrap_ruby_annotation_xml`: a plain base may span adjacent character
+    /// data under one parent, while an XML base may span balanced legal inline
+    /// elements. Existing ancestors and ruby annotations are never split.
+    /// Ruby insertion is inert and does not execute scripts, macros, links, or
+    /// external content.
     pub fn wrap_ruby_annotation(
         &mut self,
         paragraph_index: usize,

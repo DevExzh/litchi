@@ -243,6 +243,9 @@ fn ns(value: &ResolveResult<'_>) -> Ns {
     }
 }
 include!("ruby_inline_specs.rs");
+mod ruby_range {
+    include!("ruby_range.rs");
+}
 
 fn name(value: &[u8]) -> Result<String> {
     std::str::from_utf8(value)
@@ -960,10 +963,12 @@ pub fn insert_ruby_annotation_xml(
 /// `range` is measured over the concatenated values of text, CDATA, and entity
 /// reference nodes in the selected `text:p`, in document order. Existing ruby
 /// annotations are excluded from that coordinate space. The range must be
-/// non-empty, lie within adjacent character-data nodes under one eligible
-/// parent, and exactly match a plain-text `RubyBase::from_text` base. This
-/// preserves surrounding inline structure while refusing to split elements or
-/// cross markup boundaries.
+/// non-empty and exactly match its base. A `RubyBase::from_text` value may
+/// cover adjacent character-data nodes under one eligible parent. A
+/// `RubyBase::from_xml_fragment` value may additionally cover a balanced
+/// sequence of legal inline elements at one structural depth. Ancestor
+/// elements are never split or cloned, and a range cannot cross an existing
+/// ruby annotation.
 ///
 /// The mutation is structural only: it does not resolve links, run scripts, or
 /// execute macros embedded elsewhere in the document.
@@ -982,6 +987,16 @@ pub fn wrap_ruby_annotation_xml(
     value.validate()?;
     parse_ruby_entries(xml)?;
     let fragment = value.to_xml_fragment()?;
+    for span in ruby_range::locate_balanced_ruby_ranges(xml, paragraph_index, &range)? {
+        if xml[span.start..span.end] == value.base.xml {
+            let mut output = String::with_capacity(xml.len() + fragment.len());
+            output.push_str(&xml[..span.start]);
+            output.push_str(&fragment);
+            output.push_str(&xml[span.end..]);
+            parse_ruby_entries(&output)?;
+            return Ok(output);
+        }
+    }
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut stack: Vec<(Ns, Vec<u8>)> = Vec::new();
@@ -1032,7 +1047,7 @@ pub fn wrap_ruby_annotation_xml(
                 let content = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| bad(format!("invalid ruby range text: {error}")))?;
-                if let Some(output) = collect_ruby_text_node(
+                if let Some(output) = ruby_range::collect_ruby_text_node(
                     xml,
                     previous_end..event_end,
                     content.as_ref(),
@@ -1052,7 +1067,7 @@ pub fn wrap_ruby_annotation_xml(
                 let content = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| bad(format!("invalid ruby range CDATA: {error}")))?;
-                if let Some(output) = collect_ruby_text_node(
+                if let Some(output) = ruby_range::collect_ruby_text_node(
                     xml,
                     previous_end..event_end,
                     content.as_ref(),
@@ -1070,7 +1085,7 @@ pub fn wrap_ruby_annotation_xml(
             },
             Event::GeneralRef(ref reference) => {
                 let content = crate::elements::xml::decode_reference(reference, "ruby range")?;
-                if let Some(output) = collect_ruby_text_node(
+                if let Some(output) = ruby_range::collect_ruby_text_node(
                     xml,
                     previous_end..event_end,
                     &content,
@@ -1116,102 +1131,6 @@ pub fn wrap_ruby_annotation_xml(
     ))
 }
 
-struct PendingRubyRange {
-    xml_start: usize,
-    xml_end: usize,
-    prefix: String,
-    selected: String,
-    stack: Vec<(Ns, Vec<u8>)>,
-}
-
-#[allow(clippy::too_many_arguments)]
-fn collect_ruby_text_node(
-    xml: &str,
-    span: Range<usize>,
-    text: &str,
-    text_offset: &mut usize,
-    range: &Range<usize>,
-    stack: &[(Ns, Vec<u8>)],
-    value: &RubyAnnotation,
-    fragment: &str,
-    target_depth: Option<usize>,
-    pending: &mut Option<PendingRubyRange>,
-) -> Result<Option<String>> {
-    let Some(target_depth) = target_depth else {
-        return Ok(None);
-    };
-    if stack.len() < target_depth
-        || stack
-            .iter()
-            .any(|(namespace, local)| *namespace == Ns::Text && local == b"ruby")
-    {
-        return Ok(None);
-    }
-    let start = *text_offset;
-    let end = start
-        .checked_add(text.len())
-        .ok_or_else(|| bad("ruby text range offset overflow"))?;
-    *text_offset = end;
-    if range.start >= end || range.end <= start {
-        return Ok(None);
-    }
-    if !ruby_parent(stack.last()) {
-        return Err(bad("ruby text range has unsupported inline parent"));
-    }
-    let local_start = range.start.saturating_sub(start);
-    let local_end = range.end.min(end) - start;
-    if !text.is_char_boundary(local_start) || !text.is_char_boundary(local_end) {
-        return Err(bad("ruby text range is not on a UTF-8 character boundary"));
-    }
-
-    let state = if let Some(state) = pending.as_mut() {
-        if state.xml_end != span.start || state.stack != stack {
-            return Err(bad("ruby text range crosses an inline markup boundary"));
-        }
-        state
-    } else {
-        pending.insert(PendingRubyRange {
-            xml_start: span.start,
-            xml_end: span.start,
-            prefix: escape_xml(&text[..local_start]),
-            selected: String::new(),
-            stack: stack.to_vec(),
-        })
-    };
-    let selected_len = local_end - local_start;
-    let total_len = state
-        .selected
-        .len()
-        .checked_add(selected_len)
-        .ok_or_else(|| bad("ruby text range size overflow"))?;
-    if total_len > MAX_BASE {
-        return Err(bad("ruby text range exceeds the base-size limit"));
-    }
-    state
-        .selected
-        .try_reserve(selected_len)
-        .map_err(|_| bad("ruby text range allocation failed"))?;
-    state.selected.push_str(&text[local_start..local_end]);
-    state.xml_end = span.end;
-
-    if range.end > end {
-        return Ok(None);
-    }
-    if value.base.xml != escape_xml(&state.selected) {
-        return Err(bad(
-            "ruby annotation base must equal the selected plain-text range",
-        ));
-    }
-    let suffix = escape_xml(&text[local_end..]);
-    let mut output = String::with_capacity(xml.len() + fragment.len());
-    output.push_str(&xml[..state.xml_start]);
-    output.push_str(&state.prefix);
-    output.push_str(fragment);
-    output.push_str(&suffix);
-    output.push_str(&xml[state.xml_end..]);
-    Ok(Some(output))
-}
-
 #[derive(Clone)]
 enum StyleSite {
     Content(usize),
@@ -1239,12 +1158,10 @@ fn locate_ruby_style(xml: &str, target_name: &str) -> Result<(Option<Span>, Styl
                 if namespace == Ns::Style
                     && local == b"style"
                     && matches!(stack.last(), Some((Ns::Office, parent)) if parent == b"styles" || parent == b"automatic-styles")
-                {
-                    if parse_style_header(&reader, start)?
+                    && parse_style_header(&reader, start)?
                         .is_some_and(|style| style.name == target_name)
-                    {
-                        open = Some((depth, begin));
-                    }
+                {
+                    open = Some((depth, begin));
                 }
                 stack.push((namespace, local));
             },
@@ -1526,10 +1443,52 @@ mod tests {
     }
 
     #[test]
-    fn adjacent_node_range_still_refuses_inline_markup_boundaries() {
+    fn plain_base_range_still_refuses_inline_markup_boundaries() {
         let paragraph = r#"<text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">A<![CDATA[B]]><text:span>C</text:span>D</text:p>"#;
         let ruby =
             RubyAnnotation::new(None, RubyBase::from_text("BCD").unwrap(), "base", None).unwrap();
         assert!(wrap_ruby_annotation_xml(paragraph, 0, 1..4, &ruby).is_err());
+    }
+
+    #[test]
+    fn wraps_balanced_inline_markup_as_a_structured_base() {
+        let paragraph = r#"<text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">A<text:span text:style-name="Em">漢</text:span><text:span text:style-name="Strong">字</text:span>Z</text:p>"#;
+        let base = RubyBase::from_xml_fragment(
+            r#"<text:span text:style-name="Em">漢</text:span><text:span text:style-name="Strong">字</text:span>"#,
+        )
+        .unwrap();
+        let ruby = RubyAnnotation::new(None, base, "かんじ", None).unwrap();
+        let wrapped = wrap_ruby_annotation_xml(paragraph, 0, 1..1 + "漢字".len(), &ruby).unwrap();
+
+        assert!(wrapped.contains(
+            r#">A<text:ruby xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0""#
+        ));
+        assert!(wrapped.ends_with("</text:ruby>Z</text:p>"));
+        assert_eq!(
+            parse_ruby_annotations(&wrapped).unwrap().annotations,
+            vec![ruby]
+        );
+    }
+
+    #[test]
+    fn structural_range_refuses_partial_ancestors_and_existing_ruby() {
+        let partial = r#"<text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><text:span text:style-name="Em">AB</text:span>C</text:p>"#;
+        let partial_base =
+            RubyBase::from_xml_fragment(r#"<text:span text:style-name="Em">B</text:span>C"#)
+                .unwrap();
+        let partial_ruby = RubyAnnotation::new(None, partial_base, "partial", None).unwrap();
+        assert!(wrap_ruby_annotation_xml(partial, 0, 1..3, &partial_ruby).is_err());
+
+        let existing =
+            RubyAnnotation::new(None, RubyBase::from_text("X").unwrap(), "existing", None)
+                .unwrap()
+                .to_xml_fragment()
+                .unwrap();
+        let paragraph = format!(
+            r#"<text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">A{existing}B</text:p>"#
+        );
+        let crossing_base = RubyBase::from_xml_fragment(&format!("A{existing}B")).unwrap();
+        let crossing = RubyAnnotation::new(None, crossing_base, "outer", None).unwrap();
+        assert!(wrap_ruby_annotation_xml(&paragraph, 0, 0..2, &crossing).is_err());
     }
 }

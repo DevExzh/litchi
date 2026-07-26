@@ -428,7 +428,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Track changes | ✅ | ✅ | ✅ | Change metadata, regions, policy, and mutation APIs |
 | Dynamic/database fields | ✅ | ✅ | ✅ | Date/time/page/user/variable/drop-down/database families plus inert inline `text:script` metadata, including cached `text:author-name`/`text:author-initials`, `text:sender-*`, `text:file-name`, `text:template-name`, `text:sheet-name`, and `text:chapter`; no external query execution, script execution or link opening, host identity/contact or path reads, template lookups, or live outline/sheet-state resolution |
 | Variables and declarations | ✅ | ✅ | ✅ | Typed declarations and mutation |
-| Ruby annotations | 🟡 | ✅ | 🟡 | Typed `text:ruby` insertion, named ruby styles, and mutable CRUD; append or validate a UTF-8 range across adjacent text/CDATA/entity nodes under one inline parent without splitting surrounding markup |
+| Ruby annotations | 🟡 | ✅ | 🟡 | Typed `text:ruby` insertion, named ruby styles, and mutable CRUD; append or wrap UTF-8 ranges across adjacent character data and balanced legal inline markup without splitting ancestors or existing ruby |
 | TOC, indexes, and source marks | 🟡 | ✅ | ✅ | Typed structures and cached-body authoring; no pagination or automatic regeneration |
 | Bibliography records | 🟡 | ✅ | ✅ | Typed bibliography policy inspection/mutation plus inert records and source marks; no automatic entry generation or citation resolution |
 | Images and drawing frames | ✅ | ✅ | ✅ | Semantic discovery and resource replacement/removal, plus frame authoring: `insert_image` (PNG/JPEG/GIF sniffed, verbatim `Pictures/` payloads, typed lengths/anchors) and `insert_text_box` round-trip through the read inventory |
