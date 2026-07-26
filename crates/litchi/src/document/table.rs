@@ -10,6 +10,11 @@ use crate::ole;
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
 
+use super::CellMerge;
+
+/// The column span of a cell that participates in no horizontal merge.
+const UNMERGED_SPAN: usize = 1;
+
 /// A table in a Word document.
 #[derive(Debug, Clone)]
 pub enum Table {
@@ -198,6 +203,44 @@ impl Row {
             },
         }
     }
+
+    /// Resolve the true column span of the cell at `index` using row context.
+    ///
+    /// Returns `Ok(None)` when the index is out of bounds, or when the cell is
+    /// covered by a merge that an earlier cell in the row began — a covered cell
+    /// has no span of its own.
+    ///
+    /// This succeeds for every supported format. DOCX and ODF read their stored
+    /// span counts directly; DOC and RTF, which tag each covered cell with a
+    /// role instead of storing a count, are resolved by counting the run of
+    /// continuation cells that follows the range's first cell.
+    pub fn grid_span_at(&self, index: usize) -> Result<Option<usize>> {
+        let cells = self.cells()?;
+        let Some(cell) = cells.get(index) else {
+            return Ok(None);
+        };
+
+        match cell.horizontal_merge()? {
+            CellMerge::Continuation => Ok(None),
+            CellMerge::None => Ok(Some(cell.grid_span()?.max(UNMERGED_SPAN))),
+            CellMerge::Start => {
+                // Count-based formats already know the width; role-based ones
+                // must measure the continuation run that follows.
+                let stored = cell.grid_span()?;
+                if stored > UNMERGED_SPAN {
+                    return Ok(Some(stored));
+                }
+                let mut span = UNMERGED_SPAN;
+                for following in &cells[index + 1..] {
+                    if following.horizontal_merge()? != CellMerge::Continuation {
+                        break;
+                    }
+                    span += 1;
+                }
+                Ok(Some(span))
+            },
+        }
+    }
 }
 
 /// A table cell in a Word document.
@@ -232,47 +275,170 @@ impl Cell {
 
     /// Get the grid span (colspan) of this cell.
     ///
-    /// Returns the number of columns this cell spans. Default is 1 (no merge).
+    /// Returns the number of columns this cell spans, where 1 means "no
+    /// horizontal merge".
     ///
-    /// **Note**: Currently only implemented for OOXML (.docx) format.
-    /// Other formats always return 1.
+    /// Only DOCX (`w:gridSpan`) and ODF (`table:number-columns-spanned`) store a
+    /// span count on the cell itself. Binary DOC and RTF instead tag every
+    /// covered cell with a merge role, so a cell in isolation cannot know how
+    /// wide its range is and this method reports 1 for them. Use
+    /// [`Row::grid_span_at`] to resolve a true column count for every format, or
+    /// [`Cell::horizontal_merge`] for the portable merge signal.
     pub fn grid_span(&self) -> Result<usize> {
         match self {
+            // DOC records merge roles per cell, not a span count; the width of
+            // the range is only recoverable from the surrounding row.
             #[cfg(feature = "ole")]
-            Cell::Doc(_) => Ok(1), // Not implemented for OLE format
+            Cell::Doc(_) => Ok(1),
             #[cfg(feature = "ooxml")]
             Cell::Docx(c) => c.grid_span().map_err(Error::from),
+            // RTF `\clmgf`/`\clmrg` are roles, not counts; see `Row::grid_span_at`.
             #[cfg(feature = "rtf")]
-            Cell::Rtf(_) => Ok(1), // Not implemented for RTF format
+            Cell::Rtf(_) => Ok(1),
             #[cfg(feature = "odf")]
-            Cell::Odt(_) => Ok(1), // Grid span not available in ODF format (always 1)
+            Cell::Odt(c) => Ok(c.colspan().max(1)),
+        }
+    }
+
+    /// Get the row span (rowspan) of this cell where the format stores one.
+    ///
+    /// Returns `None` for formats that express vertical merges as per-cell roles
+    /// (DOC, DOCX, and RTF) rather than as an explicit count; for those, use
+    /// [`Cell::vertical_merge`] and walk the following rows. ODF stores
+    /// `table:number-rows-spanned` directly and always yields `Some`.
+    pub fn row_span(&self) -> Result<Option<usize>> {
+        match self {
+            #[cfg(feature = "ole")]
+            Cell::Doc(_) => Ok(None),
+            // `w:vMerge` marks participation only; the count is not stored.
+            #[cfg(feature = "ooxml")]
+            Cell::Docx(_) => Ok(None),
+            #[cfg(feature = "rtf")]
+            Cell::Rtf(_) => Ok(None),
+            #[cfg(feature = "odf")]
+            Cell::Odt(c) => Ok(Some(c.rowspan().max(1))),
+        }
+    }
+
+    /// Get the horizontal merge state of this cell.
+    ///
+    /// This is the portable form of [`Cell::grid_span`]: it is resolved for
+    /// every supported format, including the role-based DOC and RTF encodings.
+    pub fn horizontal_merge(&self) -> Result<CellMerge> {
+        match self {
+            #[cfg(feature = "ole")]
+            Cell::Doc(c) => Ok(c
+                .properties()
+                .map(|p| doc_merge(p.merge_status))
+                .unwrap_or_default()),
+            // A `w:gridSpan` above 1 absorbs the covered columns outright, so a
+            // DOCX cell is either the owner of a range or unmerged.
+            #[cfg(feature = "ooxml")]
+            Cell::Docx(c) => Ok(span_merge(c.grid_span().map_err(Error::from)?)),
+            #[cfg(feature = "rtf")]
+            Cell::Rtf(c) => Ok(rtf_merge(c.merge().horizontal)),
+            // ODF covered cells are `table:covered-table-cell` elements, which
+            // the reader does not surface, so only owners remain.
+            #[cfg(feature = "odf")]
+            Cell::Odt(c) => Ok(span_merge(c.colspan())),
         }
     }
 
     /// Get the vertical merge state of this cell.
     ///
-    /// Returns the vertical merge state if this cell participates in vertical merging,
-    /// or `None` if no vertical merge is present.
+    /// Unlike [`Cell::v_merge`], this is available regardless of which format
+    /// features are enabled and is resolved for every supported format.
+    pub fn vertical_merge(&self) -> Result<CellMerge> {
+        match self {
+            #[cfg(feature = "ole")]
+            Cell::Doc(c) => Ok(c
+                .vertical_merge_status()
+                .map(vertical_doc_merge)
+                .unwrap_or_default()),
+            #[cfg(feature = "ooxml")]
+            Cell::Docx(c) => Ok(match c.v_merge().map_err(Error::from)? {
+                None => CellMerge::None,
+                Some(crate::ooxml::docx::VMergeState::Restart) => CellMerge::Start,
+                Some(crate::ooxml::docx::VMergeState::Continue) => CellMerge::Continuation,
+            }),
+            #[cfg(feature = "rtf")]
+            Cell::Rtf(c) => Ok(rtf_merge(c.merge().vertical)),
+            #[cfg(feature = "odf")]
+            Cell::Odt(c) => Ok(span_merge(c.rowspan())),
+        }
+    }
+
+    /// Get the vertical merge state of this cell as a DOCX-specific value.
     ///
-    /// **Note**: Currently only implemented for OOXML (.docx) format.
-    /// Other formats always return `None`.
+    /// Prefer [`Cell::vertical_merge`], which is format-neutral and does not
+    /// require the `ooxml` feature. Formats other than DOCX always return `None`
+    /// here because they have no `w:vMerge` equivalent to report.
     #[cfg(feature = "ooxml")]
     pub fn v_merge(&self) -> Result<Option<crate::ooxml::docx::VMergeState>> {
         match self {
             #[cfg(feature = "ole")]
-            Cell::Doc(_) => Ok(None), // Not implemented for OLE format
+            Cell::Doc(_) => Ok(None),
             Cell::Docx(c) => c.v_merge().map_err(Error::from),
             #[cfg(feature = "rtf")]
-            Cell::Rtf(_) => Ok(None), // Not implemented for RTF format
+            Cell::Rtf(_) => Ok(None),
             #[cfg(feature = "odf")]
-            Cell::Odt(_) => Ok(None), // Vertical merge not available in ODF format
+            Cell::Odt(_) => Ok(None),
         }
+    }
+}
+
+/// Interpret an explicit span count as a merge state.
+///
+/// Formats that store counts never surface covered cells, so a count above the
+/// unmerged width means this cell owns a range.
+#[cfg(any(feature = "ooxml", feature = "odf"))]
+#[inline]
+fn span_merge(span: usize) -> CellMerge {
+    if span > UNMERGED_SPAN {
+        CellMerge::Start
+    } else {
+        CellMerge::None
+    }
+}
+
+/// Map a binary-DOC horizontal `TC80` merge role onto the facade enum.
+#[cfg(feature = "ole")]
+#[inline]
+fn doc_merge(status: litchi_ole::doc::parts::tap::CellMergeStatus) -> CellMerge {
+    use litchi_ole::doc::parts::tap::CellMergeStatus;
+    match status {
+        CellMergeStatus::None => CellMerge::None,
+        CellMergeStatus::First => CellMerge::Start,
+        CellMergeStatus::Merged => CellMerge::Continuation,
+    }
+}
+
+/// Map a binary-DOC vertical `TC80` merge role onto the facade enum.
+#[cfg(feature = "ole")]
+#[inline]
+fn vertical_doc_merge(status: litchi_ole::doc::parts::tap::VerticalMergeStatus) -> CellMerge {
+    use litchi_ole::doc::parts::tap::VerticalMergeStatus;
+    match status {
+        VerticalMergeStatus::None => CellMerge::None,
+        VerticalMergeStatus::First => CellMerge::Start,
+        VerticalMergeStatus::Merged => CellMerge::Continuation,
+    }
+}
+
+/// Map an RTF `\clmgf`/`\clmrg`-style merge role onto the facade enum.
+#[cfg(feature = "rtf")]
+#[inline]
+fn rtf_merge(role: Option<litchi_rtf::TableCellMergeRole>) -> CellMerge {
+    match role {
+        None => CellMerge::None,
+        Some(litchi_rtf::TableCellMergeRole::First) => CellMerge::Start,
+        Some(litchi_rtf::TableCellMergeRole::Continuation) => CellMerge::Continuation,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::Document;
+    use super::super::{CellMerge, Document};
     use std::path::PathBuf;
 
     fn test_data_path() -> PathBuf {
@@ -413,6 +579,230 @@ mod tests {
                         let row_count = table.row_count().expect("Failed to get row count");
                         assert!(row_count > 0, "Expected at least one row in {}", file);
                     }
+                }
+            }
+        }
+    }
+
+    /// The RTF fixture is a single row of two cells joined by `\clmgf`
+    /// (range owner) and `\clmrg` (covered), so the row spans two columns.
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn rtf_horizontal_merge_roles_resolve_to_a_two_column_span() {
+        let path = test_data_path().join("rtf/table-cell-horizontal-merge.rtf");
+        let doc = Document::open(&path).expect("Failed to open RTF");
+        let tables = doc.tables().expect("Failed to get tables");
+        let table = tables.first().expect("fixture has one table");
+        let row = table
+            .row_at(0)
+            .expect("Failed to read row")
+            .expect("fixture has one row");
+
+        let cells = row.cells().expect("Failed to get cells");
+        assert_eq!(cells.len(), 2, "fixture row has two cells");
+        assert_eq!(
+            cells[0].horizontal_merge().expect("merge state"),
+            CellMerge::Start,
+            "\\clmgf marks the first cell as the range owner"
+        );
+        assert_eq!(
+            cells[1].horizontal_merge().expect("merge state"),
+            CellMerge::Continuation,
+            "\\clmrg marks the second cell as covered"
+        );
+
+        assert_eq!(
+            row.grid_span_at(0).expect("span"),
+            Some(2),
+            "the owner spans itself plus one continuation cell"
+        );
+        assert_eq!(
+            row.grid_span_at(1).expect("span"),
+            None,
+            "a covered cell has no span of its own"
+        );
+        assert_eq!(row.grid_span_at(99).expect("span"), None);
+    }
+
+    /// `\clvmgf` opens a vertical merge; the facade must report it without the
+    /// DOCX-specific `v_merge` accessor.
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn rtf_vertical_merge_roles_are_reported() {
+        let path = test_data_path().join("rtf/table-cell-vertical-merge.rtf");
+        let doc = Document::open(&path).expect("Failed to open RTF");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        let mut starts = 0usize;
+        for table in &tables {
+            for row in &table.rows().expect("Failed to get rows") {
+                for cell in &row.cells().expect("Failed to get cells") {
+                    if cell.vertical_merge().expect("merge state") == CellMerge::Start {
+                        starts += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            starts > 0,
+            "fixture uses \\clvmgf, so at least one vertical merge must start"
+        );
+    }
+
+    /// ODF stores an explicit `table:number-columns-spanned`, so the span is
+    /// readable from the cell alone. This previously returned a hardcoded 1.
+    #[test]
+    #[cfg(feature = "odf")]
+    fn odt_column_span_is_read_from_the_stored_count() {
+        let path = test_data_path().join("odf/odt/table-cell-column-span.odt");
+        let doc = Document::open(&path).expect("Failed to open ODT");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        let mut spanned = Vec::new();
+        for (table_index, table) in tables.iter().enumerate() {
+            for row in &table.rows().expect("Failed to get rows") {
+                for (index, cell) in row.cells().expect("Failed to get cells").iter().enumerate() {
+                    let span = cell.grid_span().expect("grid span");
+                    if span > 1 {
+                        spanned.push((table_index, span));
+                        assert_eq!(
+                            cell.horizontal_merge().expect("merge state"),
+                            CellMerge::Start,
+                            "a cell spanning columns owns its range"
+                        );
+                        assert_eq!(
+                            row.grid_span_at(index).expect("span"),
+                            Some(span),
+                            "row context must agree with the stored count"
+                        );
+                    }
+                    assert!(
+                        cell.row_span().expect("row span").is_some(),
+                        "ODF always stores a row span"
+                    );
+                }
+            }
+        }
+
+        assert!(
+            spanned.iter().any(|(_, span)| *span == 3),
+            "fixture declares table:number-columns-spanned=\"3\", got {spanned:?}"
+        );
+    }
+
+    /// Binary DOC records `TC80` merge roles per cell; the span is only
+    /// recoverable with row context, which `grid_span_at` supplies.
+    #[test]
+    #[cfg(feature = "ole")]
+    fn doc_merge_roles_resolve_through_row_context() {
+        let path = test_data_path().join("ole/doc/table-merged-cells.doc");
+        let doc = Document::open(&path).expect("Failed to open DOC");
+        let tables = doc.tables().expect("Failed to get tables");
+        assert!(!tables.is_empty(), "fixture contains merged tables");
+
+        let mut horizontal_starts = 0usize;
+        let mut vertical_participants = 0usize;
+        for table in &tables {
+            for row in &table.rows().expect("Failed to get rows") {
+                let cells = row.cells().expect("Failed to get cells");
+                for (index, cell) in cells.iter().enumerate() {
+                    match cell.horizontal_merge().expect("merge state") {
+                        CellMerge::Start => {
+                            horizontal_starts += 1;
+                            let span = row.grid_span_at(index).expect("span").expect("owner span");
+                            assert!(
+                                span >= 1 && span <= cells.len(),
+                                "span {span} must stay within the row's {} cells",
+                                cells.len()
+                            );
+                        },
+                        CellMerge::Continuation => {
+                            assert_eq!(
+                                row.grid_span_at(index).expect("span"),
+                                None,
+                                "covered cells report no span"
+                            );
+                        },
+                        CellMerge::None => {
+                            assert_eq!(row.grid_span_at(index).expect("span"), Some(1));
+                        },
+                    }
+                    if cell.vertical_merge().expect("merge state").is_merged() {
+                        vertical_participants += 1;
+                    }
+                }
+            }
+        }
+
+        // The fixture merges cells vertically. Horizontal `fFirstMerged`
+        // merges are rare in Word output (it usually drops cell boundaries
+        // instead), so the horizontal mapping is covered by the TAP parser's
+        // own unit tests; here it is exercised through the `CellMerge::None`
+        // and `Start` arms above.
+        assert_eq!(
+            horizontal_starts, 0,
+            "fixture is not expected to use horizontal TC80 merges"
+        );
+        assert!(
+            vertical_participants > 0,
+            "table-merged-cells.doc must expose vertically merged cells"
+        );
+    }
+
+    /// DOCX absorbs covered columns into `w:gridSpan`, so merged cells are
+    /// always range owners and never continuations.
+    #[test]
+    #[cfg(feature = "ooxml")]
+    fn docx_grid_span_owners_are_never_continuations() {
+        let path = test_data_path().join("ooxml/docx/drawing.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        let mut widest = 1usize;
+        for table in &tables {
+            for row in &table.rows().expect("Failed to get rows") {
+                for (index, cell) in row.cells().expect("Failed to get cells").iter().enumerate() {
+                    let span = cell.grid_span().expect("grid span");
+                    widest = widest.max(span);
+                    assert_ne!(
+                        cell.horizontal_merge().expect("merge state"),
+                        CellMerge::Continuation,
+                        "DOCX never surfaces covered cells"
+                    );
+                    assert_eq!(row.grid_span_at(index).expect("span"), Some(span));
+                    assert!(
+                        cell.row_span().expect("row span").is_none(),
+                        "w:vMerge carries no span count"
+                    );
+                }
+            }
+        }
+
+        assert!(
+            widest >= 3,
+            "fixture declares w:gridSpan=\"3\", got a widest span of {widest}"
+        );
+    }
+
+    /// The format-neutral accessor must agree with the DOCX-specific one.
+    #[test]
+    #[cfg(feature = "ooxml")]
+    fn docx_vertical_merge_matches_the_format_specific_accessor() {
+        use crate::ooxml::docx::VMergeState;
+
+        let path = test_data_path().join("ooxml/docx/drawing.docx");
+        let doc = Document::open(&path).expect("Failed to open DOCX");
+        let tables = doc.tables().expect("Failed to get tables");
+
+        for table in &tables {
+            for row in &table.rows().expect("Failed to get rows") {
+                for cell in &row.cells().expect("Failed to get cells") {
+                    let expected = match cell.v_merge().expect("v_merge") {
+                        None => CellMerge::None,
+                        Some(VMergeState::Restart) => CellMerge::Start,
+                        Some(VMergeState::Continue) => CellMerge::Continuation,
+                    };
+                    assert_eq!(cell.vertical_merge().expect("merge state"), expected);
                 }
             }
         }

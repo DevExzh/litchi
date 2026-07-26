@@ -46,6 +46,7 @@
 //! ```
 
 // Submodule declarations
+mod cell_merge;
 mod doc;
 mod element;
 mod paragraph;
@@ -54,6 +55,7 @@ mod table;
 mod types;
 
 // Re-exports
+pub use cell_merge::CellMerge;
 pub use doc::Document;
 pub use element::DocumentElement;
 pub use paragraph::Paragraph;

@@ -1459,40 +1459,21 @@ impl MarkdownWriter {
         }
 
         // Try OLE MTEF formulas
-        #[cfg(all(feature = "ole", not(feature = "ooxml")))]
+        #[cfg(feature = "ole")]
         {
-            // When only `ole` is enabled, Run can only be the Doc variant, so we
-            // destructure directly without a match. This keeps the code simple
-            // and avoids the `infallible_destructuring_match` lint in ole-only
-            // builds.
-            let crate::document::Run::Doc(ole_run) = _run;
-
-            if ole_run.has_mtef_formula() {
-                if let Some(latex) = ole_run.mtef_formula_latex() {
-                    return Ok(Some(self.format_formula(latex, true))); // true = inline
-                } else {
+            // `Run` carries one variant per enabled format feature, so this
+            // pattern is refutable in most builds and irrefutable in an
+            // `ole`-only build; `if let` covers both without a wildcard arm that
+            // would be unreachable in the latter.
+            #[allow(irrefutable_let_patterns)]
+            if let crate::document::Run::Doc(ole_run) = _run
+                && ole_run.has_mtef_formula()
+            {
+                return Ok(Some(match ole_run.mtef_formula_latex() {
+                    Some(latex) => self.format_formula(latex, true),
                     // Fallback placeholder if rendered formula text is unavailable.
-                    return Ok(Some(self.format_formula("[Formula]", true)));
-                }
-            }
-        }
-
-        #[cfg(all(feature = "ole", feature = "ooxml"))]
-        {
-            // When both `ole` and `ooxml` are enabled, fall back to the slower
-            // path for non-OLE runs.
-            let ole_run = match _run {
-                crate::document::Run::Doc(r) => r,
-                _ => return Ok(None),
-            };
-
-            if ole_run.has_mtef_formula() {
-                if let Some(latex) = ole_run.mtef_formula_latex() {
-                    return Ok(Some(self.format_formula(latex, true))); // true = inline
-                } else {
-                    // Fallback placeholder if rendered formula text is unavailable.
-                    return Ok(Some(self.format_formula("[Formula]", true)));
-                }
+                    None => self.format_formula("[Formula]", true),
+                }));
             }
         }
 

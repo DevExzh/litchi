@@ -437,24 +437,13 @@ impl Document {
             },
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => {
-                let tables = doc.tables();
-                Ok(tables
+                // Detach each table from the source buffer without flattening
+                // it: `into_owned` keeps merge roles, borders, widths, nested
+                // tables, and drawings that a text-only rebuild would discard.
+                Ok(doc
+                    .tables()
                     .iter()
-                    .map(|t| {
-                        // Convert RTF table to owned Table
-                        let mut owned_table = litchi_rtf::Table::new();
-                        for row in t.rows() {
-                            let mut owned_row = litchi_rtf::Row::new();
-                            for cell in row.cells() {
-                                let owned_cell = litchi_rtf::Cell::new(std::borrow::Cow::Owned(
-                                    cell.text().to_string(),
-                                ));
-                                owned_row.add_cell(owned_cell);
-                            }
-                            owned_table.add_row(owned_row);
-                        }
-                        Table::Rtf(owned_table)
-                    })
+                    .map(|t| Table::Rtf(t.clone().into_owned()))
                     .collect())
             },
             #[cfg(feature = "odf")]
@@ -586,19 +575,10 @@ impl Document {
                             ))));
                         },
                         litchi_rtf::DocumentElement::Table(table) => {
-                            let mut owned_table = litchi_rtf::Table::new();
-                            for row in table.rows() {
-                                let mut owned_row = litchi_rtf::Row::new();
-                                for cell in row.cells() {
-                                    let owned_cell = litchi_rtf::Cell::new(
-                                        std::borrow::Cow::Owned(cell.text().to_string()),
-                                    );
-                                    owned_row.add_cell(owned_cell);
-                                }
-                                owned_table.add_row(owned_row);
-                            }
-                            elements
-                                .push(DocumentElement::Table(Box::new(Table::Rtf(owned_table))));
+                            // Detach without flattening; see `tables()` above.
+                            elements.push(DocumentElement::Table(Box::new(Table::Rtf(
+                                table.into_owned(),
+                            ))));
                         },
                     }
                 }

@@ -1368,6 +1368,92 @@ impl<'a> Row<'a> {
     }
 }
 
+impl Table<'_> {
+    /// Detach this table from the source buffer, cloning any borrowed text.
+    ///
+    /// Every row, cell, nested table, and anchored drawing is carried over, so
+    /// the result is structurally identical to the parsed table rather than a
+    /// text-only skeleton. Cells whose text is already owned move without
+    /// copying.
+    pub fn into_owned(self) -> Table<'static> {
+        Table {
+            rows: self.rows.into_iter().map(Row::into_owned).collect(),
+            direction: self.direction,
+        }
+    }
+}
+
+impl Row<'_> {
+    /// Detach this row from the source buffer, cloning any borrowed text.
+    ///
+    /// See [`Table::into_owned`]; all row-level geometry, borders, shading, and
+    /// autoformat state is preserved.
+    pub fn into_owned(self) -> Row<'static> {
+        Row {
+            cells: self.cells.into_iter().map(Cell::into_owned).collect(),
+            table_style: self.table_style,
+            direction: self.direction,
+            layout: self.layout,
+            padding: self.padding,
+            spacing: self.spacing,
+            positioning: self.positioning,
+            borders: self.borders,
+            shading: self.shading,
+            geometry: self.geometry,
+            autoformat_flags: self.autoformat_flags,
+            banding: self.banding,
+        }
+    }
+}
+
+impl Cell<'_> {
+    /// Detach this cell from the source buffer, cloning any borrowed text.
+    ///
+    /// See [`Table::into_owned`]; merge roles, borders, shading, layout,
+    /// boundaries, preferred width, nested tables, shapes, and the story event
+    /// ordering are all preserved.
+    pub fn into_owned(self) -> Cell<'static> {
+        Cell {
+            text: Cow::Owned(self.text.into_owned()),
+            padding: self.padding,
+            spacing: self.spacing,
+            layout: self.layout,
+            borders: self.borders,
+            shading: self.shading,
+            merge: self.merge,
+            right_boundary: self.right_boundary,
+            preferred_width: self.preferred_width,
+            nested_tables: self
+                .nested_tables
+                .into_iter()
+                .map(CellNestedTable::into_owned)
+                .collect(),
+            shapes: self
+                .shapes
+                .into_iter()
+                .map(crate::Shape::into_owned)
+                .collect(),
+            shape_groups: self
+                .shape_groups
+                .into_iter()
+                .map(crate::ShapeGroup::into_owned)
+                .collect(),
+            drawing_order: self.drawing_order,
+            story_events: self.story_events,
+        }
+    }
+}
+
+impl CellNestedTable<'_> {
+    /// Detach this nested table from the source buffer, keeping its anchor.
+    pub fn into_owned(self) -> CellNestedTable<'static> {
+        CellNestedTable {
+            text_offset: self.text_offset,
+            table: self.table.into_owned(),
+        }
+    }
+}
+
 impl<'a> Table<'a> {
     pub fn rows_mut(&mut self) -> &mut [Row<'a>] {
         &mut self.rows
