@@ -59,9 +59,9 @@ use super::shape_style::{
     ArrowStyle, FillStyle, LineCapStyle, LineJoinStyle, LineStyle, LineStyleConfig, ShadowStyle,
     ShapeStyle,
 };
-use super::smart_tags::{PowerPointSmartTagDefinition, PowerPointSmartTagIndex};
 #[allow(unused_imports)]
 use super::shapes::ShapeKind;
+use super::smart_tags::{PowerPointSmartTagDefinition, PowerPointSmartTagIndex};
 use super::slide_timing::SlideTiming;
 use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
 use super::table::{PositionedTable, Table};
@@ -93,6 +93,8 @@ pub enum PptWriteError {
     InvalidData(String),
     /// OLE error
     Ole(crate::OleError),
+    /// MS-OVBA project authoring error
+    Vba(crate::ovba::VbaError),
 }
 
 /// Build a minimal, valid Current User stream referencing the given UserEditAtom offset.
@@ -201,17 +203,33 @@ impl From<crate::OleError> for PptWriteError {
     }
 }
 
+impl From<crate::ovba::VbaError> for PptWriteError {
+    fn from(err: crate::ovba::VbaError) -> Self {
+        PptWriteError::Vba(err)
+    }
+}
+
 impl std::fmt::Display for PptWriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PptWriteError::Io(e) => write!(f, "I/O error: {}", e),
             PptWriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
             PptWriteError::Ole(e) => write!(f, "OLE error: {}", e),
+            PptWriteError::Vba(e) => write!(f, "VBA project error: {}", e),
         }
     }
 }
 
-impl std::error::Error for PptWriteError {}
+impl std::error::Error for PptWriteError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::Ole(error) => Some(error),
+            Self::Vba(error) => Some(error),
+            Self::InvalidData(_) => None,
+        }
+    }
+}
 
 /// Shape type (legacy - use ShapeKind from shapes module for new code)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -703,6 +721,8 @@ pub struct PptWriter {
     encryption: Option<PptWriterEncryption>,
     /// Inert modify password, wiped on replacement, clear, or drop.
     modify_password: Option<PptWriterModifyPassword>,
+    /// Standalone CFB project wrapped for a persisted `VbaProjectStg`.
+    vba_project: Option<crate::ppt::PowerPointOleStorage>,
 }
 
 struct PptWriterEncryption {
@@ -759,6 +779,7 @@ impl PptWriter {
             main_master_header_footer: None,
             encryption: None,
             modify_password: None,
+            vba_project: None,
         }
     }
 
@@ -784,6 +805,84 @@ impl PptWriter {
     /// Return the configured encryption profile without exposing the password.
     pub fn encryption_profile(&self) -> Option<PptEncryptionProfile> {
         self.encryption.as_ref().map(|value| value.profile)
+    }
+
+    /// Configure a complete module-free VBA project.
+    pub fn enable_empty_vba_project(
+        &mut self,
+        project_name: &str,
+        compression: crate::ppt::PowerPointVbaProjectCompression,
+    ) -> Result<(), PptWriteError> {
+        let project = crate::ovba::VbaProjectBuilder::new(project_name)
+            .build(&crate::ovba::VbaLimits::default())?;
+        self.set_vba_project_binary(project, compression)
+    }
+
+    /// Configure a complete inert VBA project using explicit MS-OVBA limits.
+    ///
+    /// The inner CFB and optional outer zlib stream are fully serialized before
+    /// writer state changes. Module source is never compiled or executed.
+    pub fn set_vba_project(
+        &mut self,
+        project: &crate::ovba::VbaProjectBuilder,
+        limits: &crate::ovba::VbaLimits,
+        compression: crate::ppt::PowerPointVbaProjectCompression,
+    ) -> Result<(), PptWriteError> {
+        let project = project.build(limits)?;
+        self.set_vba_project_binary(project, compression)
+    }
+
+    /// Configure an already validated inert VBA project.
+    pub fn set_vba_project_binary(
+        &mut self,
+        project: crate::ovba::VbaProjectBinary,
+        compression: crate::ppt::PowerPointVbaProjectCompression,
+    ) -> Result<(), PptWriteError> {
+        use std::io::Write;
+
+        let cfb = project.to_cfb_bytes()?;
+        let storage = match compression {
+            crate::ppt::PowerPointVbaProjectCompression::Uncompressed => {
+                crate::ppt::PowerPointOleStorage {
+                    kind: crate::ppt::PowerPointOleStorageKind::VbaProject,
+                    compression: crate::ppt::PowerPointOleStorageCompression::Uncompressed,
+                    data: cfb,
+                }
+            },
+            crate::ppt::PowerPointVbaProjectCompression::Zlib => {
+                let uncompressed_len = u32::try_from(cfb.len()).map_err(|_| {
+                    PptWriteError::InvalidData(
+                        "PowerPoint VBA project CFB exceeds the 32-bit size limit".to_string(),
+                    )
+                })?;
+                let mut encoder =
+                    flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+                encoder.write_all(&cfb)?;
+                let data = encoder.finish()?;
+                crate::ppt::PowerPointOleStorage {
+                    kind: crate::ppt::PowerPointOleStorageKind::VbaProject,
+                    compression: crate::ppt::PowerPointOleStorageCompression::Zlib {
+                        uncompressed_len,
+                    },
+                    data,
+                }
+            },
+        };
+        storage
+            .to_record_bytes()
+            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+        self.vba_project = Some(storage);
+        Ok(())
+    }
+
+    /// Remove the configured VBA project and its persisted metadata.
+    pub fn clear_vba_project(&mut self) {
+        self.vba_project = None;
+    }
+
+    /// Whether a complete VBA project is configured for output.
+    pub fn has_vba_project(&self) -> bool {
+        self.vba_project.is_some()
     }
 
     /// Set the inert password required by PowerPoint to modify the presentation.
@@ -2020,13 +2119,20 @@ impl PptWriter {
         self.notes_view_info.as_ref()
     }
 
-    fn build_docinfo_list(&self) -> Result<Vec<u8>, PptWriteError> {
+    fn build_docinfo_list(&self, vba_persist_id: Option<u32>) -> Result<Vec<u8>, PptWriteError> {
         let ppt11 = super::smart_tags::build_document_binary_tag(&self.smart_tags)?;
-        Ok(super::records::create_docinfo_list_container_with_binary_tags(
-            self.slide_view_info.as_ref(),
-            self.notes_view_info.as_ref(),
-            ppt11.as_deref(),
-        )?)
+        Ok(
+            super::records::create_docinfo_list_container_with_binary_tags(
+                self.slide_view_info.as_ref(),
+                self.notes_view_info.as_ref(),
+                super::env_data::VBAInfoAtom {
+                    persist_id_ref: vba_persist_id.unwrap_or(0),
+                    has_macros: vba_persist_id.is_some(),
+                    runtime_version: 2,
+                },
+                ppt11.as_deref(),
+            )?,
+        )
     }
 
     /// Set a presentation property
@@ -2074,6 +2180,10 @@ impl PptWriter {
         persist_builder.set_offset(doc_persist_id, 0);
         // Allocate persist ID for MainMaster (top-level record written after Document)
         let master_persist_id = persist_builder.allocate_id();
+        let vba_persist_id = self
+            .vba_project
+            .as_ref()
+            .map(|_| persist_builder.allocate_id());
 
         // 2) Build DocumentContainer
         let mut doc_container = RecordBuilder::new(0x0F, 0, record_type::DOCUMENT);
@@ -2120,7 +2230,7 @@ impl PptWriter {
         doc_container.write_child(&slwt_master);
 
         // 2.4) DocInfo List (0x07D0) before SlideListWithText (slides), per POI empty_textbox.ppt
-        let docinfo = self.build_docinfo_list()?;
+        let docinfo = self.build_docinfo_list(vba_persist_id)?;
         doc_container.write_child(&docinfo);
 
         if let Some(value) = &header_footers.presentation_slides {
@@ -2387,6 +2497,17 @@ impl PptWriter {
             ppt_stream.extend_from_slice(&storage);
         }
 
+        if let (Some(persist_id), Some(storage)) = (vba_persist_id, &self.vba_project) {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+            })?;
+            persist_builder.set_offset(persist_id, offset);
+            let record = storage
+                .to_record_bytes()
+                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+            ppt_stream.extend_from_slice(&record);
+        }
+
         let mut pictures_stream = if self.blip_store.is_empty() {
             None
         } else {
@@ -2494,6 +2615,10 @@ impl PptWriter {
         persist_builder.set_offset(doc_persist_id, 0);
         // Allocate persist ID for MainMaster
         let master_persist_id = persist_builder.allocate_id();
+        let vba_persist_id = self
+            .vba_project
+            .as_ref()
+            .map(|_| persist_builder.allocate_id());
 
         let mut doc_container = RecordBuilder::new(0x0F, 0, record_type::DOCUMENT);
 
@@ -2534,7 +2659,7 @@ impl PptWriter {
         doc_container.write_child(&slwt_master);
 
         // DocInfo List before SlideListWithText (slides), matching POI empty_textbox.ppt
-        let docinfo = self.build_docinfo_list()?;
+        let docinfo = self.build_docinfo_list(vba_persist_id)?;
         doc_container.write_child(&docinfo);
 
         if let Some(value) = &header_footers.presentation_slides {
@@ -2734,6 +2859,17 @@ impl PptWriter {
                 &self.slides[plan.slide].charts[plan.chart].workbook,
             )?;
             ppt_stream.extend_from_slice(&storage);
+        }
+
+        if let (Some(persist_id), Some(storage)) = (vba_persist_id, &self.vba_project) {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+            })?;
+            persist_builder.set_offset(persist_id, offset);
+            let record = storage
+                .to_record_bytes()
+                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+            ppt_stream.extend_from_slice(&record);
         }
 
         let mut pictures_stream = if self.blip_store.is_empty() {

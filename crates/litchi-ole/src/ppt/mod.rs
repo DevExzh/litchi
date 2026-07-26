@@ -307,7 +307,10 @@ pub use text_run::{
     ParagraphTabAlignment, ParagraphTabStop, ParagraphTextDirection, TextRun, TextRunExtractor,
     TextRunFormatting,
 };
-pub use vba_info::{PowerPointVbaInfo, PowerPointVbaProjectStorage};
+pub use vba_info::{
+    PowerPointVbaInfo, PowerPointVbaProjectCompression, PowerPointVbaProjectError,
+    PowerPointVbaProjectLimits, PowerPointVbaProjectStorage,
+};
 
 // Re-export writer types
 pub use writer::{

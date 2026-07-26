@@ -546,6 +546,7 @@ pub fn create_docinfo_list_container(
     create_docinfo_list_container_with_binary_tags(
         slide_view_info,
         notes_view_info,
+        VBAInfoAtom::DEFAULT,
         std::iter::empty(),
     )
 }
@@ -555,6 +556,7 @@ pub fn create_docinfo_list_container(
 pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
     slide_view_info: Option<&PowerPointSlideViewInfo>,
     notes_view_info: Option<&PowerPointSlideViewInfo>,
+    vba_info: VBAInfoAtom,
     additional_binary_tags: impl IntoIterator<Item = &'a [u8]>,
 ) -> Result<Vec<u8>, PptError> {
     let mut list = RecordBuilder::new(0x0F, 0, record_type::DOC_INFO_LIST);
@@ -589,7 +591,7 @@ pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
     // VBAInfo (1023) container with VBAInfoAtom
     let mut vba = RecordBuilder::new(0x0F, 1, record_type::VBA_INFO);
     let mut vba_atom = RecordBuilder::new(0x02, 0, record_type::VBA_INFO_ATOM);
-    vba_atom.write_data(&VBAInfoAtom::DEFAULT.to_bytes());
+    vba_atom.write_data(&vba_info.to_bytes());
     vba.write_child(&vba_atom.build()?);
     list.write_child(&vba.build()?);
 

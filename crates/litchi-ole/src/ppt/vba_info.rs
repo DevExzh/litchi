@@ -8,11 +8,84 @@ use super::ole_storage::{
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 
+const DEFAULT_MAX_STORED_PROJECT_BYTES: usize = 128 * 1_048_576;
+const DEFAULT_MAX_PROJECT_CFB_BYTES: usize = 256 * 1_048_576;
+
+/// Outer storage encoding used when authoring a PowerPoint VBA project.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PowerPointVbaProjectCompression {
+    /// Store the standalone CFB bytes directly.
+    Uncompressed,
+    /// Compress the standalone CFB with the MS-PPT zlib wrapper.
+    #[default]
+    Zlib,
+}
+
+/// Resource limits for loading an embedded PowerPoint VBA project.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PowerPointVbaProjectLimits {
+    /// Maximum zlib or uncompressed bytes stored in `VbaProjectStg`.
+    pub max_stored_bytes: usize,
+    /// Maximum CFB bytes accepted after outer zlib decompression.
+    pub max_cfb_bytes: usize,
+    /// Limits applied while parsing the inner MS-OVBA project.
+    pub project: crate::ovba::VbaLimits,
+}
+
+impl Default for PowerPointVbaProjectLimits {
+    fn default() -> Self {
+        Self {
+            max_stored_bytes: DEFAULT_MAX_STORED_PROJECT_BYTES,
+            max_cfb_bytes: DEFAULT_MAX_PROJECT_CFB_BYTES,
+            project: crate::ovba::VbaLimits::default(),
+        }
+    }
+}
+
+/// Error returned while resolving or parsing a PowerPoint VBA project.
+#[derive(Debug)]
+pub enum PowerPointVbaProjectError {
+    /// Invalid outer MS-PPT metadata, compression, or persistence.
+    PowerPoint(PptError),
+    /// Invalid inner CFB or MS-OVBA project data.
+    Vba(crate::ovba::VbaError),
+}
+
+impl std::fmt::Display for PowerPointVbaProjectError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::PowerPoint(error) => write!(formatter, "{error}"),
+            Self::Vba(error) => write!(formatter, "{error}"),
+        }
+    }
+}
+
+impl std::error::Error for PowerPointVbaProjectError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::PowerPoint(error) => Some(error),
+            Self::Vba(error) => Some(error),
+        }
+    }
+}
+
+impl From<PptError> for PowerPointVbaProjectError {
+    fn from(error: PptError) -> Self {
+        Self::PowerPoint(error)
+    }
+}
+
+impl From<crate::ovba::VbaError> for PowerPointVbaProjectError {
+    fn from(error: crate::ovba::VbaError) -> Self {
+        Self::Vba(error)
+    }
+}
+
 /// Strictly validated metadata pointing at a persisted VBA project storage.
 ///
-/// This type never opens, decompresses, interprets, or executes the referenced
-/// project. The storage remains available only through the bounded opaque
-/// storage API.
+/// Parsing this metadata never opens or executes the referenced project.
+/// [`crate::ppt::Presentation::vba_project`] provides a separate bounded,
+/// inert parser for callers that need project and module source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PowerPointVbaInfo {
     /// Persist-directory identifier of the `VbaProjectStg` record.
@@ -25,9 +98,9 @@ pub struct PowerPointVbaInfo {
 
 /// Payload-free metadata for a PowerPoint `VbaProjectStg` persist object.
 ///
-/// This describes the outer MS-PPT storage record only. It deliberately does
-/// not expose, decompress, parse as CFB, inspect, or execute the embedded
-/// MS-OVBA project payload.
+/// This descriptor does not expose or decompress the embedded payload.
+/// Callers can opt into bounded CFB/MS-OVBA parsing through
+/// [`crate::ppt::Presentation::vba_project`]. VBA is never executed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PowerPointVbaProjectStorage {
     info: PowerPointVbaInfo,
@@ -59,6 +132,18 @@ impl PowerPointVbaProjectStorage {
                 "VBAInfoAtom persist ID {} does not reference VBA project storage",
                 info.persist_id_ref
             )));
+        }
+        if let Some(storage) = storage {
+            let contains_data = match storage.compression {
+                PowerPointOleStorageCompression::Uncompressed => !storage.data.is_empty(),
+                PowerPointOleStorageCompression::Zlib { uncompressed_len } => uncompressed_len != 0,
+            };
+            if info.has_macros != contains_data {
+                return Err(PptError::Corrupted(
+                    "VBAInfoAtom fHasMacros disagrees with VbaProjectStg payload presence"
+                        .to_string(),
+                ));
+            }
         }
         Ok(Self {
             info,
@@ -104,8 +189,8 @@ impl PowerPointVbaProjectStorage {
 
     /// Return the declared decompressed payload length, if the storage is compressed.
     ///
-    /// This is metadata from the outer record. The library never attempts the
-    /// corresponding decompression.
+    /// This is untrusted metadata from the outer record. Bounded project
+    /// parsing verifies it against the actual decompressed byte count.
     pub fn declared_uncompressed_len(&self) -> Option<u32> {
         match self.compression {
             Some(PowerPointOleStorageCompression::Zlib { uncompressed_len }) => {
@@ -328,10 +413,10 @@ mod tests {
     }
 
     #[test]
-    fn rejects_missing_or_wrong_vba_storage_without_touching_payload_contents() {
+    fn rejects_missing_wrong_or_contradictory_vba_storage() {
         let info = PowerPointVbaInfo {
             persist_id_ref: 41,
-            has_macros: false,
+            has_macros: true,
             runtime_version: 2,
         };
         assert!(PowerPointVbaProjectStorage::from_info_and_storage(info, None).is_err());
@@ -343,6 +428,23 @@ mod tests {
         };
         assert!(
             PowerPointVbaProjectStorage::from_info_and_storage(info, Some(&wrong_storage)).is_err()
+        );
+
+        let contradictory = PowerPointOleStorage {
+            kind: PowerPointOleStorageKind::VbaProject,
+            compression: PowerPointOleStorageCompression::Uncompressed,
+            data: vec![0x01],
+        };
+        assert!(
+            PowerPointVbaProjectStorage::from_info_and_storage(
+                PowerPointVbaInfo {
+                    persist_id_ref: 41,
+                    has_macros: false,
+                    runtime_version: 2,
+                },
+                Some(&contradictory),
+            )
+            .is_err()
         );
 
         let empty = PowerPointVbaInfo {

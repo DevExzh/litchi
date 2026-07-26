@@ -387,7 +387,7 @@ conversion, fonts, and image conversion are optional.
 | Presentation settings/metadata | ✅ | ✅ | ✅ | Slide-show, print, HTML publish, broadcast, envelope, routing, and privacy metadata |
 | Modify password/protection | ✅ | ✅ | ✅ | Password and protection metadata; policy is not enforced |
 | Password encryption | ✅ | ✅ | ✅ | Supported PPT encryption profiles |
-| VBA project metadata | 🟡 | ✅ | ✅ | Inert MS-PPT `VBAInfo`/`VbaProjectStg` persist ID, compression, and payload-size metadata; storage is never decompressed or parsed as CFB, and no project/module code is exposed or executed |
+| VBA projects | ✅ | ✅ | ✅ | Exact MS-PPT `VBAInfo`/`VbaProjectStg` persistence with context-correct uncompressed/zlib storage, bounded standalone-CFB and MS-OVBA project/module source parsing, deterministic cache-free project authoring, removal, and encrypted-presentation round trips; source is codepage-aware and inert, and VBA is never executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral CFB verification and signing |
 
 ## OpenDocument common package features

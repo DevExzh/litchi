@@ -26,7 +26,7 @@ use crate::consts::PptRecordType;
 use crate::extractor::{ExtractedImage, ImageExtractor};
 #[cfg(feature = "imgconv")]
 use litchi_imgconv::BlipStore;
-use std::io::{Read, Seek};
+use std::io::{Cursor, Read, Seek};
 
 /// A PowerPoint presentation (.ppt) with high-performance zero-copy parsing.
 ///
@@ -335,10 +335,17 @@ impl Presentation {
         Ok(Some(objects))
     }
 
-    /// Resolve a persisted OLE, VBA, or ActiveX storage record as bounded opaque bytes.
-    ///
-    /// The returned payload is never decompressed, opened as an OLE filesystem, or executed.
+    /// Resolve a persisted embedded OLE-object storage as bounded inert bytes.
     pub fn ole_storage(&self, persist_id: u32) -> Result<Option<PowerPointOleStorage>> {
+        self.ole_storage_as(persist_id, crate::ppt::PowerPointOleStorageKind::OleObject)
+    }
+
+    /// Resolve a persisted storage with the kind supplied by its referencing record.
+    pub fn ole_storage_as(
+        &self,
+        persist_id: u32,
+        kind: crate::ppt::PowerPointOleStorageKind,
+    ) -> Result<Option<PowerPointOleStorage>> {
         let Some(offset) = self.persist_mapping.get_offset(persist_id) else {
             return Ok(None);
         };
@@ -350,7 +357,7 @@ impl Presentation {
                 "persist ID {persist_id} does not reference ExOleObjStg"
             )));
         }
-        PowerPointOleStorage::parse(&record).map(Some)
+        PowerPointOleStorage::parse_as(&record, kind).map(Some)
     }
 
     /// Enumerate typed, inert native charts embedded as OLE objects.
@@ -405,7 +412,11 @@ impl Presentation {
         let storage = if info.persist_id_ref == 0 {
             None
         } else {
-            let Some(storage) = self.ole_storage(info.persist_id_ref)? else {
+            let Some(storage) = self.ole_storage_as(
+                info.persist_id_ref,
+                crate::ppt::PowerPointOleStorageKind::VbaProject,
+            )?
+            else {
                 return Err(PptError::Corrupted(format!(
                     "VBAInfoAtom persist ID {} has no storage record",
                     info.persist_id_ref
@@ -423,6 +434,50 @@ impl Presentation {
     /// use [`Self::vba_project_storage`].
     pub fn vba_info(&self) -> Result<Option<crate::ppt::PowerPointVbaInfo>> {
         Ok(self.vba_project_storage()?.map(|storage| storage.info()))
+    }
+
+    /// Parse the embedded MS-OVBA project and expose inert module source.
+    ///
+    /// The outer zlib stream, inner CFB, and MS-OVBA compressed containers are
+    /// all bounded by caller-supplied limits. Source is never compiled,
+    /// interpreted, or executed.
+    pub fn vba_project(
+        &self,
+        limits: &crate::ppt::PowerPointVbaProjectLimits,
+    ) -> std::result::Result<Option<crate::ovba::VbaProject>, crate::ppt::PowerPointVbaProjectError>
+    {
+        let Some(summary) = self.vba_project_storage()? else {
+            return Ok(None);
+        };
+        if !summary.has_persisted_storage() {
+            return Ok(None);
+        }
+        let storage = self
+            .ole_storage_as(
+                summary.persist_id_ref(),
+                crate::ppt::PowerPointOleStorageKind::VbaProject,
+            )?
+            .ok_or_else(|| {
+                PptError::Corrupted(format!(
+                    "VBAInfoAtom persist ID {} has no storage record",
+                    summary.persist_id_ref()
+                ))
+            })?;
+        if storage.data.len() > limits.max_stored_bytes {
+            return Err(PptError::Corrupted(format!(
+                "VbaProjectStg stores {} bytes above the {}-byte limit",
+                storage.data.len(),
+                limits.max_stored_bytes
+            ))
+            .into());
+        }
+        let cfb = storage.decompressed_bytes(limits.max_cfb_bytes)?;
+        let mut ole = OleFile::open(Cursor::new(cfb))
+            .map_err(crate::ovba::VbaError::from)
+            .map_err(crate::ppt::PowerPointVbaProjectError::from)?;
+        crate::ovba::VbaProject::open(&mut ole, &[], &limits.project)
+            .map(Some)
+            .map_err(Into::into)
     }
 
     /// Return the PPT10 modify-password metadata without verifying it.
@@ -1142,7 +1197,7 @@ mod tests {
         let mut storage_data = Vec::new();
         storage_data.extend_from_slice(&4096u32.to_le_bytes());
         storage_data.extend_from_slice(&[0x78, 0x9c, 1, 2, 3]);
-        let storage = record_bytes(0, 3, PptRecordType::ExternalOleObjectStg, &storage_data);
+        let storage = record_bytes(0, 1, PptRecordType::ExternalOleObjectStg, &storage_data);
         let storage_offset = vba_info.len() as u32;
 
         let mut powerpoint_document = vba_info;

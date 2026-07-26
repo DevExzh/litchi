@@ -209,34 +209,30 @@ impl SlideViewInfoAtom {
 // VBAInfoAtom (MS-PPT 2.10.1)
 // =============================================================================
 
-/// VBA macro flags
-pub mod vba_flags {
-    /// Document has macros (fHasMacros)
-    pub const HAS_MACROS: u32 = 0x0000_0001;
-    /// Macros are enabled (fHasProject)
-    pub const HAS_PROJECT: u32 = 0x0000_0002;
-}
-
 /// VBAInfoAtom - VBA macro information
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VBAInfoAtom {
     /// Persist ID reference to VBA storage (0 if none)
-    pub persist_id_ref: u64,
-    /// VBA flags (see vba_flags module)
-    pub flags: u32,
+    pub persist_id_ref: u32,
+    /// Whether the referenced VBA project storage contains data.
+    pub has_macros: bool,
+    /// VBA runtime version. MS-PPT requires `2`.
+    pub runtime_version: u32,
 }
 
 impl VBAInfoAtom {
-    /// Default: no VBA but project flag set (POI behavior)
+    /// Canonical metadata for a presentation without a VBA project.
     pub const DEFAULT: Self = Self {
         persist_id_ref: 0,
-        flags: vba_flags::HAS_PROJECT,
+        has_macros: false,
+        runtime_version: 2,
     };
 
     pub fn to_bytes(&self) -> [u8; 12] {
         let mut data = [0u8; 12];
-        data[0..8].copy_from_slice(&self.persist_id_ref.to_le_bytes());
-        data[8..12].copy_from_slice(&self.flags.to_le_bytes());
+        data[0..4].copy_from_slice(&self.persist_id_ref.to_le_bytes());
+        data[4..8].copy_from_slice(&u32::from(self.has_macros).to_le_bytes());
+        data[8..12].copy_from_slice(&self.runtime_version.to_le_bytes());
         data
     }
 }
@@ -535,7 +531,8 @@ mod tests {
     fn test_vba_info_atom_default() {
         let atom = VBAInfoAtom::DEFAULT;
         assert_eq!(atom.persist_id_ref, 0);
-        assert_eq!(atom.flags, vba_flags::HAS_PROJECT);
+        assert!(!atom.has_macros);
+        assert_eq!(atom.runtime_version, 2);
     }
 
     #[test]
@@ -544,15 +541,11 @@ mod tests {
         let bytes = atom.to_bytes();
         assert_eq!(bytes.len(), 12);
 
-        assert_eq!(
-            u64::from_le_bytes([
-                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]
-            ]),
-            0
-        );
+        assert_eq!(u32::from_le_bytes(bytes[0..4].try_into().unwrap()), 0);
+        assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()), 0);
         assert_eq!(
             u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
-            vba_flags::HAS_PROJECT
+            2
         );
     }
 
@@ -560,25 +553,22 @@ mod tests {
     fn test_vba_info_atom_with_macros() {
         let atom = VBAInfoAtom {
             persist_id_ref: 12345,
-            flags: vba_flags::HAS_MACROS | vba_flags::HAS_PROJECT,
+            has_macros: true,
+            runtime_version: 2,
         };
         let bytes = atom.to_bytes();
         assert_eq!(
-            u64::from_le_bytes([
-                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]
-            ]),
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
             12345
         );
         assert_eq!(
-            u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
-            0x0000_0003
+            u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            1
         );
-    }
-
-    #[test]
-    fn test_vba_flags_constants() {
-        assert_eq!(vba_flags::HAS_MACROS, 0x0000_0001);
-        assert_eq!(vba_flags::HAS_PROJECT, 0x0000_0002);
+        assert_eq!(
+            u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
+            2
+        );
     }
 
     // =============================================================================
@@ -636,8 +626,7 @@ mod tests {
     fn test_vba_info_atom_clone() {
         let atom = VBAInfoAtom::DEFAULT;
         let cloned = atom;
-        assert_eq!(atom.persist_id_ref, cloned.persist_id_ref);
-        assert_eq!(atom.flags, cloned.flags);
+        assert_eq!(atom, cloned);
     }
 
     #[test]
