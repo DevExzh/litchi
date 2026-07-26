@@ -845,6 +845,37 @@ pub(super) fn rewrite_table_model_comment_table_wire(
     Ok(data)
 }
 
+pub(super) fn rewrite_table_model_format_table_wire(
+    original: &[u8],
+    previous: &TableModelArchive,
+    current: &TableModelArchive,
+) -> Result<Vec<u8>> {
+    let mut expected = current.clone();
+    expected.base_data_store.format_table = previous.base_data_store.format_table;
+    if expected != *previous {
+        return Err(Error::InvalidFormat(
+            "Numbers table model changed outside its format-table reference".to_owned(),
+        ));
+    }
+    let replacement = current
+        .base_data_store
+        .format_table
+        .as_ref()
+        .map(Message::encode_to_vec);
+    let data = patch_nested_length_delimited_field(
+        original,
+        &[4, 22],
+        previous.base_data_store.format_table.is_some(),
+        replacement.as_deref(),
+    )?;
+    if TableModelArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "Numbers table-model format-table wire mutation failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn segment_key_range(
     entries: &[tst::table_data_list::ListEntry],
 ) -> Result<crate::protobuf::tsp::Range> {

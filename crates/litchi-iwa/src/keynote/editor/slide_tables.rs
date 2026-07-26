@@ -65,6 +65,13 @@ pub use crate::table_cell_layout::{
     TableCellLayout as KeynoteTableCellLayout, TableCellTextWrap as KeynoteTableCellTextWrap,
     TableCellVerticalAlignment as KeynoteTableCellVerticalAlignment,
 };
+pub use crate::table_cell_number_format::{
+    TableCellDecimalPlaces as KeynoteTableCellDecimalPlaces,
+    TableCellFixedDecimalPlaces as KeynoteTableCellFixedDecimalPlaces,
+    TableCellNegativeNumberStyle as KeynoteTableCellNegativeNumberStyle,
+    TableCellNumberFormat as KeynoteTableCellNumberFormat,
+    TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
+};
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
 /// Lossless header/footer configuration shared by native iWork tables.
@@ -439,6 +446,88 @@ impl KeynoteEditor {
             column,
             KeynoteTableCellValue::Empty,
         )
+    }
+
+    /// Read an explicit decimal-number format for one slide-table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn slide_table_cell_number_format(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<KeynoteTableCellNumberFormat>> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_number_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace an explicit decimal-number format transactionally.
+    pub fn set_slide_table_cell_number_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: KeynoteTableCellNumberFormat,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_number_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            format,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_number_format(slide_index, model_object_id, row, column)?
+            != Some(format)
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell number format failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore iWork's automatic data format for one slide-table cell.
+    pub fn reset_slide_table_cell_number_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_number_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            if verified
+                .slide_table_cell_number_format(slide_index, model_object_id, row, column)?
+                .is_some()
+            {
+                return Err(Error::InvalidFormat(
+                    "Keynote table-cell number-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
     }
 
     /// Read the effective text layout for one reachable slide-table cell.

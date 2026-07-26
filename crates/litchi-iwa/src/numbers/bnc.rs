@@ -29,6 +29,12 @@ pub(crate) const STYLE_FLAG: u32 = 0x000020;
 pub(crate) const FORMULA_FLAG: u32 = 0x000200;
 pub(crate) const FORMULA_ERROR_FLAG: u32 = 0x000800;
 pub(crate) const COMMENT_FLAG: u32 = 0x080000;
+const CELL_FORMAT_KIND_FLAG: u32 = 0x001000;
+const CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x002000;
+const EXPLICIT_FORMAT_FLAGS_START: usize = 6;
+const EXPLICIT_FORMAT_FLAGS_END: usize = 8;
+const EXPLICIT_NUMBER_FORMAT: u16 = 1;
+pub(crate) const NUMBER_CELL_FORMAT_KIND: u32 = 1;
 
 const VALUE_FLAGS: u32 = DECIMAL_FLAG
     | NUMBER_FLAG
@@ -321,6 +327,41 @@ impl BncCell {
         self.u32_field(STYLE_FLAG)
     }
 
+    pub(crate) fn explicit_format_flags(&self) -> u16 {
+        u16::from_le_bytes(
+            self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+                .try_into()
+                .expect("fixed BNC prefix range"),
+        )
+    }
+
+    pub(crate) fn cell_format_kind(&self) -> Option<u32> {
+        self.u32_field(CELL_FORMAT_KIND_FLAG)
+    }
+
+    pub(crate) fn format_identifier(&self) -> Option<u32> {
+        self.u32_field(CELL_FORMAT_IDENTIFIER_FLAG)
+    }
+
+    pub(crate) fn set_number_format_identifier(&mut self, identifier: u32) {
+        self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&EXPLICIT_NUMBER_FORMAT.to_le_bytes());
+        self.fields.insert(
+            CELL_FORMAT_KIND_FLAG,
+            NUMBER_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+        );
+        self.fields.insert(
+            CELL_FORMAT_IDENTIFIER_FLAG,
+            identifier.to_le_bytes().to_vec(),
+        );
+    }
+
+    pub(crate) fn clear_explicit_format(&mut self) {
+        self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END].fill(0);
+        self.fields.remove(&CELL_FORMAT_KIND_FLAG);
+        self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
+    }
+
     pub(crate) fn set_style_identifier(&mut self, identifier: Option<u32>) {
         if let Some(identifier) = identifier {
             self.fields
@@ -559,6 +600,30 @@ mod tests {
         assert_eq!(cell.comment_identifier(), Some(9));
         cell.set_comment_identifier(None);
         assert_eq!(cell.comment_identifier(), None);
+    }
+
+    #[test]
+    fn number_formats_are_orthogonal_to_values_and_styles() {
+        let mut cell = BncCell::minimal();
+        cell.set_number(1_234.5).unwrap();
+        cell.set_style_identifier(Some(7));
+        cell.set_number_format_identifier(2);
+
+        assert_eq!(cell.explicit_format_flags(), EXPLICIT_NUMBER_FORMAT);
+        assert_eq!(cell.cell_format_kind(), Some(NUMBER_CELL_FORMAT_KIND));
+        assert_eq!(cell.format_identifier(), Some(2));
+
+        let reparsed = BncCell::parse(&cell.encode()).unwrap();
+        assert_eq!(reparsed.stored_value(), StoredValue::Number);
+        assert_eq!(reparsed.style_identifier(), Some(7));
+        assert_eq!(reparsed.format_identifier(), Some(2));
+
+        cell.clear_explicit_format();
+        assert_eq!(cell.explicit_format_flags(), 0);
+        assert_eq!(cell.cell_format_kind(), None);
+        assert_eq!(cell.format_identifier(), None);
+        assert_eq!(cell.stored_value(), StoredValue::Number);
+        assert_eq!(cell.style_identifier(), Some(7));
     }
 
     fn hex(value: &str) -> Vec<u8> {

@@ -3925,8 +3925,10 @@ pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
     PagesCellValue, PagesTable, PagesTableAxisIndex, PagesTableCellComment,
-    PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo, PagesTableCellInset,
-    PagesTableCellInsets, PagesTableCellLayout, PagesTableCellRegion, PagesTableCellTextWrap,
+    PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo, PagesTableCellDecimalPlaces,
+    PagesTableCellFixedDecimalPlaces, PagesTableCellInset, PagesTableCellInsets,
+    PagesTableCellLayout, PagesTableCellNegativeNumberStyle, PagesTableCellNumberFormat,
+    PagesTableCellRegion, PagesTableCellTextWrap, PagesTableCellThousandsSeparator,
     PagesTableCellUpdate, PagesTableCellVerticalAlignment, PagesTableColumnDeletion,
     PagesTableColumnInsertion, PagesTableDimension, PagesTableDimensionSize,
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,

@@ -67,6 +67,13 @@ pub use crate::table_cell_layout::{
     TableCellLayout as PagesTableCellLayout, TableCellTextWrap as PagesTableCellTextWrap,
     TableCellVerticalAlignment as PagesTableCellVerticalAlignment,
 };
+pub use crate::table_cell_number_format::{
+    TableCellDecimalPlaces as PagesTableCellDecimalPlaces,
+    TableCellFixedDecimalPlaces as PagesTableCellFixedDecimalPlaces,
+    TableCellNegativeNumberStyle as PagesTableCellNegativeNumberStyle,
+    TableCellNumberFormat as PagesTableCellNumberFormat,
+    TableCellThousandsSeparator as PagesTableCellThousandsSeparator,
+};
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -231,6 +238,83 @@ impl PagesEditor {
         column: usize,
     ) -> Result<()> {
         self.set_table_cell(model_object_id, row, column, PagesCellValue::Empty)
+    }
+
+    /// Read an explicit decimal-number format for one body-table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_number_format(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<PagesTableCellNumberFormat>> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_number_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace an explicit decimal-number format transactionally.
+    pub fn set_table_cell_number_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: PagesTableCellNumberFormat,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_number_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            format,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_number_format(model_object_id, row, column)? != Some(format) {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell number format failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore iWork's automatic data format for one body-table cell.
+    pub fn reset_table_cell_number_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_number_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            if verified
+                .table_cell_number_format(model_object_id, row, column)?
+                .is_some()
+            {
+                return Err(Error::InvalidFormat(
+                    "Pages table-cell number-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
     }
 
     /// Read the effective text layout for one body-table cell.
@@ -1236,6 +1320,41 @@ mod tests {
         assert_eq!(
             reopened.table_cell_layout(model_id, 1, 1).unwrap(),
             inherited
+        );
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_number_format_crud() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Formats", 3, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let format = PagesTableCellNumberFormat::new(
+            PagesTableCellDecimalPlaces::fixed(2).unwrap(),
+            PagesTableCellNegativeNumberStyle::Parentheses,
+            PagesTableCellThousandsSeparator::Shown,
+        );
+        editor
+            .set_table_cell(model_id, 1, 1, PagesCellValue::Number(1_234.5))
+            .unwrap();
+        editor
+            .set_table_cell_number_format(model_id, 1, 1, format)
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_number_format(model_id, 1, 1).unwrap(),
+            Some(format)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_number_format(model_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened.table_cell_number_format(model_id, 1, 1).unwrap(),
+            None
         );
     }
 

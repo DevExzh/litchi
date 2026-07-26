@@ -4467,18 +4467,19 @@ pub use slide_movies::{
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableAxisIndex, KeynoteTableCellComment,
-    KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo, KeynoteTableCellInset,
-    KeynoteTableCellInsets, KeynoteTableCellLayout, KeynoteTableCellRegion,
-    KeynoteTableCellTextWrap, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableCellVerticalAlignment, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
-    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
-    KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
-    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTableHiddenAxes, KeynoteTablePoints,
-    KeynoteTableRowDeletion, KeynoteTableRowInsertion, KeynoteTableSortColumnIndex,
-    KeynoteTableSortDirection, KeynoteTableSortOrder, KeynoteTableSortRowRange,
-    KeynoteTableSortRule, KeynoteTableSortScope, KeynoteTableTitleSettings,
-    RemovedKeynoteSlideTable,
+    KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo, KeynoteTableCellDecimalPlaces,
+    KeynoteTableCellFixedDecimalPlaces, KeynoteTableCellInset, KeynoteTableCellInsets,
+    KeynoteTableCellLayout, KeynoteTableCellNegativeNumberStyle, KeynoteTableCellNumberFormat,
+    KeynoteTableCellRegion, KeynoteTableCellTextWrap, KeynoteTableCellThousandsSeparator,
+    KeynoteTableCellUpdate, KeynoteTableCellValue, KeynoteTableCellVerticalAlignment,
+    KeynoteTableColumnDeletion, KeynoteTableColumnInsertion, KeynoteTableDimension,
+    KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
+    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
+    KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
+    KeynoteTableHiddenAxes, KeynoteTablePoints, KeynoteTableRowDeletion, KeynoteTableRowInsertion,
+    KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
+    KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
+    KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;

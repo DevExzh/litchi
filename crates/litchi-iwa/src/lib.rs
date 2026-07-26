@@ -153,6 +153,7 @@ pub mod table_appearance;
 pub mod table_cell_border;
 /// Typed text-layout controls shared by native iWork table cells.
 pub mod table_cell_layout;
+pub mod table_cell_number_format;
 /// Typed hidden-row and hidden-column state shared by native iWork tables.
 pub mod table_hidden_axes;
 /// Typed native table lock controls shared by Pages, Numbers, and Keynote.

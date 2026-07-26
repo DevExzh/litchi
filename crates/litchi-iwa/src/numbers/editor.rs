@@ -1959,6 +1959,63 @@ impl NumbersEditor {
         self.set_cell(table_id, row, column, CellValue::Empty)
     }
 
+    /// Read an explicit decimal-number format for one zero-based table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_number_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<crate::table_cell_number_format::TableCellNumberFormat>> {
+        cell_number_format::cell_number_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit decimal-number format transactionally.
+    pub fn set_table_cell_number_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: crate::table_cell_number_format::TableCellNumberFormat,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_number_format::set_cell_number_format(&mut staged, table_id, row, column, format)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_number_format(table_id, row, column)? != Some(format) {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell number format failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore iWork's automatic data format for one table cell.
+    pub fn reset_table_cell_number_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_number_format::reset_cell_number_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified
+                .table_cell_number_format(table_id, row, column)?
+                .is_some()
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers table-cell number-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective text layout for one zero-based table cell.
     pub fn table_cell_layout(
         &self,
@@ -3021,6 +3078,34 @@ pub(crate) fn table_cell_layout_in_package(
     cell_layout::cell_layout(package, table_id, row, column)
 }
 
+pub(crate) fn table_cell_number_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<crate::table_cell_number_format::TableCellNumberFormat>> {
+    cell_number_format::cell_number_format(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: crate::table_cell_number_format::TableCellNumberFormat,
+) -> Result<()> {
+    cell_number_format::set_cell_number_format(package, table_id, row, column, format)
+}
+
+pub(crate) fn reset_table_cell_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_number_format::reset_cell_number_format(package, table_id, row, column)
+}
+
 pub(crate) fn set_table_cell_layout_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -3361,6 +3446,7 @@ pub(crate) fn create_empty_table_graph_in_package(
 mod cell_fill;
 mod cell_layout;
 mod cell_merge;
+mod cell_number_format;
 mod cell_style;
 mod column_insert;
 mod date_time_fields;

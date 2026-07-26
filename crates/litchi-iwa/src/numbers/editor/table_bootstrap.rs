@@ -392,6 +392,7 @@ fn table_objects(
             style_table: reference(ids.style_list),
             formula_table: reference(ids.formula_list),
             format_table_pre_bnc: reference(ids.format_list),
+            format_table: Some(reference(ids.format_list)),
             next_row_strip_id: 1,
             next_column_strip_id: 0,
             row_tile_tree: tst::TableRbTree {
