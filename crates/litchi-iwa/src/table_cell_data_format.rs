@@ -7,8 +7,13 @@ use std::str::FromStr;
 const MAXIMUM_DECIMAL_PLACES: u8 = 30;
 
 mod date_time;
+mod duration;
 mod numeral_system;
 pub use date_time::TableCellDateTimeFormat;
+pub use duration::{
+    TableCellDurationFormat, TableCellDurationStyle, TableCellDurationUnit,
+    TableCellDurationUnitRange, TableCellDurationUnits,
+};
 pub use numeral_system::{
     TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
@@ -457,6 +462,8 @@ pub enum TableCellDataFormat {
     NumeralSystem(TableCellNumeralSystemFormat),
     /// Display a native Date value with an ICU-style pattern.
     DateTime(TableCellDateTimeFormat),
+    /// Display a native Duration value with typed style and unit settings.
+    Duration(TableCellDurationFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -619,6 +626,25 @@ mod tests {
         assert_eq!(
             TableCellDataFormat::from(custom.clone()),
             TableCellDataFormat::DateTime(custom)
+        );
+    }
+
+    #[test]
+    fn duration_units_are_strict_and_ergonomic() {
+        assert!(
+            TableCellDurationUnitRange::new(
+                TableCellDurationUnit::Seconds,
+                TableCellDurationUnit::Hours,
+            )
+            .is_err()
+        );
+        let range = TableCellDurationUnitRange::hours_to_milliseconds();
+        let format = TableCellDurationFormat::custom(TableCellDurationStyle::Abbreviated, range);
+        assert_eq!(format.style(), TableCellDurationStyle::Abbreviated);
+        assert_eq!(format.units(), TableCellDurationUnits::Custom(range));
+        assert_eq!(
+            TableCellDataFormat::from(format),
+            TableCellDataFormat::Duration(format)
         );
     }
 }

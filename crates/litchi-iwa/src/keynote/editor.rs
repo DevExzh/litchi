@@ -4467,10 +4467,14 @@ pub use slide_movies::{
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableAxisIndex, KeynoteTableCellComment,
-    KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo, KeynoteTableCellDataFormat,
-    KeynoteTableCellDecimalPlaces, KeynoteTableCellFixedDecimalPlaces, KeynoteTableCellInset,
+    KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo, KeynoteTableCellCurrencyFormat,
+    KeynoteTableCellDataFormat, KeynoteTableCellDateTimeFormat, KeynoteTableCellDecimalPlaces,
+    KeynoteTableCellDurationFormat, KeynoteTableCellDurationStyle, KeynoteTableCellDurationUnit,
+    KeynoteTableCellDurationUnitRange, KeynoteTableCellDurationUnits,
+    KeynoteTableCellFixedDecimalPlaces, KeynoteTableCellFractionFormat, KeynoteTableCellInset,
     KeynoteTableCellInsets, KeynoteTableCellLayout, KeynoteTableCellNegativeNumberStyle,
-    KeynoteTableCellNumberFormat, KeynoteTableCellPercentageFormat, KeynoteTableCellRegion,
+    KeynoteTableCellNumberFormat, KeynoteTableCellNumeralSystemFormat,
+    KeynoteTableCellPercentageFormat, KeynoteTableCellRegion, KeynoteTableCellScientificFormat,
     KeynoteTableCellTextWrap, KeynoteTableCellThousandsSeparator, KeynoteTableCellUpdate,
     KeynoteTableCellValue, KeynoteTableCellVerticalAlignment, KeynoteTableColumnDeletion,
     KeynoteTableColumnInsertion, KeynoteTableDimension, KeynoteTableDimensionSize,

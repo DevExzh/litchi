@@ -1,4 +1,4 @@
-//! Create Pages, Numbers, and Keynote files with native numeric cell formats.
+//! Create Pages, Numbers, and Keynote files with native table-cell formats.
 
 use std::path::{Path, PathBuf};
 
@@ -8,7 +8,8 @@ use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle,
-    TableCellDateTimeFormat, TableCellDecimalPlaces, TableCellFixedDecimalPlaces,
+    TableCellDateTimeFormat, TableCellDecimalPlaces, TableCellDurationFormat,
+    TableCellDurationStyle, TableCellDurationUnitRange, TableCellFixedDecimalPlaces,
     TableCellFractionAccuracy, TableCellFractionFormat, TableCellNegativeNumberStyle,
     TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces,
     TableCellNumeralSystemFormat, TableCellNumeralSystemNegativeStyle,
@@ -24,6 +25,7 @@ const SCIENTIFIC_COLUMN: usize = 4;
 const FRACTION_COLUMN: usize = 5;
 const NUMERAL_SYSTEM_COLUMN: usize = 6;
 const DATE_TIME_COLUMN: usize = 7;
+const DURATION_COLUMN: usize = 8;
 const NUMBER_VALUE: f64 = -1_234.5;
 const PERCENTAGE_VALUE: f64 = -12.345;
 const CURRENCY_VALUE: f64 = -1_234.5;
@@ -31,6 +33,7 @@ const SCIENTIFIC_VALUE: f64 = -1_234.5;
 const FRACTION_VALUE: f64 = -12.375;
 const NUMERAL_SYSTEM_VALUE: f64 = -1_234.5;
 const DATE_TIME_VALUE: f64 = 789_332_889.0;
+const DURATION_VALUE: f64 = 3_723.5;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -93,10 +96,17 @@ fn date_time_format() -> TableCellDateTimeFormat {
     TableCellDateTimeFormat::iso_date_time_24_hour_with_seconds()
 }
 
+const fn duration_format() -> TableCellDurationFormat {
+    TableCellDurationFormat::custom(
+        TableCellDurationStyle::Abbreviated,
+        TableCellDurationUnitRange::hours_to_milliseconds(),
+    )
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
-        .table_dimensions(3, 8)
+        .table_dimensions(3, 9)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(
@@ -163,14 +173,21 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CellValue::Date(DATE_TIME_VALUE),
     )?;
     editor.set_table_cell_date_time_format(table_id, ROW, DATE_TIME_COLUMN, date_time_format())?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        DURATION_COLUMN,
+        CellValue::Duration(DURATION_VALUE),
+    )?;
+    editor.set_table_cell_duration_format(table_id, ROW, DURATION_COLUMN, duration_format())?;
     editor.save(output)?;
     Ok(())
 }
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
-        .body_text("Created from scratch with a native decimal table-cell format.\n")
-        .body_table("Number Formats", 3, 8)
+        .body_text("Created from scratch with native table-cell formats.\n")
+        .body_table("Number Formats", 3, 9)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(
@@ -237,19 +254,26 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CellValue::Date(DATE_TIME_VALUE),
     )?;
     editor.set_table_cell_date_time_format(table_id, ROW, DATE_TIME_COLUMN, date_time_format())?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        DURATION_COLUMN,
+        CellValue::Duration(DURATION_VALUE),
+    )?;
+    editor.set_table_cell_duration_format(table_id, ROW, DURATION_COLUMN, duration_format())?;
     editor.save(output)?;
     Ok(())
 }
 
 fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = KeynoteDocumentBuilder::new()
-        .title("Native table-cell number formats")
+        .title("Native table-cell formats")
         .build()?;
     let table = editor.add_slide_table(
         0,
         "Number Formats",
         3,
-        8,
+        9,
         DrawablePoint { x: 320.0, y: 360.0 },
         DrawableSize {
             width: 1_280.0,
@@ -353,6 +377,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         DATE_TIME_COLUMN,
         date_time_format(),
+    )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        ROW,
+        DURATION_COLUMN,
+        CellValue::Duration(DURATION_VALUE),
+    )?;
+    editor.set_slide_table_cell_duration_format(
+        0,
+        table.model_object_id,
+        ROW,
+        DURATION_COLUMN,
+        duration_format(),
     )?;
     editor.save(output)?;
     Ok(())

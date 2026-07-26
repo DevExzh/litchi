@@ -3,11 +3,13 @@
 use crate::protobuf::tsk::FormatStructArchive;
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDataFormat,
-    TableCellDateTimeFormat, TableCellDecimalPlaces, TableCellFixedDecimalPlaces,
-    TableCellFractionAccuracy, TableCellFractionFormat, TableCellNegativeNumberStyle,
-    TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFormat,
-    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
-    TableCellScientificFormat, TableCellThousandsSeparator,
+    TableCellDateTimeFormat, TableCellDecimalPlaces, TableCellDurationFormat,
+    TableCellDurationStyle, TableCellDurationUnit, TableCellDurationUnitRange,
+    TableCellDurationUnits, TableCellFixedDecimalPlaces, TableCellFractionAccuracy,
+    TableCellFractionFormat, TableCellNegativeNumberStyle, TableCellNumberFormat,
+    TableCellNumeralSystemBase, TableCellNumeralSystemFormat, TableCellNumeralSystemNegativeStyle,
+    TableCellNumeralSystemPlaces, TableCellPercentageFormat, TableCellScientificFormat,
+    TableCellThousandsSeparator,
 };
 use crate::{Error, Result};
 
@@ -17,6 +19,7 @@ pub(super) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 pub(super) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 pub(super) const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
 pub(super) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
+pub(super) const NATIVE_DURATION_FORMAT_TYPE: u32 = 268;
 pub(super) const NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE: u32 = 269;
 pub(super) const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
 const NATIVE_FRACTION_UP_TO_ONE_DIGIT: i32 = -1;
@@ -30,6 +33,17 @@ const NATIVE_FRACTION_TENTHS: i32 = 10;
 const NATIVE_FRACTION_HUNDREDTHS: i32 = 100;
 
 pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<FormatStructArchive> {
+    if let TableCellDataFormat::Duration(format) = format {
+        let range = format.units().range();
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_DURATION_FORMAT_TYPE),
+            duration_style: Some(duration_style_to_native(format.style())),
+            duration_unit_largest: Some(range.largest().native_value()),
+            duration_unit_smallest: Some(range.smallest().native_value()),
+            use_automatic_duration_units: Some(format.units().uses_automatic_units()),
+            ..Default::default()
+        });
+    }
     if let TableCellDataFormat::DateTime(format) = format {
         return Ok(FormatStructArchive {
             format_type: Some(NATIVE_DATE_TIME_FORMAT_TYPE),
@@ -107,6 +121,7 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
         TableCellDataFormat::Fraction(_) => unreachable!("handled above"),
         TableCellDataFormat::NumeralSystem(_) => unreachable!("handled above"),
         TableCellDataFormat::DateTime(_) => unreachable!("handled above"),
+        TableCellDataFormat::Duration(_) => unreachable!("handled above"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -134,6 +149,34 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
     let format_type = native.format_type.ok_or_else(|| {
         Error::InvalidFormat("Table cell has no native data-format type".to_owned())
     })?;
+    if format_type == NATIVE_DURATION_FORMAT_TYPE {
+        let style = duration_style_from_native(native.duration_style.ok_or_else(|| {
+            Error::InvalidFormat("Duration cell format has no presentation style".to_owned())
+        })?)?;
+        let range = TableCellDurationUnitRange::new(
+            TableCellDurationUnit::from_native(native.duration_unit_largest.ok_or_else(|| {
+                Error::InvalidFormat("Duration cell format has no largest unit".to_owned())
+            })?)?,
+            TableCellDurationUnit::from_native(native.duration_unit_smallest.ok_or_else(
+                || Error::InvalidFormat("Duration cell format has no smallest unit".to_owned()),
+            )?)?,
+        )?;
+        let units = if native.use_automatic_duration_units.ok_or_else(|| {
+            Error::InvalidFormat("Duration cell format has no unit-selection mode".to_owned())
+        })? {
+            TableCellDurationUnits::Automatic(range)
+        } else {
+            TableCellDurationUnits::Custom(range)
+        };
+        let format = TableCellDurationFormat::new(style, units);
+        let canonical = data_format_to_native(&TableCellDataFormat::Duration(format))?;
+        if native != &canonical {
+            return Err(Error::InvalidFormat(
+                "Duration cell format contains non-canonical options".to_owned(),
+            ));
+        }
+        return Ok(TableCellDataFormat::Duration(format));
+    }
     if format_type == NATIVE_DATE_TIME_FORMAT_TYPE {
         if native.decimal_places.is_some()
             || native.negative_style.is_some()
@@ -344,6 +387,25 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
         },
         _ => unreachable!("validated native data-format type"),
     })
+}
+
+const fn duration_style_to_native(style: TableCellDurationStyle) -> u32 {
+    match style {
+        TableCellDurationStyle::Colon => 0,
+        TableCellDurationStyle::Abbreviated => 1,
+        TableCellDurationStyle::FullNames => 2,
+    }
+}
+
+fn duration_style_from_native(value: u32) -> Result<TableCellDurationStyle> {
+    match value {
+        0 => Ok(TableCellDurationStyle::Colon),
+        1 => Ok(TableCellDurationStyle::Abbreviated),
+        2 => Ok(TableCellDurationStyle::FullNames),
+        _ => Err(Error::InvalidFormat(format!(
+            "Unsupported native Duration style {value}"
+        ))),
+    }
 }
 
 const fn fraction_accuracy_to_native(accuracy: TableCellFractionAccuracy) -> u32 {

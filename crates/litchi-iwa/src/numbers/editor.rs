@@ -2319,6 +2319,53 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read an explicit Duration format for one table cell.
+    ///
+    /// `None` means the Duration value uses iWork's automatic data format.
+    pub fn table_cell_duration_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<crate::table_cell_data_format::TableCellDurationFormat>> {
+        cell_data_format::cell_duration_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit Duration format transactionally.
+    pub fn set_table_cell_duration_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: crate::table_cell_data_format::TableCellDurationFormat,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Duration cell.
+    pub fn reset_table_cell_duration_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_duration_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Duration reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective text layout for one zero-based table cell.
     pub fn table_cell_layout(
         &self,
@@ -3534,6 +3581,24 @@ pub(crate) fn reset_table_cell_date_time_format_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_data_format::reset_cell_date_time_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_duration_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<crate::table_cell_data_format::TableCellDurationFormat>> {
+    cell_data_format::cell_duration_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_duration_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_duration_format(package, table_id, row, column)
 }
 
 pub(crate) fn set_table_cell_layout_in_package(
