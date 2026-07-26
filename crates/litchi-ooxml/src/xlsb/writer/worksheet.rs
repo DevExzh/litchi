@@ -128,6 +128,10 @@ pub struct MutableXlsbWorksheet {
     tables: Vec<crate::xlsb::table::XlsbTable>,
     /// Typed DrawingML charts anchored on this sheet.
     charts: Vec<crate::xlsx::WorksheetChart>,
+    /// Typed image parts anchored in the same Drawings part.
+    images: Vec<crate::xlsb::XlsbWorksheetImage>,
+    /// Cached sum of encoded image bytes for constant-time safety checks.
+    image_bytes: usize,
     /// Relationship ID allocated for the sheet's Drawings part.
     drawing_rel_id: Option<String>,
     /// Relationship IDs allocated for `tables` by the workbook writer, in
@@ -243,6 +247,8 @@ impl MutableXlsbWorksheet {
             formula_group_sources: BTreeMap::new(),
             tables: Vec::new(),
             charts: Vec::new(),
+            images: Vec::new(),
+            image_bytes: 0,
             drawing_rel_id: None,
             table_rel_ids: Vec::new(),
         }
@@ -821,6 +827,8 @@ impl MutableXlsbWorksheet {
         self.data_validation14_settings = DataValidationSettings::default();
         self.conditional_formattings.clear();
         self.charts.clear();
+        self.images.clear();
+        self.image_bytes = 0;
         self.drawing_rel_id = None;
         self.formula_groups.clear();
         self.formula_group_sources.clear();
@@ -1049,13 +1057,76 @@ impl MutableXlsbWorksheet {
                 self.charts.len()
             )));
         }
-        Ok(self.charts.remove(index))
+        let removed = self.charts.remove(index);
+        if self.charts.is_empty() && self.images.is_empty() {
+            self.drawing_rel_id = None;
+        }
+        Ok(removed)
     }
 
     /// Remove every authored chart from this worksheet.
     pub fn clear_charts(&mut self) {
         self.charts.clear();
-        self.drawing_rel_id = None;
+        if self.images.is_empty() {
+            self.drawing_rel_id = None;
+        }
+    }
+
+    /// Add a typed embedded image to this worksheet's Drawings part.
+    pub fn add_image(&mut self, image: crate::xlsb::XlsbWorksheetImage) -> XlsbResult<()> {
+        if self.images.len() >= crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES {
+            return Err(XlsbError::InvalidFormula(
+                "worksheet image count exceeds the safety limit".to_string(),
+            ));
+        }
+        image.validate()?;
+        let total_bytes =
+            self.image_bytes
+                .checked_add(image.data().len())
+                .ok_or(XlsbError::InvalidLength {
+                    expected:
+                        crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
+                    found: usize::MAX,
+                })?;
+        if total_bytes > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES {
+            return Err(XlsbError::InvalidLength {
+                expected: crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
+                found: total_bytes,
+            });
+        }
+        self.image_bytes = total_bytes;
+        self.images.push(image);
+        Ok(())
+    }
+
+    /// Typed embedded images in drawing order.
+    pub fn images(&self) -> &[crate::xlsb::XlsbWorksheetImage] {
+        &self.images
+    }
+
+    /// Remove one embedded image by drawing order.
+    pub fn remove_image(&mut self, index: usize) -> XlsbResult<crate::xlsb::XlsbWorksheetImage> {
+        if index >= self.images.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "image index {index} is out of bounds for {} images",
+                self.images.len()
+            )));
+        }
+        let removed = self.images.remove(index);
+        self.image_bytes -= removed.data().len();
+        if self.images.is_empty() && self.charts.is_empty() {
+            self.drawing_rel_id = None;
+        }
+        Ok(removed)
+    }
+
+    /// Remove every authored image from this worksheet.
+    pub fn clear_images(&mut self) {
+        self.images.clear();
+        self.image_bytes = 0;
+        if self.charts.is_empty() {
+            self.drawing_rel_id = None;
+        }
     }
 
     pub(crate) fn set_drawing_rel_id(&mut self, rel_id: Option<String>) {
@@ -1344,10 +1415,10 @@ impl MutableXlsbWorksheet {
             writer.write_record(record_types::END_WEB_EXTENSIONS, &[])?;
         }
 
-        if !self.charts.is_empty() {
+        if !self.charts.is_empty() || !self.images.is_empty() {
             let rel_id = self.drawing_rel_id.as_deref().ok_or_else(|| {
                 XlsbError::InvalidFormula(
-                    "worksheet charts lack a Drawings relationship ID".to_string(),
+                    "worksheet drawing objects lack a Drawings relationship ID".to_string(),
                 )
             })?;
             let mut payload = Vec::with_capacity(4 + rel_id.len() * 2);

@@ -169,6 +169,7 @@ pub mod chartsheet;
 
 /// SpreadsheetDrawing XML inventory for XLSB Drawings parts (MS-XLSB 2.1.7.23)
 pub mod drawing;
+pub mod drawing_image;
 pub(crate) mod drawing_write;
 
 /// Formula parsing and generation
@@ -185,9 +186,10 @@ pub use data_validation::{DataValidation, DataValidationRecordKind, DataValidati
 pub use drawing::{
     CHART_GRAPHIC_DATA_URI, XlsbDrawing, XlsbDrawingAnchor, XlsbDrawingAnchorKind,
     XlsbDrawingCellMarker, XlsbDrawingEmuPoint, XlsbDrawingEmuSize, XlsbDrawingGraphicFrame,
-    XlsbDrawingNonVisual, XlsbDrawingObject, XlsbEmbeddedChart, XlsbSheetDrawing,
+    XlsbDrawingNonVisual, XlsbDrawingObject, XlsbEmbeddedChart, XlsbEmbeddedImage, XlsbSheetDrawing,
     parse_drawing_part,
 };
+pub use drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
 pub use error::{XlsbError, XlsbResult};
 pub use formula::{XlsbExternalLink, XlsbExternalLinkKind};
 pub use pivot::{

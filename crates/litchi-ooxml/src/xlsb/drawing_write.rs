@@ -1,10 +1,13 @@
-//! Typed authoring helpers for XLSB worksheet Drawings and Chart parts.
+//! Typed authoring helpers for XLSB worksheet Drawings, Image, and Chart parts.
 //!
 //! XLSB reuses the ordinary SpreadsheetDrawing and DrawingML Chart XML
 //! grammars. Only the worksheet link is binary (`BrtDrawing`).
 
+use crate::xlsb::XlsbWorksheetImage;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsx::WorksheetChart;
+use litchi_core::xml::escape_xml;
+use std::fmt::Write as _;
 
 pub(crate) const MAX_CHARTS_PER_SHEET: usize = 4_096;
 const MAX_DRAWING_XML_BYTES: usize = 16 * 1024 * 1024;
@@ -55,27 +58,115 @@ pub(crate) fn serialize_chart(chart: &WorksheetChart) -> XlsbResult<Vec<u8>> {
     Ok(xml)
 }
 
-pub(crate) fn serialize_drawing(charts: &[WorksheetChart]) -> XlsbResult<Vec<u8>> {
-    if charts.is_empty() || charts.len() > MAX_CHARTS_PER_SHEET {
+pub(crate) fn serialize_drawing(
+    images: &[XlsbWorksheetImage],
+    charts: &[WorksheetChart],
+) -> XlsbResult<Vec<u8>> {
+    if images.is_empty() && charts.is_empty() {
+        return Err(XlsbError::InvalidFormula(
+            "worksheet drawing requires at least one image or chart".to_string(),
+        ));
+    }
+    if images.len() > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES
+        || charts.len() > MAX_CHARTS_PER_SHEET
+    {
         return Err(XlsbError::InvalidFormula(format!(
-            "worksheet drawing requires 1 to {MAX_CHARTS_PER_SHEET} charts"
+            "worksheet drawing exceeds the {} image or {MAX_CHARTS_PER_SHEET} chart safety limit",
+            crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES
         )));
     }
-    let mut xml = String::with_capacity(512 + charts.len() * 512);
+    let mut total_image_bytes = 0usize;
+    for image in images {
+        image.validate()?;
+        total_image_bytes =
+            total_image_bytes
+                .checked_add(image.data().len())
+                .ok_or(XlsbError::InvalidLength {
+                    expected: crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
+                    found: usize::MAX,
+                })?;
+        if total_image_bytes > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES {
+            return Err(XlsbError::InvalidLength {
+                expected: crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
+                found: total_image_bytes,
+            });
+        }
+    }
+
+    let mut xml = String::with_capacity(512 + (images.len() + charts.len()) * 512);
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
     xml.push_str(
         r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#,
     );
-    crate::xlsx::chart::write_worksheet_chart_anchors(&mut xml, charts, 0, 0)?;
-    xml.push_str("</xdr:wsDr>");
-    if xml.len() > MAX_DRAWING_XML_BYTES {
-        return Err(XlsbError::InvalidLength {
-            expected: MAX_DRAWING_XML_BYTES,
-            found: xml.len(),
-        });
+    for (index, image) in images.iter().enumerate() {
+        write_image_anchor(&mut xml, image, index)?;
+        ensure_drawing_size(xml.len())?;
     }
+    crate::xlsx::chart::write_worksheet_chart_anchors(
+        &mut xml,
+        charts,
+        images.len(),
+        images.len(),
+    )?;
+    xml.push_str("</xdr:wsDr>");
+    ensure_drawing_size(xml.len())?;
     let bytes = xml.into_bytes();
     // The XLSB drawing inventory reader is the package-load oracle.
     crate::xlsb::drawing::parse_drawing_part(&bytes)?;
     Ok(bytes)
+}
+
+fn ensure_drawing_size(bytes: usize) -> XlsbResult<()> {
+    if bytes > MAX_DRAWING_XML_BYTES {
+        return Err(XlsbError::InvalidLength {
+            expected: MAX_DRAWING_XML_BYTES,
+            found: bytes,
+        });
+    }
+    Ok(())
+}
+
+fn write_image_anchor(
+    xml: &mut String,
+    image: &XlsbWorksheetImage,
+    index: usize,
+) -> XlsbResult<()> {
+    let anchor = image.anchor();
+    let object_id = index.checked_add(1).ok_or_else(|| {
+        XlsbError::InvalidFormula("worksheet picture object ID overflow".to_string())
+    })?;
+    xml.push_str("<xdr:twoCellAnchor>");
+    write!(
+        xml,
+        "<xdr:from><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:from>",
+        anchor.from_col,
+        anchor.from_col_offset,
+        anchor.from_row,
+        anchor.from_row_offset
+    )
+    .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+    write!(
+        xml,
+        "<xdr:to><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:to>",
+        anchor.to_col,
+        anchor.to_col_offset,
+        anchor.to_row,
+        anchor.to_row_offset
+    )
+    .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+    write!(
+        xml,
+        r#"<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="{object_id}" name="Picture {object_id}""#
+    )
+    .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+    if let Some(description) = image.description() {
+        write!(xml, r#" descr="{}""#, escape_xml(description))
+            .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+    }
+    write!(
+        xml,
+        r#"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId{object_id}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>"#
+    )
+    .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+    Ok(())
 }

@@ -948,6 +948,7 @@ impl XlsbWorkbookWriter {
         let mut next_table_index = 1usize;
         let mut next_drawing_index = 1usize;
         let mut next_chart_index = 1usize;
+        let mut next_image_index = 1usize;
         for (i, worksheet) in self.worksheets.iter_mut().enumerate() {
             // Create the worksheet part with an empty blob first so we can attach
             // relationships (binary index + external hyperlinks) and obtain
@@ -1029,14 +1030,17 @@ impl XlsbWorkbookWriter {
                 worksheet.table_rel_ids = rel_ids;
             }
 
-            // Worksheet charts use standard SpreadsheetDrawing and DrawingML
-            // Chart XML parts. The binary sheet carries only BrtDrawing with
-            // the relationship ID allocated here.
+            // Worksheet images and charts use standard SpreadsheetDrawing,
+            // Image, and DrawingML Chart parts. The binary sheet carries only
+            // BrtDrawing with the relationship ID allocated here.
             let mut drawing_part = None;
             let mut chart_parts = Vec::new();
-            if !worksheet.charts().is_empty() {
-                let drawing_xml =
-                    crate::xlsb::drawing_write::serialize_drawing(worksheet.charts())?;
+            let mut image_parts = Vec::new();
+            if !worksheet.charts().is_empty() || !worksheet.images().is_empty() {
+                let drawing_xml = crate::xlsb::drawing_write::serialize_drawing(
+                    worksheet.images(),
+                    worksheet.charts(),
+                )?;
                 let drawing_name = format!("drawing{next_drawing_index}.xml");
                 next_drawing_index = next_drawing_index.checked_add(1).ok_or_else(|| {
                     XlsbError::InvalidFormula("drawing part index overflow".to_string())
@@ -1046,6 +1050,26 @@ impl XlsbWorkbookWriter {
                     ct::OFC_DRAWING.to_string(),
                     drawing_xml,
                 );
+                for (image_ordinal, image) in worksheet.images().iter().enumerate() {
+                    let image_name =
+                        format!("image{next_image_index}.{}", image.format().extension());
+                    next_image_index = next_image_index.checked_add(1).ok_or_else(|| {
+                        XlsbError::InvalidFormula("image part index overflow".to_string())
+                    })?;
+                    let relationship_id =
+                        part.relate_to(&format!("../media/{image_name}"), rel::IMAGE);
+                    let expected_relationship_id = format!("rId{}", image_ordinal + 1);
+                    if relationship_id != expected_relationship_id {
+                        return Err(XlsbError::InvalidFormula(format!(
+                            "drawing image relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
+                        )));
+                    }
+                    image_parts.push(BlobPart::new(
+                        PackURI::new(format!("/xl/media/{image_name}"))?,
+                        image.format().content_type().to_string(),
+                        image.data().to_vec(),
+                    ));
+                }
                 for (chart_ordinal, chart) in worksheet.charts().iter().enumerate() {
                     let chart_name = format!("chart{next_chart_index}.xml");
                     next_chart_index = next_chart_index.checked_add(1).ok_or_else(|| {
@@ -1054,7 +1078,8 @@ impl XlsbWorkbookWriter {
                     let chart_xml = crate::xlsb::drawing_write::serialize_chart(chart)?;
                     let relationship_id =
                         part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);
-                    let expected_relationship_id = format!("rId{}", chart_ordinal + 1);
+                    let expected_relationship_id =
+                        format!("rId{}", worksheet.images().len() + chart_ordinal + 1);
                     if relationship_id != expected_relationship_id {
                         return Err(XlsbError::InvalidFormula(format!(
                             "drawing chart relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
@@ -1113,6 +1138,9 @@ impl XlsbWorkbookWriter {
                 package.add_part(Box::new(part));
             }
             for part in chart_parts {
+                package.add_part(Box::new(part));
+            }
+            for part in image_parts {
                 package.add_part(Box::new(part));
             }
         }
@@ -2506,5 +2534,197 @@ mod tests {
         sheet.add_chart(valid).unwrap();
         sheet.clear_charts();
         assert!(sheet.charts().is_empty());
+    }
+
+    #[test]
+    fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
+        use crate::xlsb::{
+            XlsbDrawingAnchorKind, XlsbDrawingObject, XlsbWorksheetImage,
+            XlsbWorksheetImageFormat,
+        };
+        use crate::xlsx::{ChartAnchor, WorksheetChart};
+
+        const PNG_1X1: &[u8] = &[
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
+            0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
+            0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x08,
+            0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0xF0, 0x1F, 0x00, 0x05, 0x00, 0x01, 0xFF, 0x89, 0x99,
+            0x03, 0x5D, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+        ];
+        const SVG: &[u8] =
+            br#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><path d="M0 0h1v1z"/></svg>"#;
+        const GIF_1X1: &[u8] = &[
+            0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x21, 0xF9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2C,
+            0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00,
+            0x3B,
+        ];
+
+        let png_anchor = ChartAnchor::with_offsets(1, 10, 2, 20, 5, 30, 8, 40);
+        let png = XlsbWorksheetImage::new(
+            PNG_1X1.to_vec(),
+            XlsbWorksheetImageFormat::Png,
+            png_anchor,
+        )
+        .unwrap()
+        .with_description("Logo & <mark>")
+        .unwrap();
+        let svg = XlsbWorksheetImage::new(
+            SVG.to_vec(),
+            XlsbWorksheetImageFormat::Svg,
+            ChartAnchor::new(6, 2, 9, 8),
+        )
+        .unwrap();
+        let chart = WorksheetChart::line_chart(
+            "Trend",
+            "Pictures!$A$1:$A$2",
+            "Pictures!$B$1:$B$2",
+            ChartAnchor::new(10, 2, 17, 16),
+        )
+        .unwrap();
+
+        let mut sheet = MutableXlsbWorksheet::new("Pictures");
+        sheet.add_image(png).unwrap();
+        sheet.add_image(svg).unwrap();
+        sheet.add_chart(chart).unwrap();
+        let mut image_only = MutableXlsbWorksheet::new("Image only");
+        image_only
+            .add_image(
+                XlsbWorksheetImage::new(
+                    GIF_1X1.to_vec(),
+                    XlsbWorksheetImageFormat::Gif,
+                    ChartAnchor::new(0, 0, 2, 3),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(sheet);
+        workbook.add_worksheet(image_only);
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let drawing = reader.sheet_drawing(0).expect("sheet drawing missing");
+        assert_eq!(drawing.images.len(), 2);
+        assert_eq!(drawing.charts.len(), 1);
+        assert_eq!(drawing.images[0].format, XlsbWorksheetImageFormat::Png);
+        assert_eq!(drawing.images[0].data.as_ref(), PNG_1X1);
+        assert_eq!(
+            drawing.images[0].description.as_deref(),
+            Some("Logo & <mark>")
+        );
+        assert_eq!(drawing.images[1].format, XlsbWorksheetImageFormat::Svg);
+        assert_eq!(drawing.images[1].data.as_ref(), SVG);
+        assert_eq!(drawing.images[0].rel_id, "rId1");
+        assert_eq!(drawing.images[1].rel_id, "rId2");
+        assert_eq!(drawing.charts[0].rel_id, "rId3");
+        assert_eq!(drawing.drawing.anchors.len(), 3);
+        match &drawing.drawing.anchors[0].anchor {
+            XlsbDrawingAnchorKind::TwoCell { from, to, .. } => {
+                assert_eq!(
+                    (from.column, from.column_offset, from.row, from.row_offset),
+                    (1, 10, 2, 20)
+                );
+                assert_eq!(
+                    (to.column, to.column_offset, to.row, to.row_offset),
+                    (5, 30, 8, 40)
+                );
+            },
+            other => panic!("unexpected image anchor: {other:?}"),
+        }
+        assert!(matches!(
+            &drawing.drawing.anchors[0].object,
+            XlsbDrawingObject::Picture {
+                embed_rel_id: Some(rel_id),
+                ..
+            } if rel_id == "rId1"
+        ));
+        assert!(matches!(
+            &drawing.drawing.anchors[2].object,
+            XlsbDrawingObject::GraphicFrame(frame)
+                if frame.rel_id.as_deref() == Some("rId3")
+        ));
+        let second_drawing = reader
+            .sheet_drawing(1)
+            .expect("image-only sheet drawing missing");
+        assert_eq!(second_drawing.images.len(), 1);
+        assert!(second_drawing.charts.is_empty());
+        assert_eq!(second_drawing.images[0].format, XlsbWorksheetImageFormat::Gif);
+        assert_eq!(second_drawing.images[0].data.as_ref(), GIF_1X1);
+
+        let package = reader.opc_package();
+        assert_eq!(
+            package
+                .iter_parts()
+                .filter(|part| matches!(
+                    part.content_type(),
+                    ct::PNG | ct::GIF | "image/svg+xml"
+                ))
+                .count(),
+            3
+        );
+        for part_name in [
+            "/xl/media/image1.png",
+            "/xl/media/image2.svg",
+            "/xl/media/image3.gif",
+        ] {
+            assert!(package.get_part(&PackURI::new(part_name).unwrap()).is_ok());
+        }
+    }
+
+    #[test]
+    fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
+        use crate::xlsb::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
+        use crate::xlsx::ChartAnchor;
+
+        assert!(
+            XlsbWorksheetImage::new(
+                b"not a png".to_vec(),
+                XlsbWorksheetImageFormat::Png,
+                ChartAnchor::new(0, 0, 1, 1),
+            )
+            .is_err()
+        );
+        assert!(
+            XlsbWorksheetImage::new(
+                b"<not-svg/>".to_vec(),
+                XlsbWorksheetImageFormat::Svg,
+                ChartAnchor::new(0, 0, 1, 1),
+            )
+            .is_err()
+        );
+        assert!(
+            XlsbWorksheetImage::new(
+                b"GIF89a".to_vec(),
+                XlsbWorksheetImageFormat::Gif,
+                ChartAnchor::new(2, 2, 1, 1),
+            )
+            .is_err()
+        );
+
+        let valid = XlsbWorksheetImage::new(
+            b"GIF89a".to_vec(),
+            XlsbWorksheetImageFormat::Gif,
+            ChartAnchor::new(0, 0, 1, 1),
+        )
+        .unwrap();
+        let mut sheet = MutableXlsbWorksheet::new("Pictures");
+        sheet.add_image(valid.clone()).unwrap();
+        assert_eq!(sheet.images().len(), 1);
+        assert!(
+            valid
+                .clone()
+                .with_description("invalid\u{0}description")
+                .is_err()
+        );
+        assert_eq!(sheet.images().len(), 1);
+        let removed = sheet.remove_image(0).unwrap();
+        assert_eq!(removed.format(), XlsbWorksheetImageFormat::Gif);
+        assert!(sheet.images().is_empty());
+        assert!(sheet.remove_image(0).is_err());
+        sheet.add_image(valid).unwrap();
+        sheet.clear_images();
+        assert!(sheet.images().is_empty());
     }
 }

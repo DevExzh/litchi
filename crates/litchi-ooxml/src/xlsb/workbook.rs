@@ -23,8 +23,9 @@ use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BinaryHeap};
+use std::collections::{BTreeMap, BinaryHeap, HashMap};
 use std::io::{BufReader, Cursor, Read, Seek, Write};
+use std::sync::Arc;
 
 /// External-workbook relationship types documented by MS-XLSB.
 const EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES: &[&str] = &[
@@ -325,11 +326,11 @@ impl XlsbWorkbook {
     }
 
     /// Drawings part inventories anchored to sheets, in sheet discovery
-    /// order (MS-XLSB 2.1.7.23), with the charts their graphic frames
-    /// reference parsed into the shared typed chart model.
+    /// order (MS-XLSB 2.1.7.23), with referenced images resolved and charts
+    /// parsed into the shared typed chart model.
     ///
-    /// These are inert data snapshots: relationship identifiers and content
-    /// URIs are stored verbatim and are never dereferenced.
+    /// These are inert data snapshots. Internal image and chart parts are
+    /// resolved during package loading; external targets are never fetched.
     pub fn sheet_drawings(&self) -> &[crate::xlsb::drawing::XlsbSheetDrawing] {
         &self.sheet_drawings
     }
@@ -345,17 +346,99 @@ impl XlsbWorkbook {
             .find(|drawing| drawing.sheet_index == sheet_index)
     }
 
-    /// Parse one Drawings part and resolve the chart parts its chart
-    /// graphic frames reference (MS-XLSB 2.1.7.5, 2.1.7.23).
+    /// Parse one Drawings part and resolve the image and chart parts its
+    /// picture objects and chart graphic frames reference (MS-XLSB
+    /// 2.1.7.5, 2.1.7.23, 2.1.7.30).
     fn load_sheet_drawing(
         &self,
         sheet_index: usize,
         drawing_part: &dyn litchi_opc::part::Part,
     ) -> XlsbResult<crate::xlsb::drawing::XlsbSheetDrawing> {
-        use crate::xlsb::drawing::{XlsbDrawingObject, XlsbEmbeddedChart, XlsbSheetDrawing};
+        use crate::xlsb::drawing::{
+            XlsbDrawingObject, XlsbEmbeddedChart, XlsbEmbeddedImage, XlsbSheetDrawing,
+        };
         let drawing = crate::xlsb::drawing::parse_drawing_part(drawing_part.blob())?;
         let mut charts = Vec::new();
+        let mut images = Vec::new();
+        let mut image_bytes = 0usize;
+        let mut image_cache = HashMap::new();
         for anchor in &drawing.anchors {
+            if let XlsbDrawingObject::Picture {
+                non_visual,
+                embed_rel_id: Some(rel_id),
+            } = &anchor.object
+            {
+                let relationship = drawing_part.rels().get(rel_id).ok_or_else(|| {
+                    crate::xlsb::error::XlsbError::Unrecognized {
+                        typ: "Drawings part".to_string(),
+                        val: format!(
+                            "picture {:?} relationship {rel_id:?} is missing",
+                            non_visual.name
+                        ),
+                    }
+                })?;
+                if matches!(
+                    relationship.reltype(),
+                    relationship_type::IMAGE | relationship_type::STRICT_IMAGE
+                ) {
+                    if relationship.is_external() {
+                        return Err(crate::xlsb::error::XlsbError::Unrecognized {
+                            typ: "Drawings part".to_string(),
+                            val: format!("image relationship {rel_id:?} is external"),
+                        });
+                    }
+                    let image_uri = relationship.target_partname()?;
+                    let image_part = self.package.get_part(&image_uri)?;
+                    let Some(format) =
+                        crate::xlsb::drawing_image::XlsbWorksheetImageFormat::from_content_type(
+                            image_part.content_type(),
+                        )
+                    else {
+                        continue;
+                    };
+                    if images.len()
+                        >= crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES
+                    {
+                        return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                            expected:
+                                crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES,
+                            found: images.len() + 1,
+                        });
+                    }
+                    let data = if let Some(data) = image_cache.get(&image_uri) {
+                        Arc::clone(data)
+                    } else {
+                        format.validate_payload(image_part.blob())?;
+                        image_bytes = image_bytes
+                            .checked_add(image_part.blob().len())
+                            .ok_or(crate::xlsb::error::XlsbError::InvalidLength {
+                                expected: crate::xlsb::drawing_image::
+                                    MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
+                                found: usize::MAX,
+                            })?;
+                        if image_bytes
+                            > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES
+                        {
+                            return Err(crate::xlsb::error::XlsbError::InvalidLength {
+                                expected: crate::xlsb::drawing_image::
+                                    MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
+                                found: image_bytes,
+                            });
+                        }
+                        let data = Arc::<[u8]>::from(image_part.blob());
+                        image_cache.insert(image_uri, Arc::clone(&data));
+                        data
+                    };
+                    images.push(XlsbEmbeddedImage {
+                        picture_name: non_visual.name.clone(),
+                        description: non_visual.description.clone(),
+                        rel_id: rel_id.clone(),
+                        format,
+                        data,
+                    });
+                }
+                continue;
+            }
             let XlsbDrawingObject::GraphicFrame(frame) = &anchor.object else {
                 continue;
             };
@@ -395,6 +478,7 @@ impl XlsbWorkbook {
             sheet_index,
             drawing,
             charts,
+            images,
         })
     }
 

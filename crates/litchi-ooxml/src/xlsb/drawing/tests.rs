@@ -50,6 +50,7 @@ fn parses_two_cell_shape_anchor() {
         XlsbDrawingObject::Shape(XlsbDrawingNonVisual {
             id: 1026,
             name: "shapetype_75".to_string(),
+            description: None,
         })
     );
 }
@@ -58,7 +59,7 @@ fn parses_two_cell_shape_anchor() {
 fn parses_one_cell_picture_anchor() {
     let body = format!(
         "<xdr:oneCellAnchor>{}<xdr:ext cx=\"1219200\" cy=\"914400\"/><xdr:pic>\
-         <xdr:nvPicPr><xdr:cNvPr id=\"3\" name=\"Logo\"/><xdr:cNvPicPr/></xdr:nvPicPr>\
+         <xdr:nvPicPr><xdr:cNvPr id=\"3\" name=\"Logo\" descr=\"Company logo\"/><xdr:cNvPicPr/></xdr:nvPicPr>\
          <xdr:blipFill><a:blip r:embed=\"rIdImage1\"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>\
          <xdr:spPr/></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>",
         marker_xml("from", 2, 19050, 4, 9525),
@@ -78,6 +79,7 @@ fn parses_one_cell_picture_anchor() {
             non_visual: XlsbDrawingNonVisual {
                 id: 3,
                 name: "Logo".to_string(),
+                description: Some("Company logo".to_string()),
             },
             embed_rel_id: Some("rIdImage1".to_string()),
         }
@@ -129,6 +131,7 @@ fn parses_connection_and_group_shapes() {
         XlsbDrawingObject::ConnectionShape(XlsbDrawingNonVisual {
             id: 4,
             name: "Connector".to_string(),
+            description: None,
         })
     );
     // The group keeps its own non-visual properties; nested shapes are not
@@ -138,6 +141,7 @@ fn parses_connection_and_group_shapes() {
         XlsbDrawingObject::GroupShape(XlsbDrawingNonVisual {
             id: 5,
             name: "Group".to_string(),
+            description: None,
         })
     );
 }
@@ -204,6 +208,7 @@ fn parses_real_fixture_workbook_drawing() {
         XlsbDrawingObject::Shape(XlsbDrawingNonVisual {
             id: 1026,
             name: "shapetype_75".to_string(),
+            description: None,
         })
     );
     let XlsbDrawingAnchorKind::TwoCell { from, to, .. } = &drawing.drawing.anchors[0].anchor else {

@@ -5,10 +5,10 @@
 //! 20.5), identical to XLSX — only sheet streams are binary. This module
 //! parses that XML into an inert inventory of anchored objects (shapes,
 //! pictures, graphic frames, connection shapes, and group shapes) with their
-//! cell anchors. Relationship identifiers and content URIs are stored
-//! verbatim and are never dereferenced; the workbook wiring resolves the
-//! graphic frames that reference Chart parts into the typed chart model
-//! shared with the other formats ([`crate::charts`]).
+//! cell anchors. The standalone parser stores relationship identifiers and
+//! content URIs verbatim. Workbook loading resolves internal image and Chart
+//! parts into bounded inert payloads and the typed chart model shared with
+//! the other formats ([`crate::charts`]); external targets are never fetched.
 
 use crate::common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
@@ -108,6 +108,8 @@ pub struct XlsbDrawingNonVisual {
     pub id: u32,
     /// Drawing object name (`name`).
     pub name: String,
+    /// Optional alternative text (`descr`).
+    pub description: Option<String>,
 }
 
 /// A graphic frame (`xdr:graphicFrame`) and the content it hosts.
@@ -167,7 +169,7 @@ pub struct XlsbDrawing {
     pub anchors: Vec<XlsbDrawingAnchor>,
 }
 
-/// The drawing of one sheet plus the charts its graphic frames reference.
+/// The drawing of one sheet plus the images and charts its objects reference.
 #[derive(Debug, Clone)]
 pub struct XlsbSheetDrawing {
     /// Zero-based sheet index in workbook sheet order.
@@ -176,6 +178,23 @@ pub struct XlsbSheetDrawing {
     pub drawing: XlsbDrawing,
     /// Typed charts resolved from chart graphic frames.
     pub charts: Vec<XlsbEmbeddedChart>,
+    /// Embedded image parts resolved from picture objects.
+    pub images: Vec<XlsbEmbeddedImage>,
+}
+
+/// One embedded image part resolved through a drawing picture.
+#[derive(Debug, Clone)]
+pub struct XlsbEmbeddedImage {
+    /// Name of the hosting picture object (`xdr:cNvPr name`).
+    pub picture_name: String,
+    /// Optional picture alternative text (`xdr:cNvPr descr`).
+    pub description: Option<String>,
+    /// Relationship identifier from the drawing part to the image part.
+    pub rel_id: String,
+    /// Typed encoded image format.
+    pub format: crate::xlsb::drawing_image::XlsbWorksheetImageFormat,
+    /// Exact encoded image bytes, shared when pictures reuse one Image part.
+    pub data: std::sync::Arc<[u8]>,
 }
 
 /// One embedded chart part resolved through a drawing graphic frame.
@@ -363,6 +382,8 @@ impl PendingObject {
             };
             self.non_visual.name =
                 unqualified_attribute_value(element, b"name", decoder)?.unwrap_or_default();
+            self.non_visual.description =
+                unqualified_attribute_value(element, b"descr", decoder)?;
             return Ok(());
         }
         if self.kind == ObjectKind::Picture
