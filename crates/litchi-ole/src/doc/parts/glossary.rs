@@ -1,8 +1,17 @@
 //! Passive AutoText and formatted AutoCorrect metadata for legacy DOC files.
 
 use super::super::package::{DocError, Result};
+use super::super::paragraph::{Paragraph, Run};
+use super::chp_bin_table::ChpBinTable;
 use super::fib::FileInformationBlock;
+use super::pap_bin_table::PapBinTable;
+use super::paragraph_extractor::ParagraphExtractor;
+use super::piece_table::PieceTable;
+use super::revisions::RevisionAuthorTable;
+use super::styles::StyleSheet;
 use super::text::TextExtractor;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 const STTBF_GLSY_FIB_INDEX: usize = 9;
 const PLCF_GLSY_FIB_INDEX: usize = 10;
@@ -167,12 +176,23 @@ pub struct GlossaryMetadata {
 
 /// An AutoText-only document attached to a template through `FibBase.pnNext`.
 ///
-/// Text, fields, links, embedded objects, and macros remain passive. This type
-/// only exposes stored metadata and text; it never resolves or activates content.
+/// Fields, links, embedded objects, and macros remain passive. Stored text,
+/// formatting, pictures, and drawing metadata can be inspected without
+/// resolving or activating content.
 pub struct AttachedGlossary {
     fib: FileInformationBlock,
     metadata: GlossaryMetadata,
     text_extractor: TextExtractor,
+    chp_bin_table: Option<ChpBinTable>,
+    pap_bin_table: Option<PapBinTable>,
+    stylesheet: Option<StyleSheet>,
+    revision_authors: RevisionAuthorTable,
+    images: Vec<super::super::image::Image>,
+    shapes: Vec<super::super::shapes::DocShape>,
+    shape_anchors: Vec<super::spa::ShapeAnchor>,
+    header_shape_anchors: Vec<super::spa::ShapeAnchor>,
+    textbox_entries: Vec<super::textbox::TextBoxEntry>,
+    header_textbox_entries: Vec<super::textbox::TextBoxEntry>,
 }
 
 impl AttachedGlossary {
@@ -180,6 +200,7 @@ impl AttachedGlossary {
         main_fib: &FileInformationBlock,
         word_document: &[u8],
         table_stream: &[u8],
+        data_stream: Option<&[u8]>,
     ) -> Result<Option<Self>> {
         let page = main_fib.next_fib_page();
         if page == 0 {
@@ -258,10 +279,65 @@ impl AttachedGlossary {
             .ok_or_else(|| corrupted("attached glossary metadata is absent"))?;
         let text_extractor = TextExtractor::new(&fib, word_document, table_stream)?;
         metadata.validate_text_boundaries(&text_extractor)?;
+        let revision_authors = RevisionAuthorTable::parse(&fib, table_stream)?;
+        let mut stylesheet = (fib.version() >= 0x00C1)
+            .then(|| StyleSheet::parse(&fib, table_stream))
+            .transpose()?;
+        if let Some(stylesheet) = &mut stylesheet {
+            stylesheet.resolve_revision_authors(&revision_authors)?;
+        }
+        let piece_table = table_slice(&fib, table_stream, 33)?.and_then(PieceTable::parse);
+        let chpx_data = table_slice(&fib, table_stream, 12)?;
+        let chp_bin_table = piece_table.as_ref().and_then(|piece_table| {
+            chpx_data.and_then(|data| ChpBinTable::parse(data, word_document, piece_table))
+        });
+        let papx_data = table_slice(&fib, table_stream, 13)?;
+        let pap_bin_table =
+            if let (Some(piece_table), Some(data)) = (piece_table.as_ref(), papx_data) {
+                PapBinTable::parse(
+                    data,
+                    word_document,
+                    data_stream,
+                    piece_table,
+                    stylesheet.as_ref(),
+                )?
+            } else {
+                None
+            };
+        let images = collect_images(&text_extractor, chp_bin_table.as_ref(), data_stream);
+        let _ = table_slice(&fib, table_stream, super::super::shapes::FIB_INDEX_DGG_INFO)?;
+        let shapes = super::super::shapes::extract_dgg_shapes(&fib, table_stream)
+            .map_err(|error| corrupted(format!("invalid attached glossary drawing: {error}")))?;
+        let shape_anchors =
+            parse_shape_anchors(&fib, table_stream, super::spa::FIB_INDEX_PLC_SPA_MOM)?;
+        let header_shape_anchors =
+            parse_shape_anchors(&fib, table_stream, super::spa::FIB_INDEX_PLC_SPA_HDR)?;
+        let textbox_entries = parse_textbox_entries(
+            &fib,
+            table_stream,
+            super::textbox::FIB_INDEX_PLCF_TXBX_TXT,
+            fib.get_textbox_range(),
+        )?;
+        let header_textbox_entries = parse_textbox_entries(
+            &fib,
+            table_stream,
+            super::textbox::FIB_INDEX_PLCF_HDR_TXBX_TXT,
+            fib.get_header_textbox_range(),
+        )?;
         Ok(Some(Self {
             fib,
             metadata,
             text_extractor,
+            chp_bin_table,
+            pap_bin_table,
+            stylesheet,
+            revision_authors,
+            images,
+            shapes,
+            shape_anchors,
+            header_shape_anchors,
+            textbox_entries,
+            header_textbox_entries,
         }))
     }
 
@@ -288,6 +364,210 @@ impl AttachedGlossary {
                 .text_at_range(item.start_cp(), item.end_cp().saturating_sub(1)),
         )
     }
+
+    /// Extract formatted paragraphs from every stored glossary subdocument.
+    pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
+        let text = Arc::new(self.text_extractor.text().to_string());
+        let mut output = Vec::new();
+        for (_, start_cp, end_cp) in self.fib.get_all_subdoc_ranges() {
+            if start_cp >= end_cp {
+                continue;
+            }
+            let extractor = ParagraphExtractor::new_with_range_and_stylesheet(
+                Arc::clone(&text),
+                self.pap_bin_table.as_ref(),
+                self.chp_bin_table.as_ref(),
+                (start_cp, end_cp),
+                self.stylesheet.as_ref(),
+            )?;
+            for (_, properties, runs) in extractor.extract_paragraphs()? {
+                let mut run_objects = Vec::with_capacity(runs.len());
+                for (text, properties) in runs {
+                    let image_offset = properties.pic_offset.filter(|offset| {
+                        self.images
+                            .binary_search_by_key(offset, |image| image.pic_offset())
+                            .is_ok()
+                    });
+                    let mut run = if let Some(offset) = image_offset {
+                        Run::with_image(text, properties, super::super::image::Image::new(offset))
+                    } else {
+                        Run::new(text, properties)
+                    };
+                    run.resolve_revisions(&self.revision_authors)?;
+                    run_objects.push(run);
+                }
+                let mut paragraph = Paragraph::new(String::new());
+                paragraph.set_runs(run_objects);
+                paragraph.set_properties(properties);
+                paragraph.resolve_revision(&self.revision_authors)?;
+                output.push(paragraph);
+            }
+        }
+        Ok(output)
+    }
+
+    /// Pictures referenced by formatted runs in the attached story.
+    ///
+    /// Pass an entry to [`super::super::document::Document::image_data`] to
+    /// retrieve its payload from the template's shared Data stream.
+    pub fn images(&self) -> &[super::super::image::Image] {
+        &self.images
+    }
+
+    /// Floating OfficeArt shapes stored by the secondary FIB.
+    pub fn shapes(&self) -> &[super::super::shapes::DocShape] {
+        &self.shapes
+    }
+
+    /// Floating-shape anchors in the attached main story.
+    pub fn shape_positions(&self) -> &[super::spa::ShapeAnchor] {
+        &self.shape_anchors
+    }
+
+    /// Floating-shape anchors in attached header/footer stories.
+    pub fn header_shape_positions(&self) -> &[super::spa::ShapeAnchor] {
+        &self.header_shape_anchors
+    }
+
+    /// Text boxes stored in the attached main story.
+    pub fn text_boxes(&self) -> Vec<super::textbox::DocTextBox> {
+        resolve_text_boxes(
+            &self.text_extractor,
+            &self.textbox_entries,
+            self.fib.get_textbox_range(),
+        )
+    }
+
+    /// Text boxes stored in attached header/footer stories.
+    pub fn header_text_boxes(&self) -> Vec<super::textbox::DocTextBox> {
+        resolve_text_boxes(
+            &self.text_extractor,
+            &self.header_textbox_entries,
+            self.fib.get_header_textbox_range(),
+        )
+    }
+}
+
+fn table_slice<'a>(
+    fib: &FileInformationBlock,
+    table_stream: &'a [u8],
+    index: usize,
+) -> Result<Option<&'a [u8]>> {
+    let Some((offset, length)) = fib.get_table_pointer(index) else {
+        return Ok(None);
+    };
+    if length == 0 {
+        return Ok(None);
+    }
+    let start = usize::try_from(offset).map_err(|_| {
+        corrupted(format!(
+            "attached glossary table {index} offset is too large"
+        ))
+    })?;
+    let length = usize::try_from(length).map_err(|_| {
+        corrupted(format!(
+            "attached glossary table {index} length is too large"
+        ))
+    })?;
+    let end = start
+        .checked_add(length)
+        .ok_or_else(|| corrupted(format!("attached glossary table {index} range overflows")))?;
+    table_stream.get(start..end).map(Some).ok_or_else(|| {
+        corrupted(format!(
+            "attached glossary table {index} extends beyond the table stream"
+        ))
+    })
+}
+
+fn collect_images(
+    text: &TextExtractor,
+    chp: Option<&ChpBinTable>,
+    data_stream: Option<&[u8]>,
+) -> Vec<super::super::image::Image> {
+    let (Some(chp), Some(data_stream)) = (chp, data_stream) else {
+        return Vec::new();
+    };
+    let mut offsets = HashSet::new();
+    let mut images = Vec::new();
+    for run in chp.runs() {
+        let Some(offset) = run.properties.pic_offset else {
+            continue;
+        };
+        let run_text = text.text_at_range(run.start_cp, run.end_cp);
+        let run_text = run_text
+            .strip_suffix('\r')
+            .or_else(|| run_text.strip_suffix('\u{7}'))
+            .unwrap_or(run_text);
+        if offsets.insert(offset)
+            && let Ok(Some(image)) =
+                super::super::image::extract_image(data_stream, run_text, &run.properties)
+        {
+            images.push(image);
+        }
+    }
+    images.sort_unstable_by_key(|image| image.pic_offset());
+    images
+}
+
+fn parse_shape_anchors(
+    fib: &FileInformationBlock,
+    table_stream: &[u8],
+    index: usize,
+) -> Result<Vec<super::spa::ShapeAnchor>> {
+    let Some(data) = table_slice(fib, table_stream, index)? else {
+        return Ok(Vec::new());
+    };
+    super::spa::parse_plcf_spa(data)
+}
+
+fn parse_textbox_entries(
+    fib: &FileInformationBlock,
+    table_stream: &[u8],
+    index: usize,
+    story_range: Option<(u32, u32)>,
+) -> Result<Vec<super::textbox::TextBoxEntry>> {
+    let Some(data) = table_slice(fib, table_stream, index)? else {
+        return Ok(Vec::new());
+    };
+    let entries = super::textbox::parse_plcf_txbx_txt(data)?;
+    let story_length = story_range
+        .and_then(|(start, end)| end.checked_sub(start))
+        .ok_or_else(|| corrupted(format!("attached glossary table {index} has no text story")))?;
+    if entries
+        .iter()
+        .any(|entry| entry.start_cp > entry.end_cp || entry.end_cp > story_length)
+    {
+        return Err(corrupted(format!(
+            "attached glossary table {index} has an invalid text range"
+        )));
+    }
+    Ok(entries)
+}
+
+fn resolve_text_boxes(
+    text: &TextExtractor,
+    entries: &[super::textbox::TextBoxEntry],
+    range: Option<(u32, u32)>,
+) -> Vec<super::textbox::DocTextBox> {
+    let Some((story_start, story_end)) = range else {
+        return Vec::new();
+    };
+    entries
+        .iter()
+        .filter_map(|entry| {
+            let start = story_start.checked_add(entry.start_cp)?;
+            let end = story_start.checked_add(entry.end_cp)?;
+            if start > end || end > story_end {
+                return None;
+            }
+            let raw = text.text_at_range(start, end);
+            Some(super::textbox::DocTextBox {
+                shape_id: entry.shape_id,
+                text: raw.strip_suffix('\r').unwrap_or(raw).to_string(),
+                header_kind: None,
+            })
+        })
+        .collect()
 }
 
 impl GlossaryMetadata {

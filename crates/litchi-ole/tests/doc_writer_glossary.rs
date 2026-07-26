@@ -71,11 +71,12 @@ fn glossary_with_drawings() -> DocWriter {
         .insert_picture(DocPicture::new(image_fixture("png/lena.png")).unwrap())
         .unwrap();
     writer
-        .insert_floating_shape(
+        .insert_floating_text_box(
             DocDrawingShape::new(DocShapeKind::Rectangle, 1440, 720)
                 .unwrap()
                 .with_fill(0x80, 0x40, 0x20),
             FloatingPosition::new(720, 360),
+            "AutoText box",
         )
         .unwrap();
     writer.add_paragraph("").unwrap();
@@ -369,6 +370,32 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
     assert_eq!(attached.item_text(0), Some("Greeting"));
     assert_eq!(attached.item_text(1), Some("\u{0001}"));
     assert_eq!(attached.item_text(2), Some("\u{0008}"));
+    assert_eq!(attached.images().len(), 1);
+    assert!(attached.images()[0].pic_offset() as usize >= 4096);
+    assert_eq!(attached.shape_positions().len(), 1);
+    assert!(
+        attached
+            .shapes()
+            .iter()
+            .any(|shape| shape.shape_id == attached.shape_positions()[0].spa.shape_id)
+    );
+    assert_eq!(attached.text_boxes().len(), 1);
+    assert_eq!(attached.text_boxes()[0].text, "AutoText box\r");
+    let paragraphs = attached.paragraphs().unwrap();
+    assert!(
+        paragraphs
+            .iter()
+            .flat_map(|paragraph| paragraph.runs().unwrap())
+            .any(|run| run.has_image())
+    );
+    #[cfg(feature = "imgconv")]
+    assert_eq!(
+        document
+            .image_data(&attached.images()[0])
+            .unwrap()
+            .raw_data(),
+        child_image.as_slice()
+    );
     assert!(
         attached
             .fib()
@@ -406,6 +433,7 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
 
 #[test]
 fn malformed_attached_fib_topologies_are_deferred_and_rejected() {
+    const DGG_INFO_INDEX: usize = 50;
     let cases = [
         attached_template_bytes(|word, _| {
             word[FIB_FLAGS_OFFSET..FIB_FLAGS_OFFSET + 2].copy_from_slice(&0x12F4u16.to_le_bytes());
@@ -424,6 +452,11 @@ fn malformed_attached_fib_topologies_are_deferred_and_rejected() {
         attached_template_bytes(|word, secondary| {
             let cb_mac = secondary + FIB_CB_MAC_OFFSET;
             word[cb_mac..cb_mac + 4].copy_from_slice(&1u32.to_le_bytes());
+        }),
+        attached_template_bytes(|word, secondary| {
+            let pointer = secondary + FIB_POINTERS_OFFSET + DGG_INFO_INDEX * FIB_POINTER_BYTES;
+            word[pointer..pointer + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+            word[pointer + 4..pointer + 8].copy_from_slice(&1u32.to_le_bytes());
         }),
         attached_template_bytes(|word, _| {
             word[FIB_PN_NEXT_OFFSET..FIB_PN_NEXT_OFFSET + 2].copy_from_slice(&1u16.to_le_bytes());

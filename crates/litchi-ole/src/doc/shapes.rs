@@ -10,7 +10,7 @@ use std::io::{Read, Seek};
 
 /// FIB index (into `FileInformationBlock::get_table_pointer`) of the
 /// `fcDggInfo`/`lcbDggInfo` pair holding the document's OfficeArtContent.
-const FIB_INDEX_DGG_INFO: usize = 50;
+pub(crate) const FIB_INDEX_DGG_INFO: usize = 50;
 
 /// OfficeArt record types used to walk the OfficeArtContent.
 const RECORD_DGG_CONTAINER: u16 = 0xF000;
@@ -65,7 +65,7 @@ impl DocShape {
 /// The OfficeArtContent in the table stream holds one OfficeArtWordDrawing
 /// per story; each consists of a `dgglbl` byte followed by an
 /// OfficeArtDgContainer with the story's floating shapes.
-fn extract_dgg_shapes(
+pub(crate) fn extract_dgg_shapes(
     fib: &FileInformationBlock,
     table_stream: &[u8],
 ) -> std::io::Result<Vec<DocShape>> {
@@ -94,8 +94,7 @@ fn extract_dgg_shapes(
     let mut offset = first_size;
     while offset + 1 + RECORD_HEADER_LEN <= dgg_info.len() {
         offset += 1; // OfficeArtWordDrawing dgglbl byte
-        let Ok((record, record_size)) = crate::escher::EscherRecord::parse(dgg_info, offset)
-        else {
+        let Ok((record, record_size)) = crate::escher::EscherRecord::parse(dgg_info, offset) else {
             break;
         };
         if record.record_type_raw != RECORD_DG_CONTAINER {
