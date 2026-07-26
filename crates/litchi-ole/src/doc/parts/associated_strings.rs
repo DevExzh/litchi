@@ -67,6 +67,13 @@ impl AssociatedStringSlot {
     pub const fn index(self) -> usize {
         self as usize
     }
+
+    const fn maximum_units(self) -> usize {
+        match self {
+            Self::WriteReservationPassword => MAX_PASSWORD_UNITS,
+            _ => MAX_GENERAL_UNITS,
+        }
+    }
 }
 
 /// The 18 associated strings stored with a Word document.
@@ -162,13 +169,14 @@ impl DocumentAssociatedStrings {
             let bytes = data
                 .get(offset..end)
                 .ok_or_else(|| corrupted(format!("SttbfAssoc string {index} is truncated")))?;
-            let units = bytes
-                .chunks_exact(2)
-                .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-                .collect::<Vec<_>>();
-            values.push(String::from_utf16(&units).map_err(|_| {
-                corrupted(format!("SttbfAssoc string {index} contains invalid UTF-16"))
-            })?);
+            let value = char::decode_utf16(
+                bytes
+                    .chunks_exact(2)
+                    .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
+            )
+            .collect::<std::result::Result<String, _>>()
+            .map_err(|_| corrupted(format!("SttbfAssoc string {index} contains invalid UTF-16")))?;
+            values.push(value);
             offset = end;
         }
         if offset != data.len() {
@@ -182,6 +190,20 @@ impl DocumentAssociatedStrings {
 
     pub fn get(&self, slot: AssociatedStringSlot) -> &str {
         &self.values[slot.index()]
+    }
+
+    /// Replace one slot after validating its specification-defined UTF-16 limit.
+    ///
+    /// Validation is atomic: an invalid value leaves the previous string intact.
+    pub fn set(&mut self, slot: AssociatedStringSlot, value: impl Into<String>) -> Result<String> {
+        let value = value.into();
+        validate_value(slot, &value)?;
+        Ok(std::mem::replace(&mut self.values[slot.index()], value))
+    }
+
+    /// Clear one slot and return its previous value.
+    pub fn clear(&mut self, slot: AssociatedStringSlot) -> String {
+        std::mem::take(&mut self.values[slot.index()])
     }
 
     pub fn iter(&self) -> impl ExactSizeIterator<Item = (AssociatedStringSlot, &str)> {
@@ -229,30 +251,35 @@ impl DocumentAssociatedStrings {
         data.extend_from_slice(&(STRING_COUNT as u16).to_le_bytes());
         data.extend_from_slice(&0u16.to_le_bytes());
         for value in &self.values {
-            let units = value.encode_utf16().collect::<Vec<_>>();
-            let count = u16::try_from(units.len())
+            let count = u16::try_from(value.encode_utf16().count())
                 .map_err(|_| corrupted("SttbfAssoc string length exceeds u16"))?;
             data.extend_from_slice(&count.to_le_bytes());
-            data.extend(units.into_iter().flat_map(u16::to_le_bytes));
+            data.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
         }
         Ok(data)
     }
+}
+
+fn validate_value(slot: AssociatedStringSlot, value: &str) -> Result<()> {
+    validate_unit_count(slot, value.encode_utf16().count())
+}
+
+fn validate_unit_count(slot: AssociatedStringSlot, units: usize) -> Result<()> {
+    let maximum = slot.maximum_units();
+    if units > maximum {
+        return Err(corrupted(format!(
+            "SttbfAssoc string {} exceeds {maximum} UTF-16 code units",
+            slot.index()
+        )));
+    }
+    Ok(())
 }
 
 fn validate_values(values: &[String; STRING_COUNT]) -> Result<usize> {
     let mut size = 6usize;
     for (index, value) in values.iter().enumerate() {
         let units = value.encode_utf16().count();
-        let maximum = if index == AssociatedStringSlot::WriteReservationPassword.index() {
-            MAX_PASSWORD_UNITS
-        } else {
-            MAX_GENERAL_UNITS
-        };
-        if units > maximum {
-            return Err(corrupted(format!(
-                "SttbfAssoc string {index} exceeds {maximum} UTF-16 code units"
-            )));
-        }
+        validate_unit_count(AssociatedStringSlot::ALL[index], units)?;
         size = size
             .checked_add(2 + units * 2)
             .ok_or_else(|| corrupted("SttbfAssoc serialized size overflows"))?;

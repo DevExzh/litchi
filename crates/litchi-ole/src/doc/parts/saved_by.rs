@@ -121,15 +121,19 @@ impl SavedByTable {
             let bytes = data
                 .get(offset..end)
                 .ok_or_else(|| corrupted(format!("SttbSavedBy string {index} is truncated")))?;
-            let units = bytes
-                .chunks_exact(2)
-                .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-                .collect::<Vec<_>>();
-            strings.push(String::from_utf16(&units).map_err(|_| {
-                corrupted(format!(
-                    "SttbSavedBy string {index} contains invalid UTF-16"
-                ))
-            })?);
+            strings.push(
+                char::decode_utf16(
+                    bytes
+                        .chunks_exact(2)
+                        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
+                )
+                .collect::<std::result::Result<String, _>>()
+                .map_err(|_| {
+                    corrupted(format!(
+                        "SttbSavedBy string {index} contains invalid UTF-16"
+                    ))
+                })?,
+            );
             offset = end;
         }
         if offset != data.len() {
@@ -198,11 +202,10 @@ fn validate_entries(entries: &[SavedByEntry]) -> Result<usize> {
 }
 
 fn write_string(data: &mut Vec<u8>, value: &str) -> Result<()> {
-    let units = value.encode_utf16().collect::<Vec<_>>();
-    let count = u16::try_from(units.len())
+    let count = u16::try_from(value.encode_utf16().count())
         .map_err(|_| corrupted("SttbSavedBy string exceeds 65535 UTF-16 code units"))?;
     data.extend_from_slice(&count.to_le_bytes());
-    data.extend(units.into_iter().flat_map(u16::to_le_bytes));
+    data.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
     Ok(())
 }
 

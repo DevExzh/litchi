@@ -93,7 +93,10 @@ use crate::doc::parts::pap::{
     TabStop, TextBoxTightWrap,
 };
 use crate::doc::parts::{list_names::ListNamesTable, list_templates::ListTemplateTable};
-use crate::doc::{ProofingFeature, ProofingStateTable, ProofingTables, SmartTagRecognizerRange};
+use crate::doc::{
+    AssociatedStringSlot, DocumentAssociatedStrings, ProofingFeature, ProofingStateTable,
+    ProofingTables, SavedByTable, SmartTagRecognizerRange,
+};
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
@@ -903,6 +906,10 @@ pub struct DocWriter {
     smart_tag_recognizer_ranges: Vec<SmartTagRecognizerRange>,
     /// Optional spelling and grammar proofing-state PLCFs.
     proofing_tables: ProofingTables,
+    /// Mandatory fixed associated-document string table.
+    associated_strings: DocumentAssociatedStrings,
+    /// Optional Word 97/2000 save-history table.
+    saved_by_table: Option<SavedByTable>,
     /// Property revision metadata for the writer's single document section
     section_formatting_revision: Option<FormattingRevision>,
     /// Explicit column geometry for the writer's single document section.
@@ -1030,6 +1037,8 @@ impl DocWriter {
             smart_tags: Vec::new(),
             smart_tag_recognizer_ranges: Vec::new(),
             proofing_tables: ProofingTables::default(),
+            associated_strings: DocumentAssociatedStrings::default(),
+            saved_by_table: None,
             section_formatting_revision: None,
             section_columns: None,
             section_right_to_left: false,
@@ -1140,6 +1149,49 @@ impl DocWriter {
         feature: ProofingFeature,
     ) -> Option<ProofingStateTable> {
         self.proofing_tables.remove(feature)
+    }
+
+    /// Replace all 18 associated-document string slots.
+    pub fn set_associated_strings(&mut self, strings: DocumentAssociatedStrings) {
+        self.associated_strings = strings;
+    }
+
+    /// Access the associated-document string table that will be written.
+    pub fn associated_strings(&self) -> &DocumentAssociatedStrings {
+        &self.associated_strings
+    }
+
+    /// Replace one associated-document string slot atomically.
+    pub fn set_associated_string(
+        &mut self,
+        slot: AssociatedStringSlot,
+        value: impl Into<String>,
+    ) -> Result<String, DocWriteError> {
+        self.associated_strings
+            .set(slot, value)
+            .map_err(|error| DocWriteError::InvalidData(error.to_string()))
+    }
+
+    /// Reset all associated-document string slots to empty strings.
+    ///
+    /// The mandatory `SttbfAssoc` structure is still emitted.
+    pub fn reset_associated_strings(&mut self) {
+        self.associated_strings = DocumentAssociatedStrings::default();
+    }
+
+    /// Configure the optional Word 97/2000 save-history table.
+    pub fn set_saved_by_table(&mut self, table: SavedByTable) -> Option<SavedByTable> {
+        self.saved_by_table.replace(table)
+    }
+
+    /// Access the configured save-history table.
+    pub fn saved_by_table(&self) -> Option<&SavedByTable> {
+        self.saved_by_table.as_ref()
+    }
+
+    /// Remove and return the configured save-history table.
+    pub fn clear_saved_by_table(&mut self) -> Option<SavedByTable> {
+        self.saved_by_table.take()
     }
 
     fn encryption_table_header_len(&self) -> Result<usize, DocWriteError> {
@@ -3837,6 +3889,13 @@ impl DocWriter {
         fib.set_dop(table_offset, dop_data.len() as u32);
         table_stream.extend_from_slice(&dop_data);
         table_offset = table_stream.len() as u32;
+        table_offset = super::auxiliary_strings::append_auxiliary_string_tables(
+            &mut fib,
+            &mut table_stream,
+            &self.associated_strings,
+            self.saved_by_table.as_ref(),
+            table_offset,
+        )?;
 
         // Write PlcfHdd if present (headers/footers PLCF)
         if let Some(header) = &header_plcfhdd {
@@ -4727,6 +4786,13 @@ impl DocWriter {
         fib.set_dop(table_offset, dop_data.len() as u32);
         table_stream.extend_from_slice(&dop_data);
         table_offset = table_stream.len() as u32;
+        table_offset = super::auxiliary_strings::append_auxiliary_string_tables(
+            &mut fib,
+            &mut table_stream,
+            &self.associated_strings,
+            self.saved_by_table.as_ref(),
+            table_offset,
+        )?;
 
         // Write PlcfHdd if present
         if let Some(header) = &header_plcfhdd {

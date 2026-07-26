@@ -67,6 +67,9 @@ pub mod shapes;
 /// Legacy smart-tag/factoid writer input types.
 pub mod smart_tags;
 
+/// Associated-document and save-history string-table authoring.
+mod auxiliary_strings;
+
 /// Spelling and grammar proofing-state table authoring.
 mod proofing;
 

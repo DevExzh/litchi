@@ -62,6 +62,9 @@ pub struct FibBuilder {
     /// Document properties offset and size
     fc_dop: u32,
     lcb_dop: u32,
+    /// Associated-document string table (`SttbfAssoc`)
+    fc_sttbf_assoc: u32,
+    lcb_sttbf_assoc: u32,
     /// Complex table (piece table) offset and size
     fc_clx: u32,
     lcb_clx: u32,
@@ -131,6 +134,9 @@ pub struct FibBuilder {
     /// Grammar proofing-state table (`Plcfgram`)
     fc_plcfgram: u32,
     lcb_plcfgram: u32,
+    /// Word 97/2000 save-history table (`SttbSavedBy`)
+    fc_sttb_saved_by: u32,
+    lcb_sttb_saved_by: u32,
     /// Annotation bookmark name table (`SttbfAtnBkmk`)
     fc_sttbf_atn_bkmk: u32,
     lcb_sttbf_atn_bkmk: u32,
@@ -207,6 +213,8 @@ impl FibBuilder {
             lcb_stshf: 0,
             fc_dop: 0,
             lcb_dop: 0,
+            fc_sttbf_assoc: 0,
+            lcb_sttbf_assoc: 0,
             fc_clx: 0,
             lcb_clx: 0,
             fc_plcfbte_chpx: 0,
@@ -255,6 +263,8 @@ impl FibBuilder {
             lcb_plcfspl: 0,
             fc_plcfgram: 0,
             lcb_plcfgram: 0,
+            fc_sttb_saved_by: 0,
+            lcb_sttb_saved_by: 0,
             fc_sttbf_atn_bkmk: 0,
             lcb_sttbf_atn_bkmk: 0,
             fc_plcf_atn_bkf: 0,
@@ -313,6 +323,12 @@ impl FibBuilder {
     pub fn set_dop(&mut self, offset: u32, size: u32) {
         self.fc_dop = offset;
         self.lcb_dop = size;
+    }
+
+    /// Set the associated-document string table (`SttbfAssoc`).
+    pub fn set_sttbf_assoc(&mut self, offset: u32, size: u32) {
+        self.fc_sttbf_assoc = offset;
+        self.lcb_sttbf_assoc = size;
     }
 
     /// Set Complex table (piece table) offset and size
@@ -479,6 +495,12 @@ impl FibBuilder {
     pub fn set_plcfgram(&mut self, offset: u32, size: u32) {
         self.fc_plcfgram = offset;
         self.lcb_plcfgram = size;
+    }
+
+    /// Set the Word 97/2000 save-history table (`SttbSavedBy`).
+    pub fn set_sttb_saved_by(&mut self, offset: u32, size: u32) {
+        self.fc_sttb_saved_by = offset;
+        self.lcb_sttb_saved_by = size;
     }
 
     /// Set the annotation-bookmark name table (`SttbfAtnBkmk`).
@@ -764,6 +786,7 @@ impl FibBuilder {
         const PLCFBTECHPX: usize = 12; // Character bin table
         const PLCFBTEPAPX: usize = 13; // Paragraph bin table
         const DOP: usize = 31; // Document properties
+        const STTBFASSOC: usize = 32; // Associated-document strings
         const CLX: usize = 33; // Complex table (piece table)
 
         // Zero all fields first
@@ -799,6 +822,7 @@ impl FibBuilder {
         const PLCFENDTXT: usize = 47; // Endnote text PLCF
         const STTBFRMARK: usize = 51; // Revision author table
         const PLCFSPL: usize = 55; // Spelling proofing-state table
+        const STTBSAVEDBY: usize = 71; // Word 97/2000 save history
         const PLFLST: usize = 73; // List table (PlfLst)
         const PLFLFO: usize = 74; // List format override table (PlfLfo)
         const PLCFGRAM: usize = 90; // Grammar proofing-state table
@@ -818,6 +842,7 @@ impl FibBuilder {
 
         // Write field offsets and sizes
         set_field(buf, STSHF, self.fc_stshf, self.lcb_stshf);
+        set_field(buf, STTBFASSOC, self.fc_sttbf_assoc, self.lcb_sttbf_assoc);
         set_field(buf, PLCFFNDREF, self.fc_plcffnd_ref, self.lcb_plcffnd_ref);
         set_field(buf, PLCFFNDTXT, self.fc_plcffnd_txt, self.lcb_plcffnd_txt);
         set_field(buf, PLCFANDREF, self.fc_plcfand_ref, self.lcb_plcfand_ref);
@@ -830,6 +855,12 @@ impl FibBuilder {
         set_field(buf, STTBFRMARK, self.fc_sttbf_rmark, self.lcb_sttbf_rmark);
         set_field(buf, PLCFSPL, self.fc_plcfspl, self.lcb_plcfspl);
         set_field(buf, PLCFGRAM, self.fc_plcfgram, self.lcb_plcfgram);
+        set_field(
+            buf,
+            STTBSAVEDBY,
+            self.fc_sttb_saved_by,
+            self.lcb_sttb_saved_by,
+        );
         set_field(buf, PLCFSED, self.fc_plcfsed, self.lcb_plcfsed);
         set_field(buf, PLCFHDD, self.fc_plcfhdd, self.lcb_plcfhdd);
         set_field(

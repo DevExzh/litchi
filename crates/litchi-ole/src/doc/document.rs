@@ -38,6 +38,7 @@ use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
 use super::parts::revisions::RevisionAuthorTable;
+use super::parts::saved_by::SavedByTable;
 use super::parts::sections::SectionsTable;
 use super::parts::smart_tags::DocumentSmartTags;
 use super::parts::styles::StyleSheet;
@@ -112,6 +113,8 @@ pub struct Document {
     list_templates: Option<ListTemplateTable>,
     /// Deferred strict spelling/grammar proofing metadata parse
     proofing_tables: Result<ProofingTables>,
+    /// Deferred strict Word 97/2000 save-history metadata parse
+    saved_by_table: Result<SavedByTable>,
     /// Section ranges, layout, and property revision marks
     sections: SectionsTable,
     /// Floating-shape anchors from the Main Document PlcfSpa (empty when the
@@ -237,6 +240,7 @@ impl Document {
         let list_names = ListNamesTable::parse(&fib, &table_stream)?;
         let list_templates = ListTemplateTable::parse(&fib, &table_stream)?;
         let proofing_tables = ProofingTables::parse(&fib, &table_stream);
+        let saved_by_table = SavedByTable::parse(&fib, &table_stream);
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
         let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
@@ -321,6 +325,7 @@ impl Document {
             list_names,
             list_templates,
             proofing_tables,
+            saved_by_table,
             sections,
             shape_anchors,
             header_shape_anchors,
@@ -630,6 +635,16 @@ impl Document {
         self.proofing_tables
             .as_ref()
             .map_err(|error| DocError::Corrupted(format!("invalid proofing metadata: {error}")))
+    }
+
+    /// Strictly access the ordered Word 97/2000 save history.
+    ///
+    /// Parsing is deferred because modern Word versions are instructed to ignore
+    /// this legacy cache. Saved paths remain inert and are never opened or resolved.
+    pub fn saved_by_table(&self) -> Result<&SavedByTable> {
+        self.saved_by_table
+            .as_ref()
+            .map_err(|error| DocError::Corrupted(format!("invalid saved-by metadata: {error}")))
     }
 
     /// Get access to the fields table (if parsed).
