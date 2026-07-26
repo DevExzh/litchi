@@ -486,11 +486,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                         &args,
                     ))
                 } else {
-                    // Fallback for completely unknown templates
-                    Ok(MathNode::Text(Cow::Owned(format!(
-                        "\\unknown_template_{}_{{{}}}",
-                        tmpl_obj.selector, tmpl_obj.variation
-                    ))))
+                    self.unknown_template_content(tmpl_obj)
                 }
             },
         }
@@ -578,14 +574,28 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                     Ok(MathNode::Text(Cow::Borrowed("\\int ")))
                 }
             },
-            _ => {
-                // Unknown template - return as placeholder
-                Ok(MathNode::Text(Cow::Owned(format!(
-                    "\\unknown_template_{}_{{{}}}",
-                    tmpl_obj.selector, tmpl_obj.variation
-                ))))
-            },
+            _ => self.unknown_template_content(tmpl_obj),
         }
+    }
+
+    /// Keep an unrecognised template's operands instead of discarding them
+    ///
+    /// A template the tables do not name still carries real mathematics in its
+    /// subobjects. Emitting a `\\unknown_template_N` placeholder threw that
+    /// content away and left a literal command in the output, so the operands
+    /// are returned as a row and only the unknown decoration is lost — the same
+    /// degradation the MTEF 5 converter already applies.
+    fn unknown_template_content(
+        &self,
+        tmpl_obj: &MtefTemplate,
+    ) -> Result<MathNode<'arena>, MtefError> {
+        let Some(obj_list) = &tmpl_obj.subobject_list else {
+            return Ok(MathNode::Row(Vec::new()));
+        };
+        let args = self.parse_template_arguments(obj_list)?;
+        Ok(MathNode::Row(
+            args.into_iter().flat_map(|arg| arg.into_iter()).collect(),
+        ))
     }
 
     fn parse_template_arguments(
