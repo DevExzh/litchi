@@ -437,8 +437,12 @@ impl XlsFormatting {
             }
         }
 
-        let date_system = date_system
-            .ok_or_else(|| invalid(DATE1904_RECORD, "missing required Date1904 record"))?;
+        // MS-XLS 2.1 lists Date1904 in the globals grammar, but workbooks
+        // written by other producers omit it and Excel still opens them. The
+        // record only selects between two date systems and the absent value is
+        // unambiguous, so fall back to the 1900 system rather than rejecting an
+        // otherwise readable workbook.
+        let date_system = date_system.unwrap_or(XlsDateSystem::Excel1900);
         if extended_formats.len() < MIN_XF_RECORDS {
             return Err(invalid(
                 XF_RECORD,
@@ -587,56 +591,46 @@ fn parse_number_format(data: &[u8]) -> XlsResult<XlsNumberFormat> {
     })
 }
 
+/// `fHighByte`: the characters in `rgb` are UTF-16 rather than compressed.
+pub(crate) const XL_UNICODE_STRING_HIGH_BYTE: u8 = 0x01;
+/// Bytes per character when `fHighByte` is set.
+pub(crate) const UTF16_CHAR_BYTES: usize = 2;
+/// Bytes per character in a compressed (single-byte) string.
+pub(crate) const COMPRESSED_CHAR_BYTES: usize = 1;
+/// `cch` plus the option byte that precede an XLUnicodeString's characters.
+const XL_UNICODE_STRING_HEADER_LEN: usize = 3;
+/// Offset of the option byte within an XLUnicodeString.
+const XL_UNICODE_STRING_FLAGS_OFFSET: usize = 2;
+
 fn parse_xl_unicode_string(data: &[u8]) -> XlsResult<String> {
-    if data.len() < 3 {
+    if data.len() < XL_UNICODE_STRING_HEADER_LEN {
         return Err(invalid(FORMAT_RECORD, "truncated XLUnicodeString header"));
     }
     let cch = u16::from_le_bytes([data[0], data[1]]) as usize;
-    let flags = data[2];
-    if flags & !0x0d != 0 {
-        return Err(invalid(
-            FORMAT_RECORD,
-            format!("XLUnicodeString has reserved option bits 0x{flags:02x}"),
-        ));
-    }
-    let mut offset = 3usize;
-    let rich_runs = if flags & 0x08 != 0 {
-        let bytes = data
-            .get(offset..offset + 2)
-            .ok_or_else(|| invalid(FORMAT_RECORD, "truncated rich-run count"))?;
-        offset += 2;
-        u16::from_le_bytes([bytes[0], bytes[1]]) as usize
+    // MS-XLS 2.5.294: an XLUnicodeString is `cch`, one option byte, and `rgb`.
+    // Only `fHighByte` is defined; every other bit is reserved and "MUST be
+    // zero, and MUST be ignored". Unlike XLUnicodeRichExtendedString (2.5.293)
+    // there are no `cRun`/`cbExtRst` fields, so the option byte never changes
+    // the layout beyond the character width.
+    let flags = data[XL_UNICODE_STRING_FLAGS_OFFSET];
+    let char_width = if flags & XL_UNICODE_STRING_HIGH_BYTE != 0 {
+        UTF16_CHAR_BYTES
     } else {
-        0
+        COMPRESSED_CHAR_BYTES
     };
-    let extension_len = if flags & 0x04 != 0 {
-        let bytes = data
-            .get(offset..offset + 4)
-            .ok_or_else(|| invalid(FORMAT_RECORD, "truncated extension length"))?;
-        offset += 4;
-        u32::from_le_bytes(bytes.try_into().unwrap()) as usize
-    } else {
-        0
-    };
-    let char_width = if flags & 0x01 != 0 { 2usize } else { 1usize };
     let char_bytes = cch
         .checked_mul(char_width)
         .ok_or_else(|| invalid(FORMAT_RECORD, "format string length overflow"))?;
     let chars = data
-        .get(offset..offset + char_bytes)
+        .get(XL_UNICODE_STRING_HEADER_LEN..XL_UNICODE_STRING_HEADER_LEN + char_bytes)
         .ok_or_else(|| invalid(FORMAT_RECORD, "truncated format string characters"))?;
-    offset += char_bytes;
-    let trailing = rich_runs
-        .checked_mul(4)
-        .and_then(|value| value.checked_add(extension_len))
-        .ok_or_else(|| invalid(FORMAT_RECORD, "format string optional-data overflow"))?;
-    if offset.checked_add(trailing) != Some(data.len()) {
+    if XL_UNICODE_STRING_HEADER_LEN + char_bytes != data.len() {
         return Err(invalid(
             FORMAT_RECORD,
-            "XLUnicodeString optional data is truncated or has trailing bytes",
+            "XLUnicodeString has trailing bytes after its characters",
         ));
     }
-    if char_width == 1 {
+    if char_width == COMPRESSED_CHAR_BYTES {
         Ok(chars.iter().map(|byte| char::from(*byte)).collect())
     } else {
         let units = chars
@@ -1086,5 +1080,118 @@ mod tests {
                 assert_eq!(format.index() as usize, index, "{path}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod real_world_tolerance_tests {
+    use super::*;
+    use crate::xls::records::{Record, RecordHeader};
+
+    fn record(record_type: u16, data: Vec<u8>) -> Record {
+        Record {
+            header: RecordHeader {
+                record_type,
+                data_len: data.len() as u16,
+            },
+            data,
+        }
+    }
+
+    fn format_record(id: u16, code: &str) -> Record {
+        let mut data = id.to_le_bytes().to_vec();
+        data.extend_from_slice(&(code.len() as u16).to_le_bytes());
+        data.push(0); // compressed characters, no reserved bits
+        data.extend_from_slice(code.as_bytes());
+        record(FORMAT_RECORD, data)
+    }
+
+    /// `MIN_XF_RECORDS` style XFs plus one cell XF, the smallest set
+    /// `parse_globals` accepts.
+    fn minimal_xf_records() -> Vec<Record> {
+        fn xf(style: bool, parent: u16, format_id: u16) -> Record {
+            let mut data = vec![0u8; 20];
+            data[2..4].copy_from_slice(&format_id.to_le_bytes());
+            let flags = (parent << 4) | u16::from(style) << 2 | 1;
+            data[4..6].copy_from_slice(&flags.to_le_bytes());
+            record(XF_RECORD, data)
+        }
+        let mut records: Vec<Record> = (0..MIN_XF_RECORDS - 1)
+            .map(|_| xf(true, 0x0fff, 0))
+            .collect();
+        records.push(xf(false, 0, 164));
+        records
+    }
+
+    /// MS-XLS 2.1 lists Date1904 in the globals grammar, but workbooks written
+    /// by other producers omit it. The record selects between exactly two date
+    /// systems, so the absent value is unambiguous and must not make the
+    /// workbook unreadable.
+    #[test]
+    fn defaults_to_the_1900_date_system_when_date1904_is_absent() {
+        let mut records = vec![format_record(164, "yyyy-mm-dd")];
+        records.extend(minimal_xf_records());
+
+        let formatting =
+            XlsFormatting::parse_globals(&records).expect("a missing Date1904 is not fatal");
+        assert_eq!(formatting.date_system(), XlsDateSystem::Excel1900);
+    }
+
+    /// An explicit record still wins over the fallback.
+    #[test]
+    fn honours_an_explicit_1904_date_system() {
+        let mut records = vec![record(DATE1904_RECORD, vec![1, 0])];
+        records.push(format_record(164, "yyyy-mm-dd"));
+        records.extend(minimal_xf_records());
+
+        let formatting = XlsFormatting::parse_globals(&records).expect("explicit Date1904 parses");
+        assert_eq!(formatting.date_system(), XlsDateSystem::Excel1904);
+    }
+
+    /// MS-XLS 2.5.294 gives XLUnicodeString exactly one meaningful option bit;
+    /// the rest are reserved and "MUST be zero, and MUST be ignored". A writer
+    /// that leaves one set must not make the FORMAT record unreadable, and the
+    /// bits must not be mistaken for the `fRichSt`/`fExtSt` of the unrelated
+    /// XLUnicodeRichExtendedString, which would shift the character offset.
+    #[test]
+    fn ignores_reserved_option_bits_in_format_record_strings() {
+        const CODE: &str = "0.00";
+        for reserved in [0x02u8, 0x04, 0x08, 0x20, 0xf0] {
+            let mut data = 164u16.to_le_bytes().to_vec();
+            data.extend_from_slice(&(CODE.len() as u16).to_le_bytes());
+            data.push(reserved); // fHighByte clear, reserved bits set
+            data.extend_from_slice(CODE.as_bytes());
+
+            let mut records = vec![
+                record(DATE1904_RECORD, vec![0, 0]),
+                record(FORMAT_RECORD, data),
+            ];
+            records.extend(minimal_xf_records());
+
+            let formatting = XlsFormatting::parse_globals(&records)
+                .unwrap_or_else(|error| panic!("reserved bits {reserved:#04x} rejected: {error}"));
+            assert_eq!(
+                formatting.number_format(164).map(XlsNumberFormat::code),
+                Some(CODE),
+                "reserved bits {reserved:#04x} must not shift the characters"
+            );
+        }
+    }
+
+    /// Tolerating reserved bits must not turn a genuinely truncated record into
+    /// a silently mis-parsed one.
+    #[test]
+    fn still_rejects_a_truncated_format_record() {
+        let mut data = 164u16.to_le_bytes().to_vec();
+        data.extend_from_slice(&10u16.to_le_bytes()); // claims 10 characters
+        data.push(0);
+        data.extend_from_slice(b"0.00"); // supplies 4
+        let mut records = vec![
+            record(DATE1904_RECORD, vec![0, 0]),
+            record(FORMAT_RECORD, data),
+        ];
+        records.extend(minimal_xf_records());
+
+        assert!(XlsFormatting::parse_globals(&records).is_err());
     }
 }

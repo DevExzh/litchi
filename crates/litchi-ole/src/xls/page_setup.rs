@@ -1,5 +1,6 @@
 //! BIFF8 worksheet print and page setup records.
 
+use super::number_format::{COMPRESSED_CHAR_BYTES, UTF16_CHAR_BYTES, XL_UNICODE_STRING_HIGH_BYTE};
 use crate::xls::error::{XlsError, XlsResult};
 
 const HEADER_RECORD_TYPE: u16 = 0x0014;
@@ -272,13 +273,14 @@ fn parse_header_footer(data: &[u8], record_type: u16) -> XlsResult<String> {
             "header/footer text exceeds 255 UTF-16 code units",
         ));
     }
-    if flags & 0xfe != 0 {
-        return Err(invalid(
-            record_type,
-            "header/footer XLUnicodeString has reserved option bits",
-        ));
-    }
-    let width = if flags & 1 != 0 { 2 } else { 1 };
+    // MS-XLS 2.5.293: every option bit other than `fHighByte` is reserved and
+    // "MUST be zero, and MUST be ignored", so a writer that leaves one set does
+    // not make the record unreadable.
+    let width = if flags & XL_UNICODE_STRING_HIGH_BYTE != 0 {
+        UTF16_CHAR_BYTES
+    } else {
+        COMPRESSED_CHAR_BYTES
+    };
     let byte_count = count
         .checked_mul(width)
         .ok_or_else(|| invalid(record_type, "header/footer string length overflow"))?;
