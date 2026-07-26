@@ -19,7 +19,8 @@
 //! - **Chart Sheets**: Typed chart sheet stream parsing and bounded new-workbook
 //!   authoring (code name, tab color, views, protection, page setup, drawing links)
 //! - **Drawings and Charts**: SpreadsheetDrawing inventory (anchors, shapes, pictures,
-//!   graphic frames) with embedded charts parsed through the shared typed chart model
+//!   graphic frames) with embedded charts and their bounded inert package-resource
+//!   graphs parsed and authored through the shared typed chart model
 //! - **Error Handling**: Comprehensive error types with detailed context
 //!
 //! ## Writing
@@ -166,6 +167,7 @@ pub(crate) mod walker;
 
 /// Chart sheet stream parsing (MS-XLSB 2.1.7.7)
 pub mod chartsheet;
+mod chart_resources;
 
 /// SpreadsheetDrawing XML inventory for XLSB Drawings parts (MS-XLSB 2.1.7.23)
 pub mod drawing;

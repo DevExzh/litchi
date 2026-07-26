@@ -1065,7 +1065,7 @@ impl MutableXlsbWorksheet {
                 "worksheet chart count exceeds the safety limit".to_string(),
             ));
         }
-        let _ = crate::xlsb::drawing_write::serialize_chart(&chart)?;
+        crate::xlsb::drawing_write::validate_chart(&chart)?;
         self.charts.push(chart);
         Ok(())
     }

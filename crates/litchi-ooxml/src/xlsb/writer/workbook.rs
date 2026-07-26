@@ -1171,10 +1171,11 @@ impl XlsbWorkbookWriter {
                 }
                 for (chart_ordinal, chart) in worksheet.charts().iter().enumerate() {
                     let chart_name = format!("chart{next_chart_index}.xml");
+                    let graph =
+                        crate::xlsb::chart_resources::author_chart_graph(chart, next_chart_index)?;
                     next_chart_index = next_chart_index.checked_add(1).ok_or_else(|| {
                         XlsbError::InvalidFormula("chart part index overflow".to_string())
                     })?;
-                    let chart_xml = crate::xlsb::drawing_write::serialize_chart(chart)?;
                     let relationship_id =
                         part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);
                     let expected_relationship_id =
@@ -1184,11 +1185,8 @@ impl XlsbWorkbookWriter {
                             "drawing chart relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
                         )));
                     }
-                    chart_parts.push(BlobPart::new(
-                        PackURI::new(format!("/xl/charts/{chart_name}"))?,
-                        ct::DML_CHART.to_string(),
-                        chart_xml,
-                    ));
+                    chart_parts.push(graph.chart_part);
+                    chart_parts.extend(graph.related_parts);
                 }
                 let rel_id =
                     sheet_part.relate_to(&format!("../drawings/{drawing_name}"), rel::DRAWING);
@@ -1268,10 +1266,13 @@ impl XlsbWorkbookWriter {
             next_drawing_index = next_drawing_index.checked_add(1).ok_or_else(|| {
                 XlsbError::InvalidFormula("drawing part index overflow".to_string())
             })?;
-            let chart_name = format!("chart{next_chart_index}.xml");
+            let chart_index = next_chart_index;
+            let chart_name = format!("chart{chart_index}.xml");
             next_chart_index = next_chart_index.checked_add(1).ok_or_else(|| {
                 XlsbError::InvalidFormula("chart part index overflow".to_string())
             })?;
+            let graph =
+                crate::xlsb::chart_resources::author_chart_graph(sheet.chart(), chart_index)?;
 
             let mut chart_sheet_part = BlobPart::new(
                 PackURI::new(format!("/xl/chartsheets/sheet{}.bin", index + 1))?,
@@ -1321,15 +1322,12 @@ impl XlsbWorkbookWriter {
                     "chart-sheet chart relationship allocation mismatch: {chart_rel_id}"
                 )));
             }
-            let chart_part = BlobPart::new(
-                PackURI::new(format!("/xl/charts/{chart_name}"))?,
-                ct::DML_CHART.to_string(),
-                crate::xlsb::drawing_write::serialize_chart(sheet.chart())?,
-            );
-
             package.add_part(Box::new(chart_sheet_part));
             package.add_part(Box::new(drawing_part));
-            package.add_part(Box::new(chart_part));
+            package.add_part(Box::new(graph.chart_part));
+            for part in graph.related_parts {
+                package.add_part(Box::new(part));
+            }
             if let Some(part) = printer_part {
                 package.add_part(Box::new(part));
             }
@@ -2847,8 +2845,147 @@ mod tests {
     }
 
     #[test]
+    fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
+        use crate::charts::{ChartExtensionList, ChartShapeProperties};
+        use crate::xlsx::{
+            ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
+            ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
+            ChartUserShapesRelationshipTarget, WorksheetChart,
+        };
+
+        let mut worksheet_chart = WorksheetChart::bar_chart(
+            "Resources",
+            "Data!$A$1:$A$2",
+            "Data!$B$1:$B$2",
+            ChartAnchor::new(1, 1, 8, 15),
+        )
+        .unwrap();
+        worksheet_chart.chart.shape_properties = Some(
+            ChartShapeProperties::from_xml(
+                br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId9"/></a:blipFill></c:spPr>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        worksheet_chart.chart.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="resources"><x:reference r:id="rId1" r:link="rId10"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        worksheet_chart = worksheet_chart
+            .with_additional_relationship(ChartRelationship {
+                relationship_id: "rId9".to_string(),
+                relationship_type: rel::IMAGE.to_string(),
+                target: ChartRelationshipTarget::Embedded {
+                    data: b"chart background".to_vec(),
+                    content_type: "image/png".to_string(),
+                    extension: "png".to_string(),
+                },
+            })
+            .with_additional_relationship(ChartRelationship {
+                relationship_id: "rId10".to_string(),
+                relationship_type: rel::HYPERLINK.to_string(),
+                target: ChartRelationshipTarget::External {
+                    target: "https://example.test/chart".to_string(),
+                },
+            })
+            .with_external_data_part(
+                ChartExternalDataPart::embedded_workbook(b"PK chart workbook".to_vec()),
+                Some(false),
+            )
+            .with_user_shapes_part(ChartUserShapesPart {
+                xml: br#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:cdr="http://schemas.openxmlformats.org/drawingml/2006/chartDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><cdr:relSizeAnchor><cdr:from><cdr:x>0</cdr:x><cdr:y>0</cdr:y></cdr:from><cdr:to><cdr:x>1</cdr:x><cdr:y>1</cdr:y></cdr:to><cdr:pic><a:blip r:embed="rId5"/></cdr:pic></cdr:relSizeAnchor></c:userShapes>"#.to_vec(),
+                relationships: vec![ChartUserShapesRelationship {
+                    relationship_id: "rId5".to_string(),
+                    relationship_type: rel::IMAGE.to_string(),
+                    target: ChartUserShapesRelationshipTarget::Embedded {
+                        data: b"shape image".to_vec(),
+                        content_type: "image/png".to_string(),
+                        extension: "png".to_string(),
+                    },
+                }],
+            });
+
+        let chart_sheet_chart = WorksheetChart::line_chart(
+            "Linked",
+            "Data!$A$1:$A$2",
+            "Data!$B$1:$B$2",
+            ChartAnchor::new(0, 0, 5, 10),
+        )
+        .unwrap()
+        .with_external_data_part(
+            ChartExternalDataPart::linked_package("https://example.test/data.xlsx"),
+            Some(true),
+        );
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        let mut data = MutableXlsbWorksheet::new("Data");
+        data.add_chart(worksheet_chart).unwrap();
+        workbook.add_worksheet(data);
+        workbook
+            .add_chart_sheet(MutableXlsbChartSheet::new("Linked Chart", chart_sheet_chart))
+            .unwrap();
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+
+        let worksheet_chart = &reader.sheet_drawing(0).unwrap().charts[0];
+        match &worksheet_chart.external_data_part.as_ref().unwrap().target {
+            ChartExternalDataTarget::Embedded { data, .. } => {
+                assert_eq!(data, b"PK chart workbook");
+            },
+            other => panic!("unexpected worksheet chart external data: {other:?}"),
+        }
+        let user_shapes = worksheet_chart.user_shapes_part.as_ref().unwrap();
+        assert_eq!(user_shapes.relationships.len(), 1);
+        match &user_shapes.relationships[0].target {
+            ChartRelationshipTarget::Embedded { data, .. } => {
+                assert_eq!(data, b"shape image");
+            },
+            other => panic!("unexpected user-shapes target: {other:?}"),
+        }
+        assert_eq!(worksheet_chart.additional_relationships.len(), 2);
+        let background = worksheet_chart
+            .additional_relationships
+            .iter()
+            .find(|relationship| relationship.relationship_id == "rId9")
+            .unwrap();
+        match &background.target {
+            ChartRelationshipTarget::Embedded { data, .. } => {
+                assert_eq!(data, b"chart background");
+            },
+            other => panic!("unexpected background target: {other:?}"),
+        }
+        let hyperlink = worksheet_chart
+            .additional_relationships
+            .iter()
+            .find(|relationship| relationship.relationship_id == "rId10")
+            .unwrap();
+        match &hyperlink.target {
+            ChartRelationshipTarget::External { target } => {
+                assert_eq!(target, "https://example.test/chart");
+            },
+            other => panic!("unexpected hyperlink target: {other:?}"),
+        }
+
+        let chart_sheet_chart = &reader.sheet_drawing(1).unwrap().charts[0];
+        match &chart_sheet_chart.external_data_part.as_ref().unwrap().target {
+            ChartExternalDataTarget::Linked { target } => {
+                assert_eq!(target, "https://example.test/data.xlsx");
+            },
+            other => panic!("unexpected chart-sheet external data: {other:?}"),
+        }
+        assert!(chart_sheet_chart.user_shapes_part.is_none());
+        assert!(chart_sheet_chart.additional_relationships.is_empty());
+    }
+
+    #[test]
     fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
-        use crate::xlsx::{ChartAnchor, WorksheetChart};
+        use crate::xlsx::{
+            ChartAnchor, ChartRelationship, ChartRelationshipTarget, ChartUserShapesPart,
+            WorksheetChart,
+        };
 
         let mut sheet = MutableXlsbWorksheet::new("Charts");
         let valid = WorksheetChart::bar_chart(
@@ -2865,8 +3002,26 @@ mod tests {
         assert!(sheet.add_chart(descending).is_err());
         assert_eq!(sheet.charts().len(), 1);
 
-        let with_external_data = valid.clone().with_embedded_workbook(vec![0x50, 0x4B]);
-        assert!(sheet.add_chart(with_external_data).is_err());
+        let mut mismatched_external_data = valid.clone();
+        mismatched_external_data.chart.external_data =
+            Some(crate::charts::ChartExternalData::pending());
+        assert!(sheet.add_chart(mismatched_external_data).is_err());
+        assert_eq!(sheet.charts().len(), 1);
+
+        let invalid_user_shapes = valid.clone().with_user_shapes_part(ChartUserShapesPart::new(
+            br#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blip r:embed="rId5"/></c:userShapes>"#.to_vec(),
+        ));
+        assert!(sheet.add_chart(invalid_user_shapes).is_err());
+        let invalid_relationship = valid
+            .clone()
+            .with_additional_relationship(ChartRelationship {
+                relationship_id: "not an id".to_string(),
+                relationship_type: rel::HYPERLINK.to_string(),
+                target: ChartRelationshipTarget::External {
+                    target: "https://example.test".to_string(),
+                },
+            });
+        assert!(sheet.add_chart(invalid_relationship).is_err());
         assert_eq!(sheet.charts().len(), 1);
 
         let removed = sheet.remove_chart(0).unwrap();

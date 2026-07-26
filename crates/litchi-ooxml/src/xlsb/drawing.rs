@@ -8,7 +8,8 @@
 //! cell anchors. The standalone parser stores relationship identifiers and
 //! content URIs verbatim. Workbook loading resolves internal image and Chart
 //! parts into bounded inert payloads and the typed chart model shared with
-//! the other formats ([`crate::charts`]); external targets are never fetched.
+//! the other formats ([`crate::charts`]), including chart external data,
+//! user-shapes, and extension resources; external targets are never fetched.
 
 use crate::common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
@@ -210,6 +211,13 @@ pub struct XlsbEmbeddedChart {
     /// Typed chart parsed from the standard DrawingML `c:chartSpace` part
     /// (MS-XLSB 2.1.7.5 defers to ISO/IEC 29500-1:2016 section 21.2).
     pub chart: crate::charts::Chart,
+    /// Embedded or linked external-data payload declared by the chart.
+    pub external_data_part: Option<crate::xlsx::ChartExternalDataPart>,
+    /// Chart user-shapes XML and its directly related inert resources.
+    pub user_shapes_part: Option<crate::xlsx::ChartUserShapesPart>,
+    /// Other relationships owned by the Chart part, including resources
+    /// referenced by preserved extension fragments.
+    pub additional_relationships: Vec<crate::xlsx::ChartRelationship>,
 }
 
 fn invalid(message: impl Into<String>) -> OoxmlError {

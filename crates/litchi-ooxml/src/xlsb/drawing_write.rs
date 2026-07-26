@@ -14,7 +14,6 @@ use std::fmt::Write as _;
 
 pub(crate) const MAX_CHARTS_PER_SHEET: usize = 4_096;
 const MAX_DRAWING_XML_BYTES: usize = 16 * 1024 * 1024;
-const MAX_CHART_XML_BYTES: usize = 16 * 1024 * 1024;
 const CHART_SHEET_EXTENT_X: u64 = 8_582_025;
 const CHART_SHEET_EXTENT_Y: u64 = 5_838_825;
 
@@ -29,38 +28,7 @@ pub(crate) fn validate_chart(chart: &WorksheetChart) -> XlsbResult<()> {
             "XLSB worksheet chart authoring does not yet wire PivotTable views",
         ));
     }
-    if chart.chart.external_data.is_some() || chart.external_data_part.is_some() {
-        return Err(unsupported(
-            "XLSB worksheet chart external-data relationships are not yet authored",
-        ));
-    }
-    if chart.chart.user_shapes.is_some() || chart.user_shapes_part.is_some() {
-        return Err(unsupported(
-            "XLSB worksheet chart user-shapes relationships are not yet authored",
-        ));
-    }
-    if !chart.additional_relationships.is_empty()
-        || !crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)?.is_empty()
-    {
-        return Err(unsupported(
-            "XLSB worksheet chart relationship-bearing extension fragments are not yet authored",
-        ));
-    }
-    Ok(())
-}
-
-pub(crate) fn serialize_chart(chart: &WorksheetChart) -> XlsbResult<Vec<u8>> {
-    validate_chart(chart)?;
-    let xml = crate::xlsx::chart::generate_chart_xml(&chart.chart)?;
-    if xml.len() > MAX_CHART_XML_BYTES {
-        return Err(XlsbError::InvalidLength {
-            expected: MAX_CHART_XML_BYTES,
-            found: xml.len(),
-        });
-    }
-    // Treat the shared chart reader as a post-serialization grammar oracle.
-    crate::charts::reader::parse_chart(xml.as_slice())?;
-    Ok(xml)
+    crate::xlsb::chart_resources::validate_chart_resources(chart)
 }
 
 /// Serialize the single absolute-anchored chart frame used by a chart sheet.

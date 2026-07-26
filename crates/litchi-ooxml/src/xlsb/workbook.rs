@@ -473,11 +473,15 @@ impl XlsbWorkbook {
                 });
             }
             let chart_part = self.package.get_part(&relationship.target_partname()?)?;
-            let chart = crate::charts::reader::parse_chart(chart_part.blob())?;
+            let graph =
+                crate::xlsb::chart_resources::parse_chart_resources(&self.package, chart_part)?;
             charts.push(XlsbEmbeddedChart {
                 frame_name: frame.non_visual.name.clone(),
                 rel_id: rel_id.clone(),
-                chart,
+                chart: graph.chart,
+                external_data_part: graph.external_data_part,
+                user_shapes_part: graph.user_shapes_part,
+                additional_relationships: graph.additional_relationships,
             });
         }
         Ok(XlsbSheetDrawing {
