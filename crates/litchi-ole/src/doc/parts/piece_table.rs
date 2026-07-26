@@ -14,6 +14,12 @@ use crate::plcf::PlcfParser;
 /// - [MS-DOC] 2.9.179 Pcd (Piece Descriptor)
 use litchi_core::binary::{read_u16_le, read_u32_le};
 
+/// Bytes per character in a Unicode (UTF-16LE) text piece.
+const UNICODE_CHAR_BYTES: u32 = 2;
+
+/// Bytes per character in a single-byte (ANSI) text piece.
+const ANSI_CHAR_BYTES: u32 = 1;
+
 /// A text piece - maps a range of CPs to an FC in the WordDocument stream.
 ///
 /// Based on Apache POI's TextPiece.
@@ -33,9 +39,13 @@ pub struct TextPiece {
 
 impl TextPiece {
     /// Get the length in characters.
+    ///
+    /// A piece table's character positions ascend, but a corrupt or hostile
+    /// table can violate that; such a piece reports no length rather than
+    /// wrapping the subtraction.
     #[inline]
     pub fn length(&self) -> u32 {
-        self.cp_end - self.cp_start
+        self.cp_end.saturating_sub(self.cp_start)
     }
 
     /// Convert a CP within this piece to an FC.
@@ -44,14 +54,14 @@ impl TextPiece {
             return None;
         }
 
-        let offset = cp - self.cp_start;
+        let offset = cp.checked_sub(self.cp_start)?;
         let byte_offset = if self.is_unicode {
-            offset * 2 // Unicode is 2 bytes per character
+            offset.checked_mul(UNICODE_CHAR_BYTES)? // Unicode is 2 bytes per character
         } else {
             offset // Single-byte encoding
         };
 
-        Some(self.fc + byte_offset)
+        self.fc.checked_add(byte_offset)
     }
 
     /// Convert an FC to a CP within this piece.
@@ -62,19 +72,23 @@ impl TextPiece {
 
         let byte_offset = fc - self.fc;
         let char_offset = if self.is_unicode {
-            byte_offset / 2
+            byte_offset / UNICODE_CHAR_BYTES
         } else {
             byte_offset
         };
 
-        let cp = self.cp_start + char_offset;
+        let cp = self.cp_start.checked_add(char_offset)?;
         if cp > self.cp_end { None } else { Some(cp) }
     }
 
     /// Exclusive FC boundary for this piece.
     #[inline]
     fn fc_end(&self) -> u32 {
-        let bytes_per_character = if self.is_unicode { 2 } else { 1 };
+        let bytes_per_character = if self.is_unicode {
+            UNICODE_CHAR_BYTES
+        } else {
+            ANSI_CHAR_BYTES
+        };
         self.fc
             .saturating_add(self.length().saturating_mul(bytes_per_character))
     }
@@ -446,5 +460,51 @@ mod tests {
             Some(groups[0].clone())
         );
         assert!(PieceTable::resolve_property_modifier(3, &groups).is_none());
+    }
+
+    /// A piece table's character positions ascend, but a corrupt or hostile
+    /// table can invert them. `length` must report nothing rather than wrap,
+    /// which in a debug build panicked and in a release build produced a
+    /// nonsense length near `u32::MAX`.
+    #[test]
+    fn inverted_character_positions_report_no_length() {
+        let piece = TextPiece {
+            cp_start: 200,
+            cp_end: 100,
+            fc: 0,
+            is_unicode: true,
+            property_modifier: Vec::new(),
+        };
+        assert_eq!(piece.length(), 0);
+    }
+
+    /// Converting a position must not overflow the file offset either.
+    #[test]
+    fn conversions_near_the_numeric_limit_report_none_rather_than_wrap() {
+        let piece = TextPiece {
+            cp_start: 0,
+            cp_end: u32::MAX,
+            fc: u32::MAX - 1,
+            is_unicode: true,
+            property_modifier: Vec::new(),
+        };
+        // `fc + offset * 2` would wrap for any non-trivial offset.
+        assert_eq!(piece.cp_to_fc(u32::MAX / 2), None);
+        // The start still resolves, so the guard is not over-broad.
+        assert_eq!(piece.cp_to_fc(0), Some(u32::MAX - 1));
+    }
+
+    /// `fc_to_cp` adds the character offset to `cp_start`; that must not wrap.
+    #[test]
+    fn fc_to_cp_does_not_wrap_past_the_numeric_limit() {
+        let piece = TextPiece {
+            cp_start: u32::MAX - 1,
+            cp_end: u32::MAX,
+            fc: 0,
+            is_unicode: false,
+            property_modifier: Vec::new(),
+        };
+        assert_eq!(piece.fc_to_cp(10), None);
+        assert_eq!(piece.fc_to_cp(0), Some(u32::MAX - 1));
     }
 }

@@ -12,6 +12,9 @@ use litchi_core::binary::{read_u16_le, read_u32_le};
 /// Size of a PieceDescriptor in bytes (8 bytes as per Apache POI)
 pub const PIECE_DESCRIPTOR_SIZE: usize = 8;
 
+/// Bytes per UTF-16LE code unit, for sizing a non-ANSI piece's text run.
+const UTF16_CODE_UNIT_BYTES: usize = 2;
+
 /// CLX (Compound Line Extension) parsing utilities.
 ///
 /// Based on Apache POI's PlexOfCps implementation, the CLX structure is a
@@ -347,8 +350,13 @@ impl TextExtractor {
         let mut text = Vec::new();
 
         for piece in pieces {
-            // Calculate text length in characters from CP range
-            let char_count = (piece.cp_end - piece.cp_start) as usize;
+            // Character positions in a piece table ascend, but a corrupt or
+            // hostile table can violate that. A descending range is skipped
+            // rather than allowed to wrap the subtraction.
+            let Some(char_count) = piece.cp_end.checked_sub(piece.cp_start) else {
+                continue;
+            };
+            let char_count = char_count as usize;
 
             if char_count == 0 {
                 continue; // Empty piece
@@ -358,38 +366,21 @@ impl TextExtractor {
             let byte_count = if piece.is_ansi {
                 char_count // 1 byte per character for ANSI
             } else {
-                char_count * 2 // 2 bytes per character for Unicode
+                char_count.saturating_mul(UTF16_CODE_UNIT_BYTES)
             };
 
-            // Read the text data from the WordDocument stream
+            // Read the text data from the WordDocument stream. A piece that
+            // starts past the end contributes nothing; one that merely extends
+            // past it contributes the bytes that are present.
             let start = piece.file_pos;
-            let end = start + byte_count;
-
             if start >= word_document.len() {
-                eprintln!(
-                    "Warning: Piece file position {} beyond document length {}",
-                    start,
-                    word_document.len()
-                );
                 continue;
             }
-
-            if end > word_document.len() {
-                eprintln!(
-                    "Warning: Piece extends beyond document: start={}, end={}, doc_len={}",
-                    start,
-                    end,
-                    word_document.len()
-                );
-                // Try to read what we can
-                let available_end = word_document.len();
-                if start >= available_end {
-                    continue;
-                }
-            }
-
-            let actual_end = end.min(word_document.len());
-            let text_data = &word_document[start..actual_end];
+            let end = start
+                .checked_add(byte_count)
+                .unwrap_or(word_document.len())
+                .min(word_document.len());
+            let text_data = &word_document[start..end];
 
             if piece.is_ansi {
                 // 8-bit ANSI text (Windows-1252)
