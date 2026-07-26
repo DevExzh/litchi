@@ -73,6 +73,9 @@ mod auxiliary_strings;
 /// Spelling and grammar proofing-state table authoring.
 mod proofing;
 
+/// Glossary-only DOC table authoring.
+mod glossary;
+
 // Re-export public types
 pub use crate::doc::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
 pub use crate::doc::parts::pap::{

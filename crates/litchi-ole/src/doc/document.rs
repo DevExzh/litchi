@@ -28,6 +28,7 @@ use super::parts::fields::{
     TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
+use super::parts::glossary::GlossaryMetadata;
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
 use super::parts::list_names::ListNamesTable;
@@ -115,6 +116,8 @@ pub struct Document {
     proofing_tables: Result<ProofingTables>,
     /// Deferred strict Word 97/2000 save-history metadata parse
     saved_by_table: Result<SavedByTable>,
+    /// Deferred strict glossary-only AutoText metadata parse
+    glossary_metadata: Result<Option<GlossaryMetadata>>,
     /// Section ranges, layout, and property revision marks
     sections: SectionsTable,
     /// Floating-shape anchors from the Main Document PlcfSpa (empty when the
@@ -241,6 +244,7 @@ impl Document {
         let list_templates = ListTemplateTable::parse(&fib, &table_stream)?;
         let proofing_tables = ProofingTables::parse(&fib, &table_stream);
         let saved_by_table = SavedByTable::parse(&fib, &table_stream);
+        let glossary_metadata = GlossaryMetadata::parse(&fib, &table_stream);
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
         let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
@@ -326,6 +330,7 @@ impl Document {
             list_templates,
             proofing_tables,
             saved_by_table,
+            glossary_metadata,
             sections,
             shape_anchors,
             header_shape_anchors,
@@ -645,6 +650,35 @@ impl Document {
         self.saved_by_table
             .as_ref()
             .map_err(|error| DocError::Corrupted(format!("invalid saved-by metadata: {error}")))
+    }
+
+    /// Strictly access glossary-only AutoText and formatted AutoCorrect metadata.
+    ///
+    /// Ordinary documents return `None`. Parsing is deferred so malformed
+    /// optional metadata does not prevent primary text access.
+    pub fn glossary_metadata(&self) -> Result<Option<&GlossaryMetadata>> {
+        self.glossary_metadata
+            .as_ref()
+            .map(Option::as_ref)
+            .map_err(|error| DocError::Corrupted(format!("invalid glossary metadata: {error}")))
+    }
+
+    /// Get one glossary entry's content without its structural final character.
+    ///
+    /// Word-compatible producers treat the last CP in each item range as the
+    /// entry-ending paragraph mark. The stored text is returned passively; fields,
+    /// links, objects, and macros are never evaluated or activated.
+    pub fn glossary_item_text(&self, index: usize) -> Result<Option<&str>> {
+        let Some(metadata) = self.glossary_metadata()? else {
+            return Ok(None);
+        };
+        let Some(item) = metadata.items().get(index) else {
+            return Ok(None);
+        };
+        Ok(Some(self.text_extractor.text_at_range(
+            item.start_cp(),
+            item.end_cp().saturating_sub(1),
+        )))
     }
 
     /// Get access to the fields table (if parsed).

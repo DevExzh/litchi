@@ -94,8 +94,8 @@ use crate::doc::parts::pap::{
 };
 use crate::doc::parts::{list_names::ListNamesTable, list_templates::ListTemplateTable};
 use crate::doc::{
-    AssociatedStringSlot, DocumentAssociatedStrings, ProofingFeature, ProofingStateTable,
-    ProofingTables, SavedByTable, SmartTagRecognizerRange,
+    AssociatedStringSlot, DocumentAssociatedStrings, GlossaryMetadata, ProofingFeature,
+    ProofingStateTable, ProofingTables, SavedByTable, SmartTagRecognizerRange,
 };
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -910,6 +910,8 @@ pub struct DocWriter {
     associated_strings: DocumentAssociatedStrings,
     /// Optional Word 97/2000 save-history table.
     saved_by_table: Option<SavedByTable>,
+    /// Optional glossary-only AutoText metadata over the main story.
+    glossary_metadata: Option<GlossaryMetadata>,
     /// Property revision metadata for the writer's single document section
     section_formatting_revision: Option<FormattingRevision>,
     /// Explicit column geometry for the writer's single document section.
@@ -1039,6 +1041,7 @@ impl DocWriter {
             proofing_tables: ProofingTables::default(),
             associated_strings: DocumentAssociatedStrings::default(),
             saved_by_table: None,
+            glossary_metadata: None,
             section_formatting_revision: None,
             section_columns: None,
             section_right_to_left: false,
@@ -1192,6 +1195,28 @@ impl DocWriter {
     /// Remove and return the configured save-history table.
     pub fn clear_saved_by_table(&mut self) -> Option<SavedByTable> {
         self.saved_by_table.take()
+    }
+
+    /// Configure this output as a glossary-only DOC.
+    ///
+    /// Item ranges use main-story UTF-16 character positions and may cover
+    /// formatted text, tables, drawings, or pictures. The metadata's `ccpText`
+    /// is checked against the generated main story before output is modified.
+    pub fn set_glossary_metadata(
+        &mut self,
+        metadata: GlossaryMetadata,
+    ) -> Option<GlossaryMetadata> {
+        self.glossary_metadata.replace(metadata)
+    }
+
+    /// Access the configured glossary-only metadata.
+    pub fn glossary_metadata(&self) -> Option<&GlossaryMetadata> {
+        self.glossary_metadata.as_ref()
+    }
+
+    /// Return this writer to ordinary-document output.
+    pub fn clear_glossary_metadata(&mut self) -> Option<GlossaryMetadata> {
+        self.glossary_metadata.take()
     }
 
     fn encryption_table_header_len(&self) -> Result<usize, DocWriteError> {
@@ -3896,6 +3921,13 @@ impl DocWriter {
             self.saved_by_table.as_ref(),
             table_offset,
         )?;
+        table_offset = super::glossary::append_glossary_tables(
+            &mut fib,
+            &mut table_stream,
+            self.glossary_metadata.as_ref(),
+            table_offset,
+            text_length,
+        )?;
 
         // Write PlcfHdd if present (headers/footers PLCF)
         if let Some(header) = &header_plcfhdd {
@@ -4792,6 +4824,13 @@ impl DocWriter {
             &self.associated_strings,
             self.saved_by_table.as_ref(),
             table_offset,
+        )?;
+        table_offset = super::glossary::append_glossary_tables(
+            &mut fib,
+            &mut table_stream,
+            self.glossary_metadata.as_ref(),
+            table_offset,
+            text_length,
         )?;
 
         // Write PlcfHdd if present

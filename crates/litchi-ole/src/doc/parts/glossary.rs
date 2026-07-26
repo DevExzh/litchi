@@ -25,11 +25,12 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
 }
 
 fn decode_utf16(data: &[u8], context: &str) -> Result<String> {
-    let units = data
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-        .collect::<Vec<_>>();
-    String::from_utf16(&units).map_err(|_| corrupted(format!("{context} contains invalid UTF-16")))
+    char::decode_utf16(
+        data.chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
+    )
+    .collect::<std::result::Result<String, _>>()
+    .map_err(|_| corrupted(format!("{context} contains invalid UTF-16")))
 }
 
 /// The inert classification recorded by `LEGOXTR_V11.flego`.
@@ -579,11 +580,10 @@ fn write_sttb_header(data: &mut Vec<u8>, count: usize, extra: u16, name: &str) -
 }
 
 fn write_string(data: &mut Vec<u8>, value: &str, table: &str) -> Result<()> {
-    let units = value.encode_utf16().collect::<Vec<_>>();
-    let count = u16::try_from(units.len())
+    let count = u16::try_from(value.encode_utf16().count())
         .map_err(|_| corrupted(format!("{table} string length exceeds u16")))?;
     data.extend_from_slice(&count.to_le_bytes());
-    data.extend(units.into_iter().flat_map(u16::to_le_bytes));
+    data.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
     Ok(())
 }
 

@@ -54,6 +54,8 @@ pub struct FibBuilder {
     header_textbox_length: u32,
     /// Complex (formatted) flag
     is_complex: bool,
+    /// This FIB describes a glossary-only (AutoText) document.
+    is_glossary: bool,
 
     // File offsets and byte counts for various structures (FibRgFcLcb)
     /// StyleSheet offset and size
@@ -65,6 +67,15 @@ pub struct FibBuilder {
     /// Associated-document string table (`SttbfAssoc`)
     fc_sttbf_assoc: u32,
     lcb_sttbf_assoc: u32,
+    /// AutoText item-name table (`SttbfGlsy`)
+    fc_sttbf_glsy: u32,
+    lcb_sttbf_glsy: u32,
+    /// AutoText item position table (`PlcfGlsy`)
+    fc_plcf_glsy: u32,
+    lcb_plcf_glsy: u32,
+    /// AutoText style-name table (`SttbGlsyStyle`)
+    fc_sttb_glsy_style: u32,
+    lcb_sttb_glsy_style: u32,
     /// Complex table (piece table) offset and size
     fc_clx: u32,
     lcb_clx: u32,
@@ -209,12 +220,19 @@ impl FibBuilder {
             textbox_length: 0,
             header_textbox_length: 0,
             is_complex: true, // Use complex format by default
+            is_glossary: false,
             fc_stshf: 0,
             lcb_stshf: 0,
             fc_dop: 0,
             lcb_dop: 0,
             fc_sttbf_assoc: 0,
             lcb_sttbf_assoc: 0,
+            fc_sttbf_glsy: 0,
+            lcb_sttbf_glsy: 0,
+            fc_plcf_glsy: 0,
+            lcb_plcf_glsy: 0,
+            fc_sttb_glsy_style: 0,
+            lcb_sttb_glsy_style: 0,
             fc_clx: 0,
             lcb_clx: 0,
             fc_plcfbte_chpx: 0,
@@ -329,6 +347,29 @@ impl FibBuilder {
     pub fn set_sttbf_assoc(&mut self, offset: u32, size: u32) {
         self.fc_sttbf_assoc = offset;
         self.lcb_sttbf_assoc = size;
+    }
+
+    /// Mark this as a glossary-only FIB (`FibBase.fGlsy`).
+    pub fn set_glossary_document(&mut self, is_glossary: bool) {
+        self.is_glossary = is_glossary;
+    }
+
+    /// Set the AutoText item-name table (`SttbfGlsy`).
+    pub fn set_sttbf_glsy(&mut self, offset: u32, size: u32) {
+        self.fc_sttbf_glsy = offset;
+        self.lcb_sttbf_glsy = size;
+    }
+
+    /// Set the AutoText item position table (`PlcfGlsy`).
+    pub fn set_plcf_glsy(&mut self, offset: u32, size: u32) {
+        self.fc_plcf_glsy = offset;
+        self.lcb_plcf_glsy = size;
+    }
+
+    /// Set the AutoText style-name table (`SttbGlsyStyle`).
+    pub fn set_sttb_glsy_style(&mut self, offset: u32, size: u32) {
+        self.fc_sttb_glsy_style = offset;
+        self.lcb_sttb_glsy_style = size;
     }
 
     /// Set Complex table (piece table) offset and size
@@ -681,6 +722,9 @@ impl FibBuilder {
         flags |= 0x1000; // fExtChar
         flags |= 0x0004; // fComplex
         flags |= 0x00F0; // cQuickSaves = 0xF (required for nFib >= 0x00D9)
+        if self.is_glossary {
+            flags |= 0x0002; // fGlsy
+        }
         fib[10..12].copy_from_slice(&flags.to_le_bytes());
 
         // Encrypted flag (nFibBack)
@@ -782,6 +826,8 @@ impl FibBuilder {
 
         // Field indices from Apache POI's FIBFieldHandler.java
         const STSHF: usize = 1; // StyleSheet
+        const STTBFGLSY: usize = 9; // AutoText item names
+        const PLCFGLSY: usize = 10; // AutoText item ranges
         const PLCFSED: usize = 6; // Section table
         const PLCFBTECHPX: usize = 12; // Character bin table
         const PLCFBTEPAPX: usize = 13; // Paragraph bin table
@@ -823,6 +869,7 @@ impl FibBuilder {
         const STTBFRMARK: usize = 51; // Revision author table
         const PLCFSPL: usize = 55; // Spelling proofing-state table
         const STTBSAVEDBY: usize = 71; // Word 97/2000 save history
+        const STTBGLSYSTYLE: usize = 83; // AutoText style names
         const PLFLST: usize = 73; // List table (PlfLst)
         const PLFLFO: usize = 74; // List format override table (PlfLfo)
         const PLCFGRAM: usize = 90; // Grammar proofing-state table
@@ -842,6 +889,14 @@ impl FibBuilder {
 
         // Write field offsets and sizes
         set_field(buf, STSHF, self.fc_stshf, self.lcb_stshf);
+        set_field(buf, STTBFGLSY, self.fc_sttbf_glsy, self.lcb_sttbf_glsy);
+        set_field(buf, PLCFGLSY, self.fc_plcf_glsy, self.lcb_plcf_glsy);
+        set_field(
+            buf,
+            STTBGLSYSTYLE,
+            self.fc_sttb_glsy_style,
+            self.lcb_sttb_glsy_style,
+        );
         set_field(buf, STTBFASSOC, self.fc_sttbf_assoc, self.lcb_sttbf_assoc);
         set_field(buf, PLCFFNDREF, self.fc_plcffnd_ref, self.lcb_plcffnd_ref);
         set_field(buf, PLCFFNDTXT, self.fc_plcffnd_txt, self.lcb_plcffnd_txt);
