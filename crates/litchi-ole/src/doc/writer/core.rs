@@ -99,6 +99,11 @@ use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
 use zeroize::Zeroizing;
 
+const WORD_DOCUMENT_CLSID: [u8; 16] = [
+    0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
+];
+const VBA_PROJECT_STORAGE_NAME: &str = "Macros";
+
 /// Error type for DOC writing
 #[derive(Debug)]
 pub enum DocWriteError {
@@ -108,6 +113,8 @@ pub enum DocWriteError {
     InvalidData(String),
     /// OLE error
     Ole(crate::OleError),
+    /// MS-OVBA project authoring error
+    Vba(crate::ovba::VbaError),
 }
 
 impl From<std::io::Error> for DocWriteError {
@@ -122,17 +129,33 @@ impl From<crate::OleError> for DocWriteError {
     }
 }
 
+impl From<crate::ovba::VbaError> for DocWriteError {
+    fn from(err: crate::ovba::VbaError) -> Self {
+        DocWriteError::Vba(err)
+    }
+}
+
 impl std::fmt::Display for DocWriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DocWriteError::Io(e) => write!(f, "I/O error: {}", e),
             DocWriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
             DocWriteError::Ole(e) => write!(f, "OLE error: {}", e),
+            DocWriteError::Vba(e) => write!(f, "VBA project error: {}", e),
         }
     }
 }
 
-impl std::error::Error for DocWriteError {}
+impl std::error::Error for DocWriteError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::Ole(error) => Some(error),
+            Self::Vba(error) => Some(error),
+            Self::InvalidData(_) => None,
+        }
+    }
+}
 
 fn utf16_code_unit_len(text: &str) -> Result<u32, DocWriteError> {
     let length = u32::try_from(text.encode_utf16().count()).map_err(|_| {
@@ -907,6 +930,8 @@ pub struct DocWriter {
     next_shape_id: u32,
     /// Password-to-open settings. The password is wiped when replaced, cleared, or dropped.
     encryption: Option<DocWriterEncryption>,
+    /// Complete inert MS-OVBA project written under the MS-DOC `Macros` storage.
+    vba_project: Option<crate::ovba::VbaProjectBinary>,
 }
 
 struct DocWriterEncryption {
@@ -1016,6 +1041,7 @@ impl DocWriter {
             header_anchors: Vec::new(),
             next_shape_id: super::images::FIRST_PICTURE_SHAPE_ID,
             encryption: None,
+            vba_project: None,
         }
     }
 
@@ -1045,6 +1071,45 @@ impl DocWriter {
         self.encryption.as_ref().map(|value| value.profile)
     }
 
+    /// Configure a complete module-free VBA project.
+    ///
+    /// The project storage is deterministic and cache-free. No source is
+    /// compiled, interpreted, or executed.
+    pub fn enable_empty_vba_project(&mut self, project_name: &str) -> Result<(), DocWriteError> {
+        let project = crate::ovba::VbaProjectBuilder::new(project_name)
+            .build(&crate::ovba::VbaLimits::default())?;
+        self.vba_project = Some(project);
+        Ok(())
+    }
+
+    /// Configure a complete inert VBA project using explicit resource limits.
+    ///
+    /// Validation and serialization complete before writer state is changed.
+    pub fn set_vba_project(
+        &mut self,
+        project: &crate::ovba::VbaProjectBuilder,
+        limits: &crate::ovba::VbaLimits,
+    ) -> Result<(), DocWriteError> {
+        let project = project.build(limits)?;
+        self.set_vba_project_binary(project);
+        Ok(())
+    }
+
+    /// Configure an already validated and serialized inert VBA project.
+    pub fn set_vba_project_binary(&mut self, project: crate::ovba::VbaProjectBinary) {
+        self.vba_project = Some(project);
+    }
+
+    /// Remove the configured VBA project storage.
+    pub fn clear_vba_project(&mut self) {
+        self.vba_project = None;
+    }
+
+    /// Whether a complete VBA project is configured for output.
+    pub fn has_vba_project(&self) -> bool {
+        self.vba_project.is_some()
+    }
+
     fn encryption_table_header_len(&self) -> Result<usize, DocWriteError> {
         self.encryption
             .as_ref()
@@ -1071,6 +1136,33 @@ impl DocWriter {
             data_stream,
         )
         .map_err(DocWriteError::InvalidData)
+    }
+
+    fn populate_compound_document(
+        &self,
+        ole_writer: &mut OleWriter,
+        word_document_stream: &[u8],
+        table_stream: &[u8],
+        data_stream: &[u8],
+    ) -> Result<(), DocWriteError> {
+        ole_writer.set_root_clsid(WORD_DOCUMENT_CLSID);
+
+        // Preserve the conventional stream order so WordDocument occupies the
+        // first regular FAT sector, followed by the table and Data streams.
+        ole_writer.create_stream(&["WordDocument"], word_document_stream)?;
+        ole_writer.create_stream(&["1Table"], table_stream)?;
+        ole_writer.create_stream(&["Data"], data_stream)?;
+
+        let compobj_data = crate::doc::writer::ole_metadata::generate_compobj_stream();
+        let ole_data = crate::doc::writer::ole_metadata::generate_ole_stream();
+        ole_writer.create_stream(&["\x01CompObj"], &compobj_data)?;
+        ole_writer.create_stream(&["\x01Ole"], &ole_data)?;
+
+        if let Some(project) = &self.vba_project {
+            ole_writer.create_storage(&[VBA_PROJECT_STORAGE_NAME])?;
+            project.write_into(ole_writer, &[VBA_PROJECT_STORAGE_NAME])?;
+        }
+        Ok(())
     }
 
     /// Add a custom paragraph, character, table, or numbering style.
@@ -4088,27 +4180,12 @@ impl DocWriter {
 
         // 15. Create OLE compound document
         let mut ole_writer = OleWriter::new();
-
-        // Set Word document CLSID (REQUIRED for Microsoft Word to recognize the file)
-        // CLSID: {00020906-0000-0000-C000-000000000046}
-        let word_clsid = [
-            0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x46,
-        ];
-        ole_writer.set_root_clsid(word_clsid);
-
-        // WordDocument stream FIRST to guarantee sector 0, then 1Table, then Data
-        ole_writer.create_stream(&["WordDocument"], &word_document_stream)?;
-        ole_writer.create_stream(&["1Table"], &table_stream)?;
-
-        // Data stream (MANDATORY per POI - even if empty, padded to 4096)
-        ole_writer.create_stream(&["Data"], &data_stream)?;
-
-        // Create OLE metadata streams (optional for type association)
-        let compobj_data = crate::doc::writer::ole_metadata::generate_compobj_stream();
-        let ole_data = crate::doc::writer::ole_metadata::generate_ole_stream();
-        ole_writer.create_stream(&["\x01CompObj"], &compobj_data)?;
-        ole_writer.create_stream(&["\x01Ole"], &ole_data)?;
+        self.populate_compound_document(
+            &mut ole_writer,
+            &word_document_stream,
+            &table_stream,
+            &data_stream,
+        )?;
 
         // 16. Save to file
         ole_writer.save(path)?;
@@ -4956,26 +5033,12 @@ impl DocWriter {
 
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
-
-        // Set Word document CLSID (REQUIRED for Microsoft Word)
-        let word_clsid = [
-            0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x46,
-        ];
-        ole_writer.set_root_clsid(word_clsid);
-
-        // Ensure WordDocument gets sector 0: add it first, then 1Table, then Data
-        ole_writer.create_stream(&["WordDocument"], &word_document_stream)?;
-        ole_writer.create_stream(&["1Table"], &table_stream)?;
-
-        // Data stream (MANDATORY per POI - even if empty, padded to 4096)
-        ole_writer.create_stream(&["Data"], &data_stream)?;
-
-        // Add metadata streams after core ones
-        let compobj_data = crate::doc::writer::ole_metadata::generate_compobj_stream();
-        let ole_data = crate::doc::writer::ole_metadata::generate_ole_stream();
-        ole_writer.create_stream(&["\x01CompObj"], &compobj_data)?;
-        ole_writer.create_stream(&["\x01Ole"], &ole_data)?;
+        self.populate_compound_document(
+            &mut ole_writer,
+            &word_document_stream,
+            &table_stream,
+            &data_stream,
+        )?;
         ole_writer.write_to(writer)?;
 
         Ok(())

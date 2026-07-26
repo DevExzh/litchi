@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-/// Directory-only metadata for one candidate MS-OVBA project storage.
+/// Directory-only metadata for the optional MS-DOC `Macros` project storage.
 ///
 /// MS-OVBA defines a project root storage containing a `VBA` storage and a
 /// `PROJECT` stream. The `VBA` storage in turn requires `_VBA_PROJECT` and
@@ -117,6 +117,11 @@ pub(crate) fn discover_vba_project_storages(
 
     direct_children
         .into_iter()
+        .filter(|(vba_storage_path, _)| {
+            vba_storage_path.len() == 2
+                && vba_storage_path[0].eq_ignore_ascii_case("Macros")
+                && vba_storage_path[1].eq_ignore_ascii_case("VBA")
+        })
         .map(|(vba_storage_path, mut children)| {
             sort_case_insensitively(&mut children);
             children.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
@@ -239,6 +244,28 @@ mod tests {
             ["Module1", "ThisDocument"]
         );
         assert_eq!(project.srp_stream_names(), ["__sRp_0"]);
+    }
+
+    #[test]
+    fn ignores_ovba_roots_outside_the_ms_doc_macros_storage() {
+        let stream_paths = vec![
+            vec!["PROJECT".to_string()],
+            vec!["VBA".to_string(), "_VBA_PROJECT".to_string()],
+            vec!["VBA".to_string(), "dir".to_string()],
+            vec!["ObjectPool".to_string(), "PROJECT".to_string()],
+            vec![
+                "ObjectPool".to_string(),
+                "VBA".to_string(),
+                "_VBA_PROJECT".to_string(),
+            ],
+            vec![
+                "ObjectPool".to_string(),
+                "VBA".to_string(),
+                "dir".to_string(),
+            ],
+        ];
+
+        assert!(discover_vba_project_storages(&stream_paths).is_empty());
     }
 
     #[test]

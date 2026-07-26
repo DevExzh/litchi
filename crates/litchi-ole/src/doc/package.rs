@@ -227,7 +227,7 @@ impl<R: Read + Seek> Package<R> {
         &mut self.ole
     }
 
-    /// Discover candidate MS-OVBA project storages without opening macro streams.
+    /// Discover the optional MS-DOC `Macros` project storage without opening streams.
     ///
     /// This inspects CFB directory names only. It never opens, decompresses,
     /// parses, or executes the `PROJECT`, `dir`, `_VBA_PROJECT`, `__SRP_*`,
@@ -236,7 +236,34 @@ impl<R: Read + Seek> Package<R> {
         super::vba::discover_vba_project_storages(&self.ole.list_streams())
     }
 
-    /// Parse all discovered MS-OVBA projects and expose their inert source.
+    /// Discover the optional MS-DOC `Macros` project storage.
+    pub fn vba_project_storage(&self) -> Option<super::vba::VbaProjectStorage> {
+        self.vba_project_storages().into_iter().next()
+    }
+
+    /// Parse the optional MS-DOC VBA project and expose its inert source.
+    ///
+    /// Source is decompressed and decoded according to the project code page,
+    /// but is never compiled, interpreted, or executed.
+    pub fn vba_project(
+        &mut self,
+        limits: &crate::ovba::VbaLimits,
+    ) -> std::result::Result<Option<crate::ovba::VbaProject>, crate::ovba::VbaError> {
+        let Some(storage) = self.vba_project_storage() else {
+            return Ok(None);
+        };
+        if !storage.is_structurally_complete() {
+            return Ok(None);
+        }
+        let path: Vec<&str> = storage
+            .project_root_path()
+            .iter()
+            .map(String::as_str)
+            .collect();
+        crate::ovba::VbaProject::open(&mut self.ole, &path, limits).map(Some)
+    }
+
+    /// Parse the optional MS-DOC VBA project as a compatibility collection.
     ///
     /// Source is decompressed and decoded according to the project code page,
     /// but is never compiled, interpreted, or executed. Explicit limits are
@@ -246,20 +273,7 @@ impl<R: Read + Seek> Package<R> {
         &mut self,
         limits: &crate::ovba::VbaLimits,
     ) -> std::result::Result<Vec<crate::ovba::VbaProject>, crate::ovba::VbaError> {
-        let storages = self.vba_project_storages();
-        let mut projects = Vec::with_capacity(storages.len());
-        for storage in storages {
-            if !storage.is_structurally_complete() {
-                continue;
-            }
-            let path: Vec<&str> = storage
-                .project_root_path()
-                .iter()
-                .map(String::as_str)
-                .collect();
-            projects.push(crate::ovba::VbaProject::open(&mut self.ole, &path, limits)?);
-        }
-        Ok(projects)
+        Ok(self.vba_project(limits)?.into_iter().collect())
     }
 
     /// Read the legacy Custom XML Data Storage without resolving schema URIs.
