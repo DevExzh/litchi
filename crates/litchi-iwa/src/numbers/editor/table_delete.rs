@@ -20,6 +20,7 @@ use formula_dependency_shift::{
 use row::{delete_row_headers, delete_table_tile_row};
 use stroke_layers::{StrokeAxis, delete as delete_stroke_layers};
 use table_headers::set_attached_table_header_settings;
+use table_sort::{delete_table_sort_column, validate_table_sort_order_for_topology};
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
 use uid::{delete_column_uid, delete_row_uid};
 
@@ -44,6 +45,8 @@ impl NumbersEditor {
     /// Stored values, comments, formula records, headers, stable UIDs, and
     /// dimension sidecars are removed or shifted together. Formulas that still
     /// reference the deleted row cause the entire operation to fail unchanged.
+    /// Full-table sort rules are preserved because row edits do not change
+    /// their physical column slots.
     pub fn remove_table_row(&mut self, table_id: u64, deletion: TableRowDeletion) -> Result<()> {
         let mut staged = self.package.clone();
         let (new_rows, columns) = remove_attached_table_row(&mut staged, table_id, deletion)?;
@@ -56,7 +59,9 @@ impl NumbersEditor {
     ///
     /// Stored values, comments, formula records, headers, stable UIDs, and
     /// dimension sidecars are removed or shifted together. Formulas that still
-    /// reference the deleted column cause the entire operation to fail unchanged.
+    /// reference the deleted column cause the entire operation to fail
+    /// unchanged. Sort rules whose physical slot disappears are removed while
+    /// all other rule indices remain unchanged, matching Numbers.
     pub fn remove_table_column(
         &mut self,
         table_id: u64,
@@ -86,6 +91,7 @@ pub(super) fn remove_attached_table_row(
         validate_table_dimensions(new_rows, descriptor.model.number_of_columns as usize)?;
     let updated_header_settings = resolved.updated_header_settings;
     let locations = object_locations(package)?;
+    validate_table_sort_order_for_topology(package, table_id)?;
     validate_deletion_features(
         package,
         &locations,
@@ -165,6 +171,7 @@ pub(super) fn remove_attached_table_column(
         validate_table_dimensions(descriptor.model.number_of_rows as usize, new_columns)?;
     let updated_header_settings = resolved.updated_header_settings;
     let locations = object_locations(package)?;
+    validate_table_sort_order_for_topology(package, table_id)?;
     validate_deletion_features(
         package,
         &locations,
@@ -231,6 +238,7 @@ pub(super) fn remove_attached_table_column(
             descriptor.model.number_of_columns,
         )?;
     }
+    delete_table_sort_column(package, table_id, column, new_columns)?;
     set_table_dimensions(package, &locations, table_id, rows_u32, new_columns_u32)?;
     if let Some(settings) = updated_header_settings {
         set_attached_table_header_settings(package, table_id, settings)?;
@@ -265,15 +273,11 @@ fn validate_deletion_features(
     }
     if model.number_of_filtered_rows.unwrap_or(0) != 0
         || model.pivot_owner.is_some()
-        || model
-            .sort_order
-            .as_ref()
-            .is_some_and(|sort| !sort.rules.is_empty())
         || filter_has_row_state(package, locations, model.row_filter_set_pre_pivot.as_ref())?
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(format!(
-            "Cannot yet delete a {} from a sorted, filtered, grouped, pivot, or spill iWork table",
+            "Cannot yet delete a {} from a filtered, grouped, pivot, or spill iWork table",
             axis.noun()
         )));
     }

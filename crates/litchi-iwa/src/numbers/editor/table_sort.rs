@@ -9,7 +9,8 @@ mod wire;
 
 use apply::apply_attached_table_sort_order;
 use wire::{
-    clear_table_sort_order_wire, read_native_table_sort_order_wire, write_table_sort_order_wire,
+    clear_table_sort_order_wire, delete_table_sort_column_wire, read_native_table_sort_order_wire,
+    write_table_sort_order_wire,
 };
 
 const NATIVE_ENTIRE_TABLE_SORT: i32 = tst::table_sort_order_archive::SortType::EntireTable as i32;
@@ -457,9 +458,60 @@ fn validate_sort_order(model: &TableModelArchive, order: &NumbersTableSortOrder)
     Ok(())
 }
 
+/// Validate that a table has either no sort order or a supported full-table order.
+pub(super) fn validate_table_sort_order_for_topology(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<()> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let Some(native) = read_native_table_sort_order(package, &descriptor)? else {
+        return Ok(());
+    };
+    let Some(order) = NumbersTableSortOrder::from_native(&native)? else {
+        return Ok(());
+    };
+    validate_sort_order(&descriptor.model, &order)
+}
+
+/// Remove sort rules whose physical slot disappears with a column deletion.
+///
+/// Numbers keeps every other rule index unchanged, including rules after a
+/// deleted earlier column. A rule therefore belongs to its physical slot
+/// rather than following the cells that shift through that slot.
+pub(super) fn delete_table_sort_column(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    column: usize,
+    new_columns: usize,
+) -> Result<()> {
+    validate_table_sort_order_for_topology(package, table_id)?;
+    let column = u32::try_from(column)
+        .map_err(|_| Error::ParseError("Numbers deleted sort column exceeds u32".to_owned()))?;
+    let new_columns = u32::try_from(new_columns)
+        .map_err(|_| Error::ParseError("Numbers table column count exceeds u32".to_owned()))?;
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let Some(native) = read_native_table_sort_order(package, &descriptor)? else {
+        return Ok(());
+    };
+    if !native
+        .rules
+        .iter()
+        .any(|rule| rule.index == column || rule.index >= new_columns)
+    {
+        return Ok(());
+    }
+    update_table_sort_order(package, table_id, |original, model| {
+        delete_table_sort_column_wire(original, model, column, new_columns)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::numbers::{
+        NumbersDocumentBuilder, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
+        TableRowInsertion,
+    };
 
     #[test]
     fn sort_column_index_rejects_values_outside_native_range() {
@@ -478,5 +530,54 @@ mod tests {
             NumbersTableSortRule::new(column, NumbersTableSortDirection::Descending),
         ]);
         assert!(duplicate.is_err());
+    }
+
+    #[test]
+    fn full_table_sort_rules_survive_native_topology_semantics() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(4, 4)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let initial = NumbersTableSortOrder::new([
+            NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(1).unwrap(),
+                NumbersTableSortDirection::Ascending,
+            ),
+            NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(3).unwrap(),
+                NumbersTableSortDirection::Descending,
+            ),
+        ])
+        .unwrap();
+        editor
+            .set_table_sort_order(table_id, initial.clone())
+            .unwrap();
+
+        editor
+            .insert_table_row(table_id, TableRowInsertion::body(0))
+            .unwrap();
+        editor
+            .insert_table_column(table_id, TableColumnInsertion::body(0))
+            .unwrap();
+        assert_eq!(editor.table_sort_order(table_id).unwrap(), Some(initial));
+
+        editor
+            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .unwrap();
+        editor
+            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .unwrap();
+        let remaining = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(3).unwrap(),
+            NumbersTableSortDirection::Descending,
+        )])
+        .unwrap();
+        assert_eq!(editor.table_sort_order(table_id).unwrap(), Some(remaining));
+
+        editor
+            .remove_table_column(table_id, TableColumnDeletion::body(2))
+            .unwrap();
+        assert_eq!(editor.table_sort_order(table_id).unwrap(), None);
     }
 }

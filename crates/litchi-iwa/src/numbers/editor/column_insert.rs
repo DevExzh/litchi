@@ -11,6 +11,7 @@ use storage::{
 };
 use stroke_layers::{StrokeAxis, insert as insert_stroke_layers};
 use table_headers::set_attached_table_header_settings;
+use table_sort::validate_table_sort_order_for_topology;
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
 
 impl NumbersEditor {
@@ -18,6 +19,8 @@ impl NumbersEditor {
     ///
     /// Stored cells, column metadata, stable column UIDs, header counts, and
     /// ordinary formula dependency coordinates are shifted in lockstep.
+    /// Configured full-table sort-rule indices remain on their physical slots,
+    /// matching Numbers when cells shift through an inserted column.
     /// Unsupported topology is rejected transactionally without changing the
     /// package.
     pub fn insert_table_column(
@@ -60,6 +63,7 @@ pub(super) fn insert_attached_table_column(
     let (_, new_columns_u32) =
         validate_table_dimensions(descriptor.model.number_of_rows as usize, new_columns)?;
     let locations = object_locations(package)?;
+    validate_table_sort_order_for_topology(package, table_id)?;
     validate_column_insertion_features(package, &locations, &descriptor.model)?;
 
     shift_formula_dependencies(
@@ -164,15 +168,11 @@ fn validate_column_insertion_features(
 ) -> Result<()> {
     if model.number_of_filtered_rows.unwrap_or(0) != 0
         || model.pivot_owner.is_some()
-        || model
-            .sort_order
-            .as_ref()
-            .is_some_and(|sort| !sort.rules.is_empty())
         || filter_has_row_state(package, locations, model.row_filter_set_pre_pivot.as_ref())?
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(
-            "Cannot yet insert a column into a sorted, filtered, grouped, pivot, or spill iWork table"
+            "Cannot yet insert a column into a filtered, grouped, pivot, or spill iWork table"
                 .to_owned(),
         ));
     }

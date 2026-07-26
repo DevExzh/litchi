@@ -9,15 +9,18 @@ use formula_dependency_shift::{DependencyAxis, FooterRangeInsertion, shift_formu
 use storage::{insert_row_uid, set_table_row_count, shift_row_headers, shift_table_tile_rows};
 use stroke_layers::{StrokeAxis, insert as insert_stroke_layers};
 use table_headers::set_attached_table_header_settings;
+use table_sort::validate_table_sort_order_for_topology;
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
 
 impl NumbersEditor {
     /// Insert one blank row at a section-relative position in a table.
     ///
     /// Stored cells, row metadata, stable row UIDs, header/footer counts, and
-    /// ordinary formula dependency coordinates are shifted in lockstep. The
-    /// operation is transactional: table features whose row topology cannot
-    /// yet be rewritten safely are rejected without changing the package.
+    /// ordinary formula dependency coordinates are shifted in lockstep.
+    /// Configured full-table sort rules remain attached to their physical
+    /// column slots. The operation is transactional: table features whose row
+    /// topology cannot yet be rewritten safely are rejected without changing
+    /// the package.
     pub fn insert_table_row(&mut self, table_id: u64, insertion: TableRowInsertion) -> Result<()> {
         let mut staged = self.package.clone();
         let new_rows = insert_attached_table_row(&mut staged, table_id, insertion)?;
@@ -54,6 +57,7 @@ pub(super) fn insert_attached_table_row(
     let (new_rows_u32, _) =
         validate_table_dimensions(new_rows, descriptor.model.number_of_columns as usize)?;
     let locations = object_locations(package)?;
+    validate_table_sort_order_for_topology(package, table_id)?;
     validate_row_insertion_features(package, &locations, &descriptor.model)?;
     shift_formula_dependencies(
         package,
@@ -163,15 +167,11 @@ fn validate_row_insertion_features(
 ) -> Result<()> {
     if model.number_of_filtered_rows.unwrap_or(0) != 0
         || model.pivot_owner.is_some()
-        || model
-            .sort_order
-            .as_ref()
-            .is_some_and(|sort| !sort.rules.is_empty())
         || filter_has_row_state(package, locations, model.row_filter_set_pre_pivot.as_ref())?
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(
-            "Cannot yet insert a row into a sorted, filtered, grouped, pivot, or spill iWork table"
+            "Cannot yet insert a row into a filtered, grouped, pivot, or spill iWork table"
                 .to_owned(),
         ));
     }

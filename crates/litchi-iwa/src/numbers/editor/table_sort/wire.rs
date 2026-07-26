@@ -113,6 +113,62 @@ pub(super) fn write_table_sort_order_wire(
     Ok(data)
 }
 
+pub(super) fn delete_table_sort_column_wire(
+    original: &[u8],
+    model: &TableModelArchive,
+    column: u32,
+    new_columns: u32,
+) -> Result<Vec<u8>> {
+    let Some(previous) = read_native_table_sort_order_wire(original, model)? else {
+        return Ok(original.to_vec());
+    };
+    let mut expected = previous.clone();
+    expected
+        .rules
+        .retain(|rule| rule.index != column && rule.index < new_columns);
+    if expected == previous {
+        return Ok(original.to_vec());
+    }
+    let data = transform_length_delimited_field(original, SORT_ORDER_FIELD, |sort_order| {
+        delete_sort_column_wire(sort_order, &previous, &expected, column, new_columns)
+    })?;
+    let verified = TableModelArchive::decode(data.as_slice())?;
+    if read_native_table_sort_order_wire(&data, &verified)?.as_ref() != Some(&expected) {
+        return Err(Error::InvalidFormat(
+            "Numbers table sort-order column deletion failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+fn delete_sort_column_wire(
+    original: &[u8],
+    previous: &tst::TableSortOrderArchive,
+    expected: &tst::TableSortOrderArchive,
+    column: u32,
+    new_columns: u32,
+) -> Result<Vec<u8>> {
+    let raw_rules = repeated_length_delimited_payloads(original, SORT_RULES_FIELD)?;
+    if raw_rules.len() != previous.rules.len() {
+        return Err(Error::InvalidFormat(
+            "Numbers table sort order has an inconsistent rule wire payload".to_owned(),
+        ));
+    }
+    let retained = raw_rules
+        .into_iter()
+        .zip(&previous.rules)
+        .filter(|(_, rule)| rule.index != column && rule.index < new_columns)
+        .map(|(raw, _)| raw.to_vec())
+        .collect::<Vec<_>>();
+    let data = rewrite_repeated_length_delimited_fields(original, SORT_RULES_FIELD, &retained)?;
+    if tst::TableSortOrderArchive::decode(data.as_slice())? != *expected {
+        return Err(Error::InvalidFormat(
+            "Numbers table sort-rule deletion failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 fn rewrite_sort_order_wire(
     original: &[u8],
     expected: &tst::TableSortOrderArchive,
