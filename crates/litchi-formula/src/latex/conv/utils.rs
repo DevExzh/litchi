@@ -88,6 +88,46 @@ pub fn extend_buffer_with_capacity(buffer: &mut String, text: &str, additional_c
     buffer.push_str(text);
 }
 
+/// Append `text` to `buffer`, separating it from a preceding control word
+///
+/// A LaTeX control word such as `\alpha` swallows the letters that follow it,
+/// so emitting `\alpha` directly followed by `x` produces `\alphax`, which
+/// reads back as a single unknown command. Inserting a space keeps the output
+/// re-parseable without changing how it renders.
+#[inline]
+pub fn push_separated(buffer: &mut String, text: &str) {
+    if needs_command_separator(buffer, text) {
+        buffer.push(' ');
+    }
+    extend_buffer_with_capacity(buffer, text, 0);
+}
+
+/// Check whether `text` would be glued onto a control word already in `buffer`
+#[inline]
+pub fn needs_command_separator(buffer: &str, text: &str) -> bool {
+    let Some(first) = text.chars().next() else {
+        return false;
+    };
+    if !first.is_ascii_alphanumeric() {
+        return false;
+    }
+    ends_with_control_word(buffer)
+}
+
+/// Check whether `buffer` ends with a multi-letter control sequence
+#[inline]
+fn ends_with_control_word(buffer: &str) -> bool {
+    let bytes = buffer.as_bytes();
+    let mut start = bytes.len();
+    while start > 0 && bytes[start - 1].is_ascii_alphabetic() {
+        start -= 1;
+    }
+
+    // The trailing letters must be preceded by a backslash, and there must be
+    // at least one of them (otherwise the tail is `\\`, a line break).
+    start < bytes.len() && start > 0 && bytes[start - 1] == b'\\'
+}
+
 /// Fast check if text needs LaTeX protection (contains spaces or special chars)
 #[inline]
 pub fn needs_latex_protection(text: &str) -> bool {

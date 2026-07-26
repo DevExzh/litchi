@@ -143,19 +143,18 @@ fn convert_node_internal(
                     "\\text{",
                     text.len() + 2,
                 );
-                converter.buffer.push_str("\\text{");
                 if escape_latex_special_chars(text, &mut converter.buffer) {
                     converter.stats.record_allocation(text.len());
                 }
                 converter.buffer.push('}');
             } else {
-                super::utils::extend_buffer_with_capacity(&mut converter.buffer, text, 0);
+                super::utils::push_separated(&mut converter.buffer, text);
             }
         },
         MathNode::Number(num) => {
             // Fast validation for numbers (helps with malformed input)
             debug_assert!(is_valid_number_fast(num), "Invalid number format: {num}");
-            super::utils::extend_buffer_with_capacity(&mut converter.buffer, num, 0);
+            super::utils::push_separated(&mut converter.buffer, num);
         },
         MathNode::Operator(op) => {
             let op_str = operator_to_latex(*op);
@@ -165,8 +164,10 @@ fn convert_node_internal(
             convert_symbol(&mut converter.buffer, sym)?;
         },
         MathNode::PredefinedSymbol(symbol) => {
+            // Symbols such as `Omicron` render as a bare letter, which must not
+            // be glued onto a preceding control word.
             let symbol_str = predefined_symbol_to_latex(*symbol);
-            converter.append_cached_command(symbol_str);
+            super::utils::push_separated(&mut converter.buffer, symbol_str);
         },
         MathNode::Frac {
             numerator,

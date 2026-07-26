@@ -74,8 +74,8 @@ pub use ast::{
     AccentType, Fence, Formula, FormulaBuilder, LargeOperator, MathNode, MatrixFence, Operator,
     SpaceType, StyleType, Symbol,
 };
-pub use latex::{LatexConverter, LatexError};
-pub use mtef::{MtefError, MtefParser};
+pub use latex::{DEFAULT_MAX_DEPTH, LatexConverter, LatexError, LatexParseError, LatexParser};
+pub use mtef::{MtefError, MtefParser, MtefWriteError, MtefWriteOptions, MtefWriter};
 pub use omml::{OmmlError, OmmlParser, OmmlWriter};
 
 /// Conversion error that wraps all possible formula errors
@@ -84,7 +84,9 @@ pub use omml::{OmmlError, OmmlParser, OmmlWriter};
 pub enum FormulaError {
     Omml(OmmlError),
     Latex(LatexError),
+    LatexParse(LatexParseError),
     Mtef(MtefError),
+    MtefWrite(MtefWriteError),
 }
 
 impl std::fmt::Display for FormulaError {
@@ -92,7 +94,9 @@ impl std::fmt::Display for FormulaError {
         match self {
             FormulaError::Omml(e) => write!(f, "OMML error: {}", e),
             FormulaError::Latex(e) => write!(f, "LaTeX error: {}", e),
+            FormulaError::LatexParse(e) => write!(f, "LaTeX parse error: {}", e),
             FormulaError::Mtef(e) => write!(f, "MTEF error: {}", e),
+            FormulaError::MtefWrite(e) => write!(f, "MTEF write error: {}", e),
         }
     }
 }
@@ -114,6 +118,18 @@ impl From<LatexError> for FormulaError {
 impl From<MtefError> for FormulaError {
     fn from(e: MtefError) -> Self {
         FormulaError::Mtef(e)
+    }
+}
+
+impl From<LatexParseError> for FormulaError {
+    fn from(e: LatexParseError) -> Self {
+        FormulaError::LatexParse(e)
+    }
+}
+
+impl From<MtefWriteError> for FormulaError {
+    fn from(e: MtefWriteError) -> Self {
+        FormulaError::MtefWrite(e)
     }
 }
 
@@ -156,11 +172,54 @@ pub fn mtef_to_latex(mtef_data: &[u8]) -> Result<String, FormulaError> {
     Ok(converter.convert(&formula)?.to_string())
 }
 
-/// Convert OMML to MTEF (not yet implemented)
+/// Convert OMML to MTEF
 ///
-/// This function is planned for future implementation.
-pub fn omml_to_mtef(_omml: &str) -> Result<Vec<u8>, FormulaError> {
-    unimplemented!("OMML to MTEF conversion is not yet implemented")
+/// Parses the `m:oMath` fragment and serializes the resulting AST as an MTEF 5
+/// stream carrying the 28-byte `Equation.3` OLE header, ready to store as an
+/// `Equation Native` stream. Use [`MtefWriter`] directly for a bare payload.
+///
+/// # Example
+/// ```ignore
+/// let mtef = omml_to_mtef("<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>")?;
+/// ```
+pub fn omml_to_mtef(omml: &str) -> Result<Vec<u8>, FormulaError> {
+    let formula = Formula::new();
+    let parser = OmmlParser::new(formula.arena());
+    let nodes = parser.parse(omml)?;
+
+    let writer = MtefWriter::new();
+    Ok(writer.write_nodes(&nodes)?)
+}
+
+/// Convert LaTeX to OMML
+///
+/// # Example
+/// ```ignore
+/// let omml = latex_to_omml(r"x^2 + \sqrt{y}")?;
+/// ```
+pub fn latex_to_omml(latex: &str) -> Result<String, FormulaError> {
+    let parser = LatexParser::new();
+    let nodes = parser.parse(latex)?;
+
+    let mut writer = OmmlWriter::new();
+    Ok(writer.write_nodes(&nodes)?.to_string())
+}
+
+/// Convert LaTeX to MTEF
+///
+/// Produces an MTEF 5 stream with the `Equation.3` OLE header, as
+/// [`omml_to_mtef`] does.
+///
+/// # Example
+/// ```ignore
+/// let mtef = latex_to_mtef(r"\alpha + \beta")?;
+/// ```
+pub fn latex_to_mtef(latex: &str) -> Result<Vec<u8>, FormulaError> {
+    let parser = LatexParser::new();
+    let nodes = parser.parse(latex)?;
+
+    let writer = MtefWriter::new();
+    Ok(writer.write_nodes(&nodes)?)
 }
 
 /// Convert MTEF binary data to OMML
@@ -245,5 +304,55 @@ mod tests {
         let omml = mtef_to_omml(&[0u8; 4]).expect("short input is not fatal");
         assert!(omml.starts_with("<m:oMath "));
         assert!(omml.ends_with("</m:oMath>"));
+    }
+}
+
+#[cfg(test)]
+mod conversion_tests {
+    use super::*;
+
+    /// `omml_to_mtef` used to be an `unimplemented!()` panic in the public API.
+    #[test]
+    fn omml_to_mtef_produces_a_stream_the_reader_accepts() {
+        let omml = r#"<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>"#;
+        let mtef = omml_to_mtef(omml).expect("OMML converts to MTEF");
+        assert!(!mtef.is_empty(), "expected a non-empty MTEF stream");
+
+        let latex = mtef_to_latex(&mtef).expect("the writer's output parses back");
+        assert!(latex.contains('x'), "round trip lost the operand: {latex}");
+    }
+
+    #[test]
+    fn latex_to_omml_emits_a_namespaced_fragment() {
+        let omml = latex_to_omml(r"x^2").expect("LaTeX converts to OMML");
+        assert!(omml.starts_with("<m:oMath "), "got {omml}");
+        assert!(omml.contains("officeDocument/2006/math"), "got {omml}");
+        assert!(omml.ends_with("</m:oMath>"), "unclosed fragment: {omml}");
+        assert!(omml.contains('2'), "lost the exponent: {omml}");
+    }
+
+    #[test]
+    fn latex_to_mtef_round_trips_through_the_reader() {
+        let mtef = latex_to_mtef(r"a+b").expect("LaTeX converts to MTEF");
+        let latex = mtef_to_latex(&mtef).expect("the writer's output parses back");
+        for expected in ['a', '+', 'b'] {
+            assert!(latex.contains(expected), "round trip lost {expected}: {latex}");
+        }
+    }
+
+    /// A LaTeX fragment survives a full OMML round trip.
+    #[test]
+    fn latex_survives_a_round_trip_through_omml() {
+        let omml = latex_to_omml(r"\frac{a}{b}").expect("converts to OMML");
+        let latex = omml_to_latex(&omml).expect("converts back to LaTeX");
+        assert!(latex.contains("\\frac"), "lost the fraction: {latex}");
+        assert!(latex.contains('a') && latex.contains('b'), "lost operands: {latex}");
+    }
+
+    /// Malformed LaTeX must be reported, never panic.
+    #[test]
+    fn malformed_latex_is_an_error_not_a_panic() {
+        assert!(latex_to_omml(r"\frac{a").is_err());
+        assert!(latex_to_mtef(r"{{{").is_err());
     }
 }

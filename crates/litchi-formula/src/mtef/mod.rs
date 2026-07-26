@@ -1,6 +1,12 @@
 mod binary;
 mod constants;
 mod templates;
+mod writer;
+
+// Re-exported for `lib.rs`; the allow drops away once the crate root re-exports
+// these alongside `MtefParser`.
+#[allow(unused_imports)]
+pub use writer::{MtefWriteError, MtefWriteOptions, MtefWriter};
 
 use crate::ast::MathNode;
 

@@ -1,12 +1,14 @@
 mod conv;
 mod matrix;
 mod operators;
+mod parse;
 mod symbols;
 mod templates;
 mod utils;
 
 pub use conv::converter::LatexConverter;
 pub use conv::error::LatexError;
+pub use parse::{DEFAULT_MAX_DEPTH, LatexParseError, LatexParser};
 
 /// Efficient string interning for repeated LaTeX commands
 /// Uses SmallVec to avoid allocations for common cases

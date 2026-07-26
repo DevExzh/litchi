@@ -247,10 +247,12 @@ static UNICODE_TO_LATEX: phf::Map<char, &'static str> = phf::phf_map! {
 /// Handles both named symbols (Greek letters, special symbols) and Unicode characters.
 /// Uses efficient lookup tables for performance.
 pub fn convert_symbol(buffer: &mut String, symbol: &Symbol) -> Result<(), LatexError> {
+    use super::conv::utils::push_separated;
+
     // If Unicode character is provided, try Unicode lookup first
     if let Some(unicode) = symbol.unicode {
         if let Some(latex) = UNICODE_TO_LATEX.get(&unicode) {
-            buffer.push_str(latex);
+            push_separated(buffer, latex);
             return Ok(());
         }
         // Fall back to using the Unicode character directly if not in our mapping
@@ -260,7 +262,7 @@ pub fn convert_symbol(buffer: &mut String, symbol: &Symbol) -> Result<(), LatexE
 
     // Try named symbol lookup
     if let Some(latex) = GREEK_SYMBOLS.get(symbol.name.as_ref()) {
-        buffer.push_str(latex);
+        push_separated(buffer, latex);
         return Ok(());
     }
 

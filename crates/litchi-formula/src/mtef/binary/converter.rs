@@ -47,14 +47,22 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                         // Special handling based on rtf2latex2e Eqn_TranslateObjects logic
                         match char_obj.typeface {
                             130 => {
-                                // Function typeface - auto-recognize functions
-                                let (node, skip_count) = self.convert_function_to_node(current)?;
-                                nodes.push(node);
-                                // Skip the consumed characters
-                                for _ in 0..skip_count {
-                                    current = current.and_then(|c| c.next.as_deref());
+                                // Function typeface - auto-recognize functions.
+                                // A run that spells no name (for example a
+                                // symbol set in the function font) is not an
+                                // error: fall through and convert the character
+                                // on its own rather than losing the equation.
+                                if let Some((node, skip_count)) =
+                                    self.convert_function_to_node(current)?
+                                {
+                                    nodes.push(node);
+                                    // Skip the consumed characters
+                                    for _ in 0..skip_count {
+                                        current = current.and_then(|c| c.next.as_deref());
+                                    }
+                                    continue;
                                 }
-                                continue;
+                                nodes.push(self.convert_char_to_node(char_obj)?);
                             },
                             129 if self.mode != crate::mtef::constants::EQN_MODE_TEXT => {
                                 // Text in math mode
@@ -75,7 +83,17 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                 },
                 MtefRecordType::Tmpl => {
                     if let Some(tmpl_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefTemplate>() {
-                        nodes.push(self.convert_template_to_node(tmpl_obj)?);
+                        // MTEF 5 script templates decorate the object that
+                        // precedes them, so that object becomes their base.
+                        let node = if self.mtef_version >= MTEF_VERSION_5
+                            && super::converter_v5::takes_preceding_base(tmpl_obj.selector)
+                        {
+                            let base = nodes.pop().map(|node| vec![node]).unwrap_or_default();
+                            self.convert_template_v5(tmpl_obj, base)?
+                        } else {
+                            self.convert_template_to_node(tmpl_obj)?
+                        };
+                        nodes.push(node);
                     }
                 },
                 MtefRecordType::Line => {
@@ -129,10 +147,12 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
     }
 
     /// Convert a function sequence to a MathNode (handles typeface 130 functions)
+    /// Returns `None` when the run spells no function name, leaving the caller
+    /// to convert the character normally.
     fn convert_function_to_node(
         &self,
         start_obj: Option<&MtefObjectList>,
-    ) -> Result<(MathNode<'arena>, usize), MtefError> {
+    ) -> Result<Option<(MathNode<'arena>, usize)>, MtefError> {
         use crate::mtef::binary::charset::lookup_function;
 
         let mut function_name = String::new();
@@ -156,7 +176,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
 
         if function_name.is_empty() {
-            return Err(MtefError::ParseError("Empty function name".to_string()));
+            return Ok(None);
         }
 
         // Look up the function in the table
@@ -167,7 +187,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             Cow::Owned(format!("\\mathrm{{{}}}", function_name))
         };
 
-        Ok((MathNode::Text(latex_text), skip_count))
+        Ok(Some((MathNode::Text(latex_text), skip_count)))
     }
 
     /// Convert a text run to a MathNode (handles typeface 129 text in math)
@@ -375,10 +395,16 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
     }
 
-    fn convert_template_to_node(
+    pub(super) fn convert_template_to_node(
         &self,
         tmpl_obj: &MtefTemplate,
     ) -> Result<MathNode<'arena>, MtefError> {
+        // MTEF 5 uses a different template numbering than MTEF 1-4; the arms
+        // below (and `convert_legacy_template`) follow the older table.
+        if self.mtef_version >= MTEF_VERSION_5 {
+            return self.convert_template_v5(tmpl_obj, Vec::new());
+        }
+
         // Handle templates based on selector type
         // Some templates have specific AST representations, others use generic template parsing
         match tmpl_obj.selector {
@@ -800,7 +826,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         Ok(nodes)
     }
 
-    fn convert_line_to_nodes(
+    pub(super) fn convert_line_to_nodes(
         &self,
         line_obj: &MtefLine,
     ) -> Result<Option<Vec<MathNode<'arena>>>, MtefError> {
@@ -929,7 +955,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
     }
 
-    fn convert_fence_template(
+    pub(super) fn convert_fence_template(
         &self,
         tmpl_obj: &MtefTemplate,
     ) -> Result<MathNode<'arena>, MtefError> {
@@ -977,7 +1003,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         Ok(TemplateParser::parse_fence(fence_type, content))
     }
 
-    fn convert_decoration_template(
+    pub(super) fn convert_decoration_template(
         &self,
         tmpl_obj: &MtefTemplate,
     ) -> Result<MathNode<'arena>, MtefError> {
@@ -1031,7 +1057,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
     }
 
-    fn convert_arrow_template(
+    pub(super) fn convert_arrow_template(
         &self,
         tmpl_obj: &MtefTemplate,
     ) -> Result<MathNode<'arena>, MtefError> {

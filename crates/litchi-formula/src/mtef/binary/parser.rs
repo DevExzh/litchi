@@ -42,14 +42,18 @@ pub struct MtefBinaryParser<'arena> {
 }
 
 impl<'arena> MtefBinaryParser<'arena> {
-    /// Get attribute byte(s) according to MTEF version (matches rtf2latex2e GetAttribute)
+    /// Consume a record's tag and return its attributes (matches rtf2latex2e GetAttribute)
+    ///
+    /// Every record starts with a tag byte, which the object-list loop only
+    /// peeks at. Up to MTEF 4 that byte doubles as the attribute byte, carrying
+    /// the record type in its low nibble and the attributes in its high one.
+    /// From MTEF 5 on, the tag stands alone and a dedicated options byte
+    /// follows it.
     fn get_attribute(&mut self) -> Result<u8, MtefError> {
-        if self.mtef_version < 5 {
-            // For MTEF < 5, attribute is in high nibble of current byte
-            let byte = self.read_u8()?;
-            Ok((byte & 0xF0) >> 4) // HiNibble equivalent
+        let tag = self.read_u8()?;
+        if self.mtef_version < MTEF_VERSION_5 {
+            Ok((tag & TAG_ATTRIBUTE_MASK) >> TAG_ATTRIBUTE_SHIFT) // HiNibble equivalent
         } else {
-            // For MTEF >= 5, attribute is the next byte
             self.read_u8()
         }
     }
@@ -429,14 +433,14 @@ impl<'arena> MtefBinaryParser<'arena> {
             }
         }
 
-        let embellishment_list = if self.mtef_version == 5 {
-            if attrs & CHAR_EMBELL != 0 {
-                Some(Box::new(self.parse_embell()?))
-            } else {
-                None
-            }
-        } else if attrs & crate::mtef::constants::XF_EMBELL != 0 {
-            Some(Box::new(self.parse_embell()?))
+        let embellished = if self.mtef_version == MTEF_VERSION_5 {
+            attrs & CHAR_EMBELL != 0
+        } else {
+            attrs & crate::mtef::constants::XF_EMBELL != 0
+        };
+
+        let embellishment_list = if embellished {
+            self.parse_embell_list()?
         } else {
             None
         };
@@ -608,6 +612,40 @@ impl<'arena> MtefBinaryParser<'arena> {
         })
     }
 
+    /// Parse the embellishment list that follows an embellished character
+    ///
+    /// The list is a run of EMBELL records terminated by an END record, so the
+    /// terminator has to be consumed here: leaving it in the stream would end
+    /// the line the character belongs to.
+    fn parse_embell_list(&mut self) -> Result<Option<Box<MtefEmbell>>, MtefError> {
+        let mut embellishments = Vec::new();
+
+        while self.pos < self.data.len() {
+            let tag = if self.mtef_version == MTEF_VERSION_5 {
+                self.data[self.pos]
+            } else {
+                self.data[self.pos] & TAG_TYPE_MASK
+            };
+
+            if tag == crate::mtef::constants::END {
+                self.pos += 1;
+                break;
+            }
+            if tag != crate::mtef::constants::EMBELL {
+                break;
+            }
+            embellishments.push(self.parse_embell()?);
+        }
+
+        // Link the records back to front so each one owns its successor.
+        let mut next: Option<Box<MtefEmbell>> = None;
+        for mut embellishment in embellishments.into_iter().rev() {
+            embellishment.next = next;
+            next = Some(Box::new(embellishment));
+        }
+        Ok(next)
+    }
+
     fn parse_embell(&mut self) -> Result<MtefEmbell, MtefError> {
         let attrs = self.get_attribute()?;
 
@@ -631,10 +669,13 @@ impl<'arena> MtefBinaryParser<'arena> {
 
     fn parse_ruler(&mut self) -> Result<MtefRuler, MtefError> {
         // If we arrived here from LINE, skip the RULER tag if present
-        let tag = if self.mtef_version == 5 {
-            self.data[self.pos]
+        let Some(&tag_byte) = self.data.get(self.pos) else {
+            return Err(MtefError::UnexpectedEof);
+        };
+        let tag = if self.mtef_version == MTEF_VERSION_5 {
+            tag_byte
         } else {
-            self.data[self.pos] & 0x0F
+            tag_byte & TAG_TYPE_MASK
         };
         if tag == crate::mtef::constants::RULER {
             self.pos += 1; // Skip the ruler tag
@@ -673,6 +714,7 @@ impl<'arena> MtefBinaryParser<'arena> {
     }
 
     fn parse_font(&mut self) -> Result<MtefFont, MtefError> {
+        self.pos += 1; // Skip the FONT tag, which the object-list loop only peeked at
         let tface = self.read_u8()? as i32;
         let style = self.read_u8()? as i32;
 
