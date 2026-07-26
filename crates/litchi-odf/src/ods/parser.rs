@@ -1,13 +1,15 @@
 //! ODS-specific parsing utilities.
 
 use super::{
-    Cell, CellDetective, CellHyperlink, CellMatrixSpan, CellMerge, CellRangeSource, CellValue,
-    Column, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
-    DetectiveOperationKind, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
-    NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
-    TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
+    Cell, CellDetective, CellHyperlink, CellMatrixSpan, CellMerge, CellRangeSource,
+    CellTextContent, CellValue, Column, DetectiveDirection, DetectiveHighlightedRange,
+    DetectiveOperation, DetectiveOperationKind, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario,
+    SheetStyle, SheetTableSource, TableGroup, TableRange, TableSourceMode, TableStructure,
+    TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
     dde::parse_source as parse_dde_source,
+    rich_text::CellTextContentBuilder,
     scenario::validate_scenario,
     source::validate_table_source,
     structure::{
@@ -79,6 +81,7 @@ impl OdsParser {
         let mut current_cell: Option<CellBuilder> = None;
         let mut text_element_depth = 0usize;
         let mut text_content = String::new();
+        let mut rich_text_builder: Option<CellTextContentBuilder> = None;
         let mut annotation_builder: Option<AnnotationBuilder> = None;
         let mut annotation_depth = 0usize;
         let mut pending_hyperlink: Option<PendingHyperlink> = None;
@@ -159,6 +162,10 @@ impl OdsParser {
                             document_namespaces.clone(),
                         )?);
                     } else if text_element_depth > 0 {
+                        rich_text_builder
+                            .as_mut()
+                            .expect("rich-text builder exists inside text:p")
+                            .start(e, reader.decoder())?;
                         if Self::element_name_is(
                             e.name().as_ref(),
                             &document_namespaces,
@@ -367,6 +374,9 @@ impl OdsParser {
                         }
                         current_cell = Some(cell_builder);
                         text_content.clear();
+                        rich_text_builder = None;
+                        pending_hyperlink = None;
+                        text_element_depth = 0;
                     } else if let Some(cell) = current_cell.as_mut()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -411,6 +421,10 @@ impl OdsParser {
                         if !text_content.is_empty() {
                             text_content.push('\n');
                         }
+                        let builder = rich_text_builder.get_or_insert_with(|| {
+                            CellTextContentBuilder::new(document_namespaces.clone())
+                        });
+                        builder.start(e, reader.decoder())?;
                         text_element_depth = 1;
                     }
                 },
@@ -491,6 +505,10 @@ impl OdsParser {
                             cell.annotation = Some(annotation);
                         }
                     } else if text_element_depth > 0 {
+                        rich_text_builder
+                            .as_mut()
+                            .expect("rich-text builder exists inside text:p")
+                            .empty(e, reader.decoder())?;
                         if Self::element_name_is(
                             e.name().as_ref(),
                             &document_namespaces,
@@ -518,6 +536,21 @@ impl OdsParser {
                                 &mut text_content,
                             )?;
                         }
+                    } else if current_cell.is_some()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TEXT_NAMESPACE,
+                            "p",
+                        )
+                    {
+                        if !text_content.is_empty() {
+                            text_content.push('\n');
+                        }
+                        let builder = rich_text_builder.get_or_insert_with(|| {
+                            CellTextContentBuilder::new(document_namespaces.clone())
+                        });
+                        builder.empty(e, reader.decoder())?;
                     } else if let Some(cell) = current_cell.as_mut()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -661,7 +694,7 @@ impl OdsParser {
                             cell_builder.merge = CellMerge::Covered;
                         }
                         if let Some(row) = current_row.as_mut() {
-                            row.add_repeated_cells(&cell_builder, "")?;
+                            row.add_repeated_cells(&cell_builder, "", None)?;
                         }
                     } else if current_sheet.is_some()
                         && Self::element_name_is(
@@ -746,6 +779,10 @@ impl OdsParser {
                     sheet_text.push_str(&decode_reference(reference)?);
                 },
                 Ok(Event::Text(ref t)) if text_element_depth > 0 && current_cell.is_some() => {
+                    rich_text_builder
+                        .as_mut()
+                        .expect("rich-text builder exists inside text:p")
+                        .text(t)?;
                     let decoded = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid cell text: {error}"))
                     })?;
@@ -755,6 +792,10 @@ impl OdsParser {
                     text_content.push_str(&decoded);
                 },
                 Ok(Event::CData(ref t)) if text_element_depth > 0 && current_cell.is_some() => {
+                    rich_text_builder
+                        .as_mut()
+                        .expect("rich-text builder exists inside text:p")
+                        .cdata(t)?;
                     let decoded = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid cell CDATA: {error}"))
                     })?;
@@ -763,6 +804,10 @@ impl OdsParser {
                 Ok(Event::GeneralRef(ref reference))
                     if text_element_depth > 0 && current_cell.is_some() =>
                 {
+                    rich_text_builder
+                        .as_mut()
+                        .expect("rich-text builder exists inside text:p")
+                        .reference(reference)?;
                     text_content.push_str(&decode_reference(reference)?);
                 },
                 Ok(Event::End(ref e)) => {
@@ -845,6 +890,10 @@ impl OdsParser {
                     }
 
                     if text_element_depth > 0 {
+                        rich_text_builder
+                            .as_mut()
+                            .expect("rich-text builder exists inside text:p")
+                            .end()?;
                         if pending_hyperlink
                             .as_ref()
                             .is_some_and(|pending| pending.depth == text_element_depth)
@@ -899,7 +948,15 @@ impl OdsParser {
                         if let Some(cell_builder) = current_cell.take()
                             && let Some(ref mut row_builder) = current_row
                         {
-                            row_builder.add_repeated_cells(&cell_builder, &text_content)?;
+                            let rich_text = rich_text_builder
+                                .take()
+                                .map(CellTextContentBuilder::finish)
+                                .transpose()?;
+                            row_builder.add_repeated_cells(
+                                &cell_builder,
+                                &text_content,
+                                rich_text.as_ref(),
+                            )?;
                         }
                     } else if Self::element_name_is(
                         e.name().as_ref(),
@@ -2604,7 +2661,12 @@ impl RowBuilder {
         self.cells.push(cell);
     }
 
-    fn add_repeated_cells(&mut self, builder: &CellBuilder, text: &str) -> Result<()> {
+    fn add_repeated_cells(
+        &mut self,
+        builder: &CellBuilder,
+        text: &str,
+        rich_text: Option<&CellTextContent>,
+    ) -> Result<()> {
         let expanded = self
             .cells
             .len()
@@ -2618,7 +2680,7 @@ impl RowBuilder {
             )));
         }
         for _ in 0..builder.repeated {
-            self.add_cell(builder.build(text));
+            self.add_cell(builder.build(text, rich_text));
         }
         Ok(())
     }
@@ -2660,7 +2722,7 @@ pub(crate) struct CellBuilder {
 }
 
 impl CellBuilder {
-    pub fn build(&self, text_content: &str) -> Cell {
+    pub fn build(&self, text_content: &str, rich_text: Option<&CellTextContent>) -> Cell {
         let value = self.parse_value(text_content);
 
         Cell {
@@ -2670,6 +2732,7 @@ impl CellBuilder {
             formula: self.formula.clone(),
             annotation: self.annotation.clone(),
             hyperlinks: self.hyperlinks.clone(),
+            rich_text: rich_text.cloned(),
             range_source: self.range_source.clone(),
             detective: self.detective.clone(),
             validation_name: self.validation_name.clone(),
@@ -3454,6 +3517,7 @@ mod tests {
                 formula: None,
                 annotation: None,
                 hyperlinks: Vec::new(),
+                rich_text: None,
                 range_source: None,
                 detective: None,
                 validation_name: None,
@@ -3489,6 +3553,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3508,6 +3573,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3547,7 +3613,7 @@ mod tests {
             protected: None,
             repeated: 1,
         };
-        let cell = builder.build("123.45");
+        let cell = builder.build("123.45", None);
         match cell.value {
             CellValue::Number(n) => assert!((n - 123.45).abs() < f64::EPSILON),
             _ => panic!("Expected Number for float"),
@@ -3571,7 +3637,7 @@ mod tests {
             protected: None,
             repeated: 1,
         };
-        let cell = builder.build("99.99");
+        let cell = builder.build("99.99", None);
         match cell.value {
             CellValue::Number(n) => assert!((n - 99.99).abs() < f64::EPSILON),
             _ => panic!("Expected Number for double"),
@@ -3595,7 +3661,7 @@ mod tests {
             protected: None,
             repeated: 1,
         };
-        let cell = builder.build("0.001");
+        let cell = builder.build("0.001", None);
         match cell.value {
             CellValue::Number(n) => assert!((n - 0.001).abs() < f64::EPSILON),
             _ => panic!("Expected Number for decimal"),
@@ -3621,7 +3687,7 @@ mod tests {
             protected: None,
             repeated: 1,
         };
-        let cell = builder.build("some text");
+        let cell = builder.build("some text", None);
         match cell.value {
             CellValue::Text(t) => assert_eq!(t, "some text"),
             _ => panic!("Expected Text fallback for invalid number"),
@@ -3648,7 +3714,7 @@ mod tests {
             protected: None,
             repeated: 1,
         };
-        let cell = builder.build("FALSE");
+        let cell = builder.build("FALSE", None);
         match cell.value {
             CellValue::Boolean(b) => assert!(!b),
             _ => panic!("Expected Boolean false"),
@@ -3672,7 +3738,7 @@ mod tests {
             protected: None,
             repeated: 1,
         };
-        let cell = builder.build("maybe");
+        let cell = builder.build("maybe", None);
         match cell.value {
             CellValue::Text(t) => assert_eq!(t, "maybe"),
             _ => panic!("Expected Text for invalid boolean"),
@@ -3698,7 +3764,7 @@ mod tests {
             protected: None,
             repeated: 1,
         };
-        let cell = builder.build("   ");
+        let cell = builder.build("   ", None);
         match cell.value {
             CellValue::Empty => {},
             _ => panic!("Expected Empty for whitespace-only text"),
@@ -3724,7 +3790,7 @@ mod tests {
             protected: None,
             repeated: 1,
         };
-        let cell = builder.build("$50");
+        let cell = builder.build("$50", None);
         match cell.value {
             CellValue::Currency(amount, currency) => {
                 assert!((amount - 50.0).abs() < f64::EPSILON);
@@ -4021,6 +4087,23 @@ mod tests {
             .err()
             .expect("parse must fail");
         assert!(error.to_string().contains("nested"));
+    }
+
+    #[test]
+    fn rejects_cell_rich_text_beyond_the_depth_limit() {
+        let nested = format!(
+            "{}x{}",
+            "<text:span>".repeat(128),
+            "</text:span>".repeat(128)
+        );
+        let xml = hyperlink_document(&format!(
+            r#"<table:table-cell office:value-type="string"><text:p>{nested}</text:p></table:table-cell>"#
+        ));
+
+        let error = OdsParser::parse_sheets(&xml)
+            .err()
+            .expect("overly deep rich text must fail");
+        assert!(error.to_string().contains("depth limit"));
     }
 
     #[test]

@@ -23,9 +23,9 @@ pub enum AnnotationNode {
 /// fields, tabs, line breaks, and implementation-defined extension elements.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AnnotationElement {
-    name: String,
-    attributes: BTreeMap<String, String>,
-    children: Vec<AnnotationNode>,
+    pub(crate) name: String,
+    pub(crate) attributes: BTreeMap<String, String>,
+    pub(crate) children: Vec<AnnotationNode>,
 }
 
 impl AnnotationElement {
@@ -122,7 +122,7 @@ impl AnnotationElement {
         text
     }
 
-    fn write_xml(&self, output: &mut String) {
+    pub(crate) fn write_xml(&self, output: &mut String) {
         output.push('<');
         output.push_str(&self.name);
         write_attributes(output, &self.attributes);
@@ -143,7 +143,7 @@ impl AnnotationElement {
         output.push('>');
     }
 
-    fn collect_prefixes(&self, prefixes: &mut BTreeSet<String>) {
+    pub(crate) fn collect_prefixes(&self, prefixes: &mut BTreeSet<String>) {
         collect_prefix(&self.name, prefixes);
         for name in self.attributes.keys() {
             collect_prefix(name, prefixes);
@@ -155,7 +155,7 @@ impl AnnotationElement {
         }
     }
 
-    fn collect_namespace_declarations(&self, prefixes: &mut BTreeSet<String>) {
+    pub(crate) fn collect_namespace_declarations(&self, prefixes: &mut BTreeSet<String>) {
         for name in self.attributes.keys() {
             if let Some(prefix) = name.strip_prefix("xmlns:") {
                 prefixes.insert(prefix.to_string());
@@ -652,7 +652,10 @@ pub(crate) fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
     }
 }
 
-fn parse_element(start: &BytesStart<'_>, decoder: Decoder) -> Result<AnnotationElement> {
+pub(crate) fn parse_element(
+    start: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<AnnotationElement> {
     let name = std::str::from_utf8(start.name().as_ref())
         .map_err(|_| Error::InvalidFormat("invalid UTF-8 in annotation element name".to_string()))?
         .to_string();
@@ -742,7 +745,7 @@ fn collect_prefix(name: &str, prefixes: &mut BTreeSet<String>) {
     }
 }
 
-fn standard_namespace_uri(prefix: &str) -> Option<&'static str> {
+pub(crate) fn standard_namespace_uri(prefix: &str) -> Option<&'static str> {
     match prefix {
         "office" => Some("urn:oasis:names:tc:opendocument:xmlns:office:1.0"),
         "text" => Some("urn:oasis:names:tc:opendocument:xmlns:text:1.0"),

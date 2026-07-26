@@ -86,6 +86,7 @@ mod evaluation;
 /// OpenFormula parsing and support
 pub mod formula;
 mod hyperlink;
+mod rich_text;
 mod label_range;
 mod mutable;
 pub(crate) mod named_expression;
@@ -135,6 +136,7 @@ pub use detective::{
 };
 pub use evaluation::{OdsWorkbook, normalize_open_formula};
 pub use hyperlink::CellHyperlink;
+pub use rich_text::CellTextContent;
 pub use label_range::{LabelRange, LabelRangeOrientation};
 pub use mutable::MutableSpreadsheet;
 pub use named_expression::{

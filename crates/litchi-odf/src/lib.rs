@@ -110,7 +110,7 @@
 //! - ✅ SpreadsheetBuilder for creating new ODS files
 //! - ✅ Add sheets with names
 //! - ✅ Set cell values (all types)
-//! - ✅ Author inert full-cell `text:a` hyperlinks with XLink metadata
+//! - ✅ Preserve and author inert rich-text `text:a` hyperlink ranges with XLink metadata
 //! - ✅ Set cell formulas
 //! - ✅ Set cell styles
 //! - ✅ MutableSpreadsheet for modifying existing spreadsheets
@@ -646,8 +646,8 @@ pub use odp::{
 pub use ods::{
     AnnotationElement, AnnotationNode, CalculationIteration, CalculationNullDate,
     CalculationSettings, Cell as SCell, CellAnnotation, CellDetective, CellHyperlink,
-    CellMatrixSpan, CellMerge, CellRangeSource, CellStyleProtection, CellValue, Column as SColumn,
-    ConditionalCellStyle,
+    CellMatrixSpan, CellMerge, CellRangeSource, CellStyleProtection, CellTextContent, CellValue,
+    Column as SColumn, ConditionalCellStyle,
     ConditionalCellStyleRule, Consolidation, ConsolidationUseLabels, ContentValidation,
     DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,
     DataPilotGrandTotal, DataPilotGrandTotalElement, DataPilotGrandTotalOrientation,

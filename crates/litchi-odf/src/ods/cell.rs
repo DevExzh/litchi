@@ -1,6 +1,6 @@
 //! Cell data structures for ODS spreadsheets.
 
-use super::{CellAnnotation, CellDetective, CellHyperlink, CellRangeSource, Row};
+use super::{CellAnnotation, CellDetective, CellHyperlink, CellRangeSource, CellTextContent, Row};
 use litchi_core::{Result, xml::escape_xml};
 use std::{num::NonZeroUsize, ops::Range};
 
@@ -89,6 +89,8 @@ pub struct Cell {
     /// Hyperlinks (`text:a`) contained in the cell's text content, in
     /// document order.
     pub hyperlinks: Vec<CellHyperlink>,
+    /// Retained mixed paragraph content for parsed rich-text cells.
+    pub(crate) rich_text: Option<CellTextContent>,
     /// Optional inert metadata for an externally imported rectangular range.
     pub range_source: Option<CellRangeSource>,
     /// Optional inert formula-auditing highlights and operations.
@@ -120,6 +122,7 @@ impl Cell {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -209,6 +212,14 @@ impl Cell {
         !self.hyperlinks.is_empty()
     }
 
+    /// Return the structure-preserving mixed paragraph content, when present.
+    ///
+    /// Parsed spans, fields, whitespace elements, and extension nodes remain
+    /// available here and are preserved when the spreadsheet is saved.
+    pub fn rich_text(&self) -> Option<&CellTextContent> {
+        self.rich_text.as_ref()
+    }
+
     /// Replace this cell's displayed content with one validated hyperlink.
     ///
     /// The operation clears a formula and stores a string value. To retain
@@ -220,11 +231,14 @@ impl Cell {
             ));
         }
         hyperlink.validate()?;
-        self.text = hyperlink.text.clone();
-        hyperlink.set_range(0..self.text.len());
+        let text = hyperlink.text.clone();
+        hyperlink.set_range(0..text.len());
+        let rich_text = CellTextContent::from_hyperlink(&hyperlink)?;
+        self.text = text;
         self.value = CellValue::Text(self.text.clone());
         self.formula = None;
         self.hyperlinks = vec![hyperlink];
+        self.rich_text = Some(rich_text);
         Ok(())
     }
 
@@ -256,7 +270,8 @@ impl Cell {
             ));
         }
 
-        hyperlink.set_range(range);
+        hyperlink.set_range(range.clone());
+        let authored = hyperlink.clone();
         let mut hyperlinks = self.hyperlinks.clone();
         hyperlinks.push(hyperlink);
         hyperlinks.sort_by_key(|candidate| {
@@ -264,22 +279,49 @@ impl Cell {
             (range.start, range.start != range.end)
         });
         validate_hyperlink_ranges(&self.text, &hyperlinks)?;
+        let mut rich_text = self.rich_text.clone();
+        if let Some(content) = rich_text.as_mut() {
+            content.wrap_hyperlink(range, &authored)?;
+        }
         self.hyperlinks = hyperlinks;
+        self.rich_text = rich_text;
         Ok(())
     }
 
     /// Remove every parsed or authored hyperlink while preserving the cell text.
     pub fn clear_hyperlinks(&mut self) -> Vec<CellHyperlink> {
+        if let Some(rich_text) = self.rich_text.as_mut() {
+            rich_text.clear_hyperlinks();
+        }
         std::mem::take(&mut self.hyperlinks)
     }
 
     /// Remove and return one hyperlink by its document-order index.
     pub fn remove_hyperlink(&mut self, index: usize) -> Option<CellHyperlink> {
-        (index < self.hyperlinks.len()).then(|| self.hyperlinks.remove(index))
+        if index >= self.hyperlinks.len() {
+            return None;
+        }
+        if let Some(rich_text) = self.rich_text.as_mut() {
+            debug_assert!(rich_text.remove_hyperlink(index));
+        }
+        Some(self.hyperlinks.remove(index))
     }
 
     pub(crate) fn validate_hyperlinks(&self) -> Result<()> {
-        validate_hyperlink_ranges(&self.text, &self.hyperlinks)
+        validate_hyperlink_ranges(&self.text, &self.hyperlinks)?;
+        if let Some(rich_text) = &self.rich_text {
+            if rich_text.plain_text() != self.text {
+                return Err(litchi_core::Error::InvalidFormat(
+                    "cell rich-text tree does not match its displayed text".to_string(),
+                ));
+            }
+            if rich_text.hyperlink_count() != self.hyperlinks.len() {
+                return Err(litchi_core::Error::InvalidFormat(
+                    "cell rich-text hyperlink count does not match hyperlink metadata".to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Return inert external-range metadata without accessing its URI.
@@ -643,6 +685,7 @@ pub(crate) fn merge_cell_range(
                 formula: None,
                 annotation: None,
                 hyperlinks: Vec::new(),
+                rich_text: None,
                 range_source: None,
                 detective: None,
                 validation_name: None,
@@ -704,6 +747,7 @@ pub(crate) fn unmerge_cell_range(rows: &mut [Row], start_row: usize, start_col: 
 
 pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
     let has_hyperlinks = cell.has_hyperlinks();
+    let has_rich_text = cell.rich_text.is_some();
     output.push_str(match cell.merge {
         CellMerge::Covered => "<table:covered-table-cell",
         CellMerge::None | CellMerge::Span { .. } => "<table:table-cell",
@@ -759,6 +803,7 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         && cell.annotation.is_none()
         && cell.detective.is_none()
         && !has_hyperlinks
+        && !has_rich_text
         && cell.text.is_empty()
     {
         output.push_str("/>");
@@ -776,10 +821,8 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         if let Some(detective) = &cell.detective {
             super::detective::write_detective(output, detective);
         }
-        if has_hyperlinks || !cell.text.is_empty() {
-            output.push_str("<text:p>");
-            write_cell_text_with_hyperlinks(output, cell);
-            output.push_str("</text:p>");
+        if has_rich_text || has_hyperlinks || !cell.text.is_empty() {
+            write_cell_text_content(output, cell);
         }
         output.push_str("</table:covered-table-cell>");
         return;
@@ -823,7 +866,8 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
             if cell.annotation.is_none()
                 && cell.range_source.is_none()
                 && cell.detective.is_none()
-                && !has_hyperlinks =>
+                && !has_hyperlinks
+                && !has_rich_text =>
         {
             output.push_str("/>");
             return;
@@ -841,16 +885,29 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
     if let Some(detective) = &cell.detective {
         super::detective::write_detective(output, detective);
     }
-    if has_hyperlinks {
-        output.push_str("<text:p>");
-        write_cell_text_with_hyperlinks(output, cell);
-        output.push_str("</text:p>");
+    if has_rich_text || has_hyperlinks {
+        write_cell_text_content(output, cell);
     } else if !matches!(cell.value, CellValue::Empty) {
         output.push_str("<text:p>");
         output.push_str(&escape_xml(&cell.text));
         output.push_str("</text:p>");
     }
     output.push_str("</table:table-cell>");
+}
+
+fn write_cell_text_content(output: &mut String, cell: &Cell) {
+    if let Some(rich_text) = &cell.rich_text {
+        let mut rich_text = rich_text.clone();
+        if rich_text.plain_text() == cell.text
+            && rich_text.synchronize_hyperlinks(cell.hyperlinks())
+        {
+            rich_text.write_xml(output);
+            return;
+        }
+    }
+    output.push_str("<text:p>");
+    write_cell_text_with_hyperlinks(output, cell);
+    output.push_str("</text:p>");
 }
 
 fn validate_hyperlink_ranges(text: &str, hyperlinks: &[CellHyperlink]) -> Result<()> {
@@ -1037,6 +1094,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1061,6 +1119,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1136,6 +1195,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1158,6 +1218,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1183,6 +1244,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1202,6 +1264,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1221,6 +1284,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1240,6 +1304,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1262,6 +1327,7 @@ mod tests {
             formula: Some("=A1+B1".to_string()),
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1284,6 +1350,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1306,6 +1373,7 @@ mod tests {
             formula: Some("=A1".to_string()),
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1325,6 +1393,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1347,6 +1416,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1369,6 +1439,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1388,6 +1459,7 @@ mod tests {
             formula: None,
             annotation: None,
             hyperlinks: Vec::new(),
+            rich_text: None,
             range_source: None,
             detective: None,
             validation_name: None,
