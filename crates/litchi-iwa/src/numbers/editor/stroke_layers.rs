@@ -6,6 +6,10 @@
 //! cells when the editor inserts or removes a blank row or column.
 
 use super::*;
+use crate::package_metadata::{next_object_identifier, set_package_last_object_identifier};
+use crate::shapes::{empty_stroke_archive, stroke_from_native, stroke_to_native};
+use crate::table_cell_border::{TableCellBorderSide, TableCellBorders};
+use crate::wire::patch_length_delimited_field;
 
 const STROKE_SIDECAR_MESSAGE_TYPE: u32 = 6_305;
 const STROKE_LAYER_MESSAGE_TYPE: u32 = 6_306;
@@ -119,6 +123,31 @@ impl LayerSide {
             Self::Bottom => &mut sidecar.bottom_row_stroke_layers,
         }
     }
+
+    const fn from_public(side: TableCellBorderSide) -> Self {
+        match side {
+            TableCellBorderSide::Left => Self::Left,
+            TableCellBorderSide::Right => Self::Right,
+            TableCellBorderSide::Top => Self::Top,
+            TableCellBorderSide::Bottom => Self::Bottom,
+        }
+    }
+
+    const fn public(self) -> TableCellBorderSide {
+        match self {
+            Self::Left => TableCellBorderSide::Left,
+            Self::Right => TableCellBorderSide::Right,
+            Self::Top => TableCellBorderSide::Top,
+            Self::Bottom => TableCellBorderSide::Bottom,
+        }
+    }
+
+    const fn coordinate(self, row: u32, column: u32) -> (u32, u32) {
+        match self.fixed_axis() {
+            StrokeAxis::Row => (row, column),
+            StrokeAxis::Column => (column, row),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -128,13 +157,357 @@ struct LayerUpdate {
     message_index: usize,
     previous: tst::StrokeLayerArchive,
     current: tst::StrokeLayerArchive,
-    run_sources: Vec<usize>,
+    run_sources: Vec<Option<usize>>,
 }
 
 #[derive(Debug)]
 struct PlannedLayer {
     keep: bool,
     update: Option<LayerUpdate>,
+}
+
+pub(crate) fn cell_borders(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TableCellBorders> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let (row, column, dimensions) = validated_cell_coordinates(&descriptor.model, row, column)?;
+    let sidecar_id = descriptor
+        .model
+        .stroke_sidecar
+        .as_ref()
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork table {table_id} has no cell-border sidecar"))
+        })?
+        .identifier;
+    let locations = object_locations(package)?;
+    let sidecar = decoded_sidecar(package, &locations, sidecar_id)?;
+    validate_sidecar_dimensions(&sidecar, dimensions)?;
+
+    let mut borders = TableCellBorders::default();
+    let mut seen_layers = HashSet::new();
+    for side in LayerSide::ALL {
+        let (fixed_index, traversal_index) = side.coordinate(row, column);
+        let mut selected: Option<(u32, usize, tsd::StrokeArchive)> = None;
+        let mut encounter = 0;
+        for reference in side.references(&sidecar) {
+            if !seen_layers.insert(reference.identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork stroke sidecar {sidecar_id} references layer {} more than once",
+                    reference.identifier
+                )));
+            }
+            let layer = decoded_layer(package, &locations, reference.identifier)?;
+            if layer.row_column_index != Some(fixed_index) {
+                continue;
+            }
+            for (run_index, run) in layer.stroke_runs.iter().enumerate() {
+                encounter += 1;
+                let (start, end) = validated_run_range(
+                    run,
+                    axis_length(opposite_axis(side.fixed_axis()), dimensions),
+                )?;
+                if !(start..end).contains(&traversal_index) {
+                    continue;
+                }
+                let stroke = run.stroke.as_ref().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "iWork stroke layer {} run {run_index} has no stroke",
+                        reference.identifier
+                    ))
+                })?;
+                let candidate = (run.order.unwrap_or_default(), encounter, stroke.clone());
+                if selected
+                    .as_ref()
+                    .is_none_or(|(order, index, _)| (candidate.0, candidate.1) > (*order, *index))
+                {
+                    selected = Some(candidate);
+                }
+            }
+        }
+        borders.set(
+            side.public(),
+            selected
+                .map(|(_, _, stroke)| stroke_from_native(&stroke))
+                .transpose()?
+                .flatten(),
+        );
+    }
+    Ok(borders)
+}
+
+pub(crate) fn set_cell_border(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    public_side: TableCellBorderSide,
+    stroke: Option<crate::shapes::ShapeStroke>,
+) -> Result<()> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let (row, column, dimensions) = validated_cell_coordinates(&descriptor.model, row, column)?;
+    let sidecar_id = descriptor
+        .model
+        .stroke_sidecar
+        .as_ref()
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork table {table_id} has no cell-border sidecar"))
+        })?
+        .identifier;
+    let locations = object_locations(package)?;
+    let sidecar_archive = locations.get(&sidecar_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork stroke sidecar {sidecar_id} is missing"))
+    })?;
+    let (sidecar_message_index, previous) =
+        decoded_sidecar_with_index(package, sidecar_archive, sidecar_id)?;
+    validate_sidecar_dimensions(&previous, dimensions)?;
+
+    let side = LayerSide::from_public(public_side);
+    let (fixed_index, traversal_index) = side.coordinate(row, column);
+    let next_order = highest_order(package, &locations, &previous)?
+        .max(previous.max_order.unwrap_or_default())
+        .checked_add(1)
+        .ok_or_else(|| Error::ParseError("iWork cell-border order overflow".to_owned()))?;
+    let run = tst::stroke_layer_archive::StrokeRunArchive {
+        origin: Some(checked_i32(traversal_index)?),
+        length: Some(1),
+        stroke: Some(stroke.map_or_else(empty_stroke_archive, stroke_to_native)),
+        order: Some(next_order),
+    };
+
+    let mut current = previous.clone();
+    current.max_order = Some(next_order);
+    let existing_layer =
+        find_layer_at_index(package, &locations, side.references(&previous), fixed_index)?;
+    if let Some(mut update) = existing_layer {
+        let traversal_length = axis_length(opposite_axis(side.fixed_axis()), dimensions);
+        let mut effective = None;
+        for (index, candidate) in update.current.stroke_runs.iter().enumerate() {
+            let (start, end) = validated_run_range(candidate, traversal_length)?;
+            if (start..end).contains(&traversal_index) {
+                effective = effective.max(Some((candidate.order.unwrap_or_default(), index)));
+            }
+        }
+        if let Some((_, index)) = effective
+            && update.current.stroke_runs[index].origin == run.origin
+            && update.current.stroke_runs[index].length == Some(1)
+        {
+            update.current.stroke_runs[index].stroke = run.stroke;
+            update.current.stroke_runs[index].order = run.order;
+        } else {
+            update.current.stroke_runs.push(run);
+            update.run_sources.push(None);
+        }
+        apply_layer_updates(package, &[update])?;
+    } else {
+        let identifier = next_object_identifier(package)?;
+        let layer = tst::StrokeLayerArchive {
+            row_column_index: Some(fixed_index),
+            stroke_runs: vec![run],
+        };
+        let object = ArchiveObject::new(
+            identifier,
+            vec![RawMessage {
+                type_: STROKE_LAYER_MESSAGE_TYPE,
+                data: layer.encode_to_vec(),
+            }],
+        )?;
+        package.update_archive(sidecar_archive, |archive| archive.insert_object(object))?;
+        side.references_mut(&mut current).push(tsp::Reference {
+            identifier,
+            ..Default::default()
+        });
+        set_package_last_object_identifier(package, identifier)?;
+    }
+
+    package.update_archive(sidecar_archive, |archive| {
+        let object = archive.object_mut(sidecar_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork stroke sidecar {sidecar_id} is missing"))
+        })?;
+        let original = object.messages.get(sidecar_message_index).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork stroke sidecar {sidecar_id} payload is missing"
+            ))
+        })?;
+        if tst::StrokeSidecarArchive::decode(original.data.as_slice())? != previous {
+            return Err(Error::InvalidFormat(format!(
+                "iWork stroke sidecar {sidecar_id} changed before mutation"
+            )));
+        }
+        let data = rewrite_stroke_sidecar_wire(original.data.as_slice(), &previous, &current)?;
+        object.replace_message(
+            sidecar_message_index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        if let Some(reference) = side
+            .references(&current)
+            .iter()
+            .find(|reference| !side.references(&previous).contains(reference))
+        {
+            add_message_object_reference(
+                object,
+                sidecar_message_index,
+                side.references(&previous)
+                    .first()
+                    .map_or(reference.identifier, |existing| existing.identifier),
+                reference.identifier,
+            );
+        }
+        Ok(())
+    })
+}
+
+fn validated_cell_coordinates(
+    model: &TableModelArchive,
+    row: usize,
+    column: usize,
+) -> Result<(u32, u32, TableDimensions)> {
+    if row >= model.number_of_rows as usize || column >= model.number_of_columns as usize {
+        return Err(Error::ParseError(format!(
+            "Cell ({row}, {column}) is outside iWork table {:?} dimensions {}x{}",
+            model.table_name, model.number_of_rows, model.number_of_columns
+        )));
+    }
+    Ok((
+        u32::try_from(row)
+            .map_err(|_| Error::ParseError("iWork table row exceeds u32".to_owned()))?,
+        u32::try_from(column)
+            .map_err(|_| Error::ParseError("iWork table column exceeds u32".to_owned()))?,
+        TableDimensions {
+            rows: model.number_of_rows,
+            columns: model.number_of_columns,
+        },
+    ))
+}
+
+fn decoded_sidecar(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    sidecar_id: u64,
+) -> Result<tst::StrokeSidecarArchive> {
+    let archive_name = locations.get(&sidecar_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork stroke sidecar {sidecar_id} is missing"))
+    })?;
+    decoded_sidecar_with_index(package, archive_name, sidecar_id).map(|(_, sidecar)| sidecar)
+}
+
+fn decoded_sidecar_with_index(
+    package: &IWorkPackage,
+    archive_name: &str,
+    sidecar_id: u64,
+) -> Result<(usize, tst::StrokeSidecarArchive)> {
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(sidecar_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork stroke sidecar {sidecar_id} is missing"))
+    })?;
+    let index = unique_message_index(
+        object,
+        STROKE_SIDECAR_MESSAGE_TYPE,
+        |data| tst::StrokeSidecarArchive::decode(data).is_ok(),
+        "stroke sidecar",
+    )?;
+    Ok((
+        index,
+        tst::StrokeSidecarArchive::decode(object.messages[index].data.as_slice())?,
+    ))
+}
+
+fn decoded_layer(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    identifier: u64,
+) -> Result<tst::StrokeLayerArchive> {
+    let archive_name = locations.get(&identifier).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork stroke layer {identifier} is missing"))
+    })?;
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(identifier).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork stroke layer {identifier} is missing"))
+    })?;
+    let index = unique_message_index(
+        object,
+        STROKE_LAYER_MESSAGE_TYPE,
+        |data| tst::StrokeLayerArchive::decode(data).is_ok(),
+        "stroke layer",
+    )?;
+    tst::StrokeLayerArchive::decode(object.messages[index].data.as_slice()).map_err(Into::into)
+}
+
+fn highest_order(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    sidecar: &tst::StrokeSidecarArchive,
+) -> Result<u32> {
+    let mut highest = 0;
+    let mut seen = HashSet::new();
+    for side in LayerSide::ALL {
+        for reference in side.references(sidecar) {
+            if !seen.insert(reference.identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork stroke sidecar references layer {} more than once",
+                    reference.identifier
+                )));
+            }
+            for run in decoded_layer(package, locations, reference.identifier)?.stroke_runs {
+                highest = highest.max(run.order.unwrap_or_default());
+            }
+        }
+    }
+    Ok(highest)
+}
+
+fn find_layer_at_index(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    references: &[tsp::Reference],
+    fixed_index: u32,
+) -> Result<Option<LayerUpdate>> {
+    let mut found = None;
+    for reference in references {
+        let archive_name = locations.get(&reference.identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork stroke layer {} is missing",
+                reference.identifier
+            ))
+        })?;
+        let archive = package.archive(archive_name)?;
+        let object = archive.object(reference.identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork stroke layer {} is missing",
+                reference.identifier
+            ))
+        })?;
+        let message_index = unique_message_index(
+            object,
+            STROKE_LAYER_MESSAGE_TYPE,
+            |data| tst::StrokeLayerArchive::decode(data).is_ok(),
+            "stroke layer",
+        )?;
+        let previous =
+            tst::StrokeLayerArchive::decode(object.messages[message_index].data.as_slice())?;
+        if previous.row_column_index != Some(fixed_index) {
+            continue;
+        }
+        if found.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork cell-border side has multiple layers at index {fixed_index}"
+            )));
+        }
+        found = Some(LayerUpdate {
+            identifier: reference.identifier,
+            archive_name: archive_name.clone(),
+            message_index,
+            run_sources: (0..previous.stroke_runs.len()).map(Some).collect(),
+            current: previous.clone(),
+            previous,
+        });
+    }
+    Ok(found)
 }
 
 /// Shift explicit border layers for one inserted table axis.
@@ -340,7 +713,7 @@ fn plan_reordered_layer(
             body_start,
             destinations_by_source,
         )?);
-        (current, (0..previous.stroke_runs.len()).collect())
+        (current, (0..previous.stroke_runs.len()).map(Some).collect())
     } else {
         let (runs, run_sources) = reorder_runs(
             &previous.stroke_runs,
@@ -368,7 +741,10 @@ fn reorder_runs(
     rows: u32,
     body_start: usize,
     destinations_by_source: &[usize],
-) -> Result<(Vec<tst::stroke_layer_archive::StrokeRunArchive>, Vec<usize>)> {
+) -> Result<(
+    Vec<tst::stroke_layer_archive::StrokeRunArchive>,
+    Vec<Option<usize>>,
+)> {
     let mut reordered = Vec::with_capacity(runs.len());
     let mut sources = Vec::with_capacity(runs.len());
     for (source, run) in runs.iter().enumerate() {
@@ -413,7 +789,7 @@ fn reorder_runs(
 
 fn push_reordered_run(
     runs: &mut Vec<tst::stroke_layer_archive::StrokeRunArchive>,
-    sources: &mut Vec<usize>,
+    sources: &mut Vec<Option<usize>>,
     template: &tst::stroke_layer_archive::StrokeRunArchive,
     source: usize,
     start: u32,
@@ -427,7 +803,7 @@ fn push_reordered_run(
             .ok_or_else(|| Error::ParseError("Numbers stroke run length overflow".to_owned()))?,
     );
     runs.push(run);
-    sources.push(source);
+    sources.push(Some(source));
     Ok(())
 }
 
@@ -626,7 +1002,11 @@ fn plan_layer(
         };
         let mut current = previous.clone();
         current.row_column_index = Some(index);
-        (true, current, (0..previous.stroke_runs.len()).collect())
+        (
+            true,
+            current,
+            (0..previous.stroke_runs.len()).map(Some).collect(),
+        )
     } else {
         let (runs, run_sources) =
             transform_runs(&previous.stroke_runs, mutation.edit, traversal_length)?;
@@ -656,7 +1036,10 @@ fn transform_runs(
     runs: &[tst::stroke_layer_archive::StrokeRunArchive],
     edit: AxisEdit,
     length: u32,
-) -> Result<(Vec<tst::stroke_layer_archive::StrokeRunArchive>, Vec<usize>)> {
+) -> Result<(
+    Vec<tst::stroke_layer_archive::StrokeRunArchive>,
+    Vec<Option<usize>>,
+)> {
     let mut transformed = Vec::with_capacity(runs.len().saturating_add(1));
     let mut sources = Vec::with_capacity(runs.len().saturating_add(1));
     for (source, run) in runs.iter().enumerate() {
@@ -666,40 +1049,40 @@ fn transform_runs(
                 let mut shifted = run.clone();
                 shifted.origin = Some(checked_i32(indexed_add(start, 1)?)?);
                 transformed.push(shifted);
-                sources.push(source);
+                sources.push(Some(source));
             },
             AxisEdit::Insert { index } if index >= end => {
                 transformed.push(run.clone());
-                sources.push(source);
+                sources.push(Some(source));
             },
             AxisEdit::Insert { index } => {
                 let mut before = run.clone();
                 before.length = Some(index - start);
                 transformed.push(before);
-                sources.push(source);
+                sources.push(Some(source));
 
                 let mut after = run.clone();
                 after.origin = Some(checked_i32(indexed_add(index, 1)?)?);
                 after.length = Some(end - index);
                 transformed.push(after);
-                sources.push(source);
+                sources.push(Some(source));
             },
             AxisEdit::Delete { index } if index < start => {
                 let mut shifted = run.clone();
                 shifted.origin = Some(checked_i32(start - 1)?);
                 transformed.push(shifted);
-                sources.push(source);
+                sources.push(Some(source));
             },
             AxisEdit::Delete { index } if index >= end => {
                 transformed.push(run.clone());
-                sources.push(source);
+                sources.push(Some(source));
             },
             AxisEdit::Delete { .. } if end - start == 1 => {},
             AxisEdit::Delete { .. } => {
                 let mut shortened = run.clone();
                 shortened.length = Some(end - start - 1);
                 transformed.push(shortened);
-                sources.push(source);
+                sources.push(Some(source));
             },
         }
     }
@@ -751,7 +1134,7 @@ fn rewrite_stroke_layer_wire(
     original: &[u8],
     previous: &tst::StrokeLayerArchive,
     current: &tst::StrokeLayerArchive,
-    run_sources: &[usize],
+    run_sources: &[Option<usize>],
 ) -> Result<Vec<u8>> {
     if current.stroke_runs.len() != run_sources.len() {
         return Err(Error::InvalidFormat(
@@ -778,6 +1161,9 @@ fn rewrite_stroke_layer_wire(
         .iter()
         .zip(run_sources)
         .map(|(run, &source)| {
+            let Some(source) = source else {
+                return Ok(run.encode_to_vec());
+            };
             let previous_run = previous.stroke_runs.get(source).ok_or_else(|| {
                 Error::InvalidFormat("Numbers stroke-layer run source is missing".to_owned())
             })?;
@@ -804,14 +1190,6 @@ fn rewrite_stroke_run_wire(
     previous: &tst::stroke_layer_archive::StrokeRunArchive,
     current: &tst::stroke_layer_archive::StrokeRunArchive,
 ) -> Result<Vec<u8>> {
-    let mut expected = current.clone();
-    expected.origin = previous.origin;
-    expected.length = previous.length;
-    if expected != *previous {
-        return Err(Error::InvalidFormat(
-            "Numbers stroke run changed outside its coordinates".to_owned(),
-        ));
-    }
     let mut data = patch_varint_field(
         original,
         1,
@@ -823,6 +1201,22 @@ fn rewrite_stroke_run_wire(
         2,
         previous.length.is_some(),
         current.length.map(u64::from),
+    )?;
+    data = patch_length_delimited_field(
+        &data,
+        3,
+        previous.stroke.is_some(),
+        current
+            .stroke
+            .as_ref()
+            .map(Message::encode_to_vec)
+            .as_deref(),
+    )?;
+    data = patch_varint_field(
+        &data,
+        4,
+        previous.order.is_some(),
+        current.order.map(u64::from),
     )?;
     if tst::stroke_layer_archive::StrokeRunArchive::decode(data.as_slice())? != *current {
         return Err(Error::InvalidFormat(
@@ -838,6 +1232,7 @@ fn rewrite_stroke_sidecar_wire(
     current: &tst::StrokeSidecarArchive,
 ) -> Result<Vec<u8>> {
     let mut expected = current.clone();
+    expected.max_order = previous.max_order;
     expected.column_count = previous.column_count;
     expected.row_count = previous.row_count;
     for side in LayerSide::ALL {
@@ -845,11 +1240,18 @@ fn rewrite_stroke_sidecar_wire(
     }
     if expected != *previous {
         return Err(Error::InvalidFormat(
-            "Numbers stroke sidecar changed outside its dimensions and layer references".to_owned(),
+            "Numbers stroke sidecar changed outside its order, dimensions, and layer references"
+                .to_owned(),
         ));
     }
     let mut data = patch_varint_field(
         original,
+        1,
+        previous.max_order.is_some(),
+        current.max_order.map(u64::from),
+    )?;
+    data = patch_varint_field(
+        &data,
         2,
         previous.column_count.is_some(),
         current.column_count.map(u64::from),
@@ -910,21 +1312,17 @@ fn rewrite_reference_list(
     let replacements = current
         .iter()
         .map(|reference| {
-            let raw = raw_by_identifier
-                .get(&reference.identifier)
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Numbers stroke sidecar introduced layer reference {}",
+            if let Some(raw) = raw_by_identifier.get(&reference.identifier) {
+                if tsp::Reference::decode(*raw)? != *reference {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers stroke sidecar changed layer reference {}",
                         reference.identifier
-                    ))
-                })?;
-            if tsp::Reference::decode(*raw)? != *reference {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers stroke sidecar changed layer reference {}",
-                    reference.identifier
-                )));
+                    )));
+                }
+                Ok((*raw).to_vec())
+            } else {
+                Ok(reference.encode_to_vec())
             }
-            Ok((*raw).to_vec())
         })
         .collect::<Result<Vec<_>>>()?;
     rewrite_repeated_length_delimited_fields(data, field_number, &replacements)

@@ -12,6 +12,56 @@ fn table_geometry() -> (DrawablePoint, DrawableSize) {
 }
 
 #[test]
+fn source_built_table_roundtrips_cell_border_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Borders", 3, 3, position, size)
+        .unwrap();
+    let stroke = crate::shapes::ShapeStroke::new(
+        crate::shapes::RgbaColor::new(0.9, 0.2, 0.1, 1.0, crate::shapes::RgbColorSpace::Srgb)
+            .unwrap(),
+        crate::shapes::StrokeWidth::new(3.0).unwrap(),
+        crate::shapes::StrokePattern::Solid,
+    );
+    editor
+        .set_slide_table_cell_border(
+            0,
+            table.model_object_id,
+            2,
+            1,
+            KeynoteTableCellBorderSide::Top,
+            stroke,
+        )
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_cell_borders(0, table.model_object_id, 2, 1)
+            .unwrap()
+            .top,
+        Some(stroke)
+    );
+    reopened
+        .clear_slide_table_cell_border(
+            0,
+            table.model_object_id,
+            2,
+            1,
+            KeynoteTableCellBorderSide::Top,
+        )
+        .unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_cell_borders(0, table.model_object_id, 2, 1)
+            .unwrap()
+            .top,
+        None
+    );
+}
+
+#[test]
 fn source_built_table_roundtrips_full_crud() {
     let editor = KeynoteDocumentBuilder::new().build().unwrap();
     assert!(editor.slide_tables(0).unwrap().is_empty());

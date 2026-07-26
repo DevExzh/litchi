@@ -57,6 +57,9 @@ pub type KeynoteTableRowInsertion = crate::numbers::TableRowInsertion;
 pub type KeynoteTableColumnInsertion = crate::numbers::TableColumnInsertion;
 /// A validated native merged-cell rectangle.
 pub type KeynoteTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
+pub use crate::table_cell_border::{
+    TableCellBorderSide as KeynoteTableCellBorderSide, TableCellBorders as KeynoteTableCellBorders,
+};
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
 /// Lossless header/footer configuration shared by native iWork tables.
@@ -431,6 +434,89 @@ impl KeynoteEditor {
             column,
             KeynoteTableCellValue::Empty,
         )
+    }
+
+    /// Read the effective explicit borders for one reachable slide-table cell.
+    pub fn slide_table_cell_borders(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellBorders> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_borders_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace one explicit slide-table cell border.
+    pub fn set_slide_table_cell_border(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        side: KeynoteTableCellBorderSide,
+        stroke: crate::shapes::ShapeStroke,
+    ) -> Result<()> {
+        self.update_slide_table_cell_border(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            side,
+            Some(stroke),
+        )
+    }
+
+    /// Explicitly clear one slide-table cell border.
+    pub fn clear_slide_table_cell_border(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        side: KeynoteTableCellBorderSide,
+    ) -> Result<()> {
+        self.update_slide_table_cell_border(slide_index, model_object_id, row, column, side, None)
+    }
+
+    fn update_slide_table_cell_border(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        side: KeynoteTableCellBorderSide,
+        stroke: Option<crate::shapes::ShapeStroke>,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_border_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            side,
+            stroke,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified
+            .slide_table_cell_borders(slide_index, model_object_id, row, column)?
+            .get(side)
+            != stroke
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell border failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Rename a reachable slide table.

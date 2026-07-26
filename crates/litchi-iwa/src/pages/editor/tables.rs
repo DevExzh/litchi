@@ -59,6 +59,9 @@ pub type PagesTableRowInsertion = crate::numbers::TableRowInsertion;
 pub type PagesTableColumnInsertion = crate::numbers::TableColumnInsertion;
 /// A validated native merged-cell rectangle.
 pub type PagesTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
+pub use crate::table_cell_border::{
+    TableCellBorderSide as PagesTableCellBorderSide, TableCellBorders as PagesTableCellBorders,
+};
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -223,6 +226,78 @@ impl PagesEditor {
         column: usize,
     ) -> Result<()> {
         self.set_table_cell(model_object_id, row, column, PagesCellValue::Empty)
+    }
+
+    /// Read the effective explicit borders for one body-table cell.
+    pub fn table_cell_borders(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellBorders> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_borders_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace one explicit body-table cell border.
+    pub fn set_table_cell_border(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        side: PagesTableCellBorderSide,
+        stroke: crate::shapes::ShapeStroke,
+    ) -> Result<()> {
+        self.update_table_cell_border(model_object_id, row, column, side, Some(stroke))
+    }
+
+    /// Explicitly clear one body-table cell border.
+    pub fn clear_table_cell_border(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        side: PagesTableCellBorderSide,
+    ) -> Result<()> {
+        self.update_table_cell_border(model_object_id, row, column, side, None)
+    }
+
+    fn update_table_cell_border(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        side: PagesTableCellBorderSide,
+        stroke: Option<crate::shapes::ShapeStroke>,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_border_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            side,
+            stroke,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified
+            .table_cell_borders(model_object_id, row, column)?
+            .get(side)
+            != stroke
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell border failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// List native merged-cell rectangles in one reachable body table.
@@ -946,6 +1021,37 @@ mod tests {
     use crate::pages::PagesDocumentBuilder;
 
     const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
+
+    #[test]
+    fn source_built_table_roundtrips_cell_border_crud() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Borders", 3, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let stroke = crate::shapes::ShapeStroke::new(
+            crate::shapes::RgbaColor::new(0.1, 0.3, 0.9, 1.0, crate::shapes::RgbColorSpace::Srgb)
+                .unwrap(),
+            crate::shapes::StrokeWidth::new(2.0).unwrap(),
+            crate::shapes::StrokePattern::RoundedDash,
+        );
+        editor
+            .set_table_cell_border(model_id, 1, 1, PagesTableCellBorderSide::Right, stroke)
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_borders(model_id, 1, 1).unwrap().right,
+            Some(stroke)
+        );
+        reopened
+            .clear_table_cell_border(model_id, 1, 1, PagesTableCellBorderSide::Right)
+            .unwrap();
+        assert_eq!(
+            reopened.table_cell_borders(model_id, 1, 1).unwrap().right,
+            None
+        );
+    }
 
     #[test]
     fn source_built_table_roundtrips_cell_updates() {

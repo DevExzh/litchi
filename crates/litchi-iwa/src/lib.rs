@@ -149,6 +149,8 @@ pub mod snappy;
 pub mod structured;
 /// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.
 pub mod table_appearance;
+/// Typed explicit cell-border controls shared by native iWork tables.
+pub mod table_cell_border;
 /// Typed hidden-row and hidden-column state shared by native iWork tables.
 pub mod table_hidden_axes;
 /// Typed native table lock controls shared by Pages, Numbers, and Keynote.

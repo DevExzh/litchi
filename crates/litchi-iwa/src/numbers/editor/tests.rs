@@ -3364,6 +3364,167 @@ fn grows_and_truncates_blank_table_edges_with_uid_maps() {
 }
 
 #[test]
+fn table_cell_border_crud_allocates_sparse_layers_and_round_trips() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    let side = crate::table_cell_border::TableCellBorderSide::Bottom;
+    assert_eq!(editor.table_cell_borders(10, 1, 2).unwrap().get(side), None);
+
+    let stroke = crate::shapes::ShapeStroke::new(
+        crate::shapes::RgbaColor::new(0.8, 0.1, 0.2, 1.0, crate::shapes::RgbColorSpace::Srgb)
+            .unwrap(),
+        crate::shapes::StrokeWidth::new(2.5).unwrap(),
+        crate::shapes::StrokePattern::MediumDash,
+    );
+    editor
+        .set_table_cell_border(10, 1, 2, side, stroke)
+        .unwrap();
+    assert_eq!(
+        editor.table_cell_borders(10, 1, 2).unwrap().get(side),
+        Some(stroke)
+    );
+    assert_eq!(editor.table_cell_borders(10, 1, 1).unwrap().get(side), None);
+
+    let sidecar = test_stroke_sidecar(editor.package());
+    assert_eq!(sidecar.max_order, Some(1));
+    assert_eq!(sidecar.bottom_row_stroke_layers.len(), 1);
+    let layer_id = sidecar.bottom_row_stroke_layers[0].identifier;
+    let layer = test_stroke_layer(editor.package(), layer_id);
+    assert_eq!(layer.row_column_index, Some(1));
+    assert_eq!(
+        layer
+            .stroke_runs
+            .iter()
+            .map(|run| (run.origin, run.length, run.order))
+            .collect::<Vec<_>>(),
+        [(Some(2), Some(1), Some(1))]
+    );
+
+    editor.clear_table_cell_border(10, 1, 2, side).unwrap();
+    assert_eq!(editor.table_cell_borders(10, 1, 2).unwrap().get(side), None);
+    let sidecar = test_stroke_sidecar(editor.package());
+    assert_eq!(sidecar.max_order, Some(2));
+    assert_eq!(sidecar.bottom_row_stroke_layers[0].identifier, layer_id);
+    let layer = test_stroke_layer(editor.package(), layer_id);
+    assert_eq!(layer.stroke_runs.len(), 1);
+    assert_eq!(layer.stroke_runs[0].order, Some(2));
+    assert_eq!(
+        crate::shapes::stroke_from_native(layer.stroke_runs[0].stroke.as_ref().unwrap()).unwrap(),
+        None
+    );
+
+    let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.table_cell_borders(10, 1, 2).unwrap().get(side),
+        None
+    );
+}
+
+#[test]
+fn table_cell_border_rejects_invalid_coordinates_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    let before = editor.to_bytes().unwrap();
+    let stroke = crate::shapes::ShapeStroke::new(
+        crate::shapes::RgbaColor::black(),
+        crate::shapes::StrokeWidth::ONE,
+        crate::shapes::StrokePattern::Solid,
+    );
+    assert!(
+        editor
+            .set_table_cell_border(
+                10,
+                usize::MAX,
+                0,
+                crate::table_cell_border::TableCellBorderSide::Top,
+                stroke,
+            )
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
+    let mut package = test_package();
+    add_test_stroke_layer(&mut package, 50, TestStrokeLayerSide::Top, 1, &[(1, 1)]);
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let sidecar = archive.object_mut(41).unwrap();
+            let message = sidecar.messages[0].clone();
+            let mut data = message.data;
+            append_unknown_varint(&mut data, 99, 9_999);
+            sidecar.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+
+            let layer = archive.object_mut(50).unwrap();
+            let message = layer.messages[0].clone();
+            let mut data = crate::wire::transform_length_delimited_fields_at_path(
+                &message.data,
+                &[2],
+                |run| {
+                    let mut run = run.to_vec();
+                    append_unknown_varint(&mut run, 97, 9_797);
+                    Ok(run)
+                },
+            )?;
+            append_unknown_varint(&mut data, 98, 9_898);
+            layer
+                .replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )
+                .map(drop)
+        })
+        .unwrap();
+
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor
+        .set_table_cell_border(
+            10,
+            1,
+            1,
+            crate::table_cell_border::TableCellBorderSide::Top,
+            crate::shapes::ShapeStroke::new(
+                crate::shapes::RgbaColor::black(),
+                crate::shapes::StrokeWidth::ONE,
+                crate::shapes::StrokePattern::Solid,
+            ),
+        )
+        .unwrap();
+
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let sidecar = &archive.object(41).unwrap().messages[0].data;
+    assert!(
+        crate::wire::parse_wire_fields(sidecar)
+            .unwrap()
+            .iter()
+            .any(|field| field.number == 99)
+    );
+    let layer = &archive.object(50).unwrap().messages[0].data;
+    assert!(
+        crate::wire::parse_wire_fields(layer)
+            .unwrap()
+            .iter()
+            .any(|field| field.number == 98)
+    );
+    let runs = crate::wire::repeated_length_delimited_payloads(layer, 2).unwrap();
+    assert_eq!(runs.len(), 1);
+    assert!(
+        crate::wire::parse_wire_fields(runs[0])
+            .unwrap()
+            .iter()
+            .any(|field| field.number == 97)
+    );
+}
+
+#[test]
 fn table_row_insertion_preserves_explicit_stroke_layers_on_original_cells() {
     let mut package = test_package();
     add_test_stroke_layer(&mut package, 50, TestStrokeLayerSide::Top, 1, &[(1, 1)]);

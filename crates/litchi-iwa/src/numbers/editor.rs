@@ -1959,6 +1959,63 @@ impl NumbersEditor {
         self.set_cell(table_id, row, column, CellValue::Empty)
     }
 
+    /// Read the effective explicit borders for one zero-based table cell.
+    pub fn table_cell_borders(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<crate::table_cell_border::TableCellBorders> {
+        stroke_layers::cell_borders(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace one explicit table-cell border transactionally.
+    pub fn set_table_cell_border(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        side: crate::table_cell_border::TableCellBorderSide,
+        stroke: crate::shapes::ShapeStroke,
+    ) -> Result<()> {
+        self.update_table_cell_border(table_id, row, column, side, Some(stroke))
+    }
+
+    /// Explicitly clear one table-cell border transactionally.
+    pub fn clear_table_cell_border(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        side: crate::table_cell_border::TableCellBorderSide,
+    ) -> Result<()> {
+        self.update_table_cell_border(table_id, row, column, side, None)
+    }
+
+    fn update_table_cell_border(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        side: crate::table_cell_border::TableCellBorderSide,
+        stroke: Option<crate::shapes::ShapeStroke>,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        stroke_layers::set_cell_border(&mut staged, table_id, row, column, side, stroke)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .table_cell_borders(table_id, row, column)?
+            .get(side)
+            != stroke
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell border failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// List every native merged-cell rectangle in one attached table.
     pub fn table_cell_merges(&self, table_id: u64) -> Result<Vec<IWorkTableCellRegion>> {
         cell_merge::regions_in_package(&self.package, table_id)
@@ -2845,6 +2902,26 @@ pub(crate) fn set_table_cell_in_package(
     model::set_attached_cell_in_package(package, table_id, row, column, value)?;
     formula_cache::refresh_formula_caches_after_cell_write(package, table_id, row, column)?;
     Ok(())
+}
+
+pub(crate) fn table_cell_borders_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<crate::table_cell_border::TableCellBorders> {
+    stroke_layers::cell_borders(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_border_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    side: crate::table_cell_border::TableCellBorderSide,
+    stroke: Option<crate::shapes::ShapeStroke>,
+) -> Result<()> {
+    stroke_layers::set_cell_border(package, table_id, row, column, side, stroke)
 }
 
 pub(crate) fn table_cell_merges_in_package(
