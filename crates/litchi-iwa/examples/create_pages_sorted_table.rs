@@ -39,6 +39,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             PagesTableCellUpdate::new(4, 1, PagesCellValue::Text("second apple".to_owned())),
         ],
     )?;
+    editor.set_table_cell_comment(table_id, 1, 1, "Zebra comment follows its sorted row")?;
+    let reply_id =
+        editor.add_table_cell_comment_reply(table_id, 1, 1, "Pages keeps this thread intact")?;
     editor.set_table_sort_order(
         table_id,
         PagesTableSortOrder::new([PagesTableSortRule::new(
@@ -48,6 +51,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     if !editor.apply_table_sort_order(table_id)? {
         return Err("expected the source table to be reordered".into());
+    }
+    let moved = editor
+        .table_cell_comment(table_id, 4, 1)?
+        .ok_or("sorted row lost its comment")?;
+    let moved_reply_id = editor
+        .table_cell_comment_replies(table_id, 4, 1)?
+        .first()
+        .map(|reply| reply.storage_object_id);
+    if moved.comment.text != "Zebra comment follows its sorted row"
+        || moved_reply_id != Some(reply_id)
+    {
+        return Err("sorted row did not preserve its comment thread".into());
     }
     editor.save(&output)?;
     println!("created {output}");

@@ -5761,6 +5761,17 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
             ],
         )
         .unwrap();
+    editor
+        .set_cell_comment(table_id, 2, 1, "Selected South comment")
+        .unwrap();
+    let reply_id = editor
+        .add_cell_comment_reply(table_id, 2, 1, "Selected South reply")
+        .unwrap();
+    let comment_id = editor
+        .cell_comment(table_id, 2, 1)
+        .unwrap()
+        .unwrap()
+        .storage_object_id;
     let order = NumbersTableSortOrder::selected_rows([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
         NumbersTableSortDirection::Descending,
@@ -5817,6 +5828,19 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
     assert_eq!(
         table.get_cell(5, 0),
         Some(&CellValue::Text("Total".to_owned()))
+    );
+    assert!(editor.cell_comment(table_id, 2, 1).unwrap().is_none());
+    assert_eq!(
+        editor
+            .cell_comment(table_id, 4, 1)
+            .unwrap()
+            .unwrap()
+            .storage_object_id,
+        comment_id
+    );
+    assert_eq!(
+        editor.cell_comment_replies(table_id, 4, 1).unwrap()[0].storage_object_id,
+        reply_id
     );
 
     let sorted = editor.to_bytes().unwrap();
@@ -6111,6 +6135,15 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
             ],
         )
         .unwrap();
+    editor
+        .set_cell_comment(table_id, 2, 1, "South comment follows row")
+        .unwrap();
+    let reply_id = editor
+        .add_cell_comment_reply(table_id, 2, 1, "Reply follows row too")
+        .unwrap();
+    let original_comment = editor.cell_comment(table_id, 2, 1).unwrap().unwrap();
+    let original_reply = editor.cell_comment_replies(table_id, 2, 1).unwrap()[0].clone();
+    assert_eq!(original_reply.storage_object_id, reply_id);
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
         NumbersTableSortDirection::Ascending,
@@ -6151,8 +6184,41 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
         Some(&CellValue::Text("Total".to_owned()))
     );
     assert_eq!(table.get_cell(4, 1), Some(&CellValue::Number(323.0)));
+    assert!(editor.cell_comment(table_id, 2, 1).unwrap().is_none());
+    let moved_comment = editor.cell_comment(table_id, 1, 1).unwrap().unwrap();
+    assert_eq!(moved_comment.row, 1);
+    assert_eq!(moved_comment.column, original_comment.column);
+    assert_eq!(
+        moved_comment.storage_object_id,
+        original_comment.storage_object_id
+    );
+    assert_eq!(moved_comment.comment, original_comment.comment);
+    let moved_replies = editor.cell_comment_replies(table_id, 1, 1).unwrap();
+    assert_eq!(moved_replies.len(), 1);
+    assert_eq!(
+        moved_replies[0].root_storage_object_id,
+        original_reply.root_storage_object_id
+    );
+    assert_eq!(
+        moved_replies[0].storage_object_id,
+        original_reply.storage_object_id
+    );
+    assert_eq!(moved_replies[0].comment, original_reply.comment);
     let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.table_sort_order(table_id).unwrap(), Some(order));
+    assert!(reopened.cell_comment(table_id, 2, 1).unwrap().is_none());
+    assert_eq!(
+        reopened
+            .cell_comment(table_id, 1, 1)
+            .unwrap()
+            .unwrap()
+            .storage_object_id,
+        original_comment.storage_object_id
+    );
+    assert_eq!(
+        reopened.cell_comment_replies(table_id, 1, 1).unwrap()[0].storage_object_id,
+        reply_id
+    );
 }
 
 #[test]

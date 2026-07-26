@@ -311,6 +311,17 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             ],
         )
         .unwrap();
+    editor
+        .set_slide_table_cell_comment(0, model_id, 1, 1, "Zebra comment follows row")
+        .unwrap();
+    let reply_id = editor
+        .add_slide_table_cell_comment_reply(0, model_id, 1, 1, "Zebra reply follows row")
+        .unwrap();
+    let comment_id = editor
+        .slide_table_cell_comment(0, model_id, 1, 1)
+        .unwrap()
+        .unwrap()
+        .storage_object_id;
     let order = KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
         KeynoteTableSortColumnIndex::new(0).unwrap(),
         KeynoteTableSortDirection::Ascending,
@@ -352,11 +363,47 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         materialized.get_cell(4, 0),
         Some(&KeynoteTableCellValue::Text("zebra".to_owned()))
     );
+    assert!(
+        editor
+            .slide_table_cell_comment(0, model_id, 1, 1)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        editor
+            .slide_table_cell_comment(0, model_id, 4, 1)
+            .unwrap()
+            .unwrap()
+            .storage_object_id,
+        comment_id
+    );
+    assert_eq!(
+        editor
+            .slide_table_cell_comment_replies(0, model_id, 4, 1)
+            .unwrap()[0]
+            .storage_object_id,
+        reply_id
+    );
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.slide_table_sort_order(0, model_id).unwrap(),
         Some(order.clone())
+    );
+    assert_eq!(
+        reopened
+            .slide_table_cell_comment(0, model_id, 4, 1)
+            .unwrap()
+            .unwrap()
+            .storage_object_id,
+        comment_id
+    );
+    assert_eq!(
+        reopened
+            .slide_table_cell_comment_replies(0, model_id, 4, 1)
+            .unwrap()[0]
+            .storage_object_id,
+        reply_id
     );
     let unchanged = reopened.to_bytes().unwrap();
     reopened
@@ -417,6 +464,27 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     assert_eq!(
         table.get_cell(4, 1),
         Some(&KeynoteTableCellValue::Text("second apple".to_owned()))
+    );
+    assert!(
+        reopened
+            .slide_table_cell_comment(0, model_id, 4, 1)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        reopened
+            .slide_table_cell_comment(0, model_id, 2, 1)
+            .unwrap()
+            .unwrap()
+            .storage_object_id,
+        comment_id
+    );
+    assert_eq!(
+        reopened
+            .slide_table_cell_comment_replies(0, model_id, 2, 1)
+            .unwrap()[0]
+            .storage_object_id,
+        reply_id
     );
 
     reopened.clear_slide_table_sort_order(0, model_id).unwrap();

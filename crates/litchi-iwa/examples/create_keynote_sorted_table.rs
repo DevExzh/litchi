@@ -60,6 +60,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ),
         ],
     )?;
+    editor.set_slide_table_cell_comment(
+        0,
+        table.model_object_id,
+        1,
+        1,
+        "Zebra comment follows its sorted row",
+    )?;
+    let reply_id = editor.add_slide_table_cell_comment_reply(
+        0,
+        table.model_object_id,
+        1,
+        1,
+        "Keynote keeps this thread intact",
+    )?;
     editor.set_slide_table_sort_order(
         0,
         table.model_object_id,
@@ -70,6 +84,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     if !editor.apply_slide_table_sort_order(0, table.model_object_id)? {
         return Err("expected the source table to be reordered".into());
+    }
+    let moved = editor
+        .slide_table_cell_comment(0, table.model_object_id, 4, 1)?
+        .ok_or("sorted row lost its comment")?;
+    let moved_reply_id = editor
+        .slide_table_cell_comment_replies(0, table.model_object_id, 4, 1)?
+        .first()
+        .map(|reply| reply.storage_object_id);
+    if moved.comment.text != "Zebra comment follows its sorted row"
+        || moved_reply_id != Some(reply_id)
+    {
+        return Err("sorted row did not preserve its comment thread".into());
     }
     editor.save(&output)?;
     println!("created {output}");

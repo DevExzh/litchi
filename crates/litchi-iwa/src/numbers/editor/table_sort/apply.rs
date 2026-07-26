@@ -468,11 +468,6 @@ fn decode_unique_tile(object: &ArchiveObject, tile_id: u64) -> Result<Tile> {
 }
 
 fn validate_movable_body_cell(cell: &BncCell, row: usize, column: usize) -> Result<()> {
-    if cell.comment_identifier().is_some() {
-        return Err(Error::ParseError(format!(
-            "Cannot yet execute a Numbers sort with a comment in body cell ({row}, {column})"
-        )));
-    }
     if cell.formula_error_identifier().is_some() {
         return Err(Error::ParseError(format!(
             "Cannot yet execute a Numbers sort with a formula error in body cell ({row}, {column})"

@@ -1135,6 +1135,17 @@ mod tests {
                 ],
             )
             .unwrap();
+        editor
+            .set_table_cell_comment(model_id, 1, 1, "Zebra comment follows row")
+            .unwrap();
+        let reply_id = editor
+            .add_table_cell_comment_reply(model_id, 1, 1, "Zebra reply follows row")
+            .unwrap();
+        let comment_id = editor
+            .table_cell_comment(model_id, 1, 1)
+            .unwrap()
+            .unwrap()
+            .storage_object_id;
         let order = PagesTableSortOrder::new([PagesTableSortRule::new(
             PagesTableSortColumnIndex::new(0).unwrap(),
             PagesTableSortDirection::Ascending,
@@ -1176,11 +1187,36 @@ mod tests {
             table.get_cell(4, 0),
             Some(&PagesCellValue::Text("zebra".to_owned()))
         );
+        assert!(editor.table_cell_comment(model_id, 1, 1).unwrap().is_none());
+        assert_eq!(
+            editor
+                .table_cell_comment(model_id, 4, 1)
+                .unwrap()
+                .unwrap()
+                .storage_object_id,
+            comment_id
+        );
+        assert_eq!(
+            editor.table_cell_comment_replies(model_id, 4, 1).unwrap()[0].storage_object_id,
+            reply_id
+        );
 
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_sort_order(model_id).unwrap(),
             Some(order.clone())
+        );
+        assert_eq!(
+            reopened
+                .table_cell_comment(model_id, 4, 1)
+                .unwrap()
+                .unwrap()
+                .storage_object_id,
+            comment_id
+        );
+        assert_eq!(
+            reopened.table_cell_comment_replies(model_id, 4, 1).unwrap()[0].storage_object_id,
+            reply_id
         );
         let unchanged = reopened.to_bytes().unwrap();
         reopened.set_table_sort_order(model_id, order).unwrap();
@@ -1234,6 +1270,24 @@ mod tests {
         assert_eq!(
             table.get_cell(4, 1),
             Some(&PagesCellValue::Text("second apple".to_owned()))
+        );
+        assert!(
+            reopened
+                .table_cell_comment(model_id, 4, 1)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            reopened
+                .table_cell_comment(model_id, 2, 1)
+                .unwrap()
+                .unwrap()
+                .storage_object_id,
+            comment_id
+        );
+        assert_eq!(
+            reopened.table_cell_comment_replies(model_id, 2, 1).unwrap()[0].storage_object_id,
+            reply_id
         );
 
         reopened.clear_table_sort_order(model_id).unwrap();

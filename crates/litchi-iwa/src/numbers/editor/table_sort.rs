@@ -378,10 +378,10 @@ impl NumbersEditor {
     /// The current executor deliberately supports the scalar, non-formula
     /// subset that can be moved without rewriting a formula graph: every sort
     /// key in the body must be a complete plain Text, finite Number, Boolean,
-    /// Date, or Duration column of one consistent type. It rejects formula,
-    /// error, and commented body cells. It also rejects merged cells, filters,
-    /// hidden rows, grouping, pivots, spill state, conditional styles, and
-    /// explicit border layers
+    /// Date, or Duration column of one consistent type. Cell comment threads
+    /// move with their rows. It rejects formula and error body cells, merged
+    /// cells, filters, hidden rows, grouping, pivots, spill state, conditional
+    /// styles, and explicit border layers
     /// transactionally rather than risking a semantically partial rewrite.
     ///
     /// Returns `true` when one or more body rows were physically reordered,

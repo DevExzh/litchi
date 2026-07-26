@@ -42,6 +42,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             TableCellUpdate::new(4, 1, CellValue::Number(323.0)),
         ],
     )?;
+    editor.set_cell_comment(table_id, 2, 1, "South comment follows its sorted row")?;
+    let reply_id =
+        editor.add_cell_comment_reply(table_id, 2, 1, "Numbers keeps this thread intact")?;
     editor.set_table_sort_order(
         table_id,
         NumbersTableSortOrder::new([NumbersTableSortRule::new(
@@ -51,6 +54,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     if !editor.apply_table_sort_order(table_id)? {
         return Err("expected the source table to be reordered".into());
+    }
+    let moved = editor
+        .cell_comment(table_id, 1, 1)?
+        .ok_or("sorted row lost its comment")?;
+    let moved_reply_id = editor
+        .cell_comment_replies(table_id, 1, 1)?
+        .first()
+        .map(|reply| reply.storage_object_id);
+    if moved.comment.text != "South comment follows its sorted row"
+        || moved_reply_id != Some(reply_id)
+    {
+        return Err("sorted row did not preserve its comment thread".into());
     }
     editor.save(output)?;
     Ok(())
