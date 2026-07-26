@@ -1,4 +1,4 @@
-//! Planning and validation for physical full-table Numbers sorting.
+//! Planning and validation for physical Numbers row sorting.
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -139,8 +139,62 @@ pub(super) fn apply_attached_table_sort_order(
 ) -> Result<bool> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     validate_sort_order(&descriptor.model, order)?;
+    if order.scope() != NumbersTableSortScope::EntireTable {
+        return Err(Error::ParseError(
+            "Cannot execute a selected-row Numbers sort without an explicit row range".to_owned(),
+        ));
+    }
     let (body_start, body_end) = table_body_bounds(&descriptor.model)?;
-    if body_end.saturating_sub(body_start) < 2 {
+    apply_attached_table_sort_range(package, table_id, &descriptor, order, body_start, body_end)
+}
+
+pub(super) fn apply_attached_table_sort_order_to_rows(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    order: &NumbersTableSortOrder,
+    rows: NumbersTableSortRowRange,
+) -> Result<bool> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    validate_sort_order(&descriptor.model, order)?;
+    if order.scope() != NumbersTableSortScope::SelectedRows {
+        return Err(Error::ParseError(
+            "Cannot execute an entire-table Numbers sort through a selected-row range".to_owned(),
+        ));
+    }
+    let (body_start, body_end) = table_body_bounds(&descriptor.model)?;
+    let body_rows = body_end - body_start;
+    if rows.end() > body_rows {
+        return Err(Error::ParseError(format!(
+            "Numbers selected-row sort range {}..{} is outside the table's {body_rows} body rows",
+            rows.start(),
+            rows.end()
+        )));
+    }
+    let selected_start = body_start
+        .checked_add(rows.start())
+        .ok_or_else(|| Error::ParseError("Numbers selected-row sort start overflow".to_owned()))?;
+    let selected_end = body_start
+        .checked_add(rows.end())
+        .ok_or_else(|| Error::ParseError("Numbers selected-row sort end overflow".to_owned()))?;
+    apply_attached_table_sort_range(
+        package,
+        table_id,
+        &descriptor,
+        order,
+        selected_start,
+        selected_end,
+    )
+}
+
+fn apply_attached_table_sort_range(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    descriptor: &TableDescriptor,
+    order: &NumbersTableSortOrder,
+    row_start: usize,
+    row_end: usize,
+) -> Result<bool> {
+    if row_end.saturating_sub(row_start) < 2 {
         return Ok(false);
     }
 
@@ -150,8 +204,8 @@ pub(super) fn apply_attached_table_sort_order(
         package,
         &locations,
         &descriptor.model,
-        body_start,
-        body_end,
+        row_start,
+        row_end,
         order,
     )?;
     if !plan.reorders_rows() {
@@ -162,14 +216,14 @@ pub(super) fn apply_attached_table_sort_order(
         package,
         &locations,
         &descriptor.model,
-        body_start,
+        row_start,
         &destinations_by_source,
     )?;
     reorder_body_row_headers(
         package,
         &locations,
         &descriptor.model,
-        body_start,
+        row_start,
         &destinations_by_source,
     )?;
     let row_uids = descriptor
@@ -186,7 +240,7 @@ pub(super) fn apply_attached_table_sort_order(
         &locations,
         row_uids.identifier,
         descriptor.model.number_of_rows as usize,
-        body_start,
+        row_start,
         &destinations_by_source,
     )?;
     Ok(true)

@@ -61,12 +61,13 @@ pub use editor::{
     KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
     KeynoteTablePoints, KeynoteTableRowDeletion, KeynoteTableRowInsertion,
     KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
-    KeynoteTableSortRule, KeynoteTableTitleSettings, KeynoteTransitionAcceleration,
-    KeynoteTransitionAnimationParameters, KeynoteTransitionCustomParameters,
-    KeynoteTransitionDirection, KeynoteTransitionEffect, KeynoteTransitionMosaicType,
-    KeynoteTransitionSettings, KeynoteTransitionTextDelivery, RemovedKeynoteSlideAudio,
-    RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideMovie,
-    RemovedKeynoteSlideShape, RemovedKeynoteSlideTable, RemovedKeynoteTextBox,
+    KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
+    KeynoteTableTitleSettings, KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
+    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionEffect,
+    KeynoteTransitionMosaicType, KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
+    RemovedKeynoteSlideAudio, RemovedKeynoteSlideChart, RemovedKeynoteSlideImage,
+    RemovedKeynoteSlideMovie, RemovedKeynoteSlideShape, RemovedKeynoteSlideTable,
+    RemovedKeynoteTextBox,
 };
 pub use show::KeynoteShow;
 pub use slide::{BuildAnimation, KeynoteSlide, SlideTransition};

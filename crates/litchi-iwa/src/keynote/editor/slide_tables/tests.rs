@@ -377,6 +377,48 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_invalid);
 
+    let selected_order = KeynoteTableSortOrder::selected_rows([KeynoteTableSortRule::new(
+        KeynoteTableSortColumnIndex::new(0).unwrap(),
+        KeynoteTableSortDirection::Descending,
+    )])
+    .unwrap();
+    reopened
+        .set_slide_table_sort_order(0, model_id, selected_order.clone())
+        .unwrap();
+    assert_eq!(
+        reopened.slide_table_sort_order(0, model_id).unwrap(),
+        Some(selected_order)
+    );
+    let before_wrong_executor = reopened.to_bytes().unwrap();
+    assert!(reopened.apply_slide_table_sort_order(0, model_id).is_err());
+    assert_eq!(reopened.to_bytes().unwrap(), before_wrong_executor);
+    assert!(
+        reopened
+            .apply_slide_table_sort_order_to_rows(
+                0,
+                model_id,
+                KeynoteTableSortRowRange::new(1, 4).unwrap(),
+            )
+            .unwrap()
+    );
+    let table = reopened.slide_table(0, model_id).unwrap();
+    assert_eq!(
+        table.get_cell(1, 1),
+        Some(&KeynoteTableCellValue::Text("first apple".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(2, 0),
+        Some(&KeynoteTableCellValue::Text("zebra".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(3, 0),
+        Some(&KeynoteTableCellValue::Text("banana".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(4, 1),
+        Some(&KeynoteTableCellValue::Text("second apple".to_owned()))
+    );
+
     reopened.clear_slide_table_sort_order(0, model_id).unwrap();
     assert_eq!(reopened.slide_table_sort_order(0, model_id).unwrap(), None);
     let unchanged = reopened.to_bytes().unwrap();

@@ -1,4 +1,4 @@
-//! Typed full-table sort-rule editing for Pages body tables.
+//! Typed sort-rule editing and execution for Pages body tables.
 
 use super::*;
 
@@ -6,16 +6,21 @@ use super::*;
 pub type PagesTableSortColumnIndex = crate::numbers::NumbersTableSortColumnIndex;
 /// Sort direction for one Pages table column.
 pub type PagesTableSortDirection = crate::numbers::NumbersTableSortDirection;
-/// One full-table sort-configuration rule in priority order.
+/// One sort-configuration rule in priority order.
 pub type PagesTableSortRule = crate::numbers::NumbersTableSortRule;
-/// An ordered, non-empty full-table Pages sort-rule configuration.
+/// Rows targeted by a persisted Pages table sort configuration.
+pub type PagesTableSortScope = crate::numbers::NumbersTableSortScope;
+/// A non-empty body-relative half-open row range for selected-row sorting.
+pub type PagesTableSortRowRange = crate::numbers::NumbersTableSortRowRange;
+/// An ordered, non-empty Pages sort-rule configuration.
 pub type PagesTableSortOrder = crate::numbers::NumbersTableSortOrder;
 
 impl PagesEditor {
-    /// Read a body table's full-table native sort-rule configuration.
+    /// Read a body table's persisted native sort-rule configuration.
     ///
-    /// An empty native order is reported as `None`. Row-range sorts depend on
-    /// transient selection state and are rejected rather than guessed.
+    /// An empty native order is reported as `None`. Selected-row orders expose
+    /// their persisted scope while leaving the view-state row selection to the
+    /// caller.
     pub fn table_sort_order(&self, model_object_id: u64) -> Result<Option<PagesTableSortOrder>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_sort_order_in_package(self.package(), model_object_id)
@@ -105,6 +110,42 @@ impl PagesEditor {
         if verified.table_sort_order(model_object_id)?.as_ref() != Some(&order) {
             return Err(Error::InvalidFormat(
                 "Pages table sort execution did not preserve its sort order".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(true)
+    }
+
+    /// Execute a body table's configured selected-row sort over one range.
+    ///
+    /// The half-open range is body-relative, excluding header and footer rows.
+    /// Returns `true` when one or more selected rows moved.
+    pub fn apply_table_sort_order_to_rows(
+        &mut self,
+        model_object_id: u64,
+        rows: PagesTableSortRowRange,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let order = self.table_sort_order(model_object_id)?.ok_or_else(|| {
+            Error::ParseError(
+                "Cannot execute a Pages table sort without a configured table sort order"
+                    .to_owned(),
+            )
+        })?;
+        let mut staged = self.package().clone();
+        if !crate::numbers::editor::apply_table_sort_order_to_rows_in_package(
+            &mut staged,
+            model_object_id,
+            &order,
+            rows,
+        )? {
+            return Ok(false);
+        }
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_sort_order(model_object_id)?.as_ref() != Some(&order) {
+            return Err(Error::InvalidFormat(
+                "Pages selected-row table sort did not preserve its sort order".to_owned(),
             ));
         }
         *self = verified;

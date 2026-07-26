@@ -21,7 +21,8 @@ pub use layout::{
     PagesTablePoints,
 };
 pub use sort::{
-    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRule,
+    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
+    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope,
 };
 pub use title::PagesTableTitleSettings;
 
@@ -1193,6 +1194,47 @@ mod tests {
         let before_invalid = reopened.to_bytes().unwrap();
         assert!(reopened.set_table_sort_order(model_id, invalid).is_err());
         assert_eq!(reopened.to_bytes().unwrap(), before_invalid);
+
+        let selected_order = PagesTableSortOrder::selected_rows([PagesTableSortRule::new(
+            PagesTableSortColumnIndex::new(0).unwrap(),
+            PagesTableSortDirection::Descending,
+        )])
+        .unwrap();
+        reopened
+            .set_table_sort_order(model_id, selected_order.clone())
+            .unwrap();
+        assert_eq!(
+            reopened.table_sort_order(model_id).unwrap(),
+            Some(selected_order)
+        );
+        let before_wrong_executor = reopened.to_bytes().unwrap();
+        assert!(reopened.apply_table_sort_order(model_id).is_err());
+        assert_eq!(reopened.to_bytes().unwrap(), before_wrong_executor);
+        assert!(
+            reopened
+                .apply_table_sort_order_to_rows(
+                    model_id,
+                    PagesTableSortRowRange::new(1, 4).unwrap(),
+                )
+                .unwrap()
+        );
+        let table = reopened.table(model_id).unwrap();
+        assert_eq!(
+            table.get_cell(1, 1),
+            Some(&PagesCellValue::Text("first apple".to_owned()))
+        );
+        assert_eq!(
+            table.get_cell(2, 0),
+            Some(&PagesCellValue::Text("zebra".to_owned()))
+        );
+        assert_eq!(
+            table.get_cell(3, 0),
+            Some(&PagesCellValue::Text("banana".to_owned()))
+        );
+        assert_eq!(
+            table.get_cell(4, 1),
+            Some(&PagesCellValue::Text("second apple".to_owned()))
+        );
 
         reopened.clear_table_sort_order(model_id).unwrap();
         assert_eq!(reopened.table_sort_order(model_id).unwrap(), None);

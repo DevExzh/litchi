@@ -3931,7 +3931,8 @@ pub use tables::{
     PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
     PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
     PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
-    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRule, PagesTableTitleSettings,
+    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
+    PagesTableSortScope, PagesTableTitleSettings,
 };
 
 #[cfg(test)]

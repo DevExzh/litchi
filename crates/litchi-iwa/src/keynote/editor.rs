@@ -4474,8 +4474,8 @@ pub use slide_tables::{
     KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
     KeynoteTableHeaderSettings, KeynoteTablePoints, KeynoteTableRowDeletion,
     KeynoteTableRowInsertion, KeynoteTableSortColumnIndex, KeynoteTableSortDirection,
-    KeynoteTableSortOrder, KeynoteTableSortRule, KeynoteTableTitleSettings,
-    RemovedKeynoteSlideTable,
+    KeynoteTableSortOrder, KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
+    KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;

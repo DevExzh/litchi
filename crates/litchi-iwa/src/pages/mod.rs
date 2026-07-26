@@ -50,8 +50,9 @@ pub use editor::{
     PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
     PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
     PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
-    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRule, PagesTableTitleSettings,
-    PagesTemplateKind, RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape,
-    RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
+    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
+    PagesTableSortScope, PagesTableTitleSettings, PagesTemplateKind, RemovedPagesAudio,
+    RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie,
+    RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};

@@ -3193,11 +3193,12 @@ use table_duplicate::{
 pub use table_headers::{NumbersTableHeaderCount, NumbersTableHeaderSettings};
 pub use table_sort::{
     NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRule,
+    NumbersTableSortRowRange, NumbersTableSortRule, NumbersTableSortScope,
 };
 pub(crate) use table_sort::{
-    apply_table_sort_order_in_package, clear_table_sort_order_in_package,
-    set_table_sort_order_in_package, table_sort_order_in_package,
+    apply_table_sort_order_in_package, apply_table_sort_order_to_rows_in_package,
+    clear_table_sort_order_in_package, set_table_sort_order_in_package,
+    table_sort_order_in_package,
 };
 pub use table_title::NumbersTableTitleSettings;
 pub(crate) use table_title::{

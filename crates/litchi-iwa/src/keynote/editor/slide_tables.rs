@@ -31,7 +31,7 @@ pub use formula::{
 use graph::{require_table_model, slide_table_graph, table_template};
 pub use sort::{
     KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
-    KeynoteTableSortRule,
+    KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
 };
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
 pub use title::KeynoteTableTitleSettings;

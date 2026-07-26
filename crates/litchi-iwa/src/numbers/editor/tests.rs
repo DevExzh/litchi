@@ -5726,6 +5726,109 @@ fn source_created_table_supports_sort_order_configuration_crud() {
 }
 
 #[test]
+fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(6, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    editor
+        .set_table_header_settings(
+            table_id,
+            NumbersTableHeaderSettings {
+                header_rows: Some(NumbersTableHeaderCount::ONE),
+                footer_rows: Some(NumbersTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    editor
+        .set_cells(
+            table_id,
+            [
+                TableCellUpdate::new(0, 0, CellValue::Text("Region".to_owned())),
+                TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
+                TableCellUpdate::new(1, 0, CellValue::Text("Outside".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::Number(50.0)),
+                TableCellUpdate::new(2, 0, CellValue::Text("South".to_owned())),
+                TableCellUpdate::new(2, 1, CellValue::Number(98.0)),
+                TableCellUpdate::new(3, 0, CellValue::Text("Central".to_owned())),
+                TableCellUpdate::new(3, 1, CellValue::Number(105.0)),
+                TableCellUpdate::new(4, 0, CellValue::Text("North".to_owned())),
+                TableCellUpdate::new(4, 1, CellValue::Number(120.0)),
+                TableCellUpdate::new(5, 0, CellValue::Text("Total".to_owned())),
+                TableCellUpdate::new(5, 1, CellValue::Number(323.0)),
+            ],
+        )
+        .unwrap();
+    let order = NumbersTableSortOrder::selected_rows([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Descending,
+    )])
+    .unwrap();
+    assert_eq!(order.scope(), NumbersTableSortScope::SelectedRows);
+    editor
+        .set_table_sort_order(table_id, order.clone())
+        .unwrap();
+    assert_eq!(
+        NumbersEditor::from_bytes(&editor.to_bytes().unwrap())
+            .unwrap()
+            .table_sort_order(table_id)
+            .unwrap(),
+        Some(order.clone())
+    );
+
+    let before_wrong_executor = editor.to_bytes().unwrap();
+    assert!(editor.apply_table_sort_order(table_id).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before_wrong_executor);
+    let outside = NumbersTableSortRowRange::new(1, 5).unwrap();
+    assert!(
+        editor
+            .apply_table_sort_order_to_rows(table_id, outside)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_wrong_executor);
+
+    let selected = NumbersTableSortRowRange::new(1, 4).unwrap();
+    assert!(
+        editor
+            .apply_table_sort_order_to_rows(table_id, selected)
+            .unwrap()
+    );
+    assert_eq!(editor.table_sort_order(table_id).unwrap(), Some(order));
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!(
+        table.get_cell(1, 0),
+        Some(&CellValue::Text("Outside".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(2, 0),
+        Some(&CellValue::Text("North".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(3, 0),
+        Some(&CellValue::Text("Central".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(4, 0),
+        Some(&CellValue::Text("South".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(5, 0),
+        Some(&CellValue::Text("Total".to_owned()))
+    );
+
+    let sorted = editor.to_bytes().unwrap();
+    assert!(
+        !editor
+            .apply_table_sort_order_to_rows(table_id, selected)
+            .unwrap()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), sorted);
+}
+
+#[test]
 fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
     editor
