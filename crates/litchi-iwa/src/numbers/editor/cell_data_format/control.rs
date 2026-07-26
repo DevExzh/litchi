@@ -4,12 +4,24 @@ use super::*;
 
 const DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
 const CHECKBOX_INTERACTION_TYPE: u32 = 8;
+const STAR_RATING_INTERACTION_TYPE: u32 = 6;
+const STAR_RATING_MINIMUM: f64 = 0.0;
+const STAR_RATING_MAXIMUM: f64 = 5.0;
+const STAR_RATING_INCREMENT: f64 = 1.0;
 
-pub(super) fn acquire_checkbox_spec(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ControlCellSpecKind {
+    Checkbox,
+    StarRating,
+}
+
+pub(super) fn acquire_spec(
     package: &mut IWorkPackage,
     location: &model::CellLocation,
     current_identifier: Option<u32>,
+    kind: ControlCellSpecKind,
 ) -> Result<u32> {
+    let expected = cell_spec(kind);
     let table_id = ensure_control_table(package, location)?;
     let locations = storage::object_locations(package)?;
     let resolved = storage::resolve_table_data_list(
@@ -21,7 +33,7 @@ pub(super) fn acquire_checkbox_spec(
     let reusable = resolved
         .entries
         .iter()
-        .find(|entry| entry.entry.cell_spec.as_ref() == Some(&checkbox_spec()));
+        .find(|entry| entry.entry.cell_spec.as_ref() == Some(&expected));
     if let Some(reusable) = reusable {
         if reusable.entry.refcount == 0 {
             return Err(Error::InvalidFormat(
@@ -64,7 +76,7 @@ pub(super) fn acquire_checkbox_spec(
         current.entries.push(tst::table_data_list::ListEntry {
             key,
             refcount: 1,
-            cell_spec: Some(checkbox_spec()),
+            cell_spec: Some(expected),
             ..Default::default()
         });
         let data = storage::rewrite_table_data_list_wire(
@@ -85,11 +97,13 @@ pub(super) fn acquire_checkbox_spec(
     Ok(key)
 }
 
-pub(super) fn validate_checkbox_spec(
+pub(super) fn validate_spec(
     package: &IWorkPackage,
     location: &model::CellLocation,
     identifier: u32,
+    kind: ControlCellSpecKind,
 ) -> Result<()> {
+    let label = control_label(kind);
     let table_id = location
         .descriptor
         .model
@@ -98,7 +112,7 @@ pub(super) fn validate_checkbox_spec(
         .as_ref()
         .map(|reference| reference.identifier)
         .ok_or_else(|| {
-            Error::InvalidFormat("Checkbox cell has no control-cell-spec table".to_owned())
+            Error::InvalidFormat(format!("{label} cell has no control-cell-spec table"))
         })?;
     let resolved = storage::resolve_table_data_list(
         package,
@@ -112,18 +126,18 @@ pub(super) fn validate_checkbox_spec(
         .find(|entry| entry.entry.key == identifier)
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "Checkbox cell references missing control spec {identifier}"
+                "{label} cell references missing control spec {identifier}"
             ))
         })?;
-    if entry.entry.refcount == 0 || entry.entry.cell_spec.as_ref() != Some(&checkbox_spec()) {
+    if entry.entry.refcount == 0 || entry.entry.cell_spec.as_ref() != Some(&cell_spec(kind)) {
         return Err(Error::InvalidFormat(format!(
-            "Checkbox control spec {identifier} is invalid"
+            "{label} control spec {identifier} is invalid"
         )));
     }
     Ok(())
 }
 
-pub(super) fn release_checkbox_spec(
+pub(super) fn release_spec(
     package: &mut IWorkPackage,
     location: &model::CellLocation,
     identifier: u32,
@@ -136,7 +150,7 @@ pub(super) fn release_checkbox_spec(
         .as_ref()
         .map(|reference| reference.identifier)
         .ok_or_else(|| {
-            Error::InvalidFormat("Checkbox cell has no control-cell-spec table".to_owned())
+            Error::InvalidFormat("Interactive cell has no control-cell-spec table".to_owned())
         })?;
     let resolved = storage::resolve_table_data_list(
         package,
@@ -150,7 +164,7 @@ pub(super) fn release_checkbox_spec(
         .find(|entry| entry.entry.key == identifier)
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "Checkbox cell references missing control spec {identifier}"
+                "Interactive cell references missing control spec {identifier}"
             ))
         })?;
     storage::decrement_table_data_list_entry(
@@ -256,9 +270,25 @@ fn ensure_control_table(package: &mut IWorkPackage, location: &model::CellLocati
     Ok(identifier)
 }
 
-fn checkbox_spec() -> tst::CellSpecArchive {
-    tst::CellSpecArchive {
-        interaction_type: CHECKBOX_INTERACTION_TYPE,
-        ..Default::default()
+fn cell_spec(kind: ControlCellSpecKind) -> tst::CellSpecArchive {
+    match kind {
+        ControlCellSpecKind::Checkbox => tst::CellSpecArchive {
+            interaction_type: CHECKBOX_INTERACTION_TYPE,
+            ..Default::default()
+        },
+        ControlCellSpecKind::StarRating => tst::CellSpecArchive {
+            interaction_type: STAR_RATING_INTERACTION_TYPE,
+            range_control_min: Some(STAR_RATING_MINIMUM),
+            range_control_max: Some(STAR_RATING_MAXIMUM),
+            range_control_inc: Some(STAR_RATING_INCREMENT),
+            ..Default::default()
+        },
+    }
+}
+
+const fn control_label(kind: ControlCellSpecKind) -> &'static str {
+    match kind {
+        ControlCellSpecKind::Checkbox => "Checkbox",
+        ControlCellSpecKind::StarRating => "Star Rating",
     }
 }

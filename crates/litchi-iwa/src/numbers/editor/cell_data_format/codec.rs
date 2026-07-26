@@ -9,7 +9,7 @@ use crate::table_cell_data_format::{
     TableCellFractionAccuracy, TableCellFractionFormat, TableCellNegativeNumberStyle,
     TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFormat,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
-    TableCellScientificFormat, TableCellThousandsSeparator,
+    TableCellScientificFormat, TableCellStarRatingFormat, TableCellThousandsSeparator,
 };
 use crate::{Error, Result};
 
@@ -20,6 +20,7 @@ pub(super) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 pub(super) const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
 pub(super) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
 pub(super) const NATIVE_CHECKBOX_FORMAT_TYPE: u32 = 263;
+pub(super) const NATIVE_STAR_RATING_FORMAT_TYPE: u32 = 267;
 pub(super) const NATIVE_DURATION_FORMAT_TYPE: u32 = 268;
 pub(super) const NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE: u32 = 269;
 pub(super) const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
@@ -37,6 +38,12 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
     if matches!(format, TableCellDataFormat::Checkbox(_)) {
         return Ok(FormatStructArchive {
             format_type: Some(NATIVE_CHECKBOX_FORMAT_TYPE),
+            ..Default::default()
+        });
+    }
+    if matches!(format, TableCellDataFormat::StarRating(_)) {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_STAR_RATING_FORMAT_TYPE),
             ..Default::default()
         });
     }
@@ -130,6 +137,7 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
         TableCellDataFormat::DateTime(_) => unreachable!("handled above"),
         TableCellDataFormat::Duration(_) => unreachable!("handled above"),
         TableCellDataFormat::Checkbox(_) => unreachable!("handled above"),
+        TableCellDataFormat::StarRating(_) => unreachable!("handled above"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -166,6 +174,16 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
             ));
         }
         return Ok(TableCellDataFormat::Checkbox(TableCellCheckboxFormat));
+    }
+    if format_type == NATIVE_STAR_RATING_FORMAT_TYPE {
+        let canonical =
+            data_format_to_native(&TableCellDataFormat::StarRating(TableCellStarRatingFormat))?;
+        if native != &canonical {
+            return Err(Error::InvalidFormat(
+                "Star Rating cell format contains non-canonical options".to_owned(),
+            ));
+        }
+        return Ok(TableCellDataFormat::StarRating(TableCellStarRatingFormat));
     }
     if format_type == NATIVE_DURATION_FORMAT_TYPE {
         let style = duration_style_from_native(native.duration_style.ok_or_else(|| {

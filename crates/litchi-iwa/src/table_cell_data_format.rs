@@ -26,6 +26,13 @@ pub use numeral_system::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TableCellCheckboxFormat;
 
+/// Native interactive five-star rating format for one table cell.
+///
+/// iWork stores a fixed zero-through-five range with whole-star increments;
+/// the inspector exposes no configurable options.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TableCellStarRatingFormat;
+
 /// A fixed fractional-digit count accepted by the iWork cell inspector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TableCellFixedDecimalPlaces(u8);
@@ -473,6 +480,8 @@ pub enum TableCellDataFormat {
     Duration(TableCellDurationFormat),
     /// Display and edit the value as a native Checkbox control.
     Checkbox(TableCellCheckboxFormat),
+    /// Display and edit the numeric value as a native five-star rating.
+    StarRating(TableCellStarRatingFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -508,6 +517,12 @@ impl From<TableCellFractionFormat> for TableCellDataFormat {
 impl From<TableCellCheckboxFormat> for TableCellDataFormat {
     fn from(value: TableCellCheckboxFormat) -> Self {
         Self::Checkbox(value)
+    }
+}
+
+impl From<TableCellStarRatingFormat> for TableCellDataFormat {
+    fn from(value: TableCellStarRatingFormat) -> Self {
+        Self::StarRating(value)
     }
 }
 

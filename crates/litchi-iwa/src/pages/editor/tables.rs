@@ -76,6 +76,7 @@ pub use crate::table_cell_data_format::{
     TableCellNumeralSystemFormat as PagesTableCellNumeralSystemFormat,
     TableCellPercentageFormat as PagesTableCellPercentageFormat,
     TableCellScientificFormat as PagesTableCellScientificFormat,
+    TableCellStarRatingFormat as PagesTableCellStarRatingFormat,
 };
 pub use crate::table_cell_layout::{
     TableCellInset as PagesTableCellInset, TableCellInsets as PagesTableCellInsets,
@@ -825,6 +826,63 @@ impl PagesEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Pages Checkbox reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Star Rating format for one body-table cell.
+    pub fn table_cell_star_rating_format(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<PagesTableCellStarRatingFormat>> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_star_rating_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace an explicit native five-star rating transactionally.
+    pub fn set_table_cell_star_rating_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: PagesTableCellStarRatingFormat,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(model_object_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Star Rating body-table cell.
+    pub fn reset_table_cell_star_rating_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_star_rating_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            if verified.table_cell_data_format(model_object_id, row, column)?
+                != PagesTableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Pages Star Rating reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;
@@ -2146,6 +2204,39 @@ mod tests {
         assert!(
             reopened
                 .reset_table_cell_checkbox_format(model_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
+            PagesTableCellDataFormat::Automatic
+        );
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_star_rating_format_crud() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Ratings", 3, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        editor
+            .set_table_cell_star_rating_format(model_id, 1, 1, PagesTableCellStarRatingFormat)
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .table_cell_star_rating_format(model_id, 1, 1)
+                .unwrap(),
+            Some(PagesTableCellStarRatingFormat)
+        );
+        assert_eq!(
+            reopened.table(model_id).unwrap().get_cell(1, 1),
+            Some(&PagesCellValue::Number(0.0))
+        );
+        assert!(
+            reopened
+                .reset_table_cell_star_rating_format(model_id, 1, 1)
                 .unwrap()
         );
         assert_eq!(

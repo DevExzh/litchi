@@ -28,7 +28,7 @@ pub(crate) const STRING_FLAG: u32 = 0x000008;
 pub(crate) const RICH_TEXT_FLAG: u32 = 0x000010;
 pub(crate) const STYLE_FLAG: u32 = 0x000020;
 pub(crate) const FORMULA_FLAG: u32 = 0x000200;
-const CHECKBOX_CONTROL_FLAG: u32 = 0x000400;
+const CONTROL_CELL_SPEC_FLAG: u32 = 0x000400;
 pub(crate) const FORMULA_ERROR_FLAG: u32 = 0x000800;
 pub(crate) const COMMENT_FLAG: u32 = 0x080000;
 const CELL_FORMAT_KIND_FLAG: u32 = 0x001000;
@@ -49,6 +49,7 @@ pub(crate) const CURRENCY_CELL_FORMAT_KIND: u32 = 2;
 pub(crate) const DATE_TIME_CELL_FORMAT_KIND: u32 = 3;
 pub(crate) const DURATION_CELL_FORMAT_KIND: u32 = 4;
 pub(crate) const CHECKBOX_CELL_FORMAT_KIND: u32 = 6;
+pub(crate) const STAR_RATING_CELL_FORMAT_KIND: u32 = DECIMAL_CELL_FORMAT_KIND;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CellDataFormatKind {
@@ -57,6 +58,7 @@ pub(crate) enum CellDataFormatKind {
     DateTime,
     Duration,
     Checkbox,
+    StarRating,
 }
 
 const VALUE_FLAGS: u32 = DECIMAL_FLAG
@@ -366,8 +368,8 @@ impl BncCell {
         self.u32_field(CELL_FORMAT_KIND_FLAG)
     }
 
-    pub(crate) fn checkbox_control_value(&self) -> Option<u32> {
-        self.u32_field(CHECKBOX_CONTROL_FLAG)
+    pub(crate) fn control_cell_spec_identifier(&self) -> Option<u32> {
+        self.u32_field(CONTROL_CELL_SPEC_FLAG)
     }
 
     pub(crate) fn format_identifier(&self) -> Option<u32> {
@@ -396,7 +398,7 @@ impl BncCell {
         control_identifier: Option<u32>,
     ) -> Result<()> {
         match (kind, control_identifier) {
-            (CellDataFormatKind::Checkbox, Some(_))
+            (CellDataFormatKind::Checkbox | CellDataFormatKind::StarRating, Some(_))
             | (
                 CellDataFormatKind::NumberOrPercentage
                 | CellDataFormatKind::Currency
@@ -404,20 +406,23 @@ impl BncCell {
                 | CellDataFormatKind::Duration,
                 None,
             ) => {},
-            (CellDataFormatKind::Checkbox, None) => {
+            (CellDataFormatKind::Checkbox | CellDataFormatKind::StarRating, None) => {
                 return Err(Error::InvalidFormat(
-                    "Checkbox format requires a control-cell-spec identifier".to_owned(),
+                    "Interactive format requires a control-cell-spec identifier".to_owned(),
                 ));
             },
             (_, Some(_)) => {
                 return Err(Error::InvalidFormat(
-                    "Non-Checkbox format cannot use a control-cell-spec identifier".to_owned(),
+                    "Non-interactive format cannot use a control-cell-spec identifier".to_owned(),
                 ));
             },
         }
         self.convert_scalar_for_data_format(kind)?;
-        if kind != CellDataFormatKind::Checkbox {
-            self.fields.remove(&CHECKBOX_CONTROL_FLAG);
+        if !matches!(
+            kind,
+            CellDataFormatKind::Checkbox | CellDataFormatKind::StarRating
+        ) {
+            self.fields.remove(&CONTROL_CELL_SPEC_FLAG);
         }
         let (explicit_flags, format_kind) = match kind {
             CellDataFormatKind::NumberOrPercentage => {
@@ -486,10 +491,25 @@ impl BncCell {
                     identifier.to_le_bytes().to_vec(),
                 );
                 self.fields.insert(
-                    CHECKBOX_CONTROL_FLAG,
+                    CONTROL_CELL_SPEC_FLAG,
                     control_identifier.unwrap().to_le_bytes().to_vec(),
                 );
                 (EXPLICIT_CHECKBOX_FORMAT, CHECKBOX_CELL_FORMAT_KIND)
+            },
+            CellDataFormatKind::StarRating => {
+                self.fields.remove(&CURRENCY_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&DATE_TIME_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&DURATION_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&CHECKBOX_FORMAT_IDENTIFIER_FLAG);
+                self.fields.insert(
+                    CELL_FORMAT_IDENTIFIER_FLAG,
+                    identifier.to_le_bytes().to_vec(),
+                );
+                self.fields.insert(
+                    CONTROL_CELL_SPEC_FLAG,
+                    control_identifier.unwrap().to_le_bytes().to_vec(),
+                );
+                (EXPLICIT_DECIMAL_FORMAT, STAR_RATING_CELL_FORMAT_KIND)
             },
         };
         self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
@@ -507,7 +527,7 @@ impl BncCell {
         self.fields.remove(&DATE_TIME_FORMAT_IDENTIFIER_FLAG);
         self.fields.remove(&DURATION_FORMAT_IDENTIFIER_FLAG);
         self.fields.remove(&CHECKBOX_FORMAT_IDENTIFIER_FLAG);
-        self.fields.remove(&CHECKBOX_CONTROL_FLAG);
+        self.fields.remove(&CONTROL_CELL_SPEC_FLAG);
         let is_plain_numeric_rich_text_cell = self.prefix[1] == CELL_TYPE_RICH_TEXT_OR_NUMBER
             && !self.fields.contains_key(&RICH_TEXT_FLAG)
             && (self.fields.contains_key(&DECIMAL_FLAG) || self.fields.contains_key(&NUMBER_FLAG));
@@ -529,6 +549,7 @@ impl BncCell {
                 self.set_boolean(value != 0.0);
             },
             (CellDataFormatKind::Checkbox, None) => self.set_boolean(false),
+            (CellDataFormatKind::StarRating, None) => self.set_number(0.0)?,
             (CellDataFormatKind::Duration, Some(CachedScalar::Number(days))) => {
                 self.set_duration(spreadsheet_days_to_seconds(days)?)?;
             },
@@ -1005,6 +1026,36 @@ mod tests {
             .set_data_format_identifier(10, CellDataFormatKind::Checkbox, Some(1))
             .unwrap();
         assert_eq!(number.encode(), native_checked);
+    }
+
+    #[test]
+    fn star_rating_formats_match_native_numeric_metadata_and_conversion() {
+        let native_three =
+            hex("0502000000000100013400000300000000000000000000000000403002000000010000000b000000");
+        let three = BncCell::parse(&native_three).unwrap();
+        assert_eq!(three.stored_value(), StoredValue::Number);
+        assert_eq!(
+            three.cached_scalar().unwrap(),
+            Some(CachedScalar::Number(3.0))
+        );
+        assert_eq!(three.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(three.cell_format_kind(), Some(STAR_RATING_CELL_FORMAT_KIND));
+        assert_eq!(three.control_cell_spec_identifier(), Some(2));
+        assert_eq!(three.format_identifier(), Some(11));
+        assert_eq!(three.encode(), native_three);
+
+        let mut empty = BncCell::minimal();
+        empty
+            .set_data_format_identifier(11, CellDataFormatKind::StarRating, Some(2))
+            .unwrap();
+        assert_eq!(
+            empty.cached_scalar().unwrap(),
+            Some(CachedScalar::Number(0.0))
+        );
+        assert_eq!(empty.format_identifier(), Some(11));
+        empty.clear_explicit_format();
+        assert_eq!(empty.stored_value(), StoredValue::Number);
+        assert_eq!(empty.control_cell_spec_identifier(), None);
     }
 
     fn hex(value: &str) -> Vec<u8> {
