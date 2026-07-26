@@ -1,7 +1,8 @@
-//! Passive AutoText and formatted AutoCorrect metadata for glossary-only DOC files.
+//! Passive AutoText and formatted AutoCorrect metadata for legacy DOC files.
 
 use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
+use super::text::TextExtractor;
 
 const STTBF_GLSY_FIB_INDEX: usize = 9;
 const PLCF_GLSY_FIB_INDEX: usize = 10;
@@ -9,6 +10,7 @@ const STTB_GLSY_STYLE_FIB_INDEX: usize = 83;
 const MAX_ITEM_NAME_UNITS: usize = 32;
 const MAX_STYLE_USE_COUNT: u8 = 0x32;
 const MAX_TABLE_BYTES: usize = 16 * 1024 * 1024;
+const FIB_PAGE_BYTES: usize = 512;
 
 fn corrupted(message: impl Into<String>) -> DocError {
     DocError::Corrupted(message.into())
@@ -163,6 +165,131 @@ pub struct GlossaryMetadata {
     main_text_length: u32,
 }
 
+/// An AutoText-only document attached to a template through `FibBase.pnNext`.
+///
+/// Text, fields, links, embedded objects, and macros remain passive. This type
+/// only exposes stored metadata and text; it never resolves or activates content.
+pub struct AttachedGlossary {
+    fib: FileInformationBlock,
+    metadata: GlossaryMetadata,
+    text_extractor: TextExtractor,
+}
+
+impl AttachedGlossary {
+    pub(crate) fn parse(
+        main_fib: &FileInformationBlock,
+        word_document: &[u8],
+        table_stream: &[u8],
+    ) -> Result<Option<Self>> {
+        let page = main_fib.next_fib_page();
+        if page == 0 {
+            return Ok(None);
+        }
+        if main_fib.is_glossary_document() {
+            return Err(corrupted(
+                "glossary-only FIB has a forbidden nonzero pnNext",
+            ));
+        }
+        if !main_fib.is_template() {
+            return Err(corrupted(
+                "non-template document has a forbidden nonzero pnNext",
+            ));
+        }
+        let offset = usize::from(page)
+            .checked_mul(FIB_PAGE_BYTES)
+            .ok_or_else(|| corrupted("attached glossary FIB offset overflows"))?;
+        let main_fib_size = main_fib
+            .minimum_serialized_size()
+            .ok_or_else(|| corrupted("template FIB pointer array is truncated"))?;
+        if offset < main_fib_size {
+            return Err(corrupted("attached glossary FIB overlaps the template FIB"));
+        }
+        let main_cb_mac_u32 = main_fib
+            .word_document_size()
+            .ok_or_else(|| corrupted("template FIB does not contain cbMac"))?;
+        let main_cb_mac = usize::try_from(main_cb_mac_u32)
+            .map_err(|_| corrupted("template cbMac is too large"))?;
+        if main_cb_mac > word_document.len() {
+            return Err(corrupted(
+                "template cbMac extends beyond the WordDocument stream",
+            ));
+        }
+        if offset >= main_cb_mac {
+            return Err(corrupted(
+                "attached glossary FIB starts at or beyond template cbMac",
+            ));
+        }
+        let fib = FileInformationBlock::parse_at(word_document, offset)?;
+        if !fib.is_glossary_document() {
+            return Err(corrupted("pnNext does not address a glossary-only FIB"));
+        }
+        if fib.next_fib_page() != 0 {
+            return Err(corrupted(
+                "attached glossary FIB has a forbidden nonzero pnNext",
+            ));
+        }
+        if fib.which_table_stream() != main_fib.which_table_stream() {
+            return Err(corrupted(
+                "template and attached glossary select different table streams",
+            ));
+        }
+        for (index, name) in [(12, "PlcfBteChpx"), (13, "PlcfBtePapx")] {
+            let main = main_fib
+                .get_table_pointer(index)
+                .ok_or_else(|| corrupted(format!("template FIB does not contain {name}")))?;
+            let attached = fib.get_table_pointer(index).ok_or_else(|| {
+                corrupted(format!("attached glossary FIB does not contain {name}"))
+            })?;
+            if main != attached {
+                return Err(corrupted(format!(
+                    "template and attached glossary do not share {name}"
+                )));
+            }
+        }
+        let attached_cb_mac = fib
+            .word_document_size()
+            .ok_or_else(|| corrupted("attached glossary FIB does not contain cbMac"))?;
+        if attached_cb_mac != main_cb_mac_u32 {
+            return Err(corrupted(
+                "template and attached glossary do not share cbMac",
+            ));
+        }
+        let metadata = GlossaryMetadata::parse(&fib, table_stream)?
+            .ok_or_else(|| corrupted("attached glossary metadata is absent"))?;
+        let text_extractor = TextExtractor::new(&fib, word_document, table_stream)?;
+        metadata.validate_text_boundaries(&text_extractor)?;
+        Ok(Some(Self {
+            fib,
+            metadata,
+            text_extractor,
+        }))
+    }
+
+    /// The secondary AutoText-only FIB.
+    pub fn fib(&self) -> &FileInformationBlock {
+        &self.fib
+    }
+
+    /// Cross-validated item, style, and character-position metadata.
+    pub fn metadata(&self) -> &GlossaryMetadata {
+        &self.metadata
+    }
+
+    /// The complete stored AutoText-only main story.
+    pub fn text(&self) -> &str {
+        self.text_extractor.text()
+    }
+
+    /// Get one entry's stored content without its structural final character.
+    pub fn item_text(&self, index: usize) -> Option<&str> {
+        let item = self.metadata.items().get(index)?;
+        Some(
+            self.text_extractor
+                .text_at_range(item.start_cp(), item.end_cp().saturating_sub(1)),
+        )
+    }
+}
+
 impl GlossaryMetadata {
     pub fn try_new(
         items: Vec<GlossaryItem>,
@@ -277,6 +404,73 @@ impl GlossaryMetadata {
             .get(index)?
             .style_index
             .and_then(|style| self.styles.get(usize::from(style)))
+    }
+
+    pub(crate) fn validate_text_boundaries(&self, text: &TextExtractor) -> Result<()> {
+        for (index, item) in self.items.iter().enumerate() {
+            if !text.is_cp_boundary(item.start_cp) || !text.is_cp_boundary(item.end_cp) {
+                return Err(corrupted(format!(
+                    "glossary item {index} range splits a UTF-16 surrogate pair"
+                )));
+            }
+        }
+        for (name, cp) in [
+            ("terminal", self.terminal_cp),
+            ("ignored", self.ignored_cp),
+            ("ccpText", self.main_text_length),
+        ] {
+            if !text.is_cp_boundary(cp) {
+                return Err(corrupted(format!(
+                    "glossary {name} CP splits a UTF-16 surrogate pair"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate_utf16_bytes(&self, bytes: &[u8]) -> Result<()> {
+        let required_bytes = usize::try_from(self.main_text_length)
+            .ok()
+            .and_then(|units| units.checked_mul(2))
+            .ok_or_else(|| corrupted("glossary ccpText byte count overflows"))?;
+        let bytes = bytes
+            .get(..required_bytes)
+            .ok_or_else(|| corrupted("generated glossary text is truncated"))?;
+        let is_boundary = |cp: u32| {
+            let Ok(index) = usize::try_from(cp) else {
+                return false;
+            };
+            if index > bytes.len() / 2 {
+                return false;
+            }
+            if index == 0 || index == bytes.len() / 2 {
+                return true;
+            }
+            let previous_offset = (index - 1) * 2;
+            let current_offset = index * 2;
+            let previous = u16::from_le_bytes([bytes[previous_offset], bytes[previous_offset + 1]]);
+            let current = u16::from_le_bytes([bytes[current_offset], bytes[current_offset + 1]]);
+            !(matches!(previous, 0xD800..=0xDBFF) && matches!(current, 0xDC00..=0xDFFF))
+        };
+        for (index, item) in self.items.iter().enumerate() {
+            if !is_boundary(item.start_cp) || !is_boundary(item.end_cp) {
+                return Err(corrupted(format!(
+                    "glossary item {index} range splits a UTF-16 surrogate pair"
+                )));
+            }
+        }
+        for (name, cp) in [
+            ("terminal", self.terminal_cp),
+            ("ignored", self.ignored_cp),
+            ("ccpText", self.main_text_length),
+        ] {
+            if !is_boundary(cp) {
+                return Err(corrupted(format!(
+                    "glossary {name} CP splits a UTF-16 surrogate pair"
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// Serialize the three complete table payloads deterministically.

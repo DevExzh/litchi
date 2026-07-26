@@ -60,26 +60,40 @@ impl FileInformationBlock {
     ///
     /// A parsed FIB or an error if the data is invalid.
     pub fn parse(word_document: &[u8]) -> Result<Self> {
-        if word_document.len() < FIB_BASE_SIZE {
+        Self::parse_at(word_document, 0)
+    }
+
+    /// Parse a FIB at an explicit byte offset in the WordDocument stream.
+    ///
+    /// Secondary glossary FIBs are addressed by `FibBase.pnNext * 512`.
+    /// The returned object owns only the suffix beginning at the requested FIB,
+    /// rather than copying the prefix that precedes it.
+    pub fn parse_at(word_document: &[u8], offset: usize) -> Result<Self> {
+        let data = word_document.get(offset..).ok_or_else(|| {
+            DocError::Corrupted(format!(
+                "FIB offset {offset} is beyond the WordDocument stream"
+            ))
+        })?;
+        if data.len() < FIB_BASE_SIZE {
             return Err(DocError::Corrupted(
                 "WordDocument stream too short for FIB".to_string(),
             ));
         }
 
         // Read the base FIB fields (little-endian)
-        let magic = U16::<LE>::read_from_bytes(&word_document[0..2])
+        let magic = U16::<LE>::read_from_bytes(&data[0..2])
             .map(|v| v.get())
             .unwrap_or(0);
-        let nfib = U16::<LE>::read_from_bytes(&word_document[2..4])
+        let nfib = U16::<LE>::read_from_bytes(&data[2..4])
             .map(|v| v.get())
             .unwrap_or(0);
-        let lid = U16::<LE>::read_from_bytes(&word_document[6..8])
+        let lid = U16::<LE>::read_from_bytes(&data[6..8])
             .map(|v| v.get())
             .unwrap_or(0);
-        let flags = U16::<LE>::read_from_bytes(&word_document[10..12])
+        let flags = U16::<LE>::read_from_bytes(&data[10..12])
             .map(|v| v.get())
             .unwrap_or(0);
-        let l_key = U32::<LE>::read_from_bytes(&word_document[14..18])
+        let l_key = U32::<LE>::read_from_bytes(&data[14..18])
             .map(|v| v.get())
             .unwrap_or(0);
 
@@ -97,7 +111,7 @@ impl FileInformationBlock {
         let which_table_stream = (flags & 0x0200) != 0;
 
         // Store the complete FIB data for later parsing of variable fields
-        let data = word_document.to_vec();
+        let data = data.to_vec();
 
         Ok(Self {
             nfib,
@@ -167,6 +181,30 @@ impl FileInformationBlock {
     pub fn is_glossary_document(&self) -> bool {
         // fGlsy is bit 1 of the FibBase flags field.
         (self.flags & 0x0002) != 0
+    }
+
+    /// Whether this FIB describes a document template.
+    #[inline]
+    pub fn is_template(&self) -> bool {
+        // fDot is bit 0 of the FibBase flags field.
+        (self.flags & 0x0001) != 0
+    }
+
+    /// Page number of the attached glossary FIB, or zero when none is attached.
+    #[inline]
+    pub fn next_fib_page(&self) -> u16 {
+        U16::<LE>::read_from_bytes(&self.data[8..10])
+            .map(|value| value.get())
+            .unwrap_or(0)
+    }
+
+    /// `FibRgLw97.cbMac`, shared by a template and its attached glossary FIB.
+    #[inline]
+    pub fn word_document_size(&self) -> Option<u32> {
+        self.data
+            .get(64..68)
+            .and_then(|bytes| U32::<LE>::read_from_bytes(bytes).ok())
+            .map(|value| value.get())
     }
 
     /// Check whether the encrypted document uses legacy XOR obfuscation.
@@ -253,6 +291,12 @@ impl FileInformationBlock {
         let byte_len = count.checked_mul(TABLE_POINTER_SIZE)?;
         let end = offset.checked_add(byte_len)?;
         (end <= self.data.len()).then_some((offset, count))
+    }
+
+    /// Minimum byte extent occupied by this FIB through its declared pointer array.
+    pub(crate) fn minimum_serialized_size(&self) -> Option<usize> {
+        let (offset, count) = self.table_pointer_layout()?;
+        offset.checked_add(count.checked_mul(TABLE_POINTER_SIZE)?)
     }
 
     /// Get access to the raw FIB data.

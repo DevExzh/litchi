@@ -26,6 +26,7 @@ pub(super) fn append_glossary_tables(
     metadata: Option<&GlossaryMetadata>,
     table_offset: u32,
     main_text_length: u32,
+    text_stream: &[u8],
 ) -> Result<u32, DocWriteError> {
     let Some(metadata) = metadata else {
         return Ok(table_offset);
@@ -36,6 +37,9 @@ pub(super) fn append_glossary_tables(
             metadata.main_text_length()
         )));
     }
+    metadata
+        .validate_utf16_bytes(text_stream)
+        .map_err(invalid)?;
     let actual_offset = u32::try_from(table_stream.len())
         .map_err(|_| DocWriteError::InvalidData("DOC table stream exceeds 4 GiB".into()))?;
     if actual_offset != table_offset {

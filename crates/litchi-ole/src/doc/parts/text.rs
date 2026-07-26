@@ -94,6 +94,15 @@ impl TextExtractor {
         &self.text[self.cp_to_byte[start]..self.cp_to_byte[end]]
     }
 
+    /// Whether a UTF-16 character position maps to a Rust string boundary.
+    pub(crate) fn is_cp_boundary(&self, cp: u32) -> bool {
+        let Ok(index) = usize::try_from(cp) else {
+            return false;
+        };
+        index < self.cp_to_byte.len()
+            && (index == 0 || self.cp_to_byte[index] != self.cp_to_byte[index - 1])
+    }
+
     fn build_cp_to_byte_map(text: &str) -> Vec<usize> {
         let mut cp_to_byte = Vec::with_capacity(text.encode_utf16().count() + 1);
         for (offset, ch) in text.char_indices() {

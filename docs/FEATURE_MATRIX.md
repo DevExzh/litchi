@@ -281,7 +281,7 @@ conversion, fonts, and image conversion are optional.
 | FIB, piece tables, FKPs, and BinTable | ✅ | ✅ | ✅ | Core DOC storage and formatting structures; FIB table-pointer access is bounded by the declared `cbRgFcLcb` array, with the fixed Word 6/95 layout handled separately |
 | SPRM properties and DOP versions | ✅ | ✅ | ✅ | Typed properties with unknown-data preservation where applicable |
 | Associated strings, saved-by, proofing, and revision tables | ✅ | ✅ | ✅ | Typed, bounded auxiliary tables with mandatory associated-string emission, optional save-history authoring, proofing-state PLCFs, and round-trip mutation |
-| Glossary/AutoText | 🟡 | ✅ | 🟡 | Strict `SttbfGlsy`/`PlcfGlsy`/`SttbGlsyStyle` parsing, passive item text, and bounded glossary-only `fGlsy` authoring; attached template glossaries via a secondary `pnNext` FIB remain unsupported |
+| Glossary/AutoText | 🟡 | ✅ | 🟡 | Strict glossary-only and attached-template secondary-`pnNext` FIB parsing, shared-BTE/`cbMac` validation, passive item text, and bounded glossary-only `fGlsy` authoring; attached-template authoring remains unsupported |
 
 ### Advanced and package features
 

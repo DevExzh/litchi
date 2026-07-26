@@ -28,7 +28,7 @@ use super::parts::fields::{
     TableOfContentsField, UserIdentityField,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
-use super::parts::glossary::GlossaryMetadata;
+use super::parts::glossary::{AttachedGlossary, GlossaryMetadata};
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
 use super::parts::list_names::ListNamesTable;
@@ -118,6 +118,8 @@ pub struct Document {
     saved_by_table: Result<SavedByTable>,
     /// Deferred strict glossary-only AutoText metadata parse
     glossary_metadata: Result<Option<GlossaryMetadata>>,
+    /// Deferred strict secondary-FIB glossary parse for templates
+    attached_glossary: Result<Option<AttachedGlossary>>,
     /// Section ranges, layout, and property revision marks
     sections: SectionsTable,
     /// Floating-shape anchors from the Main Document PlcfSpa (empty when the
@@ -244,7 +246,13 @@ impl Document {
         let list_templates = ListTemplateTable::parse(&fib, &table_stream)?;
         let proofing_tables = ProofingTables::parse(&fib, &table_stream);
         let saved_by_table = SavedByTable::parse(&fib, &table_stream);
-        let glossary_metadata = GlossaryMetadata::parse(&fib, &table_stream);
+        let glossary_metadata = GlossaryMetadata::parse(&fib, &table_stream).and_then(|metadata| {
+            if let Some(metadata) = &metadata {
+                metadata.validate_text_boundaries(&text_extractor)?;
+            }
+            Ok(metadata)
+        });
+        let attached_glossary = AttachedGlossary::parse(&fib, &word_document, &table_stream);
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
         let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
@@ -331,6 +339,7 @@ impl Document {
             proofing_tables,
             saved_by_table,
             glossary_metadata,
+            attached_glossary,
             sections,
             shape_anchors,
             header_shape_anchors,
@@ -679,6 +688,19 @@ impl Document {
             item.start_cp(),
             item.end_cp().saturating_sub(1),
         )))
+    }
+
+    /// Strictly access a template's secondary-FIB attached AutoText document.
+    ///
+    /// The returned content is passive and never evaluates fields, follows
+    /// links, activates embedded objects, or resolves or executes macros.
+    pub fn attached_glossary(&self) -> Result<Option<&AttachedGlossary>> {
+        self.attached_glossary
+            .as_ref()
+            .map(Option::as_ref)
+            .map_err(|error| {
+                DocError::Corrupted(format!("invalid attached glossary: {error}"))
+            })
     }
 
     /// Get access to the fields table (if parsed).

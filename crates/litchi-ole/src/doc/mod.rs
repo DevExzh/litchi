@@ -156,7 +156,8 @@ pub use parts::fields::{
 };
 pub use parts::fields::{StyleReferenceField, StyleReferenceFieldOption};
 pub use parts::glossary::{
-    GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, GlossaryTables,
+    AttachedGlossary, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle,
+    GlossaryTables,
 };
 pub use parts::list_names::ListNamesTable;
 pub use parts::list_templates::{

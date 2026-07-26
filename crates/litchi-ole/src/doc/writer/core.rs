@@ -3927,6 +3927,7 @@ impl DocWriter {
             self.glossary_metadata.as_ref(),
             table_offset,
             text_length,
+            &text_stream,
         )?;
 
         // Write PlcfHdd if present (headers/footers PLCF)
@@ -4831,6 +4832,7 @@ impl DocWriter {
             self.glossary_metadata.as_ref(),
             table_offset,
             text_length,
+            &text_stream,
         )?;
 
         // Write PlcfHdd if present
