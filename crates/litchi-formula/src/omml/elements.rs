@@ -54,6 +54,9 @@ pub enum ElementType {
     Scr,
     Sty,
     Nor,
+    /// Simple property element carrying a single `m:val` attribute (or text
+    /// content), e.g. `m:type`, `m:subHide`, `m:supHide`, `m:baseJc`.
+    ValProperty,
     Unknown,
 }
 
@@ -242,6 +245,8 @@ pub struct ElementContext<'arena> {
     // Matrix and array structures
     pub matrix_rows: Vec<Vec<Vec<MathNode<'arena>>>>,
     pub matrix_cells: Vec<MathNode<'arena>>,
+    /// Cells collected for a single matrix row (each cell may hold several nodes)
+    pub matrix_row_cells: Vec<Vec<MathNode<'arena>>>,
     pub eq_array_rows: Vec<Vec<MathNode<'arena>>>,
 
     // Function and operator data
@@ -284,6 +289,7 @@ impl<'arena> ElementContext<'arena> {
             integrand: None,
             matrix_rows: Vec::new(),
             matrix_cells: Vec::new(),
+            matrix_row_cells: Vec::new(),
             eq_array_rows: Vec::new(),
             function_name: None,
             operator: None,
@@ -315,6 +321,7 @@ impl<'arena> ElementContext<'arena> {
         self.integrand = None;
         self.matrix_rows.clear();
         self.matrix_cells.clear();
+        self.matrix_row_cells.clear();
         self.eq_array_rows.clear();
         self.function_name = None;
         self.fence_open = None;

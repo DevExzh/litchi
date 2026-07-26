@@ -33,12 +33,18 @@ mod properties;
 /// This module provides utility functions for OMML parsing, including
 /// performance optimizations, string processing, and helper functions.
 mod utils;
+/// OMML writer
+///
+/// This module serializes the formula AST back to OMML XML (the reverse of
+/// the parser), enabling round-trips and authoring math into OOXML documents.
+mod writer;
 
 use crate::ast::MathNode;
 
 pub use error::OmmlError;
 /// Re-export public API
 pub use parser::OmmlParser;
+pub use writer::OmmlWriter;
 
 #[cfg(test)]
 mod tests {

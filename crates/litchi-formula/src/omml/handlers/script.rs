@@ -80,7 +80,8 @@ impl SuperscriptElementHandler {
         if let Some(parent) = parent_context {
             match parent.element_type {
                 crate::omml::elements::ElementType::Superscript
-                | crate::omml::elements::ElementType::SubSup => {
+                | crate::omml::elements::ElementType::SubSup
+                | crate::omml::elements::ElementType::PreScript => {
                     parent.superscript = Some(context.children.clone());
                 },
                 crate::omml::elements::ElementType::Nary => {
@@ -110,7 +111,8 @@ impl SubscriptElementHandler {
         if let Some(parent) = parent_context {
             match parent.element_type {
                 crate::omml::elements::ElementType::Subscript
-                | crate::omml::elements::ElementType::SubSup => {
+                | crate::omml::elements::ElementType::SubSup
+                | crate::omml::elements::ElementType::PreScript => {
                     parent.subscript = Some(context.children.clone());
                 },
                 crate::omml::elements::ElementType::Nary => {

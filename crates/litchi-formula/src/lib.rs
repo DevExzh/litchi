@@ -76,7 +76,7 @@ pub use ast::{
 };
 pub use latex::{LatexConverter, LatexError};
 pub use mtef::{MtefError, MtefParser};
-pub use omml::{OmmlError, OmmlParser};
+pub use omml::{OmmlError, OmmlParser, OmmlWriter};
 
 /// Conversion error that wraps all possible formula errors
 #[derive(Debug)]
@@ -163,11 +163,23 @@ pub fn omml_to_mtef(_omml: &str) -> Result<Vec<u8>, FormulaError> {
     unimplemented!("OMML to MTEF conversion is not yet implemented")
 }
 
-/// Convert MTEF to OMML (not yet implemented)
+/// Convert MTEF binary data to OMML
 ///
-/// This function is planned for future implementation.
-pub fn mtef_to_omml(_mtef_data: &[u8]) -> Result<String, FormulaError> {
-    unimplemented!("MTEF to OMML conversion is not yet implemented")
+/// Parses the MathType equation and serializes the resulting AST as an
+/// `m:oMath` fragment suitable for embedding in OOXML documents.
+///
+/// # Example
+/// ```ignore
+/// let omml = mtef_to_omml(mtef_data)?;
+/// println!("OMML: {}", omml);
+/// ```
+pub fn mtef_to_omml(mtef_data: &[u8]) -> Result<String, FormulaError> {
+    let formula = Formula::new();
+    let mut parser = MtefParser::new(formula.arena(), mtef_data);
+    let nodes = parser.parse()?;
+
+    let mut writer = OmmlWriter::new();
+    Ok(writer.write_nodes(&nodes)?.to_string())
 }
 
 #[cfg(test)]
@@ -186,5 +198,52 @@ mod tests {
         let formula = Formula::new();
         assert!(formula.root().is_empty());
         assert!(formula.display_style());
+    }
+
+    /// A minimal MTEF 5 stream: OLE equation header plus a SIZE and END record.
+    fn minimal_mtef5() -> Vec<u8> {
+        let mut data = vec![0u8; 28];
+        data[0] = 0x1c; // cb_hdr
+        data[2] = 0x00; // version
+        data[4] = 0x03; // cf_id
+        data[5] = 0x00;
+        data[6] = 0x00;
+        data[7] = 0x00;
+        data[8] = 0x02;
+        data.extend_from_slice(&[
+            0x05, // mtef_version = 5
+            0x01, // platform = Windows
+            0x01, // product = MathType
+            0x01, // version
+            0x00, // version_sub
+            0x00, // application_key (empty, null-terminated)
+            0x00, // inline
+            0x09, // SIZE
+            0x00, // END
+        ]);
+        data
+    }
+
+    #[test]
+    fn mtef_to_omml_emits_a_namespaced_omath_fragment() {
+        let omml = mtef_to_omml(&minimal_mtef5()).expect("minimal MTEF 5 converts");
+        assert!(
+            omml.starts_with("<m:oMath "),
+            "expected an m:oMath root, got {omml}"
+        );
+        assert!(
+            omml.contains("officeDocument/2006/math"),
+            "expected the OMML namespace declaration, got {omml}"
+        );
+        assert!(omml.ends_with("</m:oMath>"), "unclosed fragment: {omml}");
+    }
+
+    #[test]
+    fn mtef_to_omml_rejects_no_data_without_panicking() {
+        // Too short for the OLE equation header: the parser yields no nodes
+        // rather than panicking, so the conversion still produces a fragment.
+        let omml = mtef_to_omml(&[0u8; 4]).expect("short input is not fatal");
+        assert!(omml.starts_with("<m:oMath "));
+        assert!(omml.ends_with("</m:oMath>"));
     }
 }

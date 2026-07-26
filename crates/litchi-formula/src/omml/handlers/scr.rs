@@ -12,11 +12,13 @@ impl ScrHandler {
         _arena: &'arena bumpalo::Bump, // Unused: formatting handler, sets flags in context
     ) {
         if let Some(parent) = parent_context {
-            // Set math variant based on element content
-            let text_content = context.text.as_str().trim();
-            if !text_content.is_empty() {
-                parent.properties.math_variant = Some(text_content.to_string());
-                parent.properties.run_math_style = Some(text_content.to_string());
+            // Set math variant from the m:val attribute or element content
+            let value = context.character_data.take().unwrap_or_else(|| {
+                context.text.as_str().trim().to_string()
+            });
+            if !value.is_empty() {
+                parent.properties.math_variant = Some(value.clone());
+                parent.properties.run_math_style = Some(value);
             }
         }
     }

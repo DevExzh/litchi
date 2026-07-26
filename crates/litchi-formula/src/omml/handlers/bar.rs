@@ -19,11 +19,14 @@ impl BarHandler {
             context.children.clone()
         };
 
-        // Use dedicated position parsing function
+        // Use dedicated position parsing function. The position may come from
+        // an `m:pos` child element in `m:barPr` (accent_position) or from an
+        // alignment attribute.
         let position = context
             .properties
-            .alignment
+            .accent_position
             .as_ref()
+            .or(context.properties.alignment.as_ref())
             .and_then(|s| parse_position_type(Some(s)));
 
         let node = MathNode::Bar {

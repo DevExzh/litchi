@@ -83,6 +83,9 @@ impl BaseHandler {
                 ElementType::Accent | ElementType::Bar | ElementType::GroupChar => {
                     parent.base = Some(context.children.clone());
                 },
+                ElementType::LimLow | ElementType::LimUpp | ElementType::PreScript => {
+                    parent.base = Some(context.children.clone());
+                },
                 ElementType::Nary => {
                     // For n-ary operators, the e element is the integrand
                     parent.integrand = Some(context.children.clone());
@@ -174,13 +177,23 @@ impl LimUppHandler {
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Nary {
-                parent.upper_limit = Some(context.children.clone());
+                // Combine any routed base/limit content for legacy nary nesting
+                let mut combined = context.base.take().unwrap_or_default();
+                combined.extend(context.upper_limit.take().unwrap_or_default());
+                combined.extend(context.children.clone());
+                parent.upper_limit = Some(combined);
             } else {
-                // If not in nary context, treat as overset
-                crate::omml::utils::extend_vec_efficient(
-                    &mut parent.children,
-                    context.children.clone(),
-                );
+                // Standalone limUpp: base with an overscript (ECMA-376 §22.1.2.54)
+                let base = context
+                    .base
+                    .take()
+                    .unwrap_or_else(|| context.children.clone());
+                let over = context.upper_limit.take().unwrap_or_default();
+                parent.children.push(crate::ast::MathNode::Over {
+                    base,
+                    over,
+                    position: None,
+                });
             }
         }
     }
@@ -197,13 +210,23 @@ impl LimLowHandler {
     ) {
         if let Some(parent) = parent_context {
             if parent.element_type == ElementType::Nary {
-                parent.lower_limit = Some(context.children.clone());
+                // Combine any routed base/limit content for legacy nary nesting
+                let mut combined = context.base.take().unwrap_or_default();
+                combined.extend(context.lower_limit.take().unwrap_or_default());
+                combined.extend(context.children.clone());
+                parent.lower_limit = Some(combined);
             } else {
-                // If not in nary context, treat as underset
-                crate::omml::utils::extend_vec_efficient(
-                    &mut parent.children,
-                    context.children.clone(),
-                );
+                // Standalone limLow: base with an underscript (ECMA-376 §22.1.2.53)
+                let base = context
+                    .base
+                    .take()
+                    .unwrap_or_else(|| context.children.clone());
+                let under = context.lower_limit.take().unwrap_or_default();
+                parent.children.push(crate::ast::MathNode::Under {
+                    base,
+                    under,
+                    position: None,
+                });
             }
         }
     }

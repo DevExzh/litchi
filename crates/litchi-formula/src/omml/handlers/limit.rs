@@ -1,6 +1,6 @@
 // Limit element handler
 
-use crate::omml::elements::ElementContext;
+use crate::omml::elements::{ElementContext, ElementType};
 
 /// Handler for limit elements
 pub struct LimitHandler;
@@ -12,11 +12,21 @@ impl LimitHandler {
         _arena: &'arena bumpalo::Bump, // Unused: limit elements are owned Vec from context
     ) {
         if let Some(parent) = parent_context {
-            // Limits are handled by the specific handlers above
-            crate::omml::utils::extend_vec_efficient(
-                &mut parent.children,
-                context.children.clone(),
-            );
+            match parent.element_type {
+                // The m:lim child of m:limLow / m:limUpp carries the script
+                ElementType::LimLow => {
+                    parent.lower_limit = Some(context.children.clone());
+                },
+                ElementType::LimUpp => {
+                    parent.upper_limit = Some(context.children.clone());
+                },
+                _ => {
+                    crate::omml::utils::extend_vec_efficient(
+                        &mut parent.children,
+                        context.children.clone(),
+                    );
+                },
+            }
         }
     }
 }

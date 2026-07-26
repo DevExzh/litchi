@@ -44,23 +44,23 @@ impl DelimiterHandler {
         parent_context: Option<&mut ElementContext<'arena>>,
         arena: &'arena bumpalo::Bump,
     ) {
-        // Use fence characters parsed in handle_start, or fall back to properties
+        // Use fence characters parsed in handle_start, or fall back to properties.
+        // An explicitly empty character (begChr/endChr with an empty m:val)
+        // means "no fence" per ECMA-376; an absent one defaults to parentheses.
         let open = context.fence_open.unwrap_or_else(|| {
-            context
-                .properties
-                .delimiter_open_char
-                .as_deref()
-                .and_then(|s| parse_fence_type(Some(s), None).0)
-                .unwrap_or(Fence::Paren)
+            match context.properties.delimiter_open_char.as_deref() {
+                Some("") => Fence::None,
+                Some(s) => parse_fence_type(Some(s), None).0.unwrap_or(Fence::Paren),
+                None => Fence::Paren,
+            }
         });
 
         let close = context.fence_close.unwrap_or_else(|| {
-            context
-                .properties
-                .delimiter_close_char
-                .as_deref()
-                .and_then(|s| parse_fence_type(None, Some(s)).1)
-                .unwrap_or(Fence::Paren)
+            match context.properties.delimiter_close_char.as_deref() {
+                Some("") => Fence::None,
+                Some(s) => parse_fence_type(None, Some(s)).1.unwrap_or(Fence::Paren),
+                None => Fence::Paren,
+            }
         });
 
         let content = if context.children.is_empty() {

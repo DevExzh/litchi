@@ -141,8 +141,28 @@ pub static ELEMENT_TYPES: phf::Map<&'static str, ElementType> = phf_map! {
     "m:begChr" => ElementType::Character,
     "endChr" => ElementType::Character,
     "m:endChr" => ElementType::Character,
+    "sepChr" => ElementType::Character,
+    "m:sepChr" => ElementType::Character,
     "e" => ElementType::Base,
     "m:e" => ElementType::Base,
+
+    // Single-value property elements (carry an m:val attribute or text content)
+    "type" => ElementType::ValProperty,
+    "m:type" => ElementType::ValProperty,
+    "subHide" => ElementType::ValProperty,
+    "m:subHide" => ElementType::ValProperty,
+    "supHide" => ElementType::ValProperty,
+    "m:supHide" => ElementType::ValProperty,
+    "baseJc" => ElementType::ValProperty,
+    "m:baseJc" => ElementType::ValProperty,
+    "maxDist" => ElementType::ValProperty,
+    "m:maxDist" => ElementType::ValProperty,
+    "objDist" => ElementType::ValProperty,
+    "m:objDist" => ElementType::ValProperty,
+    "rSp" => ElementType::ValProperty,
+    "m:rSp" => ElementType::ValProperty,
+    "rSpRule" => ElementType::ValProperty,
+    "m:rSpRule" => ElementType::ValProperty,
 
     // Spacing
 };

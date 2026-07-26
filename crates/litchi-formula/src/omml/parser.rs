@@ -6,8 +6,8 @@ use crate::omml::handlers::*;
 use crate::omml::lookup::*;
 use crate::omml::properties::*;
 use crate::omml::utils::{validate_element_nesting, validate_omml_structure, *};
-use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::{Reader, XmlVersion};
 use std::borrow::Cow;
 
 /// OMML parser that converts OMML XML to our formula AST
@@ -68,7 +68,12 @@ impl<'arena> OmmlParser<'arena> {
                     depth = depth.saturating_sub(1);
                 },
                 Ok(Event::Text(ref e)) => {
-                    self.handle_text_element(e, &mut stack)?;
+                    // Decode, unescape entities (&amp;, &lt;, ...), and normalize
+                    // end-of-line characters before storing.
+                    let text = e
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|err| OmmlError::XmlError(format!("Unescape error: {}", err)))?;
+                    self.handle_text_element(text.as_bytes(), &mut stack)?;
                 },
                 Ok(Event::CData(ref e)) => {
                     self.handle_cdata_element(e, &mut stack)?;
@@ -153,6 +158,22 @@ impl<'arena> OmmlParser<'arena> {
 
         // Performance optimization: Don't store attributes in context as they're never used
         // This eliminates a clone() and unsafe transmute on every element
+
+        // Value-carrying property elements (m:chr, m:begChr, m:type, m:scr, ...)
+        // conventionally store their payload in an m:val attribute; capture it
+        // now so the end handlers can consume it without keeping attributes.
+        if matches!(
+            element_type,
+            ElementType::Character
+                | ElementType::ValProperty
+                | ElementType::Lit
+                | ElementType::Scr
+                | ElementType::Sty
+                | ElementType::Position
+                | ElementType::VerticalAlignment
+        ) {
+            context.character_data = get_attribute_value(&attrs, "val");
+        }
 
         // Element-specific attribute parsing using handlers
         // Performance optimization: Only parse properties that are actually needed by each element type
@@ -384,6 +405,9 @@ impl<'arena> OmmlParser<'arena> {
             ElementType::Character => {
                 CharHandler::handle_end(name, &mut context, parent_context, self.arena);
             },
+            ElementType::ValProperty => {
+                ValPropertyHandler::handle_end(name, &mut context, parent_context, self.arena);
+            },
             ElementType::Spacing => {
                 SpacingHandler::handle_end(&mut context, parent_context, self.arena);
             },
@@ -472,10 +496,23 @@ impl<'arena> OmmlParser<'arena> {
                     extend_vec_efficient(&mut parent.children, context.children);
                 }
             },
-            // Handle structural elements that just pass children up
+            ElementType::EqArrPr => {
+                if let Some(parent) = parent_context {
+                    // Copy equation-array properties gathered from child
+                    // elements (m:baseJc, m:maxDist, ...) to the eqArr context
+                    parent.properties = context.properties.clone();
+                    extend_vec_efficient(&mut parent.children, context.children);
+                }
+            },
+            // Matrix cells: each m:e inside m:mr is one cell that may contain
+            // several nodes; keep the cell boundary intact.
             ElementType::MatrixCell => {
                 if let Some(parent) = parent_context {
-                    extend_vec_efficient(&mut parent.children, context.children);
+                    if parent.element_type == ElementType::MatrixRow {
+                        parent.matrix_row_cells.push(context.children.clone());
+                    } else {
+                        extend_vec_efficient(&mut parent.children, context.children);
+                    }
                 }
             },
             _ => {
@@ -537,6 +574,20 @@ impl<'arena> OmmlParser<'arena> {
             std::str::from_utf8(name.as_ref()).map_err(|e| OmmlError::ParseError(e.to_string()))?;
         let element_type = get_element_type(name_str);
 
+        // Handle context-dependent element types (same mapping as start elements)
+        let element_type = match (name_str, stack.last().map(|ctx| ctx.element_type)) {
+            ("e" | "m:e", Some(ElementType::Nary)) => ElementType::Integrand,
+            ("e" | "m:e", Some(ElementType::Radical)) => ElementType::Base,
+            (
+                "e" | "m:e",
+                Some(ElementType::Superscript)
+                | Some(ElementType::Subscript)
+                | Some(ElementType::SubSup),
+            ) => ElementType::Base,
+            ("e" | "m:e", Some(ElementType::MatrixRow)) => ElementType::MatrixCell,
+            _ => element_type,
+        };
+
         // For self-closing elements, we need to handle both start and end logic
         let mut context = context_pool.get(element_type);
 
@@ -547,6 +598,21 @@ impl<'arena> OmmlParser<'arena> {
         // This eliminates a clone() and unsafe transmute on every element
 
         context.properties = parse_attributes_batch(&attrs);
+
+        // Capture the m:val payload of self-closing property elements, e.g.
+        // <m:chr m:val="^"/> or <m:subHide m:val="1"/>
+        if matches!(
+            element_type,
+            ElementType::Character
+                | ElementType::ValProperty
+                | ElementType::Lit
+                | ElementType::Scr
+                | ElementType::Sty
+                | ElementType::Position
+                | ElementType::VerticalAlignment
+        ) {
+            context.character_data = get_attribute_value(&attrs, "val");
+        }
 
         // Handle element-specific start logic
         match element_type {
@@ -673,6 +739,37 @@ impl<'arena> OmmlParser<'arena> {
             },
             ElementType::Character => {
                 CharHandler::handle_end(name.as_ref(), &mut context, parent_context, self.arena);
+            },
+            ElementType::ValProperty => {
+                ValPropertyHandler::handle_end(
+                    name.as_ref(),
+                    &mut context,
+                    parent_context,
+                    self.arena,
+                );
+            },
+            ElementType::Lit => {
+                LitHandler::handle_end(&mut context, parent_context, self.arena);
+            },
+            ElementType::Scr => {
+                ScrHandler::handle_end(&mut context, parent_context, self.arena);
+            },
+            ElementType::Sty => {
+                StyHandler::handle_end(&mut context, parent_context, self.arena);
+            },
+            ElementType::Position => {
+                PosHandler::handle_end(&mut context, parent_context, self.arena);
+            },
+            ElementType::VerticalAlignment => {
+                VertJcHandler::handle_end(&mut context, parent_context, self.arena);
+            },
+            ElementType::MatrixCell => {
+                // Self-closing m:e inside m:mr is an empty matrix cell
+                if let Some(parent) = parent_context
+                    && parent.element_type == ElementType::MatrixRow
+                {
+                    parent.matrix_row_cells.push(Vec::new());
+                }
             },
             _ => {
                 // For unknown or unhandled self-closing elements, do nothing

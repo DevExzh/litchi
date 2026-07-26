@@ -12,12 +12,20 @@ impl LitHandler {
         _arena: &'arena bumpalo::Bump, // Unused: formatting handler, sets flags in context
     ) {
         if let Some(parent) = parent_context {
-            // Set literal property based on element content
-            let text_content = context.text.as_str().trim();
-            if !text_content.is_empty() {
-                parent.properties.run_literal =
-                    Some(text_content == "1" || text_content.to_lowercase() == "true");
-            }
+            // Set literal property from the m:val attribute or element content.
+            // A bare `<m:lit/>` element means "on" (CT_OnOff semantics).
+            let value = context.character_data.take().or_else(|| {
+                let text_content = context.text.as_str().trim();
+                if text_content.is_empty() {
+                    None
+                } else {
+                    Some(text_content.to_string())
+                }
+            });
+            parent.properties.run_literal = Some(match value {
+                Some(v) => v == "1" || v.eq_ignore_ascii_case("true") || v == "on",
+                None => true,
+            });
         }
     }
 }

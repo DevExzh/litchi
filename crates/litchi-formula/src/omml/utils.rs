@@ -545,7 +545,8 @@ pub fn validate_element_nesting(
                 ElementType::Superscript
                 | ElementType::SubSup
                 | ElementType::Nary
-                | ElementType::Integrand,
+                | ElementType::Integrand
+                | ElementType::PreScript,
             ) => {},
             _ => {
                 return Err(super::OmmlError::InvalidStructure(
@@ -558,7 +559,8 @@ pub fn validate_element_nesting(
                 ElementType::Subscript
                 | ElementType::SubSup
                 | ElementType::Nary
-                | ElementType::Integrand,
+                | ElementType::Integrand
+                | ElementType::PreScript,
             ) => {},
             _ => {
                 return Err(super::OmmlError::InvalidStructure(

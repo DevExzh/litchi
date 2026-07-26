@@ -12,10 +12,12 @@ impl PosHandler {
         _arena: &'arena bumpalo::Bump, // Unused: formatting handler, sets flags in context
     ) {
         if let Some(parent) = parent_context {
-            // Set position property based on element content
-            let text_content = context.text.as_str().trim();
-            if !text_content.is_empty() {
-                parent.properties.accent_position = Some(text_content.to_string());
+            // Set position from the m:val attribute or element content
+            let value = context.character_data.take().unwrap_or_else(|| {
+                context.text.as_str().trim().to_string()
+            });
+            if !value.is_empty() {
+                parent.properties.accent_position = Some(value);
             }
         }
     }

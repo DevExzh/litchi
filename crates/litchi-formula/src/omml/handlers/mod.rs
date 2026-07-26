@@ -29,6 +29,7 @@ mod scr;
 mod script;
 mod spacing;
 mod sty;
+mod val_property;
 mod vert_jc;
 
 pub use accent::AccentHandler;
@@ -65,4 +66,5 @@ pub use script::{
 };
 pub use spacing::SpacingHandler;
 pub use sty::StyHandler;
+pub use val_property::ValPropertyHandler;
 pub use vert_jc::VertJcHandler;

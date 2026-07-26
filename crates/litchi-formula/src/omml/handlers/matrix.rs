@@ -89,13 +89,18 @@ impl MatrixRowHandler {
         if let Some(parent) = parent_context
             && parent.element_type == ElementType::Matrix
         {
-            // Matrix row - collect cells from children
-            // Each child represents a cell (mtd element)
-            let mut row = Vec::new();
-            for child in &context.children {
-                // Each child is a cell containing mathematical content
-                row.push(vec![child.clone()]);
-            }
+            // Matrix row - prefer explicitly collected cells (each m:e child is
+            // one cell and may contain several nodes); fall back to treating
+            // each loose child node as its own cell.
+            let row = if context.matrix_row_cells.is_empty() {
+                context
+                    .children
+                    .iter()
+                    .map(|child| vec![child.clone()])
+                    .collect()
+            } else {
+                std::mem::take(&mut context.matrix_row_cells)
+            };
             parent.matrix_rows.push(row);
         }
     }

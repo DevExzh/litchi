@@ -13,6 +13,9 @@ pub enum OmmlError {
     MissingRequiredElement(String),
     InvalidAttribute(String),
     ArenaAllocationError(String),
+    /// The formula AST cannot be serialized to OMML (e.g. it contains an
+    /// `Error` node produced by a failed parse).
+    SerializationError(String),
 }
 
 impl std::fmt::Display for OmmlError {
@@ -33,6 +36,7 @@ impl std::fmt::Display for OmmlError {
             },
             OmmlError::InvalidAttribute(msg) => write!(f, "Invalid attribute: {}", msg),
             OmmlError::ArenaAllocationError(msg) => write!(f, "Arena allocation error: {}", msg),
+            OmmlError::SerializationError(msg) => write!(f, "OMML serialization error: {}", msg),
         }
     }
 }
