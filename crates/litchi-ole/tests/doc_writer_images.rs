@@ -5,12 +5,10 @@
 //! format, dimensions, and byte-identity of the embedded payloads.
 #![cfg(feature = "imgconv")]
 
+use litchi_imgconv::BlipType;
 use litchi_ole::doc::image::PictureFields;
 use litchi_ole::doc::writer::{DocPicture, DocWriter, FloatingPosition, PictureFormat};
-use litchi_ole::doc::{
-    Package, Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin,
-};
-use litchi_imgconv::BlipType;
+use litchi_ole::doc::{Package, Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
 
@@ -70,9 +68,22 @@ fn make_png(width: u32, height: u32) -> Vec<u8> {
 }
 
 fn jpeg_fixture() -> Vec<u8> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-data/images/jpg/abstract4.jpg");
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/images/jpg/abstract4.jpg");
     std::fs::read(path).expect("read JPEG fixture")
+}
+
+fn hex_fixture(name: &str) -> Vec<u8> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/doc/pictures")
+        .join(name);
+    std::fs::read_to_string(path)
+        .expect("read picture fixture")
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .flat_map(str::split_ascii_whitespace)
+        .map(|byte| u8::from_str_radix(byte, 16).expect("fixture contains hexadecimal bytes"))
+        .collect()
 }
 
 fn picture_runs(document: &litchi_ole::doc::Document) -> Vec<Run> {
@@ -155,6 +166,86 @@ fn png_and_jpeg_pictures_round_trip_through_doc_reader() {
 }
 
 #[test]
+fn native_officeart_picture_family_round_trips_without_reencoding() {
+    let fixtures = [
+        ("dib-2x3.hex", PictureFormat::Dib, BlipType::Dib, (30, 45)),
+        (
+            "tiff-2x3.hex",
+            PictureFormat::Tiff,
+            BlipType::Tiff,
+            (30, 45),
+        ),
+        (
+            "emf-1x0.5in.hex",
+            PictureFormat::Emf,
+            BlipType::Emf,
+            (1440, 720),
+        ),
+        (
+            "wmf-placeable-1x0.5in.hex",
+            PictureFormat::Wmf,
+            BlipType::Wmf,
+            (1440, 720),
+        ),
+        (
+            "pict-96x48.hex",
+            PictureFormat::Pict,
+            BlipType::Pict,
+            (1440, 720),
+        ),
+    ];
+    let mut writer = DocWriter::new();
+    let mut expected = Vec::new();
+    for (name, format, blip_type, dimensions) in fixtures {
+        let bytes = hex_fixture(name);
+        let picture = DocPicture::new(bytes.clone())
+            .unwrap_or_else(|error| panic!("{name} failed validation: {error}"));
+        assert_eq!(picture.format(), format);
+        assert_eq!((picture.width_twips(), picture.height_twips()), dimensions);
+        expected.push((blip_type, bytes));
+        writer.insert_picture(picture).unwrap();
+    }
+
+    let mut cursor = Cursor::new(Vec::new());
+    writer.write_to(&mut cursor).unwrap();
+    let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let document = package.document().unwrap();
+    let runs = picture_runs(&document);
+    assert_eq!(runs.len(), expected.len());
+    for (run, (blip_type, bytes)) in runs.iter().zip(&expected) {
+        let extracted = document.image_data(run.image().unwrap()).unwrap();
+        assert_eq!(extracted.blip_type(), Some(*blip_type));
+        assert_eq!(extracted.raw_data(), bytes);
+    }
+}
+
+#[test]
+fn bmp_is_normalized_to_dib_and_explicit_formats_are_validated() {
+    let dib = hex_fixture("dib-2x3.hex");
+    let mut bmp = Vec::with_capacity(14 + dib.len());
+    bmp.extend_from_slice(b"BM");
+    bmp.extend_from_slice(&u32::try_from(14 + dib.len()).unwrap().to_le_bytes());
+    bmp.extend_from_slice(&[0; 4]);
+    bmp.extend_from_slice(&54u32.to_le_bytes());
+    bmp.extend_from_slice(&dib);
+
+    let picture = DocPicture::new(bmp).unwrap();
+    assert_eq!(picture.format(), PictureFormat::Dib);
+    assert_eq!(picture.data(), dib);
+    assert!(
+        DocPicture::from_parts_with_format(
+            hex_fixture("tiff-2x3.hex"),
+            PictureFormat::Png,
+            100,
+            100,
+        )
+        .is_err()
+    );
+    assert!(DocPicture::from_parts(b"BM\0\0".to_vec(), 100, 100).is_err());
+    assert!(DocPicture::from_parts(vec![0xD7, 0xCD, 0xC6, 0x9A], 100, 100).is_err());
+}
+
+#[test]
 fn document_without_pictures_keeps_empty_data_stream() {
     let mut writer = DocWriter::new();
     writer.add_paragraph("plain text").unwrap();
@@ -185,10 +276,7 @@ fn write_doc_with_inline_and_floating(jpeg_bytes: &[u8]) -> (Vec<u8>, u32, u32) 
         .insert_floating_picture(
             jpeg_picture,
             FloatingPosition::new(1440, 720)
-                .with_origins(
-                    ShapeHorizontalOrigin::Page,
-                    ShapeVerticalOrigin::Paragraph,
-                )
+                .with_origins(ShapeHorizontalOrigin::Page, ShapeVerticalOrigin::Paragraph)
                 .with_text_wrap(ShapeTextWrap::Square)
                 .lock_anchor(true),
         )
@@ -203,7 +291,8 @@ fn write_doc_with_inline_and_floating(jpeg_bytes: &[u8]) -> (Vec<u8>, u32, u32) 
 #[test]
 fn inline_and_floating_pictures_round_trip_through_doc_reader() {
     let jpeg_bytes = jpeg_fixture();
-    let (doc_bytes, floating_width, floating_height) = write_doc_with_inline_and_floating(&jpeg_bytes);
+    let (doc_bytes, floating_width, floating_height) =
+        write_doc_with_inline_and_floating(&jpeg_bytes);
 
     let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
@@ -335,10 +424,14 @@ fn floating_picture_writes_valid_dgg_info() {
     let mut spids = Vec::new();
     let mut client_anchors = Vec::new();
     let mut spgr_containers = 0;
-    walk_shapes(dg_container.data, &mut spids, &mut client_anchors, &mut spgr_containers);
+    walk_shapes(
+        dg_container.data,
+        &mut spids,
+        &mut client_anchors,
+        &mut spgr_containers,
+    );
 
     assert_eq!(spgr_containers, 1);
     assert_eq!(spids, vec![1024, 1026], "group shape + floating picture");
     assert_eq!(client_anchors, vec![0]);
 }
-

@@ -287,7 +287,7 @@ conversion, fonts, and image conversion are optional.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Images | 🟡 | ✅ | 🟡 | Inline/floating picture and blip extraction; `DocWriter::insert_picture` writes inline PNG/JPEG pictures (OfficeArtWordDrawing in the Data stream) and `insert_floating_picture` writes floating ones (0x0008 anchor + PlcfSpa + fcDggInfo OfficeArtContent) |
+| Images | ✅ | ✅ | ✅ | Inline/floating picture and BLIP extraction; inline, floating, and header-picture authoring supports every native OfficeArt BLIP family (EMF, WMF, PICT, JPEG, PNG, DIB/BMP, and TIFF), writes spec-defined MD4 UIDs and uncompressed metafile headers, and preserves encoded payloads except for required BMP-to-DIB normalization |
 | Drawings and shapes | 🟡 | ✅ | 🟡 | OfficeArt/Escher shape extraction (Data stream + fcDggInfo drawing group) and textbox story reading (main + header); `DocWriter::insert_floating_shape`/`insert_floating_text_box` write main-story shapes and text boxes, `insert_header_text_box`/`insert_header_picture` write odd/even/first-page header text boxes and pictures (PlcfSpaHdr + ccpHdrTxbx + PlcfHdrtxbxTxt) |
 | Embedded OLE/package objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve embedded object storages; payloads remain inert |
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |

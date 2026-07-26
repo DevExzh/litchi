@@ -1,0 +1,7 @@
+# BITMAPINFOHEADER for a 2x3, 24-bit uncompressed DIB plus padded pixels.
+28 00 00 00 02 00 00 00 03 00 00 00 01 00 18 00
+00 00 00 00 18 00 00 00 60 00 00 00 60 00 00 00
+00 00 00 00 00 00 00 00
+00 00 ff 00 ff 00 00 00
+ff 00 00 ff ff ff 00 00
+20 40 60 80 a0 c0 00 00
