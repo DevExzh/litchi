@@ -871,6 +871,13 @@ enum FloatingAnchorKind {
     Shape(u32),
 }
 
+/// Fully assembled DOC streams before compound-file packaging.
+struct DocOutputStreams {
+    word_document: Vec<u8>,
+    table: Vec<u8>,
+    data: Vec<u8>,
+}
+
 /// DOC file writer
 ///
 /// Provides methods to create and modify DOC files.
@@ -912,6 +919,8 @@ pub struct DocWriter {
     saved_by_table: Option<SavedByTable>,
     /// Optional glossary-only AutoText metadata over the main story.
     glossary_metadata: Option<GlossaryMetadata>,
+    /// Optional distinct AutoText-only document attached to this template.
+    attached_glossary: Option<Box<DocWriter>>,
     /// Property revision metadata for the writer's single document section
     section_formatting_revision: Option<FormattingRevision>,
     /// Explicit column geometry for the writer's single document section.
@@ -1042,6 +1051,7 @@ impl DocWriter {
             associated_strings: DocumentAssociatedStrings::default(),
             saved_by_table: None,
             glossary_metadata: None,
+            attached_glossary: None,
             section_formatting_revision: None,
             section_columns: None,
             section_right_to_left: false,
@@ -1217,6 +1227,76 @@ impl DocWriter {
     /// Return this writer to ordinary-document output.
     pub fn clear_glossary_metadata(&mut self) -> Option<GlossaryMetadata> {
         self.glossary_metadata.take()
+    }
+
+    /// Attach a distinct glossary-only document to this template.
+    ///
+    /// The attached writer must have [`DocWriter::set_glossary_metadata`]
+    /// configured. Its main story becomes the template's AutoText story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for nested or independently encrypted glossary
+    /// documents, independent VBA projects, and drawing-layer content. Those
+    /// configurations cannot be relocated into the shared DOC streams safely.
+    pub fn set_attached_glossary(
+        &mut self,
+        glossary: DocWriter,
+    ) -> Result<Option<DocWriter>, DocWriteError> {
+        glossary.validate_as_attached_glossary()?;
+        Ok(self
+            .attached_glossary
+            .replace(Box::new(glossary))
+            .map(|previous| *previous))
+    }
+
+    /// Access the attached glossary writer.
+    pub fn attached_glossary(&self) -> Option<&DocWriter> {
+        self.attached_glossary.as_deref()
+    }
+
+    /// Mutably access the attached glossary writer.
+    pub fn attached_glossary_mut(&mut self) -> Option<&mut DocWriter> {
+        self.attached_glossary.as_deref_mut()
+    }
+
+    /// Remove and return the attached glossary writer.
+    pub fn clear_attached_glossary(&mut self) -> Option<DocWriter> {
+        self.attached_glossary.take().map(|glossary| *glossary)
+    }
+
+    fn validate_as_attached_glossary(&self) -> Result<(), DocWriteError> {
+        if self.glossary_metadata.is_none() {
+            return Err(DocWriteError::InvalidData(
+                "attached DOC glossary requires glossary metadata".to_string(),
+            ));
+        }
+        if self.attached_glossary.is_some() {
+            return Err(DocWriteError::InvalidData(
+                "attached DOC glossaries cannot contain another attached glossary".to_string(),
+            ));
+        }
+        if self.encryption.is_some() {
+            return Err(DocWriteError::InvalidData(
+                "an attached DOC glossary cannot have independent encryption".to_string(),
+            ));
+        }
+        if self.vba_project.is_some() {
+            return Err(DocWriteError::InvalidData(
+                "an attached DOC glossary cannot contain an independent VBA project".to_string(),
+            ));
+        }
+        if !self.pictures.is_empty()
+            || !self.shapes.is_empty()
+            || !self.header_pictures.is_empty()
+            || !self.header_shapes.is_empty()
+        {
+            return Err(DocWriteError::InvalidData(
+                "pictures and drawing-layer shapes in attached DOC glossaries are not supported"
+                    .to_string(),
+            ));
+        }
+        Ok(())
     }
 
     fn encryption_table_header_len(&self) -> Result<usize, DocWriteError> {
@@ -3409,8 +3489,14 @@ impl DocWriter {
         Ok(())
     }
 
-    /// Build the complete compound document after validating every staged structure.
-    fn build_ole_writer(&mut self) -> Result<OleWriter, DocWriteError> {
+    /// Build and validate the three core DOC streams.
+    fn build_output_streams(&mut self) -> Result<DocOutputStreams, DocWriteError> {
+        if self.attached_glossary.is_some() && self.glossary_metadata.is_some() {
+            return Err(DocWriteError::InvalidData(
+                "a DOC template cannot be both glossary-only and contain an attached glossary"
+                    .to_string(),
+            ));
+        }
         self.validate_style_references()?;
         let table_header_len = self.encryption_table_header_len()?;
 
@@ -4264,19 +4350,38 @@ impl DocWriter {
             pad_to_4096(&mut data_stream);
             data_stream
         };
+        if let Some(glossary) = self.attached_glossary.as_mut() {
+            glossary.validate_as_attached_glossary()?;
+            let mut glossary_streams = glossary.build_output_streams()?;
+            super::attached_glossary::merge_attached_glossary(
+                &mut word_document_stream,
+                &mut table_stream,
+                &mut glossary_streams.word_document,
+                &mut glossary_streams.table,
+            )?;
+        }
         self.encrypt_output_streams(
             &mut word_document_stream,
             &mut table_stream,
             &mut data_stream,
         )?;
 
-        // Create OLE compound document
+        Ok(DocOutputStreams {
+            word_document: word_document_stream,
+            table: table_stream,
+            data: data_stream,
+        })
+    }
+
+    /// Build the complete compound document after validating every staged structure.
+    fn build_ole_writer(&mut self) -> Result<OleWriter, DocWriteError> {
+        let streams = self.build_output_streams()?;
         let mut ole_writer = OleWriter::new();
         self.populate_compound_document(
             &mut ole_writer,
-            &word_document_stream,
-            &table_stream,
-            &data_stream,
+            &streams.word_document,
+            &streams.table,
+            &streams.data,
         )?;
         Ok(ole_writer)
     }

@@ -1,6 +1,8 @@
 use litchi_cfb::{OleFile, OleWriter};
+use litchi_ole::doc::writer::DocEncryptionProfile;
 use litchi_ole::doc::{
-    DocWriter, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, Package,
+    DocOpenOptions, DocWriter, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle,
+    Package,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -217,6 +219,76 @@ fn template_secondary_fib_exposes_passive_attached_glossary() {
     assert_eq!(attached.item_text(0), Some("Greeting"));
     assert_eq!(attached.item_text(1), Some("World"));
     assert_eq!(attached.item_text(2), None);
+}
+
+#[test]
+fn distinct_attached_glossary_round_trips_through_public_writer() {
+    let mut template = DocWriter::new();
+    template.add_paragraph("Template body only").unwrap();
+    assert!(template.set_attached_glossary(writer()).unwrap().is_none());
+    assert!(template.attached_glossary().is_some());
+
+    let mut output = Cursor::new(Vec::new());
+    template.write_to(&mut output).unwrap();
+    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let document = package.document().unwrap();
+
+    assert!(document.fib().is_template());
+    assert!(!document.fib().is_glossary_document());
+    assert_eq!(document.text().unwrap(), "Template body only\r");
+    let attached = document.attached_glossary().unwrap().unwrap();
+    assert_eq!(attached.metadata(), &metadata());
+    assert_eq!(attached.item_text(0), Some("Greeting"));
+    assert_eq!(attached.item_text(1), Some("World"));
+    assert!(!attached.text().contains("Template body only"));
+
+    let removed = template.clear_attached_glossary().unwrap();
+    assert_eq!(removed.glossary_metadata(), Some(&metadata()));
+    assert!(template.attached_glossary().is_none());
+}
+
+#[test]
+fn invalid_attached_glossary_configuration_is_atomic() {
+    let mut template = DocWriter::new();
+    template.add_paragraph("Template").unwrap();
+    let mut output = Cursor::new(vec![0xA5; 16]);
+
+    let error = match template.set_attached_glossary(DocWriter::new()) {
+        Ok(_) => panic!("glossary metadata must be required"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("requires glossary metadata"));
+    assert!(template.attached_glossary().is_none());
+
+    template.set_glossary_metadata(metadata());
+    template.set_attached_glossary(writer()).unwrap();
+    let error = template.write_to(&mut output).unwrap_err();
+    assert!(error.to_string().contains("both glossary-only"));
+    assert_eq!(output.into_inner(), vec![0xA5; 16]);
+}
+
+#[test]
+fn attached_glossary_round_trips_inside_encrypted_template() {
+    let mut template = DocWriter::new();
+    template.add_paragraph("Protected template").unwrap();
+    template.set_attached_glossary(writer()).unwrap();
+    template
+        .set_password("secret", DocEncryptionProfile::OfficeBinaryRc4)
+        .unwrap();
+
+    let mut output = Cursor::new(Vec::new());
+    template.write_to(&mut output).unwrap();
+    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let document = package
+        .document_with_options(DocOpenOptions {
+            password: Some("secret"),
+        })
+        .unwrap();
+
+    assert_eq!(document.text().unwrap(), "Protected template\r");
+    let attached = document.attached_glossary().unwrap().unwrap();
+    assert_eq!(attached.item_text(0), Some("Greeting"));
+    assert_eq!(attached.item_text(1), Some("World"));
 }
 
 #[test]

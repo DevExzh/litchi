@@ -76,6 +76,9 @@ mod proofing;
 /// Glossary-only DOC table authoring.
 mod glossary;
 
+/// Attached AutoText story assembly.
+mod attached_glossary;
+
 // Re-export public types
 pub use crate::doc::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
 pub use crate::doc::parts::pap::{

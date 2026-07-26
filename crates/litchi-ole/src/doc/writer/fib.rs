@@ -56,6 +56,10 @@ pub struct FibBuilder {
     is_complex: bool,
     /// This FIB describes a glossary-only (AutoText) document.
     is_glossary: bool,
+    /// This FIB describes a template (`FibBase.fDot`).
+    is_template: bool,
+    /// Page number of an attached secondary FIB (`FibBase.pnNext`).
+    next_fib_page: u16,
 
     // File offsets and byte counts for various structures (FibRgFcLcb)
     /// StyleSheet offset and size
@@ -221,6 +225,8 @@ impl FibBuilder {
             header_textbox_length: 0,
             is_complex: true, // Use complex format by default
             is_glossary: false,
+            is_template: false,
+            next_fib_page: 0,
             fc_stshf: 0,
             lcb_stshf: 0,
             fc_dop: 0,
@@ -352,6 +358,16 @@ impl FibBuilder {
     /// Mark this as a glossary-only FIB (`FibBase.fGlsy`).
     pub fn set_glossary_document(&mut self, is_glossary: bool) {
         self.is_glossary = is_glossary;
+    }
+
+    /// Mark this as a template FIB (`FibBase.fDot`).
+    pub fn set_template(&mut self, is_template: bool) {
+        self.is_template = is_template;
+    }
+
+    /// Address a secondary FIB by its 512-byte page number.
+    pub fn set_next_fib_page(&mut self, page: u16) {
+        self.next_fib_page = page;
     }
 
     /// Set the AutoText item-name table (`SttbfGlsy`).
@@ -707,9 +723,8 @@ impl FibBuilder {
         // Language ID (0x0409 = English US)
         fib[6..8].copy_from_slice(&0x0409u16.to_le_bytes());
 
-        // pnNext (Next available ID for internal references)
-        // MUST be 0 for simple documents (no macros/auto-save)
-        fib[8..10].copy_from_slice(&0x0000u16.to_le_bytes());
+        // pnNext addresses a secondary FIB in 512-byte pages.
+        fib[8..10].copy_from_slice(&self.next_fib_page.to_le_bytes());
 
         // Option flags (FibBase.flags1)
         // Set according to MS-DOC and POI defaults:
@@ -722,6 +737,9 @@ impl FibBuilder {
         flags |= 0x1000; // fExtChar
         flags |= 0x0004; // fComplex
         flags |= 0x00F0; // cQuickSaves = 0xF (required for nFib >= 0x00D9)
+        if self.is_template {
+            flags |= 0x0001; // fDot
+        }
         if self.is_glossary {
             flags |= 0x0002; // fGlsy
         }
@@ -1048,6 +1066,19 @@ mod tests {
         let fib = FibBuilder::default();
         let fib_bytes = fib.generate().unwrap();
         assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn template_and_secondary_fib_page_are_serialized() {
+        let mut fib = FibBuilder::new();
+        fib.set_template(true);
+        fib.set_next_fib_page(8);
+
+        let bytes = fib.generate().unwrap();
+        assert_eq!(u16::from_le_bytes(bytes[8..10].try_into().unwrap()), 8);
+        let flags = u16::from_le_bytes(bytes[10..12].try_into().unwrap());
+        assert_ne!(flags & 0x0001, 0);
+        assert_eq!(flags & 0x0002, 0);
     }
 
     #[test]
