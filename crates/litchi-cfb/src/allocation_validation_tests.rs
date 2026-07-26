@@ -1,5 +1,6 @@
 use std::io::Cursor;
 
+use crate::consts::{DIRENTRY_SIZE, SECTOR_SHIFT_OFFSET, SECTOR_SHIFT_V3, SECTOR_SIZE_V3};
 use crate::{OleFile, writer::OleWriter};
 
 fn sample_file() -> Vec<u8> {
@@ -112,4 +113,74 @@ fn opens_the_complete_legacy_office_compound_file_corpus() {
         OleFile::open(Cursor::new(bytes))
             .unwrap_or_else(|error| panic!("failed to open {}: {error}", path.display()));
     }
+}
+
+/// MS-CFB 2.6.1 notes that older writers left the most significant 32 bits of a
+/// version 3 stream size uninitialized, and recommends that parsers ignore
+/// those bits rather than reject the file. This fixture carries such a
+/// directory entry and previously failed to open.
+#[test]
+fn opens_version_3_files_with_an_uninitialized_stream_size_high_word() {
+    const FIXTURE: &[u8] =
+        include_bytes!("../../../test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc");
+
+    // Guard the fixture's premise: a 512-byte-sector file with a directory
+    // entry whose high stream-size word is nonzero.
+    assert_eq!(
+        FIXTURE[SECTOR_SHIFT_OFFSET], SECTOR_SHIFT_V3,
+        "fixture must use version 3 512-byte sectors"
+    );
+    let has_high_word = FIXTURE[SECTOR_SIZE_V3..]
+        .chunks_exact(DIRENTRY_SIZE)
+        .any(|entry| entry[DIRENTRY_SIZE - 4..].iter().any(|&byte| byte != 0));
+    assert!(
+        has_high_word,
+        "fixture must contain a nonzero high stream-size word"
+    );
+
+    let file = OleFile::open(Cursor::new(FIXTURE)).expect("uninitialized high word is ignored");
+    let entries = file.list_streams();
+    assert!(
+        entries
+            .iter()
+            .any(|path| path.iter().any(|part| part == "WordDocument")),
+        "expected the Word streams to be reachable, got {entries:?}"
+    );
+}
+
+/// MS-CFB imposes no requirement that a compound file's length be a whole
+/// number of sectors, and real documents are commonly stored truncated at the
+/// end of their last used sector. Such a file must open, with the short final
+/// sector reading as zeroes past the end.
+#[test]
+fn opens_files_whose_length_is_not_a_whole_number_of_sectors() {
+    const FIXTURE: &[u8] =
+        include_bytes!("../../../test-data/ole/doc/cfb-truncated-final-sector.doc");
+
+    assert_ne!(
+        FIXTURE.len() % SECTOR_SIZE_V3,
+        0,
+        "fixture must end mid-sector"
+    );
+
+    let file = OleFile::open(Cursor::new(FIXTURE)).expect("a short final sector is tolerated");
+    let entries = file.list_streams();
+    assert!(
+        entries
+            .iter()
+            .any(|path| path.iter().any(|part| part == "WordDocument")),
+        "expected the Word streams to be reachable, got {entries:?}"
+    );
+}
+
+/// A sector that begins at or beyond the end of the file is still an error:
+/// tolerating a short final sector must not mask a genuinely missing one.
+#[test]
+fn still_rejects_sectors_that_start_past_the_end_of_the_file() {
+    let bytes = sample_file();
+    let truncated = &bytes[..SECTOR_SIZE_V3];
+    assert!(
+        OleFile::open(Cursor::new(truncated.to_vec())).is_err(),
+        "a header-only file has no sectors to read"
+    );
 }

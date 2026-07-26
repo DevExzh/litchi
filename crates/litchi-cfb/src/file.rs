@@ -332,11 +332,11 @@ impl<R: Read + Seek> OleFile<R> {
                 "File is smaller than its CFB header sector".to_string(),
             ));
         }
-        if file_size % sector_size as u64 != 0 {
-            return Err(OleError::InvalidFormat(
-                "File length is not a multiple of the CFB sector size".to_string(),
-            ));
-        }
+        // MS-CFB does not require the file length to be a whole number of
+        // sectors, and real documents are routinely stored truncated at the end
+        // of their last used sector. A short final sector is therefore accepted
+        // and reads as zeroes past the end of the file; a sector that starts at
+        // or beyond the end is still rejected.
         if (num_minifat_sectors == 0) != (first_minifat_sector == ENDOFCHAIN) {
             return Err(OleError::InvalidFormat(
                 "MiniFAT start sector and sector count disagree".to_string(),
@@ -855,12 +855,12 @@ impl<R: Read + Seek> OleFile<R> {
         let sid_left = raw.sid_left.get();
         let sid_right = raw.sid_right.get();
         let sid_child = raw.sid_child.get();
-        let stream_size = raw.stream_size.get();
-        if sector_size == 512 && stream_size >> 32 != 0 {
-            return Err(OleError::CorruptedFile(format!(
-                "version 3 CFB directory SID {sid} has a nonzero high stream-size word"
-            )));
-        }
+        // MS-CFB 2.6.1: a version 3 file's stream size must fit in 32 bits, but
+        // older writers left the high word uninitialized. The spec explicitly
+        // recommends that parsers ignore those bits and treat them as zero
+        // rather than reject the file, so mask instead of failing — matching
+        // what `DirectoryEntry` reading already does.
+        let stream_size = mask_v3_stream_size(raw.stream_size.get(), sector_size);
 
         match raw.entry_type {
             STGTY_ROOT if sid != 0 => {
@@ -940,12 +940,8 @@ impl<R: Read + Seek> OleFile<R> {
         // Format CLSID
         let clsid = format_clsid(&raw.clsid);
 
-        // Handle size based on sector size (512-byte sectors only use low 32 bits)
-        let size = if self.sector_size == 512 {
-            raw.stream_size.get() & 0xFFFFFFFF
-        } else {
-            raw.stream_size.get()
-        };
+        // Version 3 sizes only use the low 32 bits; see `mask_v3_stream_size`.
+        let size = mask_v3_stream_size(raw.stream_size.get(), self.sector_size);
 
         // Determine if stream should use MiniFAT
         let is_minifat = size < self.mini_stream_cutoff as u64 && raw.entry_type == STGTY_STREAM;
@@ -1046,19 +1042,29 @@ impl<R: Read + Seek> OleFile<R> {
         let position = (u64::from(sector_id) + 1)
             .checked_mul(self.sector_size as u64)
             .ok_or_else(|| OleError::CorruptedFile("Sector offset overflow".to_string()))?;
-        let end = position
+        position
             .checked_add(self.sector_size as u64)
             .ok_or_else(|| OleError::CorruptedFile("Sector end overflow".to_string()))?;
-        if end > self.file_size {
+        if position >= self.file_size {
             return Err(OleError::CorruptedFile(format!(
                 "Sector {sector_id} is outside the file"
             )));
         }
         self.reader.seek(SeekFrom::Start(position))?;
 
+        // Keep whatever a truncated final sector actually contains; the tail
+        // stays zero. See the file-length note in the header parser.
+        let present = self.present_sector_bytes(position, self.sector_size);
         let mut buffer = vec![0u8; self.sector_size];
-        self.reader.read_exact(&mut buffer)?;
+        self.reader.read_exact(&mut buffer[..present])?;
         Ok(buffer)
+    }
+
+    /// How many of the `wanted` bytes starting at `position` are present in the
+    /// file, for files whose length is not a whole number of sectors.
+    #[inline]
+    fn present_sector_bytes(&self, position: u64, wanted: usize) -> usize {
+        self.file_size.saturating_sub(position).min(wanted as u64) as usize
     }
 
     /// Read a stream by following the FAT chain with optimized batching
@@ -1105,13 +1111,23 @@ impl<R: Read + Seek> OleFile<R> {
             }
 
             // Read the entire contiguous run in one I/O operation
-            let position = ((start_sector as u64) + 1) * (self.sector_size as u64);
+            let position = (u64::from(start_sector) + 1)
+                .checked_mul(self.sector_size as u64)
+                .ok_or_else(|| OleError::CorruptedFile("Sector offset overflow".to_string()))?;
+            if position >= self.file_size {
+                return Err(OleError::CorruptedFile(format!(
+                    "Sector {start_sector} is outside the file"
+                )));
+            }
             let read_size = count * self.sector_size;
             let buffer_offset = i * self.sector_size;
 
+            // `buffer` arrives zero-filled, so a truncated final sector keeps
+            // its real bytes and reads as zeroes beyond the end of the file.
+            let present = self.present_sector_bytes(position, read_size);
             self.reader.seek(SeekFrom::Start(position))?;
             self.reader
-                .read_exact(&mut buffer[buffer_offset..buffer_offset + read_size])?;
+                .read_exact(&mut buffer[buffer_offset..buffer_offset + present])?;
 
             i += count;
         }
@@ -1538,6 +1554,22 @@ fn collect_sector_chain_exact(
         }
     }
     Ok(sectors)
+}
+
+/// Drop the high stream-size word that version 3 compound files do not use.
+///
+/// MS-CFB 2.6.1 requires a version 3 stream size to be at most 2 GB, so the
+/// most significant 32 bits must be zero. Some older writers never initialized
+/// those bits, and the specification recommends that parsers ignore them and
+/// treat them as zero rather than reject an otherwise valid file. Version 4
+/// files use the full 64-bit value unchanged.
+#[inline]
+fn mask_v3_stream_size(stream_size: u64, sector_size: usize) -> u64 {
+    if sector_size == SECTOR_SIZE_V3 {
+        stream_size & u64::from(u32::MAX)
+    } else {
+        stream_size
+    }
 }
 
 /// Decode UTF-16LE bytes to String (optimized version)

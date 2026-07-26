@@ -46,7 +46,7 @@ conversion, fonts, and image conversion are optional.
 | Unified workbook facade | ✅ | ✅ | ❌ | Common sheet names/count, text, and metadata for XLS, XLSX, XLSB, ODS, and Numbers |
 | Workbook trait API | 🟡 | ✅ | ❌ | Implemented by XLS, XLSX, XLSB, text workbooks, and immutable ODS evaluation snapshots; Numbers uses the unified facade |
 | OOXML OPC package editing | ✅ | ✅ | ✅ | Parts, relationships, content types, strict/transitional XML, and transactional graph updates |
-| OLE/CFB package editing | ✅ | ✅ | ✅ | Streams, storages, property sets, and package-preserving editors |
+| OLE/CFB package editing | ✅ | ✅ | ✅ | Streams, storages, property sets, and package-preserving editors; reading follows MS-CFB's guidance for real-world files by ignoring the uninitialized high stream-size word in version 3 directory entries and accepting a file truncated mid-sector, while sectors starting at or past the end of the file remain errors |
 | ODF package editing | ✅ | ✅ | ✅ | ZIP package, manifest, metadata, styles, settings, resources, and MIME validation |
 | OOXML encryption | ✅ | ✅ | ✅ | Standard 2007 and Agile encryption; requires `ooxml_encryption` |
 | Legacy Office encryption | ✅ | ✅ | ✅ | Format-specific DOC, XLS, and PPT password profiles |

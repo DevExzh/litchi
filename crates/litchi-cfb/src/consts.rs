@@ -10,6 +10,12 @@ pub const DIRENTRY_SIZE: usize = 128;
 /// Default sector size for version 3 (512 bytes)
 pub const SECTOR_SIZE_V3: usize = 512;
 
+/// Header offset of the Sector Shift field (MS-CFB 2.2)
+pub const SECTOR_SHIFT_OFFSET: usize = 0x1E;
+
+/// Sector Shift value that selects version 3's 512-byte sectors
+pub const SECTOR_SHIFT_V3: u8 = 9;
+
 /// Default sector size for version 4 (4096 bytes)
 pub const SECTOR_SIZE_V4: usize = 4096;
 
