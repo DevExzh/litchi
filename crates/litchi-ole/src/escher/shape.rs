@@ -235,6 +235,41 @@ impl<'data> EscherShape<'data> {
         crate::ppt::PowerPointInteraction::parse_client_data_payload(client_data.data, limits)
     }
 
+    /// Parse range-anchored actions from this shape's ClientTextbox.
+    pub fn text_interactions(
+        &self,
+    ) -> crate::ppt::package::Result<Vec<crate::ppt::PowerPointTextInteraction>> {
+        self.text_interactions_with_limits(crate::ppt::PowerPointTextInteractionLimits::default())
+    }
+
+    /// Parse range-anchored actions with caller-supplied resource limits.
+    pub fn text_interactions_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointTextInteractionLimits,
+    ) -> crate::ppt::package::Result<Vec<crate::ppt::PowerPointTextInteraction>> {
+        let group_header = if self.is_group {
+            self.container
+                .find_child(EscherRecordType::SpContainer)
+                .map(EscherContainer::new)
+        } else {
+            None
+        };
+        let metadata_container = group_header.as_ref().unwrap_or(&self.container);
+        let Some(textbox) = metadata_container.find_child(EscherRecordType::ClientTextbox) else {
+            return Ok(Vec::new());
+        };
+        if textbox.version != 0x0f
+            || textbox.instance != 0
+            || textbox.record_type_raw != 0xf00d
+            || usize::try_from(textbox.length).ok() != Some(textbox.data.len())
+        {
+            return Err(crate::ppt::package::PptError::Corrupted(
+                "Invalid OfficeArt ClientTextbox record header".to_string(),
+            ));
+        }
+        crate::ppt::EscherTextboxWrapper::parse_text_interactions_with_limits(textbox.data, limits)
+    }
+
     /// Parse the strict, context-validated PowerPoint `PlaceholderAtom`.
     pub fn placeholder_atom(
         &self,

@@ -327,6 +327,8 @@ pub struct ShapeProperties {
     pub hyperlink_id: Option<u32>,
     /// Typed click and mouse-over actions attached to the shape.
     pub interactions: Vec<crate::ppt::PowerPointInteraction>,
+    /// Typed actions attached to UTF-16 ranges in the shape text.
+    pub text_interactions: Vec<crate::ppt::PowerPointTextInteraction>,
 }
 
 /// Represents a shape on a slide
@@ -401,6 +403,7 @@ impl Default for ShapeProperties {
             freeform_geometry: None,
             hyperlink_id: None,
             interactions: Vec::new(),
+            text_interactions: Vec::new(),
         }
     }
 }
@@ -636,6 +639,7 @@ fn convert_shape_to_escher(
         hyperlink_jump: get_hyperlink_info(props.hyperlink_id, hyperlinks).1,
         hyperlink_type: get_hyperlink_info(props.hyperlink_id, hyperlinks).2,
         interactions: props.interactions.clone(),
+        text_interactions: props.text_interactions.clone(),
         picture_index: props.picture_index,
         freeform_geometry: props.freeform_geometry.clone(),
         animation_info: shape.animation_info.clone(),
@@ -727,6 +731,40 @@ fn interaction_for_hyperlink(
     interaction.hyperlink_id = hyperlink_id;
     interaction.jump = jump;
     Some(interaction)
+}
+
+fn shape_text_unit_count(properties: &ShapeProperties) -> Result<u32, PptWriteError> {
+    let units = if let Some(paragraphs) = &properties.paragraphs {
+        let mut units = 0usize;
+        for (index, paragraph) in paragraphs.iter().enumerate() {
+            for run in &paragraph.runs {
+                units = units
+                    .checked_add(run.text.encode_utf16().count())
+                    .ok_or_else(|| {
+                        PptWriteError::InvalidData(
+                            "Shape text UTF-16 length overflows usize".to_string(),
+                        )
+                    })?;
+            }
+            if index + 1 < paragraphs.len() {
+                units = units.checked_add(1).ok_or_else(|| {
+                    PptWriteError::InvalidData(
+                        "Shape text UTF-16 length overflows usize".to_string(),
+                    )
+                })?;
+            }
+        }
+        units
+    } else if let Some(text) = &properties.text {
+        text.encode_utf16().count()
+    } else {
+        return Err(PptWriteError::InvalidData(
+            "Shape has no text for a text interaction".to_string(),
+        ));
+    };
+    u32::try_from(units).map_err(|_| {
+        PptWriteError::InvalidData("Shape text exceeds the PPT size limit".to_string())
+    })
 }
 
 /// PPT file writer
@@ -1973,6 +2011,137 @@ impl PptWriter {
             .interactions
             .retain(|interaction| interaction.trigger != trigger);
         Ok(shape.properties.interactions.len() != old_len)
+    }
+
+    /// Attach a registered hyperlink to one UTF-16 range in the last shape's text.
+    pub fn set_last_shape_text_hyperlink(
+        &mut self,
+        slide: usize,
+        range: crate::ppt::PowerPointTextRange,
+        hyperlink_id: u32,
+    ) -> Result<(), PptWriteError> {
+        let interaction =
+            interaction_for_hyperlink(hyperlink_id, &self.hyperlinks).ok_or_else(|| {
+                PptWriteError::InvalidData(format!("Hyperlink {hyperlink_id} does not exist"))
+            })?;
+        self.set_last_shape_text_interaction(
+            slide,
+            crate::ppt::PowerPointTextInteraction::new(range, interaction)
+                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?,
+        )
+    }
+
+    /// Add or replace one trigger/range pair on the last shape's text.
+    ///
+    /// Text positions are UTF-16 code units. Validation occurs before mutation.
+    pub fn set_last_shape_text_interaction(
+        &mut self,
+        slide: usize,
+        interaction: crate::ppt::PowerPointTextInteraction,
+    ) -> Result<(), PptWriteError> {
+        self.set_last_shape_text_interaction_with_limits(
+            slide,
+            interaction,
+            crate::ppt::PowerPointTextInteractionLimits::default(),
+        )
+    }
+
+    /// Add or replace a text action with explicit resource limits.
+    pub fn set_last_shape_text_interaction_with_limits(
+        &mut self,
+        slide: usize,
+        interaction: crate::ppt::PowerPointTextInteraction,
+        limits: crate::ppt::PowerPointTextInteractionLimits,
+    ) -> Result<(), PptWriteError> {
+        if interaction.interaction.hyperlink_id != 0
+            && self
+                .hyperlinks
+                .get(interaction.interaction.hyperlink_id)
+                .is_none()
+        {
+            return Err(PptWriteError::InvalidData(format!(
+                "Hyperlink {} does not exist",
+                interaction.interaction.hyperlink_id
+            )));
+        }
+        let slide_data = self
+            .slides
+            .get(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+        let shape = slide_data
+            .shapes
+            .last()
+            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+        let text_units = shape_text_unit_count(&shape.properties)?;
+        interaction
+            .validate_for_text(text_units, limits)
+            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+        let replace_index = shape
+            .properties
+            .text_interactions
+            .iter()
+            .position(|existing| {
+                existing.range == interaction.range
+                    && existing.interaction.trigger == interaction.interaction.trigger
+            });
+        let prospective_len = shape
+            .properties
+            .text_interactions
+            .len()
+            .checked_add(usize::from(replace_index.is_none()))
+            .ok_or_else(|| {
+                PptWriteError::InvalidData("Shape text interaction count overflows".to_string())
+            })?;
+        if prospective_len > limits.max_interactions {
+            return Err(PptWriteError::InvalidData(
+                "Shape exceeds the configured text interaction count".to_string(),
+            ));
+        }
+
+        let shape = self
+            .slides
+            .get_mut(slide)
+            .and_then(|slide| slide.shapes.last_mut())
+            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+        if let Some(index) = replace_index {
+            shape.properties.text_interactions[index] = interaction;
+        } else {
+            shape.properties.text_interactions.push(interaction);
+            shape.properties.text_interactions.sort_by_key(|value| {
+                (
+                    value.range.begin(),
+                    value.range.end(),
+                    match value.interaction.trigger {
+                        crate::ppt::InteractionTrigger::Click => 0,
+                        crate::ppt::InteractionTrigger::MouseOver => 1,
+                    },
+                )
+            });
+        }
+        Ok(())
+    }
+
+    /// Remove one trigger/range pair from the last shape.
+    pub fn clear_last_shape_text_interaction(
+        &mut self,
+        slide: usize,
+        range: crate::ppt::PowerPointTextRange,
+        trigger: crate::ppt::InteractionTrigger,
+    ) -> Result<bool, PptWriteError> {
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+        let shape = slide_data
+            .shapes
+            .last_mut()
+            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+        let old_len = shape.properties.text_interactions.len();
+        shape
+            .properties
+            .text_interactions
+            .retain(|value| value.range != range || value.interaction.trigger != trigger);
+        Ok(shape.properties.text_interactions.len() != old_len)
     }
 
     /// Set the rotation of the last shape on a slide, in degrees.
@@ -3503,6 +3672,7 @@ mod tests {
             flip_v: false,
             hyperlink_id: None,
             interactions: Vec::new(),
+            text_interactions: Vec::new(),
             picture_index: None,
             freeform_geometry: None,
         };

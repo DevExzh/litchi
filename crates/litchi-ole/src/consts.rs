@@ -207,6 +207,8 @@ pub enum PptRecordType {
     ExternalHyperlinkAtom = 4051,
     /// External hyperlink container
     ExternalHyperlink = 4055,
+    /// Text-range anchor for the preceding interactive information record
+    TextInteractiveInfoAtom = 4063,
     /// PowerPoint 9 external hyperlink extension container
     ExternalHyperlink9 = 4068,
     /// Headers footers container record
@@ -502,6 +504,7 @@ impl From<u16> for PptRecordType {
             4050 => PptRecordType::KinsokuAtom,
             4051 => PptRecordType::ExternalHyperlinkAtom,
             4055 => PptRecordType::ExternalHyperlink,
+            4063 => PptRecordType::TextInteractiveInfoAtom,
             4068 => PptRecordType::ExternalHyperlink9,
             4057 => PptRecordType::HeadersFooters,
             4058 => PptRecordType::HeadersFootersAtom,

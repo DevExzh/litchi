@@ -20,6 +20,7 @@ pub struct SlideDirectoryEntry {
     flags: u32,
     text_placeholder_count: u32,
     list_text: String,
+    outline_text_interactions: Vec<crate::ppt::PowerPointTextBodyInteractions>,
 }
 
 impl SlideDirectoryEntry {
@@ -41,6 +42,10 @@ impl SlideDirectoryEntry {
 
     pub fn list_text(&self) -> &str {
         &self.list_text
+    }
+
+    pub fn outline_text_interactions(&self) -> &[crate::ppt::PowerPointTextBodyInteractions] {
+        &self.outline_text_interactions
     }
 }
 
@@ -209,9 +214,20 @@ impl SlideDirectory {
                     flags,
                     text_placeholder_count,
                     list_text: String::new(),
+                    outline_text_interactions: Vec::new(),
                 });
                 by_slide_id.insert(slide_id, index);
                 by_persist_id.insert(persist_id, index);
+            }
+            for set in slide_list.group_into_slide_atoms_sets() {
+                let slide_id =
+                    read_u32(&set.slide_persist_atom.data, 12, "SlidePersistAtom.slideId")?;
+                let Some(&index) = by_slide_id.get(&slide_id) else {
+                    return Err(PptError::Corrupted(format!(
+                        "text records reference unknown slideId {slide_id}"
+                    )));
+                };
+                entries[index].outline_text_interactions = set.text_interactions()?;
             }
         }
 
@@ -450,6 +466,38 @@ mod tests {
             SlideDirectory::build(&stream, &current_user(edit_offset), &mapping).unwrap();
         assert_eq!(directory.entries()[0].slide_id(), 900);
         assert_eq!(directory.document_persist_id(), 2);
+    }
+
+    #[test]
+    fn carries_slide_list_text_range_interactions_into_directory_entries() {
+        let mut atom = [0u8; 16];
+        atom[12] = 0xff;
+        let interaction = record(0x0f, 0, 4082, &record(0, 0, 4083, &atom));
+        let anchor = record(0, 0, 4063, &[1, 0, 0, 0, 3, 0, 0, 0]);
+        let mut slide_list_data = slide_persist(3, 256, 1);
+        slide_list_data.extend_from_slice(&record(0, 0, 3999, &1u32.to_le_bytes()));
+        slide_list_data.extend_from_slice(&record(0, 0, 4008, b"ABC"));
+        slide_list_data.extend_from_slice(&interaction);
+        slide_list_data.extend_from_slice(&anchor);
+        let slide_list = record(0x0f, 0, 4080, &slide_list_data);
+        let mut stream = record(0x0f, 0, 1000, &slide_list);
+        let slide_offset = stream.len() as u32;
+        stream.extend_from_slice(&record(0x0f, 0, 1006, &[]));
+        let edit_offset = stream.len() as u32;
+        let mut edit = vec![0u8; 28];
+        edit[16..20].copy_from_slice(&1u32.to_le_bytes());
+        stream.extend_from_slice(&record(0, 0, 4085, &edit));
+        let mut mapping = PersistMapping::new();
+        mapping.add_mapping(1, 0);
+        mapping.add_mapping(3, slide_offset);
+
+        let directory =
+            SlideDirectory::build(&stream, &current_user(edit_offset), &mapping).unwrap();
+        let bodies = directory.entries()[0].outline_text_interactions();
+        assert_eq!(bodies.len(), 1);
+        assert_eq!(bodies[0].text, "ABC");
+        assert_eq!(bodies[0].interactions[0].range.begin(), 1);
+        assert_eq!(bodies[0].interactions[0].range.end(), 3);
     }
 
     #[test]

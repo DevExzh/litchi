@@ -25,6 +25,7 @@ pub struct Slide<'doc> {
     /// Stable SlideId from the live SlidePersistAtom.
     slide_id: u32,
     slide_list_text: String,
+    outline_text_interactions: Vec<crate::ppt::PowerPointTextBodyInteractions>,
     /// Slide number (1-based for display)
     slide_number: usize,
     /// Slide record
@@ -58,6 +59,7 @@ impl<'doc> Slide<'doc> {
             persist_id: data.persist_id,
             slide_id: data.slide_id,
             slide_list_text: data.slide_list_text,
+            outline_text_interactions: data.outline_text_interactions,
             slide_number,
             doc_data: doc_data_ref,
             record: data.record,
@@ -145,6 +147,53 @@ impl<'doc> Slide<'doc> {
             pending.extend(shape.children().iter().rev());
         }
         Ok(result)
+    }
+
+    /// Return every shape that has a range-anchored text action.
+    pub fn shape_text_interactions(
+        &self,
+    ) -> Result<Vec<crate::ppt::PowerPointShapeTextInteractionEntry>> {
+        self.shape_text_interactions_with_limits(
+            crate::ppt::PowerPointTextInteractionLimits::default(),
+        )
+    }
+
+    /// Return shape text actions with caller-supplied resource limits.
+    pub fn shape_text_interactions_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointTextInteractionLimits,
+    ) -> Result<Vec<crate::ppt::PowerPointShapeTextInteractionEntry>> {
+        let Some(ppdrawing) = self
+            .record
+            .find_child(crate::consts::PptRecordType::PPDrawing)
+        else {
+            return Ok(Vec::new());
+        };
+        let escher_shapes =
+            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let mut result = Vec::new();
+        let mut pending = escher_shapes.iter().rev().collect::<Vec<_>>();
+        while let Some(shape) = pending.pop() {
+            let interactions = shape.text_interactions_with_limits(limits)?;
+            if !interactions.is_empty() {
+                let shape_id = shape.shape_id().ok_or_else(|| {
+                    PptError::Corrupted(
+                        "Text-interactive OfficeArt shape has no shape identifier".to_string(),
+                    )
+                })?;
+                result.push(crate::ppt::PowerPointShapeTextInteractionEntry {
+                    shape_id,
+                    interactions,
+                });
+            }
+            pending.extend(shape.children().iter().rev());
+        }
+        Ok(result)
+    }
+
+    /// Range-anchored actions stored with outline/placeholder text.
+    pub fn outline_text_interactions(&self) -> &[crate::ppt::PowerPointTextBodyInteractions] {
+        &self.outline_text_interactions
     }
 
     /// Return every shape-scoped programmable-tag container on this slide.

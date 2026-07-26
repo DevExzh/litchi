@@ -614,7 +614,12 @@ fn decode_macro_name(data: &[u8], max_bytes: usize) -> Result<String> {
     Ok(text)
 }
 
-fn encode_record(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn encode_record(
+    version: u16,
+    instance: u16,
+    record_type: u16,
+    data: &[u8],
+) -> Result<Vec<u8>> {
     let length = u32::try_from(data.len())
         .map_err(|_| PptError::Corrupted("PowerPoint record payload exceeds u32".into()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));

@@ -120,6 +120,7 @@ pub mod slide_sync;
 pub mod smart_tags;
 pub mod text_bookmark;
 pub mod text_extensions;
+pub mod text_interaction;
 pub mod text_prop;
 pub mod text_ruler;
 pub mod text_run;
@@ -299,6 +300,10 @@ pub use text_extensions::{
     TextMasterStyleExtension10, TextParagraphExtension9, TextSpecialInfoExtension9,
     TextSpecialInfoExtension11, TextStyleExtension9, TextStyleExtension9Run, TextStyleExtension10,
     TextStyleExtension11, VersionedTextDefaults, VersionedTextMasterStyles,
+};
+pub use text_interaction::{
+    PowerPointShapeTextInteractionEntry, PowerPointTextBodyInteractions, PowerPointTextInteraction,
+    PowerPointTextInteractionLimits, PowerPointTextRange, PowerPointTextType,
 };
 pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
 pub use text_ruler::{TextRuler, TextRulerLevel, parse_default_text_ruler};

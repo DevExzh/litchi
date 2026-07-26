@@ -38,4 +38,17 @@ impl<'a> SlideAtomsSet<'a> {
     pub fn get_slide_id(&self) -> Option<u32> {
         self.slide_persist_atom.get_slide_id()
     }
+
+    /// Parse range-anchored actions from every text body in this slide set.
+    pub fn text_interactions(&self) -> Result<Vec<crate::ppt::PowerPointTextBodyInteractions>> {
+        self.text_interactions_with_limits(crate::ppt::PowerPointTextInteractionLimits::default())
+    }
+
+    /// Parse text actions with caller-supplied resource limits.
+    pub fn text_interactions_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointTextInteractionLimits,
+    ) -> Result<Vec<crate::ppt::PowerPointTextBodyInteractions>> {
+        crate::ppt::text_interaction::parse_text_bodies(&self.slide_records, limits)
+    }
 }

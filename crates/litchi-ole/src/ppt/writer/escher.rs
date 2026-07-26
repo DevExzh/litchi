@@ -903,6 +903,8 @@ pub struct UserShapeData {
     /// These take precedence over the legacy single-hyperlink fields for the
     /// corresponding trigger.
     pub interactions: Vec<crate::ppt::PowerPointInteraction>,
+    /// Typed actions attached to UTF-16 ranges in this shape's text.
+    pub text_interactions: Vec<crate::ppt::PowerPointTextInteraction>,
     /// Picture BLIP index (for picture frames)
     pub picture_index: Option<u32>,
     /// Explicit custom/freeform geometry.
@@ -963,6 +965,7 @@ impl Default for UserShapeData {
             hyperlink_jump: 0,   // JUMP_NONE
             hyperlink_type: 8,   // LINK_Url
             interactions: Vec::new(),
+            text_interactions: Vec::new(),
             picture_index: None,
             freeform_geometry: None,
             animation_info: None,
@@ -1265,12 +1268,28 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
     // ClientTextBox if text present (prefer paragraphs with formatting over plain text)
     if let Some(paragraphs) = &shape.paragraphs {
         if !paragraphs.is_empty() {
-            let textbox = build_client_textbox_formatted(paragraphs, shape.text_type)?;
+            let textbox = build_client_textbox_formatted_with_interactions(
+                paragraphs,
+                shape.text_type,
+                &shape.text_interactions,
+            )?;
             container.add_data(&textbox);
+        } else if !shape.text_interactions.is_empty() {
+            return Err(std::io::Error::other(
+                "shape has text interactions but no corresponding text",
+            ));
         }
     } else if let Some(text) = &shape.text {
-        let textbox = build_client_textbox(text, shape.text_type)?;
+        let textbox = build_client_textbox_with_interactions(
+            text,
+            shape.text_type,
+            &shape.text_interactions,
+        )?;
         container.add_data(&textbox);
+    } else if !shape.text_interactions.is_empty() {
+        return Err(std::io::Error::other(
+            "shape has text interactions but no corresponding text",
+        ));
     }
 
     container.build()
@@ -1606,6 +1625,14 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
 /// Based on Apache POI EscherTextboxWrapper and HSLFTextShape
 /// text_type: 0=Title, 1=Body, 2=Notes, 4=Other
 pub(crate) fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>, PptError> {
+    build_client_textbox_with_interactions(text, text_type, &[])
+}
+
+fn build_client_textbox_with_interactions(
+    text: &str,
+    text_type: u32,
+    interactions: &[crate::ppt::PowerPointTextInteraction],
+) -> Result<Vec<u8>, PptError> {
     use super::records::{RecordBuilder, record_type as ppt_rt};
 
     let mut result = Vec::new();
@@ -1646,6 +1673,12 @@ pub(crate) fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>
     style_atom.write_data(&char_count.to_le_bytes()); // char count
     style_atom.write_data(&0u32.to_le_bytes()); // char mask
     ppt_content.extend_from_slice(&style_atom.build()?);
+    append_text_interactions(
+        &mut ppt_content,
+        text_units,
+        interactions,
+        crate::ppt::PowerPointTextInteractionLimits::default(),
+    )?;
 
     let header = EscherRecordHeader::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
     result.extend_from_slice(header.as_bytes());
@@ -1656,9 +1689,18 @@ pub(crate) fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>
 
 /// Build ClientTextBox record with rich text formatting (paragraphs with runs)
 /// text_type: 0=Title, 1=Body, 2=Notes, 4=Other
+#[cfg(test)]
 fn build_client_textbox_formatted(
     paragraphs: &[super::text_format::Paragraph],
     text_type: u32,
+) -> Result<Vec<u8>, PptError> {
+    build_client_textbox_formatted_with_interactions(paragraphs, text_type, &[])
+}
+
+fn build_client_textbox_formatted_with_interactions(
+    paragraphs: &[super::text_format::Paragraph],
+    text_type: u32,
+    interactions: &[crate::ppt::PowerPointTextInteraction],
 ) -> Result<Vec<u8>, PptError> {
     use super::records::{RecordBuilder, record_type as ppt_rt};
     use super::text_format::TextPropsBuilder;
@@ -1679,6 +1721,12 @@ fn build_client_textbox_formatted(
 
     // Use TextCharsAtom (UTF-16) since we might have unicode
     let text_chars = builder.build_text_chars();
+    let text_units = u32::try_from(text_chars.len() / 2).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "ClientTextbox text exceeds the PPT size limit",
+        )
+    })?;
     let mut text_atom = RecordBuilder::new(0, 0, ppt_rt::TEXT_CHARS_ATOM);
     text_atom.write_data(&text_chars);
     ppt_content.extend_from_slice(&text_atom.build()?);
@@ -1688,12 +1736,40 @@ fn build_client_textbox_formatted(
     let mut style_atom = RecordBuilder::new(0, 0, ppt_rt::STYLE_TEXT_PROP_ATOM);
     style_atom.write_data(&style_data);
     ppt_content.extend_from_slice(&style_atom.build()?);
+    append_text_interactions(
+        &mut ppt_content,
+        text_units,
+        interactions,
+        crate::ppt::PowerPointTextInteractionLimits::default(),
+    )?;
 
     let header = EscherRecordHeader::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
     result.extend_from_slice(header.as_bytes());
     result.extend_from_slice(&ppt_content);
 
     Ok(result)
+}
+
+fn append_text_interactions(
+    output: &mut Vec<u8>,
+    text_units: u32,
+    interactions: &[crate::ppt::PowerPointTextInteraction],
+    limits: crate::ppt::PowerPointTextInteractionLimits,
+) -> Result<(), PptError> {
+    if interactions.len() > limits.max_interactions {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "ClientTextbox exceeds the text interaction count limit",
+        ));
+    }
+    for interaction in interactions {
+        output.extend_from_slice(
+            &interaction
+                .to_bytes_for_text(text_units, limits)
+                .map_err(|error| std::io::Error::other(error.to_string()))?,
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -2196,6 +2272,55 @@ mod tests {
             3
         );
         assert_eq!(wrapper.text(), "😀");
+    }
+
+    #[test]
+    fn client_textbox_writes_adjacent_trigger_matched_text_interaction_pairs() {
+        use crate::consts::PptRecordType;
+        use crate::ppt::{
+            InteractionAction, InteractionLinkTarget, InteractionTrigger, PowerPointInteraction,
+            PowerPointTextInteraction, PowerPointTextRange,
+        };
+
+        let interactions = [
+            PowerPointTextInteraction::new(
+                PowerPointTextRange::new(0, 1).unwrap(),
+                PowerPointInteraction::new(
+                    InteractionTrigger::Click,
+                    InteractionAction::NoAction,
+                    InteractionLinkTarget::Nil,
+                ),
+            )
+            .unwrap(),
+            PowerPointTextInteraction::new(
+                PowerPointTextRange::new(1, 3).unwrap(),
+                PowerPointInteraction::new(
+                    InteractionTrigger::MouseOver,
+                    InteractionAction::NoAction,
+                    InteractionLinkTarget::Nil,
+                ),
+            )
+            .unwrap(),
+        ];
+        let data = build_client_textbox_with_interactions("A😀", 4, &interactions).unwrap();
+        let wrapper = crate::ppt::EscherTextboxWrapper::new(data[8..].to_vec()).unwrap();
+        let records = wrapper.child_records();
+        let tail = &records[records.len() - 4..];
+
+        assert_eq!(
+            tail.iter()
+                .map(|record| record.record_type)
+                .collect::<Vec<_>>(),
+            [
+                PptRecordType::InteractiveInfo,
+                PptRecordType::TextInteractiveInfoAtom,
+                PptRecordType::InteractiveInfo,
+                PptRecordType::TextInteractiveInfoAtom,
+            ]
+        );
+        assert_eq!(tail[1].instance, 0);
+        assert_eq!(tail[3].instance, 1);
+        assert_eq!(wrapper.text_interactions(), interactions);
     }
 
     #[test]

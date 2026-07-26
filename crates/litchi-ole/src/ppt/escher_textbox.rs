@@ -6,6 +6,9 @@ use super::package::{PptError, Result};
 /// Based on Apache POI's EscherTextboxWrapper, this wraps an Escher textbox record
 /// and provides access to its child PPT records (TextCharsAtom, TextBytesAtom, StyleTextPropAtom).
 use super::records::PptRecord;
+use super::text_interaction::{
+    PowerPointTextInteraction, PowerPointTextInteractionLimits, text_units_from_records,
+};
 use super::text_run::{ParagraphRun, TextRun, TextRunExtractor};
 
 /// Wrapper around Escher textbox data.
@@ -25,6 +28,8 @@ pub struct EscherTextboxWrapper {
     paragraph_runs: Vec<ParagraphRun>,
     /// Text ruler carried by the textbox, when present
     text_ruler: Option<TextRuler>,
+    /// Range-anchored click and mouse-over actions.
+    text_interactions: Vec<PowerPointTextInteraction>,
 }
 
 impl EscherTextboxWrapper {
@@ -33,6 +38,14 @@ impl EscherTextboxWrapper {
     /// Based on POI's EscherTextboxWrapper constructor which calls
     /// Record.findChildRecords(data, 0, data.length).
     pub fn new(data: Vec<u8>) -> Result<Self> {
+        Self::new_with_interaction_limits(data, PowerPointTextInteractionLimits::default())
+    }
+
+    /// Create a wrapper with explicit text-interaction resource limits.
+    pub fn new_with_interaction_limits(
+        data: Vec<u8>,
+        limits: PowerPointTextInteractionLimits,
+    ) -> Result<Self> {
         // Parse child records from the escher data
         let child_records = Self::find_child_records(&data)?;
 
@@ -53,6 +66,7 @@ impl EscherTextboxWrapper {
                 "ClientTextbox contains multiple TextRulerAtom records".to_string(),
             ));
         }
+        let text_interactions = Self::text_interactions_from_records(&child_records, limits)?;
 
         Ok(Self {
             data,
@@ -61,6 +75,7 @@ impl EscherTextboxWrapper {
             runs,
             paragraph_runs,
             text_ruler,
+            text_interactions,
         })
     }
 
@@ -112,6 +127,50 @@ impl EscherTextboxWrapper {
         Ok(records)
     }
 
+    /// Parse only text-range actions without retaining or decoding the textbox.
+    pub fn parse_text_interactions_with_limits(
+        data: &[u8],
+        limits: PowerPointTextInteractionLimits,
+    ) -> Result<Vec<PowerPointTextInteraction>> {
+        let records = Self::find_child_records(data)?;
+        Self::text_interactions_from_records(&records, limits)
+    }
+
+    fn text_interactions_from_records(
+        records: &[PptRecord],
+        limits: PowerPointTextInteractionLimits,
+    ) -> Result<Vec<PowerPointTextInteraction>> {
+        let has_text_interactions = records.iter().any(|record| {
+            matches!(
+                record.record_type,
+                PptRecordType::InteractiveInfo | PptRecordType::TextInteractiveInfoAtom
+            )
+        });
+        if !has_text_interactions {
+            return Ok(Vec::new());
+        }
+        let mut headers = records
+            .iter()
+            .filter(|record| record.record_type == PptRecordType::TextHeaderAtom);
+        let header = headers.next().ok_or_else(|| {
+            PptError::Corrupted("Interactive ClientTextbox has no TextHeaderAtom".to_string())
+        })?;
+        if headers.next().is_some()
+            || header.version != 0
+            || header.data_length != 4
+            || header.data.len() != 4
+        {
+            return Err(PptError::Corrupted(
+                "Interactive ClientTextbox has an invalid TextHeaderAtom".to_string(),
+            ));
+        }
+        let _ = crate::ppt::PowerPointTextType::parse(u32::from_le_bytes(
+            header.data[..4].try_into().unwrap(),
+        ))?;
+        let text_units = text_units_from_records(records)?;
+        PowerPointTextInteraction::parse_records(records, text_units, limits)
+    }
+
     /// Get the extracted text.
     pub fn text(&self) -> &str {
         &self.text
@@ -135,6 +194,11 @@ impl EscherTextboxWrapper {
     /// Get the textbox-specific ruler, when present.
     pub fn text_ruler(&self) -> Option<&TextRuler> {
         self.text_ruler.as_ref()
+    }
+
+    /// Strictly paired text-range interactions in record order.
+    pub fn text_interactions(&self) -> &[PowerPointTextInteraction] {
+        &self.text_interactions
     }
 
     /// Find a StyleTextPropAtom record.
